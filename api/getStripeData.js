@@ -1,48 +1,56 @@
-// api/getStripeData.js
+import React, { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import './App.css';
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-module.exports = async (req, res) => {
-  console.log('getStripeData invoked with:', req.query);
+function App() {
+  const [members, setMembers] = useState([]);
 
-  try {
-    const { customerId } = req.query;
-    if (!customerId) {
-      throw new Error('Missing customerId in query');
-    }
-    console.log('Retrieving Stripe customer:', customerId);
-
-    let customer;
-    try {
-      customer = await stripe.customers.retrieve(customerId);
-      console.log('Customer retrieved:', customer.id);
-    } catch (err) {
-      console.error('Error retrieving customer:', err);
-      throw err;
-    }
-
-    let subscription = null;
-    try {
-      const subsList = await stripe.subscriptions.list({
-        customer: customerId,
-        status: 'all',
-        limit: 1
-      });
-      subscription = subsList.data[0] || null;
-      console.log('Subscription data:', subscription);
-    } catch (err) {
-      console.error('Error listing subscriptions:', err);
-    }
-
-    return res.status(200).json({
-      customer: { id: customer.id },
-      subscription: {
-        status: subscription?.status || 'none',
-        current_period_end: subscription?.current_period_end || null
+  useEffect(() => {
+    async function fetchAll() {
+      // 1) Fetch members
+      const { data: membersData, error: memErr } = await supabase
+        .from('members')
+        .select('*')
+        .order('join_date', { ascending: false });
+      if (memErr) {
+        console.error('Error fetching members:', memErr);
+        return;
       }
-    });
-  } catch (err) {
-    console.error('getStripeData fatal error:', err);
-    return res.status(500).json({ error: err.message });
-  }
-};
+
+      // 2) Enrich with Stripe data?
+      const enriched = membersData.map(m => ({
+        ...m,
+        stripeStatus: m.statusStripe || 'none',
+        nextRenewal: m.nextRenewalDate || '—'
+      }));
+
+      setMembers(enriched);
+    }
+    fetchAll();
+  }, []);
+
+  return (
+    <div className="app-container">
+      <h1 className="app-title">Noir CRM – Members</h1>
+      <ul className="member-list">
+        {members.map(m => (
+          <li key={m.id} className="member-item">
+            <strong>{m.first_name} {m.last_name}</strong> — {m.email}
+            <br/>
+            Member Status: {m.status}
+            <br/>
+            Stripe Status: {m.stripeStatus}
+            <br/>
+            Next Renewal: {m.nextRenewal}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default App;
