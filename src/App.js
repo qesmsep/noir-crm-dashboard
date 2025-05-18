@@ -10,37 +10,49 @@ function App() {
 
   useEffect(() => {
     async function fetchAll() {
-      // 1) Fetch members from Supabase
-      const { data: membersData, error: memErr } = await supabase
-        .from('members')
-        .select('*')
-        .order('join_date', { ascending: false });
+      try {
+        // 1) Fetch members from Supabase
+        const { data: membersData, error: memErr } = await supabase
+          .from('members')
+          .select('*')
+          .order('join_date', { ascending: false });
 
-      if (memErr) {
-        console.error('Error fetching members:', memErr);
-        return;
+        console.log('membersData:', membersData);
+
+        if (memErr) {
+          console.error('Error fetching members:', memErr);
+          return;
+        }
+
+        // 2) For each member, fetch Stripe subscription info
+        const membersWithStripe = await Promise.all(
+          membersData.map(async m => {
+            let stripeStatus = 'none';
+            let nextRenewal = '—';
+
+            if (m.stripe_customer_id) {
+              try {
+                const res = await fetch(`/api/getStripeData?customerId=${m.stripe_customer_id}`);
+                const json = await res.json();
+                stripeStatus = json.subscription?.status || 'none';
+                nextRenewal = json.subscription?.current_period_end
+                  ? new Date(json.subscription.current_period_end * 1000).toLocaleDateString()
+                  : '—';
+              } catch (err) {
+                console.error('Stripe fetch error for', m.stripe_customer_id, err);
+              }
+            }
+
+            return { ...m, stripeStatus, nextRenewal };
+          })
+        );
+
+        console.log('membersWithStripe:', membersWithStripe);
+
+        setMembers(membersWithStripe);
+      } catch (err) {
+        console.error('Unexpected error in fetchAll:', err);
       }
-
-      // 2) For each member, fetch Stripe subscription info
-      const membersWithStripe = await Promise.all(
-        membersData.map(async m => {
-          let stripeStatus = 'none';
-          let nextRenewal = '—';
-
-          if (m.stripe_customer_id) {
-            const res = await fetch(`/api/getStripeData?customerId=${m.stripe_customer_id}`);
-            const json = await res.json();
-            stripeStatus = json.subscription?.status || 'none';
-            nextRenewal = json.subscription?.current_period_end
-              ? new Date(json.subscription.current_period_end * 1000).toLocaleDateString()
-              : '—';
-          }
-
-          return { ...m, stripeStatus, nextRenewal };
-        })
-      );
-
-      setMembers(membersWithStripe);
     }
 
     fetchAll();
