@@ -17,7 +17,7 @@ function App() {
       console.log('Fetched members:', data);
 
       if (error) {
-        console.error('Error fetching members:'f, error);
+        console.error('Error fetching members:', error);
       } else {
         setMembers(data);
       }
