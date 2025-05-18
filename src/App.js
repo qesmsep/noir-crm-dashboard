@@ -9,30 +9,54 @@ function App() {
   const [members, setMembers] = useState([]);
 
   useEffect(() => {
-    async function fetchMembers() {
-      const { data, error } = await supabase
+    async function fetchAll() {
+      // 1) Fetch members from Supabase
+      const { data: membersData, error: memErr } = await supabase
         .from('members')
         .select('*')
         .order('join_date', { ascending: false });
-      console.log('Fetched members:', data);
 
-      if (error) {
-        console.error('Error fetching members:', error);
-      } else {
-        setMembers(data);
+      if (memErr) {
+        console.error('Error fetching members:', memErr);
+        return;
       }
+
+      // 2) For each member, fetch Stripe subscription info
+      const membersWithStripe = await Promise.all(
+        membersData.map(async m => {
+          let stripeStatus = 'none';
+          let nextRenewal = '—';
+
+          if (m.stripe_customer_id) {
+            const res = await fetch(`/api/getStripeData?customerId=${m.stripe_customer_id}`);
+            const json = await res.json();
+            stripeStatus = json.subscription?.status || 'none';
+            nextRenewal = json.subscription?.current_period_end
+              ? new Date(json.subscription.current_period_end * 1000).toLocaleDateString()
+              : '—';
+          }
+
+          return { ...m, stripeStatus, nextRenewal };
+        })
+      );
+
+      setMembers(membersWithStripe);
     }
 
-    fetchMembers();
+    fetchAll();
   }, []);
 
   return (
     <div style={{ padding: '2rem' }}>
       <h1>Noir CRM – Members</h1>
       <ul>
-        {members.map(member => (
-          <li key={member.id}>
-            {member.first_name} {member.last_name} — {member.email}
+        {members.map(m => (
+          <li key={m.id} style={{ marginBottom: '1rem' }}>
+            <strong>{m.first_name} {m.last_name}</strong> — {m.email}
+            <br/>
+            Status: {m.stripeStatus}
+            <br/>
+            Next Renewal: {m.nextRenewal}
           </li>
         ))}
       </ul>
