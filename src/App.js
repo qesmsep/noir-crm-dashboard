@@ -31,7 +31,7 @@ function App() {
       <ul>
         {members.map(member => (
           <li key={member.id}>
-            {member.full_name} — {member.email}
+            {member.first_name} {member.last_name} — {member.email}
           </li>
         ))}
       </ul>
