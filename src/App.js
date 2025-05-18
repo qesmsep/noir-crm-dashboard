@@ -14,9 +14,10 @@ function App() {
         .from('members')
         .select('*')
         .order('join_date', { ascending: false });
+      console.log('Fetched members:', data);
 
       if (error) {
-        console.error('Error fetching members:', error);
+        console.error('Error fetching members:'f, error);
       } else {
         setMembers(data);
       }
