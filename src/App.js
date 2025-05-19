@@ -5,6 +5,22 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { v4 as uuidv4 } from 'uuid';
 
+// Formatting helpers
+function formatPhone(phone) {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  }
+  return phone;
+}
+function formatDOB(dob) {
+  if (!dob) return "";
+  const d = new Date(dob);
+  if (isNaN(d)) return dob;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
+
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -485,10 +501,10 @@ function App() {
                               <strong>
                                 {member.first_name} {member.last_name} — {member.membership}
                               </strong>
-                              <div>Balance: ${member.balance}</div>
-                              <div>Phone: {member.phone}</div>
+                              
+                              <div>Phone: {formatPhone(member.phone)}</div>
                               <div>Email: {member.email}</div>
-                              <div>Date of Birth: {member.dob}</div>
+                              <div>Date of Birth: {formatDOB(member.dob)}</div>
                             </div>
                             {member.first_name2 && (
                               <div className="member-counterpart">
@@ -503,7 +519,7 @@ function App() {
                                   {member.first_name2} {member.last_name2}
                                 </strong>
                                 <div>Email: {member.email2}</div>
-                                <div>Phone: {member.phone2}</div>
+                                <div>Phone: {formatPhone(member.phone2)}</div>
                                 <div>Company: {member.company2}</div>
                               </div>
                             )}
@@ -707,10 +723,10 @@ function App() {
                           <strong>
                             {selectedMember.first_name} {selectedMember.last_name} — {selectedMember.membership}
                           </strong>
-                          <div>Balance: ${selectedMember.balance}</div>
-                          <div>Phone: {selectedMember.phone}</div>
+                          
+                          <div>Phone: {formatPhone(selectedMember.phone)}</div>
                           <div>Email: {selectedMember.email}</div>
-                          <div>Date of Birth: {selectedMember.dob}</div>
+                          <div>Date of Birth: {formatDOB(selectedMember.dob)}</div>
                         </div>
                         <div style={{ marginTop: "1.25rem" }}>
                           <button
@@ -758,7 +774,7 @@ function App() {
                             {selectedMember.first_name2} {selectedMember.last_name2}
                           </strong>
                           <div>Email: {selectedMember.email2}</div>
-                          <div>Phone: {selectedMember.phone2}</div>
+                          <div>Phone: {formatPhone(selectedMember.phone2)}</div>
                           <div>Company: {selectedMember.company2}</div>
                         </div>
                       )}
@@ -1098,10 +1114,10 @@ function App() {
                             <strong>
                               {member.first_name} {member.last_name} — {member.membership}
                             </strong>
-                            <div>Balance: ${member.balance}</div>
-                            <div>Phone: {member.phone}</div>
+                            
+                            <div>Phone: {formatPhone(member.phone)}</div>
                             <div>Email: {member.email}</div>
-                            <div>Date of Birth: {member.dob}</div>
+                            <div>Date of Birth: {formatDOB(member.dob)}</div>
                           </div>
                           {member.first_name2 && (
                             <div className="member-counterpart">
@@ -1116,7 +1132,7 @@ function App() {
                                 {member.first_name2} {member.last_name2}
                               </strong>
                               <div>Email: {member.email2}</div>
-                              <div>Phone: {member.phone2}</div>
+                              <div>Phone: {formatPhone(member.phone2)}</div>
                               <div>Company: {member.company2}</div>
                             </div>
                           )}
