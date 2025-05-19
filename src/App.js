@@ -13,6 +13,7 @@ function App() {
   const [members, setMembers] = useState([]);
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteStatus, setPromoteStatus] = useState('');
+  const [section, setSection] = useState('members');
 
   useEffect(() => {
     // Get initial session
@@ -113,88 +114,93 @@ function App() {
     }
 
     return (
-      <div className="app-container">
-        <button
-          style={{
-            position: "fixed",
-            top: "1rem",
-            right: "1rem",
-            padding: "0.75rem 1.5rem",
-            border: "none",
-            borderRadius: "6px",
-            background: "#a59480",
-            color: "#fff",
-            fontSize: "1rem",
-            fontWeight: 600,
-            boxShadow: "0 2px 8px rgba(53,53,53,0.16)",
-            cursor: "pointer",
-            zIndex: 9999
-          }}
-          onClick={async () => {
-            await supabase.auth.signOut();
-            window.location.reload();
-          }}
-        >
-          Sign Out
-        </button>
-        <h1 className="app-title">Noir CRM – Members</h1>
-        <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-          <h2>Promote User to Admin</h2>
-          <form onSubmit={handlePromote} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <input
-              type="email"
-              placeholder="User email"
-              value={promoteEmail}
-              onChange={e => setPromoteEmail(e.target.value)}
-              required
-              style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
-            />
-            <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
-              Promote
-            </button>
-          </form>
-          {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
+      <>
+        <div className="sidebar-nav">
+          <button className={section === 'members' ? 'nav-active' : ''} onClick={() => setSection('members')}>
+            Members
+          </button>
+          <button className={section === 'admin' ? 'nav-active' : ''} onClick={() => setSection('admin')}>
+            Admin
+          </button>
+          <button className={section === 'lookup' ? 'nav-active' : ''} onClick={() => setSection('lookup')}>
+            Lookup
+          </button>
+          <button onClick={async () => { await supabase.auth.signOut(); window.location.reload(); }}>
+            Log Out
+          </button>
         </div>
-        <ul className="member-list">
-          {members.map(member => (
-            <li key={member.id} className="member-item">
-              {member.photo && (
-                <img
-                  src={member.photo}
-                  alt={`${member.first_name} ${member.last_name}`}
-                  className="member-photo"
+        <div className="app-container">
+          {section === 'members' && (
+            <>
+              <h1 className="app-title">Noir CRM – Members</h1>
+              <ul className="member-list">
+                {members.map(member => (
+                  <li key={member.id} className="member-item">
+                    {member.photo && (
+                      <img
+                        src={member.photo}
+                        alt={`${member.first_name} ${member.last_name}`}
+                        className="member-photo"
+                      />
+                    )}
+                    <div className="member-info">
+                      <strong>
+                        {member.first_name} {member.last_name} — {member.membership}
+                      </strong>
+                      <div>Balance: ${member.balance}</div>
+                      <div>Phone: {member.phone}</div>
+                      <div>Email: {member.email}</div>
+                      <div>Date of Birth: {member.dob}</div>
+                    </div>
+                    {member.first_name2 && (
+                      <div className="member-counterpart">
+                        {member.photo2 && (
+                          <img
+                            src={member.photo2}
+                            alt={`${member.first_name2} ${member.last_name2}`}
+                            className="member-photo"
+                          />
+                        )}
+                        <strong>
+                          {member.first_name2} {member.last_name2}
+                        </strong>
+                        <div>Email: {member.email2}</div>
+                        <div>Phone: {member.phone2}</div>
+                        <div>Company: {member.company2}</div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {section === 'admin' && (
+            <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+              <h2>Promote User to Admin</h2>
+              <form onSubmit={handlePromote} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <input
+                  type="email"
+                  placeholder="User email"
+                  value={promoteEmail}
+                  onChange={e => setPromoteEmail(e.target.value)}
+                  required
+                  style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
                 />
-              )}
-              <div className="member-info">
-                <strong>
-                  {member.first_name} {member.last_name} — {member.membership}
-                </strong>
-                <div>Balance: ${member.balance}</div>
-                <div>Phone: {member.phone}</div>
-                <div>Email: {member.email}</div>
-                <div>Date of Birth: {member.dob}</div>
-              </div>
-              {member.first_name2 && (
-                <div className="member-counterpart">
-                  {member.photo2 && (
-                    <img
-                      src={member.photo2}
-                      alt={`${member.first_name2} ${member.last_name2}`}
-                      className="member-photo"
-                    />
-                  )}
-                  <strong>
-                    {member.first_name2} {member.last_name2}
-                  </strong>
-                  <div>Email: {member.email2}</div>
-                  <div>Phone: {member.phone2}</div>
-                  <div>Company: {member.company2}</div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
+                <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
+                  Promote
+                </button>
+              </form>
+              {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
+            </div>
+          )}
+          {section === 'lookup' && (
+            <div style={{ padding: "2rem" }}>
+              <h2>Lookup (coming soon)</h2>
+              <div>Search for members here.</div>
+            </div>
+          )}
+        </div>
+      </>
     );
   }
 }
