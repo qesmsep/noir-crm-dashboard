@@ -367,3 +367,31 @@ body {
 .hamburger {
   display: none;
 }
+
+/* DELETE MEMBER BUTTON (for MemberDetail page) */
+.delete-member-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  margin-top: 32px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 8px rgba(231,76,60,0.13);
+  transition: background 0.16s;
+  display: block;
+}
+.delete-member-btn:hover {
+  background: #c0392b;
+}
+
+@media (max-width: 600px) {
+  .delete-member-btn {
+    width: 100%;
+    padding: 14px 0;
+    font-size: 1.07rem;
+    margin-top: 24px;
+  }
+}

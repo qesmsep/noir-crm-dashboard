@@ -231,17 +231,7 @@ const MemberDetail = ({
         )}
     </form>
     <button
-      style={{
-        background: '#e74c3c',
-        color: 'white',
-        border: 'none',
-        padding: '12px 24px',
-        borderRadius: '6px',
-        marginTop: '32px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        fontSize: '1.1rem'
-      }}
+      className="delete-member-btn"
       onClick={() => {
         if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
           if (typeof onDeleteMember === 'function') {
