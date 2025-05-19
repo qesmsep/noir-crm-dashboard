@@ -387,8 +387,17 @@ function App() {
             aria-label="Open navigation"
             style={{
               position: "fixed",
-              top: "1rem",
-              right: "1rem",
+              ...(isMobile
+                ? {
+                    bottom: "1rem",
+                    right: "1rem",
+                    top: undefined, // remove any top positioning
+                  }
+                : {
+                    top: "1rem",
+                    right: "1rem",
+                    bottom: undefined,
+                  }),
               zIndex: 1001,
               background: "#fff",
               border: "1px solid #e2dfd8",
