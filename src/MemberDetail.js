@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const MemberDetail = ({
   member,
@@ -13,6 +13,9 @@ const MemberDetail = ({
 }) => {
   const [linkingStripe, setLinkingStripe] = useState(false);
   const [linkResult, setLinkResult] = useState(null);
+  const [stripeData, setStripeData] = useState(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeError, setStripeError] = useState(null);
 
   if (!member) return null;
   // Link member to Stripe
@@ -42,6 +45,26 @@ const MemberDetail = ({
     }
     setLinkingStripe(false);
   };
+
+  useEffect(() => {
+    if (member?.stripe_customer_id) {
+      setStripeLoading(true);
+      fetch('/api/getStripeCustomer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stripe_customer_id: member.stripe_customer_id }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setStripeData(data);
+          setStripeLoading(false);
+        })
+        .catch((err) => {
+          setStripeError('Error fetching Stripe info');
+          setStripeLoading(false);
+        });
+    }
+  }, [member?.stripe_customer_id]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -114,6 +137,23 @@ const MemberDetail = ({
               </span>
             )}
           </>
+        )}
+      </div>
+      <div>
+        <h3>Stripe Subscription</h3>
+        {stripeLoading ? (
+          <div>Loading Stripe data...</div>
+        ) : stripeError ? (
+          <div style={{ color: 'red' }}>{stripeError}</div>
+        ) : stripeData ? (
+          <div>
+            <div><strong>Status:</strong> {stripeData.status || 'N/A'}</div>
+            <div><strong>Next Renewal:</strong> {stripeData.next_renewal || 'N/A'}</div>
+            <div><strong>Last Payment:</strong> {stripeData.last_payment || 'N/A'}</div>
+            <div><strong>Plan:</strong> {stripeData.plan || 'N/A'}</div>
+          </div>
+        ) : (
+          <div>No Stripe data found.</div>
         )}
       </div>
 
