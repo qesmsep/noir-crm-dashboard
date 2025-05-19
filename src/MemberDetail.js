@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const MemberDetail = ({
   member,
@@ -10,7 +15,6 @@ const MemberDetail = ({
   setNewTransaction,
   transactionStatus,
   session,
-  onDeleteMember,
 }) => {
   const [linkingStripe, setLinkingStripe] = useState(false);
   const [linkResult, setLinkResult] = useState(null);
@@ -90,6 +94,18 @@ const MemberDetail = ({
       return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
     }
     return phone.trim();
+  };
+
+  const handleDeleteMember = async (id) => {
+    const { error } = await supabase
+      .from('members')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      alert('Failed to delete member: ' + error.message);
+      return;
+    }
+    if (typeof onBack === 'function') onBack();
   };
 
   return (
@@ -283,9 +299,7 @@ const MemberDetail = ({
         className="delete-member-btn"
         onClick={() => {
           if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-            if (typeof onDeleteMember === 'function') {
-              onDeleteMember(member.id);
-            }
+            handleDeleteMember(member.id);
           }
         }}
       >
