@@ -19,6 +19,7 @@ const MemberDetail = ({
   const [stripeError, setStripeError] = useState(null);
 
   if (!member) return null;
+
   // Link member to Stripe
   const handleLinkStripe = async () => {
     setLinkingStripe(true);
@@ -37,7 +38,6 @@ const MemberDetail = ({
       const result = await response.json();
       if (result.success) {
         setLinkResult({ status: 'success', stripeId: result.stripe_customer.id });
-        // Optionally reload member info here if needed
       } else {
         setLinkResult({ status: 'error', error: result.error });
       }
@@ -60,7 +60,7 @@ const MemberDetail = ({
           setStripeData(data);
           setStripeLoading(false);
         })
-        .catch((err) => {
+        .catch(() => {
           setStripeError('Error fetching Stripe info');
           setStripeLoading(false);
         });
@@ -98,7 +98,17 @@ const MemberDetail = ({
       <h2>Primary Member</h2>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
         {member.photo && (
-          <img src={member.photo} alt="Member" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 8, marginRight: 20 }} />
+          <img
+            src={member.photo}
+            alt="Member"
+            style={{
+              width: 70,
+              height: 70,
+              objectFit: 'cover',
+              borderRadius: 8,
+              marginRight: 20,
+            }}
+          />
         )}
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, marginTop: 10 }}>STATUS</div>
@@ -110,20 +120,22 @@ const MemberDetail = ({
                 fontSize: 14,
                 padding: '2px 10px',
                 borderRadius: 8,
-                background: member.status && member.status.toLowerCase() === 'active'
-                  ? '#c2eacb'
-                  : member.status && member.status.toLowerCase() === 'pending'
-                  ? '#fff3cd'
-                  : member.status && member.status.toLowerCase() === 'inactive'
-                  ? '#f8d7da'
-                  : '#ececec',
-                color: member.status && member.status.toLowerCase() === 'active'
-                  ? '#217a40'
-                  : member.status && member.status.toLowerCase() === 'pending'
-                  ? '#ad8608'
-                  : member.status && member.status.toLowerCase() === 'inactive'
-                  ? '#842029'
-                  : '#353535',
+                background:
+                  member.status && member.status.toLowerCase() === 'active'
+                    ? '#c2eacb'
+                    : member.status && member.status.toLowerCase() === 'pending'
+                    ? '#fff3cd'
+                    : member.status && member.status.toLowerCase() === 'inactive'
+                    ? '#f8d7da'
+                    : '#ececec',
+                color:
+                  member.status && member.status.toLowerCase() === 'active'
+                    ? '#217a40'
+                    : member.status && member.status.toLowerCase() === 'pending'
+                    ? '#ad8608'
+                    : member.status && member.status.toLowerCase() === 'inactive'
+                    ? '#842029'
+                    : '#353535',
               }}
             >
               {member.status || 'N/A'}
@@ -147,7 +159,7 @@ const MemberDetail = ({
         </div>
       </div>
       <div>
-        <strong>Joined:</strong> {member.joined}
+        <strong>Joined:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
       </div>
       <div>
         <strong>Stripe Customer ID:</strong>{' '}
@@ -265,20 +277,21 @@ const MemberDetail = ({
         {transactionStatus === 'success' && (
           <span style={{ color: 'green', marginLeft: 8 }}>Added!</span>
         )}
-    </form>
-    <button
-      className="delete-member-btn"
-      onClick={() => {
-        if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-          if (typeof onDeleteMember === 'function') {
-            onDeleteMember(member.id);
+      </form>
+
+      <button
+        className="delete-member-btn"
+        onClick={() => {
+          if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+            if (typeof onDeleteMember === 'function') {
+              onDeleteMember(member.id);
+            }
           }
-        }
-      }}
-    >
-      Delete Member
-    </button>
-  </div>
+        }}
+      >
+        Delete Member
+      </button>
+    </div>
   );
 };
 
