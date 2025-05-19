@@ -7,8 +7,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { user_id, requester_token } = req.body;
-  if (!user_id) return res.status(400).json({ error: 'Missing user_id' });
+  const { member_id, supabase_user_id, requester_token } = req.body;
+  if (!member_id || !supabase_user_id) {
+    return res.status(400).json({ error: 'Missing member_id or supabase_user_id' });
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
@@ -45,7 +47,7 @@ export default async function handler(req, res) {
 
   // Use direct fetch with service role for the admin delete call
   try {
-    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${user_id}`, {
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${supabase_user_id}`, {
       method: 'DELETE',
       headers: {
         apiKey: service_role_key,
@@ -57,12 +59,12 @@ export default async function handler(req, res) {
     if (response.ok) {
       // Delete the user from the members table as well
       const supabaseDb = createClient(supabaseUrl, service_role_key);
-      // LOG user_id before deleting
-      console.log('Deleting member with id:', user_id);
+      // LOG member_id before deleting
+      console.log('Deleting member with id:', member_id);
       const { data, error: dbError } = await supabaseDb
         .from('members')
         .delete()
-        .eq('id', user_id)
+        .eq('id', member_id)
         .select(); // fetch deleted rows for debugging
 
       if (dbError) {

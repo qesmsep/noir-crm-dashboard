@@ -96,16 +96,33 @@ const MemberDetail = ({
     return phone.trim();
   };
 
-  const handleDeleteMember = async (id) => {
-    const { error } = await supabase
-      .from('members')
-      .delete()
-      .eq('id', id);
-    if (error) {
-      alert('Failed to delete member: ' + error.message);
-      return;
+  const handleDeleteMember = async (member_id, supabase_user_id) => {
+    try {
+      // Get session for access token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Not authenticated.');
+        return;
+      }
+      const res = await fetch('/api/deleteAuthUser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id,
+          supabase_user_id,
+          requester_token: session.access_token
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('Member deleted.');
+        if (typeof onBack === 'function') onBack();
+      } else {
+        alert('Failed to delete member: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      alert('Failed to delete member: ' + e.message);
     }
-    if (typeof onBack === 'function') onBack();
   };
 
   return (
@@ -299,7 +316,7 @@ const MemberDetail = ({
         className="delete-member-btn"
         onClick={() => {
           if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-            handleDeleteMember(member.id);
+            handleDeleteMember(member.id, member.supabase_user_id);
           }
         }}
       >

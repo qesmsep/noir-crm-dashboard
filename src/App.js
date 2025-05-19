@@ -321,29 +321,27 @@ function App() {
     // Now expects the full member object, not just the ID
     async function handleDeleteMember(member) {
       if (!window.confirm('Are you sure you want to delete this member? This cannot be undone.')) return;
-      const { error } = await supabase.from('members').delete().eq('id', member.id);
-      if (!error) {
-        setMembers(members.filter(m => m.id !== member.id));
-        setSelectedMember(null);
-        setEditingMemberId(null);
-        alert('Member deleted.');
-        // After deleting from members, if member has supabase_user_id, delete the corresponding Auth user
-        if (member.supabase_user_id) {
-          try {
-            await fetch('/api/deleteAuthUser', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: member.supabase_user_id }),
-            });
-            // Optionally: handle response or error
-          } catch (e) {
-            console.error('Failed to delete Supabase Auth user:', e);
-          }
+      try {
+        const res = await fetch('/api/deleteAuthUser', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            member_id: member.id,
+            supabase_user_id: member.supabase_user_id,
+            requester_token: session.access_token
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setMembers(members.filter(m => m.id !== member.id));
+          setSelectedMember(null);
+          setEditingMemberId(null);
+          alert('Member deleted.');
         } else {
-          // TODO: If supabase_user_id is not stored, update this process in the future to support Auth deletion.
+          alert('Failed to delete member: ' + (data.error || 'Unknown error'));
         }
-      } else {
-        alert('Failed to delete member: ' + error.message);
+      } catch (e) {
+        alert('Failed to delete member: ' + e.message);
       }
     }
     async function handlePhotoUpload(file, isCounterpart = false) {
