@@ -381,7 +381,7 @@ body {
   font-size: 1.1rem;
   box-shadow: 0 2px 8px rgba(231,76,60,0.13);
   transition: background 0.16s;
-  display: block;
+  display: block !important;
 }
 .delete-member-btn:hover {
   background: #c0392b;

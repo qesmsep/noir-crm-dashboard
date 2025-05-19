@@ -317,6 +317,19 @@ function App() {
   if (session) {
     const isAdmin = session.user?.user_metadata?.role === "admin";
     // Helper for uploading a photo to Supabase Storage and returning the public URL
+    // Delete member handler
+    async function handleDeleteMember(memberId) {
+      if (!window.confirm('Are you sure you want to delete this member? This cannot be undone.')) return;
+      const { error } = await supabase.from('members').delete().eq('id', memberId);
+      if (!error) {
+        setMembers(members.filter(m => m.id !== memberId));
+        setSelectedMember(null);
+        setEditingMemberId(null);
+        alert('Member deleted.');
+      } else {
+        alert('Failed to delete member: ' + error.message);
+      }
+    }
     async function handlePhotoUpload(file, isCounterpart = false) {
       if (!file) return null;
       const fileExt = file.name.split('.').pop();
@@ -1061,6 +1074,13 @@ function App() {
                       </div>
                     )}
                   </div>
+                  {/* Delete member button */}
+                  <button
+                    className="delete-member-btn"
+                    onClick={() => handleDeleteMember(selectedMember.id)}
+                  >
+                    Delete Member
+                  </button>
                   {/* Responsive styles */}
                   <style>
                     {`
