@@ -48,6 +48,53 @@ function App() {
     company2: "",
     photo2: ""
   });
+  // Ledger modal state
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [memberLedger, setMemberLedger] = useState([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({ type: 'payment', amount: '', note: '' });
+  const [transactionStatus, setTransactionStatus] = useState('');
+  // Fetch ledger for a member
+  async function fetchLedger(memberId) {
+    setLedgerLoading(true);
+    const { data, error } = await supabase
+      .from('ledger')
+      .select('*')
+      .eq('member_id', memberId)
+      .order('created_at', { ascending: true });
+    setLedgerLoading(false);
+    if (!error) setMemberLedger(data || []);
+    else setMemberLedger([]);
+  }
+
+  // Add new transaction to ledger
+  async function handleAddTransaction(memberId) {
+    setTransactionStatus('');
+    if (!newTransaction.amount || isNaN(Number(newTransaction.amount))) {
+      setTransactionStatus('Enter a valid amount.');
+      return;
+    }
+    const { error } = await supabase.from('ledger').insert({
+      member_id: memberId,
+      type: newTransaction.type,
+      amount: Number(newTransaction.amount),
+      note: newTransaction.note,
+    });
+    if (!error) {
+      setTransactionStatus('Transaction added!');
+      setNewTransaction({ type: 'payment', amount: '', note: '' });
+      fetchLedger(memberId);
+      // Optional: update member list balance
+      const { data: balData } = await supabase
+        .from('ledger')
+        .select('amount, type')
+        .eq('member_id', memberId);
+      const balance = (balData || []).reduce((acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)), 0);
+      setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
+    } else {
+      setTransactionStatus('Failed: ' + error.message);
+    }
+  }
   useEffect(() => {
     async function fetchUsers() {
       if (section === "admin") {
@@ -298,7 +345,15 @@ function App() {
               <h1 className="app-title">Noir CRM – Members</h1>
               <ul className="member-list">
                 {members.map(member => (
-                  <li key={member.id} className="member-item">
+                  <li
+                    key={member.id}
+                    className="member-item"
+                    style={{ position: "relative", cursor: "pointer" }}
+                    onClick={() => {
+                      setSelectedMember(member);
+                      fetchLedger(member.id);
+                    }}
+                  >
                     {editingMemberId === member.id ? (
                       <form
                         onSubmit={e => {
@@ -431,7 +486,31 @@ function App() {
                             <div>Company: {member.company2}</div>
                           </div>
                         )}
-                        <button style={{ marginTop: "0.5rem" }} onClick={() => handleEditMember(member)}>Edit</button>
+                        <div style={{
+                          position: "absolute",
+                          bottom: "16px",
+                          right: "16px"
+                        }}>
+                          <button
+                            style={{
+                              padding: "0.65rem 1.5rem",
+                              fontSize: "1.1rem",
+                              borderRadius: "6px",
+                              background: "#A59480",
+                              color: "#fff",
+                              border: "none",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              boxShadow: "0 2px 10px rgba(53,53,53,0.07)"
+                            }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleEditMember(member);
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </>
                     )}
                   </li>
@@ -567,7 +646,15 @@ function App() {
                       (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
                     );
                   }).map(member => (
-                    <li key={member.id} className="member-item">
+                    <li
+                      key={member.id}
+                      className="member-item"
+                      style={{ position: "relative", cursor: "pointer" }}
+                      onClick={() => {
+                        setSelectedMember(member);
+                        fetchLedger(member.id);
+                      }}
+                    >
                       {editingMemberId === member.id ? (
                         <form
                           onSubmit={e => {
@@ -700,7 +787,31 @@ function App() {
                               <div>Company: {member.company2}</div>
                             </div>
                           )}
-                          <button style={{ marginTop: "0.5rem" }} onClick={() => handleEditMember(member)}>Edit</button>
+                          <div style={{
+                            position: "absolute",
+                            bottom: "16px",
+                            right: "16px"
+                          }}>
+                            <button
+                              style={{
+                                padding: "0.65rem 1.5rem",
+                                fontSize: "1.1rem",
+                                borderRadius: "6px",
+                                background: "#A59480",
+                                color: "#fff",
+                                border: "none",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                boxShadow: "0 2px 10px rgba(53,53,53,0.07)"
+                              }}
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleEditMember(member);
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </>
                       )}
                     </li>
@@ -710,6 +821,79 @@ function App() {
             </div>
           )}
         </div>
+        {/* Ledger modal/panel */}
+        {selectedMember && (
+          <div className="ledger-modal">
+            <div className="ledger-modal-content">
+              <button className="ledger-close" onClick={() => setSelectedMember(null)}>Close</button>
+              <h2>
+                {selectedMember.first_name} {selectedMember.last_name} – Ledger
+              </h2>
+              <div>Membership: {selectedMember.membership}</div>
+              <div>Current Balance: $
+                {(memberLedger || []).reduce(
+                  (acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)),
+                  0
+                )}
+              </div>
+              <h3>Transactions</h3>
+              {ledgerLoading ? (
+                <div>Loading...</div>
+              ) : (
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(memberLedger || []).map(t => (
+                      <tr key={t.id}>
+                        <td>{new Date(t.created_at).toLocaleDateString()}</td>
+                        <td>{t.type}</td>
+                        <td style={{ color: t.type === 'payment' ? 'green' : 'red' }}>
+                          {t.type === 'payment' ? '+' : '-'}${Math.abs(Number(t.amount)).toFixed(2)}
+                        </td>
+                        <td>{t.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {session.user?.user_metadata?.role === 'admin' && (
+                <div className="add-transaction-panel">
+                  <h4>Add Transaction</h4>
+                  <form onSubmit={e => { e.preventDefault(); handleAddTransaction(selectedMember.id); }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <select value={newTransaction.type} onChange={e => setNewTransaction(t => ({ ...t, type: e.target.value }))}>
+                      <option value="payment">Payment</option>
+                      <option value="purchase">Purchase</option>
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Amount"
+                      value={newTransaction.amount}
+                      onChange={e => setNewTransaction(t => ({ ...t, amount: e.target.value }))}
+                      style={{ width: 100 }}
+                      required
+                    />
+                    <input
+                      type="text"
+                      placeholder="Note"
+                      value={newTransaction.note}
+                      onChange={e => setNewTransaction(t => ({ ...t, note: e.target.value }))}
+                      style={{ width: 160 }}
+                    />
+                    <button type="submit">Add</button>
+                  </form>
+                  {transactionStatus && <div style={{ marginTop: 4, color: '#353535' }}>{transactionStatus}</div>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </>
     );
   }
