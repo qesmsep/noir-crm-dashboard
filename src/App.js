@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import './App.css';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { v4 as uuidv4 } from 'uuid';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -231,6 +232,21 @@ function App() {
 
   if (session) {
     const isAdmin = session.user?.user_metadata?.role === "admin";
+    // Helper for uploading a photo to Supabase Storage and returning the public URL
+    async function handlePhotoUpload(file, isCounterpart = false) {
+      if (!file) return null;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = `${fileName}`;
+      let { error } = await supabase.storage.from('member-photos').upload(filePath, file);
+      if (error) {
+        alert('Failed to upload photo: ' + error.message);
+        return null;
+      }
+      const { data } = supabase.storage.from('member-photos').getPublicUrl(filePath);
+      return data?.publicUrl || null;
+    }
+
     if (!isAdmin) {
       return (
         <div style={{ padding: "4rem", textAlign: "center" }}>
@@ -321,8 +337,21 @@ function App() {
                             <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
                           </label>
                           <label>
-                            Photo URL:
-                            <input value={editMemberForm.photo || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo: e.target.value })} />
+                            Photo:
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async e => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  const url = await handlePhotoUpload(file, false);
+                                  if (url) setEditMemberForm(form => ({ ...form, photo: url }));
+                                }
+                              }}
+                            />
+                            {editMemberForm.photo && (
+                              <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                            )}
                           </label>
                           <label>
                             Counterpart First Name:
@@ -345,8 +374,21 @@ function App() {
                             <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
                           </label>
                           <label>
-                            Counterpart Photo URL:
-                            <input value={editMemberForm.photo2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo2: e.target.value })} />
+                            Counterpart Photo:
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async e => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  const url = await handlePhotoUpload(file, true);
+                                  if (url) setEditMemberForm(form => ({ ...form, photo2: url }));
+                                }
+                              }}
+                            />
+                            {editMemberForm.photo2 && (
+                              <img src={editMemberForm.photo2} alt="Counterpart Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                            )}
                           </label>
                         </div>
                         <div style={{ marginTop: "0.5rem" }}>
@@ -564,8 +606,21 @@ function App() {
                               <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
                             </label>
                             <label>
-                              Photo URL:
-                              <input value={editMemberForm.photo || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo: e.target.value })} />
+                              Photo:
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={async e => {
+                                  const file = e.target.files[0];
+                                  if (file) {
+                                    const url = await handlePhotoUpload(file, false);
+                                    if (url) setEditMemberForm(form => ({ ...form, photo: url }));
+                                  }
+                                }}
+                              />
+                              {editMemberForm.photo && (
+                                <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                              )}
                             </label>
                             <label>
                               Counterpart First Name:
@@ -588,8 +643,21 @@ function App() {
                               <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
                             </label>
                             <label>
-                              Counterpart Photo URL:
-                              <input value={editMemberForm.photo2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo2: e.target.value })} />
+                              Counterpart Photo:
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={async e => {
+                                  const file = e.target.files[0];
+                                  if (file) {
+                                    const url = await handlePhotoUpload(file, true);
+                                    if (url) setEditMemberForm(form => ({ ...form, photo2: url }));
+                                  }
+                                }}
+                              />
+                              {editMemberForm.photo2 && (
+                                <img src={editMemberForm.photo2} alt="Counterpart Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                              )}
                             </label>
                           </div>
                           <div style={{ marginTop: "0.5rem" }}>
