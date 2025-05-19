@@ -42,10 +42,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. Update the member's stripe_customer_id in Supabase
+    // 3. Update the member's stripe_customer_id and status in Supabase
     const { error } = await supabase
       .from('members')
-      .update({ stripe_customer_id: customer.id })
+      .update({ stripe_customer_id: customer.id, status: 'active' })
       .eq('id', member_id);
 
     if (error) {

@@ -141,6 +141,12 @@ const MemberDetail = ({
         )}
       </div>
       <div>
+        <strong>Status:</strong>{" "}
+        <span style={{ color: member.status === 'active' ? 'green' : 'gray' }}>
+          {member.status || "N/A"}
+        </span>
+      </div>
+      <div>
         <h3>Stripe Subscription</h3>
         {stripeLoading ? (
           <div>Loading Stripe data...</div>
