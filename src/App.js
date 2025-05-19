@@ -318,14 +318,30 @@ function App() {
     const isAdmin = session.user?.user_metadata?.role === "admin";
     // Helper for uploading a photo to Supabase Storage and returning the public URL
     // Delete member handler
-    async function handleDeleteMember(memberId) {
+    // Now expects the full member object, not just the ID
+    async function handleDeleteMember(member) {
       if (!window.confirm('Are you sure you want to delete this member? This cannot be undone.')) return;
-      const { error } = await supabase.from('members').delete().eq('id', memberId);
+      const { error } = await supabase.from('members').delete().eq('id', member.id);
       if (!error) {
-        setMembers(members.filter(m => m.id !== memberId));
+        setMembers(members.filter(m => m.id !== member.id));
         setSelectedMember(null);
         setEditingMemberId(null);
         alert('Member deleted.');
+        // After deleting from members, if member has supabase_user_id, delete the corresponding Auth user
+        if (member.supabase_user_id) {
+          try {
+            await fetch('/api/deleteAuthUser', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: member.supabase_user_id }),
+            });
+            // Optionally: handle response or error
+          } catch (e) {
+            console.error('Failed to delete Supabase Auth user:', e);
+          }
+        } else {
+          // TODO: If supabase_user_id is not stored, update this process in the future to support Auth deletion.
+        }
       } else {
         alert('Failed to delete member: ' + error.message);
       }
@@ -1099,7 +1115,7 @@ function App() {
                   {/* Delete member button */}
                   <button
                     className="delete-member-btn"
-                    onClick={() => handleDeleteMember(selectedMember.id)}
+                    onClick={() => handleDeleteMember(selectedMember)}
                   >
                     Delete Member
                   </button>
