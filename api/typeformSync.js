@@ -14,87 +14,82 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Support both Typeform webhook payloads and raw testing
     const form = req.body.form_response || req.body;
-
-    // Map answers by field.ref for easy access
-    const answers = {};
-    if (form && form.answers) {
-      for (const ans of form.answers) {
-        // Save both .ref and .id in case of ref missing
-        if (ans.field.ref) answers[ans.field.ref] = ans[ans.type];
-        answers[ans.field.id] = ans[ans.type];
-      }
+    // Helper for field lookups by ref, id, or index fallback
+    function findAnswer(fieldRefs, type = null) {
+      const ans = (form.answers || []).find(
+        a =>
+          (fieldRefs.includes(a.field.ref) || fieldRefs.includes(a.field.id))
+          && (!type || a.type === type)
+      );
+      if (!ans) return null;
+      if (type === 'choice' && ans.choice) return ans.choice.label;
+      if (type === 'file_url' && ans.file_url) return ans.file_url;
+      if (type === 'phone_number' && ans.phone_number) return ans.phone_number;
+      if (type === 'email' && ans.email) return ans.email;
+      if (type === 'date' && ans.date) return ans.date;
+      if (ans.text) return ans.text;
+      return null;
     }
 
-    // Extract answers using refs (preferred) or IDs
-    const firstName      = answers['a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d'] || ''; // First name
-    const lastName       = answers['9c123e7b-2643-4819-9b4d-4a9f236302c9'] || ''; // Last name
-    const phone          = answers['6ed12e4b-95a2-4b30-96b2-a7095f673db6'] || '';
-    const email          = answers['ee4bcd7b-768d-49fb-b7cc-80cdd25c750a'] || '';
-    const company        = answers['d32131fd-318b-4e39-8fcd-41eed4096d36'] || '';
-    const dob            = answers['1432cfc0-d3dc-48fc-8561-bf0053ccc097'] || '';
-    const address        = answers['d8ef8992-e207-4165-a296-67dd22de7cc6'] || '';
-    const address2       = answers['fb3d4079-af85-4914-962a-71c9316b89e2'] || '';
-    const city           = answers['b70d8409-0f17-4bc8-9e12-35f8b50d1e74'] || '';
-    const state          = answers['9ab3b62d-a361-480a-856c-7200224f65ac'] || '';
-    const zip            = answers['f79dcd7d-a82d-4fca-8987-85014e42e115'] || '';
-    const photo          = answers['ddc3eeeb-f2ae-4070-846d-c3194008d0d9'] || '';
-    const referredBy     = answers['dff5344e-93e0-4ae5-967c-b92e0ad51f65'] || '';
+    // Mapping fields
+    const memberData = {
+      // Main member
+      first_name:   findAnswer(['a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d']),
+      last_name:    findAnswer(['9c123e7b-2643-4819-9b4d-4a9f236302c9']),
+      email:        findAnswer(['ee4bcd7b-768d-49fb-b7cc-80cdd25c750a'], 'email'),
+      phone:        findAnswer(['6ed12e4b-95a2-4b30-96b2-a7095f673db6'], 'phone_number'),
+      company:      findAnswer(['d32131fd-318b-4fcd-41eed4096d36', 'd32131fd-318b-4e39-8fcd-41eed4096d36']),
+      dob:          findAnswer(['1432cfc0-d3dc-48fc-8561-bf0053ccc097'], 'date'),
+      address:      findAnswer(['d8ef8992-e207-4165-a296-67dd22de7cc6']),
+      address_2:    findAnswer(['fb3d4079-af85-4914-962a-71c9316b89e2']),
+      city:         findAnswer(['b70d8409-0f17-4bc8-9e12-35f8b50d1e74']),
+      state:        findAnswer(['9ab3b62d-a361-480a-856c-7200224f65ac']),
+      zip:          findAnswer(['f79dcd7d-a82d-4fca-8987-85014e42e115']),
+      country:      findAnswer(['8e920793-22ca-4c89-a25e-2b76407e171f']),
+      membership:   findAnswer(['8101b9b5-5734-4db6-a2d1-27f122c05f9e'], 'choice'),
+      photo:        findAnswer(['ddc3eeeb-f2ae-4070-846d-c3194008d0d9'], 'file_url'),
+      // Partner/member 2
+      first_name2:  findAnswer(['4418ddd8-d940-4896-9589-565b78c252c8']),
+      last_name2:   findAnswer(['ac1b6049-8826-4f71-a748-bbbb41c2ce9e']),
+      phone2:       findAnswer(['9c2688e3-34c0-4da0-8e17-c44a81778cf3'], 'phone_number'),
+      email2:       findAnswer(['b9cde49b-3a69-4181-a738-228f5a11f27c'], 'email'),
+      company2:     findAnswer(['c1f6eef0-4884-49e6-8928-c803b60a115f']),
+      photo2:       findAnswer(['95940d74-dda1-4531-be16-ffd01839c49f'], 'file_url'),
+      // Misc
+      referral:     findAnswer(['dff5344e-93e0-4ae5-967c-b92e0ad51f65']),
+      auth_code:    (form.hidden && form.hidden.auth_code) ? form.hidden.auth_code : null,
+      // Required/auto fields
+      status:       'pending',
+      balance:      0,
+      // Stripe
+      stripe_customer_id: null,
+      join_date:    null,
+      renewal_date: null,
+      token:        form.token || null,
+    };
 
-    if (!email) {
-      res.status(400).json({ error: 'Missing required email' });
-      return;
+    // Stripe Customer lookup (optional)
+    if (memberData.email) {
+      try {
+        const customers = await stripe.customers.list({ email: memberData.email, limit: 1 });
+        if (customers.data.length > 0) {
+          memberData.stripe_customer_id = customers.data[0].id;
+        }
+      } catch {}
     }
 
-    // Lookup Stripe customer by email (optional, recommended for linking)
-    let stripe_customer_id = null;
-    try {
-      const customers = await stripe.customers.list({ email, limit: 1 });
-      if (customers.data.length > 0) {
-        stripe_customer_id = customers.data[0].id;
-      }
-    } catch (err) {
-      // Stripe lookup failed; not fatal
-    }
-
-    // Upsert member to Supabase, mapping all columns from members_rows.csv with fallbacks/defaults
-    const { error } = await supabase.from('members').upsert([
-      {
-        first_name: firstName || '',
-        last_name: lastName || '',
-        email: email || '',
-        phone: phone || '',
-        company: company || '',
-        dob: dob || '',
-        address: address || '',
-        address_2: address2 || '',
-        city: city || '',
-        state: state || '',
-        zip: zip || '',
-        photo: photo || '',
-        // Referral field (updated property name)
-        referral: referredBy || '',
-        stripe_customer_id: stripe_customer_id || null,
-        spouse_first: '',
-        spouse_last: '',
-        spouse_email: '',
-        spouse_phone: '',
-        membership: '',
-        status: 'pending',
-        balance: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        // Add any other fields from your CSV here, defaulting as needed
-      }
-    ], { onConflict: ['email'] });
+    // Upsert using email (main) as unique constraint (modify if needed)
+    const { error } = await supabase.from('members').upsert(
+      [memberData],
+      { onConflict: ['email'] }
+    );
 
     if (error) {
       console.error('Supabase error:', error);
       res.status(500).json({ error: error.message, details: error.details, hint: error.hint, code: error.code });
       return;
     }
-
     res.status(200).json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
