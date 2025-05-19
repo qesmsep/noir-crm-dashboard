@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 
 const MemberDetail = ({
@@ -20,6 +18,26 @@ const MemberDetail = ({
     setNewTransaction({ ...newTransaction, [name]: value });
   };
 
+  const formatDateLong = (dateString) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (isNaN(date)) return null;
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return '';
+    const trimmed = phone.replace(/\s+/g, '');
+    let digits = trimmed.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+      digits = digits.slice(1);
+    }
+    if (digits.length === 10) {
+      return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
+    }
+    return phone.trim();
+  };
+
   return (
     <div className="member-detail-container">
       <button onClick={onBack}>Back to List</button>
@@ -31,8 +49,13 @@ const MemberDetail = ({
         <strong>Email:</strong> {member.email}
       </div>
       <div>
-        <strong>Phone:</strong> {member.phone}
+        <strong>Phone:</strong> {formatPhoneNumber(member.phone)}
       </div>
+      {member.dob && (
+        <div>
+          <strong>Birthdate:</strong> {formatDateLong(member.dob)}
+        </div>
+      )}
       <div>
         <strong>Joined:</strong> {member.joined}
       </div>
