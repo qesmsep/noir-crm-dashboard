@@ -14,6 +14,10 @@ function App() {
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteStatus, setPromoteStatus] = useState('');
   const [section, setSection] = useState('members');
+  // Create User form state
+  const [createEmail, setCreateEmail] = useState('');
+  const [createName, setCreateName] = useState('');
+  const [createStatus, setCreateStatus] = useState('');
 
   useEffect(() => {
     // Get initial session
@@ -69,14 +73,39 @@ function App() {
     }
   }
 
+  // Handler for Create User form
+  async function handleCreateUser(e) {
+    e.preventDefault();
+    setCreateStatus('');
+    try {
+      const response = await fetch('/api/createUser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: createEmail, name: createName }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCreateStatus('User created! Check their email for a magic link.');
+        setCreateEmail('');
+        setCreateName('');
+      } else {
+        setCreateStatus(data.error || 'Failed to create user.');
+      }
+    } catch (err) {
+      setCreateStatus('Error: ' + err.message);
+    }
+  }
+
   if (!session) {
     return (
       <div className="auth-container">
         <Auth
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
-          providers={[]} // Hide social provider buttons
+          providers={[]} // No social sign-in
           theme="dark"
+          magicLink={true}
+          view="magic_link"
         />
       </div>
     );
@@ -175,23 +204,49 @@ function App() {
             </>
           )}
           {section === 'admin' && (
-            <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-              <h2>Promote User to Admin</h2>
-              <form onSubmit={handlePromote} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <input
-                  type="email"
-                  placeholder="User email"
-                  value={promoteEmail}
-                  onChange={e => setPromoteEmail(e.target.value)}
-                  required
-                  style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
-                />
-                <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
-                  Promote
-                </button>
-              </form>
-              {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
-            </div>
+            <>
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>Create New User</h2>
+                <form onSubmit={handleCreateUser} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
+                  <input
+                    type="email"
+                    placeholder="User email"
+                    value={createEmail}
+                    onChange={e => setCreateEmail(e.target.value)}
+                    required
+                    style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Name (optional)"
+                    value={createName}
+                    onChange={e => setCreateName(e.target.value)}
+                    style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "200px" }}
+                  />
+                  <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
+                    Create User
+                  </button>
+                </form>
+                {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
+              </div>
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>Promote User to Admin</h2>
+                <form onSubmit={handlePromote} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <input
+                    type="email"
+                    placeholder="User email"
+                    value={promoteEmail}
+                    onChange={e => setPromoteEmail(e.target.value)}
+                    required
+                    style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
+                  />
+                  <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
+                    Promote
+                  </button>
+                </form>
+                {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
+              </div>
+            </>
           )}
           {section === 'lookup' && (
             <div style={{ padding: "2rem" }}>
