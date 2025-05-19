@@ -380,30 +380,28 @@ function App() {
     return (
       <>
         {/* Hamburger button for mobile */}
-        <button
-          className={sidebarOpen ? "hamburger open" : "hamburger"}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          aria-label="Open navigation"
-          style={
-            isMobile
-              ? {
-                  position: "fixed",
-                  top: "1rem",
-                  right: "1rem",
-                  zIndex: 1001,
-                  background: "#fff",
-                  border: "1px solid #e2dfd8",
-                  borderRadius: "6px",
-                  padding: "0.5rem 1rem",
-                  fontSize: "2rem",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-                  cursor: "pointer"
-                }
-              : {}
-          }
-        >
-          &#9776;
-        </button>
+        {isMobile && (
+          <button
+            className={sidebarOpen ? "hamburger open" : "hamburger"}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Open navigation"
+            style={{
+              position: "fixed",
+              top: "1rem",
+              right: "1rem",
+              zIndex: 1001,
+              background: "#fff",
+              border: "1px solid #e2dfd8",
+              borderRadius: "6px",
+              padding: "0.5rem 1rem",
+              fontSize: "2rem",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+              cursor: "pointer"
+            }}
+          >
+            &#9776;
+          </button>
+        )}
         <div className={`sidebar-nav${sidebarOpen ? " open" : ""}`} style={{
           minWidth: isMobile ? (sidebarOpen ? 180 : 0) : 210,
           width: isMobile ? (sidebarOpen ? 180 : 0) : 210,
@@ -1152,6 +1150,7 @@ function App() {
                       onClick={() => {
                         setSelectedMember(member);
                         fetchLedger(member.id);
+                        setSection('members');
                       }}
                       tabIndex={0}
                       role="button"
@@ -1159,6 +1158,7 @@ function App() {
                         if (e.key === "Enter" || e.key === " ") {
                           setSelectedMember(member);
                           fetchLedger(member.id);
+                          setSection('members');
                         }
                       }}
                     >
