@@ -109,17 +109,8 @@ const MemberDetail = ({
               </span>
             )}
           </div>
-          <div style={{ margin: '4px 0' }}>
-            <span style={{
-              fontWeight: 500,
-              color: member.status === 'active' ? 'green' : 'gray',
-              border: '1px solid',
-              borderColor: member.status === 'active' ? 'green' : 'gray',
-              borderRadius: 4,
-              padding: '2px 8px',
-              marginRight: 6,
-              fontSize: 13
-            }}>
+          <div className="member-status">
+            <span className={`status-badge status-${member.status?.toLowerCase() || "unknown"}`}>
               {member.status || "N/A"}
             </span>
           </div>
@@ -159,12 +150,6 @@ const MemberDetail = ({
             )}
           </>
         )}
-      </div>
-      <div>
-        <strong>Status:</strong>{" "}
-        <span style={{ color: member.status === 'active' ? 'green' : 'gray' }}>
-          {member.status || "N/A"}
-        </span>
       </div>
       <div>
         <h3>Stripe Subscription</h3>

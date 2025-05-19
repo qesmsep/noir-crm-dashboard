@@ -395,3 +395,35 @@ body {
     margin-top: 24px;
   }
 }
+
+.member-status {
+  margin: 4px 0;
+}
+.status-badge {
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+  border: 1px solid #bbb;
+  display: inline-block;
+}
+.status-active {
+  color: #228B22;
+  border-color: #228B22;
+  background: #e7faec;
+}
+.status-pending {
+  color: #a88806;
+  border-color: #c9ae11;
+  background: #fff9db;
+}
+.status-inactive {
+  color: #888;
+  border-color: #bbb;
+  background: #f3f3f3;
+}
+.status-unknown {
+  color: #999;
+  border-color: #ccc;
+  background: #fafafa;
+}
