@@ -57,15 +57,20 @@ export default async function handler(req, res) {
     if (response.ok) {
       // Delete the user from the members table as well
       const supabaseDb = createClient(supabaseUrl, service_role_key);
-      const { error: dbError } = await supabaseDb
+      // LOG user_id before deleting
+      console.log('Deleting member with id:', user_id);
+      const { data, error: dbError } = await supabaseDb
         .from('members')
         .delete()
-        .eq('id', user_id);
+        .eq('id', user_id)
+        .select(); // fetch deleted rows for debugging
 
       if (dbError) {
         return res.status(500).json({ error: 'User deleted from Auth, but failed to delete from members', details: dbError.message });
       }
-      return res.status(200).json({ success: true });
+      // LOG data returned from deletion
+      console.log('Deleted member row:', data);
+      return res.status(200).json({ success: true, deleted: data });
     } else {
       const error = await response.json();
       return res.status(response.status).json({ error });
