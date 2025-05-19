@@ -95,21 +95,41 @@ const MemberDetail = ({
   return (
     <div className="member-detail-container">
       <button onClick={onBack}>Back to List</button>
-      <h2>Member Details</h2>
-      <div>
-        <strong>Name:</strong> {member.name}
-      </div>
-      <div>
-        <strong>Email:</strong> {member.email}
-      </div>
-      <div>
-        <strong>Phone:</strong> {formatPhoneNumber(member.phone)}
-      </div>
-      {member.dob && (
+      <h2>Primary Member</h2>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+        {member.photo && (
+          <img src={member.photo} alt="Member" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 8, marginRight: 20 }} />
+        )}
         <div>
-          <strong>Birthdate:</strong> {formatDateLong(member.dob)}
+          <div style={{ fontWeight: 700, fontSize: 20 }}>
+            {member.first_name} {member.last_name}
+            {member.membership && (
+              <span style={{ fontWeight: 400, fontSize: 16, marginLeft: 8, color: '#7c6b58' }}>
+                — {member.membership}
+              </span>
+            )}
+          </div>
+          <div style={{ margin: '4px 0' }}>
+            <span style={{
+              fontWeight: 500,
+              color: member.status === 'active' ? 'green' : 'gray',
+              border: '1px solid',
+              borderColor: member.status === 'active' ? 'green' : 'gray',
+              borderRadius: 4,
+              padding: '2px 8px',
+              marginRight: 6,
+              fontSize: 13
+            }}>
+              {member.status || "N/A"}
+            </span>
+          </div>
+          <div style={{ fontSize: 15, color: '#353535' }}>
+            {member.email && <div>Email: {member.email}</div>}
+            {member.phone && <div>Phone: {formatPhoneNumber(member.phone)}</div>}
+            {member.dob && <div>Date of Birth: {formatDateLong(member.dob)}</div>}
+          </div>
         </div>
-      )}
+      </div>
       <div>
         <strong>Joined:</strong> {member.joined}
       </div>
