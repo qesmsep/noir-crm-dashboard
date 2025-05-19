@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const MemberDetail = ({
   member,
@@ -11,7 +11,37 @@ const MemberDetail = ({
   transactionStatus,
   session,
 }) => {
+  const [linkingStripe, setLinkingStripe] = useState(false);
+  const [linkResult, setLinkResult] = useState(null);
+
   if (!member) return null;
+  // Link member to Stripe
+  const handleLinkStripe = async () => {
+    setLinkingStripe(true);
+    setLinkResult(null);
+    try {
+      const response = await fetch('/api/linkStripeCustomer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: member.id,
+          first_name: member.first_name,
+          last_name: member.last_name,
+          email: member.email,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setLinkResult({ status: 'success', stripeId: result.stripe_customer.id });
+        // Optionally reload member info here if needed
+      } else {
+        setLinkResult({ status: 'error', error: result.error });
+      }
+    } catch (err) {
+      setLinkResult({ status: 'error', error: err.message });
+    }
+    setLinkingStripe(false);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -59,7 +89,33 @@ const MemberDetail = ({
       <div>
         <strong>Joined:</strong> {member.joined}
       </div>
-      {/* You can add more fields as needed */}
+      <div>
+        <strong>Stripe Customer ID:</strong>{' '}
+        {member.stripe_customer_id ? (
+          <span style={{ color: 'green' }}>{member.stripe_customer_id}</span>
+        ) : (
+          <>
+            <span style={{ color: 'red' }}>Not linked</span>
+            <button
+              onClick={handleLinkStripe}
+              disabled={linkingStripe}
+              style={{ marginLeft: 8 }}
+            >
+              {linkingStripe ? 'Linking...' : 'Link to Stripe'}
+            </button>
+            {linkResult && linkResult.status === 'success' && (
+              <span style={{ color: 'green', marginLeft: 8 }}>
+                Linked! Stripe ID: {linkResult.stripeId}
+              </span>
+            )}
+            {linkResult && linkResult.status === 'error' && (
+              <span style={{ color: 'red', marginLeft: 8 }}>
+                Error: {linkResult.error}
+              </span>
+            )}
+          </>
+        )}
+      </div>
 
       <h3>Ledger</h3>
       {ledgerLoading ? (
