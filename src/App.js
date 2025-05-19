@@ -307,7 +307,24 @@ function App() {
         return null;
       }
       const { data } = supabase.storage.from('member-photos').getPublicUrl(filePath);
-      return data?.publicUrl || null;
+      const url = data?.publicUrl || null;
+      // After getting the publicUrl, update the members table and local state
+      if (url && editingMemberId) {
+        if (isCounterpart) {
+          // Update photo2
+          await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
+          setEditMemberForm(form => ({ ...form, photo2: url }));
+          setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
+          setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
+        } else {
+          // Update photo
+          await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
+          setEditMemberForm(form => ({ ...form, photo: url }));
+          setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
+          setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
+        }
+      }
+      return url;
     }
 
     if (!isAdmin) {
