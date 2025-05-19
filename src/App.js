@@ -11,6 +11,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 function App() {
   const [session, setSession] = useState(null);
   const [members, setMembers] = useState([]);
+  const [promoteEmail, setPromoteEmail] = useState('');
+  const [promoteStatus, setPromoteStatus] = useState('');
 
   useEffect(() => {
     // Get initial session
@@ -46,12 +48,33 @@ function App() {
     fetchMembers();
   }, []);
 
+  async function handlePromote(e) {
+    e.preventDefault();
+    setPromoteStatus(''); // Clear previous message
+    try {
+      const response = await fetch('/api/promoteUser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: promoteEmail }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setPromoteStatus('User promoted to admin!');
+      } else {
+        setPromoteStatus(data.error || 'Failed to promote user.');
+      }
+    } catch (err) {
+      setPromoteStatus('Error: ' + err.message);
+    }
+  }
+
   if (!session) {
     return (
       <div className="auth-container">
         <Auth
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
+          providers={[]} // Hide social provider buttons
           theme="dark"
         />
       </div>
@@ -93,16 +116,19 @@ function App() {
       <div className="app-container">
         <button
           style={{
-            position: "absolute",
+            position: "fixed",
             top: "1rem",
             right: "1rem",
-            padding: "0.5rem 1rem",
+            padding: "0.75rem 1.5rem",
             border: "none",
-            borderRadius: "4px",
+            borderRadius: "6px",
             background: "#a59480",
             color: "#fff",
+            fontSize: "1rem",
+            fontWeight: 600,
+            boxShadow: "0 2px 8px rgba(53,53,53,0.16)",
             cursor: "pointer",
-            zIndex: 10
+            zIndex: 9999
           }}
           onClick={async () => {
             await supabase.auth.signOut();
@@ -112,6 +138,23 @@ function App() {
           Sign Out
         </button>
         <h1 className="app-title">Noir CRM – Members</h1>
+        <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+          <h2>Promote User to Admin</h2>
+          <form onSubmit={handlePromote} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <input
+              type="email"
+              placeholder="User email"
+              value={promoteEmail}
+              onChange={e => setPromoteEmail(e.target.value)}
+              required
+              style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
+            />
+            <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
+              Promote
+            </button>
+          </form>
+          {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
+        </div>
         <ul className="member-list">
           {members.map(member => (
             <li key={member.id} className="member-item">
