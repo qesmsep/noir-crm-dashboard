@@ -387,7 +387,7 @@ function App() {
             aria-label="Open navigation"
             style={{
               position: "fixed",
-              bottom: "1.5rem",
+              top: "1.5rem",
               right: "1.5rem",
               width: "2.5rem",
               height: "2.5rem",
@@ -749,31 +749,7 @@ function App() {
                                 <div>Company: {member.company2}</div>
                               </div>
                             )}
-                            <div style={{
-                              position: "absolute",
-                              bottom: "16px",
-                              right: "16px"
-                            }}>
-                              <button
-                                style={{
-                                  padding: "0.65rem 1.5rem",
-                                  fontSize: "1.1rem",
-                                  borderRadius: "6px",
-                                  background: "#A59480",
-                                  color: "#fff",
-                                  border: "none",
-                                  fontWeight: 600,
-                                  cursor: "pointer",
-                                  boxShadow: "0 2px 10px rgba(53,53,53,0.07)"
-                                }}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  handleEditMember(member);
-                                }}
-                              >
-                                Edit
-                              </button>
-                            </div>
+                            {/* Edit button removed from member card */}
                           </>
                         )}
                       </li>
@@ -1400,31 +1376,7 @@ function App() {
                               <div>Company: {member.company2}</div>
                             </div>
                           )}
-                          <div style={{
-                            position: "absolute",
-                            bottom: "16px",
-                            right: "16px"
-                          }}>
-                            <button
-                              style={{
-                                padding: "0.65rem 1.5rem",
-                                fontSize: "1.1rem",
-                                borderRadius: "6px",
-                                background: "#A59480",
-                                color: "#fff",
-                                border: "none",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                                boxShadow: "0 2px 10px rgba(53,53,53,0.07)"
-                              }}
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleEditMember(member);
-                              }}
-                            >
-                              Edit
-                            </button>
-                          </div>
+                          {/* Edit button removed from member card */}
                         </>
                       )}
                     </li>
