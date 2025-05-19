@@ -100,6 +100,8 @@ const MemberDetail = ({
         {member.photo && (
           <img src={member.photo} alt="Member" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 8, marginRight: 20 }} />
         )}
+        <div style={{ fontWeight: 700, fontSize: 14, marginTop: 10 }}>STATUS</div>
+        <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 10 }}>{member.status || 'N/A'}</div>
         <div>
           <div style={{ fontWeight: 700, fontSize: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>
