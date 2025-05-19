@@ -383,107 +383,194 @@ function App() {
         {isMobile && (
           <button
             className={sidebarOpen ? "hamburger open" : "hamburger"}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => setSidebarOpen(true)}
             aria-label="Open navigation"
             style={{
               position: "fixed",
-              ...(isMobile
-                ? {
-                    bottom: "1rem",
-                    right: "1rem",
-                    top: undefined, // remove any top positioning
-                  }
-                : {
-                    top: "1rem",
-                    right: "1rem",
-                    bottom: undefined,
-                  }),
-              zIndex: 1001,
+              bottom: "1.5rem",
+              right: "1.5rem",
+              width: "2.5rem",
+              height: "2.5rem",
+              minWidth: "2.5rem",
+              minHeight: "2.5rem",
+              maxWidth: "2.5rem",
+              maxHeight: "2.5rem",
+              zIndex: 2002,
               background: "#fff",
-              border: "1px solid #e2dfd8",
-              borderRadius: "6px",
-              padding: "0.5rem 1rem",
-              fontSize: "2rem",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-              cursor: "pointer"
+              border: "1.5px solid #e2dfd8",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.7rem",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.09)",
+              cursor: "pointer",
+              transition: "background 0.2s"
             }}
           >
-            &#9776;
+            <span style={{ fontWeight: 700, fontSize: "2rem", lineHeight: 1 }}>&#9776;</span>
           </button>
         )}
-        <div className={`sidebar-nav${sidebarOpen ? " open" : ""}`} style={{
-          minWidth: isMobile ? (sidebarOpen ? 180 : 0) : 210,
-          width: isMobile ? (sidebarOpen ? 180 : 0) : 210,
-          background: "#f3f2ef",
-          borderRight: isMobile ? "none" : "1.5px solid #e2dfd8",
-          minHeight: "100vh",
-          padding: isMobile ? "1rem 0.5rem" : "2rem 1rem 2rem 1.5rem",
-          boxSizing: "border-box",
-          position: "fixed",
-          top: 0,
-          left: 0,
-          zIndex: 10,
-          display: isMobile && !sidebarOpen ? "none" : "flex",
-          flexDirection: "column",
-          gap: "1.5rem"
-        }}>
-          {/* Close button for sidebar (mobile) */}
-          {sidebarOpen && (
-            <button
+        {/* Sidebar overlay and sidebar for mobile */}
+        {isMobile && sidebarOpen && (
+          <>
+            {/* Overlay */}
+            <div
               onClick={() => setSidebarOpen(false)}
               style={{
-                background: "none",
-                border: "none",
-                color: "#353535",
-                alignSelf: "flex-end",
-                fontSize: "2rem",
-                marginBottom: "1.5rem",
-                cursor: "pointer",
-                padding: 0
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100vw",
+                height: "100vh",
+                background: "rgba(44, 41, 38, 0.36)",
+                zIndex: 2000,
+                transition: "opacity 0.2s",
               }}
-              aria-label="Close navigation"
+              aria-label="Close sidebar"
+              tabIndex={0}
+              role="button"
+            />
+            {/* Sidebar */}
+            <div
+              className="sidebar-nav open"
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "80vw",
+                maxWidth: 280,
+                minWidth: 180,
+                height: "100vh",
+                background: "#f3f2ef",
+                boxShadow: "2px 0 16px rgba(40,40,40,0.13)",
+                zIndex: 2001,
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.5rem",
+                padding: "1.25rem 1rem 2rem 1rem",
+                boxSizing: "border-box",
+                transition: "transform 0.22s cubic-bezier(.6,.2,.2,1)",
+                transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+              }}
             >
-              &times;
+              {/* Close button */}
+              <button
+                onClick={() => setSidebarOpen(false)}
+                style={{
+                  background: "#fff",
+                  border: "1.5px solid #e2dfd8",
+                  color: "#353535",
+                  alignSelf: "flex-end",
+                  fontSize: "2rem",
+                  marginBottom: "1.5rem",
+                  cursor: "pointer",
+                  padding: 0,
+                  width: "2.5rem",
+                  height: "2.5rem",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+                }}
+                aria-label="Close navigation"
+              >
+                &times;
+              </button>
+              <button
+                className={section === 'members' ? 'nav-active' : ''}
+                onClick={() => {
+                  setSection('members');
+                  setSelectedMember(null);
+                  setSidebarOpen(false);
+                }}
+              >
+                Members
+              </button>
+              <button
+                className={section === 'admin' ? 'nav-active' : ''}
+                onClick={() => {
+                  setSection('admin');
+                  setSidebarOpen(false);
+                }}
+              >
+                Admin
+              </button>
+              <button
+                className={section === 'lookup' ? 'nav-active' : ''}
+                onClick={() => {
+                  setSection('lookup');
+                  setSidebarOpen(false);
+                }}
+              >
+                Lookup
+              </button>
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  window.location.reload();
+                  setSidebarOpen(false);
+                }}
+              >
+                Log Out
+              </button>
+            </div>
+          </>
+        )}
+        {/* Desktop sidebar */}
+        {!isMobile && (
+          <div className="sidebar-nav" style={{
+            minWidth: 210,
+            width: 210,
+            background: "#f3f2ef",
+            borderRight: "1.5px solid #e2dfd8",
+            minHeight: "100vh",
+            padding: "2rem 1rem 2rem 1.5rem",
+            boxSizing: "border-box",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            zIndex: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.5rem"
+          }}>
+            <button
+              className={section === 'members' ? 'nav-active' : ''}
+              onClick={() => {
+                setSection('members');
+                setSelectedMember(null);
+              }}
+            >
+              Members
             </button>
-          )}
-          <button
-            className={section === 'members' ? 'nav-active' : ''}
-            onClick={() => {
-              setSection('members');
-              setSelectedMember(null);
-              setSidebarOpen(false);
-            }}
-          >
-            Members
-          </button>
-          <button
-            className={section === 'admin' ? 'nav-active' : ''}
-            onClick={() => {
-              setSection('admin');
-              setSidebarOpen(false);
-            }}
-          >
-            Admin
-          </button>
-          <button
-            className={section === 'lookup' ? 'nav-active' : ''}
-            onClick={() => {
-              setSection('lookup');
-              setSidebarOpen(false);
-            }}
-          >
-            Lookup
-          </button>
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              window.location.reload();
-              setSidebarOpen(false);
-            }}
-          >
-            Log Out
-          </button>
-        </div>
+            <button
+              className={section === 'admin' ? 'nav-active' : ''}
+              onClick={() => {
+                setSection('admin');
+              }}
+            >
+              Admin
+            </button>
+            <button
+              className={section === 'lookup' ? 'nav-active' : ''}
+              onClick={() => {
+                setSection('lookup');
+              }}
+            >
+              Lookup
+            </button>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                window.location.reload();
+              }}
+            >
+              Log Out
+            </button>
+          </div>
+        )}
         <div
           className="app-container"
           style={{
