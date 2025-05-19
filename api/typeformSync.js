@@ -79,7 +79,8 @@ export default async function handler(req, res) {
     ], { onConflict: ['email'] });
 
     if (error) {
-      res.status(500).json({ error: error.message });
+      console.error('Supabase error:', error);
+      res.status(500).json({ error: error.message, details: error.details, hint: error.hint, code: error.code });
       return;
     }
 
