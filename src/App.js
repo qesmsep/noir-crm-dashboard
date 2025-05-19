@@ -29,6 +29,24 @@ function App() {
     phone: "",
     role: "view"
   });
+  // Member editing state
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editMemberForm, setEditMemberForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    dob: "",
+    membership: "",
+    balance: "",
+    photo: "",
+    first_name2: "",
+    last_name2: "",
+    email2: "",
+    phone2: "",
+    company2: "",
+    photo2: ""
+  });
   useEffect(() => {
     async function fetchUsers() {
       if (section === "admin") {
@@ -81,6 +99,41 @@ function App() {
       setEditUserId(null);
     } else {
       alert(result.error || "Failed to update user");
+    }
+  }
+
+  // Member edit handlers
+  function handleEditMember(member) {
+    setEditingMemberId(member.id);
+    setEditMemberForm({ ...member });
+  }
+  function handleCancelEditMember() {
+    setEditingMemberId(null);
+    setEditMemberForm({
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      dob: "",
+      membership: "",
+      balance: "",
+      photo: "",
+      first_name2: "",
+      last_name2: "",
+      email2: "",
+      phone2: "",
+      company2: "",
+      photo2: ""
+    });
+  }
+  async function handleSaveEditMember() {
+    const { id, ...fields } = editMemberForm;
+    const { error } = await supabase.from('members').update(fields).eq('id', editingMemberId);
+    if (!error) {
+      setMembers(members.map(m => m.id === editingMemberId ? { ...m, ...fields } : m));
+      setEditingMemberId(null);
+    } else {
+      alert('Failed to update member: ' + error.message);
     }
   }
 
@@ -230,38 +283,114 @@ function App() {
               <ul className="member-list">
                 {members.map(member => (
                   <li key={member.id} className="member-item">
-                    {member.photo && (
-                      <img
-                        src={member.photo}
-                        alt={`${member.first_name} ${member.last_name}`}
-                        className="member-photo"
-                      />
-                    )}
-                    <div className="member-info">
-                      <strong>
-                        {member.first_name} {member.last_name} — {member.membership}
-                      </strong>
-                      <div>Balance: ${member.balance}</div>
-                      <div>Phone: {member.phone}</div>
-                      <div>Email: {member.email}</div>
-                      <div>Date of Birth: {member.dob}</div>
-                    </div>
-                    {member.first_name2 && (
-                      <div className="member-counterpart">
-                        {member.photo2 && (
+                    {editingMemberId === member.id ? (
+                      <form
+                        onSubmit={e => {
+                          e.preventDefault();
+                          handleSaveEditMember();
+                        }}
+                        style={{ width: "100%" }}
+                      >
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                          <label>
+                            First Name:
+                            <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
+                          </label>
+                          <label>
+                            Last Name:
+                            <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
+                          </label>
+                          <label>
+                            Email:
+                            <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
+                          </label>
+                          <label>
+                            Phone:
+                            <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
+                          </label>
+                          <label>
+                            Date of Birth:
+                            <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
+                          </label>
+                          <label>
+                            Membership:
+                            <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
+                          </label>
+                          <label>
+                            Balance:
+                            <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
+                          </label>
+                          <label>
+                            Photo URL:
+                            <input value={editMemberForm.photo || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo: e.target.value })} />
+                          </label>
+                          <label>
+                            Counterpart First Name:
+                            <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
+                          </label>
+                          <label>
+                            Counterpart Last Name:
+                            <input value={editMemberForm.last_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name2: e.target.value })} />
+                          </label>
+                          <label>
+                            Counterpart Email:
+                            <input value={editMemberForm.email2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email2: e.target.value })} />
+                          </label>
+                          <label>
+                            Counterpart Phone:
+                            <input value={editMemberForm.phone2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone2: e.target.value })} />
+                          </label>
+                          <label>
+                            Counterpart Company:
+                            <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
+                          </label>
+                          <label>
+                            Counterpart Photo URL:
+                            <input value={editMemberForm.photo2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo2: e.target.value })} />
+                          </label>
+                        </div>
+                        <div style={{ marginTop: "0.5rem" }}>
+                          <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
+                          <button type="button" onClick={handleCancelEditMember}>Cancel</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        {member.photo && (
                           <img
-                            src={member.photo2}
-                            alt={`${member.first_name2} ${member.last_name2}`}
+                            src={member.photo}
+                            alt={`${member.first_name} ${member.last_name}`}
                             className="member-photo"
                           />
                         )}
-                        <strong>
-                          {member.first_name2} {member.last_name2}
-                        </strong>
-                        <div>Email: {member.email2}</div>
-                        <div>Phone: {member.phone2}</div>
-                        <div>Company: {member.company2}</div>
-                      </div>
+                        <div className="member-info">
+                          <strong>
+                            {member.first_name} {member.last_name} — {member.membership}
+                          </strong>
+                          <div>Balance: ${member.balance}</div>
+                          <div>Phone: {member.phone}</div>
+                          <div>Email: {member.email}</div>
+                          <div>Date of Birth: {member.dob}</div>
+                        </div>
+                        {member.first_name2 && (
+                          <div className="member-counterpart">
+                            {member.photo2 && (
+                              <img
+                                src={member.photo2}
+                                alt={`${member.first_name2} ${member.last_name2}`}
+                                className="member-photo"
+                              />
+                            )}
+                            <strong>
+                              {member.first_name2} {member.last_name2}
+                            </strong>
+                            <div>Email: {member.email2}</div>
+                            <div>Phone: {member.phone2}</div>
+                            <div>Company: {member.company2}</div>
+                          </div>
+                        )}
+                        <button style={{ marginTop: "0.5rem" }} onClick={() => handleEditMember(member)}>Edit</button>
+                      </>
                     )}
                   </li>
                 ))}
@@ -397,38 +526,114 @@ function App() {
                     );
                   }).map(member => (
                     <li key={member.id} className="member-item">
-                      {member.photo && (
-                        <img
-                          src={member.photo}
-                          alt={`${member.first_name} ${member.last_name}`}
-                          className="member-photo"
-                        />
-                      )}
-                      <div className="member-info">
-                        <strong>
-                          {member.first_name} {member.last_name} — {member.membership}
-                        </strong>
-                        <div>Balance: ${member.balance}</div>
-                        <div>Phone: {member.phone}</div>
-                        <div>Email: {member.email}</div>
-                        <div>Date of Birth: {member.dob}</div>
-                      </div>
-                      {member.first_name2 && (
-                        <div className="member-counterpart">
-                          {member.photo2 && (
+                      {editingMemberId === member.id ? (
+                        <form
+                          onSubmit={e => {
+                            e.preventDefault();
+                            handleSaveEditMember();
+                          }}
+                          style={{ width: "100%" }}
+                        >
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            <label>
+                              First Name:
+                              <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
+                            </label>
+                            <label>
+                              Last Name:
+                              <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
+                            </label>
+                            <label>
+                              Email:
+                              <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
+                            </label>
+                            <label>
+                              Phone:
+                              <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
+                            </label>
+                            <label>
+                              Date of Birth:
+                              <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
+                            </label>
+                            <label>
+                              Membership:
+                              <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
+                            </label>
+                            <label>
+                              Balance:
+                              <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
+                            </label>
+                            <label>
+                              Photo URL:
+                              <input value={editMemberForm.photo || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo: e.target.value })} />
+                            </label>
+                            <label>
+                              Counterpart First Name:
+                              <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
+                            </label>
+                            <label>
+                              Counterpart Last Name:
+                              <input value={editMemberForm.last_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name2: e.target.value })} />
+                            </label>
+                            <label>
+                              Counterpart Email:
+                              <input value={editMemberForm.email2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email2: e.target.value })} />
+                            </label>
+                            <label>
+                              Counterpart Phone:
+                              <input value={editMemberForm.phone2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone2: e.target.value })} />
+                            </label>
+                            <label>
+                              Counterpart Company:
+                              <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
+                            </label>
+                            <label>
+                              Counterpart Photo URL:
+                              <input value={editMemberForm.photo2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, photo2: e.target.value })} />
+                            </label>
+                          </div>
+                          <div style={{ marginTop: "0.5rem" }}>
+                            <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
+                            <button type="button" onClick={handleCancelEditMember}>Cancel</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          {member.photo && (
                             <img
-                              src={member.photo2}
-                              alt={`${member.first_name2} ${member.last_name2}`}
+                              src={member.photo}
+                              alt={`${member.first_name} ${member.last_name}`}
                               className="member-photo"
                             />
                           )}
-                          <strong>
-                            {member.first_name2} {member.last_name2}
-                          </strong>
-                          <div>Email: {member.email2}</div>
-                          <div>Phone: {member.phone2}</div>
-                          <div>Company: {member.company2}</div>
-                        </div>
+                          <div className="member-info">
+                            <strong>
+                              {member.first_name} {member.last_name} — {member.membership}
+                            </strong>
+                            <div>Balance: ${member.balance}</div>
+                            <div>Phone: {member.phone}</div>
+                            <div>Email: {member.email}</div>
+                            <div>Date of Birth: {member.dob}</div>
+                          </div>
+                          {member.first_name2 && (
+                            <div className="member-counterpart">
+                              {member.photo2 && (
+                                <img
+                                  src={member.photo2}
+                                  alt={`${member.first_name2} ${member.last_name2}`}
+                                  className="member-photo"
+                                />
+                              )}
+                              <strong>
+                                {member.first_name2} {member.last_name2}
+                              </strong>
+                              <div>Email: {member.email2}</div>
+                              <div>Phone: {member.phone2}</div>
+                              <div>Company: {member.company2}</div>
+                            </div>
+                          )}
+                          <button style={{ marginTop: "0.5rem" }} onClick={() => handleEditMember(member)}>Edit</button>
+                        </>
                       )}
                     </li>
                   ))
