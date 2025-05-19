@@ -32,6 +32,8 @@ function App() {
   const [promoteStatus, setPromoteStatus] = useState('');
   const [section, setSection] = useState('members');
   const [lookupQuery, setLookupQuery] = useState('');
+  // Sidebar state for mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // Create User form state
   const [createEmail, setCreateEmail] = useState('');
   const [createName, setCreateName] = useState('');
@@ -358,7 +360,16 @@ function App() {
 
     return (
       <>
-        <div className="sidebar-nav" style={{
+        {/* Hamburger button for mobile */}
+        <button
+          className={sidebarOpen ? "hamburger open" : "hamburger"}
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Open navigation"
+          style={{}}
+        >
+          &#9776;
+        </button>
+        <div className={`sidebar-nav${sidebarOpen ? " open" : ""}`} style={{
           minWidth: 210,
           background: "#f3f2ef",
           borderRight: "1.5px solid #e2dfd8",
@@ -373,16 +384,60 @@ function App() {
           flexDirection: "column",
           gap: "1.5rem"
         }}>
-          <button className={section === 'members' ? 'nav-active' : ''} onClick={() => setSection('members')}>
+          {/* Close button for sidebar (mobile) */}
+          {sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#353535",
+                alignSelf: "flex-end",
+                fontSize: "2rem",
+                marginBottom: "1.5rem",
+                cursor: "pointer",
+                padding: 0
+              }}
+              aria-label="Close navigation"
+            >
+              &times;
+            </button>
+          )}
+          <button
+            className={section === 'members' ? 'nav-active' : ''}
+            onClick={() => {
+              setSection('members');
+              setSelectedMember(null);
+              setSidebarOpen(false);
+            }}
+          >
             Members
           </button>
-          <button className={section === 'admin' ? 'nav-active' : ''} onClick={() => setSection('admin')}>
+          <button
+            className={section === 'admin' ? 'nav-active' : ''}
+            onClick={() => {
+              setSection('admin');
+              setSidebarOpen(false);
+            }}
+          >
             Admin
           </button>
-          <button className={section === 'lookup' ? 'nav-active' : ''} onClick={() => setSection('lookup')}>
+          <button
+            className={section === 'lookup' ? 'nav-active' : ''}
+            onClick={() => {
+              setSection('lookup');
+              setSidebarOpen(false);
+            }}
+          >
             Lookup
           </button>
-          <button onClick={async () => { await supabase.auth.signOut(); window.location.reload(); }}>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.reload();
+              setSidebarOpen(false);
+            }}
+          >
             Log Out
           </button>
         </div>
