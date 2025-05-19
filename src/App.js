@@ -65,6 +65,26 @@ function App() {
 
     return (
       <div className="app-container">
+        <button
+          style={{
+            position: "absolute",
+            top: "1rem",
+            right: "1rem",
+            padding: "0.5rem 1rem",
+            border: "none",
+            borderRadius: "4px",
+            background: "#a59480",
+            color: "#fff",
+            cursor: "pointer",
+            zIndex: 10
+          }}
+          onClick={async () => {
+            await supabase.auth.signOut();
+            window.location.reload();
+          }}
+        >
+          Sign Out
+        </button>
         <h1 className="app-title">Noir CRM – Members</h1>
         <ul className="member-list">
           {members.map(member => (
