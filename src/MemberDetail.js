@@ -10,6 +10,7 @@ const MemberDetail = ({
   setNewTransaction,
   transactionStatus,
   session,
+  onDeleteMember,
 }) => {
   const [linkingStripe, setLinkingStripe] = useState(false);
   const [linkResult, setLinkResult] = useState(null);
@@ -228,8 +229,30 @@ const MemberDetail = ({
         {transactionStatus === 'success' && (
           <span style={{ color: 'green', marginLeft: 8 }}>Added!</span>
         )}
-      </form>
-    </div>
+    </form>
+    <button
+      style={{
+        background: '#e74c3c',
+        color: 'white',
+        border: 'none',
+        padding: '12px 24px',
+        borderRadius: '6px',
+        marginTop: '32px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        fontSize: '1.1rem'
+      }}
+      onClick={() => {
+        if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+          if (typeof onDeleteMember === 'function') {
+            onDeleteMember(member.id);
+          }
+        }
+      }}
+    >
+      Delete Member
+    </button>
+  </div>
   );
 };
 
