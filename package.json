@@ -1,37 +1,44 @@
-{
-  "name": "noir-crm-dashboard",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "@supabase/supabase-js": "^2.49.4",
-    "stripe": "^18.1.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  }
+import React, { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import './App.css';
+
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+function App() {
+  const [members, setMembers] = useState([]);
+
+  useEffect(() => {
+    async function fetchMembers() {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .order('join_date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching members:', error);
+      } else {
+        setMembers(data);
+      }
+    }
+    fetchMembers();
+  }, []);
+
+  return (
+    <div className="app-container">
+      <h1 className="app-title">Noir CRM – Members</h1>
+      <ul className="member-list">
+        {members.map(member => (
+          <li key={member.id} className="member-item">
+            <strong>{member.first_name} {member.last_name}</strong> — {member.email}
+            <br/>
+            Member Status: {member.status}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
+
+export default App;
