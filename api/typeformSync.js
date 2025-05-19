@@ -58,23 +58,34 @@ export default async function handler(req, res) {
       // Stripe lookup failed; not fatal
     }
 
-    // Upsert member to Supabase
+    // Upsert member to Supabase, mapping all columns from members_rows.csv with fallbacks/defaults
     const { error } = await supabase.from('members').upsert([
       {
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        phone,
-        company,
-        dob,
-        address,
-        address_2: address2,     // <-- NEW: Address line 2
-        city,
-        state,
-        zip,
-        photo,
-        referred_by: referredBy,
-        stripe_customer_id
+        first_name: firstName || '',
+        last_name: lastName || '',
+        email: email || '',
+        phone: phone || '',
+        company: company || '',
+        dob: dob || '',
+        address: address || '',
+        address_2: address2 || '',
+        city: city || '',
+        state: state || '',
+        zip: zip || '',
+        photo: photo || '',
+        // Referral field (updated property name)
+        referral: referredBy || '',
+        stripe_customer_id: stripe_customer_id || null,
+        spouse_first: '',
+        spouse_last: '',
+        spouse_email: '',
+        spouse_phone: '',
+        membership: '',
+        status: 'pending',
+        balance: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        // Add any other fields from your CSV here, defaulting as needed
       }
     ], { onConflict: ['email'] });
 
