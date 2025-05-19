@@ -68,7 +68,7 @@ export default async function handler(req, res) {
         company,
         dob,
         address,
-        address_line_2: address2,     // <-- NEW: Address line 2
+        address_2: address2,     // <-- NEW: Address line 2
         city,
         state,
         zip,
