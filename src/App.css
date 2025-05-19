@@ -1,38 +1,71 @@
-.App {
-  text-align: center;
+:root {
+  --color-wedding-day: #ecede8;
+  --color-night-sky: #353535;
+  --color-cork: #a59480;
+  --color-daybreak: #cac2b9;
+  --color-greige: #aba8a1;
+  --font-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-base);
+  background-color: var(--color-wedding-day);
+  color: var(--color-night-sky);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.app-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 1rem 2rem;
+  background-color: white;
+  border: 1px solid var(--color-daybreak);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+.app-title {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: var(--color-night-sky);
 }
 
-.App-link {
-  color: #61dafb;
+.member-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.member-item {
+  display: block;
+  overflow: auto;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-greige);
+  border-radius: 4px;
+  background-color: var(--color-wedding-day);
+}
+
+.member-photo {
+  float: left;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.member-item strong {
+  color: var(--color-cork);
+  font-size: 1.1rem;
+  margin-right: auto;
+}
+
+.member-counterpart {
+  clear: both;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-greige);
 }
