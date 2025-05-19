@@ -294,6 +294,11 @@ function App() {
     }
   }
 
+  // Scroll to top on section or selectedMember change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [section, selectedMember]);
+
   if (!session) {
     return (
       <div className="auth-container">
@@ -379,7 +384,23 @@ function App() {
           className={sidebarOpen ? "hamburger open" : "hamburger"}
           onClick={() => setSidebarOpen(!sidebarOpen)}
           aria-label="Open navigation"
-          style={{}}
+          style={
+            isMobile
+              ? {
+                  position: "fixed",
+                  top: "1rem",
+                  right: "1rem",
+                  zIndex: 1001,
+                  background: "#fff",
+                  border: "1px solid #e2dfd8",
+                  borderRadius: "6px",
+                  padding: "0.5rem 1rem",
+                  fontSize: "2rem",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+                  cursor: "pointer"
+                }
+              : {}
+          }
         >
           &#9776;
         </button>
@@ -456,12 +477,18 @@ function App() {
             Log Out
           </button>
         </div>
-        <div className="app-container" style={{
-          marginLeft: isMobile ? 0 : 220,
-          padding: isMobile ? "1rem 2vw" : "2.5rem 2.5vw",
-          minHeight: "100vh",
-          background: "#f8f7f4"
-        }}>
+        <div
+          className="app-container"
+          style={{
+            marginLeft: isMobile ? 0 : 220,
+            padding: isMobile ? "1rem 2vw" : "2.5rem 2.5vw",
+            minHeight: "100vh",
+            background: "#f8f7f4",
+            maxWidth: "100vw",
+            width: "100%",
+            overflowX: isMobile ? "hidden" : undefined
+          }}
+        >
           {section === 'members' && (
             <>
               {!selectedMember ? (
@@ -671,7 +698,8 @@ function App() {
                     borderRadius: "12px",
                     boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
                     padding: "2.5rem 2.5rem 2.5rem 2.5rem",
-                    boxSizing: "border-box"
+                    boxSizing: "border-box",
+                    overflowX: isMobile ? "hidden" : undefined
                   }}
                 >
                   <button
@@ -969,6 +997,13 @@ function App() {
                       @media (max-width: 700px) {
                         .member-detail-view {
                           padding: 1rem 0.5rem !important;
+                          width: 100% !important;
+                          overflow-x: hidden !important;
+                        }
+                        .app-container {
+                          width: 100% !important;
+                          max-width: 100vw !important;
+                          overflow-x: hidden !important;
                         }
                         .member-detail-view > div,
                         .member-detail-view form > div {
@@ -1078,7 +1113,7 @@ function App() {
             </>
           )}
           {section === 'lookup' && (
-            <div style={{ padding: '2rem' }}>
+            <div style={{ padding: '2rem', maxWidth: "100vw", width: "100%" }}>
               <h2>Member Lookup</h2>
               <input
                 type="text"
@@ -1113,10 +1148,18 @@ function App() {
                     <li
                       key={member.id}
                       className="member-item"
-                      style={{ position: "relative", cursor: "pointer" }}
+                      style={{ position: "relative", cursor: "pointer", width: "100%" }}
                       onClick={() => {
                         setSelectedMember(member);
                         fetchLedger(member.id);
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      onKeyDown={e => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          setSelectedMember(member);
+                          fetchLedger(member.id);
+                        }
                       }}
                     >
                       {editingMemberId === member.id ? (
@@ -1299,6 +1342,7 @@ function App() {
       </>
     );
   }
+
 }
 
 export default App;
