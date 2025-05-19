@@ -325,7 +325,21 @@ function App() {
 
     return (
       <>
-        <div className="sidebar-nav">
+        <div className="sidebar-nav" style={{
+          minWidth: 210,
+          background: "#f3f2ef",
+          borderRight: "1.5px solid #e2dfd8",
+          minHeight: "100vh",
+          padding: "2rem 1rem 2rem 1.5rem",
+          boxSizing: "border-box",
+          position: "fixed",
+          top: 0,
+          left: 0,
+          zIndex: 10,
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.5rem"
+        }}>
           <button className={section === 'members' ? 'nav-active' : ''} onClick={() => setSection('members')}>
             Members
           </button>
@@ -339,7 +353,12 @@ function App() {
             Log Out
           </button>
         </div>
-        <div className="app-container">
+        <div className="app-container" style={{
+          marginLeft: 220,
+          padding: "2.5rem 2.5vw",
+          minHeight: "100vh",
+          background: "#f8f7f4"
+        }}>
           {section === 'members' && (
             <>
               {!selectedMember ? (
@@ -520,11 +539,23 @@ function App() {
                   </ul>
                 </>
               ) : (
-                // Member Detail View
-                <div className="member-detail-view" style={{ maxWidth: "900px", margin: "2rem auto", background: "#faf9f7", borderRadius: "10px", boxShadow: "0 2px 16px rgba(0,0,0,0.07)", padding: "2rem" }}>
+                // Member Detail View (not modal, full width minus sidebar)
+                <div
+                  className="member-detail-view"
+                  style={{
+                    width: "100%",
+                    maxWidth: "none",
+                    margin: "0 auto",
+                    background: "#faf9f7",
+                    borderRadius: "12px",
+                    boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
+                    padding: "2.5rem 2.5rem 2.5rem 2.5rem",
+                    boxSizing: "border-box"
+                  }}
+                >
                   <button
                     style={{
-                      marginBottom: "1.5rem",
+                      marginBottom: "2rem",
                       padding: "0.5rem 1.25rem",
                       background: "#a59480",
                       color: "#fff",
@@ -545,8 +576,15 @@ function App() {
                       }}
                       style={{ width: "100%" }}
                     >
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "2rem" }}>
-                        <div style={{ flex: "1 0 220px", minWidth: 220 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "2.5rem",
+                          flexWrap: "wrap"
+                        }}
+                      >
+                        <div style={{ flex: "1 0 320px", minWidth: 260 }}>
+                          <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Primary Member</h3>
                           <label>
                             First Name:
                             <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
@@ -593,7 +631,8 @@ function App() {
                             )}
                           </label>
                         </div>
-                        <div style={{ flex: "1 0 220px", minWidth: 220 }}>
+                        <div style={{ flex: "1 0 320px", minWidth: 260 }}>
+                          <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Counterpart</h3>
                           <label>
                             Counterpart First Name:
                             <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
@@ -633,14 +672,29 @@ function App() {
                           </label>
                         </div>
                       </div>
-                      <div style={{ marginTop: "1rem" }}>
+                      <div style={{ marginTop: "1.5rem" }}>
                         <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
                         <button type="button" onClick={handleCancelEditMember}>Cancel</button>
                       </div>
                     </form>
                   ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "2.5rem" }}>
-                      <div style={{ flex: "1 0 280px", minWidth: 280 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "2.5rem",
+                        flexWrap: "wrap"
+                      }}
+                    >
+                      <div style={{
+                        flex: "1 0 320px",
+                        minWidth: 260,
+                        background: "#fff",
+                        borderRadius: "10px",
+                        padding: "1.5rem 1.5rem 1.5rem 1.5rem",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.03)",
+                        marginBottom: "1.5rem"
+                      }}>
+                        <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Primary Member</h3>
                         {selectedMember.photo && (
                           <img
                             src={selectedMember.photo}
@@ -681,7 +735,17 @@ function App() {
                         </div>
                       </div>
                       {selectedMember.first_name2 && (
-                        <div className="member-counterpart" style={{ flex: "1 0 280px", minWidth: 280, background: "#f2eee8", borderRadius: "10px", padding: "1.2rem" }}>
+                        <div className="member-counterpart"
+                          style={{
+                            flex: "1 0 320px",
+                            minWidth: 260,
+                            background: "#f2eee8",
+                            borderRadius: "10px",
+                            padding: "1.5rem",
+                            marginBottom: "1.5rem",
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.02)"
+                          }}>
+                          <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Counterpart</h3>
                           {selectedMember.photo2 && (
                             <img
                               src={selectedMember.photo2}
@@ -702,17 +766,17 @@ function App() {
                   )}
                   {/* Ledger section */}
                   <div style={{ marginTop: "2.5rem" }}>
-                    <h2>
-                      {selectedMember.first_name} {selectedMember.last_name} – Ledger
-                    </h2>
-                    <div>Membership: {selectedMember.membership}</div>
-                    <div>Current Balance: $
+                    <h3 style={{ color: "#a59480", fontWeight: 700, letterSpacing: "0.01em", marginBottom: "1rem" }}>Ledger</h3>
+                    <div style={{ marginBottom: "0.5rem" }}>
+                      <span style={{ fontWeight: 600 }}>{selectedMember.first_name} {selectedMember.last_name}</span> – Membership: {selectedMember.membership}
+                    </div>
+                    <div style={{ marginBottom: "1.2rem" }}>
+                      <strong>Current Balance:</strong> $
                       {(memberLedger || []).reduce(
                         (acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)),
                         0
                       )}
                     </div>
-                    <h3 style={{ marginTop: "1.5rem" }}>Transactions</h3>
                     {ledgerLoading ? (
                       <div>Loading...</div>
                     ) : (
@@ -742,7 +806,7 @@ function App() {
                     {session.user?.user_metadata?.role === 'admin' && (
                       <div className="add-transaction-panel" style={{ marginTop: "1.5rem" }}>
                         <h4>Add Transaction</h4>
-                        <form onSubmit={e => { e.preventDefault(); handleAddTransaction(selectedMember.id); }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <form onSubmit={e => { e.preventDefault(); handleAddTransaction(selectedMember.id); }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                           <select value={newTransaction.type} onChange={e => setNewTransaction(t => ({ ...t, type: e.target.value }))}>
                             <option value="payment">Payment</option>
                             <option value="purchase">Purchase</option>
@@ -768,6 +832,21 @@ function App() {
                       </div>
                     )}
                   </div>
+                  {/* Responsive styles */}
+                  <style>
+                    {`
+                      @media (max-width: 700px) {
+                        .member-detail-view {
+                          padding: 1rem 0.5rem !important;
+                        }
+                        .member-detail-view > div,
+                        .member-detail-view form > div {
+                          flex-direction: column !important;
+                          gap: 1.2rem !important;
+                        }
+                      }
+                    `}
+                  </style>
                 </div>
               )}
             </>
