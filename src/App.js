@@ -5,6 +5,19 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { v4 as uuidv4 } from 'uuid';
 
+// Responsive helper
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 700);
+  useEffect(() => {
+    function handleResize() {
+      setIsMobile(window.innerWidth <= 700);
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  return isMobile;
+}
+
 // Formatting helpers
 function formatPhone(phone) {
   if (!phone) return "";
@@ -72,6 +85,7 @@ function App() {
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [newTransaction, setNewTransaction] = useState({ type: 'payment', amount: '', note: '' });
   const [transactionStatus, setTransactionStatus] = useState('');
+  const isMobile = useIsMobile();
   // Fetch ledger for a member
   async function fetchLedger(memberId) {
     setLedgerLoading(true);
@@ -370,17 +384,18 @@ function App() {
           &#9776;
         </button>
         <div className={`sidebar-nav${sidebarOpen ? " open" : ""}`} style={{
-          minWidth: 210,
+          minWidth: isMobile ? (sidebarOpen ? 180 : 0) : 210,
+          width: isMobile ? (sidebarOpen ? 180 : 0) : 210,
           background: "#f3f2ef",
-          borderRight: "1.5px solid #e2dfd8",
+          borderRight: isMobile ? "none" : "1.5px solid #e2dfd8",
           minHeight: "100vh",
-          padding: "2rem 1rem 2rem 1.5rem",
+          padding: isMobile ? "1rem 0.5rem" : "2rem 1rem 2rem 1.5rem",
           boxSizing: "border-box",
           position: "fixed",
           top: 0,
           left: 0,
           zIndex: 10,
-          display: "flex",
+          display: isMobile && !sidebarOpen ? "none" : "flex",
           flexDirection: "column",
           gap: "1.5rem"
         }}>
@@ -442,8 +457,8 @@ function App() {
           </button>
         </div>
         <div className="app-container" style={{
-          marginLeft: 220,
-          padding: "2.5rem 2.5vw",
+          marginLeft: isMobile ? 0 : 220,
+          padding: isMobile ? "1rem 2vw" : "2.5rem 2.5vw",
           minHeight: "100vh",
           background: "#f8f7f4"
         }}>
