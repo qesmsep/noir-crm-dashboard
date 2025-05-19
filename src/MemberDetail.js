@@ -101,18 +101,43 @@ const MemberDetail = ({
           <img src={member.photo} alt="Member" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 8, marginRight: 20 }} />
         )}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 20 }}>
-            {member.first_name} {member.last_name}
-            {member.membership && (
-              <span style={{ fontWeight: 400, fontSize: 16, marginLeft: 8, color: '#7c6b58' }}>
-                — {member.membership}
+          <div style={{ fontWeight: 700, fontSize: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>
+              {member.first_name} {member.last_name}
+              {member.membership && (
+                <span style={{ fontWeight: 400, fontSize: 16, marginLeft: 8, color: '#7c6b58' }}>
+                  — {member.membership}
+                </span>
+              )}
+            </span>
+            {member.status && (
+              <span
+                className={`status-badge status-${member.status.toLowerCase()}`}
+                style={{
+                  fontWeight: 400,
+                  fontSize: 14,
+                  marginLeft: 10,
+                  padding: '2px 10px',
+                  borderRadius: 8,
+                  background: member.status.toLowerCase() === 'active'
+                    ? '#c2eacb'
+                    : member.status.toLowerCase() === 'pending'
+                    ? '#fff3cd'
+                    : member.status.toLowerCase() === 'inactive'
+                    ? '#f8d7da'
+                    : '#ececec',
+                  color: member.status.toLowerCase() === 'active'
+                    ? '#217a40'
+                    : member.status.toLowerCase() === 'pending'
+                    ? '#ad8608'
+                    : member.status.toLowerCase() === 'inactive'
+                    ? '#842029'
+                    : '#353535',
+                }}
+              >
+                {member.status}
               </span>
             )}
-          </div>
-          <div className="member-status">
-            <span className={`status-badge status-${member.status?.toLowerCase() || "unknown"}`}>
-              {member.status || "N/A"}
-            </span>
           </div>
           <div style={{ fontSize: 15, color: '#353535' }}>
             {member.email && <div>Email: {member.email}</div>}
