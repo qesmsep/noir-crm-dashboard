@@ -14,6 +14,7 @@ function App() {
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteStatus, setPromoteStatus] = useState('');
   const [section, setSection] = useState('members');
+  const [lookupQuery, setLookupQuery] = useState('');
   // Create User form state
   const [createEmail, setCreateEmail] = useState('');
   const [createName, setCreateName] = useState('');
@@ -363,9 +364,76 @@ function App() {
             </>
           )}
           {section === 'lookup' && (
-            <div style={{ padding: "2rem" }}>
-              <h2>Lookup (coming soon)</h2>
-              <div>Search for members here.</div>
+            <div style={{ padding: '2rem' }}>
+              <h2>Member Lookup</h2>
+              <input
+                type="text"
+                placeholder="Search by name, email, or phone"
+                value={lookupQuery}
+                onChange={e => setLookupQuery(e.target.value)}
+                style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
+              />
+              <ul className="member-list">
+                {members.filter(m => {
+                  const q = lookupQuery.trim().toLowerCase();
+                  if (!q) return false;
+                  return (
+                    (m.first_name && m.first_name.toLowerCase().includes(q)) ||
+                    (m.last_name && m.last_name.toLowerCase().includes(q)) ||
+                    (m.email && m.email.toLowerCase().includes(q)) ||
+                    (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+                  );
+                }).length === 0 && lookupQuery ? (
+                  <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
+                ) : (
+                  members.filter(m => {
+                    const q = lookupQuery.trim().toLowerCase();
+                    if (!q) return false;
+                    return (
+                      (m.first_name && m.first_name.toLowerCase().includes(q)) ||
+                      (m.last_name && m.last_name.toLowerCase().includes(q)) ||
+                      (m.email && m.email.toLowerCase().includes(q)) ||
+                      (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+                    );
+                  }).map(member => (
+                    <li key={member.id} className="member-item">
+                      {member.photo && (
+                        <img
+                          src={member.photo}
+                          alt={`${member.first_name} ${member.last_name}`}
+                          className="member-photo"
+                        />
+                      )}
+                      <div className="member-info">
+                        <strong>
+                          {member.first_name} {member.last_name} — {member.membership}
+                        </strong>
+                        <div>Balance: ${member.balance}</div>
+                        <div>Phone: {member.phone}</div>
+                        <div>Email: {member.email}</div>
+                        <div>Date of Birth: {member.dob}</div>
+                      </div>
+                      {member.first_name2 && (
+                        <div className="member-counterpart">
+                          {member.photo2 && (
+                            <img
+                              src={member.photo2}
+                              alt={`${member.first_name2} ${member.last_name2}`}
+                              className="member-photo"
+                            />
+                          )}
+                          <strong>
+                            {member.first_name2} {member.last_name2}
+                          </strong>
+                          <div>Email: {member.email2}</div>
+                          <div>Phone: {member.phone2}</div>
+                          <div>Company: {member.company2}</div>
+                        </div>
+                      )}
+                    </li>
+                  ))
+                )}
+              </ul>
             </div>
           )}
         </div>
