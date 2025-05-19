@@ -59,6 +59,32 @@ function App() {
   }
 
   if (session) {
+    const isAdmin = session.user?.user_metadata?.role === "admin";
+    if (!isAdmin) {
+      return (
+        <div style={{ padding: "4rem", textAlign: "center" }}>
+          <h2>You do not have access to this dashboard.</h2>
+          <button
+            style={{
+              marginTop: "2rem",
+              padding: "0.5rem 1.5rem",
+              background: "#a59480",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.reload();
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+      );
+    }
+
     if (!members.length) {
       return <div>Loading members...</div>;
     }
