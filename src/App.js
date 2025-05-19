@@ -342,27 +342,211 @@ function App() {
         <div className="app-container">
           {section === 'members' && (
             <>
-              <h1 className="app-title">Noir CRM – Members</h1>
-              <ul className="member-list">
-                {members.map(member => (
-                  <li
-                    key={member.id}
-                    className="member-item"
-                    style={{ position: "relative", cursor: "pointer" }}
-                    onClick={() => {
-                      setSelectedMember(member);
-                      fetchLedger(member.id);
-                    }}
-                  >
-                    {editingMemberId === member.id ? (
-                      <form
-                        onSubmit={e => {
-                          e.preventDefault();
-                          handleSaveEditMember();
+              {!selectedMember ? (
+                <>
+                  <h1 className="app-title">Noir CRM – Members</h1>
+                  <ul className="member-list">
+                    {members.map(member => (
+                      <li
+                        key={member.id}
+                        className="member-item"
+                        style={{ position: "relative", cursor: "pointer" }}
+                        onClick={() => {
+                          setSelectedMember(member);
+                          fetchLedger(member.id);
                         }}
-                        style={{ width: "100%" }}
                       >
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        {editingMemberId === member.id ? (
+                          <form
+                            onSubmit={e => {
+                              e.preventDefault();
+                              handleSaveEditMember();
+                            }}
+                            style={{ width: "100%" }}
+                          >
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                              <label>
+                                First Name:
+                                <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
+                              </label>
+                              <label>
+                                Last Name:
+                                <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
+                              </label>
+                              <label>
+                                Email:
+                                <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
+                              </label>
+                              <label>
+                                Phone:
+                                <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
+                              </label>
+                              <label>
+                                Date of Birth:
+                                <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
+                              </label>
+                              <label>
+                                Membership:
+                                <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
+                              </label>
+                              <label>
+                                Balance:
+                                <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
+                              </label>
+                              <label>
+                                Photo:
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={async e => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      const url = await handlePhotoUpload(file, false);
+                                      if (url) setEditMemberForm(form => ({ ...form, photo: url }));
+                                    }
+                                  }}
+                                />
+                                {editMemberForm.photo && (
+                                  <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                                )}
+                              </label>
+                              <label>
+                                Counterpart First Name:
+                                <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
+                              </label>
+                              <label>
+                                Counterpart Last Name:
+                                <input value={editMemberForm.last_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name2: e.target.value })} />
+                              </label>
+                              <label>
+                                Counterpart Email:
+                                <input value={editMemberForm.email2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email2: e.target.value })} />
+                              </label>
+                              <label>
+                                Counterpart Phone:
+                                <input value={editMemberForm.phone2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone2: e.target.value })} />
+                              </label>
+                              <label>
+                                Counterpart Company:
+                                <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
+                              </label>
+                              <label>
+                                Counterpart Photo:
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={async e => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                      const url = await handlePhotoUpload(file, true);
+                                      if (url) setEditMemberForm(form => ({ ...form, photo2: url }));
+                                    }
+                                  }}
+                                />
+                                {editMemberForm.photo2 && (
+                                  <img src={editMemberForm.photo2} alt="Counterpart Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                                )}
+                              </label>
+                            </div>
+                            <div style={{ marginTop: "0.5rem" }}>
+                              <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
+                              <button type="button" onClick={handleCancelEditMember}>Cancel</button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            {member.photo && (
+                              <img
+                                src={member.photo}
+                                alt={`${member.first_name} ${member.last_name}`}
+                                className="member-photo"
+                              />
+                            )}
+                            <div className="member-info">
+                              <strong>
+                                {member.first_name} {member.last_name} — {member.membership}
+                              </strong>
+                              <div>Balance: ${member.balance}</div>
+                              <div>Phone: {member.phone}</div>
+                              <div>Email: {member.email}</div>
+                              <div>Date of Birth: {member.dob}</div>
+                            </div>
+                            {member.first_name2 && (
+                              <div className="member-counterpart">
+                                {member.photo2 && (
+                                  <img
+                                    src={member.photo2}
+                                    alt={`${member.first_name2} ${member.last_name2}`}
+                                    className="member-photo"
+                                  />
+                                )}
+                                <strong>
+                                  {member.first_name2} {member.last_name2}
+                                </strong>
+                                <div>Email: {member.email2}</div>
+                                <div>Phone: {member.phone2}</div>
+                                <div>Company: {member.company2}</div>
+                              </div>
+                            )}
+                            <div style={{
+                              position: "absolute",
+                              bottom: "16px",
+                              right: "16px"
+                            }}>
+                              <button
+                                style={{
+                                  padding: "0.65rem 1.5rem",
+                                  fontSize: "1.1rem",
+                                  borderRadius: "6px",
+                                  background: "#A59480",
+                                  color: "#fff",
+                                  border: "none",
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 10px rgba(53,53,53,0.07)"
+                                }}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleEditMember(member);
+                                }}
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                // Member Detail View
+                <div className="member-detail-view" style={{ maxWidth: "900px", margin: "2rem auto", background: "#faf9f7", borderRadius: "10px", boxShadow: "0 2px 16px rgba(0,0,0,0.07)", padding: "2rem" }}>
+                  <button
+                    style={{
+                      marginBottom: "1.5rem",
+                      padding: "0.5rem 1.25rem",
+                      background: "#a59480",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "5px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                    onClick={() => setSelectedMember(null)}
+                  >
+                    ← Back to List
+                  </button>
+                  {editingMemberId === selectedMember.id ? (
+                    <form
+                      onSubmit={e => {
+                        e.preventDefault();
+                        handleSaveEditMember();
+                      }}
+                      style={{ width: "100%" }}
+                    >
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "2rem" }}>
+                        <div style={{ flex: "1 0 220px", minWidth: 220 }}>
                           <label>
                             First Name:
                             <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
@@ -408,6 +592,8 @@ function App() {
                               <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
                             )}
                           </label>
+                        </div>
+                        <div style={{ flex: "1 0 220px", minWidth: 220 }}>
                           <label>
                             Counterpart First Name:
                             <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
@@ -446,51 +632,33 @@ function App() {
                             )}
                           </label>
                         </div>
-                        <div style={{ marginTop: "0.5rem" }}>
-                          <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
-                          <button type="button" onClick={handleCancelEditMember}>Cancel</button>
-                        </div>
-                      </form>
-                    ) : (
-                      <>
-                        {member.photo && (
+                      </div>
+                      <div style={{ marginTop: "1rem" }}>
+                        <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
+                        <button type="button" onClick={handleCancelEditMember}>Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "2.5rem" }}>
+                      <div style={{ flex: "1 0 280px", minWidth: 280 }}>
+                        {selectedMember.photo && (
                           <img
-                            src={member.photo}
-                            alt={`${member.first_name} ${member.last_name}`}
+                            src={selectedMember.photo}
+                            alt={`${selectedMember.first_name} ${selectedMember.last_name}`}
                             className="member-photo"
+                            style={{ maxWidth: 180, borderRadius: "10px", marginBottom: "1rem" }}
                           />
                         )}
-                        <div className="member-info">
+                        <div className="member-info" style={{ fontSize: "1.15rem" }}>
                           <strong>
-                            {member.first_name} {member.last_name} — {member.membership}
+                            {selectedMember.first_name} {selectedMember.last_name} — {selectedMember.membership}
                           </strong>
-                          <div>Balance: ${member.balance}</div>
-                          <div>Phone: {member.phone}</div>
-                          <div>Email: {member.email}</div>
-                          <div>Date of Birth: {member.dob}</div>
+                          <div>Balance: ${selectedMember.balance}</div>
+                          <div>Phone: {selectedMember.phone}</div>
+                          <div>Email: {selectedMember.email}</div>
+                          <div>Date of Birth: {selectedMember.dob}</div>
                         </div>
-                        {member.first_name2 && (
-                          <div className="member-counterpart">
-                            {member.photo2 && (
-                              <img
-                                src={member.photo2}
-                                alt={`${member.first_name2} ${member.last_name2}`}
-                                className="member-photo"
-                              />
-                            )}
-                            <strong>
-                              {member.first_name2} {member.last_name2}
-                            </strong>
-                            <div>Email: {member.email2}</div>
-                            <div>Phone: {member.phone2}</div>
-                            <div>Company: {member.company2}</div>
-                          </div>
-                        )}
-                        <div style={{
-                          position: "absolute",
-                          bottom: "16px",
-                          right: "16px"
-                        }}>
+                        <div style={{ marginTop: "1.25rem" }}>
                           <button
                             style={{
                               padding: "0.65rem 1.5rem",
@@ -505,17 +673,103 @@ function App() {
                             }}
                             onClick={e => {
                               e.stopPropagation();
-                              handleEditMember(member);
+                              handleEditMember(selectedMember);
                             }}
                           >
                             Edit
                           </button>
                         </div>
-                      </>
+                      </div>
+                      {selectedMember.first_name2 && (
+                        <div className="member-counterpart" style={{ flex: "1 0 280px", minWidth: 280, background: "#f2eee8", borderRadius: "10px", padding: "1.2rem" }}>
+                          {selectedMember.photo2 && (
+                            <img
+                              src={selectedMember.photo2}
+                              alt={`${selectedMember.first_name2} ${selectedMember.last_name2}`}
+                              className="member-photo"
+                              style={{ maxWidth: 120, borderRadius: "8px", marginBottom: "0.7rem" }}
+                            />
+                          )}
+                          <strong>
+                            {selectedMember.first_name2} {selectedMember.last_name2}
+                          </strong>
+                          <div>Email: {selectedMember.email2}</div>
+                          <div>Phone: {selectedMember.phone2}</div>
+                          <div>Company: {selectedMember.company2}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* Ledger section */}
+                  <div style={{ marginTop: "2.5rem" }}>
+                    <h2>
+                      {selectedMember.first_name} {selectedMember.last_name} – Ledger
+                    </h2>
+                    <div>Membership: {selectedMember.membership}</div>
+                    <div>Current Balance: $
+                      {(memberLedger || []).reduce(
+                        (acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)),
+                        0
+                      )}
+                    </div>
+                    <h3 style={{ marginTop: "1.5rem" }}>Transactions</h3>
+                    {ledgerLoading ? (
+                      <div>Loading...</div>
+                    ) : (
+                      <table className="ledger-table">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Note</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(memberLedger || []).map(t => (
+                            <tr key={t.id}>
+                              <td>{new Date(t.created_at).toLocaleDateString()}</td>
+                              <td>{t.type}</td>
+                              <td style={{ color: t.type === 'payment' ? 'green' : 'red' }}>
+                                {t.type === 'payment' ? '+' : '-'}${Math.abs(Number(t.amount)).toFixed(2)}
+                              </td>
+                              <td>{t.note}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     )}
-                  </li>
-                ))}
-              </ul>
+                    {session.user?.user_metadata?.role === 'admin' && (
+                      <div className="add-transaction-panel" style={{ marginTop: "1.5rem" }}>
+                        <h4>Add Transaction</h4>
+                        <form onSubmit={e => { e.preventDefault(); handleAddTransaction(selectedMember.id); }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <select value={newTransaction.type} onChange={e => setNewTransaction(t => ({ ...t, type: e.target.value }))}>
+                            <option value="payment">Payment</option>
+                            <option value="purchase">Purchase</option>
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            value={newTransaction.amount}
+                            onChange={e => setNewTransaction(t => ({ ...t, amount: e.target.value }))}
+                            style={{ width: 100 }}
+                            required
+                          />
+                          <input
+                            type="text"
+                            placeholder="Note"
+                            value={newTransaction.note}
+                            onChange={e => setNewTransaction(t => ({ ...t, note: e.target.value }))}
+                            style={{ width: 160 }}
+                          />
+                          <button type="submit">Add</button>
+                        </form>
+                        {transactionStatus && <div style={{ marginTop: 4, color: '#353535' }}>{transactionStatus}</div>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
           {section === 'admin' && (
@@ -821,79 +1075,7 @@ function App() {
             </div>
           )}
         </div>
-        {/* Ledger modal/panel */}
-        {selectedMember && (
-          <div className="ledger-modal">
-            <div className="ledger-modal-content">
-              <button className="ledger-close" onClick={() => setSelectedMember(null)}>Close</button>
-              <h2>
-                {selectedMember.first_name} {selectedMember.last_name} – Ledger
-              </h2>
-              <div>Membership: {selectedMember.membership}</div>
-              <div>Current Balance: $
-                {(memberLedger || []).reduce(
-                  (acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)),
-                  0
-                )}
-              </div>
-              <h3>Transactions</h3>
-              {ledgerLoading ? (
-                <div>Loading...</div>
-              ) : (
-                <table className="ledger-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Amount</th>
-                      <th>Note</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(memberLedger || []).map(t => (
-                      <tr key={t.id}>
-                        <td>{new Date(t.created_at).toLocaleDateString()}</td>
-                        <td>{t.type}</td>
-                        <td style={{ color: t.type === 'payment' ? 'green' : 'red' }}>
-                          {t.type === 'payment' ? '+' : '-'}${Math.abs(Number(t.amount)).toFixed(2)}
-                        </td>
-                        <td>{t.note}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-              {session.user?.user_metadata?.role === 'admin' && (
-                <div className="add-transaction-panel">
-                  <h4>Add Transaction</h4>
-                  <form onSubmit={e => { e.preventDefault(); handleAddTransaction(selectedMember.id); }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <select value={newTransaction.type} onChange={e => setNewTransaction(t => ({ ...t, type: e.target.value }))}>
-                      <option value="payment">Payment</option>
-                      <option value="purchase">Purchase</option>
-                    </select>
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      value={newTransaction.amount}
-                      onChange={e => setNewTransaction(t => ({ ...t, amount: e.target.value }))}
-                      style={{ width: 100 }}
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="Note"
-                      value={newTransaction.note}
-                      onChange={e => setNewTransaction(t => ({ ...t, note: e.target.value }))}
-                      style={{ width: 160 }}
-                    />
-                    <button type="submit">Add</button>
-                  </form>
-                  {transactionStatus && <div style={{ marginTop: 4, color: '#353535' }}>{transactionStatus}</div>}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Ledger modal removed; member detail view now in main panel */}
       </>
     );
   }
