@@ -119,14 +119,14 @@ const MemberDetail = ({
                   marginLeft: 10,
                   padding: '2px 10px',
                   borderRadius: 8,
-                  background: member.status.toLowerCase() === 'active'
+                  background: member.status.toLowerCase() === 'Active'
                     ? '#c2eacb'
                     : member.status.toLowerCase() === 'pending'
                     ? '#fff3cd'
                     : member.status.toLowerCase() === 'inactive'
                     ? '#f8d7da'
                     : '#ececec',
-                  color: member.status.toLowerCase() === 'active'
+                  color: member.status.toLowerCase() === 'Active'
                     ? '#217a40'
                     : member.status.toLowerCase() === 'pending'
                     ? '#ad8608'
