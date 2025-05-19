@@ -55,6 +55,16 @@ export default async function handler(req, res) {
     });
 
     if (response.ok) {
+      // Delete the user from the members table as well
+      const supabaseDb = createClient(supabaseUrl, service_role_key);
+      const { error: dbError } = await supabaseDb
+        .from('members')
+        .delete()
+        .eq('id', user_id);
+
+      if (dbError) {
+        return res.status(500).json({ error: 'User deleted from Auth, but failed to delete from members', details: dbError.message });
+      }
       return res.status(200).json({ success: true });
     } else {
       const error = await response.json();
