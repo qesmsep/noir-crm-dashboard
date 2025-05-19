@@ -21,7 +21,7 @@ body {
   top: 0;
   bottom: 0;
   width: 220px;
-  background: var(--color-daybreak);
+  background: var(--color-cork);
   color: var(--color-night-sky);
   display: flex;
   flex-direction: column;
@@ -34,7 +34,7 @@ body {
 }
 
 .sidebar-nav button {
-  background: none;
+  background: var(--color-daybreak);
   border: none;
   color: var(--color-night-sky);
   font-size: 1.14rem;
