@@ -15,6 +15,7 @@ export default async function handler(req, res) {
 
   try {
     const { form_response } = req.body;
+    console.log('Typeform Payload:', JSON.stringify(form_response, null, 2));
 
     // Example: Extract answers by their question refs or order
     // You may want to log form_response to see the structure
