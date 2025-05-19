@@ -18,6 +18,70 @@ function App() {
   const [createEmail, setCreateEmail] = useState('');
   const [createName, setCreateName] = useState('');
   const [createStatus, setCreateStatus] = useState('');
+  // User management state for Admin tab
+  const [users, setUsers] = useState([]);
+  const [editUserId, setEditUserId] = useState(null);
+  const [editForm, setEditForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    role: "view"
+  });
+  useEffect(() => {
+    async function fetchUsers() {
+      if (section === "admin") {
+        const res = await fetch('/api/listUsers');
+        const data = await res.json();
+        setUsers(data.users || []);
+      }
+    }
+    fetchUsers();
+  }, [section]);
+
+  function handleEditUser(user) {
+    setEditUserId(user.id);
+    setEditForm({
+      first_name: user.user_metadata?.first_name || "",
+      last_name: user.user_metadata?.last_name || "",
+      email: user.email,
+      phone: user.user_metadata?.phone || "",
+      role: user.user_metadata?.role || "view"
+    });
+  }
+
+  function handleCancelEdit() {
+    setEditUserId(null);
+    setEditForm({
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      role: "view"
+    });
+  }
+
+  async function handleSaveUser(userId) {
+    // Call your API to update user
+    const res = await fetch('/api/updateUser', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: userId, ...editForm })
+    });
+    const result = await res.json();
+    if (result.success) {
+      // Refresh user list
+      const newUsers = users.map(u =>
+        u.id === userId
+          ? { ...u, email: editForm.email, user_metadata: { ...u.user_metadata, ...editForm, role: editForm.role } }
+          : u
+      );
+      setUsers(newUsers);
+      setEditUserId(null);
+    } else {
+      alert(result.error || "Failed to update user");
+    }
+  }
 
   useEffect(() => {
     // Get initial session
@@ -245,7 +309,57 @@ function App() {
                   </button>
                 </form>
                 {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
-              </div>
+          </div>
+          {/* User Management Panel */}
+          <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+            <h2>All Users</h2>
+            <table className="user-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "0.5rem" }}>First Name</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Last Name</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Email</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Phone</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Role</th>
+                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(user => (
+                  editUserId === user.id ? (
+                    <tr key={user.id}>
+                      <td><input value={editForm.first_name} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} /></td>
+                      <td><input value={editForm.last_name} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} /></td>
+                      <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
+                      <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
+                      <td>
+                        <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
+                          <option value="admin">admin</option>
+                          <option value="member">member</option>
+                          <option value="view">view</option>
+                        </select>
+                      </td>
+                      <td>
+                        <button onClick={() => handleSaveUser(user.id)} style={{ marginRight: "0.5rem" }}>Save</button>
+                        <button onClick={handleCancelEdit}>Cancel</button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={user.id}>
+                      <td>{user.user_metadata?.first_name || ""}</td>
+                      <td>{user.user_metadata?.last_name || ""}</td>
+                      <td>{user.email}</td>
+                      <td>{user.user_metadata?.phone || ""}</td>
+                      <td>{user.user_metadata?.role || "view"}</td>
+                      <td>
+                        <button onClick={() => handleEditUser(user)} style={{ marginRight: "0.5rem" }}>Edit</button>
+                      </td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>
+          </div>
             </>
           )}
           {section === 'lookup' && (
