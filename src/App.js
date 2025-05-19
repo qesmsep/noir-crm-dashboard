@@ -945,6 +945,28 @@ function App() {
                             style={{ maxWidth: 180, borderRadius: "10px", marginBottom: "1rem" }}
                           />
                         )}
+                        {selectedMember.status && (
+                          <div style={{
+                            margin: "0.5rem 0 1.25rem 0",
+                            fontWeight: 700,
+                            fontSize: "1.18rem",
+                            color: "#A59480",
+                            letterSpacing: "0.09em",
+                            textTransform: "uppercase"
+                          }}>
+                            STATUS
+                            <span style={{
+                              display: "block",
+                              fontWeight: 600,
+                              fontSize: "1.14rem",
+                              color: "#353535",
+                              marginTop: "0.25rem",
+                              textTransform: "capitalize"
+                            }}>
+                              {selectedMember.status}
+                            </span>
+                          </div>
+                        )}
                         <div className="member-info" style={{ fontSize: "1.15rem" }}>
                           <strong>
                             {selectedMember.first_name} {selectedMember.last_name} — {selectedMember.membership}
