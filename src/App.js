@@ -437,7 +437,16 @@ function App() {
                                     const file = e.target.files[0];
                                     if (file) {
                                       const url = await handlePhotoUpload(file, false);
-                                      if (url) setEditMemberForm(form => ({ ...form, photo: url }));
+                                      if (url && editingMemberId) {
+                                        // Update in Supabase
+                                        await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
+                                        // Update local form state
+                                        setEditMemberForm(form => ({ ...form, photo: url }));
+                                        // Update members array
+                                        setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
+                                        // Update selectedMember if needed
+                                        setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
+                                      }
                                     }
                                   }}
                                 />
@@ -474,7 +483,16 @@ function App() {
                                     const file = e.target.files[0];
                                     if (file) {
                                       const url = await handlePhotoUpload(file, true);
-                                      if (url) setEditMemberForm(form => ({ ...form, photo2: url }));
+                                      if (url && editingMemberId) {
+                                        // Update in Supabase
+                                        await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
+                                        // Update local form state
+                                        setEditMemberForm(form => ({ ...form, photo2: url }));
+                                        // Update members array
+                                        setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
+                                        // Update selectedMember if needed
+                                        setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
+                                      }
                                     }
                                   }}
                                 />
@@ -638,7 +656,12 @@ function App() {
                                 const file = e.target.files[0];
                                 if (file) {
                                   const url = await handlePhotoUpload(file, false);
-                                  if (url) setEditMemberForm(form => ({ ...form, photo: url }));
+                                  if (url && editingMemberId) {
+                                    await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
+                                    setEditMemberForm(form => ({ ...form, photo: url }));
+                                    setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
+                                    setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
+                                  }
                                 }
                               }}
                             />
@@ -678,7 +701,12 @@ function App() {
                                 const file = e.target.files[0];
                                 if (file) {
                                   const url = await handlePhotoUpload(file, true);
-                                  if (url) setEditMemberForm(form => ({ ...form, photo2: url }));
+                                  if (url && editingMemberId) {
+                                    await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
+                                    setEditMemberForm(form => ({ ...form, photo2: url }));
+                                    setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
+                                    setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
+                                  }
                                 }
                               }}
                             />
@@ -1050,7 +1078,12 @@ function App() {
                                   const file = e.target.files[0];
                                   if (file) {
                                     const url = await handlePhotoUpload(file, false);
-                                    if (url) setEditMemberForm(form => ({ ...form, photo: url }));
+                                    if (url && editingMemberId) {
+                                      await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
+                                      setEditMemberForm(form => ({ ...form, photo: url }));
+                                      setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
+                                      setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
+                                    }
                                   }
                                 }}
                               />
@@ -1087,7 +1120,12 @@ function App() {
                                   const file = e.target.files[0];
                                   if (file) {
                                     const url = await handlePhotoUpload(file, true);
-                                    if (url) setEditMemberForm(form => ({ ...form, photo2: url }));
+                                    if (url && editingMemberId) {
+                                      await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
+                                      setEditMemberForm(form => ({ ...form, photo2: url }));
+                                      setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
+                                      setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
+                                    }
                                   }
                                 }}
                               />
