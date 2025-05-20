@@ -16,17 +16,16 @@ const MemberDetail = ({
   transactionStatus,
   session,
 }) => {
+  // All hooks must be at the top, before any return
   const [linkingStripe, setLinkingStripe] = useState(false);
   const [linkResult, setLinkResult] = useState(null);
   const [stripeData, setStripeData] = useState(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState(null);
-
-  if (!member) return null;
-
-  // Charge balance states
   const [charging, setCharging] = useState(false);
   const [chargeStatus, setChargeStatus] = useState(null);
+
+  if (!member) return null;
 
   // Link member to Stripe
   const handleLinkStripe = async () => {
