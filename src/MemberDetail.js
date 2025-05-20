@@ -24,6 +24,10 @@ const MemberDetail = ({
 
   if (!member) return null;
 
+  // Charge balance states
+  const [charging, setCharging] = useState(false);
+  const [chargeStatus, setChargeStatus] = useState(null);
+
   // Link member to Stripe
   const handleLinkStripe = async () => {
     setLinkingStripe(true);
@@ -84,6 +88,34 @@ const MemberDetail = ({
   };
 
   const formatPhoneNumber = (phone) => {
+  // Compute current balance from ledger
+  const balance = (ledger || []).reduce(
+    (acc, t) => (t.type === 'payment' ? acc + Number(t.amount) : acc - Number(t.amount)),
+    0
+  );
+
+  // Handler to charge outstanding balance via API
+  const handleChargeBalance = async () => {
+    setCharging(true);
+    setChargeStatus(null);
+    try {
+      const res = await fetch('/api/chargeBalance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_id: member.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setChargeStatus('Charged successfully');
+        onAddTransaction();
+      } else {
+        setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
+      }
+    } catch (e) {
+      setChargeStatus(`Error: ${e.message}`);
+    }
+    setCharging(false);
+  };
     if (!phone) return '';
     const trimmed = phone.replace(/\s+/g, '');
     let digits = trimmed.replace(/\D/g, '');
@@ -135,8 +167,8 @@ const MemberDetail = ({
             src={member.photo}
             alt="Member"
             style={{
-              width: 70,
-              height: 70,
+              width: 120,
+              height: 120,
               objectFit: 'cover',
               borderRadius: 8,
               marginRight: 20,
@@ -186,7 +218,17 @@ const MemberDetail = ({
           </div>
           <div style={{ fontSize: 15, color: '#353535' }}>
             {member.email && <div>Email: {member.email}</div>}
-            {member.phone && <div>Phone: {formatPhoneNumber(member.phone)}</div>}
+            {member.phone && (
+              <div>
+                Phone:&nbsp;
+                <a
+                  href={`tel:${member.phone}`}
+                  style={{ color: 'inherit', textDecoration: 'none' }}
+                >
+                  {formatPhoneNumber(member.phone)}
+                </a>
+              </div>
+            )}
             {member.dob && <div>Date of Birth: {formatDateLong(member.dob)}</div>}
           </div>
         </div>
@@ -240,6 +282,22 @@ const MemberDetail = ({
       </div>
 
       <h3>Ledger</h3>
+      <div style={{ marginBottom: '1rem' }}>
+        <strong>
+          {balance >= 0 ? 'Current Balance' : 'Current Credit'}:
+        </strong>{' '}
+        ${Math.abs(balance).toFixed(2)}
+        {session.user?.user_metadata?.role === 'admin' && balance > 0 && (
+          <button
+            onClick={handleChargeBalance}
+            disabled={charging}
+            style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+          >
+            {charging ? 'Charging...' : 'Charge Balance'}
+          </button>
+        )}
+        {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
+      </div>
       {ledgerLoading ? (
         <div>Loading ledger...</div>
       ) : (
@@ -322,6 +380,22 @@ const MemberDetail = ({
       >
         Delete Member
       </button>
+
+      {/* Counterpart photo size adjustment (if applicable) */}
+      {member.photo2 && (
+        <img
+          src={member.photo2}
+          alt="Counterpart"
+          style={{
+            width: 120,
+            height: 120,
+            objectFit: 'cover',
+            borderRadius: 8,
+            marginTop: 20,
+            marginBottom: 10,
+          }}
+        />
+      )}
     </div>
   );
 };
