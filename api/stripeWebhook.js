@@ -60,5 +60,32 @@ export default async function handler(req, res) {
       .eq('id', member.id);
   }
 
+  // Handle automatic subscription renewals
+  if (event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object;
+    const stripeCustomerId = invoice.customer;
+    const amountPaid = invoice.amount_paid; // in cents
+    // Connect to Supabase
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    // Find member by stripe_customer_id
+    const { data: member, error: memberErr } = await supabase
+      .from('members')
+      .select('id')
+      .eq('stripe_customer_id', stripeCustomerId)
+      .single();
+    if (!memberErr && member) {
+      // Record renewal in ledger as a payment (credit)
+      await supabase
+        .from('ledger')
+        .insert([{
+          member_id: member.id,
+          type: 'payment',
+          amount: amountPaid / 100,
+          note: 'Subscription renewal',
+          date: new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+        }]);
+    }
+  }
+
   res.json({ received: true });
 }
