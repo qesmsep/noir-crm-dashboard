@@ -132,7 +132,13 @@ function App() {
         // Optional: update member list balance
         // (recompute from new ledger)
         const ledgerArr = result.data ? [...(memberLedger || []), result.data] : memberLedger || [];
-        const balance = ledgerArr.reduce((acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)), 0);
+        const balance = ledgerArr.reduce(
+          (acc, t) =>
+            t.type === 'purchase'
+              ? acc + Number(t.amount)
+              : acc - Number(t.amount),
+          0
+        );
         setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
       } else {
         setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));

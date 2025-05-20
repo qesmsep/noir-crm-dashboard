@@ -131,7 +131,10 @@ const MemberDetail = ({
 
   // Compute current balance from ledger
   const balance = (ledger || []).reduce(
-    (acc, t) => (t.type === 'payment' ? acc + Number(t.amount) : acc - Number(t.amount)),
+    (acc, t) =>
+      t.type === 'purchase'
+        ? acc + Number(t.amount)
+        : acc - Number(t.amount),
     0
   );
 
@@ -286,19 +289,19 @@ const MemberDetail = ({
         <h3>Ledger</h3>
         <div style={{ marginBottom: '1rem' }}>
           <strong>
-            {balance < 0 ? 'Balance Due:' : 'Current Credit:'}
+            {balance > 0 ? 'Balance Due:' : 'Current Credit:'}
           </strong>{' '}
           ${Math.abs(balance).toFixed(2)}
           {session.user?.user_metadata?.role === 'admin' && member.stripe_customer_id && (
             <>
               <button
                 onClick={handleChargeBalance}
-                disabled={charging || balance >= 0}
-                style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: balance < 0 ? 'pointer' : 'not-allowed' }}
+                disabled={charging || balance <= 0}
+                style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: balance > 0 ? 'pointer' : 'not-allowed' }}
               >
                 {charging ? 'Charging...' : 'Charge Balance'}
               </button>
-              {balance >= 0 && (
+              {balance <= 0 && (
                 <span style={{ marginLeft: '1rem', color: '#888' }}>
                   No outstanding balance to charge.
                 </span>
