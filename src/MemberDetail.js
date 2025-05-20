@@ -28,35 +28,51 @@ const MemberDetail = ({
   const [charging, setCharging] = useState(false);
   const [chargeStatus, setChargeStatus] = useState(null);
 
-  // Member attributes and notes
-  const [attributes, setAttributes] = useState([
-    { key: 'Favorite spirit', value: member.favorite_spirit || '' },
-    { key: 'Favorite cocktail', value: member.favorite_cocktail || '' },
-    { key: 'Water preference', value: member.water_preference || '' },
-    { key: 'Profession', value: member.profession || '' },
-  ]);
-  const [newAttrKey, setNewAttrKey] = useState('');
-  const [newAttrValue, setNewAttrValue] = useState('');
-  const [notes, setNotes] = useState(member.notes || '');
+  // Member attributes and notes (API-driven)
+  const [attributes, setAttributes] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [notesLog, setNotesLog] = useState([]);
 
-  // Save attributes and notes to DB
-  const handleSaveAttributes = async () => {
-    const updateObj = {
-      favorite_spirit: attributes.find(a => a.key === 'Favorite spirit')?.value || null,
-      favorite_cocktail: attributes.find(a => a.key === 'Favorite cocktail')?.value || null,
-      water_preference: attributes.find(a => a.key === 'Water preference')?.value || null,
-      profession: attributes.find(a => a.key === 'Profession')?.value || null,
-      notes: notes || null,
-    };
-    const { error } = await supabase
-      .from('members')
-      .update(updateObj)
-      .eq('id', member.id);
-    if (error) {
-      alert('Failed to save: ' + error.message);
-    } else {
-      alert('Saved successfully');
+  // Load attributes from API
+  const fetchAttributes = async () => {
+    const res = await fetch(`/api/member_attributes?member_id=${member.id}`);
+    const { data } = await res.json();
+    setAttributes(data || []);
+  };
+  // Load notes history
+  const fetchNotesLog = async () => {
+    const res = await fetch(`/api/member_notes?member_id=${member.id}`);
+    const { data } = await res.json();
+    setNotesLog(data || []);
+  };
+  useEffect(() => {
+    if (member?.id) {
+      fetchAttributes();
+      fetchNotesLog();
     }
+  }, [member?.id]);
+
+  const handleSaveAttributes = async () => {
+    for (const attr of attributes) {
+      await fetch('/api/member_attributes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_id: member.id, key: attr.key, value: attr.value }),
+      });
+    }
+    alert('Attributes saved');
+    fetchAttributes();
+  };
+
+  const handleAddNote = async () => {
+    if (!notes.trim()) return;
+    await fetch('/api/member_notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: member.id, note: notes }),
+    });
+    setNotes(''); // clear input
+    fetchNotesLog();
   };
 
   // Link member to Stripe
@@ -284,61 +300,52 @@ const MemberDetail = ({
           <strong>Next Renewal:</strong> {nextRenewal}
         </div>
 
-        {/* Member Attributes */}
-        <div style={{ marginTop: '1.5rem' }}>
-          <h3>Member Attributes</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
-            <tbody>
-              {attributes.map((attr, idx) => (
-                <tr key={idx}>
-                  <td style={{ padding: '4px 8px', fontWeight: 600 }}>{attr.key}</td>
-                  <td style={{ padding: '4px 8px' }}>{attr.value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <form onSubmit={e => {
-            e.preventDefault();
-            if (newAttrKey && newAttrValue) {
-              setAttributes([...attributes, { key: newAttrKey, value: newAttrValue }]);
-              setNewAttrKey('');
-              setNewAttrValue('');
-            }
-          }} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-            <input
-              type="text"
-              placeholder="Attribute name"
-              value={newAttrKey}
-              onChange={e => setNewAttrKey(e.target.value)}
-              style={{ flex: 1 }}
+        {/* Attributes & Notes section (API-driven) */}
+        <div className="add-transaction-panel">
+          {/* Attributes */}
+          <h3>Attributes</h3>
+          {attributes.map((attr, i) => (
+            <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <input
+                value={attr.key}
+                onChange={e => {
+                  const newAttrs = [...attributes];
+                  newAttrs[i].key = e.target.value;
+                  setAttributes(newAttrs);
+                }}
+                className="add-transaction-input"
+                placeholder="Attribute"
+              />
+              <input
+                value={attr.value}
+                onChange={e => {
+                  const newAttrs = [...attributes];
+                  newAttrs[i].value = e.target.value;
+                  setAttributes(newAttrs);
+                }}
+                className="add-transaction-input"
+                placeholder="Value"
+              />
+            </div>
+          ))}
+          <button onClick={handleSaveAttributes} className="add-transaction-btn">Save Attributes</button>
+          {/* Notes */}
+          <h3>Notes History</h3>
+          <ul>
+            {notesLog.map(n => (
+              <li key={n.id}>{formatDateLong(n.created_at)}: {n.note}</li>
+            ))}
+          </ul>
+          <h3>Add Note</h3>
+          <div className="add-transaction-panel">
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="add-transaction-input"
+              placeholder="New note..."
             />
-            <input
-              type="text"
-              placeholder="Value"
-              value={newAttrValue}
-              onChange={e => setNewAttrValue(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button type="submit" style={{ padding: '0.4rem 0.8rem' }}>Add</button>
-          </form>
-        </div>
-
-        {/* Notes */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h3>Notes</h3>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            rows={4}
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-            placeholder="Add visit notes..."
-          />
-          <button
-            onClick={handleSaveAttributes}
-            style={{ padding: '0.5rem 1rem', marginBottom: '1.5rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Save Changes
-          </button>
+            <button onClick={handleAddNote} className="add-transaction-btn">Add Note</button>
+          </div>
         </div>
 
         <h3>Ledger</h3>
