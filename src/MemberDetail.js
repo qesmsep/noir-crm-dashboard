@@ -1,10 +1,14 @@
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 const MemberDetail = ({
   member,
@@ -22,6 +26,10 @@ const MemberDetail = ({
   const [linkResult, setLinkResult] = useState(null);
   const [stripeData, setStripeData] = useState(null);
   const [stripeLoading, setStripeLoading] = useState(false);
+  // Stripe hooks for saving payment method
+  const stripe = useStripe();
+  const elements = useElements();
+  const [stripeSaving, setStripeSaving] = useState(false);
   const [stripeError, setStripeError] = useState(null);
   const [charging, setCharging] = useState(false);
   const [chargeStatus, setChargeStatus] = useState(null);
@@ -266,25 +274,77 @@ const MemberDetail = ({
           )}
         </div>
         <div>
-          <h3>Stripe Subscription</h3>
-          {stripeLoading ? (
-            <div>Loading Stripe data...</div>
-          ) : stripeError ? (
-            <div style={{ color: 'red' }}>{stripeError}</div>
-          ) : stripeData ? (
-            <div>
-              <div><strong>Status:</strong> {stripeData.status || 'N/A'}</div>
-              <div><strong>Next Renewal:</strong> {stripeData.next_renewal || 'N/A'}</div>
-              <div><strong>Last Payment:</strong> {stripeData.last_payment || 'N/A'}</div>
-              <div><strong>Plan:</strong> {stripeData.plan || 'N/A'}</div>
-            </div>
-          ) : (
-            <div>No Stripe data found.</div>
-          )}
-        </div>
-
-        <h3>Ledger</h3>
-        <div style={{ marginBottom: '1rem' }}>
+          <Elements stripe={stripePromise}>
+            <h3>Stripe Subscription</h3>
+            {stripeLoading ? (
+              <div>Loading Stripe data...</div>
+            ) : stripeError ? (
+              <div style={{ color: 'red' }}>{stripeError}</div>
+            ) : stripeData ? (
+              <div>
+                <div><strong>Status:</strong> {stripeData.status || 'N/A'}</div>
+                <div><strong>Next Renewal:</strong> {stripeData.next_renewal || 'N/A'}</div>
+                <div><strong>Last Payment:</strong> {stripeData.last_payment || 'N/A'}</div>
+                <div><strong>Plan:</strong> {stripeData.plan || 'N/A'}</div>
+                {stripeData && !stripeData.invoice_settings?.default_payment_method && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <h4>Save Payment Method</h4>
+                    <div style={{ maxWidth: 300, margin: '1rem 0' }}>
+                      <CardElement options={{ hidePostalCode: true }} />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!stripe || !elements) return;
+                        setStripeSaving(true);
+                        setStripeError(null);
+                        const card = elements.getElement(CardElement);
+                        const { error, paymentMethod } = await stripe.createPaymentMethod({
+                          type: 'card',
+                          card
+                        });
+                        if (error) {
+                          setStripeError(error.message);
+                          setStripeSaving(false);
+                          return;
+                        }
+                        const res = await fetch('/api/savePaymentMethod', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            member_id: member.id,
+                            payment_method_id: paymentMethod.id
+                          })
+                        });
+                        const result = await res.json();
+                        if (res.ok) {
+                          setStripeError(null);
+                          // Refresh Stripe data
+                          fetch('/api/getStripeCustomer', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ stripe_customer_id: member.stripe_customer_id }),
+                          })
+                            .then(r => r.json())
+                            .then(data => setStripeData(data));
+                        } else {
+                          setStripeError(result.error || 'Save failed');
+                        }
+                        setStripeSaving(false);
+                      }}
+                      disabled={stripeSaving}
+                      style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}
+                    >
+                      {stripeSaving ? 'Saving...' : 'Save Card'}
+                    </button>
+                    {stripeError && <div style={{ color: 'red', marginTop: '0.5rem' }}>{stripeError}</div>}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>No Stripe data found.</div>
+            )}
+            <h3>Ledger</h3>
+            <div style={{ marginBottom: '1rem' }}>
           <strong>
             {balance < 0 ? 'Balance Due:' : 'Current Credit:'}
           </strong>{' '}
@@ -306,37 +366,39 @@ const MemberDetail = ({
             </>
           )}
           {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
-        </div>
-        {ledgerLoading ? (
-          <div>Loading ledger...</div>
-        ) : (
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ledger && ledger.length > 0 ? (
-                ledger.map((tx, idx) => (
-                  <tr key={tx.id || idx}>
-                    <td>{formatDateLong(tx.date)}</td>
-                    <td>{tx.note}</td>
-                    <td>${Number(tx.amount).toFixed(2)}</td>
-                    <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+            </div>
+            {ledgerLoading ? (
+              <div>Loading ledger...</div>
+            ) : (
+              <table className="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Type</th>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4">No transactions found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
+                </thead>
+                <tbody>
+                  {ledger && ledger.length > 0 ? (
+                    ledger.map((tx, idx) => (
+                      <tr key={tx.id || idx}>
+                        <td>{formatDateLong(tx.date)}</td>
+                        <td>{tx.note}</td>
+                        <td>${Number(tx.amount).toFixed(2)}</td>
+                        <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4">No transactions found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </Elements>
+        </div>
 
         <h3>Add Transaction</h3>
         <div className="add-transaction-panel">
