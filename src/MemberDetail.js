@@ -290,13 +290,20 @@ const MemberDetail = ({
           </strong>{' '}
           ${Math.abs(balance).toFixed(2)}
           {session.user?.user_metadata?.role === 'admin' && member.stripe_customer_id && (
-            <button
-              onClick={handleChargeBalance}
-              disabled={charging}
-              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
-            >
-              {charging ? 'Charging...' : 'Charge Balance'}
-            </button>
+            <>
+              <button
+                onClick={handleChargeBalance}
+                disabled={charging || balance >= 0}
+                style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: balance < 0 ? 'pointer' : 'not-allowed' }}
+              >
+                {charging ? 'Charging...' : 'Charge Balance'}
+              </button>
+              {balance >= 0 && (
+                <span style={{ marginLeft: '1rem', color: '#888' }}>
+                  No outstanding balance to charge.
+                </span>
+              )}
+            </>
           )}
           {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
         </div>
