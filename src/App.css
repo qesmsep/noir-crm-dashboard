@@ -457,3 +457,21 @@ body {
     padding: 0.5rem !important;
   }
 }
+
+.member-detail-card {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto 2rem auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  padding: clamp(1rem, 3vw, 2.5rem);
+  box-sizing: border-box;
+}
+
+@media (max-width: 700px) {
+  .member-detail-card {
+    padding: 0.7rem 0.3rem !important;
+    border-radius: 7px;
+  }
+}

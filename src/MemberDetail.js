@@ -88,34 +88,6 @@ const MemberDetail = ({
   };
 
   const formatPhoneNumber = (phone) => {
-  // Compute current balance from ledger
-  const balance = (ledger || []).reduce(
-    (acc, t) => (t.type === 'payment' ? acc + Number(t.amount) : acc - Number(t.amount)),
-    0
-  );
-
-  // Handler to charge outstanding balance via API
-  const handleChargeBalance = async () => {
-    setCharging(true);
-    setChargeStatus(null);
-    try {
-      const res = await fetch('/api/chargeBalance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ member_id: member.id }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setChargeStatus('Charged successfully');
-        onAddTransaction();
-      } else {
-        setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
-      }
-    } catch (e) {
-      setChargeStatus(`Error: ${e.message}`);
-    }
-    setCharging(false);
-  };
     if (!phone) return '';
     const trimmed = phone.replace(/\s+/g, '');
     let digits = trimmed.replace(/\D/g, '');
@@ -157,245 +129,276 @@ const MemberDetail = ({
     }
   };
 
+  // Compute current balance from ledger
+  const balance = (ledger || []).reduce(
+    (acc, t) => (t.type === 'payment' ? acc + Number(t.amount) : acc - Number(t.amount)),
+    0
+  );
+
+  // Handler to charge outstanding balance via API
+  const handleChargeBalance = async () => {
+    setCharging(true);
+    setChargeStatus(null);
+    try {
+      const res = await fetch('/api/chargeBalance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_id: member.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setChargeStatus('Charged successfully');
+        onAddTransaction();
+      } else {
+        setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
+      }
+    } catch (e) {
+      setChargeStatus(`Error: ${e.message}`);
+    }
+    setCharging(false);
+  };
+
   return (
     <div className="member-detail-container">
-      <button onClick={onBack}>Back to List</button>
-      <h2>Primary Member</h2>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-        {member.photo && (
+      <div className="member-detail-card">
+        <button onClick={onBack}>Back to List</button>
+        <h2>Primary Member</h2>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          {member.photo && (
+            <img
+              src={member.photo}
+              alt="Member"
+              style={{
+                width: 120,
+                height: 120,
+                objectFit: 'cover',
+                borderRadius: 8,
+                marginRight: 20,
+              }}
+            />
+          )}
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, marginTop: 10 }}>STATUS</div>
+            <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 10 }}>
+              <span
+                className={`status-badge status-${(member.status || 'na').toLowerCase()}`}
+                style={{
+                  fontWeight: 400,
+                  fontSize: 14,
+                  padding: '2px 10px',
+                  borderRadius: 8,
+                  background:
+                    member.status && member.status.toLowerCase() === 'active'
+                      ? '#c2eacb'
+                      : member.status && member.status.toLowerCase() === 'pending'
+                      ? '#fff3cd'
+                      : member.status && member.status.toLowerCase() === 'inactive'
+                      ? '#f8d7da'
+                      : '#ececec',
+                  color:
+                    member.status && member.status.toLowerCase() === 'active'
+                      ? '#217a40'
+                      : member.status && member.status.toLowerCase() === 'pending'
+                      ? '#ad8608'
+                      : member.status && member.status.toLowerCase() === 'inactive'
+                      ? '#842029'
+                      : '#353535',
+                }}
+              >
+                {member.status || 'N/A'}
+              </span>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>
+                {member.first_name} {member.last_name}
+                {member.membership && (
+                  <span style={{ fontWeight: 400, fontSize: 16, marginLeft: 8, color: '#7c6b58' }}>
+                    — {member.membership}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div style={{ fontSize: 15, color: '#353535' }}>
+              {member.email && <div>Email: {member.email}</div>}
+              {member.phone && (
+                <div>
+                  Phone:&nbsp;
+                  <a
+                    href={`tel:${member.phone}`}
+                    style={{ color: 'inherit', textDecoration: 'none' }}
+                  >
+                    {formatPhoneNumber(member.phone)}
+                  </a>
+                </div>
+              )}
+              {member.dob && <div>Date of Birth: {formatDateLong(member.dob)}</div>}
+            </div>
+          </div>
+        </div>
+        <div>
+          <strong>Joined:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
+        </div>
+        <div>
+          <strong>Stripe Customer ID:</strong>{' '}
+          {member.stripe_customer_id ? (
+            <span style={{ color: 'green' }}>{member.stripe_customer_id}</span>
+          ) : (
+            <>
+              <span style={{ color: 'red' }}>Not linked</span>
+              <button
+                onClick={handleLinkStripe}
+                disabled={linkingStripe}
+                style={{ marginLeft: 8 }}
+              >
+                {linkingStripe ? 'Linking...' : 'Link to Stripe'}
+              </button>
+              {linkResult && linkResult.status === 'success' && (
+                <span style={{ color: 'green', marginLeft: 8 }}>
+                  Linked! Stripe ID: {linkResult.stripeId}
+                </span>
+              )}
+              {linkResult && linkResult.status === 'error' && (
+                <span style={{ color: 'red', marginLeft: 8 }}>
+                  Error: {linkResult.error}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+        <div>
+          <h3>Stripe Subscription</h3>
+          {stripeLoading ? (
+            <div>Loading Stripe data...</div>
+          ) : stripeError ? (
+            <div style={{ color: 'red' }}>{stripeError}</div>
+          ) : stripeData ? (
+            <div>
+              <div><strong>Status:</strong> {stripeData.status || 'N/A'}</div>
+              <div><strong>Next Renewal:</strong> {stripeData.next_renewal || 'N/A'}</div>
+              <div><strong>Last Payment:</strong> {stripeData.last_payment || 'N/A'}</div>
+              <div><strong>Plan:</strong> {stripeData.plan || 'N/A'}</div>
+            </div>
+          ) : (
+            <div>No Stripe data found.</div>
+          )}
+        </div>
+
+        <h3>Ledger</h3>
+        <div style={{ marginBottom: '1rem' }}>
+          <strong>
+            {balance >= 0 ? 'Current Balance' : 'Current Credit'}:
+          </strong>{' '}
+          ${Math.abs(balance).toFixed(2)}
+          {session.user?.user_metadata?.role === 'admin' && member.stripe_customer_id && (
+            <button
+              onClick={handleChargeBalance}
+              disabled={charging}
+              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+            >
+              {charging ? 'Charging...' : 'Charge Balance'}
+            </button>
+          )}
+          {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
+        </div>
+        {ledgerLoading ? (
+          <div>Loading ledger...</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger && ledger.length > 0 ? (
+                ledger.map((tx, idx) => (
+                  <tr key={tx.id || idx}>
+                    <td>{tx.date}</td>
+                    <td>{tx.description}</td>
+                    <td>{tx.amount}</td>
+                    <td>{tx.type}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4">No transactions found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+
+        <h3>Add Transaction</h3>
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            onAddTransaction();
+          }}
+        >
+          <input
+            type="text"
+            name="description"
+            placeholder="Description"
+            value={newTransaction.description || ''}
+            onChange={handleInputChange}
+          />
+          <input
+            type="number"
+            name="amount"
+            placeholder="Amount"
+            value={newTransaction.amount || ''}
+            onChange={handleInputChange}
+          />
+          <select
+            name="type"
+            value={newTransaction.type || ''}
+            onChange={handleInputChange}
+          >
+            <option value="">Type</option>
+            <option value="credit">Credit</option>
+            <option value="debit">Debit</option>
+          </select>
+          <button type="submit" disabled={transactionStatus === 'loading'}>
+            {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
+          </button>
+          {transactionStatus === 'error' && (
+            <span style={{ color: 'red', marginLeft: 8 }}>Error adding transaction.</span>
+          )}
+          {transactionStatus === 'success' && (
+            <span style={{ color: 'green', marginLeft: 8 }}>Added!</span>
+          )}
+        </form>
+
+        <button
+          className="delete-member-btn"
+        onClick={() => {
+          if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+            handleDeleteMember(member.id, member.supabase_user_id);
+          }
+        }}
+        >
+          Delete Member
+        </button>
+
+        {/* Counterpart photo size adjustment (if applicable) */}
+        {member.photo2 && (
           <img
-            src={member.photo}
-            alt="Member"
+            src={member.photo2}
+            alt="Counterpart"
             style={{
-              width: 120,
-              height: 120,
+              width: 200,
+              height: 200,
               objectFit: 'cover',
               borderRadius: 8,
-              marginRight: 20,
+              marginTop: 20,
+              marginBottom: 10,
             }}
           />
         )}
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 14, marginTop: 10 }}>STATUS</div>
-          <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 10 }}>
-            <span
-              className={`status-badge status-${(member.status || 'na').toLowerCase()}`}
-              style={{
-                fontWeight: 400,
-                fontSize: 14,
-                padding: '2px 10px',
-                borderRadius: 8,
-                background:
-                  member.status && member.status.toLowerCase() === 'active'
-                    ? '#c2eacb'
-                    : member.status && member.status.toLowerCase() === 'pending'
-                    ? '#fff3cd'
-                    : member.status && member.status.toLowerCase() === 'inactive'
-                    ? '#f8d7da'
-                    : '#ececec',
-                color:
-                  member.status && member.status.toLowerCase() === 'active'
-                    ? '#217a40'
-                    : member.status && member.status.toLowerCase() === 'pending'
-                    ? '#ad8608'
-                    : member.status && member.status.toLowerCase() === 'inactive'
-                    ? '#842029'
-                    : '#353535',
-              }}
-            >
-              {member.status || 'N/A'}
-            </span>
-          </div>
-          <div style={{ fontWeight: 700, fontSize: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>
-              {member.first_name} {member.last_name}
-              {member.membership && (
-                <span style={{ fontWeight: 400, fontSize: 16, marginLeft: 8, color: '#7c6b58' }}>
-                  — {member.membership}
-                </span>
-              )}
-            </span>
-          </div>
-          <div style={{ fontSize: 15, color: '#353535' }}>
-            {member.email && <div>Email: {member.email}</div>}
-            {member.phone && (
-              <div>
-                Phone:&nbsp;
-                <a
-                  href={`tel:${member.phone}`}
-                  style={{ color: 'inherit', textDecoration: 'none' }}
-                >
-                  {formatPhoneNumber(member.phone)}
-                </a>
-              </div>
-            )}
-            {member.dob && <div>Date of Birth: {formatDateLong(member.dob)}</div>}
-          </div>
-        </div>
       </div>
-      <div>
-        <strong>Joined:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
-      </div>
-      <div>
-        <strong>Stripe Customer ID:</strong>{' '}
-        {member.stripe_customer_id ? (
-          <span style={{ color: 'green' }}>{member.stripe_customer_id}</span>
-        ) : (
-          <>
-            <span style={{ color: 'red' }}>Not linked</span>
-            <button
-              onClick={handleLinkStripe}
-              disabled={linkingStripe}
-              style={{ marginLeft: 8 }}
-            >
-              {linkingStripe ? 'Linking...' : 'Link to Stripe'}
-            </button>
-            {linkResult && linkResult.status === 'success' && (
-              <span style={{ color: 'green', marginLeft: 8 }}>
-                Linked! Stripe ID: {linkResult.stripeId}
-              </span>
-            )}
-            {linkResult && linkResult.status === 'error' && (
-              <span style={{ color: 'red', marginLeft: 8 }}>
-                Error: {linkResult.error}
-              </span>
-            )}
-          </>
-        )}
-      </div>
-      <div>
-        <h3>Stripe Subscription</h3>
-        {stripeLoading ? (
-          <div>Loading Stripe data...</div>
-        ) : stripeError ? (
-          <div style={{ color: 'red' }}>{stripeError}</div>
-        ) : stripeData ? (
-          <div>
-            <div><strong>Status:</strong> {stripeData.status || 'N/A'}</div>
-            <div><strong>Next Renewal:</strong> {stripeData.next_renewal || 'N/A'}</div>
-            <div><strong>Last Payment:</strong> {stripeData.last_payment || 'N/A'}</div>
-            <div><strong>Plan:</strong> {stripeData.plan || 'N/A'}</div>
-          </div>
-        ) : (
-          <div>No Stripe data found.</div>
-        )}
-      </div>
-
-      <h3>Ledger</h3>
-      <div style={{ marginBottom: '1rem' }}>
-        <strong>
-          {balance >= 0 ? 'Current Balance' : 'Current Credit'}:
-        </strong>{' '}
-        ${Math.abs(balance).toFixed(2)}
-        {session.user?.user_metadata?.role === 'admin' && member.stripe_customer_id && (
-          <button
-            onClick={handleChargeBalance}
-            disabled={charging}
-            style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
-          >
-            {charging ? 'Charging...' : 'Charge Balance'}
-          </button>
-        )}
-        {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
-      </div>
-      {ledgerLoading ? (
-        <div>Loading ledger...</div>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th>Type</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ledger && ledger.length > 0 ? (
-              ledger.map((tx, idx) => (
-                <tr key={tx.id || idx}>
-                  <td>{tx.date}</td>
-                  <td>{tx.description}</td>
-                  <td>{tx.amount}</td>
-                  <td>{tx.type}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4">No transactions found.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
-
-      <h3>Add Transaction</h3>
-      <form
-        onSubmit={e => {
-          e.preventDefault();
-          onAddTransaction();
-        }}
-      >
-        <input
-          type="text"
-          name="description"
-          placeholder="Description"
-          value={newTransaction.description || ''}
-          onChange={handleInputChange}
-        />
-        <input
-          type="number"
-          name="amount"
-          placeholder="Amount"
-          value={newTransaction.amount || ''}
-          onChange={handleInputChange}
-        />
-        <select
-          name="type"
-          value={newTransaction.type || ''}
-          onChange={handleInputChange}
-        >
-          <option value="">Type</option>
-          <option value="credit">Credit</option>
-          <option value="debit">Debit</option>
-        </select>
-        <button type="submit" disabled={transactionStatus === 'loading'}>
-          {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
-        </button>
-        {transactionStatus === 'error' && (
-          <span style={{ color: 'red', marginLeft: 8 }}>Error adding transaction.</span>
-        )}
-        {transactionStatus === 'success' && (
-          <span style={{ color: 'green', marginLeft: 8 }}>Added!</span>
-        )}
-      </form>
-
-      <button
-        className="delete-member-btn"
-      onClick={() => {
-        if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-          handleDeleteMember(member.id, member.supabase_user_id);
-        }
-      }}
-      >
-        Delete Member
-      </button>
-
-      {/* Counterpart photo size adjustment (if applicable) */}
-      {member.photo2 && (
-        <img
-          src={member.photo2}
-          alt="Counterpart"
-          style={{
-            width: 200,
-            height: 200,
-            objectFit: 'cover',
-            borderRadius: 8,
-            marginTop: 20,
-            marginBottom: 10,
-          }}
-        />
-      )}
     </div>
   );
 };
