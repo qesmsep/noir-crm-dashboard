@@ -26,6 +26,7 @@ const MemberDetail = ({
   const [linkResult, setLinkResult] = useState(null);
   const [stripeData, setStripeData] = useState(null);
   const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeError, setStripeError] = useState(null);
   // Removed Stripe hooks for saving payment method
   const [charging, setCharging] = useState(false);
   const [chargeStatus, setChargeStatus] = useState(null);
