@@ -7,15 +7,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id, supabase_user_id, requester_token } = req.body;
-  if (!member_id || !supabase_user_id) {
-    return res.status(400).json({ error: 'Missing member_id or supabase_user_id' });
+  const { member_id, supabase_user_id: initial_supabase_user_id, requester_token } = req.body;
+  if (!member_id) {
+    return res.status(400).json({ error: 'Missing member_id' });
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
   const service_role_key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
+
   // Use anon key for client calls
   const supabase = createClient(supabaseUrl, anonKey);
 
@@ -43,6 +43,25 @@ export default async function handler(req, res) {
 
   if (!isAdmin) {
     return res.status(403).json({ error: 'Only admins may delete users' });
+  }
+
+  let supabase_user_id = initial_supabase_user_id;
+
+  // If no supabase_user_id provided, look it up from the members table
+  if (!supabase_user_id) {
+    if (!service_role_key) {
+      return res.status(500).json({ error: 'Server misconfiguration: missing service role key' });
+    }
+    const supabaseAdmin = createClient(supabaseUrl, service_role_key);
+    const { data, error } = await supabaseAdmin
+      .from('members')
+      .select('user_id')
+      .eq('id', member_id)
+      .single();
+    if (error || !data || !data.user_id) {
+      return res.status(400).json({ error: 'No linked auth user found for this member.' });
+    }
+    supabase_user_id = data.user_id;
   }
 
   // Use direct fetch with service role for the admin delete call
