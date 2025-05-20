@@ -1281,22 +1281,21 @@ function App() {
                   <p>Selected event/reservation ID: {eventInfo.id}</p>
                 </div>
               )}
+              {showReservationModal && slotInfo && (
+                <div style={{ marginTop: '1rem', padding: '1rem', background: '#faf9f7', borderRadius: '8px' }}>
+                  <h3>Book Reservation</h3>
+                  <ReservationForm
+                    initialStart={slotInfo.start}
+                    onSave={handleSaveReservation}
+                  />
+                  <button onClick={() => setShowReservationModal(false)} style={{ marginTop: '0.5rem' }}>
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
-        {/* Reservation Modal */}
-        {showReservationModal && slotInfo && (
-          <div className="modal-overlay" onClick={() => setShowReservationModal(false)}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-              <ReservationForm
-                initialStart={slotInfo.start}
-                initialEnd={slotInfo.end}
-                onSave={handleSaveReservation}
-              />
-              <button onClick={() => setShowReservationModal(false)}>Cancel</button>
-            </div>
-          </div>
-        )}
       </>
     );
   }

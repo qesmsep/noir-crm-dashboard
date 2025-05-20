@@ -2,6 +2,7 @@
 
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import '../App.css';
 
 import React, { useState } from 'react';
 
@@ -63,6 +64,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave }) {
           onChange={d => setDate(d)}
           dateFormat="MMMM d, yyyy"
           minDate={new Date()}
+          className="datepicker-input"
         />
       </div>
       <div>

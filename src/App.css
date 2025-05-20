@@ -529,3 +529,15 @@ body {
   justify-content: space-between;
   margin-bottom: 0.4rem;
 }
+.datepicker-input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-greige);
+  width: 100%;
+  font-size: 1rem;
+}
+
+/* Ensure the calendar popup appears above the modal */
+.react-datepicker-popper {
+  z-index: 4000;
+}
