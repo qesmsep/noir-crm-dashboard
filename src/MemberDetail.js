@@ -32,6 +32,9 @@ const MemberDetail = ({
   const [attributes, setAttributes] = useState([]);
   const [notes, setNotes] = useState('');
   const [notesLog, setNotesLog] = useState([]);
+  // State for adding attributes
+  const [newAttrKey, setNewAttrKey] = useState('');
+  const [newAttrValue, setNewAttrValue] = useState('');
 
   // Load attributes from API
   const fetchAttributes = async () => {
@@ -328,6 +331,32 @@ const MemberDetail = ({
               />
             </div>
           ))}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <input
+              value={newAttrKey}
+              onChange={e => setNewAttrKey(e.target.value)}
+              className="add-transaction-input"
+              placeholder="Attribute Type"
+            />
+            <input
+              value={newAttrValue}
+              onChange={e => setNewAttrValue(e.target.value)}
+              className="add-transaction-input"
+              placeholder="Attribute Detail"
+            />
+            <button
+              onClick={() => {
+                if (newAttrKey && newAttrValue) {
+                  setAttributes([...attributes, { key: newAttrKey, value: newAttrValue }]);
+                  setNewAttrKey('');
+                  setNewAttrValue('');
+                }
+              }}
+              className="add-transaction-btn"
+            >
+              Add Attribute
+            </button>
+          </div>
           <button onClick={handleSaveAttributes} className="add-transaction-btn">Save Attributes</button>
           {/* Notes */}
           <h3>Notes History</h3>
@@ -336,13 +365,14 @@ const MemberDetail = ({
               <li key={n.id}>{formatDateLong(n.created_at)}: {n.note}</li>
             ))}
           </ul>
-          <h3>Add Note</h3>
           <div className="add-transaction-panel">
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               className="add-transaction-input"
               placeholder="New note..."
+              rows={6}
+              style={{ minHeight: '120px' }}
             />
             <button onClick={handleAddNote} className="add-transaction-btn">Add Note</button>
           </div>
