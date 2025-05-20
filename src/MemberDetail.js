@@ -325,7 +325,7 @@ const MemberDetail = ({
                   <tr key={tx.id || idx}>
                     <td>{formatDateLong(tx.date)}</td>
                     <td>{tx.note}</td>
-                    <td>{tx.amount}</td>
+                    <td>${Number(tx.amount).toFixed(2)}</td>
                     <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
                   </tr>
                 ))

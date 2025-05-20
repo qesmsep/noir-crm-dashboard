@@ -30,6 +30,13 @@ export default async function handler(req, res) {
   }
   const stripe_customer_id = member.stripe_customer_id;
 
+  // Retrieve customer's default payment method for off-session charge
+  const stripeCustomer = await stripe.customers.retrieve(stripe_customer_id);
+  const defaultPaymentMethodId = stripeCustomer.invoice_settings.default_payment_method;
+  if (!defaultPaymentMethodId) {
+    return res.status(400).json({ error: 'No default payment method' });
+  }
+
   // 2. Get ledger for member and compute balance
   const { data: ledger, error: ledgerError } = await supabase
     .from('ledger')
@@ -55,6 +62,7 @@ export default async function handler(req, res) {
       amount: Math.round(balance * 100), // in cents
       currency: 'usd',
       customer: stripe_customer_id,
+      payment_method: defaultPaymentMethodId,
       off_session: true,
       confirm: true,
     });
