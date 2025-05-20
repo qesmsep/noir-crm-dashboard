@@ -90,17 +90,32 @@ const MemberDetail = ({
     setNewAttrValue('');
     fetchAttributes();
   };
-  // Edit existing attribute
+  // Edit or delete attribute via prompt
   const handleEditAttribute = async (attr) => {
-    const updated = prompt(`Edit ${attr.key}`, attr.value);
-    if (updated != null) {
-      await fetch('/api/member_attributes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ member_id: member.id, key: attr.key, value: updated }),
-      });
-      fetchAttributes();
+    const input = prompt(
+      `Attribute "${attr.key}": enter new value or type "delete" to remove`,
+      attr.value
+    );
+    if (input == null) return;
+    if (input.toLowerCase() === 'delete') {
+      return handleDeleteAttribute(attr);
     }
+    await fetch('/api/member_attributes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: member.id, key: attr.key, value: input }),
+    });
+    fetchAttributes();
+  };
+
+  // Delete existing attribute
+  const handleDeleteAttribute = async (attr) => {
+    if (!window.confirm(`Delete attribute "${attr.key}"?`)) return;
+    await supabase
+      .from('member_attributes')
+      .delete()
+      .eq('id', attr.id);
+    fetchAttributes();
   };
   // Edit existing note
   const handleEditNote = async (noteObj) => {
@@ -346,8 +361,12 @@ const MemberDetail = ({
           <h3>Attributes</h3>
           {attributes.map((attr, i) => (
             <div key={i} className="attribute-item">
-              <strong>{attr.key}:</strong> {attr.value}
-              <button className="edit-attribute-btn" onClick={() => handleEditAttribute(attr)}>Edit</button>
+              <div className="attribute-info">
+                <strong>{attr.key}:</strong> {attr.value}
+              </div>
+              <div className="attribute-actions">
+                <button className="edit-attribute-btn" onClick={() => handleEditAttribute(attr)}>Edit</button>
+              </div>
             </div>
           ))}
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
