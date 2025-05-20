@@ -70,20 +70,38 @@ export default async function handler(req, res) {
     // Find member by stripe_customer_id
     const { data: member, error: memberErr } = await supabase
       .from('members')
-      .select('id')
+      .select('id, membership')
       .eq('stripe_customer_id', stripeCustomerId)
       .single();
     if (!memberErr && member) {
-      // Record renewal in ledger as a payment (credit)
-      await supabase
-        .from('ledger')
-        .insert([{
+      const date = new Date(invoice.status_transitions.paid_at * 1000).toISOString();
+      if (member.membership === 'Host') {
+        // Charge renewal fee
+        await supabase.from('ledger').insert([{
+          member_id: member.id,
+          type: 'purchase',
+          amount: 1,
+          note: 'Host membership renewal',
+          date
+        }]);
+        // Reset host credit
+        await supabase.from('ledger').insert([{
+          member_id: member.id,
+          type: 'payment',
+          amount: 100,
+          note: 'Host membership credit reset',
+          date
+        }]);
+      } else {
+        // Standard renewal credit
+        await supabase.from('ledger').insert([{
           member_id: member.id,
           type: 'payment',
           amount: amountPaid / 100,
           note: 'Subscription renewal',
-          date: new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+          date
         }]);
+      }
     }
   }
 
