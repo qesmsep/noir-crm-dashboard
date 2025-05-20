@@ -37,10 +37,17 @@ export default async function handler(req, res) {
       const timestamp = new Date().toISOString();
       const { data, error } = await supabaseAdmin
         .from("ledger")
-        .insert([{ member_id, type, amount: amt, note, date: timestamp }]);
+        .insert(
+          [{ member_id, type, amount: amt, note, date: timestamp }],
+          { returning: 'representation' }
+        );
       if (error) {
         console.error("Ledger POST error:", error);
         return res.status(500).json({ error: error.message });
+      }
+      if (!data || data.length === 0) {
+        console.error("Ledger POST returned no data");
+        return res.status(500).json({ error: 'No data returned from insert' });
       }
       return res.status(200).json({ data: data[0] });
     }
