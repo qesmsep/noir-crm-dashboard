@@ -318,7 +318,7 @@ const MemberDetail = ({
                     <td>{tx.date}</td>
                     <td>{tx.note}</td>
                     <td>{tx.amount}</td>
-                    <td>{tx.type}</td>
+                    <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
                   </tr>
                 ))
               ) : (
@@ -366,8 +366,8 @@ const MemberDetail = ({
               className="add-transaction-input"
             >
               <option value="">Type</option>
-              <option value="credit">Credit</option>
-              <option value="debit">Debit</option>
+              <option value="credit">Payment</option>
+              <option value="debit">Purchase</option>
             </select>
             <button
               type="submit"
