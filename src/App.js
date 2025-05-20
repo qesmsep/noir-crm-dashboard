@@ -1,5 +1,12 @@
-  // Reminder settings state for admin
-  const [reminderHour, setReminderHour] = useState('');
+import React, { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import './App.css';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { v4 as uuidv4 } from 'uuid';
+import MemberDetail from './MemberDetail';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import './App.css';
@@ -52,6 +59,7 @@ function App() {
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteStatus, setPromoteStatus] = useState('');
   const [section, setSection] = useState('members');
+  const [reminderHour, setReminderHour] = useState('');
   const [lookupQuery, setLookupQuery] = useState('');
   // Sidebar state for mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
