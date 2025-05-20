@@ -6,6 +6,9 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { v4 as uuidv4 } from 'uuid';
 import MemberDetail from './MemberDetail';
 
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+
 // Responsive helper
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 700);
@@ -38,6 +41,8 @@ function formatDOB(dob) {
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function App() {
   const [session, setSession] = useState(null);
@@ -814,17 +819,19 @@ function App() {
                   }}
                 >
                   {/* Use MemberDetail component if available */}
-                  <MemberDetail
-                    member={selectedMember}
-                    ledger={memberLedger}
-                    ledgerLoading={ledgerLoading}
-                    onBack={() => setSelectedMember(null)}
-                    onAddTransaction={() => handleAddTransaction(selectedMember.id)}
-                    newTransaction={newTransaction}
-                    setNewTransaction={setNewTransaction}
-                    transactionStatus={transactionStatus}
-                    session={session}
-                  />
+                  <Elements stripe={stripePromise}>
+                    <MemberDetail
+                      member={selectedMember}
+                      ledger={memberLedger}
+                      ledgerLoading={ledgerLoading}
+                      onBack={() => setSelectedMember(null)}
+                      onAddTransaction={() => handleAddTransaction(selectedMember.id)}
+                      newTransaction={newTransaction}
+                      setNewTransaction={setNewTransaction}
+                      transactionStatus={transactionStatus}
+                      session={session}
+                    />
+                  </Elements>
                 </div>
               )}
             </>
