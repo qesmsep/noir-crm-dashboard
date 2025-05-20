@@ -287,7 +287,7 @@ const MemberDetail = ({
           {balance >= 0 ? 'Current Balance' : 'Current Credit'}:
         </strong>{' '}
         ${Math.abs(balance).toFixed(2)}
-        {session.user?.user_metadata?.role === 'admin' && balance > 0 && (
+        {session.user?.user_metadata?.role === 'admin' && member.stripe_customer_id && (
           <button
             onClick={handleChargeBalance}
             disabled={charging}
@@ -387,8 +387,8 @@ const MemberDetail = ({
           src={member.photo2}
           alt="Counterpart"
           style={{
-            width: 120,
-            height: 120,
+            width: 200,
+            height: 200,
             objectFit: 'cover',
             borderRadius: 8,
             marginTop: 20,
