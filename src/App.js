@@ -789,12 +789,12 @@ function App() {
                   className="member-detail-view"
                   style={{
                     width: "100%",
-                    maxWidth: "100%",
+                    maxWidth: "100vw",
                     margin: "0 auto",
                     background: "#faf9f7",
                     borderRadius: "12px",
                     boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-                    padding: "2.5rem 2.5rem 2.5rem 2.5rem",
+                    padding: "clamp(1rem, 4vw, 2.5rem)",
                     boxSizing: "border-box",
                     overflowX: "hidden"
                   }}
@@ -1185,57 +1185,57 @@ function App() {
                   </button>
                 </form>
                 {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
-          </div>
-          {/* User Management Panel */}
-          <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-            <h2>All Users</h2>
-            <table className="user-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>First Name</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Last Name</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Email</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Phone</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Role</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(user => (
-                  editUserId === user.id ? (
-                    <tr key={user.id}>
-                      <td><input value={editForm.first_name} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} /></td>
-                      <td><input value={editForm.last_name} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} /></td>
-                      <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
-                      <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
-                      <td>
-                        <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
-                          <option value="admin">admin</option>
-                          <option value="member">member</option>
-                          <option value="view">view</option>
-                        </select>
-                      </td>
-                      <td>
-                        <button onClick={() => handleSaveUser(user.id)} style={{ marginRight: "0.5rem" }}>Save</button>
-                        <button onClick={handleCancelEdit}>Cancel</button>
-                      </td>
+              </div>
+              {/* User Management Panel */}
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>All Users</h2>
+                <table className="user-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>First Name</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Last Name</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Email</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Phone</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Role</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Actions</th>
                     </tr>
-                  ) : (
-                    <tr key={user.id}>
-                      <td>{user.user_metadata?.first_name || ""}</td>
-                      <td>{user.user_metadata?.last_name || ""}</td>
-                      <td>{user.email}</td>
-                      <td>{user.user_metadata?.phone || ""}</td>
-                      <td>{user.user_metadata?.role || "view"}</td>
-                      <td>
-                        <button onClick={() => handleEditUser(user)} style={{ marginRight: "0.5rem" }}>Edit</button>
-                      </td>
-                    </tr>
-                  )
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {users.map(user => (
+                      editUserId === user.id ? (
+                        <tr key={user.id}>
+                          <td><input value={editForm.first_name} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} /></td>
+                          <td><input value={editForm.last_name} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} /></td>
+                          <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
+                          <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
+                          <td>
+                            <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
+                              <option value="admin">admin</option>
+                              <option value="member">member</option>
+                              <option value="view">view</option>
+                            </select>
+                          </td>
+                          <td>
+                            <button onClick={() => handleSaveUser(user.id)} style={{ marginRight: "0.5rem" }}>Save</button>
+                            <button onClick={handleCancelEdit}>Cancel</button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={user.id}>
+                          <td>{user.user_metadata?.first_name || ""}</td>
+                          <td>{user.user_metadata?.last_name || ""}</td>
+                          <td>{user.email}</td>
+                          <td>{user.user_metadata?.phone || ""}</td>
+                          <td>{user.user_metadata?.role || "view"}</td>
+                          <td>
+                            <button onClick={() => handleEditUser(user)} style={{ marginRight: "0.5rem" }}>Edit</button>
+                          </td>
+                        </tr>
+                      )
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
           {section === 'lookup' && (
