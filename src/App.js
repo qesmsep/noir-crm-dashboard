@@ -788,13 +788,10 @@ function App() {
                 <div
                   className="member-detail-view"
                   style={{
-                    width: "100%",
-                    maxWidth: "100vw",
                     margin: "0 auto",
                     background: "#faf9f7",
                     borderRadius: "12px",
                     boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-                    padding: "clamp(1rem, 4vw, 2.5rem)",
                     boxSizing: "border-box",
                     overflowX: "hidden"
                   }}
