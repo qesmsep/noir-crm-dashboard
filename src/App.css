@@ -63,8 +63,6 @@ body {
 
 .app-container {
   margin-left: 250px;
-  max-width: 95%;
-  width: 95%;
   overflow-x: hidden;
   box-sizing: border-box;
   padding: 0.5rem 0.5rem;
@@ -313,7 +311,7 @@ body {
   .app-container {
     margin-left: 0 !important;
     padding: 1rem 1vw !important;
-    max-width: 90% !important;
+    max-width: 95% !important;
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
