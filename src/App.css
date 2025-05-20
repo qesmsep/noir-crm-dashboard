@@ -1,3 +1,19 @@
+.attribute-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.attribute-info {
+  flex-grow: 1;
+}
+.attribute-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.delete-attribute-btn {
+  /* ensure visible contrast */
+  color: #c0392b;
+}
 :root {
   --color-wedding-day: #ecede8;
   --color-night-sky: #353535;
