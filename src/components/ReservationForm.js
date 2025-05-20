@@ -5,11 +5,11 @@ import React, { useState, useEffect } from 'react';
 export default function ReservationForm({ initialStart, initialEnd, onSave }) {
   const [form, setForm] = useState({
     name: '', phone: '', email: '', party_size: 1, notes: '',
-    start_time: initialStart, end_time: initialEnd
+    start_time: initialStart
   });
 
   useEffect(() => {
-    // format initialStart/initialEnd to "YYYY-MM-DDTHH:MM"
+    // format initialStart to "YYYY-MM-DDTHH:MM"
     const formatLocal = dt => {
       const d = new Date(dt);
       return d.toISOString().slice(0,16);
@@ -17,15 +17,21 @@ export default function ReservationForm({ initialStart, initialEnd, onSave }) {
     setForm(f => ({
       ...f,
       start_time: formatLocal(initialStart),
-      end_time: formatLocal(initialEnd),
     }));
-  }, [initialStart, initialEnd]);
+  }, [initialStart]);
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async e => {
     e.preventDefault();
-    await onSave(form);
+    // Determine duration: 90 min for party_size ≤ 2, 120 min otherwise
+    const start = new Date(form.start_time);
+    const durationMinutes = form.party_size <= 2 ? 90 : 120;
+    const end = new Date(start.getTime() + durationMinutes * 60000);
+    await onSave({
+      ...form,
+      end_time: end.toISOString()
+    });
   };
 
   return (
@@ -41,16 +47,6 @@ export default function ReservationForm({ initialStart, initialEnd, onSave }) {
           type="datetime-local"
           name="start_time"
           value={form.start_time}
-          onChange={handleChange}
-          required
-        />
-      </label>
-      <label>
-        End:
-        <input
-          type="datetime-local"
-          name="end_time"
-          value={form.end_time}
           onChange={handleChange}
           required
         />

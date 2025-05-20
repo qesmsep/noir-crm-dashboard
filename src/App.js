@@ -1258,7 +1258,18 @@ function App() {
             <div style={{ padding: '2rem', maxWidth: '100vw', width: '100%' }}>
               <h2>Reservations & Events Calendar</h2>
               <CalendarView
-                onSelectSlot={slot => {
+                onSelectSlot={async slot => {
+                  // Check if at least one table is free
+                  const start = slot.start.toISOString();
+                  const end = slot.end.toISOString();
+                  const res = await fetch(
+                    `/api/availability?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}&party_size=1`
+                  );
+                  const { free } = await res.json();
+                  if (!free || free.length === 0) {
+                    alert('No availability for this time slot.');
+                    return;
+                  }
                   setSlotInfo(slot);
                   setShowReservationModal(true);
                 }}
