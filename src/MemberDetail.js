@@ -332,7 +332,7 @@ const MemberDetail = ({
 
         <h3>Add Transaction</h3>
         <div className="add-transaction-panel">
-          <form>
+          <form onSubmit={(e) => { e.preventDefault(); onAddTransaction(); }}>
             <input
               type="text"
               name="note"
@@ -360,11 +360,7 @@ const MemberDetail = ({
               <option value="debit">Debit</option>
             </select>
             <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                onAddTransaction();
-              }}
+              type="submit"
               className="add-transaction-btn"
               disabled={transactionStatus === 'loading'}
             >
