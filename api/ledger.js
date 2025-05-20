@@ -30,7 +30,8 @@ export default async function handler(req, res) {
 
     if (req.method === "POST") {
       const { member_id, type, amount, note } = req.body;
-      const amt = Number(amount);
+      let amt = Number(amount);
+      if (type === 'purchase') amt = -Math.abs(amt);
       if (!member_id || !type || isNaN(amt)) {
         return res.status(400).json({ error: "Missing required fields" });
       }

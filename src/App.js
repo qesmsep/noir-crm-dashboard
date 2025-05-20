@@ -133,10 +133,7 @@ function App() {
         // (recompute from new ledger)
         const ledgerArr = result.data ? [...(memberLedger || []), result.data] : memberLedger || [];
         const balance = ledgerArr.reduce(
-          (acc, t) =>
-            t.type === 'purchase'
-              ? acc + Number(t.amount)
-              : acc - Number(t.amount),
+          (acc, t) => acc + Number(t.amount),
           0
         );
         setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
