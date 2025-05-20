@@ -316,7 +316,7 @@ const MemberDetail = ({
                 ledger.map((tx, idx) => (
                   <tr key={tx.id || idx}>
                     <td>{tx.date}</td>
-                    <td>{tx.description}</td>
+                    <td>{tx.note}</td>
                     <td>{tx.amount}</td>
                     <td>{tx.type}</td>
                   </tr>
@@ -331,45 +331,50 @@ const MemberDetail = ({
         )}
 
         <h3>Add Transaction</h3>
-        <form
-          onSubmit={e => {
-            e.preventDefault();
-            onAddTransaction();
-          }}
-        >
-          <input
-            type="text"
-            name="description"
-            placeholder="Description"
-            value={newTransaction.description || ''}
-            onChange={handleInputChange}
-          />
-          <input
-            type="number"
-            name="amount"
-            placeholder="Amount"
-            value={newTransaction.amount || ''}
-            onChange={handleInputChange}
-          />
-          <select
-            name="type"
-            value={newTransaction.type || ''}
-            onChange={handleInputChange}
+        <div className="add-transaction-panel">
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              onAddTransaction();
+            }}
           >
-            <option value="">Type</option>
-            <option value="credit">Credit</option>
-            <option value="debit">Debit</option>
-          </select>
-          <button type="submit" disabled={transactionStatus === 'loading'}>
-            {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
-          </button>
-          {transactionStatus === 'error' && (
-            <span style={{ color: 'red', marginLeft: 8 }}>Error adding transaction.</span>
-          )}
-          {transactionStatus === 'success' && (
-            <span style={{ color: 'green', marginLeft: 8 }}>Added!</span>
-          )}
-        </form>
+            <input
+              type="text"
+              name="note"
+              placeholder="Note"
+              value={newTransaction.note || ''}
+              onChange={handleInputChange}
+              className="add-transaction-input"
+            />
+            <input
+              type="number"
+              name="amount"
+              placeholder="Amount"
+              value={newTransaction.amount || ''}
+              onChange={handleInputChange}
+              className="add-transaction-input"
+            />
+            <select
+              name="type"
+              value={newTransaction.type || ''}
+              onChange={handleInputChange}
+              className="add-transaction-input"
+            >
+              <option value="">Type</option>
+              <option value="credit">Credit</option>
+              <option value="debit">Debit</option>
+            </select>
+            <button type="submit" disabled={transactionStatus === 'loading'}>
+              {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
+            </button>
+            {transactionStatus === 'error' && (
+              <span style={{ color: 'red', marginLeft: 8 }}>Error adding transaction.</span>
+            )}
+            {transactionStatus === 'success' && (
+              <span style={{ color: 'green', marginLeft: 8 }}>Added!</span>
+            )}
+          </form>
+        </div>
 
         <button
           className="delete-member-btn"
