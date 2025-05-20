@@ -367,8 +367,8 @@ const MemberDetail = ({
               className="add-transaction-input"
             >
               <option value="">Type</option>
-              <option value="credit">Payment</option>
-              <option value="debit">Purchase</option>
+              <option value="payment">Payment</option>
+              <option value="purchase">Purchase</option>
             </select>
             <button
               type="submit"
