@@ -64,7 +64,8 @@ export default async function handler(req, res) {
       balance:      0,
       // Stripe
       stripe_customer_id: null,
-      join_date:    null,
+      // Use Typeform submission time as join_date
+      join_date:    form.submitted_at,
       renewal_date: null,
       token:        form.token || null,
     };
