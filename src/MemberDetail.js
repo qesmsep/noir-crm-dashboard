@@ -286,7 +286,7 @@ const MemberDetail = ({
         <h3>Ledger</h3>
         <div style={{ marginBottom: '1rem' }}>
           <strong>
-            {balance >= 0 ? 'Current Balance' : 'Current Credit'}:
+            {balance < 0 ? 'Balance Due:' : 'Current Credit:'}
           </strong>{' '}
           ${Math.abs(balance).toFixed(2)}
           {session.user?.user_metadata?.role === 'admin' && member.stripe_customer_id && (
@@ -316,7 +316,7 @@ const MemberDetail = ({
               {ledger && ledger.length > 0 ? (
                 ledger.map((tx, idx) => (
                   <tr key={tx.id || idx}>
-                    <td>{tx.date}</td>
+                    <td>{formatDateLong(tx.date)}</td>
                     <td>{tx.note}</td>
                     <td>{tx.amount}</td>
                     <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
