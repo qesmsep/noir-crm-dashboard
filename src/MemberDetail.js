@@ -225,6 +225,12 @@ const MemberDetail = ({
             </div>
           )}
         </div>
+        <div>
+          <strong>Member Since:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
+        </div>
+        <div>
+          <strong>Next Renewal:</strong> {nextRenewal}
+        </div>
         <h3>Ledger</h3>
         <div style={{ marginBottom: '1rem' }}>
           <strong>
