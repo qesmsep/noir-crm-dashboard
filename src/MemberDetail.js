@@ -332,7 +332,17 @@ const MemberDetail = ({
 
         <h3>Add Transaction</h3>
         <div className="add-transaction-panel">
-          <form onSubmit={(e) => { e.preventDefault(); onAddTransaction(); }}>
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              if (member && member.id) {
+                onAddTransaction(member.id);
+              } else {
+                onAddTransaction();
+              }
+            }}
+            style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}
+          >
             <input
               type="text"
               name="note"
@@ -366,12 +376,6 @@ const MemberDetail = ({
             >
               {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
             </button>
-            {transactionStatus === 'error' && (
-              <span style={{ color: 'red', marginLeft: 8 }}>Error adding transaction.</span>
-            )}
-            {transactionStatus === 'success' && (
-              <span style={{ color: 'green', marginLeft: 8 }}>Added!</span>
-            )}
           </form>
         </div>
 
