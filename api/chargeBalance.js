@@ -30,11 +30,24 @@ export default async function handler(req, res) {
   }
   const stripe_customer_id = member.stripe_customer_id;
 
-  // Retrieve customer's default payment method for off-session charge
+  // Retrieve default payment method from customer or subscription
+  let defaultPaymentMethodId = null;
+  // Try customer's invoice settings
   const stripeCustomer = await stripe.customers.retrieve(stripe_customer_id);
-  const defaultPaymentMethodId = stripeCustomer.invoice_settings.default_payment_method;
+  defaultPaymentMethodId = stripeCustomer.invoice_settings.default_payment_method;
+  // If none, try the active subscription's default payment method or source
   if (!defaultPaymentMethodId) {
-    return res.status(400).json({ error: 'No default payment method' });
+    const subs = await stripe.subscriptions.list({
+      customer: stripe_customer_id,
+      status: 'active',
+      limit: 1
+    });
+    if (subs.data.length > 0) {
+      defaultPaymentMethodId = subs.data[0].default_payment_method || subs.data[0].default_source;
+    }
+  }
+  if (!defaultPaymentMethodId) {
+    return res.status(400).json({ error: 'No default payment method found on customer or subscription' });
   }
 
   // 2. Get ledger for member and compute balance
