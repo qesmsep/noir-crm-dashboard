@@ -93,7 +93,7 @@ function App() {
       .from('ledger')
       .select('*')
       .eq('member_id', memberId)
-      .order('created_at', { ascending: true });
+      .order('date', { ascending: true });
     setLedgerLoading(false);
     if (!error) setMemberLedger(data || []);
     else setMemberLedger([]);
@@ -106,16 +106,27 @@ function App() {
       setTransactionStatus('Enter a valid amount.');
       return;
     }
-    const { error } = await supabase.from('ledger').insert({
-      member_id: memberId,
-      type: newTransaction.type,
-      amount: Number(newTransaction.amount),
-      note: newTransaction.note,
-    });
-    if (!error) {
+    const timestamp = new Date().toISOString();
+    const { error: insertError } = await supabase
+      .from('ledger')
+      .insert({
+        member_id: memberId,
+        type: newTransaction.type,
+        amount: Number(newTransaction.amount),
+        note: newTransaction.note,
+        date: timestamp
+      });
+    console.error('Ledger insert error:', insertError);
+    if (!insertError) {
       setTransactionStatus('Transaction added!');
       setNewTransaction({ type: 'payment', amount: '', note: '' });
-      fetchLedger(memberId);
+      // fetch ledger, ordering by date
+      const { data, error } = await supabase
+        .from('ledger')
+        .select('*')
+        .eq('member_id', memberId)
+        .order('date', { ascending: true });
+      setMemberLedger(data || []);
       // Optional: update member list balance
       const { data: balData } = await supabase
         .from('ledger')
@@ -124,7 +135,7 @@ function App() {
       const balance = (balData || []).reduce((acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)), 0);
       setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
     } else {
-      setTransactionStatus('Failed: ' + error.message);
+      setTransactionStatus('Failed: ' + insertError.message);
     }
   }
   useEffect(() => {
