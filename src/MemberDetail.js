@@ -1,14 +1,11 @@
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 const MemberDetail = ({
   member,
@@ -89,7 +86,7 @@ const MemberDetail = ({
     if (!dateString) return null;
     const date = new Date(dateString);
     if (isNaN(date)) return null;
-    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
   };
 
   const formatPhoneNumber = (phone) => {
@@ -162,6 +159,23 @@ const MemberDetail = ({
     }
     setCharging(false);
   };
+
+  // Calculate next renewal based on join_date
+  const nextRenewal = (() => {
+    if (!member.join_date) return 'N/A';
+    const jd = new Date(member.join_date);
+    const today = new Date();
+    let year = today.getFullYear();
+    let month = today.getMonth();
+    const day = jd.getDate();
+    let candidate = new Date(year, month, day);
+    if (candidate < today) {
+      if (month === 11) { year += 1; month = 0; }
+      else { month += 1; }
+      candidate = new Date(year, month, day);
+    }
+    return candidate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
+  })();
 
   return (
     <div className="member-detail-container">
@@ -236,12 +250,15 @@ const MemberDetail = ({
                   </a>
                 </div>
               )}
-              {member.dob && <div>Date of Birth: {formatDateLong(member.dob)}</div>}
+              {member.dob && <div style={{ whiteSpace: 'nowrap' }}>Date of Birth: {formatDateLong(member.dob)}</div>}
             </div>
           </div>
         </div>
         <div>
           <strong>Joined:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
+        </div>
+        <div>
+          <strong>Next Renewal:</strong> {nextRenewal}
         </div>
         <div>
           <strong>Stripe Customer ID:</strong>{' '}
@@ -270,25 +287,8 @@ const MemberDetail = ({
             </>
           )}
         </div>
-        <div>
-          <Elements stripe={stripePromise}>
-            <h3>Stripe Subscription</h3>
-            {stripeLoading ? (
-              <div>Loading Stripe data...</div>
-            ) : stripeError ? (
-              <div style={{ color: 'red' }}>{stripeError}</div>
-            ) : stripeData ? (
-              <div>
-                <div><strong>Status:</strong> {stripeData.status || 'N/A'}</div>
-                <div><strong>Next Renewal:</strong> {stripeData.next_renewal || 'N/A'}</div>
-                <div><strong>Last Payment:</strong> {stripeData.last_payment || 'N/A'}</div>
-                <div><strong>Plan:</strong> {stripeData.plan || 'N/A'}</div>
-              </div>
-            ) : (
-              <div>No Stripe data found.</div>
-            )}
-            <h3>Ledger</h3>
-            <div style={{ marginBottom: '1rem' }}>
+        <h3>Ledger</h3>
+        <div style={{ marginBottom: '1rem' }}>
           <strong>
             {balance < 0 ? 'Balance Due:' : 'Current Credit:'}
           </strong>{' '}
@@ -310,39 +310,37 @@ const MemberDetail = ({
             </>
           )}
           {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
-            </div>
-            {ledgerLoading ? (
-              <div>Loading ledger...</div>
-            ) : (
-              <table className="ledger-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Type</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledger && ledger.length > 0 ? (
-                    ledger.map((tx, idx) => (
-                      <tr key={tx.id || idx}>
-                        <td>{formatDateLong(tx.date)}</td>
-                        <td>{tx.note}</td>
-                        <td>${Number(tx.amount).toFixed(2)}</td>
-                        <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4">No transactions found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-          </Elements>
         </div>
+        {ledgerLoading ? (
+          <div>Loading ledger...</div>
+        ) : (
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger && ledger.length > 0 ? (
+                ledger.map((tx, idx) => (
+                  <tr key={tx.id || idx}>
+                    <td>{formatDateLong(tx.date)}</td>
+                    <td>{tx.note}</td>
+                    <td>${Number(tx.amount).toFixed(2)}</td>
+                    <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4">No transactions found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
 
         <h3>Add Transaction</h3>
         <div className="add-transaction-panel">
@@ -395,11 +393,11 @@ const MemberDetail = ({
 
         <button
           className="delete-member-btn"
-        onClick={() => {
-          if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-            handleDeleteMember(member.id, member.supabase_user_id);
-          }
-        }}
+          onClick={() => {
+            if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+              handleDeleteMember(member.id, member.supabase_user_id);
+            }
+          }}
         >
           Delete Member
         </button>
