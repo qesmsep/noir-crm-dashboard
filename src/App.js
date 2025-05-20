@@ -1,3 +1,5 @@
+  // Reminder settings state for admin
+  const [reminderHour, setReminderHour] = useState('');
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import './App.css';
@@ -156,6 +158,10 @@ function App() {
         const res = await fetch('/api/listUsers');
         const data = await res.json();
         setUsers(data.users || []);
+        // Fetch reminder setting
+        fetch('/api/reminderSettings')
+          .then(res => res.json())
+          .then(d => setReminderHour(d.hour));
       }
     }
     fetchUsers();
@@ -929,6 +935,29 @@ function App() {
                   </tbody>
                 </table>
               </div>
+          {/* Reminder Settings Panel */}
+          <div className="admin-panel">
+            <h2>Reminder Settings</h2>
+            <label>
+              Send reminder at hour (0-23):
+              <input
+                type="number"
+                value={reminderHour}
+                onChange={e => setReminderHour(e.target.value)}
+                style={{ width: '4rem', marginLeft: '0.5rem' }}
+              />
+            </label>
+            <button onClick={async () => {
+              await fetch('/api/reminderSettings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hour: reminderHour })
+              });
+              alert('Updated');
+            }}>
+              Save
+            </button>
+          </div>
             </>
           )}
           {section === 'lookup' && (
