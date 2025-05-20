@@ -1,3 +1,4 @@
+import './App.css';
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -302,7 +303,7 @@ const MemberDetail = ({
         {ledgerLoading ? (
           <div>Loading ledger...</div>
         ) : (
-          <table>
+          <table className="ledger-table">
             <thead>
               <tr>
                 <th>Date</th>
