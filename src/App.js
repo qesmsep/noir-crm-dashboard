@@ -50,6 +50,9 @@ function App() {
   const [promoteStatus, setPromoteStatus] = useState('');
   const [section, setSection] = useState('members');
   const [reminderHour, setReminderHour] = useState('');
+  const [customEmailTo, setCustomEmailTo] = useState('tim@828.life');
+  const [customEmailSubject, setCustomEmailSubject] = useState('');
+  const [customEmailBody, setCustomEmailBody] = useState('');
   const [lookupQuery, setLookupQuery] = useState('');
   // Sidebar state for mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -955,6 +958,46 @@ function App() {
             }}>
               Save
             </button>
+          </div>
+          <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-daybreak)', paddingTop: '1.5rem' }}>
+            <h2>Send Custom Email</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '600px' }}>
+              <input
+                type="text"
+                placeholder="Recipient (comma-separated)"
+                value={customEmailTo}
+                onChange={e => setCustomEmailTo(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-greige)' }}
+              />
+              <input
+                type="text"
+                placeholder="Subject"
+                value={customEmailSubject}
+                onChange={e => setCustomEmailSubject(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-greige)' }}
+              />
+              <textarea
+                rows={4}
+                placeholder="Message body"
+                value={customEmailBody}
+                onChange={e => setCustomEmailBody(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-greige)', resize: 'vertical' }}
+              />
+              <button
+                onClick={async () => {
+                  const res = await fetch('/api/sendCustomEmail', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: customEmailTo, subject: customEmailSubject, text: customEmailBody })
+                  });
+                  const json = await res.json();
+                  alert(json.error ? 'Error: ' + json.error : 'Email sent successfully');
+                }}
+                style={{ padding: '0.6rem 1.2rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '0.5rem' }}
+              >
+                Send Email
+              </button>
+            </div>
           </div>
             </>
           )}
