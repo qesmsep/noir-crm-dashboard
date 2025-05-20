@@ -25,8 +25,6 @@ const MemberDetail = ({
   const [charging, setCharging] = useState(false);
   const [chargeStatus, setChargeStatus] = useState(null);
 
-  if (!member) return null;
-
   // Link member to Stripe
   const handleLinkStripe = async () => {
     setLinkingStripe(true);
@@ -73,6 +71,8 @@ const MemberDetail = ({
         });
     }
   }, [member?.stripe_customer_id]);
+
+  if (!member) return null;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
