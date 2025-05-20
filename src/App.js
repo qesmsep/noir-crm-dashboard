@@ -602,7 +602,7 @@ function App() {
           className="app-container"
           style={{
             marginLeft: isMobile ? 0 : 220,
-            padding: isMobile ? "1rem 2vw" : "2.5rem 2.5vw",
+            padding: isMobile ? "1rem" : "2.5rem",
             minHeight: "100vh",
             background: "#f8f7f4",
             maxWidth: "100vw",
