@@ -87,57 +87,60 @@ function App() {
   const [newTransaction, setNewTransaction] = useState({ type: 'payment', amount: '', note: '' });
   const [transactionStatus, setTransactionStatus] = useState('');
   const isMobile = useIsMobile();
-  // Fetch ledger for a member
+  // Fetch ledger for a member using API route
   async function fetchLedger(memberId) {
     setLedgerLoading(true);
-    const { data, error } = await supabase
-      .from('ledger')
-      .select('*')
-      .eq('member_id', memberId)
-      .order('date', { ascending: true });
-    setLedgerLoading(false);
-    if (!error) setMemberLedger(data || []);
-    else setMemberLedger([]);
+    try {
+      const res = await fetch(`/api/ledger?member_id=${encodeURIComponent(memberId)}`);
+      const result = await res.json();
+      setLedgerLoading(false);
+      if (res.ok && result.data) {
+        setMemberLedger(result.data || []);
+      } else {
+        setMemberLedger([]);
+      }
+    } catch (err) {
+      setLedgerLoading(false);
+      setMemberLedger([]);
+    }
   }
 
-  // Add new transaction to ledger
+  // Add new transaction to ledger via API route
   async function handleAddTransaction(memberId) {
     setTransactionStatus('');
     if (!newTransaction.amount || isNaN(Number(newTransaction.amount))) {
       setTransactionStatus('Enter a valid amount.');
       return;
     }
-    const timestamp = new Date().toISOString();
-    const { error: insertError } = await supabase
-      .from('ledger')
-      .insert({
-        member_id: memberId,
-        type: newTransaction.type,
-        amount: Number(newTransaction.amount),
-        note: newTransaction.note,
-        date: timestamp
+    setLedgerLoading(true);
+    try {
+      const res = await fetch('/api/ledger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: memberId,
+          type: newTransaction.type,
+          amount: Number(newTransaction.amount),
+          note: newTransaction.note
+        })
       });
-    console.error('Ledger insert error:', insertError);
-    if (!insertError) {
-      setTransactionStatus('Transaction added!');
-      setNewTransaction({ type: 'payment', amount: '', note: '' });
-      // fetch ledger, ordering by date
-      const { data, error } = await supabase
-        .from('ledger')
-        .select('*')
-        .eq('member_id', memberId)
-        .order('date', { ascending: true });
-      setMemberLedger(data || []);
-      // Optional: update member list balance
-      const { data: balData } = await supabase
-        .from('ledger')
-        .select('amount, type')
-        .eq('member_id', memberId);
-      const balance = (balData || []).reduce((acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)), 0);
-      setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
-    } else {
-      setTransactionStatus('Failed: ' + insertError.message);
+      const result = await res.json();
+      if (res.ok && result.data) {
+        setTransactionStatus('Transaction added!');
+        setNewTransaction({ type: 'payment', amount: '', note: '' });
+        await fetchLedger(memberId);
+        // Optional: update member list balance
+        // (recompute from new ledger)
+        const ledgerArr = result.data ? [...(memberLedger || []), result.data] : memberLedger || [];
+        const balance = ledgerArr.reduce((acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)), 0);
+        setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
+      } else {
+        setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      setTransactionStatus('Failed: ' + err.message);
     }
+    setLedgerLoading(false);
   }
   useEffect(() => {
     async function fetchUsers() {
