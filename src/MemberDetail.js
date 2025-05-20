@@ -332,12 +332,7 @@ const MemberDetail = ({
 
         <h3>Add Transaction</h3>
         <div className="add-transaction-panel">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              onAddTransaction();
-            }}
-          >
+          <form>
             <input
               type="text"
               name="note"
@@ -364,7 +359,15 @@ const MemberDetail = ({
               <option value="credit">Credit</option>
               <option value="debit">Debit</option>
             </select>
-            <button type="submit" disabled={transactionStatus === 'loading'}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                onAddTransaction();
+              }}
+              className="add-transaction-btn"
+              disabled={transactionStatus === 'loading'}
+            >
               {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
             </button>
             {transactionStatus === 'error' && (
