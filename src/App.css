@@ -390,7 +390,6 @@ body {
 
 .member-detail-view * {
   box-sizing: border-box;
-  max-width: 95%;
   word-break: break-word;
 }
 
