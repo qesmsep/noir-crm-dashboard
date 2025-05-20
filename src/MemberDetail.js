@@ -78,6 +78,43 @@ const MemberDetail = ({
     fetchNotesLog();
   };
 
+  // Add single attribute
+  const handleAddAttribute = async () => {
+    if (!newAttrKey || !newAttrValue) return;
+    await fetch('/api/member_attributes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id: member.id, key: newAttrKey, value: newAttrValue }),
+    });
+    setNewAttrKey('');
+    setNewAttrValue('');
+    fetchAttributes();
+  };
+  // Edit existing attribute
+  const handleEditAttribute = async (attr) => {
+    const updated = prompt(`Edit ${attr.key}`, attr.value);
+    if (updated != null) {
+      await fetch('/api/member_attributes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_id: member.id, key: attr.key, value: updated }),
+      });
+      fetchAttributes();
+    }
+  };
+  // Edit existing note
+  const handleEditNote = async (noteObj) => {
+    const updated = prompt('Edit note', noteObj.note);
+    if (updated != null) {
+      await fetch('/api/member_notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_id: member.id, note: updated, id: noteObj.id }),
+      });
+      fetchNotesLog();
+    }
+  };
+
   // Link member to Stripe
   const handleLinkStripe = async () => {
     setLinkingStripe(true);
@@ -308,27 +345,9 @@ const MemberDetail = ({
           {/* Attributes */}
           <h3>Attributes</h3>
           {attributes.map((attr, i) => (
-            <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <input
-                value={attr.key}
-                onChange={e => {
-                  const newAttrs = [...attributes];
-                  newAttrs[i].key = e.target.value;
-                  setAttributes(newAttrs);
-                }}
-                className="add-transaction-input"
-                placeholder="Attribute"
-              />
-              <input
-                value={attr.value}
-                onChange={e => {
-                  const newAttrs = [...attributes];
-                  newAttrs[i].value = e.target.value;
-                  setAttributes(newAttrs);
-                }}
-                className="add-transaction-input"
-                placeholder="Value"
-              />
+            <div key={i} className="attribute-item">
+              <strong>{attr.key}:</strong> {attr.value}
+              <button className="edit-attribute-btn" onClick={() => handleEditAttribute(attr)}>Edit</button>
             </div>
           ))}
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -344,25 +363,17 @@ const MemberDetail = ({
               className="add-transaction-input"
               placeholder="Attribute Detail"
             />
-            <button
-              onClick={() => {
-                if (newAttrKey && newAttrValue) {
-                  setAttributes([...attributes, { key: newAttrKey, value: newAttrValue }]);
-                  setNewAttrKey('');
-                  setNewAttrValue('');
-                }
-              }}
-              className="add-transaction-btn"
-            >
-              Add Attribute
-            </button>
+            <button onClick={handleAddAttribute} className="add-transaction-btn">Add Attribute</button>
           </div>
-          <button onClick={handleSaveAttributes} className="add-transaction-btn">Save Attributes</button>
+
           {/* Notes */}
           <h3>Notes History</h3>
           <ul>
             {notesLog.map(n => (
-              <li key={n.id}>{formatDateLong(n.created_at)}: {n.note}</li>
+              <li key={n.id} className="note-item">
+                {formatDateLong(n.created_at)}: {n.note}
+                <button className="edit-note-btn" onClick={() => handleEditNote(n)}>Edit</button>
+              </li>
             ))}
           </ul>
           <div className="add-transaction-panel">
@@ -371,8 +382,8 @@ const MemberDetail = ({
               onChange={e => setNotes(e.target.value)}
               className="add-transaction-input"
               placeholder="New note..."
-              rows={6}
-              style={{ minHeight: '120px' }}
+              rows={2}
+              style={{ minHeight: '60px', width: '100%' }}
             />
             <button onClick={handleAddNote} className="add-transaction-btn">Add Note</button>
           </div>

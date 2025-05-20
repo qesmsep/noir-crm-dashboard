@@ -482,3 +482,28 @@ body {
    cursor: pointer;
    margin-bottom: 1rem;
  }
+
+.attribute-item {
+  background: var(--color-wedding-day);
+  padding: 0.6rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.edit-attribute-btn,
+.edit-note-btn {
+  background: none;
+  border: none;
+  color: var(--color-cork);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 0.4rem;
+}
+.note-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
