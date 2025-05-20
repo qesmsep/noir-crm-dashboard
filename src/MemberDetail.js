@@ -180,111 +180,49 @@ const MemberDetail = ({
   return (
     <div className="member-detail-container">
       <div className="member-detail-card">
-        <button onClick={onBack}>Back to List</button>
-        <h2>Primary Member</h2>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
-          {member.photo && (
-            <img
-              src={member.photo}
-              alt="Member"
-              style={{
-                width: 120,
-                height: 120,
-                objectFit: 'cover',
-                borderRadius: 8,
-                marginRight: 20,
-              }}
-            />
-          )}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, marginTop: 10 }}>STATUS</div>
-            <div style={{ fontWeight: 500, fontSize: 15, marginBottom: 10 }}>
-              <span
-                className={`status-badge status-${(member.status || 'na').toLowerCase()}`}
-                style={{
-                  fontWeight: 400,
-                  fontSize: 14,
-                  padding: '2px 10px',
-                  borderRadius: 8,
-                  background:
-                    member.status && member.status.toLowerCase() === 'active'
-                      ? '#c2eacb'
-                      : member.status && member.status.toLowerCase() === 'pending'
-                      ? '#fff3cd'
-                      : member.status && member.status.toLowerCase() === 'inactive'
-                      ? '#f8d7da'
-                      : '#ececec',
-                  color:
-                    member.status && member.status.toLowerCase() === 'active'
-                      ? '#217a40'
-                      : member.status && member.status.toLowerCase() === 'pending'
-                      ? '#ad8608'
-                      : member.status && member.status.toLowerCase() === 'inactive'
-                      ? '#842029'
-                      : '#353535',
-                }}
-              >
-                {member.status || 'N/A'}
-              </span>
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>
+        <button className="back-button" onClick={onBack}>Back to List</button>
+        <h2>Members</h2>
+        <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 16, gap: '2rem' }}>
+          {/* Primary Member */}
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            {member.photo && (
+              <img
+                src={member.photo}
+                alt="Primary Member"
+                style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, marginRight: 20 }}
+              />
+            )}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 20, marginBottom: '0.25rem' }}>
                 {member.first_name} {member.last_name}
-                {member.membership && (
-                  <span style={{ fontWeight: 400, fontSize: 16, marginLeft: 8, color: '#7c6b58' }}>
-                    — {member.membership}
-                  </span>
-                )}
-              </span>
-            </div>
-            <div style={{ fontSize: 15, color: '#353535' }}>
-              {member.email && <div>Email: {member.email}</div>}
-              {member.phone && (
-                <div>
-                  Phone:&nbsp;
-                  <a
-                    href={`tel:${member.phone}`}
-                    style={{ color: 'inherit', textDecoration: 'none' }}
-                  >
-                    {formatPhoneNumber(member.phone)}
-                  </a>
+              </div>
+              {member.membership && (
+                <div style={{ fontWeight: 400, fontSize: 16, color: '#7c6b58', marginBottom: '0.5rem' }}>
+                  {member.membership}
                 </div>
               )}
+              {member.email && <div>Email: {member.email}</div>}
+              {member.phone && <div>Phone: {formatPhoneNumber(member.phone)}</div>}
               {member.dob && <div style={{ whiteSpace: 'nowrap' }}>Date of Birth: {formatDateLong(member.dob)}</div>}
             </div>
           </div>
-        </div>
-        <div>
-          <strong>Joined:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
-        </div>
-        <div>
-          <strong>Next Renewal:</strong> {nextRenewal}
-        </div>
-        <div>
-          <strong>Stripe Customer ID:</strong>{' '}
-          {member.stripe_customer_id ? (
-            <span style={{ color: 'green' }}>{member.stripe_customer_id}</span>
-          ) : (
-            <>
-              <span style={{ color: 'red' }}>Not linked</span>
-              <button
-                onClick={handleLinkStripe}
-                disabled={linkingStripe}
-                style={{ marginLeft: 8 }}
-              >
-                {linkingStripe ? 'Linking...' : 'Link to Stripe'}
-              </button>
-              {linkResult && linkResult.status === 'success' && (
-                <span style={{ color: 'green', marginLeft: 8 }}>
-                  Linked! Stripe ID: {linkResult.stripeId}
-                </span>
-              )}
-              {linkResult && linkResult.status === 'error' && (
-                <span style={{ color: 'red', marginLeft: 8 }}>
-                  Error: {linkResult.error}
-                </span>
-              )}
-            </>
+          {/* Secondary Member */}
+          {member.photo2 && (
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              <img
+                src={member.photo2}
+                alt="Secondary Member"
+                style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, marginRight: 20 }}
+              />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 20, marginBottom: '0.25rem' }}>
+                  {member.first_name2} {member.last_name2}
+                </div>
+                {member.company2 && <div>Company: {member.company2}</div>}
+                {member.email2 && <div>Email: {member.email2}</div>}
+                {member.phone2 && <div>Phone: {formatPhoneNumber(member.phone2)}</div>}
+              </div>
+            </div>
           )}
         </div>
         <h3>Ledger</h3>
@@ -401,22 +339,6 @@ const MemberDetail = ({
         >
           Delete Member
         </button>
-
-        {/* Counterpart photo size adjustment (if applicable) */}
-        {member.photo2 && (
-          <img
-            src={member.photo2}
-            alt="Counterpart"
-            style={{
-              width: 200,
-              height: 200,
-              objectFit: 'cover',
-              borderRadius: 8,
-              marginTop: 20,
-              marginBottom: 10,
-            }}
-          />
-        )}
       </div>
     </div>
   );
