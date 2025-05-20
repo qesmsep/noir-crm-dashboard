@@ -314,11 +314,11 @@ const MemberDetail = ({
 
       <button
         className="delete-member-btn"
-        onClick={() => {
-          if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-            handleDeleteMember(member.id, member.user_id);
-          }
-        }}
+      onClick={() => {
+        if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+          handleDeleteMember(member.id, member.supabase_user_id);
+        }
+      }}
       >
         Delete Member
       </button>

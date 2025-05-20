@@ -52,16 +52,17 @@ export default async function handler(req, res) {
     if (!service_role_key) {
       return res.status(500).json({ error: 'Server misconfiguration: missing service role key' });
     }
+    // Look up the linked auth user ID from the members table
     const supabaseAdmin = createClient(supabaseUrl, service_role_key);
     const { data, error } = await supabaseAdmin
       .from('members')
-      .select('user_id')
+      .select('supabase_user_id')
       .eq('id', member_id)
       .single();
-    if (error || !data || !data.user_id) {
+    if (error || !data || !data.supabase_user_id) {
       return res.status(400).json({ error: 'No linked auth user found for this member.' });
     }
-    supabase_user_id = data.user_id;
+    supabase_user_id = data.supabase_user_id;
   }
 
   // Use direct fetch with service role for the admin delete call

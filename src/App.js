@@ -327,7 +327,7 @@ function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             member_id: member.id,
-            supabase_user_id: member.user_id,
+            supabase_user_id: member.supabase_user_id,
             requester_token: session.access_token
           }),
         });
