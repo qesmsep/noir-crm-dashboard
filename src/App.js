@@ -606,7 +606,7 @@ function App() {
             minHeight: "100vh",
             background: "#f8f7f4",
             maxWidth: "100vw",
-            width: "100%",
+            width: "90%",
             overflowX: "hidden"
           }}
         >
