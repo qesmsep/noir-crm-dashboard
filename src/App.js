@@ -4,6 +4,7 @@ import './App.css';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { v4 as uuidv4 } from 'uuid';
+import MemberDetail from './MemberDetail';
 
 // Responsive helper
 function useIsMobile() {
@@ -796,8 +797,7 @@ function App() {
                 </>
               ) : (
                 // Member Detail View (not modal, full width minus sidebar)
-                <div
-                  className="member-detail-view"
+                <div className="member-detail-view"
                   style={{
                     margin: "0 auto",
                     background: "#faf9f7",
@@ -807,346 +807,18 @@ function App() {
                     overflowX: "hidden"
                   }}
                 >
-                  <button
-                    style={{
-                      marginBottom: "2rem",
-                      padding: "0.5rem 1.25rem",
-                      background: "#a59480",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "5px",
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
-                    onClick={() => setSelectedMember(null)}
-                  >
-                    ← Back to List
-                  </button>
-                  {editingMemberId === selectedMember.id ? (
-                    <form
-                      onSubmit={e => {
-                        e.preventDefault();
-                        handleSaveEditMember();
-                      }}
-                      style={{ width: "100%" }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "2.5rem",
-                          flexWrap: "wrap"
-                        }}
-                      >
-                        <div style={{ flex: "1 0 320px", minWidth: 260 }}>
-                          <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Primary Member</h3>
-                          <label>
-                            First Name:
-                            <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
-                          </label>
-                          <label>
-                            Last Name:
-                            <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
-                          </label>
-                          <label>
-                            Email:
-                            <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
-                          </label>
-                          <label>
-                            Phone:
-                            <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
-                          </label>
-                          <label>
-                            Date of Birth:
-                            <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
-                          </label>
-                          <label>
-                            Membership:
-                            <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
-                          </label>
-                          <label>
-                            Balance:
-                            <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
-                          </label>
-                          <label>
-                            Photo:
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={async e => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  const url = await handlePhotoUpload(file, false);
-                                  if (url && editingMemberId) {
-                                    await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
-                                    setEditMemberForm(form => ({ ...form, photo: url }));
-                                    setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
-                                    setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
-                                  }
-                                }
-                              }}
-                            />
-                            {editMemberForm.photo && (
-                              <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
-                            )}
-                          </label>
-                        </div>
-                        <div style={{ flex: "1 0 320px", minWidth: 260 }}>
-                          <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Counterpart</h3>
-                          <label>
-                            Counterpart First Name:
-                            <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
-                          </label>
-                          <label>
-                            Counterpart Last Name:
-                            <input value={editMemberForm.last_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name2: e.target.value })} />
-                          </label>
-                          <label>
-                            Counterpart Email:
-                            <input value={editMemberForm.email2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email2: e.target.value })} />
-                          </label>
-                          <label>
-                            Counterpart Phone:
-                            <input value={editMemberForm.phone2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone2: e.target.value })} />
-                          </label>
-                          <label>
-                            Counterpart Company:
-                            <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
-                          </label>
-                          <label>
-                            Counterpart Photo:
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={async e => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  const url = await handlePhotoUpload(file, true);
-                                  if (url && editingMemberId) {
-                                    await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
-                                    setEditMemberForm(form => ({ ...form, photo2: url }));
-                                    setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
-                                    setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
-                                  }
-                                }
-                              }}
-                            />
-                            {editMemberForm.photo2 && (
-                              <img src={editMemberForm.photo2} alt="Counterpart Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
-                            )}
-                          </label>
-                        </div>
-                      </div>
-                      <div style={{ marginTop: "1.5rem" }}>
-                        <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
-                        <button type="button" onClick={handleCancelEditMember}>Cancel</button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "2.5rem",
-                        flexWrap: "wrap"
-                      }}
-                    >
-                      <div style={{
-                        flex: "1 0 320px",
-                        minWidth: 260,
-                        background: "#fff",
-                        borderRadius: "10px",
-                        padding: "1.5rem 1.5rem 1.5rem 1.5rem",
-                        boxShadow: "0 1px 4px rgba(0,0,0,0.03)",
-                        marginBottom: "1.5rem"
-                      }}>
-                        <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Primary Member</h3>
-                        {selectedMember.photo && (
-                          <img
-                            src={selectedMember.photo}
-                            alt={`${selectedMember.first_name} ${selectedMember.last_name}`}
-                            className="member-photo"
-                            style={{ maxWidth: 180, borderRadius: "10px", marginBottom: "1rem" }}
-                          />
-                        )}
-                        {selectedMember.status && (
-                          <div style={{
-                            margin: "0.5rem 0 1.25rem 0",
-                            fontWeight: 700,
-                            fontSize: "1.18rem",
-                            color: "#A59480",
-                            letterSpacing: "0.09em",
-                            textTransform: "uppercase"
-                          }}>
-                            STATUS
-                            <span style={{
-                              display: "block",
-                              fontWeight: 600,
-                              fontSize: "1.14rem",
-                              color: "#353535",
-                              marginTop: "0.25rem",
-                              textTransform: "capitalize"
-                            }}>
-                              {selectedMember.status}
-                            </span>
-                          </div>
-                        )}
-                        <div className="member-info" style={{ fontSize: "1.15rem" }}>
-                          <strong>
-                            {selectedMember.first_name} {selectedMember.last_name} — {selectedMember.membership}
-                          </strong>
-                          
-                          <div>Phone: {formatPhone(selectedMember.phone)}</div>
-                          <div>Email: {selectedMember.email}</div>
-                          <div>Date of Birth: {formatDOB(selectedMember.dob)}</div>
-                        </div>
-                        <div style={{ marginTop: "1.25rem" }}>
-                          <button
-                            style={{
-                              padding: "0.65rem 1.5rem",
-                              fontSize: "1.1rem",
-                              borderRadius: "6px",
-                              background: "#A59480",
-                              color: "#fff",
-                              border: "none",
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              boxShadow: "0 2px 10px rgba(53,53,53,0.07)"
-                            }}
-                            onClick={e => {
-                              e.stopPropagation();
-                              handleEditMember(selectedMember);
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                      {selectedMember.first_name2 && (
-                        <div className="member-counterpart"
-                          style={{
-                            flex: "1 0 320px",
-                            minWidth: 260,
-                            background: "#f2eee8",
-                            borderRadius: "10px",
-                            padding: "1.5rem",
-                            marginBottom: "1.5rem",
-                            boxShadow: "0 1px 4px rgba(0,0,0,0.02)"
-                          }}>
-                          <h3 style={{ marginBottom: "1rem", color: "#a59480", fontWeight: 700, letterSpacing: "0.01em" }}>Counterpart</h3>
-                          {selectedMember.photo2 && (
-                            <img
-                              src={selectedMember.photo2}
-                              alt={`${selectedMember.first_name2} ${selectedMember.last_name2}`}
-                              className="member-photo"
-                              style={{ maxWidth: 120, borderRadius: "8px", marginBottom: "0.7rem" }}
-                            />
-                          )}
-                          <strong>
-                            {selectedMember.first_name2} {selectedMember.last_name2}
-                          </strong>
-                          <div>Email: {selectedMember.email2}</div>
-                          <div>Phone: {formatPhone(selectedMember.phone2)}</div>
-                          <div>Company: {selectedMember.company2}</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {/* Ledger section */}
-                  <div style={{ marginTop: "2.5rem" }}>
-                    <h3 style={{ color: "#a59480", fontWeight: 700, letterSpacing: "0.01em", marginBottom: "1rem" }}>Ledger</h3>
-                    <div style={{ marginBottom: "0.5rem" }}>
-                      <span style={{ fontWeight: 600 }}>{selectedMember.first_name} {selectedMember.last_name}</span> – Membership: {selectedMember.membership}
-                    </div>
-                    <div style={{ marginBottom: "1.2rem" }}>
-                      <strong>Current Balance:</strong> $
-                      {(memberLedger || []).reduce(
-                        (acc, t) => acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount)),
-                        0
-                      )}
-                    </div>
-                    {ledgerLoading ? (
-                      <div>Loading...</div>
-                    ) : (
-                      <table className="ledger-table">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                            <th>Note</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(memberLedger || []).map(t => (
-                            <tr key={t.id}>
-                              <td>{new Date(t.created_at).toLocaleDateString()}</td>
-                              <td>{t.type}</td>
-                              <td style={{ color: t.type === 'payment' ? 'green' : 'red' }}>
-                                {t.type === 'payment' ? '+' : '-'}${Math.abs(Number(t.amount)).toFixed(2)}
-                              </td>
-                              <td>{t.note}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                    {session.user?.user_metadata?.role === 'admin' && (
-                      <div className="add-transaction-panel" style={{ marginTop: "1.5rem" }}>
-                        <h4>Add Transaction</h4>
-                        <form onSubmit={e => { e.preventDefault(); handleAddTransaction(selectedMember.id); }} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <select value={newTransaction.type} onChange={e => setNewTransaction(t => ({ ...t, type: e.target.value }))}>
-                            <option value="payment">Payment</option>
-                            <option value="purchase">Purchase</option>
-                          </select>
-                          <input
-                            type="number"
-                            placeholder="Amount"
-                            value={newTransaction.amount}
-                            onChange={e => setNewTransaction(t => ({ ...t, amount: e.target.value }))}
-                            style={{ width: 100 }}
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="Note"
-                            value={newTransaction.note}
-                            onChange={e => setNewTransaction(t => ({ ...t, note: e.target.value }))}
-                            style={{ width: 160 }}
-                          />
-                          <button type="submit">Add</button>
-                        </form>
-                        {transactionStatus && <div style={{ marginTop: 4, color: '#353535' }}>{transactionStatus}</div>}
-                      </div>
-                    )}
-                  </div>
-                  {/* Delete member button */}
-                  <button
-                    className="delete-member-btn"
-                    onClick={() => handleDeleteMember(selectedMember)}
-                  >
-                    Delete Member
-                  </button>
-                  {/* Responsive styles */}
-                  <style>
-                    {`
-                      @media (max-width: 700px) {
-                        .member-detail-view {
-                          padding: 1rem 0.5rem !important;
-                          width: 100% !important;
-                          overflow-x: hidden !important;
-                        }
-                        .app-container {
-                          width: 100% !important;
-                          max-width: 100vw !important;
-                          overflow-x: hidden !important;
-                        }
-                        .member-detail-view > div,
-                        .member-detail-view form > div {
-                          flex-direction: column !important;
-                          gap: 1.2rem !important;
-                        }
-                      }
-                    `}
-                  </style>
+                  {/* Use MemberDetail component if available */}
+                  <MemberDetail
+                    member={selectedMember}
+                    ledger={memberLedger}
+                    ledgerLoading={ledgerLoading}
+                    onBack={() => setSelectedMember(null)}
+                    onAddTransaction={() => handleAddTransaction(selectedMember.id)}
+                    newTransaction={newTransaction}
+                    setNewTransaction={setNewTransaction}
+                    transactionStatus={transactionStatus}
+                    session={session}
+                  />
                 </div>
               )}
             </>
@@ -1450,7 +1122,6 @@ function App() {
             </div>
           )}
         </div>
-        {/* Ledger modal removed; member detail view now in main panel */}
       </>
     );
   }
