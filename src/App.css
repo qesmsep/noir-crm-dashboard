@@ -492,14 +492,26 @@ body {
   align-items: center;
   justify-content: space-between;
 }
-.edit-attribute-btn,
-.edit-note-btn {
+ .edit-attribute-btn,
+ .edit-note-btn {
+   background: none;
+   border: none;
+   color: var(--color-cork);
+   cursor: pointer;
+   font-size: 0.9rem;
+   padding: 0 0.4rem;
+ }
+
+.delete-attribute-btn {
   background: none;
   border: none;
-  color: var(--color-cork);
+  color: #e74c3c;
   cursor: pointer;
   font-size: 0.9rem;
-  padding: 0 0.4rem;
+  margin-left: 0.5rem;
+}
+.delete-attribute-btn:hover {
+  text-decoration: underline;
 }
 .note-item {
   display: flex;
