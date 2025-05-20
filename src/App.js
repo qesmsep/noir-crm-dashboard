@@ -7,16 +7,6 @@ import { v4 as uuidv4 } from 'uuid';
 import MemberDetail from './MemberDetail';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import React, { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import './App.css';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { v4 as uuidv4 } from 'uuid';
-import MemberDetail from './MemberDetail';
-
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 
 // Responsive helper
 function useIsMobile() {
