@@ -28,6 +28,37 @@ const MemberDetail = ({
   const [charging, setCharging] = useState(false);
   const [chargeStatus, setChargeStatus] = useState(null);
 
+  // Member attributes and notes
+  const [attributes, setAttributes] = useState([
+    { key: 'Favorite spirit', value: member.favorite_spirit || '' },
+    { key: 'Favorite cocktail', value: member.favorite_cocktail || '' },
+    { key: 'Water preference', value: member.water_preference || '' },
+    { key: 'Profession', value: member.profession || '' },
+  ]);
+  const [newAttrKey, setNewAttrKey] = useState('');
+  const [newAttrValue, setNewAttrValue] = useState('');
+  const [notes, setNotes] = useState(member.notes || '');
+
+  // Save attributes and notes to DB
+  const handleSaveAttributes = async () => {
+    const updateObj = {
+      favorite_spirit: attributes.find(a => a.key === 'Favorite spirit')?.value || null,
+      favorite_cocktail: attributes.find(a => a.key === 'Favorite cocktail')?.value || null,
+      water_preference: attributes.find(a => a.key === 'Water preference')?.value || null,
+      profession: attributes.find(a => a.key === 'Profession')?.value || null,
+      notes: notes || null,
+    };
+    const { error } = await supabase
+      .from('members')
+      .update(updateObj)
+      .eq('id', member.id);
+    if (error) {
+      alert('Failed to save: ' + error.message);
+    } else {
+      alert('Saved successfully');
+    }
+  };
+
   // Link member to Stripe
   const handleLinkStripe = async () => {
     setLinkingStripe(true);
@@ -201,9 +232,18 @@ const MemberDetail = ({
                   {member.membership}
                 </div>
               )}
-              {member.email && <div>Email: {member.email}</div>}
-              {member.phone && <div>Phone: {formatPhoneNumber(member.phone)}</div>}
-              {member.dob && <div style={{ whiteSpace: 'nowrap' }}>Date of Birth: {formatDateLong(member.dob)}</div>}
+              {member.email && (
+                <div>
+                  Email: <a href={`mailto:${member.email}`}>{member.email}</a>
+                </div>
+              )}
+              {member.phone && (
+                <div>
+                  Phone: <a href={`tel:${member.phone}`}>{formatPhoneNumber(member.phone)}</a>
+                </div>
+              )}
+              {member.dob && <div style={{ whiteSpace: 'nowrap' }}>Birthday: {formatDateLong(member.dob)}</div>}
+              {member.company && <div>Company: {member.company}</div>}
             </div>
           </div>
           {/* Secondary Member */}
@@ -219,11 +259,23 @@ const MemberDetail = ({
                   {member.first_name2} {member.last_name2}
                 </div>
                 {member.company2 && <div>Company: {member.company2}</div>}
-                {member.email2 && <div>Email: {member.email2}</div>}
-                {member.phone2 && <div>Phone: {formatPhoneNumber(member.phone2)}</div>}
+                {member.email2 && (
+                  <div>
+                    Email: <a href={`mailto:${member.email2}`}>{member.email2}</a>
+                  </div>
+                )}
+                {member.phone2 && (
+                  <div>
+                    Phone: <a href={`tel:${member.phone2}`}>{formatPhoneNumber(member.phone2)}</a>
+                  </div>
+                )}
               </div>
             </div>
           )}
+        </div>
+        {/* Referral and Renewal Block */}
+        <div>
+          <strong>Referred By:</strong> {member.referral || 'N/A'}
         </div>
         <div>
           <strong>Member Since:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
@@ -231,6 +283,64 @@ const MemberDetail = ({
         <div>
           <strong>Next Renewal:</strong> {nextRenewal}
         </div>
+
+        {/* Member Attributes */}
+        <div style={{ marginTop: '1.5rem' }}>
+          <h3>Member Attributes</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+            <tbody>
+              {attributes.map((attr, idx) => (
+                <tr key={idx}>
+                  <td style={{ padding: '4px 8px', fontWeight: 600 }}>{attr.key}</td>
+                  <td style={{ padding: '4px 8px' }}>{attr.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <form onSubmit={e => {
+            e.preventDefault();
+            if (newAttrKey && newAttrValue) {
+              setAttributes([...attributes, { key: newAttrKey, value: newAttrValue }]);
+              setNewAttrKey('');
+              setNewAttrValue('');
+            }
+          }} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            <input
+              type="text"
+              placeholder="Attribute name"
+              value={newAttrKey}
+              onChange={e => setNewAttrKey(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <input
+              type="text"
+              placeholder="Value"
+              value={newAttrValue}
+              onChange={e => setNewAttrValue(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button type="submit" style={{ padding: '0.4rem 0.8rem' }}>Add</button>
+          </form>
+        </div>
+
+        {/* Notes */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h3>Notes</h3>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={4}
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+            placeholder="Add visit notes..."
+          />
+          <button
+            onClick={handleSaveAttributes}
+            style={{ padding: '0.5rem 1rem', marginBottom: '1.5rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Save Changes
+          </button>
+        </div>
+
         <h3>Ledger</h3>
         <div style={{ marginBottom: '1rem' }}>
           <strong>
