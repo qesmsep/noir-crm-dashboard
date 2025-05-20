@@ -568,6 +568,15 @@ function App() {
                 Lookup
               </button>
               <button
+                className={section === 'calendar' ? 'nav-active' : ''}
+                onClick={() => {
+                  setSection('calendar');
+                  setSidebarOpen(false);
+                }}
+              >
+                Calendar
+              </button>
+              <button
                 onClick={async () => {
                   await supabase.auth.signOut();
                   window.location.reload();
@@ -621,6 +630,12 @@ function App() {
               }}
             >
               Lookup
+            </button>
+            <button
+              className={section === 'calendar' ? 'nav-active' : ''}
+              onClick={() => setSection('calendar')}
+            >
+              Calendar
             </button>
             <button
               onClick={async () => {
@@ -1222,6 +1237,25 @@ function App() {
                   ))
                 )}
               </ul>
+            </div>
+          )}
+          {section === 'calendar' && (
+            <div style={{ padding: '2rem', maxWidth: '100vw', width: '100%' }}>
+              <h2>Reservations & Events Calendar</h2>
+              <CalendarView
+                onSelectSlot={slot => setSlotInfo(slot)}
+                onSelectEvent={event => setEventInfo(event)}
+              />
+              {slotInfo && (
+                <div>
+                  <p>Selected slot: {slotInfo.start.toString()} - {slotInfo.end.toString()}</p>
+                </div>
+              )}
+              {eventInfo && (
+                <div>
+                  <p>Selected event/reservation ID: {eventInfo.id}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
