@@ -47,57 +47,52 @@ export default async function handler(req, res) {
 
   let supabase_user_id = initial_supabase_user_id;
 
-  // If no supabase_user_id provided, look it up from the members table
-  if (!supabase_user_id) {
-    if (!service_role_key) {
-      return res.status(500).json({ error: 'Server misconfiguration: missing service role key' });
-    }
-    // Look up the linked auth user ID from the members table
+  // Optionally look up supabase_user_id if not provided
+  if (!supabase_user_id && service_role_key) {
     const supabaseAdmin = createClient(supabaseUrl, service_role_key);
     const { data, error } = await supabaseAdmin
       .from('members')
       .select('supabase_user_id')
       .eq('id', member_id)
       .single();
-    if (error || !data || !data.supabase_user_id) {
-      return res.status(400).json({ error: 'No linked auth user found for this member.' });
-    }
-    supabase_user_id = data.supabase_user_id;
-  }
-
-  // Use direct fetch with service role for the admin delete call
-  try {
-    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${supabase_user_id}`, {
-      method: 'DELETE',
-      headers: {
-        apiKey: service_role_key,
-        Authorization: `Bearer ${service_role_key}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (response.ok) {
-      // Delete the user from the members table as well
-      const supabaseDb = createClient(supabaseUrl, service_role_key);
-      // LOG member_id before deleting
-      console.log('Deleting member with id:', member_id);
-      const { data, error: dbError } = await supabaseDb
-        .from('members')
-        .delete()
-        .eq('id', member_id)
-        .select(); // fetch deleted rows for debugging
-
-      if (dbError) {
-        return res.status(500).json({ error: 'User deleted from Auth, but failed to delete from members', details: dbError.message });
-      }
-      // LOG data returned from deletion
-      console.log('Deleted member row:', data);
-      return res.status(200).json({ success: true, deleted: data });
+    if (!error && data?.supabase_user_id) {
+      supabase_user_id = data.supabase_user_id;
     } else {
-      const error = await response.json();
-      return res.status(response.status).json({ error });
+      console.log('No linked auth user for member, skipping auth deletion');
     }
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to delete user', details: err.message });
   }
+
+  // If we have a linked Auth user, delete them via the Admin API
+  if (supabase_user_id) {
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${supabase_user_id}`, {
+        method: 'DELETE',
+        headers: {
+          apiKey: service_role_key,
+          Authorization: `Bearer ${service_role_key}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        console.warn('Failed to delete Auth user:', err);
+      }
+    } catch (err) {
+      console.warn('Error deleting Auth user:', err);
+    }
+  }
+
+  // Delete the member row (always)
+  const supabaseDb = createClient(supabaseUrl, service_role_key);
+  console.log('Deleting member with id:', member_id);
+  const { data: deletedRows, error: dbError } = await supabaseDb
+    .from('members')
+    .delete()
+    .eq('id', member_id)
+    .select();
+  if (dbError) {
+    return res.status(500).json({ error: 'Failed to delete member row', details: dbError.message });
+  }
+  console.log('Deleted member row:', deletedRows);
+  return res.status(200).json({ success: true, deleted: deletedRows });
 }
