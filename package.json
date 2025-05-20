@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@sendgrid/mail": "^8.1.5",
     "@stripe/react-stripe-js": "^3.7.0",
     "@stripe/stripe-js": "^7.3.0",
     "@supabase/auth-ui-react": "*",
     "@supabase/auth-ui-shared": "*",
     "@supabase/supabase-js": "^2.49.4",
+    "nodemailer": "^7.0.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-scripts": "5.0.1",
