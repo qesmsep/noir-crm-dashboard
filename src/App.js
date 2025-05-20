@@ -5,6 +5,7 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { v4 as uuidv4 } from 'uuid';
 import MemberDetail from './MemberDetail';
+import CalendarView from './components/CalendarView';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
@@ -95,6 +96,9 @@ function App() {
   const [newTransaction, setNewTransaction] = useState({ type: 'payment', amount: '', note: '' });
   const [transactionStatus, setTransactionStatus] = useState('');
   const isMobile = useIsMobile();
+  // Calendar modal state
+  const [slotInfo, setSlotInfo] = useState(null);
+  const [eventInfo, setEventInfo] = useState(null);
   // Fetch ledger for a member using API route
   async function fetchLedger(memberId) {
     setLedgerLoading(true);
@@ -845,6 +849,22 @@ function App() {
           )}
           {section === 'admin' && (
             <>
+              <h2>Reservations & Events Calendar</h2>
+              <CalendarView
+                onSelectSlot={(slot) => setSlotInfo(slot)}
+                onSelectEvent={(event) => setEventInfo(event)}
+              />
+              {slotInfo && (
+                <div>
+                  <p>Selected slot: {slotInfo.start.toString()} - {slotInfo.end.toString()}</p>
+                  {/* You can replace this with a ReservationForm modal */}
+                </div>
+              )}
+              {eventInfo && (
+                <div>
+                  <p>Selected event/reservation ID: {eventInfo.id}</p>
+                </div>
+              )}
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                 <h2>Create New User</h2>
                 <form onSubmit={handleCreateUser} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
