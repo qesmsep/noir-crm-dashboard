@@ -7,7 +7,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const localizer = momentLocalizer(moment);
 
-export default function CalendarView({ onSelectSlot, onSelectEvent }) {
+export default function CalendarView({ onSelectSlot, onSelectEvent, reloadKey }) {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function CalendarView({ onSelectSlot, onSelectEvent }) {
       setEvents(mapped);
     }
     fetchData();
-  }, []);
+  }, [reloadKey]);
 
   return (
     <Calendar

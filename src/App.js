@@ -6,6 +6,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { v4 as uuidv4 } from 'uuid';
 import MemberDetail from './MemberDetail';
 import CalendarView from './components/CalendarView';
+import ReservationForm from './components/ReservationForm';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 
@@ -99,6 +100,8 @@ function App() {
   // Calendar modal state
   const [slotInfo, setSlotInfo] = useState(null);
   const [eventInfo, setEventInfo] = useState(null);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // Fetch ledger for a member using API route
   async function fetchLedger(memberId) {
     setLedgerLoading(true);
@@ -436,6 +439,18 @@ function App() {
 
     if (!members.length) {
       return <div>Loading members...</div>;
+    }
+
+    // Reservation save handler for modal
+    async function handleSaveReservation(formData) {
+      await fetch('/api/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      setShowReservationModal(false);
+      setSlotInfo(null);
+      setReloadKey(k => k + 1);
     }
 
     return (
@@ -1243,14 +1258,13 @@ function App() {
             <div style={{ padding: '2rem', maxWidth: '100vw', width: '100%' }}>
               <h2>Reservations & Events Calendar</h2>
               <CalendarView
-                onSelectSlot={slot => setSlotInfo(slot)}
+                onSelectSlot={slot => {
+                  setSlotInfo(slot);
+                  setShowReservationModal(true);
+                }}
                 onSelectEvent={event => setEventInfo(event)}
+                reloadKey={reloadKey}
               />
-              {slotInfo && (
-                <div>
-                  <p>Selected slot: {slotInfo.start.toString()} - {slotInfo.end.toString()}</p>
-                </div>
-              )}
               {eventInfo && (
                 <div>
                   <p>Selected event/reservation ID: {eventInfo.id}</p>
@@ -1259,6 +1273,19 @@ function App() {
             </div>
           )}
         </div>
+        {/* Reservation Modal */}
+        {showReservationModal && slotInfo && (
+          <div className="modal-overlay" onClick={() => setShowReservationModal(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <ReservationForm
+                initialStart={slotInfo.start}
+                initialEnd={slotInfo.end}
+                onSave={handleSaveReservation}
+              />
+              <button onClick={() => setShowReservationModal(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
       </>
     );
   }
