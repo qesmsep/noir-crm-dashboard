@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@stripe/react-stripe-js": "^3.7.0",
+    "@stripe/stripe-js": "^7.3.0",
     "@supabase/auth-ui-react": "*",
     "@supabase/auth-ui-shared": "*",
     "@supabase/supabase-js": "^2.49.4",
