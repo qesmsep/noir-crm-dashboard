@@ -1,14 +1,22 @@
 
 
 import { createClient } from '@supabase/supabase-js';
-import sgMail from '@sendgrid/mail';
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+import nodemailer from 'nodemailer';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
 
 export default async function handler(req, res) {
   // Load reminder hour (optional use)
@@ -47,9 +55,9 @@ export default async function handler(req, res) {
   }
 
   // Send email
-  await sgMail.send({
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
     to: 'tim@828.life',
-    from: 'no-reply@yourapp.com',
     subject: `Membership renewals for ${targetDate}`,
     text: lines.length ? lines.join('\n') : 'No renewals tomorrow.'
   });
