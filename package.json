@@ -5,6 +5,7 @@
   "dependencies": {
     "@fullcalendar/common": "^5.11.5",
     "@fullcalendar/core": "^6.1.17",
+    "@fullcalendar/interaction": "^6.1.17",
     "@fullcalendar/react": "^6.1.17",
     "@fullcalendar/resource-timeline": "^6.1.17",
     "@sendgrid/mail": "^8.1.5",
