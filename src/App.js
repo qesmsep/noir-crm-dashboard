@@ -48,6 +48,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function App() {
+  // Reservation form extra state for calendar section
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [session, setSession] = useState(null);
   const [members, setMembers] = useState([]);
   const [promoteEmail, setPromoteEmail] = useState('');
@@ -1275,107 +1278,123 @@ function App() {
           {section === 'calendar' && (() => {
             // --- Member lookup for reservation form ---
             const normalizedPhone = phone.replace(/\D/g, '');
+            // Find member by phone (ignore non-digits)
             const matchedMember = members.find(m =>
               m.phone && m.phone.replace(/\D/g, '') === normalizedPhone
             );
             return (
-              <div style={{ display: 'flex', gap: '2rem', padding: '2rem' }}>
-                {/* Calendar column */}
-                <div style={{ flex: 2 }}>
-                  <h2>Availability Calendar</h2>
-                  <CalendarView
-                    onSelectSlot={({ start }) => setDate(start)}
-                    onSelectEvent={() => {}}
-                    reloadKey={reloadKey}
-                  />
-                </div>
-                {/* Reservation form column */}
-                <div style={{ flex: 1, background: '#faf9f7', padding: '1.5rem', borderRadius: '8px' }}>
-                  <h2>Book On the Spot</h2>
-                  {/* Party size spinner */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>-</button>
-                    <span>{partySize} guests</span>
-                    <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
-                  </div>
-                  {/* Date picker */}
-                  <div style={{ marginTop: '1rem' }}>
-                    <label>Date</label>
-                    <DatePicker
-                      selected={date}
-                      onChange={d => setDate(d)}
-                      dateFormat="MMMM d, yyyy"
-                      minDate={new Date()}
-                      filterDate={d => [4,5,6].includes(d.getDay())}
-                      className="datepicker-input"
-                    />
-                  </div>
-                  {/* Time dropdown */}
-                  <div style={{ marginTop: '1rem' }}>
-                    <label>Time</label>
-                    <select value={time} onChange={e => setTime(e.target.value)} style={{ width: '100%' }}>
-                      {times.map(t => (
-                        <option key={t} value={t}>
-                          {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {/* Contact & membership */}
-                  <div style={{ marginTop: '1rem' }}>
+              <div style={{ padding: '2rem', maxWidth: 650, margin: '0 auto' }}>
+                <div style={{ flex: 1, background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                  <h2 style={{ marginBottom: '1rem' }}>Reserve On The Spot</h2>
+
+                  {/* Phone only */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label>Phone Number</label>
                     <input
                       type="text"
-                      placeholder="Phone Number"
+                      placeholder="Enter phone"
                       value={phone}
                       onChange={e => {
-                        setMembershipNumber('');
                         setPhone(e.target.value);
+                        setFirstName('');
+                        setLastName('');
                       }}
-                      style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem' }}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
                     />
-                    {/* Show member info if matched */}
-                    {matchedMember && (
-                      <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>
-                        Booking as {matchedMember.first_name} {matchedMember.last_name} (Member #{matchedMember.membership})
-                      </div>
-                    )}
-                    {/* Membership number input only if not matchedMember */}
-                    {!matchedMember && (
-                      <input
-                        type="text"
-                        placeholder="Membership Number"
-                        value={membershipNumber}
-                        onChange={e => setMembershipNumber(e.target.value)}
-                        style={{ width: '100%', padding: '0.5rem' }}
-                      />
-                    )}
                   </div>
-                  {/* Submit */}
+
+                  {/* Conditional member lookup */}
+                  { !members.find(m => m.phone && m.phone.replace(/\D/g,'') === phone.replace(/\D/g,'')) && phone && (
+                    <>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label>First Name</label>
+                        <input
+                          type="text"
+                          placeholder="First name"
+                          value={firstName}
+                          onChange={e => setFirstName(e.target.value)}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label>Last Name</label>
+                        <input
+                          type="text"
+                          placeholder="Last name"
+                          value={lastName}
+                          onChange={e => setLastName(e.target.value)}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Party size spinner */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                    <label>Party size</label>
+                    <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
+                    <span>{partySize}</span>
+                    <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
+                  </div>
+
+                  {/* Date & Time selectors container */}
+                  <div style={{ background: '#f9f9f9', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label>Date</label>
+                      <DatePicker
+                        selected={date}
+                        onChange={d => setDate(d)}
+                        dateFormat="MMMM d, yyyy"
+                        minDate={new Date()}
+                        filterDate={d => [4,5,6].includes(d.getDay())}
+                        className="datepicker-input"
+                      />
+                    </div>
+                    <div>
+                      <label>Time</label>
+                      <select
+                        value={time}
+                        onChange={e => setTime(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                      >
+                        {times.map(t => (
+                          <option key={t} value={t}>
+                            {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Reserve Now */}
                   <button
                     onClick={async () => {
+                      const normalized = phone.replace(/\D/g, '');
+                      const member = members.find(m => m.phone && m.phone.replace(/\D/g,'') === normalized);
+                      const name = member
+                        ? `${member.first_name} ${member.last_name}`
+                        : `${firstName || ''} ${lastName || ''}`.trim();
                       const [hh, mm] = time.split(':');
                       const start = new Date(date);
                       start.setHours(Number(hh), Number(mm), 0, 0);
                       const duration = partySize <= 2 ? 90 : 120;
-                      const end = new Date(start.getTime() + duration * 60000);
+                      const end = new Date(start.getTime() + duration*60000);
                       await fetch('/api/reservations', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          name: matchedMember
-                            ? `${matchedMember.first_name} ${matchedMember.last_name}`
-                            : membershipNumber || 'Guest',
+                          name,
                           phone,
                           party_size: partySize,
                           notes: '',
                           start_time: start.toISOString(),
                           end_time: end.toISOString(),
-                          source: 'public_widget'
+                          source: member ? 'member' : 'public_widget'
                         })
                       });
-                      setReloadKey(k => k + 1);
+                      setReloadKey(k => k+1);
                     }}
-                    style={{ marginTop: '1.5rem', padding: '0.6rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px' }}
+                    style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
                   >
                     Reserve Now
                   </button>
