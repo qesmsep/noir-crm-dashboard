@@ -4,10 +4,10 @@ import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 
-
 export default function FullCalendarTimeline({ reloadKey }) {
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState([]);
+  const [localReloadKey, setLocalReloadKey] = useState(0);
 
   useEffect(() => {
     // Fetch tables as resources, sorted by number
@@ -45,18 +45,55 @@ export default function FullCalendarTimeline({ reloadKey }) {
       );
       setEvents(mapped);
     });
-  }, [reloadKey]);
+  }, [reloadKey, localReloadKey]);
 
   // Handler for drag-and-drop or resize
-  function handleEventDrop(info) {
-    // You can update your backend here
-    console.log('Event dropped:', info.event);
-    // info.event contains updated start, end, and resourceId
+  async function handleEventDrop(info) {
+    const event = info.event;
+    const id = event.id;
+    const newStart = event.start.toISOString();
+    const newEnd = event.end.toISOString();
+    // FullCalendar v6: event.getResources() returns an array
+    const newTableId = event.getResources && event.getResources().length > 0
+      ? event.getResources()[0].id
+      : event.extendedProps.resourceId;
+
+    const res = await fetch(`/api/reservations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_time: newStart,
+        end_time: newEnd,
+        table_id: newTableId
+      })
+    });
+    if (!res.ok) {
+      alert('Failed to update reservation!');
+      info.revert();
+    } else {
+      setLocalReloadKey(k => k + 1);
+    }
   }
-  function handleEventResize(info) {
-    // You can update your backend here
-    console.log('Event resized:', info.event);
-    // info.event contains updated start and end
+
+  async function handleEventResize(info) {
+    const event = info.event;
+    const id = event.id;
+    const newStart = event.start.toISOString();
+    const newEnd = event.end.toISOString();
+    const res = await fetch(`/api/reservations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_time: newStart,
+        end_time: newEnd
+      })
+    });
+    if (!res.ok) {
+      alert('Failed to update reservation!');
+      info.revert();
+    } else {
+      setLocalReloadKey(k => k + 1);
+    }
   }
 
   return (
