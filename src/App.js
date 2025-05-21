@@ -11,6 +11,7 @@ import CalendarView from './components/CalendarView';
 import ReservationForm from './components/ReservationForm';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import FullCalendarTimeline from './components/FullCalendarTimeline';
 
 // Responsive helper
 function useIsMobile() {
@@ -1444,11 +1445,7 @@ function App() {
           {section === 'calendar' && (
             <div style={{ padding: '2rem', maxWidth: '100vw', width: '100%' }}>
               <h2>Seating Calendar</h2>
-              <CalendarView
-                onSelectSlot={onSelectSlotForTableAssignment}
-                onSelectEvent={event => setEventInfo(event)}
-                reloadKey={reloadKey}
-              />
+              <FullCalendarTimeline reloadKey={reloadKey} />
               {eventInfo && (
                 <div style={{ marginTop: '1rem' }}>
                   <p>Event/Reservation ID: {eventInfo.id}</p>
