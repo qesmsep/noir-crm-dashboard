@@ -3,6 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import '@fullcalendar/common/main.css';
 
+
 export default function FullCalendarTimeline({ reloadKey }) {
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState([]);
@@ -35,7 +36,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
       })).concat(
         (resRes.data || []).map(r => ({
           id: String(r.id),
-          title: `Res: ${r.name}`,
+          title: `${r.name} | Party Size: ${r.party_size}`,
           start: r.start_time,
           end: r.end_time,
           resourceId: String(r.table_id),
@@ -63,12 +64,13 @@ export default function FullCalendarTimeline({ reloadKey }) {
         slotMinTime="18:00:00" // 6pm
         slotMaxTime="25:00:00" // 1am next day
         slotDuration="00:30:00" // 30-minute columns
+        slotLabelInterval="00:30" // show half-hour marks
         resourceAreaHeaderContent="Tables"
         resourceAreaWidth="90px"
         headerToolbar={{
           left: 'today prev,next',
           center: 'title',
-          right: 'resourceTimelineDay,resourceTimelineWeek'
+          right: 'resourceTimelineDay'
         }}
         schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
       />
