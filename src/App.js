@@ -1455,12 +1455,11 @@ function App() {
     );
   }
 
+  // Handler for selecting slot in calendar for table assignment
+  const onSelectSlotForTableAssignment = slot => {
+    setSlotInfo(slot);
+    setShowReservationModal(true);
+  };
 }
 
 export default App;
-
-// Handler for selecting slot in calendar for table assignment
-const onSelectSlotForTableAssignment = slot => {
-  setSlotInfo(slot);
-  setShowReservationModal(true);
-};
