@@ -1374,12 +1374,16 @@ function App() {
                       const name = member
                         ? `${member.first_name} ${member.last_name}`
                         : `${firstName || ''} ${lastName || ''}`.trim();
+
+                      // Compute start and end
                       const [hh, mm] = time.split(':');
                       const start = new Date(date);
                       start.setHours(Number(hh), Number(mm), 0, 0);
                       const duration = partySize <= 2 ? 90 : 120;
-                      const end = new Date(start.getTime() + duration*60000);
-                      await fetch('/api/reservations', {
+                      const end = new Date(start.getTime() + duration * 60000);
+
+                      // Attempt reservation
+                      const res = await fetch('/api/reservations', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1392,7 +1396,20 @@ function App() {
                           source: member ? 'member' : 'public_widget'
                         })
                       });
-                      setReloadKey(k => k+1);
+                      const result = await res.json();
+                      if (!res.ok) {
+                        alert(result.error || 'Reservation failed');
+                        return;
+                      }
+                      // Success: refresh calendar and clear form
+                      setReloadKey(k => k + 1);
+                      setPhone('');
+                      setFirstName('');
+                      setLastName('');
+                      setPartySize(1);
+                      setTime('18:00');
+                      // Optionally inform user
+                      alert('Reservation confirmed');
                     }}
                     style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
                   >
