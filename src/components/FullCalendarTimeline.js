@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
-import '@fullcalendar/common/main.css';
+import '@fullcalendar/core/main.css';
 
 export default function FullCalendarTimeline({ reloadKey }) {
   const [resources, setResources] = useState([]);
@@ -46,23 +46,30 @@ export default function FullCalendarTimeline({ reloadKey }) {
   }, [reloadKey]);
 
   return (
-    <div style={{ maxWidth: '100vw', overflowX: 'auto' }}>
+    <div style={{
+      width: '100%',
+      maxWidth: '100vw',
+      height: '80vh',
+      minHeight: 400,
+      overflowX: 'auto',
+      overflowY: 'auto'
+    }}>
       <FullCalendar
         plugins={[resourceTimelinePlugin]}
         initialView="resourceTimelineDay"
         resources={resources}
         events={events}
-        height="auto"
+        height="100%"
         slotMinTime="18:00:00" // 6pm
         slotMaxTime="25:00:00" // 1am next day
         slotDuration="00:30:00" // 30-minute columns
         resourceAreaHeaderContent="Tables"
+        resourceAreaWidth="90px"
         headerToolbar={{
           left: 'today prev,next',
           center: 'title',
           right: 'resourceTimelineDay,resourceTimelineWeek'
         }}
-        // Add your purchased license key here for production
         schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
       />
     </div>

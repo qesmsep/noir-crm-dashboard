@@ -1,4 +1,3 @@
-
 .modal-overlay {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
@@ -540,4 +539,31 @@ body {
 /* Ensure the calendar popup appears above the modal */
 .react-datepicker-popper {
   z-index: 4000;
+}
+
+/* Custom FullCalendar event color */
+.fc-event, .fc-timeline-event {
+  background-color: #353535 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 6px !important;
+}
+
+/* Custom FullCalendar button color */
+.fc-button, .fc-button-primary {
+  background-color: #353535 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 5px !important;
+  box-shadow: none !important;
+}
+
+.fc-button:disabled, .fc-button-primary:disabled {
+  background-color: #888 !important;
+  color: #fff !important;
+}
+
+/* Custom header cell color (optional, for more contrast) */
+.fc-col-header-cell {
+  background: #f3f2ef !important;
 }
