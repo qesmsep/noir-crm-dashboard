@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
+import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 
 
@@ -46,6 +47,18 @@ export default function FullCalendarTimeline({ reloadKey }) {
     });
   }, [reloadKey]);
 
+  // Handler for drag-and-drop or resize
+  function handleEventDrop(info) {
+    // You can update your backend here
+    console.log('Event dropped:', info.event);
+    // info.event contains updated start, end, and resourceId
+  }
+  function handleEventResize(info) {
+    // You can update your backend here
+    console.log('Event resized:', info.event);
+    // info.event contains updated start and end
+  }
+
   return (
     <div style={{
       width: '100%',
@@ -56,7 +69,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
       overflowY: 'auto'
     }}>
       <FullCalendar
-        plugins={[resourceTimelinePlugin]}
+        plugins={[resourceTimelinePlugin, interactionPlugin]}
         initialView="resourceTimelineDay"
         resources={resources}
         events={events}
@@ -70,9 +83,12 @@ export default function FullCalendarTimeline({ reloadKey }) {
         headerToolbar={{
           left: 'today prev,next',
           center: 'title',
-          right: 'resourceTimelineDay'
+          right: '' // no day/week buttons
         }}
         schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
+        editable={true}
+        eventDrop={handleEventDrop}
+        eventResize={handleEventResize}
       />
     </div>
   );
