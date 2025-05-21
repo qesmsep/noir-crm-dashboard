@@ -1276,11 +1276,7 @@ function App() {
                 onSelectEvent={event => setEventInfo(event)}
                 reloadKey={reloadKey}
               />
-              {eventInfo && (
-                <div>
-                  <p>Selected event/reservation ID: {eventInfo.id}</p>
-                </div>
-              )}
+              {/* Inline reservation form below calendar */}
               {showReservationModal && slotInfo && (
                 <div style={{ marginTop: '1rem', padding: '1rem', background: '#faf9f7', borderRadius: '8px' }}>
                   <h3>Book Reservation</h3>
@@ -1288,9 +1284,24 @@ function App() {
                     initialStart={slotInfo.start}
                     onSave={handleSaveReservation}
                   />
-                  <button onClick={() => setShowReservationModal(false)} style={{ marginTop: '0.5rem' }}>
+                  <button
+                    onClick={() => setShowReservationModal(false)}
+                    style={{
+                      marginTop: '0.5rem',
+                      background: 'transparent',
+                      border: '1px solid var(--color-cork)',
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
                     Cancel
                   </button>
+                </div>
+              )}
+              {eventInfo && (
+                <div>
+                  <p>Selected event/reservation ID: {eventInfo.id}</p>
                 </div>
               )}
             </div>
