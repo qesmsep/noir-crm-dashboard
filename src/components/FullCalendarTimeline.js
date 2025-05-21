@@ -30,13 +30,15 @@ export default function FullCalendarTimeline({ reloadKey }) {
         start: e.start_time,
         end: e.end_time,
         resourceId: String(e.table_id),
-      })).concat((resRes.data || []).map(r => ({
-        id: String(r.id),
-        title: `Res: ${r.name}`,
-        start: r.start_time,
-        end: r.end_time,
-        resourceId: String(r.table_id),
-      }))
+      })).concat(
+        (resRes.data || []).map(r => ({
+          id: String(r.id),
+          title: `Res: ${r.name}`,
+          start: r.start_time,
+          end: r.end_time,
+          resourceId: String(r.table_id),
+        }))
+      );
       setEvents(mapped);
     });
   }, [reloadKey]);
