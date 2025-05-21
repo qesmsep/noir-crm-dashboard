@@ -1,5 +1,3 @@
-
-
 import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -39,10 +37,19 @@ export default async function handler(req, res) {
     return res.status(201).json({ data });
   }
   if (method === 'PATCH') {
-    const { id, table_id } = req.body;
+    // Support id from URL (req.query.id) or body
+    const id = req.query.id || req.body.id;
+    // Only update provided fields
+    const updateFields = {};
+    if (req.body.table_id !== undefined) updateFields.table_id = req.body.table_id;
+    if (req.body.start_time !== undefined) updateFields.start_time = req.body.start_time;
+    if (req.body.end_time !== undefined) updateFields.end_time = req.body.end_time;
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
     const { data, error } = await supabase
       .from('reservations')
-      .update({ table_id })
+      .update(updateFields)
       .eq('id', id)
       .single();
     if (error) return res.status(500).json({ error: error.message });
