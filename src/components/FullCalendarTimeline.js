@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
-import '@fullcalendar/core/main.css';
+import '@fullcalendar/common/main.css';
 
 export default function FullCalendarTimeline({ reloadKey }) {
   const [resources, setResources] = useState([]);
