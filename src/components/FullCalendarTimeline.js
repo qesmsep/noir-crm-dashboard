@@ -8,14 +8,17 @@ export default function FullCalendarTimeline({ reloadKey }) {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    // Fetch tables as resources
+    // Fetch tables as resources, sorted by number
     fetch('/api/tables')
       .then(res => res.json())
       .then(data => {
-        setResources((data.data || []).map(t => ({
-          id: String(t.id),
-          title: `Table ${t.number}`,
-        })));
+        setResources((data.data || [])
+          .sort((a, b) => a.number - b.number)
+          .map(t => ({
+            id: String(t.id),
+            title: `Table ${t.number}`,
+          }))
+        );
       });
 
     // Fetch reservations/events
@@ -43,20 +46,25 @@ export default function FullCalendarTimeline({ reloadKey }) {
   }, [reloadKey]);
 
   return (
-    <FullCalendar
-      plugins={[resourceTimelinePlugin]}
-      initialView="resourceTimelineDay"
-      resources={resources}
-      events={events}
-      height="auto"
-      slotMinTime="12:00:00"
-      slotMaxTime="01:00:00"
-      resourceAreaHeaderContent="Tables"
-      headerToolbar={{
-        left: 'today prev,next',
-        center: 'title',
-        right: 'resourceTimelineDay,resourceTimelineWeek'
-      }}
-    />
+    <div style={{ maxWidth: '100vw', overflowX: 'auto' }}>
+      <FullCalendar
+        plugins={[resourceTimelinePlugin]}
+        initialView="resourceTimelineDay"
+        resources={resources}
+        events={events}
+        height="auto"
+        slotMinTime="18:00:00" // 6pm
+        slotMaxTime="25:00:00" // 1am next day
+        slotDuration="00:30:00" // 30-minute columns
+        resourceAreaHeaderContent="Tables"
+        headerToolbar={{
+          left: 'today prev,next',
+          center: 'title',
+          right: 'resourceTimelineDay,resourceTimelineWeek'
+        }}
+        // Add your purchased license key here for production
+        schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
+      />
+    </div>
   );
 }
