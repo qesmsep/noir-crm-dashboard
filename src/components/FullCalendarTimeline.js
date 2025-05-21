@@ -58,7 +58,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
       ? event.getResources()[0].id
       : event.extendedProps.resourceId;
 
-    const res = await fetch(`/api/reservations/${id}`, {
+    const res = await fetch(`/api/reservations?id=${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -80,7 +80,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
     const id = event.id;
     const newStart = event.start.toISOString();
     const newEnd = event.end.toISOString();
-    const res = await fetch(`/api/reservations/${id}`, {
+    const res = await fetch(`/api/reservations?id=${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
