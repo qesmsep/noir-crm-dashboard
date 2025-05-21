@@ -1272,95 +1272,117 @@ function App() {
               </ul>
             </div>
           )}
-          {section === 'calendar' && (
-            <div style={{ display: 'flex', gap: '2rem', padding: '2rem' }}>
-              {/* Calendar column */}
-              <div style={{ flex: 2 }}>
-                <h2>Availability Calendar</h2>
-                <CalendarView
-                  onSelectSlot={({ start }) => setDate(start)}
-                  onSelectEvent={() => {}}
-                  reloadKey={reloadKey}
-                />
+          {section === 'calendar' && (() => {
+            // --- Member lookup for reservation form ---
+            const normalizedPhone = phone.replace(/\D/g, '');
+            const matchedMember = members.find(m =>
+              m.phone && m.phone.replace(/\D/g, '') === normalizedPhone
+            );
+            return (
+              <div style={{ display: 'flex', gap: '2rem', padding: '2rem' }}>
+                {/* Calendar column */}
+                <div style={{ flex: 2 }}>
+                  <h2>Availability Calendar</h2>
+                  <CalendarView
+                    onSelectSlot={({ start }) => setDate(start)}
+                    onSelectEvent={() => {}}
+                    reloadKey={reloadKey}
+                  />
+                </div>
+                {/* Reservation form column */}
+                <div style={{ flex: 1, background: '#faf9f7', padding: '1.5rem', borderRadius: '8px' }}>
+                  <h2>Book On the Spot</h2>
+                  {/* Party size spinner */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>-</button>
+                    <span>{partySize} guests</span>
+                    <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
+                  </div>
+                  {/* Date picker */}
+                  <div style={{ marginTop: '1rem' }}>
+                    <label>Date</label>
+                    <DatePicker
+                      selected={date}
+                      onChange={d => setDate(d)}
+                      dateFormat="MMMM d, yyyy"
+                      minDate={new Date()}
+                      filterDate={d => [4,5,6].includes(d.getDay())}
+                      className="datepicker-input"
+                    />
+                  </div>
+                  {/* Time dropdown */}
+                  <div style={{ marginTop: '1rem' }}>
+                    <label>Time</label>
+                    <select value={time} onChange={e => setTime(e.target.value)} style={{ width: '100%' }}>
+                      {times.map(t => (
+                        <option key={t} value={t}>
+                          {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Contact & membership */}
+                  <div style={{ marginTop: '1rem' }}>
+                    <input
+                      type="text"
+                      placeholder="Phone Number"
+                      value={phone}
+                      onChange={e => {
+                        setMembershipNumber('');
+                        setPhone(e.target.value);
+                      }}
+                      style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem' }}
+                    />
+                    {/* Show member info if matched */}
+                    {matchedMember && (
+                      <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>
+                        Booking as {matchedMember.first_name} {matchedMember.last_name} (Member #{matchedMember.membership})
+                      </div>
+                    )}
+                    {/* Membership number input only if not matchedMember */}
+                    {!matchedMember && (
+                      <input
+                        type="text"
+                        placeholder="Membership Number"
+                        value={membershipNumber}
+                        onChange={e => setMembershipNumber(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem' }}
+                      />
+                    )}
+                  </div>
+                  {/* Submit */}
+                  <button
+                    onClick={async () => {
+                      const [hh, mm] = time.split(':');
+                      const start = new Date(date);
+                      start.setHours(Number(hh), Number(mm), 0, 0);
+                      const duration = partySize <= 2 ? 90 : 120;
+                      const end = new Date(start.getTime() + duration * 60000);
+                      await fetch('/api/reservations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: matchedMember
+                            ? `${matchedMember.first_name} ${matchedMember.last_name}`
+                            : membershipNumber || 'Guest',
+                          phone,
+                          party_size: partySize,
+                          notes: '',
+                          start_time: start.toISOString(),
+                          end_time: end.toISOString(),
+                          source: 'public_widget'
+                        })
+                      });
+                      setReloadKey(k => k + 1);
+                    }}
+                    style={{ marginTop: '1.5rem', padding: '0.6rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px' }}
+                  >
+                    Reserve Now
+                  </button>
+                </div>
               </div>
-              {/* Reservation form column */}
-              <div style={{ flex: 1, background: '#faf9f7', padding: '1.5rem', borderRadius: '8px' }}>
-                <h2>Book On the Spot</h2>
-                {/* Party size spinner */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>-</button>
-                  <span>{partySize} guests</span>
-                  <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
-                </div>
-                {/* Date picker */}
-                <div style={{ marginTop: '1rem' }}>
-                  <label>Date</label>
-                  <DatePicker
-                    selected={date}
-                    onChange={d => setDate(d)}
-                    dateFormat="MMMM d, yyyy"
-                    minDate={new Date()}
-                    className="datepicker-input"
-                  />
-                </div>
-                {/* Time dropdown */}
-                <div style={{ marginTop: '1rem' }}>
-                  <label>Time</label>
-                  <select value={time} onChange={e => setTime(e.target.value)} style={{ width: '100%' }}>
-                    {times.map(t => (
-                      <option key={t} value={t}>
-                        {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* Contact & membership */}
-                <div style={{ marginTop: '1rem' }}>
-                  <input
-                    type="text"
-                    placeholder="Phone Number"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem' }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Membership Number"
-                    value={membershipNumber}
-                    onChange={e => setMembershipNumber(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem' }}
-                  />
-                </div>
-                {/* Submit */}
-                <button
-                  onClick={async () => {
-                    const [hh, mm] = time.split(':');
-                    const start = new Date(date);
-                    start.setHours(Number(hh), Number(mm), 0, 0);
-                    const duration = partySize <= 2 ? 90 : 120;
-                    const end = new Date(start.getTime() + duration * 60000);
-                    await fetch('/api/reservations', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        name: membershipNumber || 'Guest',
-                        phone,
-                        party_size: partySize,
-                        notes: '',
-                        start_time: start.toISOString(),
-                        end_time: end.toISOString(),
-                        source: 'public_widget'
-                      })
-                    });
-                    setReloadKey(k => k + 1);
-                  }}
-                  style={{ marginTop: '1.5rem', padding: '0.6rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px' }}
-                >
-                  Reserve Now
-                </button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </>
     );
