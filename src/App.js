@@ -604,6 +604,15 @@ function App() {
                 Lookup
               </button>
               <button
+                className={section === 'makeReservation' ? 'nav-active' : ''}
+                onClick={() => {
+                  setSection('makeReservation');
+                  setSidebarOpen(false);
+                }}
+              >
+                Make Reservation
+              </button>
+              <button
                 className={section === 'calendar' ? 'nav-active' : ''}
                 onClick={() => {
                   setSection('calendar');
@@ -666,6 +675,12 @@ function App() {
               }}
             >
               Lookup
+            </button>
+            <button
+              className={section === 'makeReservation' ? 'nav-active' : ''}
+              onClick={() => setSection('makeReservation')}
+            >
+              Make Reservation
             </button>
             <button
               className={section === 'calendar' ? 'nav-active' : ''}
@@ -1275,7 +1290,8 @@ function App() {
               </ul>
             </div>
           )}
-          {section === 'calendar' && (() => {
+          {/* SPLIT: Make Reservation and Calendar tabs */}
+          {section === 'makeReservation' && (() => {
             // --- Member lookup for reservation form ---
             const normalizedPhone = phone.replace(/\D/g, '');
             // Find member by phone (ignore non-digits)
@@ -1419,6 +1435,21 @@ function App() {
               </div>
             );
           })()}
+          {section === 'calendar' && (
+            <div style={{ padding: '2rem', maxWidth: '100vw', width: '100%' }}>
+              <h2>Seating Calendar</h2>
+              <CalendarView
+                onSelectSlot={onSelectSlotForTableAssignment}
+                onSelectEvent={event => setEventInfo(event)}
+                reloadKey={reloadKey}
+              />
+              {eventInfo && (
+                <div style={{ marginTop: '1rem' }}>
+                  <p>Event/Reservation ID: {eventInfo.id}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </>
     );
@@ -1427,3 +1458,9 @@ function App() {
 }
 
 export default App;
+
+// Handler for selecting slot in calendar for table assignment
+const onSelectSlotForTableAssignment = slot => {
+  setSlotInfo(slot);
+  setShowReservationModal(true);
+};
