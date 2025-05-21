@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { createClient } from '@supabase/supabase-js';
 import './App.css';
 import { Auth } from '@supabase/auth-ui-react';
@@ -102,6 +104,22 @@ function App() {
   const [eventInfo, setEventInfo] = useState(null);
   const [showReservationModal, setShowReservationModal] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [partySize, setPartySize] = useState(1);
+  const [date, setDate] = useState(new Date());
+  const [time, setTime] = useState('18:00');
+  const [phone, setPhone] = useState('');
+  const [membershipNumber, setMembershipNumber] = useState('');
+
+  // Generate times array for 6:00pm to midnight, every 15 min
+  const times = [];
+  for (let h = 18; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hh = String(h).padStart(2, '0');
+      const mm = String(m).padStart(2, '0');
+      times.push(`${hh}:${mm}`);
+    }
+  }
+
   // Fetch ledger for a member using API route
   async function fetchLedger(memberId) {
     setLedgerLoading(true);
@@ -1255,55 +1273,92 @@ function App() {
             </div>
           )}
           {section === 'calendar' && (
-            <div style={{ padding: '2rem', maxWidth: '100vw', width: '100%' }}>
-              <h2>Reservations & Events Calendar</h2>
-              <CalendarView
-                onSelectSlot={async slot => {
-                  // Check if at least one table is free
-                  const start = slot.start.toISOString();
-                  const end = slot.end.toISOString();
-                  const res = await fetch(
-                    `/api/availability?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}&party_size=1`
-                  );
-                  const { free } = await res.json();
-                  if (!free || free.length === 0) {
-                    alert('No availability for this time slot.');
-                    return;
-                  }
-                  setSlotInfo(slot);
-                  setShowReservationModal(true);
-                }}
-                onSelectEvent={event => setEventInfo(event)}
-                reloadKey={reloadKey}
-              />
-              {/* Inline reservation form below calendar */}
-              {showReservationModal && slotInfo && (
-                <div style={{ marginTop: '1rem', padding: '1rem', background: '#faf9f7', borderRadius: '8px' }}>
-                  <h3>Book Reservation</h3>
-                  <ReservationForm
-                    initialStart={slotInfo.start}
-                    onSave={handleSaveReservation}
+            <div style={{ display: 'flex', gap: '2rem', padding: '2rem' }}>
+              {/* Calendar column */}
+              <div style={{ flex: 2 }}>
+                <h2>Availability Calendar</h2>
+                <CalendarView
+                  onSelectSlot={({ start }) => setDate(start)}
+                  onSelectEvent={() => {}}
+                  reloadKey={reloadKey}
+                />
+              </div>
+              {/* Reservation form column */}
+              <div style={{ flex: 1, background: '#faf9f7', padding: '1.5rem', borderRadius: '8px' }}>
+                <h2>Book On the Spot</h2>
+                {/* Party size spinner */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>-</button>
+                  <span>{partySize} guests</span>
+                  <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
+                </div>
+                {/* Date picker */}
+                <div style={{ marginTop: '1rem' }}>
+                  <label>Date</label>
+                  <DatePicker
+                    selected={date}
+                    onChange={d => setDate(d)}
+                    dateFormat="MMMM d, yyyy"
+                    minDate={new Date()}
+                    className="datepicker-input"
                   />
-                  <button
-                    onClick={() => setShowReservationModal(false)}
-                    style={{
-                      marginTop: '0.5rem',
-                      background: 'transparent',
-                      border: '1px solid var(--color-cork)',
-                      padding: '0.4rem 0.8rem',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Cancel
-                  </button>
                 </div>
-              )}
-              {eventInfo && (
-                <div>
-                  <p>Selected event/reservation ID: {eventInfo.id}</p>
+                {/* Time dropdown */}
+                <div style={{ marginTop: '1rem' }}>
+                  <label>Time</label>
+                  <select value={time} onChange={e => setTime(e.target.value)} style={{ width: '100%' }}>
+                    {times.map(t => (
+                      <option key={t} value={t}>
+                        {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+                {/* Contact & membership */}
+                <div style={{ marginTop: '1rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Phone Number"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Membership Number"
+                    value={membershipNumber}
+                    onChange={e => setMembershipNumber(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem' }}
+                  />
+                </div>
+                {/* Submit */}
+                <button
+                  onClick={async () => {
+                    const [hh, mm] = time.split(':');
+                    const start = new Date(date);
+                    start.setHours(Number(hh), Number(mm), 0, 0);
+                    const duration = partySize <= 2 ? 90 : 120;
+                    const end = new Date(start.getTime() + duration * 60000);
+                    await fetch('/api/reservations', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        name: membershipNumber || 'Guest',
+                        phone,
+                        party_size: partySize,
+                        notes: '',
+                        start_time: start.toISOString(),
+                        end_time: end.toISOString(),
+                        source: 'public_widget'
+                      })
+                    });
+                    setReloadKey(k => k + 1);
+                  }}
+                  style={{ marginTop: '1.5rem', padding: '0.6rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px' }}
+                >
+                  Reserve Now
+                </button>
+              </div>
             </div>
           )}
         </div>
