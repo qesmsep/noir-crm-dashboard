@@ -474,6 +474,12 @@ function App() {
       setReloadKey(k => k + 1);
     }
 
+    // Handler for selecting slot in calendar for table assignment
+    const onSelectSlotForTableAssignment = slot => {
+      setSlotInfo(slot);
+      setShowReservationModal(true);
+    };
+
     return (
       <>
         {/* Hamburger button for mobile */}
@@ -1450,23 +1456,10 @@ function App() {
               )}
             </div>
           )}
-          {/* Handler for selecting slot in calendar for table assignment */}
-          {/*
-          const onSelectSlotForTableAssignment = slot => {
-            setSlotInfo(slot);
-            setShowReservationModal(true);
-          };
-          */}
         </div>
       </>
     );
   }
-
-  // Handler for selecting slot in calendar for table assignment
-  const onSelectSlotForTableAssignment = slot => {
-    setSlotInfo(slot);
-    setShowReservationModal(true);
-  };
 }
 
 export default App;
