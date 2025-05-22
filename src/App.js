@@ -1881,30 +1881,31 @@ function App() {
             // --- Reserve On The Spot logic ---
             async function handleReserveNow() {
               setReserveStatus('');
-              // Format phone number: prepend +1 if 10 digits
               let formattedPhone = phone;
               if (/^\d{10}$/.test(phone)) {
                 formattedPhone = '+1' + phone;
               }
-              // Check for member by phone
               const res = await fetch(`/api/checkMemberByPhone?phone=${encodeURIComponent(formattedPhone)}`);
               const data = await res.json();
               if (data.member) {
-                // Member found, use their info
-                await createReservation({
-                  name: `${data.member.first_name} ${data.member.last_name}`,
-                  phone: data.member.phone,
-                  email: data.member.email,
-                  party_size: partySize,
-                  notes: '',
-                  start_time: getStartTime(),
-                  end_time: getEndTime(),
-                  source: 'member'
-                });
-                setMemberLookup(data.member);
-                setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                try {
+                  await createReservation({
+                    name: `${data.member.first_name} ${data.member.last_name}`,
+                    phone: data.member.phone,
+                    email: data.member.email,
+                    party_size: partySize,
+                    notes: '',
+                    start_time: getStartTime(),
+                    end_time: getEndTime(),
+                    source: 'member'
+                  });
+                  setMemberLookup(data.member);
+                  setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                  // Only reset state if successful
+                } catch (err) {
+                  // Do not close modal, let popup show
+                }
               } else {
-                // No member found, show modal for non-member info
                 setShowNonMemberModal(true);
               }
             }
@@ -2042,25 +2043,29 @@ function App() {
                             setReserveStatus('Please enter first name, last name, and email for non-members.');
                             return;
                           }
-                          await createReservation({
-                            name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
-                            phone,
-                            email: nonMemberFields.email,
-                            party_size: partySize,
-                            notes: '',
-                            start_time: getStartTime(),
-                            end_time: getEndTime(),
-                            source: 'public_widget'
-                          });
-                          setNonMemberFields({ firstName: '', lastName: '', email: '' });
-                          setShowNonMemberModal(false);
-                          setReloadKey(k => k + 1);
-                          setPhone('');
-                          setFirstName('');
-                          setLastName('');
-                          setPartySize(1);
-                          setTime('18:00');
-                          setReserveStatus('Reservation confirmed!');
+                          try {
+                            await createReservation({
+                              name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
+                              phone,
+                              email: nonMemberFields.email,
+                              party_size: partySize,
+                              notes: '',
+                              start_time: getStartTime(),
+                              end_time: getEndTime(),
+                              source: 'public_widget'
+                            });
+                            setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                            setShowNonMemberModal(false);
+                            setReloadKey(k => k + 1);
+                            setPhone('');
+                            setFirstName('');
+                            setLastName('');
+                            setPartySize(1);
+                            setTime('18:00');
+                            setReserveStatus('Reservation confirmed!');
+                          } catch (err) {
+                            // Do not close modal, let popup show
+                          }
                         }}
                         style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
                       >
