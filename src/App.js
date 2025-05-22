@@ -142,6 +142,8 @@ function App() {
     membership: '',
     photo: ''
   });
+  // Add state for next available time popup
+  const [nextAvailableTime, setNextAvailableTime] = useState(null);
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -1930,7 +1932,12 @@ function App() {
               });
               const result = await res.json();
               if (!res.ok) {
-                alert(result.error || 'Reservation failed');
+                if (res.status === 409 && result.next_available_time) {
+                  setNextAvailableTime(result.next_available_time);
+                  setReserveStatus('');
+                } else {
+                  alert(result.error || 'Reservation failed');
+                }
                 throw new Error(result.error || 'Reservation failed');
               }
             }
@@ -2065,6 +2072,17 @@ function App() {
                       >
                         Cancel
                       </button>
+                    </div>
+                  </div>
+                )}
+                {/* Add this near the reservation UI */}
+                {nextAvailableTime && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', maxWidth: 400, textAlign: 'center' }}>
+                      <h3>No table available at your requested time</h3>
+                      <p>The next available time for your party size is:</p>
+                      <p style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{new Date(nextAvailableTime).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}</p>
+                      <button onClick={() => setNextAvailableTime(null)} style={{ marginTop: '1.5rem', padding: '0.5rem 1.5rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}>OK</button>
                     </div>
                   </div>
                 )}
