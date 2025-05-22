@@ -499,6 +499,69 @@ const MemberDetail = ({
               </tr>
             </thead>
             <tbody>
+              {/* Add Transaction Row */}
+              <tr>
+                <td>
+                  <input
+                    type="date"
+                    name="date"
+                    value={newTransaction.date || ''}
+                    onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                    className="add-transaction-input"
+                    style={{ minWidth: 120 }}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    name="note"
+                    placeholder="Note"
+                    value={newTransaction.note || ''}
+                    onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
+                    className="add-transaction-input"
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    name="amount"
+                    placeholder="Amount"
+                    value={newTransaction.amount || ''}
+                    onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                    className="add-transaction-input"
+                  />
+                </td>
+                <td>
+                  <select
+                    name="type"
+                    value={newTransaction.type || ''}
+                    onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                    className="add-transaction-input"
+                  >
+                    <option value="">Type</option>
+                    <option value="payment">Payment</option>
+                    <option value="purchase">Purchase</option>
+                  </select>
+                </td>
+                <td>
+                  <button
+                    onClick={e => {
+                      e.preventDefault();
+                      if (member && member.id) {
+                        onAddTransaction(member.id);
+                      } else {
+                        onAddTransaction();
+                      }
+                    }}
+                    className="add-transaction-btn"
+                    style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                    disabled={transactionStatus === 'loading'}
+                  >
+                    {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
+                  </button>
+                </td>
+              </tr>
+              {/* Ledger Rows */}
               {ledger && ledger.length > 0 ? (
                 ledger.map((tx, idx) => (
                   <tr key={tx.id || idx}>
@@ -582,63 +645,6 @@ const MemberDetail = ({
             </tbody>
           </table>
         )}
-
-        <h3>Add Transaction</h3>
-        <div className="add-transaction-panel">
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              if (member && member.id) {
-                onAddTransaction(member.id);
-              } else {
-                onAddTransaction();
-              }
-            }}
-            style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}
-          >
-            <input
-              type="text"
-              name="note"
-              placeholder="Note"
-              value={newTransaction.note || ''}
-              onChange={handleInputChange}
-              className="add-transaction-input"
-            />
-            <input
-              type="number"
-              name="amount"
-              placeholder="Amount"
-              value={newTransaction.amount || ''}
-              onChange={handleInputChange}
-              className="add-transaction-input"
-            />
-            <select
-              name="type"
-              value={newTransaction.type || ''}
-              onChange={handleInputChange}
-              className="add-transaction-input"
-            >
-              <option value="">Type</option>
-              <option value="payment">Payment</option>
-              <option value="purchase">Purchase</option>
-            </select>
-            <input
-              type="date"
-              name="date"
-              value={newTransaction.date || ''}
-              onChange={handleInputChange}
-              className="add-transaction-input"
-              style={{ minWidth: 120 }}
-            />
-            <button
-              type="submit"
-              className="add-transaction-btn"
-              disabled={transactionStatus === 'loading'}
-            >
-              {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
-            </button>
-          </form>
-        </div>
 
         <button
           className="delete-member-btn"
