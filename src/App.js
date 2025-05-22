@@ -165,12 +165,9 @@ function App() {
       const result = await res.json();
       if (res.ok && result.data) {
         setTransactionStatus('Transaction added!');
-        setNewTransaction({ type: 'payment', amount: '', note: '' });
         await fetchLedger(memberId);
-        // Optional: update member list balance
-        // (recompute from new ledger)
-        const ledgerArr = result.data ? [...(memberLedger || []), result.data] : memberLedger || [];
-        const balance = ledgerArr.reduce(
+        setNewTransaction({ type: 'payment', amount: '', note: '' });
+        const balance = (memberLedger || []).reduce(
           (acc, t) => acc + Number(t.amount),
           0
         );
