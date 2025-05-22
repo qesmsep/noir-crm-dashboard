@@ -910,7 +910,7 @@ function App() {
                             )}
                             <div className="member-info" style={{ flex: 1 }}>
                               <strong>
-                                {member.first_name} {member.last_name} — {member.membership}
+                                {member.first_name} {member.last_name}
                               </strong>
                               <div>Phone: {formatPhone(member.phone)}</div>
                               <div>Email: {member.email}</div>
@@ -1458,7 +1458,7 @@ function App() {
                           )}
                           <div className="member-info">
                             <strong>
-                              {member.first_name} {member.last_name} — {member.membership}
+                              {member.first_name} {member.last_name}
                             </strong>
                             
                             <div>Phone: {formatPhone(member.phone)}</div>
