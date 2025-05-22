@@ -608,10 +608,11 @@ body {
   align-items: center;
 }
 .fc-timeline-slot {
-  border-right: 1.5px solid #e2dfd8 !important;
+  border-right: 1.5px solid #3c3c3c !important;
 }
 .fc-timeline-slots tr > td {
-  border-right: 1.5px solid #e2dfd8 !important;
+  border-right: 2px solid #2c2c2c !important;
+  position: relative;
 }
 .fc-timeline-slots tr > td:last-child {
   border-right: none !important;
@@ -630,14 +631,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.1em 0.2em;
+  height: 100%;
+  min-height: 0;
 }
 .fc-event-title {
-  font-size: .8em !important;
-  font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
-  font-weight: 400 !important;
-  color: #222 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
   line-height: 1.2;
-  letter-spacing: 0.01em;
-  text-shadow: none !important;
+}
+
+/* Fix horizontal line alignment for timeline rows */
+.fc-timeline-lane-frame {
+  border-bottom: 1.5px solid #e2dfd8 !important;
+  box-sizing: border-box;
+}
+.fc-timeline-lane-frame:last-child {
+  border-bottom: none !important;
 }
