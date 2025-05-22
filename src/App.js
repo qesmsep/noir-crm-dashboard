@@ -886,7 +886,7 @@ function App() {
                         }}>
                           <li
                             className="member-item"
-                            style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', gap: '1.5rem' }}
+                            style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}
                             onClick={() => {
                               setSelectedMember(member);
                               fetchLedger(member.account_id);
