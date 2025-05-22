@@ -3,19 +3,48 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 // Helper to auto-assign smallest free table
 async function assignTable(start_time, end_time, party_size) {
-  const { data: tables } = await supabase
-    .from('tables').select('*').gte('capacity', party_size).order('capacity');
-  for (const t of tables) {
-    const { count: evCount } = await supabase
-      .from('events').select('id', { count: 'exact' })
-      .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
-    const { count: resCount } = await supabase
-      .from('reservations').select('id', { count: 'exact' })
-      .eq('table_id', t.id)
-      .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
-    if (evCount === 0 && resCount === 0) return t.id;
+  if (party_size >= 5) {
+    // Priority order for large parties
+    const priorityTableNumbers = [11, 13, 4, 12, 8];
+    // Fetch all tables with those numbers
+    const { data: tables } = await supabase
+      .from('tables')
+      .select('*')
+      .in('number', priorityTableNumbers);
+    // Sort tables by the specified priority order
+    const sortedTables = priorityTableNumbers
+      .map(num => tables.find(t => t.number === num))
+      .filter(Boolean);
+    for (const t of sortedTables) {
+      // Check for conflicting events
+      const { count: evCount } = await supabase
+        .from('events').select('id', { count: 'exact' })
+        .eq('table_id', t.id)
+        .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
+      // Check for conflicting reservations
+      const { count: resCount } = await supabase
+        .from('reservations').select('id', { count: 'exact' })
+        .eq('table_id', t.id)
+        .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
+      if (evCount === 0 && resCount === 0) return t.id;
+    }
+    return null;
+  } else {
+    // Original logic for smaller parties
+    const { data: tables } = await supabase
+      .from('tables').select('*').gte('capacity', party_size).order('capacity');
+    for (const t of tables) {
+      const { count: evCount } = await supabase
+        .from('events').select('id', { count: 'exact' })
+        .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
+      const { count: resCount } = await supabase
+        .from('reservations').select('id', { count: 'exact' })
+        .eq('table_id', t.id)
+        .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
+      if (evCount === 0 && resCount === 0) return t.id;
+    }
+    return null;
   }
-  return null;
 }
 
 export default async function handler(req, res) {
