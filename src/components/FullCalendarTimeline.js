@@ -230,6 +230,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
             <ReservationForm
               initialStart={(selectedReservation ? selectedReservation.start_time || selectedReservation.start : newReservation.start_time)}
               initialEnd={(selectedReservation ? selectedReservation.end_time || selectedReservation.end : newReservation.end_time)}
+              table_id={selectedReservation ? selectedReservation.table_id : newReservation.table_id}
               onSave={async (form) => {
                 if (selectedReservation) {
                   await handleSaveEditReservation({

@@ -1,5 +1,3 @@
-
-
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import '../App.css';
@@ -18,7 +16,7 @@ for(let h = startHour; h < endHour; h++){
   }
 }
 
-export default function ReservationForm({ initialStart, initialEnd, onSave }) {
+export default function ReservationForm({ initialStart, initialEnd, onSave, table_id }) {
   const [form, setForm] = useState({
     name: '', phone: '', email: '', party_size: 1, notes: '',
   });
@@ -41,7 +39,8 @@ export default function ReservationForm({ initialStart, initialEnd, onSave }) {
     await onSave({
       ...form,
       start_time: start.toISOString(),
-      end_time: end.toISOString()
+      end_time: end.toISOString(),
+      table_id: table_id // Include the table_id in the payload
     });
   };
 

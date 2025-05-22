@@ -672,14 +672,30 @@ function App() {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 try {
+                  // 1. Format phone number as +1XXXXXXXXXX
+                  let phone = addMemberForm.phone || '';
+                  let digits = phone.replace(/\D/g, '');
+                  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+                  if (digits.length === 10) phone = `+1${digits}`;
+                  else phone = phone; // fallback to original if not 10 digits
+
+                  // 2. Copy over stripe_customer_id from selectedMember (account_id)
+                  const stripe_customer_id = selectedMember.stripe_customer_id || null;
+
+                  // 3. Fill in created_at with current timestamp
+                  const created_at = new Date().toISOString();
+
                   // Create new member with same account_id as selected member
                   const { data, error } = await supabase.from('members').insert({
                     ...addMemberForm,
+                    phone,
                     account_id: selectedMember.account_id,
                     member_id: uuidv4(),
                     status: 'active',
                     balance: 0,
                     join_date: new Date().toISOString(),
+                    created_at,
+                    stripe_customer_id
                   }).select();
 
                   if (error) throw error;
