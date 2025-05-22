@@ -194,6 +194,8 @@ function App() {
           0
         );
         setMembers(ms => ms.map(m => m.member_id === memberId ? { ...m, balance } : m));
+        // Show popup confirmation
+        alert('Transaction added successfully!');
         // Re-fetch the ledger in the background to ensure consistency
         fetchLedger(accountId);
       } else {
