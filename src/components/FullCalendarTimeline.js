@@ -140,8 +140,9 @@ export default function FullCalendarTimeline({ reloadKey }) {
         height="100%"
         slotMinTime="18:00:00" // 6pm
         slotMaxTime="25:00:00" // 1am next day
-        slotDuration="00:30:00" // 30-minute columns
-        slotLabelInterval="00:30" // show half-hour marks
+        slotDuration="00:15:00" // 15-minute columns
+        snapDuration="00:15:00" // allow 15-minute increments
+        slotLabelInterval="00:30:00" // show half-hour marks
         resourceAreaHeaderContent="Tables"
         resourceAreaWidth="90px"
         headerToolbar={{
@@ -154,6 +155,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
         eventClick={handleEventClick}
+        className="noir-fc-timeline"
       />
       {/* Reservation Edit Modal */}
       {showModal && selectedReservation && (
