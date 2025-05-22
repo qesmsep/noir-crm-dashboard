@@ -156,6 +156,41 @@ export default function FullCalendarTimeline({ reloadKey }) {
     setLocalReloadKey(k => k + 1);
   }
 
+  // Helper: get all 15-min slots between 6pm and 1am
+  function getTimeSlots() {
+    const slots = [];
+    const start = new Date();
+    start.setHours(18, 0, 0, 0); // 6pm
+    for (let i = 0; i < 28; i++) { // 7 hours * 4 = 28 slots
+      const slotStart = new Date(start.getTime() + i * 15 * 60000);
+      slots.push(slotStart);
+    }
+    return slots;
+  }
+
+  // Helper: get total guests for each slot
+  function getGuestTotals(events) {
+    const slots = getTimeSlots();
+    return slots.map(slotStart => {
+      const slotEnd = new Date(slotStart.getTime() + 15 * 60000);
+      // Sum party_size for all reservations overlapping this slot
+      let total = 0;
+      for (const ev of events) {
+        if (ev.type === 'reservation' && ev.start && ev.end && ev.party_size) {
+          const evStart = new Date(ev.start);
+          const evEnd = new Date(ev.end);
+          if (!(evEnd <= slotStart || evStart >= slotEnd)) {
+            total += Number(ev.party_size);
+          }
+        }
+      }
+      return total;
+    });
+  }
+
+  const slots = getTimeSlots();
+  const guestTotals = getGuestTotals(events);
+
   return (
     <div style={{
       width: '100%',
@@ -192,6 +227,15 @@ export default function FullCalendarTimeline({ reloadKey }) {
         select={handleSelectSlot}
         className="noir-fc-timeline"
       />
+      {/* Total Guests Row */}
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginTop: 8, background: '#f3f2ef', borderRadius: 6, padding: '0.5rem 0.5rem', fontWeight: 600, fontSize: '1rem', overflowX: 'auto' }}>
+        <div style={{ minWidth: 90, textAlign: 'right', color: '#888', paddingRight: 8 }}>Total Guests</div>
+        {slots.map((slot, idx) => (
+          <div key={slot.toISOString()} style={{ minWidth: 60, textAlign: 'center', color: '#333' }}>
+            {guestTotals[idx]}
+          </div>
+        ))}
+      </div>
       {/* Reservation Edit/Create Modal */}
       {showModal && (selectedReservation || newReservation) && (
         <div style={{
