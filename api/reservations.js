@@ -7,15 +7,23 @@ async function assignTable(start_time, end_time, party_size) {
   const { data: tables } = await supabase
     .from('tables').select('*').gte('capacity', party_size).order('capacity');
   for (const t of tables) {
-    const { count: evCount } = await supabase
-      .from('events').select('id', { count: 'exact' })
-      .eq('table_id', t.id)
-      .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
-    const { count: resCount } = await supabase
-      .from('reservations').select('id', { count: 'exact' })
-      .eq('table_id', t.id)
-      .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
-    if (evCount === 0 && resCount === 0) return t.id;
+    // Fetch all events for this table
+    const { data: events } = await supabase
+      .from('events').select('start_time, end_time, table_id')
+      .eq('table_id', t.id);
+    // Fetch all reservations for this table
+    const { data: reservations } = await supabase
+      .from('reservations').select('start_time, end_time, table_id')
+      .eq('table_id', t.id);
+    // Check for time overlap with events
+    const hasEventConflict = (events || []).some(e =>
+      !(new Date(e.end_time) <= new Date(start_time) || new Date(e.start_time) >= new Date(end_time))
+    );
+    // Check for time overlap with reservations
+    const hasReservationConflict = (reservations || []).some(r =>
+      !(new Date(r.end_time) <= new Date(start_time) || new Date(r.start_time) >= new Date(end_time))
+    );
+    if (!hasEventConflict && !hasReservationConflict) return t.id;
   }
   return null;
 }
