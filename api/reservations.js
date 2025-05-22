@@ -29,7 +29,9 @@ export default async function handler(req, res) {
   }
   if (method === 'POST') {
     const { name, phone, email, party_size, notes, start_time, end_time, source } = req.body;
+    console.log('POST /api/reservations - party_size:', party_size);
     const table_id = await assignTable(start_time, end_time, party_size);
+    console.log('POST /api/reservations - assignTable result:', table_id);
     if (!table_id) return res.status(409).json({ error: 'No available table' });
     const { data, error } = await supabase
       .from('reservations')
