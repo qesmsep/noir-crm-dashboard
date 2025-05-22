@@ -113,6 +113,9 @@ function App() {
   const [time, setTime] = useState('18:00');
   const [phone, setPhone] = useState('');
   const [membershipNumber, setMembershipNumber] = useState('');
+  const [nonMemberFields, setNonMemberFields] = useState({ firstName: '', lastName: '', email: '' });
+  const [memberLookup, setMemberLookup] = useState(null);
+  const [reserveStatus, setReserveStatus] = useState('');
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -1308,10 +1311,6 @@ function App() {
           {/* SPLIT: Make Reservation and Calendar tabs */}
           {section === 'makeReservation' && (() => {
             // --- Reserve On The Spot logic ---
-            const [nonMemberFields, setNonMemberFields] = React.useState({ firstName: '', lastName: '', email: '' });
-            const [memberLookup, setMemberLookup] = React.useState(null);
-            const [reserveStatus, setReserveStatus] = React.useState('');
-
             async function handleReserveNow() {
               setReserveStatus('');
               // Check for member by phone
