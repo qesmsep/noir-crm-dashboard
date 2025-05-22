@@ -850,29 +850,166 @@ function App() {
                     borderRadius: "12px",
                     boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
                     boxSizing: "border-box",
-                    overflowX: "hidden"
+                    overflowX: "hidden",
+                    padding: '2rem 1.5rem'
                   }}
                 >
                   <Elements stripe={stripePromise}>
-                    <div style={{ display: 'flex', gap: 0 }}>
+                    {/* First row: member columns */}
+                    <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
                       {members.filter(m => m.account_id === selectedMember.account_id).map((member, idx, arr) => (
                         <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
                           <MemberDetail
                             member={member}
-                            ledger={memberLedger}
-                            ledgerLoading={ledgerLoading}
-                            onBack={() => setSelectedMember(null)}
-                            onAddTransaction={() => handleAddTransaction(member.member_id)}
-                            newTransaction={newTransaction}
-                            setNewTransaction={setNewTransaction}
-                            transactionStatus={transactionStatus}
+                            // No ledger props here
                             session={session}
-                            setMemberLedger={setMemberLedger}
-                            fetchLedger={fetchLedger}
-                            selectedMember={member}
                           />
                         </div>
                       ))}
+                    </div>
+                    {/* Second row: shared ledger for the account */}
+                    <div style={{ width: '100%' }}>
+                      <h3>Ledger</h3>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <strong>
+                          {memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? 'Balance Due:' : 'Current Credit:'}
+                        </strong>{' '}
+                        ${Math.abs((memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0)).toFixed(2)}
+                        {session.user?.user_metadata?.role === 'admin' && selectedMember.stripe_customer_id && (
+                          <>
+                            <button
+                              onClick={handleChargeBalance}
+                              disabled={charging || (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0)}
+                              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0) ? 'pointer' : 'not-allowed' }}
+                            >
+                              {charging ? 'Charging...' : 'Charge Balance'}
+                            </button>
+                            {(memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0) && (
+                              <span style={{ marginLeft: '1rem', color: '#888' }}>
+                                No outstanding balance to charge.
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
+                      </div>
+                      <table className="ledger-table">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Add Transaction Row */}
+                          <tr>
+                            <td>
+                              <input
+                                type="date"
+                                name="date"
+                                value={newTransaction.date || ''}
+                                onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                                className="add-transaction-input"
+                                style={{ minWidth: 120 }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                name="note"
+                                placeholder="Note"
+                                value={newTransaction.note || ''}
+                                onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
+                                className="add-transaction-input"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                name="amount"
+                                placeholder="Amount"
+                                value={newTransaction.amount || ''}
+                                onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                                className="add-transaction-input"
+                              />
+                            </td>
+                            <td>
+                              <select
+                                name="type"
+                                value={newTransaction.type || ''}
+                                onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                                className="add-transaction-input"
+                              >
+                                <option value="">Type</option>
+                                <option value="payment">Payment</option>
+                                <option value="purchase">Purchase</option>
+                              </select>
+                            </td>
+                            <td>
+                              <button
+                                onClick={e => {
+                                  e.preventDefault();
+                                  handleAddTransaction(selectedMember.account_id);
+                                }}
+                                className="add-transaction-btn"
+                                style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                                disabled={transactionStatus === 'loading'}
+                              >
+                                {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
+                              </button>
+                            </td>
+                          </tr>
+                          {/* Ledger Rows */}
+                          {memberLedger && memberLedger.length > 0 ? (
+                            memberLedger.map((tx, idx) => (
+                              <tr key={tx.id || idx}>
+                                <td>{formatDateLong(tx.date)}</td>
+                                <td>{tx.note}</td>
+                                <td>${Number(tx.amount).toFixed(2)}</td>
+                                <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                                <td>
+                                  <button
+                                    onClick={() => handleEditTransaction(tx)}
+                                    className="add-transaction-btn"
+                                    style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                                  >
+                                    Edit
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="5">No transactions found.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                      {/* Manual Refresh Button */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                        <button
+                          onClick={() => fetchLedger(selectedMember.account_id)}
+                          style={{
+                            background: '#eee',
+                            color: '#555',
+                            border: '1px solid #ccc',
+                            borderRadius: '4px',
+                            fontSize: '0.95rem',
+                            padding: '0.3rem 0.9rem',
+                            cursor: 'pointer',
+                            opacity: 0.7,
+                            transition: 'opacity 0.2s',
+                          }}
+                          onMouseOver={e => (e.currentTarget.style.opacity = 1)}
+                          onMouseOut={e => (e.currentTarget.style.opacity = 0.7)}
+                          aria-label="Refresh ledger"
+                        >
+                          Refresh
+                        </button>
+                      </div>
                     </div>
                   </Elements>
                 </div>
