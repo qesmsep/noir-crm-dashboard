@@ -344,6 +344,10 @@ const MemberDetail = ({
             </div>
           )}
         </div>
+        {/* Discreetly show member UUID */}
+        <div style={{ fontSize: '0.85rem', color: '#888', opacity: 0.6, marginTop: 4, userSelect: 'all' }}>
+          Member UUID: {member.id}
+        </div>
         {/* Referral and Renewal Block */}
         <div>
           <strong>Referred By:</strong> {member.referral || 'N/A'}
