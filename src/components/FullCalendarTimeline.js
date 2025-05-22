@@ -11,6 +11,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
   const [localReloadKey, setLocalReloadKey] = useState(0);
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [newReservation, setNewReservation] = useState(null);
 
   useEffect(() => {
     // Fetch tables as resources, sorted by number
@@ -123,6 +124,38 @@ export default function FullCalendarTimeline({ reloadKey }) {
     setLocalReloadKey(k => k + 1);
   }
 
+  // Handler for slot selection to create a new reservation
+  function handleSelectSlot(arg) {
+    // arg.start, arg.end, arg.resource (table id)
+    const start = arg.start;
+    const end = new Date(start.getTime() + 90 * 60000); // 90 minutes later
+    setNewReservation({
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      table_id: arg.resource?.id || arg.resourceId || arg.resource || '',
+    });
+    setShowModal(true);
+    setSelectedReservation(null);
+  }
+
+  // Handler for saving a new reservation
+  async function handleSaveNewReservation(form) {
+    const payload = {
+      ...form,
+      start_time: form.start_time,
+      end_time: form.end_time,
+      table_id: newReservation.table_id,
+    };
+    const res = await fetch('/api/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    setShowModal(false);
+    setNewReservation(null);
+    setLocalReloadKey(k => k + 1);
+  }
+
   return (
     <div style={{
       width: '100%',
@@ -155,10 +188,12 @@ export default function FullCalendarTimeline({ reloadKey }) {
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
         eventClick={handleEventClick}
+        selectable={true}
+        select={handleSelectSlot}
         className="noir-fc-timeline"
       />
-      {/* Reservation Edit Modal */}
-      {showModal && selectedReservation && (
+      {/* Reservation Edit/Create Modal */}
+      {showModal && (selectedReservation || newReservation) && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -181,24 +216,30 @@ export default function FullCalendarTimeline({ reloadKey }) {
             textAlign: 'left',
             position: 'relative',
           }}>
-            <button onClick={() => { setShowModal(false); setSelectedReservation(null); }} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
-            <h3>Edit Reservation</h3>
-            <div style={{ marginBottom: '1rem', color: '#555' }}>
-              <div><strong>Name:</strong> {selectedReservation.name}</div>
-              <div><strong>Phone:</strong> {selectedReservation.phone}</div>
-              <div><strong>Email:</strong> {selectedReservation.email}</div>
-              <div><strong>Notes:</strong> {selectedReservation.notes}</div>
-              <div><strong>Table:</strong> {resources.find(r => r.id === String(selectedReservation.table_id))?.title || selectedReservation.table_id}</div>
-            </div>
+            <button onClick={() => { setShowModal(false); setSelectedReservation(null); setNewReservation(null); }} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
+            <h3>{selectedReservation ? 'Edit Reservation' : 'Create Reservation'}</h3>
+            {selectedReservation && (
+              <div style={{ marginBottom: '1rem', color: '#555' }}>
+                <div><strong>Name:</strong> {selectedReservation.name}</div>
+                <div><strong>Phone:</strong> {selectedReservation.phone}</div>
+                <div><strong>Email:</strong> {selectedReservation.email}</div>
+                <div><strong>Notes:</strong> {selectedReservation.notes}</div>
+                <div><strong>Table:</strong> {resources.find(r => r.id === String(selectedReservation.table_id))?.title || selectedReservation.table_id}</div>
+              </div>
+            )}
             <ReservationForm
-              initialStart={selectedReservation.start_time || selectedReservation.start}
-              initialEnd={selectedReservation.end_time || selectedReservation.end}
+              initialStart={(selectedReservation ? selectedReservation.start_time || selectedReservation.start : newReservation.start_time)}
+              initialEnd={(selectedReservation ? selectedReservation.end_time || selectedReservation.end : newReservation.end_time)}
               onSave={async (form) => {
-                await handleSaveEditReservation({
-                  start_time: form.start_time,
-                  end_time: form.end_time,
-                  party_size: form.party_size
-                });
+                if (selectedReservation) {
+                  await handleSaveEditReservation({
+                    start_time: form.start_time,
+                    end_time: form.end_time,
+                    party_size: form.party_size
+                  });
+                } else if (newReservation) {
+                  await handleSaveNewReservation(form);
+                }
               }}
             />
           </div>
