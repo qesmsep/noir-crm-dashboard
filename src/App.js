@@ -168,14 +168,17 @@ function App() {
       const result = await res.json();
       if (res.ok && result.data) {
         setTransactionStatus('Transaction added!');
-        const updatedLedger = await fetchLedger(memberId); // Use the returned ledger data
+        // Optimistically add the new transaction to the ledger
+        setMemberLedger(prev => [...prev, result.data]);
         setNewTransaction({ type: 'payment', amount: '', note: '' });
-        // Recompute balance from the freshly updated ledger
-        const balance = updatedLedger.reduce(
+        // Recompute balance from the optimistically updated ledger
+        const balance = [...memberLedger, result.data].reduce(
           (acc, t) => acc + Number(t.amount),
           0
         );
         setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
+        // Re-fetch the ledger in the background to ensure consistency
+        fetchLedger(memberId);
       } else {
         setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));
       }
