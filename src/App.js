@@ -1311,6 +1311,7 @@ function App() {
           {/* SPLIT: Make Reservation and Calendar tabs */}
           {section === 'makeReservation' && (() => {
             // --- Reserve On The Spot logic ---
+            const [showNonMemberModal, setShowNonMemberModal] = useState(false);
             async function handleReserveNow() {
               setReserveStatus('');
               // Check for member by phone
@@ -1331,31 +1332,9 @@ function App() {
                 setMemberLookup(data.member);
                 setNonMemberFields({ firstName: '', lastName: '', email: '' });
               } else {
-                // No member found, prompt for info if not already entered
-                setMemberLookup(null);
-                if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
-                  setReserveStatus('Please enter first name, last name, and email for non-members.');
-                  return;
-                }
-                await createReservation({
-                  name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
-                  phone,
-                  email: nonMemberFields.email,
-                  party_size: partySize,
-                  notes: '',
-                  start_time: getStartTime(),
-                  end_time: getEndTime(),
-                  source: 'public_widget'
-                });
-                setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                // No member found, show modal for non-member info
+                setShowNonMemberModal(true);
               }
-              setReloadKey(k => k + 1);
-              setPhone('');
-              setFirstName('');
-              setLastName('');
-              setPartySize(1);
-              setTime('18:00');
-              setReserveStatus('Reservation confirmed!');
             }
 
             function getStartTime() {
@@ -1405,41 +1384,6 @@ function App() {
                       style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
                     />
                   </div>
-                  {/* Show non-member fields if no member found and phone is entered */}
-                  {memberLookup === null && phone && (
-                    <>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label>First Name</label>
-                        <input
-                          type="text"
-                          placeholder="First name"
-                          value={nonMemberFields.firstName}
-                          onChange={e => setNonMemberFields(f => ({ ...f, firstName: e.target.value }))}
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label>Last Name</label>
-                        <input
-                          type="text"
-                          placeholder="Last name"
-                          value={nonMemberFields.lastName}
-                          onChange={e => setNonMemberFields(f => ({ ...f, lastName: e.target.value }))}
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
-                        />
-                      </div>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label>Email</label>
-                        <input
-                          type="email"
-                          placeholder="Email"
-                          value={nonMemberFields.email}
-                          onChange={e => setNonMemberFields(f => ({ ...f, email: e.target.value }))}
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
-                        />
-                      </div>
-                    </>
-                  )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                     <label>Party size</label>
                     <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
@@ -1481,6 +1425,79 @@ function App() {
                   </button>
                   {reserveStatus && <div style={{ marginTop: '1rem', color: reserveStatus.includes('confirmed') ? 'green' : 'red' }}>{reserveStatus}</div>}
                 </div>
+                {showNonMemberModal && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: 500 }}>
+                      <h3>Enter Non-Member Details</h3>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label>First Name</label>
+                        <input
+                          type="text"
+                          placeholder="First name"
+                          value={nonMemberFields.firstName}
+                          onChange={e => setNonMemberFields(f => ({ ...f, firstName: e.target.value }))}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label>Last Name</label>
+                        <input
+                          type="text"
+                          placeholder="Last name"
+                          value={nonMemberFields.lastName}
+                          onChange={e => setNonMemberFields(f => ({ ...f, lastName: e.target.value }))}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label>Email</label>
+                        <input
+                          type="email"
+                          placeholder="Email"
+                          value={nonMemberFields.email}
+                          onChange={e => setNonMemberFields(f => ({ ...f, email: e.target.value }))}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                        />
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
+                            setReserveStatus('Please enter first name, last name, and email for non-members.');
+                            return;
+                          }
+                          await createReservation({
+                            name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
+                            phone,
+                            email: nonMemberFields.email,
+                            party_size: partySize,
+                            notes: '',
+                            start_time: getStartTime(),
+                            end_time: getEndTime(),
+                            source: 'public_widget'
+                          });
+                          setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                          setShowNonMemberModal(false);
+                          setReloadKey(k => k + 1);
+                          setPhone('');
+                          setFirstName('');
+                          setLastName('');
+                          setPartySize(1);
+                          setTime('18:00');
+                          setReserveStatus('Reservation confirmed!');
+                        }}
+                        style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
+                      >
+                        Confirm Reservation
+                      </button>
+                      <button
+                        onClick={() => setShowNonMemberModal(false)}
+                        style={{ width: '100%', padding: '0.75rem', background: '#ccc', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem', marginTop: '1rem' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
