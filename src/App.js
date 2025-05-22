@@ -131,6 +131,17 @@ function App() {
   const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState('');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [transactionModalMessage, setTransactionModalMessage] = useState('');
+  // Add state for Add Member modal
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [addMemberForm, setAddMemberForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    dob: '',
+    membership: '',
+    photo: ''
+  });
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -946,7 +957,7 @@ function App() {
                       Back to List
                     </button>
                     <button
-                      onClick={() => alert('Add Member functionality coming soon!')}
+                      onClick={() => setShowAddMemberModal(true)}
                       style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
                     >
                       + Add Member
@@ -1137,21 +1148,6 @@ function App() {
                       </div>
                     </div>
                   </Elements>
-                  {/* Move button bar to bottom */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
-                    <button
-                      onClick={() => setSelectedMember(null)}
-                      style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Back to List
-                    </button>
-                    <button
-                      onClick={() => alert('Add Member functionality coming soon!')}
-                      style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      + Add Member
-                    </button>
-                  </div>
                 </div>
               )}
             </>
@@ -1414,10 +1410,6 @@ function App() {
                             <label>
                               Membership:
                               <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
-                            </label>
-                            <label>
-                              Balance:
-                              <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
                             </label>
                             <label>
                               Photo:
