@@ -819,9 +819,24 @@ function App() {
                 <>
                   <h1 className="app-title">Noir CRM – Members</h1>
                   {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
-                    <div key={accountId} className="account-group" style={{ marginBottom: '1rem', padding: '0.5rem', background: '#f6f5f2', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div key={accountId} className="account-group" style={{
+                      marginBottom: '2rem',
+                      padding: '2rem',
+                      background: '#fff',
+                      borderRadius: '12px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1.2rem'
+                    }}>
                       {accountMembers.map((member, idx) => (
-                        <div key={member.member_id} style={{ padding: '1.2rem', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', marginBottom: idx < accountMembers.length - 1 ? '1rem' : 0 }}>
+                        <div key={member.member_id} style={{
+                          padding: '0.5rem 0',
+                          background: 'none',
+                          boxShadow: 'none',
+                          borderRadius: 0,
+                          marginBottom: 0
+                        }}>
                           <li
                             className="member-item"
                             style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', gap: '1.5rem' }}
@@ -948,6 +963,22 @@ function App() {
                               />
                             </td>
                             <td>
+                              <select
+                                name="member_id"
+                                value={selectedTransactionMemberId}
+                                onChange={e => setSelectedTransactionMemberId(e.target.value)}
+                                className="add-transaction-input"
+                                style={{ minWidth: 120 }}
+                              >
+                                <option value="">Select Member</option>
+                                {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
+                                  <option key={m.member_id} value={m.member_id}>
+                                    {m.first_name} {m.last_name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
                               <input
                                 type="text"
                                 name="note"
@@ -980,20 +1011,6 @@ function App() {
                               </select>
                             </td>
                             <td>
-                              <select
-                                name="member_id"
-                                value={selectedTransactionMemberId}
-                                onChange={e => setSelectedTransactionMemberId(e.target.value)}
-                                className="add-transaction-input"
-                                style={{ minWidth: 120 }}
-                              >
-                                <option value="">Select Member</option>
-                                {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
-                                  <option key={m.member_id} value={m.member_id}>
-                                    {m.first_name} {m.last_name}
-                                  </option>
-                                ))}
-                              </select>
                               <button
                                 onClick={e => {
                                   e.preventDefault();
