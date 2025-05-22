@@ -863,7 +863,7 @@ function App() {
             padding: isMobile ? "1rem" : "2.5rem",
             minHeight: "100vh",
             background: "#f8f7f4",
-            maxWidth: "90vw",
+            maxWidth: "90%",
             width: "90%",
             overflowX: "hidden"
           }}
@@ -905,7 +905,7 @@ function App() {
                                 src={member.photo}
                                 alt={`${member.first_name} ${member.last_name}`}
                                 className="member-photo"
-                                style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, marginRight: 20, background: '#f6f5f2' }}
+                                style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, marginRight: 20, background: '#f6f5f2' }}
                               />
                             )}
                             <div className="member-info" style={{ flex: 1 }}>
