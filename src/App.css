@@ -580,12 +580,12 @@ body {
 }
 
 /* Decrease font size for react-big-calendar */
-.rbc-calendar,
-.rbc-calendar * {
+.app-container .rbc-calendar,
+.app-container .rbc-calendar * {
   font-size: 0.92rem !important;
 }
 
 /* Add vertical lines between each half-hour slot in react-big-calendar */
-.rbc-time-slot {
+.app-container .rbc-time-slot {
   border-right: 1px solid #e0e0e0 !important;
 }
