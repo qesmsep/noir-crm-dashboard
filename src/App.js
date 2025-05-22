@@ -183,6 +183,9 @@ function App() {
     }
     setLedgerLoading(true);
     try {
+      let amt = Number(newTransaction.amount);
+      if (newTransaction.type === 'purchase') amt = -Math.abs(amt);
+      else amt = Math.abs(amt);
       const res = await fetch('/api/ledger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,7 +193,7 @@ function App() {
           member_id: memberId,
           account_id: accountId,
           type: newTransaction.type,
-          amount: Number(newTransaction.amount),
+          amount: amt,
           note: newTransaction.note,
           date: newTransaction.date || undefined
         })
