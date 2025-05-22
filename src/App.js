@@ -130,6 +130,7 @@ function App() {
   // Add state for selected member for transaction
   const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState('');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [transactionModalMessage, setTransactionModalMessage] = useState('');
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -195,14 +196,18 @@ function App() {
           0
         );
         setMembers(ms => ms.map(m => m.member_id === memberId ? { ...m, balance } : m));
-        // Show custom modal confirmation
+        // Show modal with success message
+        setTransactionModalMessage('Transaction added successfully!');
         setShowTransactionModal(true);
-        // Do not refresh ledger yet; wait for modal OK
       } else {
         setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));
+        setTransactionModalMessage('Failed to add transaction: ' + (result.error || 'Unknown error'));
+        setShowTransactionModal(true);
       }
     } catch (err) {
       setTransactionStatus('Failed: ' + err.message);
+      setTransactionModalMessage('Failed to add transaction: ' + err.message);
+      setShowTransactionModal(true);
     }
     setLedgerLoading(false);
   }
@@ -581,7 +586,7 @@ function App() {
 
     return (
       <>
-        {/* Custom Transaction Success Modal */}
+        {/* Transaction Modal */}
         {showTransactionModal && (
           <div style={{
             position: 'fixed',
@@ -589,36 +594,39 @@ function App() {
             left: 0,
             width: '100vw',
             height: '100vh',
-            background: 'rgba(0,0,0,0.25)',
-            zIndex: 3000,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}>
             <div style={{
               background: '#fff',
-              padding: '2rem 2.5rem',
-              borderRadius: '12px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.13)',
+              padding: '2rem',
+              borderRadius: '8px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+              minWidth: '300px',
+              maxWidth: '90%',
               textAlign: 'center',
-              minWidth: 300,
             }}>
-              <h3 style={{ marginBottom: '1.2rem' }}>Transaction Added</h3>
-              <p style={{ marginBottom: '2rem' }}>The transaction was successfully added to the ledger.</p>
+              <h3 style={{ marginBottom: '1rem', color: '#333' }}>Transaction Status</h3>
+              <p style={{ marginBottom: '2rem', color: '#666' }}>{transactionModalMessage}</p>
               <button
                 onClick={() => {
                   setShowTransactionModal(false);
-                  fetchLedger(selectedMember.account_id);
+                  if (selectedMember?.account_id) {
+                    fetchLedger(selectedMember.account_id);
+                  }
                 }}
                 style={{
                   background: '#a59480',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '4px',
-                  padding: '0.7rem 1.6rem',
-                  fontWeight: 600,
-                  fontSize: '1.1rem',
+                  padding: '0.75rem 2rem',
+                  fontSize: '1rem',
                   cursor: 'pointer',
+                  fontWeight: 600,
                 }}
               >
                 OK
