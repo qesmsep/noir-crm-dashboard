@@ -938,8 +938,17 @@ function App() {
                         <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
                           <MemberDetail
                             member={member}
-                            // No ledger props here
+                            ledger={memberLedger}
+                            ledgerLoading={ledgerLoading}
+                            onBack={() => setSelectedMember(null)}
+                            onAddTransaction={() => handleAddTransaction(member.member_id)}
+                            newTransaction={newTransaction}
+                            setNewTransaction={setNewTransaction}
+                            transactionStatus={transactionStatus}
                             session={session}
+                            setMemberLedger={setMemberLedger}
+                            fetchLedger={fetchLedger}
+                            selectedMember={selectedMember}
                           />
                         </div>
                       ))}
