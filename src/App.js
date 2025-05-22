@@ -129,6 +129,7 @@ function App() {
   });
   // Add state for selected member for transaction
   const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState('');
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -194,10 +195,9 @@ function App() {
           0
         );
         setMembers(ms => ms.map(m => m.member_id === memberId ? { ...m, balance } : m));
-        // Show popup confirmation
-        alert('Transaction added successfully!');
-        // Re-fetch the ledger in the background to ensure consistency
-        fetchLedger(accountId);
+        // Show custom modal confirmation
+        setShowTransactionModal(true);
+        // Do not refresh ledger yet; wait for modal OK
       } else {
         setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));
       }
@@ -581,6 +581,51 @@ function App() {
 
     return (
       <>
+        {/* Custom Transaction Success Modal */}
+        {showTransactionModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.25)',
+            zIndex: 3000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{
+              background: '#fff',
+              padding: '2rem 2.5rem',
+              borderRadius: '12px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.13)',
+              textAlign: 'center',
+              minWidth: 300,
+            }}>
+              <h3 style={{ marginBottom: '1.2rem' }}>Transaction Added</h3>
+              <p style={{ marginBottom: '2rem' }}>The transaction was successfully added to the ledger.</p>
+              <button
+                onClick={() => {
+                  setShowTransactionModal(false);
+                  fetchLedger(selectedMember.account_id);
+                }}
+                style={{
+                  background: '#a59480',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '0.7rem 1.6rem',
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
         {/* Hamburger button for mobile */}
         {isMobile && (
           <button
@@ -822,8 +867,8 @@ function App() {
                   <h1 className="app-title">Noir CRM – Members</h1>
                   {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
                     <div key={accountId} className="account-group" style={{
-                      marginBottom: '2rem',
-                      padding: '2rem',
+                      marginBottom: '1rem',
+                      padding: '1rem',
                       background: '#fff',
                       borderRadius: '12px',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
