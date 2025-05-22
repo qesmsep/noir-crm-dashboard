@@ -816,102 +816,33 @@ function App() {
                 <>
                   <h1 className="app-title">Noir CRM – Members</h1>
                   {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
-                    <div key={accountId} className="account-group" style={{ marginBottom: '1rem', padding: '0.5rem', background: '#f6f5f2', borderRadius: '8px', display: 'flex', gap: 0 }}>
+                    <div key={accountId} className="account-group" style={{ marginBottom: '1rem', padding: '0.5rem', background: '#f6f5f2', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                       {accountMembers.map((member, idx) => (
-                        <div key={member.member_id} style={{ flex: 1, borderRight: idx < accountMembers.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1rem' }}>
+                        <div key={member.member_id} style={{ padding: '1.2rem', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', marginBottom: idx < accountMembers.length - 1 ? '1rem' : 0 }}>
                           <li
                             className="member-item"
-                            style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, padding: 0 }}
+                            style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', gap: '1.5rem' }}
                             onClick={() => {
                               setSelectedMember(member);
                               fetchLedger(member.member_id);
                             }}
                           >
-                            {editingMemberId === member.member_id ? (
-                              <form
-                                onSubmit={e => {
-                                  e.preventDefault();
-                                  handleSaveEditMember();
-                                }}
-                                style={{ width: "100%" }}
-                              >
-                                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                  <label>
-                                    First Name:
-                                    <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
-                                  </label>
-                                  <label>
-                                    Last Name:
-                                    <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
-                                  </label>
-                                  <label>
-                                    Email:
-                                    <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
-                                  </label>
-                                  <label>
-                                    Phone:
-                                    <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
-                                  </label>
-                                  <label>
-                                    Date of Birth:
-                                    <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
-                                  </label>
-                                  <label>
-                                    Membership:
-                                    <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
-                                  </label>
-                                  <label>
-                                    Balance:
-                                    <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
-                                  </label>
-                                  <label>
-                                    Photo:
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={async e => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                          const url = await handlePhotoUpload(file, false);
-                                          if (url && editingMemberId) {
-                                            await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
-                                            setEditMemberForm(form => ({ ...form, photo: url }));
-                                            setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
-                                            setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
-                                          }
-                                        }
-                                      }}
-                                    />
-                                    {editMemberForm.photo && (
-                                      <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
-                                    )}
-                                  </label>
-                                </div>
-                                <div style={{ marginTop: "0.5rem" }}>
-                                  <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
-                                  <button type="button" onClick={handleCancelEditMember}>Cancel</button>
-                                </div>
-                              </form>
-                            ) : (
-                              <>
-                                {member.photo && (
-                                  <img
-                                    src={member.photo}
-                                    alt={`${member.first_name} ${member.last_name}`}
-                                    className="member-photo"
-                                  />
-                                )}
-                                <div className="member-info">
-                                  <strong>
-                                    {member.first_name} {member.last_name} — {member.membership}
-                                  </strong>
-                                  
-                                  <div>Phone: {formatPhone(member.phone)}</div>
-                                  <div>Email: {member.email}</div>
-                                  <div>Date of Birth: {formatDOB(member.dob)}</div>
-                                </div>
-                              </>
+                            {member.photo && (
+                              <img
+                                src={member.photo}
+                                alt={`${member.first_name} ${member.last_name}`}
+                                className="member-photo"
+                                style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, marginRight: 20, background: '#f6f5f2' }}
+                              />
                             )}
+                            <div className="member-info" style={{ flex: 1 }}>
+                              <strong>
+                                {member.first_name} {member.last_name} — {member.membership}
+                              </strong>
+                              <div>Phone: {formatPhone(member.phone)}</div>
+                              <div>Email: {member.email}</div>
+                              <div>Date of Birth: {formatDOB(member.dob)}</div>
+                            </div>
                           </li>
                         </div>
                       ))}
@@ -1105,9 +1036,20 @@ function App() {
                       </div>
                     </div>
                   </Elements>
-                  {/* Discreet account_id display */}
-                  <div style={{ position: 'absolute', right: 0, bottom: -30, color: '#b3b1a7', fontSize: '0.95rem', fontStyle: 'italic', userSelect: 'all' }}>
-                    Account ID: {selectedMember.account_id}
+                  {/* Move button bar to bottom */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
+                    <button
+                      onClick={() => setSelectedMember(null)}
+                      style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Back to List
+                    </button>
+                    <button
+                      onClick={() => alert('Add Member functionality coming soon!')}
+                      style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      + Add Member
+                    </button>
                   </div>
                 </div>
               )}
