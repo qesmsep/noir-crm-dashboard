@@ -595,7 +595,7 @@ body {
   display: flex;
   align-items: center;
   height: 38px !important; 
-} */
+} 
 .fc-timeline-event {
   min-height: 95% !important;
   font-size: 1.20em;
