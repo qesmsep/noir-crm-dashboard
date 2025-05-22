@@ -158,7 +158,8 @@ function App() {
           member_id: memberId,
           type: newTransaction.type,
           amount: Number(newTransaction.amount),
-          note: newTransaction.note
+          note: newTransaction.note,
+          date: newTransaction.date || undefined
         })
       });
       const result = await res.json();

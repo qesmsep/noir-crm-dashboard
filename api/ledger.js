@@ -1,5 +1,3 @@
-
-
 import { createClient } from "@supabase/supabase-js";
 
 // Initialize Supabase with service role key
@@ -29,13 +27,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { member_id, type, amount, note } = req.body;
+      const { member_id, type, amount, note, date } = req.body;
       let amt = Number(amount);
       if (type === 'purchase') amt = -Math.abs(amt);
       if (!member_id || !type || isNaN(amt)) {
         return res.status(400).json({ error: "Missing required fields" });
       }
-      const timestamp = new Date().toISOString();
+      const timestamp = date ? new Date(date).toISOString() : new Date().toISOString();
       const { data, error } = await supabaseAdmin
         .from("ledger")
         .insert(

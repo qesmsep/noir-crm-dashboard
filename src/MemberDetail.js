@@ -506,6 +506,14 @@ const MemberDetail = ({
               <option value="payment">Payment</option>
               <option value="purchase">Purchase</option>
             </select>
+            <input
+              type="date"
+              name="date"
+              value={newTransaction.date || ''}
+              onChange={handleInputChange}
+              className="add-transaction-input"
+              style={{ minWidth: 120 }}
+            />
             <button
               type="submit"
               className="add-transaction-btn"
