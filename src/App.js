@@ -195,7 +195,7 @@ function App() {
           type: newTransaction.type,
           amount: amt,
           note: newTransaction.note,
-          date: newTransaction.date || undefined
+          date: newTransaction.date ? newTransaction.date : undefined
         })
       });
       const result = await res.json();
@@ -579,6 +579,7 @@ function App() {
           body: JSON.stringify({
             id: txId,
             ...editTransactionForm,
+            date: editTransactionForm.date ? editTransactionForm.date : undefined,
             amount: editTransactionForm.type === 'purchase' ? 
               -Math.abs(Number(editTransactionForm.amount)) : 
               Math.abs(Number(editTransactionForm.amount))
@@ -597,6 +598,25 @@ function App() {
         alert('Error updating transaction: ' + err.message);
       }
     };
+
+    // Add this function near other transaction handlers
+    async function handleDeleteTransaction(txId) {
+      if (!window.confirm('Are you sure you want to delete this transaction?')) return;
+      try {
+        const res = await fetch(`/api/ledger?id=${txId}`, { method: 'DELETE' });
+        if (res.ok) {
+          setEditingTransaction(null);
+          // Refresh ledger
+          if (selectedMember?.account_id) {
+            fetchLedger(selectedMember.account_id);
+          }
+        } else {
+          alert('Failed to delete transaction');
+        }
+      } catch (err) {
+        alert('Error deleting transaction: ' + err.message);
+      }
+    }
 
     return (
       <>
@@ -698,8 +718,9 @@ function App() {
                     <input type="text" value={editTransactionForm.note || ''} onChange={e => setEditTransactionForm(f => ({ ...f, note: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                   <button type="button" onClick={() => setEditingTransaction(null)} style={{ padding: '0.75rem 1.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction)} style={{ padding: '0.75rem 1.5rem', background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Delete</button>
                   <button type="submit" style={{ padding: '0.75rem 1.5rem', background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Save Changes</button>
                 </div>
               </form>
