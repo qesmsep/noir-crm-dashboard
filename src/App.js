@@ -1314,8 +1314,13 @@ function App() {
             // --- Reserve On The Spot logic ---
             async function handleReserveNow() {
               setReserveStatus('');
+              // Format phone number: prepend +1 if 10 digits
+              let formattedPhone = phone;
+              if (/^\d{10}$/.test(phone)) {
+                formattedPhone = '+1' + phone;
+              }
               // Check for member by phone
-              const res = await fetch(`/api/checkMemberByPhone?phone=${encodeURIComponent(phone)}`);
+              const res = await fetch(`/api/checkMemberByPhone?phone=${encodeURIComponent(formattedPhone)}`);
               const data = await res.json();
               if (data.member) {
                 // Member found, use their info
