@@ -928,9 +928,25 @@ function App() {
                     boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
                     boxSizing: "border-box",
                     overflowX: "hidden",
-                    padding: '2rem 1.5rem'
+                    padding: '2rem 1.5rem',
+                    position: 'relative'
                   }}
                 >
+                  {/* Top bar with Back to List and Add Member */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                    <button
+                      onClick={() => setSelectedMember(null)}
+                      style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Back to List
+                    </button>
+                    <button
+                      onClick={() => alert('Add Member functionality coming soon!')}
+                      style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      + Add Member
+                    </button>
+                  </div>
                   <Elements stripe={stripePromise}>
                     {/* First row: member columns */}
                     <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
@@ -938,23 +954,13 @@ function App() {
                         <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
                           <MemberDetail
                             member={member}
-                            ledger={memberLedger}
-                            ledgerLoading={ledgerLoading}
-                            onBack={() => setSelectedMember(null)}
-                            onAddTransaction={() => handleAddTransaction(member.member_id)}
-                            newTransaction={newTransaction}
-                            setNewTransaction={setNewTransaction}
-                            transactionStatus={transactionStatus}
                             session={session}
-                            setMemberLedger={setMemberLedger}
-                            fetchLedger={fetchLedger}
-                            selectedMember={selectedMember}
                           />
                         </div>
                       ))}
                     </div>
                     {/* Second row: shared ledger for the account */}
-                    <div style={{ width: '100%' }}>
+                    <div style={{ width: '100%', position: 'relative' }}>
                       <h3>Ledger</h3>
                       <div style={{ marginBottom: '1rem' }}>
                         <strong>
@@ -1098,6 +1104,10 @@ function App() {
                       </div>
                     </div>
                   </Elements>
+                  {/* Discreet account_id display */}
+                  <div style={{ position: 'absolute', right: 0, bottom: -30, color: '#b3b1a7', fontSize: '0.95rem', fontStyle: 'italic', userSelect: 'all' }}>
+                    Account ID: {selectedMember.account_id}
+                  </div>
                 </div>
               )}
             </>
