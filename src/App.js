@@ -116,6 +116,7 @@ function App() {
   const [nonMemberFields, setNonMemberFields] = useState({ firstName: '', lastName: '', email: '' });
   const [memberLookup, setMemberLookup] = useState(null);
   const [reserveStatus, setReserveStatus] = useState('');
+  const [showNonMemberModal, setShowNonMemberModal] = useState(false);
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -1311,7 +1312,6 @@ function App() {
           {/* SPLIT: Make Reservation and Calendar tabs */}
           {section === 'makeReservation' && (() => {
             // --- Reserve On The Spot logic ---
-            const [showNonMemberModal, setShowNonMemberModal] = useState(false);
             async function handleReserveNow() {
               setReserveStatus('');
               // Check for member by phone
