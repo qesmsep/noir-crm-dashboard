@@ -51,7 +51,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ data: data[0] });
     }
 
-    res.setHeader("Allow", ["GET", "POST"]);
+    if (req.method === "PUT") {
+      const { id, type, amount, note, date } = req.body;
+      let amt = Number(amount);
+      if (type === 'purchase') amt = -Math.abs(amt);
+      if (!id || !type || isNaN(amt)) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      const timestamp = date ? new Date(date).toISOString() : new Date().toISOString();
+      const { data, error } = await supabaseAdmin
+        .from("ledger")
+        .update({ type, amount: amt, note, date: timestamp })
+        .eq('id', id)
+        .select();
+      if (error) {
+        console.error("Ledger PUT error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      if (!data || data.length === 0) {
+        console.error("Ledger PUT returned no data");
+        return res.status(500).json({ error: 'No data returned from update' });
+      }
+      return res.status(200).json({ data: data[0] });
+    }
+
+    res.setHeader("Allow", ["GET", "POST", "PUT"]);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   } catch (err) {
     console.error("Ledger handler unexpected error:", err);

@@ -279,6 +279,55 @@ const MemberDetail = ({
     return candidate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
   })();
 
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [editTransactionForm, setEditTransactionForm] = useState({
+    note: '',
+    amount: '',
+    type: '',
+    date: ''
+  });
+
+  const handleEditTransaction = (tx) => {
+    setEditingTransaction(tx.id);
+    setEditTransactionForm({
+      note: tx.note || '',
+      amount: Math.abs(tx.amount).toString(),
+      type: tx.type || '',
+      date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : ''
+    });
+  };
+
+  const handleUpdateTransaction = async (txId) => {
+    try {
+      const res = await fetch('/api/ledger', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: txId,
+          ...editTransactionForm,
+          amount: editTransactionForm.type === 'purchase' ? 
+            -Math.abs(Number(editTransactionForm.amount)) : 
+            Math.abs(Number(editTransactionForm.amount))
+        })
+      });
+      if (res.ok) {
+        setEditingTransaction(null);
+        // Refresh ledger
+        if (member?.id) {
+          const res = await fetch(`/api/ledger?member_id=${encodeURIComponent(member.id)}`);
+          const result = await res.json();
+          if (res.ok && result.data) {
+            setMemberLedger(result.data || []);
+          }
+        }
+      } else {
+        alert('Failed to update transaction');
+      }
+    } catch (err) {
+      alert('Error updating transaction: ' + err.message);
+    }
+  };
+
   return (
     <div className="member-detail-container">
       <div className="member-detail-card" style={{ position: 'relative' }}>
@@ -446,21 +495,88 @@ const MemberDetail = ({
                 <th>Description</th>
                 <th>Amount</th>
                 <th>Type</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {ledger && ledger.length > 0 ? (
                 ledger.map((tx, idx) => (
                   <tr key={tx.id || idx}>
-                    <td>{formatDateLong(tx.date)}</td>
-                    <td>{tx.note}</td>
-                    <td>${Number(tx.amount).toFixed(2)}</td>
-                    <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                    {editingTransaction === tx.id ? (
+                      <>
+                        <td>
+                          <input
+                            type="date"
+                            value={editTransactionForm.date}
+                            onChange={e => setEditTransactionForm({...editTransactionForm, date: e.target.value})}
+                            className="add-transaction-input"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={editTransactionForm.note}
+                            onChange={e => setEditTransactionForm({...editTransactionForm, note: e.target.value})}
+                            className="add-transaction-input"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={editTransactionForm.amount}
+                            onChange={e => setEditTransactionForm({...editTransactionForm, amount: e.target.value})}
+                            className="add-transaction-input"
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={editTransactionForm.type}
+                            onChange={e => setEditTransactionForm({...editTransactionForm, type: e.target.value})}
+                            className="add-transaction-input"
+                          >
+                            <option value="payment">Payment</option>
+                            <option value="purchase">Purchase</option>
+                          </select>
+                        </td>
+                        <td>
+                          <button
+                            onClick={() => handleUpdateTransaction(tx.id)}
+                            className="add-transaction-btn"
+                            style={{ marginRight: '0.5rem' }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingTransaction(null)}
+                            className="add-transaction-btn"
+                            style={{ background: '#666' }}
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{formatDateLong(tx.date)}</td>
+                        <td>{tx.note}</td>
+                        <td>${Number(tx.amount).toFixed(2)}</td>
+                        <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                        <td>
+                          <button
+                            onClick={() => handleEditTransaction(tx)}
+                            className="add-transaction-btn"
+                            style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4">No transactions found.</td>
+                  <td colSpan="5">No transactions found.</td>
                 </tr>
               )}
             </tbody>
