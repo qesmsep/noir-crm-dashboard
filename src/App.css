@@ -578,3 +578,9 @@ body {
 .fc-timeline-slot {
   border-right: 1px solid #e0e0e0 !important;
 }
+
+/* Decrease font size for react-big-calendar */
+.rbc-calendar,
+.rbc-calendar * {
+  font-size: 0.92rem !important;
+}
