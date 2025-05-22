@@ -180,7 +180,7 @@ function App() {
           (acc, t) => acc + Number(t.amount),
           0
         );
-        setMembers(ms => ms.map(m => m.id === memberId ? { ...m, balance } : m));
+        setMembers(ms => ms.map(m => m.member_id === memberId ? { ...m, balance } : m));
         // Re-fetch the ledger in the background to ensure consistency
         fetchLedger(memberId);
       } else {
@@ -252,7 +252,7 @@ function App() {
 
   // Member edit handlers
   function handleEditMember(member) {
-    setEditingMemberId(member.id);
+    setEditingMemberId(member.member_id);
     setEditMemberForm({ ...member });
   }
   function handleCancelEditMember() {
@@ -275,10 +275,10 @@ function App() {
     });
   }
   async function handleSaveEditMember() {
-    const { id, ...fields } = editMemberForm;
-    const { error } = await supabase.from('members').update(fields).eq('id', editingMemberId);
+    const { member_id, ...fields } = editMemberForm;
+    const { error } = await supabase.from('members').update(fields).eq('member_id', editingMemberId);
     if (!error) {
-      setMembers(members.map(m => m.id === editingMemberId ? { ...m, ...fields } : m));
+      setMembers(members.map(m => m.member_id === editingMemberId ? { ...m, ...fields } : m));
       setEditingMemberId(null);
     } else {
       alert('Failed to update member: ' + error.message);
@@ -394,14 +394,14 @@ function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            member_id: member.id,
+            member_id: member.member_id,
             supabase_user_id: member.supabase_user_id,
             requester_token: session.access_token
           }),
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          setMembers(members.filter(m => m.id !== member.id));
+          setMembers(members.filter(m => m.member_id !== member.member_id));
           setSelectedMember(null);
           setEditingMemberId(null);
           alert('Member deleted.');
@@ -428,16 +428,16 @@ function App() {
       if (url && editingMemberId) {
         if (isCounterpart) {
           // Update photo2
-          await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
+          await supabase.from('members').update({ photo2: url }).eq('member_id', editingMemberId);
           setEditMemberForm(form => ({ ...form, photo2: url }));
-          setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
-          setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
+          setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo2: url } : m));
+          setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo2: url } : sel);
         } else {
           // Update photo
-          await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
+          await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
           setEditMemberForm(form => ({ ...form, photo: url }));
-          setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
-          setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
+          setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
+          setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
         }
       }
       return url;
@@ -734,15 +734,15 @@ function App() {
                   <ul className="member-list">
                     {members.map(member => (
                       <li
-                        key={member.id}
+                        key={member.member_id}
                         className="member-item"
                         style={{ position: "relative", cursor: "pointer" }}
                         onClick={() => {
                           setSelectedMember(member);
-                          fetchLedger(member.id);
+                          fetchLedger(member.member_id);
                         }}
                       >
-                        {editingMemberId === member.id ? (
+                        {editingMemberId === member.member_id ? (
                           <form
                             onSubmit={e => {
                               e.preventDefault();
@@ -790,65 +790,19 @@ function App() {
                                       const url = await handlePhotoUpload(file, false);
                                       if (url && editingMemberId) {
                                         // Update in Supabase
-                                        await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
+                                        await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
                                         // Update local form state
                                         setEditMemberForm(form => ({ ...form, photo: url }));
                                         // Update members array
-                                        setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
+                                        setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
                                         // Update selectedMember if needed
-                                        setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
+                                        setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
                                       }
                                     }
                                   }}
                                 />
                                 {editMemberForm.photo && (
                                   <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
-                                )}
-                              </label>
-                              <label>
-                                Counterpart First Name:
-                                <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
-                              </label>
-                              <label>
-                                Counterpart Last Name:
-                                <input value={editMemberForm.last_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name2: e.target.value })} />
-                              </label>
-                              <label>
-                                Counterpart Email:
-                                <input value={editMemberForm.email2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email2: e.target.value })} />
-                              </label>
-                              <label>
-                                Counterpart Phone:
-                                <input value={editMemberForm.phone2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone2: e.target.value })} />
-                              </label>
-                              <label>
-                                Counterpart Company:
-                                <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
-                              </label>
-                              <label>
-                                Counterpart Photo:
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={async e => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                      const url = await handlePhotoUpload(file, true);
-                                      if (url && editingMemberId) {
-                                        // Update in Supabase
-                                        await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
-                                        // Update local form state
-                                        setEditMemberForm(form => ({ ...form, photo2: url }));
-                                        // Update members array
-                                        setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
-                                        // Update selectedMember if needed
-                                        setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
-                                      }
-                                    }
-                                  }}
-                                />
-                                {editMemberForm.photo2 && (
-                                  <img src={editMemberForm.photo2} alt="Counterpart Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
                                 )}
                               </label>
                             </div>
@@ -875,24 +829,6 @@ function App() {
                               <div>Email: {member.email}</div>
                               <div>Date of Birth: {formatDOB(member.dob)}</div>
                             </div>
-                            {member.first_name2 && (
-                              <div className="member-counterpart">
-                                {member.photo2 && (
-                                  <img
-                                    src={member.photo2}
-                                    alt={`${member.first_name2} ${member.last_name2}`}
-                                    className="member-photo"
-                                  />
-                                )}
-                                <strong>
-                                  {member.first_name2} {member.last_name2}
-                                </strong>
-                                <div>Email: {member.email2}</div>
-                                <div>Phone: {formatPhone(member.phone2)}</div>
-                                <div>Company: {member.company2}</div>
-                              </div>
-                            )}
-                            {/* Edit button removed from member card */}
                           </>
                         )}
                       </li>
@@ -918,7 +854,7 @@ function App() {
                       ledger={memberLedger}
                       ledgerLoading={ledgerLoading}
                       onBack={() => setSelectedMember(null)}
-                      onAddTransaction={() => handleAddTransaction(selectedMember.id)}
+                      onAddTransaction={() => handleAddTransaction(selectedMember.member_id)}
                       newTransaction={newTransaction}
                       setNewTransaction={setNewTransaction}
                       transactionStatus={transactionStatus}
@@ -1140,12 +1076,12 @@ function App() {
                     );
                   }).map(member => (
                     <li
-                      key={member.id}
+                      key={member.member_id}
                       className="member-item"
                       style={{ position: "relative", cursor: "pointer", width: "100%" }}
                       onClick={() => {
                         setSelectedMember(member);
-                        fetchLedger(member.id);
+                        fetchLedger(member.member_id);
                         setSection('members');
                       }}
                       tabIndex={0}
@@ -1153,12 +1089,12 @@ function App() {
                       onKeyDown={e => {
                         if (e.key === "Enter" || e.key === " ") {
                           setSelectedMember(member);
-                          fetchLedger(member.id);
+                          fetchLedger(member.member_id);
                           setSection('members');
                         }
                       }}
                     >
-                      {editingMemberId === member.id ? (
+                      {editingMemberId === member.member_id ? (
                         <form
                           onSubmit={e => {
                             e.preventDefault();
@@ -1205,58 +1141,16 @@ function App() {
                                   if (file) {
                                     const url = await handlePhotoUpload(file, false);
                                     if (url && editingMemberId) {
-                                      await supabase.from('members').update({ photo: url }).eq('id', editingMemberId);
+                                      await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
                                       setEditMemberForm(form => ({ ...form, photo: url }));
-                                      setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo: url } : m));
-                                      setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo: url } : sel);
+                                      setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
+                                      setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
                                     }
                                   }
                                 }}
                               />
                               {editMemberForm.photo && (
                                 <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
-                              )}
-                            </label>
-                            <label>
-                              Counterpart First Name:
-                              <input value={editMemberForm.first_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name2: e.target.value })} />
-                            </label>
-                            <label>
-                              Counterpart Last Name:
-                              <input value={editMemberForm.last_name2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name2: e.target.value })} />
-                            </label>
-                            <label>
-                              Counterpart Email:
-                              <input value={editMemberForm.email2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email2: e.target.value })} />
-                            </label>
-                            <label>
-                              Counterpart Phone:
-                              <input value={editMemberForm.phone2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone2: e.target.value })} />
-                            </label>
-                            <label>
-                              Counterpart Company:
-                              <input value={editMemberForm.company2 || ""} onChange={e => setEditMemberForm({ ...editMemberForm, company2: e.target.value })} />
-                            </label>
-                            <label>
-                              Counterpart Photo:
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={async e => {
-                                  const file = e.target.files[0];
-                                  if (file) {
-                                    const url = await handlePhotoUpload(file, true);
-                                    if (url && editingMemberId) {
-                                      await supabase.from('members').update({ photo2: url }).eq('id', editingMemberId);
-                                      setEditMemberForm(form => ({ ...form, photo2: url }));
-                                      setMembers(ms => ms.map(m => m.id === editingMemberId ? { ...m, photo2: url } : m));
-                                      setSelectedMember(sel => sel && sel.id === editingMemberId ? { ...sel, photo2: url } : sel);
-                                    }
-                                  }
-                                }}
-                              />
-                              {editMemberForm.photo2 && (
-                                <img src={editMemberForm.photo2} alt="Counterpart Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
                               )}
                             </label>
                           </div>
@@ -1283,24 +1177,6 @@ function App() {
                             <div>Email: {member.email}</div>
                             <div>Date of Birth: {formatDOB(member.dob)}</div>
                           </div>
-                          {member.first_name2 && (
-                            <div className="member-counterpart">
-                              {member.photo2 && (
-                                <img
-                                  src={member.photo2}
-                                  alt={`${member.first_name2} ${member.last_name2}`}
-                                  className="member-photo"
-                                />
-                              )}
-                              <strong>
-                                {member.first_name2} {member.last_name2}
-                              </strong>
-                              <div>Email: {member.email2}</div>
-                              <div>Phone: {formatPhone(member.phone2)}</div>
-                              <div>Company: {member.company2}</div>
-                            </div>
-                          )}
-                          {/* Edit button removed from member card */}
                         </>
                       )}
                     </li>

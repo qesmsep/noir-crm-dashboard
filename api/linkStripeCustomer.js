@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     const { error } = await supabase
       .from('members')
       .update({ stripe_customer_id: customer.id, status: 'active' })
-      .eq('id', member_id);
+      .eq('member_id', member_id);
 
     if (error) {
       res.status(500).json({ error: 'Failed to update Supabase', details: error.message });

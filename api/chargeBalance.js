@@ -1,5 +1,3 @@
-
-
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -23,7 +21,7 @@ export default async function handler(req, res) {
   const { data: member, error: memberError } = await supabase
     .from('members')
     .select('stripe_customer_id')
-    .eq('id', member_id)
+    .eq('member_id', member_id)
     .single();
   if (memberError || !member || !member.stripe_customer_id) {
     return res.status(400).json({ error: 'Stripe customer not found for member' });

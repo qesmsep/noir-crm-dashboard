@@ -1,5 +1,3 @@
-
-
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -28,7 +26,7 @@ module.exports = async (req, res) => {
   const user = users.users[0];
 
   // Promote to admin
-  const { data, error } = await supabase.auth.admin.updateUserById(user.id, {
+  const { data, error } = await supabase.auth.admin.updateUserById(user.member_id, {
     user_metadata: { role: 'admin' },
   });
 

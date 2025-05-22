@@ -1,5 +1,3 @@
-
-
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
@@ -45,12 +43,12 @@ export default async function handler(req, res) {
     const { data: ledger, error: ledgerErr } = await supabase
       .from('ledger')
       .select('amount')
-      .eq('member_id', m.id);
+      .eq('member_id', m.member_id);
     if (ledgerErr) continue;
     const balance = ledger.reduce((sum, t) => sum + Number(t.amount), 0);
     lines.push(
       `${m.first_name} ${m.last_name} — Balance: $${balance.toFixed(2)} — ` +
-      `https://yourapp.com/profile/${m.id}`
+      `https://yourapp.com/profile/${m.member_id}`
     );
   }
 

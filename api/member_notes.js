@@ -1,5 +1,3 @@
-
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -31,7 +29,7 @@ export default async function handler(req, res) {
       ({ data, error } = await supabase
         .from('member_notes')
         .update({ note })
-        .eq('id', id)
+        .eq('member_id', id)
         .select('id, note, created_at'));
     } else {
       ({ data, error } = await supabase

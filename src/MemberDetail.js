@@ -48,29 +48,29 @@ const MemberDetail = ({
 
   // Load attributes from API
   const fetchAttributes = async () => {
-    const res = await fetch(`/api/member_attributes?member_id=${member.id}`);
+    const res = await fetch(`/api/member_attributes?member_id=${member.member_id}`);
     const { data } = await res.json();
     setAttributes(data || []);
   };
   // Load notes history
   const fetchNotesLog = async () => {
-    const res = await fetch(`/api/member_notes?member_id=${member.id}`);
+    const res = await fetch(`/api/member_notes?member_id=${member.member_id}`);
     const { data } = await res.json();
     setNotesLog(data || []);
   };
   useEffect(() => {
-    if (member?.id) {
+    if (member?.member_id) {
       fetchAttributes();
       fetchNotesLog();
     }
-  }, [member?.id]);
+  }, [member?.member_id]);
 
   const handleSaveAttributes = async () => {
     for (const attr of attributes) {
       await fetch('/api/member_attributes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ member_id: member.id, key: attr.key, value: attr.value }),
+        body: JSON.stringify({ member_id: member.member_id, key: attr.key, value: attr.value }),
       });
     }
     alert('Attributes saved');
@@ -82,7 +82,7 @@ const MemberDetail = ({
     await fetch('/api/member_notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: member.id, note: notes }),
+      body: JSON.stringify({ member_id: member.member_id, note: notes }),
     });
     setNotes(''); // clear input
     fetchNotesLog();
@@ -94,7 +94,7 @@ const MemberDetail = ({
     await fetch('/api/member_attributes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: member.id, key: newAttrKey, value: newAttrValue }),
+      body: JSON.stringify({ member_id: member.member_id, key: newAttrKey, value: newAttrValue }),
     });
     setNewAttrKey('');
     setNewAttrValue('');
@@ -113,7 +113,7 @@ const MemberDetail = ({
     await fetch('/api/member_attributes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: member.id, key: attr.key, value: input }),
+      body: JSON.stringify({ member_id: member.member_id, key: attr.key, value: input }),
     });
     fetchAttributes();
   };
@@ -124,7 +124,7 @@ const MemberDetail = ({
     await supabase
       .from('member_attributes')
       .delete()
-      .eq('id', attr.id);
+      .eq('member_id', attr.member_id);
     fetchAttributes();
   };
   // Edit existing note
@@ -134,7 +134,7 @@ const MemberDetail = ({
       await fetch('/api/member_notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ member_id: member.id, note: updated, id: noteObj.id }),
+        body: JSON.stringify({ member_id: member.member_id, note: updated, id: noteObj.id }),
       });
       fetchNotesLog();
     }
@@ -149,7 +149,7 @@ const MemberDetail = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          member_id: member.id,
+          member_id: member.member_id,
           first_name: member.first_name,
           last_name: member.last_name,
           email: member.email,
@@ -257,7 +257,7 @@ const MemberDetail = ({
       const res = await fetch('/api/chargeBalance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ member_id: member.id }),
+        body: JSON.stringify({ member_id: member.member_id }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -315,8 +315,8 @@ const MemberDetail = ({
       if (res.ok) {
         setEditingTransaction(null);
         // Refresh ledger
-        if (member?.id) {
-          const res = await fetch(`/api/ledger?member_id=${encodeURIComponent(member.id)}`);
+        if (member?.member_id) {
+          const res = await fetch(`/api/ledger?member_id=${encodeURIComponent(member.member_id)}`);
           const result = await res.json();
           if (res.ok && result.data) {
             setMemberLedger(result.data || []);
@@ -368,36 +368,10 @@ const MemberDetail = ({
               {member.company && <div>Company: {member.company}</div>}
             </div>
           </div>
-          {/* Secondary Member */}
-          {member.photo2 && (
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <img
-                src={member.photo2}
-                alt="Secondary Member"
-                style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, marginRight: 20 }}
-              />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 20, marginBottom: '0.25rem' }}>
-                  {member.first_name2} {member.last_name2}
-                </div>
-                {member.company2 && <div>Company: {member.company2}</div>}
-                {member.email2 && (
-                  <div>
-                    Email: <a href={`mailto:${member.email2}`}>{member.email2}</a>
-                  </div>
-                )}
-                {member.phone2 && (
-                  <div>
-                    Phone: <a href={`tel:${member.phone2}`}>{formatPhoneNumber(member.phone2)}</a>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
         {/* Discreetly show member UUID at bottom right */}
         <div style={{ position: 'absolute', right: 16, bottom: 12, fontSize: '0.85rem', color: '#888', opacity: 0.6, userSelect: 'all' }}>
-          Member UUID: {member.id}
+          Member UUID: {member.member_id}
         </div>
         {/* Referral and Renewal Block */}
         <div>
@@ -550,8 +524,8 @@ const MemberDetail = ({
                     <button
                       onClick={e => {
                         e.preventDefault();
-                        if (member && member.id) {
-                          onAddTransaction(member.id);
+                        if (member && member.member_id) {
+                          onAddTransaction(member.member_id);
                         } else {
                           onAddTransaction();
                         }
@@ -650,7 +624,7 @@ const MemberDetail = ({
             {/* Manual Refresh Button */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button
-                onClick={() => fetchLedger(selectedMember?.id || member?.id)}
+                onClick={() => fetchLedger(selectedMember?.member_id || member?.member_id)}
                 style={{
                   background: '#eee',
                   color: '#555',
@@ -676,7 +650,7 @@ const MemberDetail = ({
           className="delete-member-btn"
           onClick={() => {
             if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-              handleDeleteMember(member.id, member.supabase_user_id);
+              handleDeleteMember(member.member_id, member.supabase_user_id);
             }
           }}
         >

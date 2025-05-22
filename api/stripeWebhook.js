@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     // Find member by email
     const { data: member, error } = await supabase
       .from('members')
-      .select('id')
+      .select('member_id')
       .eq('email', email)
       .single();
 
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
     await supabase
       .from('members')
       .update({ stripe_customer_id: stripeCustomerId, status: 'active' })
-      .eq('id', member.id);
+      .eq('member_id', member.member_id);
   }
 
   // Handle automatic subscription renewals
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
     // Find member by stripe_customer_id
     const { data: member, error: memberErr } = await supabase
       .from('members')
-      .select('id, membership')
+      .select('member_id, membership')
       .eq('stripe_customer_id', stripeCustomerId)
       .single();
     if (!memberErr && member) {
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
       if (member.membership === 'Host') {
         // Charge renewal fee
         await supabase.from('ledger').insert([{
-          member_id: member.id,
+          member_id: member.member_id,
           type: 'purchase',
           amount: 1,
           note: 'Host membership renewal',
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
         }]);
         // Reset host credit
         await supabase.from('ledger').insert([{
-          member_id: member.id,
+          member_id: member.member_id,
           type: 'payment',
           amount: 100,
           note: 'Host membership credit reset',
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
       } else {
         // Standard renewal credit
         await supabase.from('ledger').insert([{
-          member_id: member.id,
+          member_id: member.member_id,
           type: 'payment',
           amount: amountPaid / 100,
           note: 'Subscription renewal',

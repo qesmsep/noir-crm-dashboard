@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabaseAdmin
       .from('members')
       .select('supabase_user_id')
-      .eq('id', member_id)
+      .eq('member_id', member_id)
       .single();
     if (!error && data?.supabase_user_id) {
       supabase_user_id = data.supabase_user_id;
@@ -88,7 +88,7 @@ export default async function handler(req, res) {
   const { data: deletedRows, error: dbError } = await supabaseDb
     .from('members')
     .delete()
-    .eq('id', member_id)
+    .eq('member_id', member_id)
     .select();
   if (dbError) {
     return res.status(500).json({ error: 'Failed to delete member row', details: dbError.message });
