@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 import Stripe from 'stripe';
 
 const supabase = createClient(
@@ -15,7 +16,6 @@ export default async function handler(req, res) {
 
   try {
     const form = req.body.form_response || req.body;
-    // Helper for field lookups by ref, id, or index fallback
     function findAnswer(fieldRefs, type = null) {
       const ans = (form.answers || []).find(
         a =>
@@ -32,9 +32,13 @@ export default async function handler(req, res) {
       return null;
     }
 
-    // Mapping fields
-    const memberData = {
-      // Main member
+    // Generate a new account_id for this submission
+    const account_id = uuidv4();
+
+    // Main member
+    const member1 = {
+      member_id: uuidv4(),
+      account_id,
       first_name:   findAnswer(['a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d']),
       last_name:    findAnswer(['9c123e7b-2643-4819-9b4d-4a9f236302c9']),
       email:        findAnswer(['ee4bcd7b-768d-49fb-b7cc-80cdd25c750a'], 'email'),
@@ -49,42 +53,50 @@ export default async function handler(req, res) {
       country:      findAnswer(['8e920793-22ca-4c89-a25e-2b76407e171f']),
       membership:   findAnswer(['8101b9b5-5734-4db6-a2d1-27f122c05f9e'], 'choice'),
       photo:        findAnswer(['ddc3eeeb-f2ae-4070-846d-c3194008d0d9'], 'file_url'),
-      // Partner/member 2
-      first_name2:  findAnswer(['4418ddd8-d940-4896-9589-565b78c252c8']),
-      last_name2:   findAnswer(['ac1b6049-8826-4f71-a748-bbbb41c2ce9e']),
-      phone2:       findAnswer(['9c2688e3-34c0-4da0-8e17-c44a81778cf3'], 'phone_number'),
-      email2:       findAnswer(['b9cde49b-3a69-4181-a738-228f5a11f27c'], 'email'),
-      company2:     findAnswer(['c1f6eef0-4884-49e6-8928-c803b60a115f']),
-      photo2:       findAnswer(['95940d74-dda1-4531-be16-ffd01839c49f'], 'file_url'),
-      // Misc
       referral:     findAnswer(['dff5344e-93e0-4ae5-967c-b92e0ad51f65']),
-      auth_code:    (form.hidden && form.hidden.auth_code) ? form.hidden.auth_code : null,
-      // Required/auto fields
       status:       'pending',
       balance:      0,
-      // Stripe
       stripe_customer_id: null,
-      // Use Typeform submission time as join_date
       join_date:    form.submitted_at,
       renewal_date: null,
       token:        form.token || null,
     };
 
-    // Stripe Customer lookup (optional)
-    if (memberData.email) {
+    // Second member (if present)
+    const member2FirstName = findAnswer(['4418ddd8-d940-4896-9589-565b78c252c8']);
+    let members = [member1];
+    if (member2FirstName) {
+      const member2 = {
+        member_id: uuidv4(),
+        account_id,
+        first_name: member2FirstName,
+        last_name:  findAnswer(['ac1b6049-8826-4f71-a748-bbbb41c2ce9e']),
+        email:      findAnswer(['b9cde49b-3a69-4181-a738-228f5a11f27c'], 'email'),
+        phone:      findAnswer(['9c2688e3-34c0-4da0-8e17-c44a81778cf3'], 'phone_number'),
+        company:    findAnswer(['c1f6eef0-4884-49e6-8928-c803b60a115f']),
+        photo:      findAnswer(['95940d74-dda1-4531-be16-ffd01839c49f'], 'file_url'),
+        status:     'pending',
+        balance:    0,
+        stripe_customer_id: null,
+        join_date:  form.submitted_at,
+        renewal_date: null,
+        token:      form.token || null,
+      };
+      members.push(member2);
+    }
+
+    // Stripe Customer lookup for main member (optional)
+    if (member1.email) {
       try {
-        const customers = await stripe.customers.list({ email: memberData.email, limit: 1 });
+        const customers = await stripe.customers.list({ email: member1.email, limit: 1 });
         if (customers.data.length > 0) {
-          memberData.stripe_customer_id = customers.data[0].id;
+          member1.stripe_customer_id = customers.data[0].id;
         }
       } catch {}
     }
 
-    // Upsert using email (main) as unique constraint (modify if needed)
-    const { error } = await supabase.from('members').upsert(
-      [memberData],
-      { onConflict: ['email'] }
-    );
+    // Insert both members
+    const { error } = await supabase.from('members').insert(members);
 
     if (error) {
       console.error('Supabase error:', error);

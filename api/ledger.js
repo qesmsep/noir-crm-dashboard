@@ -10,15 +10,15 @@ export default async function handler(req, res) {
   console.log('Ledger handler:', req.method, req.body, req.query);
   try {
     if (req.method === "GET") {
-      const { member_id } = req.query;
-      if (!member_id) {
-        return res.status(400).json({ error: "Missing member_id" });
+      const { member_id, account_id } = req.query;
+      if (!member_id && !account_id) {
+        return res.status(400).json({ error: "Missing member_id or account_id" });
       }
-      const { data, error } = await supabaseAdmin
-        .from("ledger")
-        .select("*")
-        .eq("member_id", member_id)
-        .order("date", { ascending: true });
+      let query = supabaseAdmin.from("ledger").select("*");
+      if (member_id) query = query.eq("member_id", member_id);
+      if (account_id) query = query.eq("account_id", account_id);
+      query = query.order("date", { ascending: true });
+      const { data, error } = await query;
       if (error) {
         console.error("Ledger GET error:", error);
         return res.status(500).json({ error: error.message });
@@ -27,17 +27,17 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { member_id, type, amount, note, date } = req.body;
+      const { member_id, account_id, type, amount, note, date } = req.body;
       let amt = Number(amount);
       if (type === 'purchase') amt = -Math.abs(amt);
-      if (!member_id || !type || isNaN(amt)) {
+      if ((!member_id && !account_id) || !type || isNaN(amt)) {
         return res.status(400).json({ error: "Missing required fields" });
       }
       const timestamp = date ? new Date(date).toISOString() : new Date().toISOString();
       const { data, error } = await supabaseAdmin
         .from("ledger")
         .insert(
-          [{ member_id, type, amount: amt, note, date: timestamp }],
+          [{ member_id: member_id || null, account_id: account_id || null, type, amount: amt, note, date: timestamp }],
           { returning: 'representation' }
         );
       if (error) {
