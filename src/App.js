@@ -827,6 +827,149 @@ function App() {
           </div>
         )}
 
+        {/* Edit Member Modal */}
+        {editingMemberId && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{
+              background: '#fff',
+              padding: '2rem',
+              borderRadius: '8px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+              width: '90%',
+              maxWidth: '500px',
+            }}>
+              <h3 style={{ marginBottom: '1.5rem', color: '#333' }}>Edit Member</h3>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                await handleSaveEditMember();
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>First Name</label>
+                    <input
+                      type="text"
+                      value={editMemberForm.first_name || ''}
+                      onChange={e => setEditMemberForm(prev => ({ ...prev, first_name: e.target.value }))}
+                      required
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Last Name</label>
+                    <input
+                      type="text"
+                      value={editMemberForm.last_name || ''}
+                      onChange={e => setEditMemberForm(prev => ({ ...prev, last_name: e.target.value }))}
+                      required
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Email</label>
+                    <input
+                      type="email"
+                      value={editMemberForm.email || ''}
+                      onChange={e => setEditMemberForm(prev => ({ ...prev, email: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Phone</label>
+                    <input
+                      type="tel"
+                      value={editMemberForm.phone || ''}
+                      onChange={e => setEditMemberForm(prev => ({ ...prev, phone: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Date of Birth</label>
+                    <input
+                      type="date"
+                      value={editMemberForm.dob || ''}
+                      onChange={e => setEditMemberForm(prev => ({ ...prev, dob: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Membership Type</label>
+                    <input
+                      type="text"
+                      value={editMemberForm.membership || ''}
+                      onChange={e => setEditMemberForm(prev => ({ ...prev, membership: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Photo</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async e => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const url = await handlePhotoUpload(file, false);
+                          if (url && editingMemberId) {
+                            await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
+                            setEditMemberForm(form => ({ ...form, photo: url }));
+                            setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
+                          }
+                        }
+                      }}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                    {editMemberForm.photo && (
+                      <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: '0.5rem', width: '120px' }} />
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleCancelEditMember}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: '#e5e1d8',
+                      color: '#555',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: '#a59480',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Hamburger button for mobile */}
         {isMobile && (
           <button
@@ -1143,6 +1286,7 @@ function App() {
                           <MemberDetail
                             member={member}
                             session={session}
+                            onEditMember={handleEditMember}
                           />
                         </div>
                       ))}
@@ -1607,7 +1751,6 @@ function App() {
                                       await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
                                       setEditMemberForm(form => ({ ...form, photo: url }));
                                       setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
-                                      setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
                                     }
                                   }
                                 }}

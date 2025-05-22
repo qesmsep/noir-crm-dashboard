@@ -20,6 +20,7 @@ const MemberDetail = ({
   setMemberLedger,
   fetchLedger,
   selectedMember,
+  onEditMember,
 }) => {
   // All hooks must be at the top, before any return
   const [linkingStripe, setLinkingStripe] = useState(false);
@@ -407,16 +408,35 @@ const MemberDetail = ({
           </div>
         </div>
 
-        <button
-          className="delete-member-btn"
-          onClick={() => {
-            if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-              handleDeleteMember(member.member_id, member.supabase_user_id);
-            }
-          }}
-        >
-          Delete Member
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+          <button
+            className="edit-member-btn"
+            onClick={() => {
+              if (typeof onEditMember === 'function') onEditMember(member);
+            }}
+            style={{
+              background: '#4a90e2',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.6rem 1.5rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Edit Member
+          </button>
+          <button
+            className="delete-member-btn"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+                handleDeleteMember(member.member_id, member.supabase_user_id);
+              }
+            }}
+          >
+            Delete Member
+          </button>
+        </div>
       </div>
     </div>
   );
