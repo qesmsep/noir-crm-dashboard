@@ -127,6 +127,8 @@ function App() {
     type: '',
     date: ''
   });
+  // Add state for selected member for transaction
+  const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState('');
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -160,7 +162,7 @@ function App() {
   }
 
   // Add new transaction to ledger via API route
-  async function handleAddTransaction(memberId) {
+  async function handleAddTransaction(memberId, accountId) {
     setTransactionStatus('');
     if (!newTransaction.amount || isNaN(Number(newTransaction.amount))) {
       setTransactionStatus('Enter a valid amount.');
@@ -173,6 +175,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           member_id: memberId,
+          account_id: accountId,
           type: newTransaction.type,
           amount: Number(newTransaction.amount),
           note: newTransaction.note,
@@ -182,9 +185,9 @@ function App() {
       const result = await res.json();
       if (res.ok && result.data) {
         setTransactionStatus('Transaction added!');
-        // Optimistically add the new transaction to the ledger
         setMemberLedger(prev => [...prev, result.data]);
         setNewTransaction({ type: 'payment', amount: '', note: '' });
+        setSelectedTransactionMemberId('');
         // Recompute balance from the optimistically updated ledger
         const balance = [...memberLedger, result.data].reduce(
           (acc, t) => acc + Number(t.amount),
@@ -192,7 +195,7 @@ function App() {
         );
         setMembers(ms => ms.map(m => m.member_id === memberId ? { ...m, balance } : m));
         // Re-fetch the ledger in the background to ensure consistency
-        fetchLedger(memberId);
+        fetchLedger(accountId);
       } else {
         setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));
       }
@@ -527,7 +530,7 @@ function App() {
         const data = await res.json();
         if (res.ok && data.success) {
           setChargeStatus('Charged successfully');
-          handleAddTransaction(selectedMember.member_id);
+          handleAddTransaction(selectedMember.member_id, selectedMember.account_id);
         } else {
           setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
         }
@@ -564,7 +567,7 @@ function App() {
           setEditingTransaction(null);
           // Refresh ledger
           if (selectedMember?.member_id) {
-            fetchLedger(selectedMember.member_id);
+            fetchLedger(selectedMember.account_id);
           }
         } else {
           alert('Failed to update transaction');
@@ -879,6 +882,9 @@ function App() {
                       + Add Member
                     </button>
                   </div>
+                  <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.95rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem' }}>
+                    Account ID: {selectedMember.account_id}
+                  </div>
                   <Elements stripe={stripePromise}>
                     {/* First row: member columns */}
                     <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
@@ -973,10 +979,28 @@ function App() {
                               </select>
                             </td>
                             <td>
+                              <select
+                                name="member_id"
+                                value={selectedTransactionMemberId}
+                                onChange={e => setSelectedTransactionMemberId(e.target.value)}
+                                className="add-transaction-input"
+                                style={{ minWidth: 120 }}
+                              >
+                                <option value="">Select Member</option>
+                                {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
+                                  <option key={m.member_id} value={m.member_id}>
+                                    {m.first_name} {m.last_name}
+                                  </option>
+                                ))}
+                              </select>
                               <button
                                 onClick={e => {
                                   e.preventDefault();
-                                  handleAddTransaction(selectedMember.account_id);
+                                  if (!selectedTransactionMemberId) {
+                                    setTransactionStatus('Please select a member.');
+                                    return;
+                                  }
+                                  handleAddTransaction(selectedTransactionMemberId, selectedMember.account_id);
                                 }}
                                 className="add-transaction-btn"
                                 style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
