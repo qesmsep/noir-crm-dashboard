@@ -645,6 +645,172 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* Add Member Modal */}
+        {showAddMemberModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{
+              background: '#fff',
+              padding: '2rem',
+              borderRadius: '8px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+              width: '90%',
+              maxWidth: '500px',
+            }}>
+              <h3 style={{ marginBottom: '1.5rem', color: '#333' }}>Add New Member</h3>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  // Create new member with same account_id as selected member
+                  const { data, error } = await supabase.from('members').insert({
+                    ...addMemberForm,
+                    account_id: selectedMember.account_id,
+                    member_id: uuidv4(),
+                    status: 'active',
+                    balance: 0,
+                    join_date: new Date().toISOString(),
+                  }).select();
+
+                  if (error) throw error;
+
+                  // Update local state
+                  setMembers(prev => [...prev, data[0]]);
+                  setShowAddMemberModal(false);
+                  setAddMemberForm({
+                    first_name: '',
+                    last_name: '',
+                    email: '',
+                    phone: '',
+                    dob: '',
+                    membership: '',
+                    photo: ''
+                  });
+                } catch (err) {
+                  alert('Failed to add member: ' + err.message);
+                }
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>First Name</label>
+                    <input
+                      type="text"
+                      value={addMemberForm.first_name}
+                      onChange={e => setAddMemberForm(prev => ({ ...prev, first_name: e.target.value }))}
+                      required
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Last Name</label>
+                    <input
+                      type="text"
+                      value={addMemberForm.last_name}
+                      onChange={e => setAddMemberForm(prev => ({ ...prev, last_name: e.target.value }))}
+                      required
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Email</label>
+                    <input
+                      type="email"
+                      value={addMemberForm.email}
+                      onChange={e => setAddMemberForm(prev => ({ ...prev, email: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Phone</label>
+                    <input
+                      type="tel"
+                      value={addMemberForm.phone}
+                      onChange={e => setAddMemberForm(prev => ({ ...prev, phone: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Date of Birth</label>
+                    <input
+                      type="date"
+                      value={addMemberForm.dob}
+                      onChange={e => setAddMemberForm(prev => ({ ...prev, dob: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Membership Type</label>
+                    <input
+                      type="text"
+                      value={addMemberForm.membership}
+                      onChange={e => setAddMemberForm(prev => ({ ...prev, membership: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Photo</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async e => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const url = await handlePhotoUpload(file);
+                          if (url) {
+                            setAddMemberForm(prev => ({ ...prev, photo: url }));
+                          }
+                        }
+                      }}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddMemberModal(false)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: '#e5e1d8',
+                      color: '#555',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: '#a59480',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Add Member
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Hamburger button for mobile */}
         {isMobile && (
           <button
@@ -949,20 +1115,7 @@ function App() {
                 >
                   {/* Add spacing above top bar */}
                   <div style={{ height: '1.5rem' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
-                    <button
-                      onClick={() => setSelectedMember(null)}
-                      style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Back to List
-                    </button>
-                    <button
-                      onClick={() => setShowAddMemberModal(true)}
-                      style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      + Add Member
-                    </button>
-                  </div>
+                  
                   <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.75rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem', opacity: 0.6 }}>
                     Account ID: {selectedMember.account_id}
                   </div>
@@ -1146,6 +1299,20 @@ function App() {
                           Refresh
                         </button>
                       </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
+                    <button
+                      onClick={() => setSelectedMember(null)}
+                      style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Back to List
+                    </button>
+                    <button
+                      onClick={() => setShowAddMemberModal(true)}
+                      style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      + Add Member
+                    </button>
+                  </div>
                     </div>
                   </Elements>
                 </div>
