@@ -281,7 +281,7 @@ const MemberDetail = ({
 
   return (
     <div className="member-detail-container">
-      <div className="member-detail-card">
+      <div className="member-detail-card" style={{ position: 'relative' }}>
         <button className="back-button" onClick={onBack}>Back to List</button>
         <h2>Members</h2>
         <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 16, gap: '2rem' }}>
@@ -344,8 +344,8 @@ const MemberDetail = ({
             </div>
           )}
         </div>
-        {/* Discreetly show member UUID */}
-        <div style={{ fontSize: '0.85rem', color: '#888', opacity: 0.6, marginTop: 4, userSelect: 'all' }}>
+        {/* Discreetly show member UUID at bottom right */}
+        <div style={{ position: 'absolute', right: 16, bottom: 12, fontSize: '0.85rem', color: '#888', opacity: 0.6, userSelect: 'all' }}>
           Member UUID: {member.id}
         </div>
         {/* Referral and Renewal Block */}
