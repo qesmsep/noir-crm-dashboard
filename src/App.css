@@ -595,14 +595,14 @@ body {
   display: flex;
   align-items: center;
   height: 38px !important; 
-}
-/*.fc-timeline-event {
-  min-height: 32px !important;
+} */
+.fc-timeline-event {
+  min-height: 90% !important;
   font-size: 1.08em;
   border-radius: 7px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
 }
-.fc-timeline-lane-frame {
+/*.fc-timeline-lane-frame {
   min-height: 44px !important;
   display: flex;
   align-items: center;
