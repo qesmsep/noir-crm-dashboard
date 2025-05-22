@@ -1330,6 +1330,7 @@ function App() {
                               <strong>
                                 {member.first_name} {member.last_name}
                               </strong>
+                              <div>Member since: {formatDateLong(member.join_date)}</div>
                               <div>Phone: {formatPhone(member.phone)}</div>
                               <div>Email: {member.email}</div>
                               <div>Date of Birth: {formatDOB(member.dob)}</div>
@@ -1860,7 +1861,7 @@ function App() {
                             <strong>
                               {member.first_name} {member.last_name}
                             </strong>
-                            
+                            <div>Member since: {formatDateLong(member.join_date)}</div>
                             <div>Phone: {formatPhone(member.phone)}</div>
                             <div>Email: {member.email}</div>
                             <div>Date of Birth: {formatDOB(member.dob)}</div>
