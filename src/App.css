@@ -598,7 +598,7 @@ body {
 } */
 .fc-timeline-event {
   min-height: 95% !important;
-  font-size: 1.0em;
+  font-size: 1.20em;
   border-radius: 7px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   display: flex;
