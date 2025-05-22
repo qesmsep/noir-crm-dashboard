@@ -739,14 +739,12 @@ function App() {
                 <>
                   <h1 className="app-title">Noir CRM – Members</h1>
                   {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
-                    <div key={accountId} className="account-group" style={{ marginBottom: '2rem', padding: '1rem', background: '#f6f5f2', borderRadius: '8px' }}>
-                      <h3 style={{ marginBottom: '0.5rem', color: '#7c6b58', fontSize: '1.1rem' }}>Account ID: {accountId}</h3>
-                      <ul className="member-list">
-                        {accountMembers.map(member => (
+                    <div key={accountId} className="account-group" style={{ marginBottom: '1rem', padding: '0.5rem', background: '#f6f5f2', borderRadius: '8px', display: 'flex', gap: 0 }}>
+                      {accountMembers.map((member, idx) => (
+                        <div key={member.member_id} style={{ flex: 1, borderRight: idx < accountMembers.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1rem' }}>
                           <li
-                            key={member.member_id}
                             className="member-item"
-                            style={{ position: "relative", cursor: "pointer" }}
+                            style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, padding: 0 }}
                             onClick={() => {
                               setSelectedMember(member);
                               fetchLedger(member.member_id);
@@ -838,8 +836,8 @@ function App() {
                               </>
                             )}
                           </li>
-                        ))}
-                      </ul>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </>
@@ -855,22 +853,27 @@ function App() {
                     overflowX: "hidden"
                   }}
                 >
-                  {/* Use MemberDetail component if available */}
                   <Elements stripe={stripePromise}>
-                    <MemberDetail
-                      member={selectedMember}
-                      ledger={memberLedger}
-                      ledgerLoading={ledgerLoading}
-                      onBack={() => setSelectedMember(null)}
-                      onAddTransaction={() => handleAddTransaction(selectedMember.member_id)}
-                      newTransaction={newTransaction}
-                      setNewTransaction={setNewTransaction}
-                      transactionStatus={transactionStatus}
-                      session={session}
-                      setMemberLedger={setMemberLedger}
-                      fetchLedger={fetchLedger}
-                      selectedMember={selectedMember}
-                    />
+                    <div style={{ display: 'flex', gap: 0 }}>
+                      {members.filter(m => m.account_id === selectedMember.account_id).map((member, idx, arr) => (
+                        <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
+                          <MemberDetail
+                            member={member}
+                            ledger={memberLedger}
+                            ledgerLoading={ledgerLoading}
+                            onBack={() => setSelectedMember(null)}
+                            onAddTransaction={() => handleAddTransaction(member.member_id)}
+                            newTransaction={newTransaction}
+                            setNewTransaction={setNewTransaction}
+                            transactionStatus={transactionStatus}
+                            session={session}
+                            setMemberLedger={setMemberLedger}
+                            fetchLedger={fetchLedger}
+                            selectedMember={member}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </Elements>
                 </div>
               )}
