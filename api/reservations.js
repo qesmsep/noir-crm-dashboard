@@ -28,6 +28,49 @@ async function assignTable(start_time, end_time, party_size) {
   return null;
 }
 
+// Helper to find the next available time for a table with sufficient capacity
+async function findNextAvailableTime(start_time, durationMinutes, party_size) {
+  const { data: tables } = await supabase
+    .from('tables').select('*').gte('capacity', party_size).order('capacity');
+  const searchStart = new Date(start_time);
+  const searchEnd = new Date(searchStart.getTime() + 7 * 24 * 60 * 60 * 1000); // search up to 7 days ahead
+  let earliest = null;
+
+  for (const t of tables) {
+    // Fetch all events and reservations for this table, sorted by start_time
+    const { data: events } = await supabase
+      .from('events').select('start_time, end_time').eq('table_id', t.id);
+    const { data: reservations } = await supabase
+      .from('reservations').select('start_time, end_time').eq('table_id', t.id);
+    const blocks = [...(events || []), ...(reservations || [])]
+      .map(b => ({
+        start: new Date(b.start_time),
+        end: new Date(b.end_time)
+      }))
+      .sort((a, b) => a.start - b.start);
+    let slotStart = new Date(searchStart);
+    while (slotStart < searchEnd) {
+      const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+      // Check for overlap with any block
+      const hasConflict = blocks.some(b =>
+        !(b.end <= slotStart || b.start >= slotEnd)
+      );
+      if (!hasConflict) {
+        if (!earliest || slotStart < earliest) earliest = new Date(slotStart);
+        break;
+      }
+      // Move to the end of the next block that starts after slotStart, or increment by 15 min
+      const nextBlock = blocks.find(b => b.start >= slotStart);
+      if (nextBlock) {
+        slotStart = new Date(Math.max(slotStart.getTime() + 15 * 60000, nextBlock.end.getTime()));
+      } else {
+        slotStart = new Date(slotStart.getTime() + 15 * 60000);
+      }
+    }
+  }
+  return earliest ? earliest.toISOString() : null;
+}
+
 export default async function handler(req, res) {
   const { method } = req;
   if (method === 'GET') {
@@ -40,7 +83,12 @@ export default async function handler(req, res) {
     console.log('POST /api/reservations - party_size:', party_size);
     const table_id = await assignTable(start_time, end_time, party_size);
     console.log('POST /api/reservations - assignTable result:', table_id);
-    if (!table_id) return res.status(409).json({ error: 'No available table' });
+    if (!table_id) {
+      // Calculate duration in minutes
+      const durationMinutes = Math.round((new Date(end_time) - new Date(start_time)) / 60000);
+      const next_available_time = await findNextAvailableTime(start_time, durationMinutes, party_size);
+      return res.status(409).json({ error: 'No available table', next_available_time });
+    }
     const { data, error } = await supabase
       .from('reservations')
       .insert({ name, phone, email, party_size, notes, start_time, end_time, table_id, source })
