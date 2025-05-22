@@ -490,6 +490,13 @@ function App() {
       setShowReservationModal(true);
     };
 
+    // Group members by account_id
+    const membersByAccount = members.reduce((acc, member) => {
+      if (!acc[member.account_id]) acc[member.account_id] = [];
+      acc[member.account_id].push(member);
+      return acc;
+    }, {});
+
     return (
       <>
         {/* Hamburger button for mobile */}
@@ -731,109 +738,110 @@ function App() {
               {!selectedMember ? (
                 <>
                   <h1 className="app-title">Noir CRM – Members</h1>
-                  <ul className="member-list">
-                    {members.map(member => (
-                      <li
-                        key={member.member_id}
-                        className="member-item"
-                        style={{ position: "relative", cursor: "pointer" }}
-                        onClick={() => {
-                          setSelectedMember(member);
-                          fetchLedger(member.member_id);
-                        }}
-                      >
-                        {editingMemberId === member.member_id ? (
-                          <form
-                            onSubmit={e => {
-                              e.preventDefault();
-                              handleSaveEditMember();
+                  {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
+                    <div key={accountId} className="account-group" style={{ marginBottom: '2rem', padding: '1rem', background: '#f6f5f2', borderRadius: '8px' }}>
+                      <h3 style={{ marginBottom: '0.5rem', color: '#7c6b58', fontSize: '1.1rem' }}>Account ID: {accountId}</h3>
+                      <ul className="member-list">
+                        {accountMembers.map(member => (
+                          <li
+                            key={member.member_id}
+                            className="member-item"
+                            style={{ position: "relative", cursor: "pointer" }}
+                            onClick={() => {
+                              setSelectedMember(member);
+                              fetchLedger(member.member_id);
                             }}
-                            style={{ width: "100%" }}
                           >
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                              <label>
-                                First Name:
-                                <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
-                              </label>
-                              <label>
-                                Last Name:
-                                <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
-                              </label>
-                              <label>
-                                Email:
-                                <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
-                              </label>
-                              <label>
-                                Phone:
-                                <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
-                              </label>
-                              <label>
-                                Date of Birth:
-                                <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
-                              </label>
-                              <label>
-                                Membership:
-                                <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
-                              </label>
-                              <label>
-                                Balance:
-                                <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
-                              </label>
-                              <label>
-                                Photo:
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={async e => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                      const url = await handlePhotoUpload(file, false);
-                                      if (url && editingMemberId) {
-                                        // Update in Supabase
-                                        await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
-                                        // Update local form state
-                                        setEditMemberForm(form => ({ ...form, photo: url }));
-                                        // Update members array
-                                        setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
-                                        // Update selectedMember if needed
-                                        setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
-                                      }
-                                    }
-                                  }}
-                                />
-                                {editMemberForm.photo && (
-                                  <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                            {editingMemberId === member.member_id ? (
+                              <form
+                                onSubmit={e => {
+                                  e.preventDefault();
+                                  handleSaveEditMember();
+                                }}
+                                style={{ width: "100%" }}
+                              >
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                  <label>
+                                    First Name:
+                                    <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
+                                  </label>
+                                  <label>
+                                    Last Name:
+                                    <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
+                                  </label>
+                                  <label>
+                                    Email:
+                                    <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
+                                  </label>
+                                  <label>
+                                    Phone:
+                                    <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
+                                  </label>
+                                  <label>
+                                    Date of Birth:
+                                    <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
+                                  </label>
+                                  <label>
+                                    Membership:
+                                    <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
+                                  </label>
+                                  <label>
+                                    Balance:
+                                    <input value={editMemberForm.balance || ""} onChange={e => setEditMemberForm({ ...editMemberForm, balance: e.target.value })} />
+                                  </label>
+                                  <label>
+                                    Photo:
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={async e => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                          const url = await handlePhotoUpload(file, false);
+                                          if (url && editingMemberId) {
+                                            await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
+                                            setEditMemberForm(form => ({ ...form, photo: url }));
+                                            setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
+                                            setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                    {editMemberForm.photo && (
+                                      <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
+                                    )}
+                                  </label>
+                                </div>
+                                <div style={{ marginTop: "0.5rem" }}>
+                                  <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
+                                  <button type="button" onClick={handleCancelEditMember}>Cancel</button>
+                                </div>
+                              </form>
+                            ) : (
+                              <>
+                                {member.photo && (
+                                  <img
+                                    src={member.photo}
+                                    alt={`${member.first_name} ${member.last_name}`}
+                                    className="member-photo"
+                                  />
                                 )}
-                              </label>
-                            </div>
-                            <div style={{ marginTop: "0.5rem" }}>
-                              <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
-                              <button type="button" onClick={handleCancelEditMember}>Cancel</button>
-                            </div>
-                          </form>
-                        ) : (
-                          <>
-                            {member.photo && (
-                              <img
-                                src={member.photo}
-                                alt={`${member.first_name} ${member.last_name}`}
-                                className="member-photo"
-                              />
+                                <div className="member-info">
+                                  <strong>
+                                    {member.first_name} {member.last_name} — {member.membership}
+                                  </strong>
+                                  
+                                  <div>Phone: {formatPhone(member.phone)}</div>
+                                  <div>Email: {member.email}</div>
+                                  <div>Date of Birth: {formatDOB(member.dob)}</div>
+                                </div>
+                              </>
                             )}
-                            <div className="member-info">
-                              <strong>
-                                {member.first_name} {member.last_name} — {member.membership}
-                              </strong>
-                              
-                              <div>Phone: {formatPhone(member.phone)}</div>
-                              <div>Email: {member.email}</div>
-                              <div>Date of Birth: {formatDOB(member.dob)}</div>
-                            </div>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </>
               ) : (
                 // Member Detail View (not modal, full width minus sidebar)
