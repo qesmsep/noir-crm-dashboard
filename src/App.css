@@ -591,12 +591,12 @@ body {
 }
 
 /* Custom FullCalendar Timeline Styles (global selectors) */
-.fc-timeline-event-harness {
+/*.fc-timeline-event-harness {
   display: flex;
   align-items: center;
   height: 38px !important; /* Thicker event blocks */
 }
-.fc-timeline-event {
+/*.fc-timeline-event {
   min-height: 32px !important;
   font-size: 1.08em;
   border-radius: 7px;
@@ -616,3 +616,4 @@ body {
 .fc-timeline-slots tr > td:last-child {
   border-right: none !important;
 }
+*/
