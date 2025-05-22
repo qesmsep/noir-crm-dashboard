@@ -15,10 +15,12 @@ export default function CalendarView({ onSelectSlot, onSelectEvent, reloadKey })
       // Fetch tables
       const tablesRes = await fetch('/api/tables');
       const tablesJson = await tablesRes.json();
-      const tableResources = (tablesJson.data || []).map(t => ({
-        resourceId: t.id,
-        resourceTitle: `Table ${t.number}`
-      }));
+      const tableResources = (tablesJson.data || [])
+        .sort((a, b) => a.number - b.number)
+        .map(t => ({
+          resourceId: t.id,
+          resourceTitle: `Table ${t.number}`
+        }));
       setTables(tableResources);
 
       // Fetch events and reservations
