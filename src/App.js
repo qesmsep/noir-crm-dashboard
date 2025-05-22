@@ -141,10 +141,10 @@ function App() {
   }
 
   // Fetch ledger for a member using API route
-  async function fetchLedger(memberId) {
+  async function fetchLedger(accountId) {
     setLedgerLoading(true);
     try {
-      const res = await fetch(`/api/ledger?member_id=${encodeURIComponent(memberId)}`);
+      const res = await fetch(`/api/ledger?account_id=${encodeURIComponent(accountId)}`);
       const result = await res.json();
       setLedgerLoading(false);
       if (res.ok && result.data) {
@@ -842,7 +842,7 @@ function App() {
                             style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, padding: 0, display: 'flex', alignItems: 'center', gap: '1.5rem' }}
                             onClick={() => {
                               setSelectedMember(member);
-                              fetchLedger(member.member_id);
+                              fetchLedger(member.account_id);
                             }}
                           >
                             {member.photo && (
@@ -1314,7 +1314,7 @@ function App() {
                       style={{ position: "relative", cursor: "pointer", width: "100%" }}
                       onClick={() => {
                         setSelectedMember(member);
-                        fetchLedger(member.member_id);
+                        fetchLedger(member.account_id);
                         setSection('members');
                       }}
                       tabIndex={0}
@@ -1322,7 +1322,7 @@ function App() {
                       onKeyDown={e => {
                         if (e.key === "Enter" || e.key === " ") {
                           setSelectedMember(member);
-                          fetchLedger(member.member_id);
+                          fetchLedger(member.account_id);
                           setSection('members');
                         }
                       }}
