@@ -165,7 +165,9 @@ function App() {
       const result = await res.json();
       if (res.ok && result.data) {
         setTransactionStatus('Transaction added!');
-        await fetchLedger(memberId);
+        setTimeout(() => {
+          fetchLedger(memberId);
+        }, 2000);
         setNewTransaction({ type: 'payment', amount: '', note: '' });
         const balance = (memberLedger || []).reduce(
           (acc, t) => acc + Number(t.amount),
