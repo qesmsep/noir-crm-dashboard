@@ -117,6 +117,16 @@ function App() {
   const [memberLookup, setMemberLookup] = useState(null);
   const [reserveStatus, setReserveStatus] = useState('');
   const [showNonMemberModal, setShowNonMemberModal] = useState(false);
+  // Add missing state variables
+  const [charging, setCharging] = useState(false);
+  const [chargeStatus, setChargeStatus] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [editTransactionForm, setEditTransactionForm] = useState({
+    note: '',
+    amount: '',
+    type: '',
+    date: ''
+  });
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -496,6 +506,73 @@ function App() {
       acc[member.account_id].push(member);
       return acc;
     }, {});
+
+    // Add missing functions
+    const formatDateLong = (dateString) => {
+      if (!dateString) return null;
+      const date = new Date(dateString);
+      if (isNaN(date)) return null;
+      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
+    };
+
+    const handleChargeBalance = async () => {
+      setCharging(true);
+      setChargeStatus(null);
+      try {
+        const res = await fetch('/api/chargeBalance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ member_id: selectedMember.member_id }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setChargeStatus('Charged successfully');
+          handleAddTransaction(selectedMember.member_id);
+        } else {
+          setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
+        }
+      } catch (e) {
+        setChargeStatus(`Error: ${e.message}`);
+      }
+      setCharging(false);
+    };
+
+    const handleEditTransaction = (tx) => {
+      setEditingTransaction(tx.id);
+      setEditTransactionForm({
+        note: tx.note || '',
+        amount: Math.abs(tx.amount).toString(),
+        type: tx.type || '',
+        date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : ''
+      });
+    };
+
+    const handleUpdateTransaction = async (txId) => {
+      try {
+        const res = await fetch('/api/ledger', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: txId,
+            ...editTransactionForm,
+            amount: editTransactionForm.type === 'purchase' ? 
+              -Math.abs(Number(editTransactionForm.amount)) : 
+              Math.abs(Number(editTransactionForm.amount))
+          })
+        });
+        if (res.ok) {
+          setEditingTransaction(null);
+          // Refresh ledger
+          if (selectedMember?.member_id) {
+            fetchLedger(selectedMember.member_id);
+          }
+        } else {
+          alert('Failed to update transaction');
+        }
+      } catch (err) {
+        alert('Error updating transaction: ' + err.message);
+      }
+    };
 
     return (
       <>
