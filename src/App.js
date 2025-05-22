@@ -649,6 +649,64 @@ function App() {
           </div>
         )}
 
+        {/* Edit Transaction Modal */}
+        {editingTransaction && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{
+              background: '#fff',
+              padding: '2rem',
+              borderRadius: '8px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+              minWidth: '350px',
+              maxWidth: '95vw',
+              textAlign: 'left',
+              position: 'relative',
+            }}>
+              <button onClick={() => setEditingTransaction(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
+              <h3>Edit Transaction</h3>
+              <form onSubmit={async e => { e.preventDefault(); await handleUpdateTransaction(editingTransaction); }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <label>Date</label>
+                    <input type="date" value={editTransactionForm.date || ''} onChange={e => setEditTransactionForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
+                  </div>
+                  <div>
+                    <label>Type</label>
+                    <select value={editTransactionForm.type || ''} onChange={e => setEditTransactionForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}>
+                      <option value="">Type</option>
+                      <option value="payment">Payment</option>
+                      <option value="purchase">Purchase</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Amount</label>
+                    <input type="number" value={editTransactionForm.amount || ''} onChange={e => setEditTransactionForm(f => ({ ...f, amount: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
+                  </div>
+                  <div>
+                    <label>Note</label>
+                    <input type="text" value={editTransactionForm.note || ''} onChange={e => setEditTransactionForm(f => ({ ...f, note: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button type="button" onClick={() => setEditingTransaction(null)} style={{ padding: '0.75rem 1.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                  <button type="submit" style={{ padding: '0.75rem 1.5rem', background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Save Changes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Add Member Modal */}
         {showAddMemberModal && (
           <div style={{
