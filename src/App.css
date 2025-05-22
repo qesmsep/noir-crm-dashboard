@@ -593,7 +593,7 @@ body {
 /* --- Begin commented out FullCalendar timeline/event overrides --- */
 
 .fc-timeline-event-harness {
-  height: 44px !important;
+  height: 100% !important;
   display: flex;
   align-items: center;
 }
