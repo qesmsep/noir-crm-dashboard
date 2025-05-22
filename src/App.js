@@ -882,7 +882,7 @@ function App() {
                       + Add Member
                     </button>
                   </div>
-                  <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.95rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem' }}>
+                  <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.75rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem', opacity: 0.6 }}>
                     Account ID: {selectedMember.account_id}
                   </div>
                   <Elements stripe={stripePromise}>
@@ -927,6 +927,7 @@ function App() {
                         <thead>
                           <tr>
                             <th>Date</th>
+                            <th>Member</th>
                             <th>Description</th>
                             <th>Amount</th>
                             <th>Type</th>
@@ -1012,26 +1013,30 @@ function App() {
                           </tr>
                           {/* Ledger Rows */}
                           {memberLedger && memberLedger.length > 0 ? (
-                            memberLedger.map((tx, idx) => (
-                              <tr key={tx.id || idx}>
-                                <td>{formatDateLong(tx.date)}</td>
-                                <td>{tx.note}</td>
-                                <td>${Number(tx.amount).toFixed(2)}</td>
-                                <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
-                                <td>
-                                  <button
-                                    onClick={() => handleEditTransaction(tx)}
-                                    className="add-transaction-btn"
-                                    style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                                  >
-                                    Edit
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
+                            memberLedger.map((tx, idx) => {
+                              const member = members.find(m => m.member_id === tx.member_id);
+                              return (
+                                <tr key={tx.id || idx}>
+                                  <td>{formatDateLong(tx.date)}</td>
+                                  <td>{member ? `${member.first_name} ${member.last_name}` : ''}</td>
+                                  <td>{tx.note}</td>
+                                  <td>${Number(tx.amount).toFixed(2)}</td>
+                                  <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                                  <td>
+                                    <button
+                                      onClick={() => handleEditTransaction(tx)}
+                                      className="add-transaction-btn"
+                                      style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                                    >
+                                      Edit
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
                           ) : (
                             <tr>
-                              <td colSpan="5">No transactions found.</td>
+                              <td colSpan="6">No transactions found.</td>
                             </tr>
                           )}
                         </tbody>
