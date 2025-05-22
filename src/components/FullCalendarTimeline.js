@@ -197,11 +197,11 @@ export default function FullCalendarTimeline({ reloadKey }) {
       maxWidth: '100vw',
       height: '80vh',
       minHeight: 400,
-      overflowY: 'auto',
-      position: 'relative'
+      display: 'flex',
+      flexDirection: 'column',
     }}>
-      {/* Calendar in its own scrollable container */}
-      <div style={{ width: '100%', overflowX: 'auto' }}>
+      {/* Calendar in its own scrollable container, fills available space */}
+      <div style={{ width: '100%', overflowX: 'auto', flex: '1 1 auto', minHeight: 0 }}>
         <FullCalendar
           plugins={[resourceTimelinePlugin, interactionPlugin]}
           initialView="resourceTimelineDay"
@@ -230,7 +230,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
           className="noir-fc-timeline"
         />
       </div>
-      {/* Total Guests Row in its own scrollable container */}
+      {/* Total Guests Row in its own scrollable container, below calendar */}
       <div style={{ width: '100%', overflowX: 'auto' }}>
         <div style={{
           display: 'flex',
