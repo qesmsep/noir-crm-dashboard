@@ -863,7 +863,7 @@ function App() {
             padding: isMobile ? "1rem" : "2.5rem",
             minHeight: "100vh",
             background: "#f8f7f4",
-            maxWidth: "100vw",
+            maxWidth: "90vw",
             width: "90%",
             overflowX: "hidden"
           }}
