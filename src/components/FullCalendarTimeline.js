@@ -228,7 +228,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
           select={handleSelectSlot}
           className="noir-fc-timeline"
         />
-        {/* Total Guests Row */}
+        {/* Total Guests Row (block, not absolute) */}
         <div style={{
           display: 'flex',
           flexDirection: 'row',
@@ -239,16 +239,12 @@ export default function FullCalendarTimeline({ reloadKey }) {
           padding: '0.5rem 0.5rem',
           fontWeight: 600,
           fontSize: '1rem',
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          pointerEvents: 'none',
-          zIndex: 2
+          borderTop: '2px solid #e0e0e0',
+          minHeight: 40
         }}>
-          <div style={{ minWidth: 90, textAlign: 'right', color: '#888', paddingRight: 8, background: '#f3f2ef', pointerEvents: 'auto' }}>Total Guests</div>
+          <div style={{ minWidth: 90, textAlign: 'right', color: '#888', paddingRight: 8 }}>Total Guests</div>
           {slots.map((slot, idx) => (
-            <div key={slot.toISOString()} style={{ minWidth: 60, maxWidth: 60, textAlign: 'center', color: '#333', background: '#f3f2ef', pointerEvents: 'auto' }}>
+            <div key={slot.toISOString()} style={{ minWidth: 60, maxWidth: 60, textAlign: 'center', color: '#333' }}>
               {guestTotals[idx]}
             </div>
           ))}
