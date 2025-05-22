@@ -590,7 +590,8 @@ body {
   border-right: 1px solid #e0e0e0 !important;
 }
 
-/* Custom FullCalendar Timeline Styles (global selectors) */
+/* --- Begin commented out FullCalendar timeline/event overrides --- */
+/*
 .fc-timeline-event-harness {
   height: 44px !important;
   display: flex;
@@ -610,6 +611,9 @@ body {
   border-bottom: 1.5px solid #e2dfd8 !important;
   box-sizing: border-box;
 }
+.fc-timeline-slot {
+  border-right: 1.5px solid #3c3c3c !important;
+}
 .fc-timeline-slots tr > td {
   border-right: 2px solid #2c2c2c !important;
   position: relative;
@@ -617,8 +621,6 @@ body {
 .fc-timeline-slots tr > td:last-child {
   border-right: none !important;
 }
-
-/* Custom FullCalendar Event Text Styles */
 .fc-event-main-frame,
 .fc-event-title-container,
 .fc-event-title {
@@ -634,12 +636,5 @@ body {
 .fc-event-title {
   color: #fff !important;
 }
-
-/* Fix horizontal line alignment for timeline rows */
-.fc-timeline-lane-frame {
-  border-bottom: 1.5px solid #e2dfd8 !important;
-  box-sizing: border-box;
-}
-.fc-timeline-lane-frame:last-child {
-  border-bottom: none !important;
-}
+*/
+/* --- End commented out FullCalendar timeline/event overrides --- */
