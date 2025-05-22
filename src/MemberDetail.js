@@ -17,6 +17,7 @@ const MemberDetail = ({
   setNewTransaction,
   transactionStatus,
   session,
+  setMemberLedger,
 }) => {
   // All hooks must be at the top, before any return
   const [linkingStripe, setLinkingStripe] = useState(false);
@@ -27,6 +28,13 @@ const MemberDetail = ({
   // Removed Stripe hooks for saving payment method
   const [charging, setCharging] = useState(false);
   const [chargeStatus, setChargeStatus] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [editTransactionForm, setEditTransactionForm] = useState({
+    note: '',
+    amount: '',
+    type: '',
+    date: ''
+  });
 
   // Member attributes and notes (API-driven)
   const [attributes, setAttributes] = useState([]);
@@ -278,14 +286,6 @@ const MemberDetail = ({
     }
     return candidate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
   })();
-
-  const [editingTransaction, setEditingTransaction] = useState(null);
-  const [editTransactionForm, setEditTransactionForm] = useState({
-    note: '',
-    amount: '',
-    type: '',
-    date: ''
-  });
 
   const handleEditTransaction = (tx) => {
     setEditingTransaction(tx.id);

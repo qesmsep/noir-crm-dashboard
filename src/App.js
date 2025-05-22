@@ -915,6 +915,7 @@ function App() {
                       setNewTransaction={setNewTransaction}
                       transactionStatus={transactionStatus}
                       session={session}
+                      setMemberLedger={setMemberLedger}
                     />
                   </Elements>
                 </div>
