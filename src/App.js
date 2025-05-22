@@ -1307,18 +1307,90 @@ function App() {
           )}
           {/* SPLIT: Make Reservation and Calendar tabs */}
           {section === 'makeReservation' && (() => {
-            // --- Member lookup for reservation form ---
-            const normalizedPhone = phone.replace(/\D/g, '');
-            // Find member by phone (ignore non-digits)
-            const matchedMember = members.find(m =>
-              m.phone && m.phone.replace(/\D/g, '') === normalizedPhone
-            );
+            // --- Reserve On The Spot logic ---
+            const [nonMemberFields, setNonMemberFields] = React.useState({ firstName: '', lastName: '', email: '' });
+            const [memberLookup, setMemberLookup] = React.useState(null);
+            const [reserveStatus, setReserveStatus] = React.useState('');
+
+            async function handleReserveNow() {
+              setReserveStatus('');
+              // Check for member by phone
+              const res = await fetch(`/api/checkMemberByPhone?phone=${encodeURIComponent(phone)}`);
+              const data = await res.json();
+              if (data.member) {
+                // Member found, use their info
+                await createReservation({
+                  name: `${data.member.first_name} ${data.member.last_name}`,
+                  phone: data.member.phone,
+                  email: data.member.email,
+                  party_size: partySize,
+                  notes: '',
+                  start_time: getStartTime(),
+                  end_time: getEndTime(),
+                  source: 'member'
+                });
+                setMemberLookup(data.member);
+                setNonMemberFields({ firstName: '', lastName: '', email: '' });
+              } else {
+                // No member found, prompt for info if not already entered
+                setMemberLookup(null);
+                if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
+                  setReserveStatus('Please enter first name, last name, and email for non-members.');
+                  return;
+                }
+                await createReservation({
+                  name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
+                  phone,
+                  email: nonMemberFields.email,
+                  party_size: partySize,
+                  notes: '',
+                  start_time: getStartTime(),
+                  end_time: getEndTime(),
+                  source: 'public_widget'
+                });
+                setNonMemberFields({ firstName: '', lastName: '', email: '' });
+              }
+              setReloadKey(k => k + 1);
+              setPhone('');
+              setFirstName('');
+              setLastName('');
+              setPartySize(1);
+              setTime('18:00');
+              setReserveStatus('Reservation confirmed!');
+            }
+
+            function getStartTime() {
+              const [hh, mm] = time.split(':');
+              const start = new Date(date);
+              start.setHours(Number(hh), Number(mm), 0, 0);
+              return start.toISOString();
+            }
+            function getEndTime() {
+              const [hh, mm] = time.split(':');
+              const start = new Date(date);
+              start.setHours(Number(hh), Number(mm), 0, 0);
+              const duration = partySize <= 2 ? 90 : 120;
+              const end = new Date(start.getTime() + duration * 60000);
+              return end.toISOString();
+            }
+
+            async function createReservation(payload) {
+              const res = await fetch('/api/reservations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const result = await res.json();
+              if (!res.ok) {
+                alert(result.error || 'Reservation failed');
+                throw new Error(result.error || 'Reservation failed');
+              }
+            }
+
             return (
               <div style={{ padding: '2rem', maxWidth: 650, margin: '0 auto' }}>
                 <div style={{ flex: 1, background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                   <h2 style={{ marginBottom: '1rem' }}>Reserve On The Spot</h2>
-
-                  {/* Phone only */}
                   <div style={{ marginBottom: '1rem' }}>
                     <label>Phone Number</label>
                     <input
@@ -1327,23 +1399,23 @@ function App() {
                       value={phone}
                       onChange={e => {
                         setPhone(e.target.value);
-                        setFirstName('');
-                        setLastName('');
+                        setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                        setMemberLookup(null);
+                        setReserveStatus('');
                       }}
                       style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
                     />
                   </div>
-
-                  {/* Conditional member lookup */}
-                  { !members.find(m => m.phone && m.phone.replace(/\D/g,'') === phone.replace(/\D/g,'')) && phone && (
+                  {/* Show non-member fields if no member found and phone is entered */}
+                  {memberLookup === null && phone && (
                     <>
                       <div style={{ marginBottom: '1rem' }}>
                         <label>First Name</label>
                         <input
                           type="text"
                           placeholder="First name"
-                          value={firstName}
-                          onChange={e => setFirstName(e.target.value)}
+                          value={nonMemberFields.firstName}
+                          onChange={e => setNonMemberFields(f => ({ ...f, firstName: e.target.value }))}
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
                         />
                       </div>
@@ -1352,23 +1424,29 @@ function App() {
                         <input
                           type="text"
                           placeholder="Last name"
-                          value={lastName}
-                          onChange={e => setLastName(e.target.value)}
+                          value={nonMemberFields.lastName}
+                          onChange={e => setNonMemberFields(f => ({ ...f, lastName: e.target.value }))}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label>Email</label>
+                        <input
+                          type="email"
+                          placeholder="Email"
+                          value={nonMemberFields.email}
+                          onChange={e => setNonMemberFields(f => ({ ...f, email: e.target.value }))}
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
                         />
                       </div>
                     </>
                   )}
-
-                  {/* Party size spinner */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                     <label>Party size</label>
                     <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
                     <span>{partySize}</span>
                     <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
                   </div>
-
-                  {/* Date & Time selectors container */}
                   <div style={{ background: '#f9f9f9', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
                     <div style={{ marginBottom: '1rem' }}>
                       <label>Date</label>
@@ -1396,56 +1474,13 @@ function App() {
                       </select>
                     </div>
                   </div>
-
-                  {/* Reserve Now */}
                   <button
-                    onClick={async () => {
-                      const normalized = phone.replace(/\D/g, '');
-                      const member = members.find(m => m.phone && m.phone.replace(/\D/g,'') === normalized);
-                      const name = member
-                        ? `${member.first_name} ${member.last_name}`
-                        : `${firstName || ''} ${lastName || ''}`.trim();
-
-                      // Compute start and end
-                      const [hh, mm] = time.split(':');
-                      const start = new Date(date);
-                      start.setHours(Number(hh), Number(mm), 0, 0);
-                      const duration = partySize <= 2 ? 90 : 120;
-                      const end = new Date(start.getTime() + duration * 60000);
-
-                      // Attempt reservation
-                      const res = await fetch('/api/reservations', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          name,
-                          phone,
-                          party_size: partySize,
-                          notes: '',
-                          start_time: start.toISOString(),
-                          end_time: end.toISOString(),
-                          source: member ? 'member' : 'public_widget'
-                        })
-                      });
-                      const result = await res.json();
-                      if (!res.ok) {
-                        alert(result.error || 'Reservation failed');
-                        return;
-                      }
-                      // Success: refresh calendar and clear form
-                      setReloadKey(k => k + 1);
-                      setPhone('');
-                      setFirstName('');
-                      setLastName('');
-                      setPartySize(1);
-                      setTime('18:00');
-                      // Optionally inform user
-                      alert('Reservation confirmed');
-                    }}
+                    onClick={handleReserveNow}
                     style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
                   >
                     Reserve Now
                   </button>
+                  {reserveStatus && <div style={{ marginTop: '1rem', color: reserveStatus.includes('confirmed') ? 'green' : 'red' }}>{reserveStatus}</div>}
                 </div>
               </div>
             );
