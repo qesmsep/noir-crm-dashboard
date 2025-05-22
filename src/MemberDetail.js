@@ -18,6 +18,8 @@ const MemberDetail = ({
   transactionStatus,
   session,
   setMemberLedger,
+  fetchLedger,
+  selectedMember,
 }) => {
   // All hooks must be at the top, before any return
   const [linkingStripe, setLinkingStripe] = useState(false);
@@ -488,162 +490,186 @@ const MemberDetail = ({
         {ledgerLoading ? (
           <div>Loading ledger...</div>
         ) : (
-          <table className="ledger-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Type</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Add Transaction Row */}
-              <tr>
-                <td>
-                  <input
-                    type="date"
-                    name="date"
-                    value={newTransaction.date || ''}
-                    onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
-                    className="add-transaction-input"
-                    style={{ minWidth: 120 }}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    name="note"
-                    placeholder="Note"
-                    value={newTransaction.note || ''}
-                    onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
-                    className="add-transaction-input"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    name="amount"
-                    placeholder="Amount"
-                    value={newTransaction.amount || ''}
-                    onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                    className="add-transaction-input"
-                  />
-                </td>
-                <td>
-                  <select
-                    name="type"
-                    value={newTransaction.type || ''}
-                    onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
-                    className="add-transaction-input"
-                  >
-                    <option value="">Type</option>
-                    <option value="payment">Payment</option>
-                    <option value="purchase">Purchase</option>
-                  </select>
-                </td>
-                <td>
-                  <button
-                    onClick={e => {
-                      e.preventDefault();
-                      if (member && member.id) {
-                        onAddTransaction(member.id);
-                      } else {
-                        onAddTransaction();
-                      }
-                    }}
-                    className="add-transaction-btn"
-                    style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                    disabled={transactionStatus === 'loading'}
-                  >
-                    {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
-                  </button>
-                </td>
-              </tr>
-              {/* Ledger Rows */}
-              {ledger && ledger.length > 0 ? (
-                ledger.map((tx, idx) => (
-                  <tr key={tx.id || idx}>
-                    {editingTransaction === tx.id ? (
-                      <>
-                        <td>
-                          <input
-                            type="date"
-                            value={editTransactionForm.date}
-                            onChange={e => setEditTransactionForm({...editTransactionForm, date: e.target.value})}
-                            className="add-transaction-input"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={editTransactionForm.note}
-                            onChange={e => setEditTransactionForm({...editTransactionForm, note: e.target.value})}
-                            className="add-transaction-input"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={editTransactionForm.amount}
-                            onChange={e => setEditTransactionForm({...editTransactionForm, amount: e.target.value})}
-                            className="add-transaction-input"
-                          />
-                        </td>
-                        <td>
-                          <select
-                            value={editTransactionForm.type}
-                            onChange={e => setEditTransactionForm({...editTransactionForm, type: e.target.value})}
-                            className="add-transaction-input"
-                          >
-                            <option value="payment">Payment</option>
-                            <option value="purchase">Purchase</option>
-                          </select>
-                        </td>
-                        <td>
-                          <button
-                            onClick={() => handleUpdateTransaction(tx.id)}
-                            className="add-transaction-btn"
-                            style={{ marginRight: '0.5rem' }}
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingTransaction(null)}
-                            className="add-transaction-btn"
-                            style={{ background: '#666' }}
-                          >
-                            Cancel
-                          </button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td>{formatDateLong(tx.date)}</td>
-                        <td>{tx.note}</td>
-                        <td>${Number(tx.amount).toFixed(2)}</td>
-                        <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
-                        <td>
-                          <button
-                            onClick={() => handleEditTransaction(tx)}
-                            className="add-transaction-btn"
-                            style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))
-              ) : (
+          <>
+            <table className="ledger-table">
+              <thead>
                 <tr>
-                  <td colSpan="5">No transactions found.</td>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Type</th>
+                  <th>Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {/* Add Transaction Row */}
+                <tr>
+                  <td>
+                    <input
+                      type="date"
+                      name="date"
+                      value={newTransaction.date || ''}
+                      onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                      className="add-transaction-input"
+                      style={{ minWidth: 120 }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      name="note"
+                      placeholder="Note"
+                      value={newTransaction.note || ''}
+                      onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
+                      className="add-transaction-input"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      name="amount"
+                      placeholder="Amount"
+                      value={newTransaction.amount || ''}
+                      onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                      className="add-transaction-input"
+                    />
+                  </td>
+                  <td>
+                    <select
+                      name="type"
+                      value={newTransaction.type || ''}
+                      onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                      className="add-transaction-input"
+                    >
+                      <option value="">Type</option>
+                      <option value="payment">Payment</option>
+                      <option value="purchase">Purchase</option>
+                    </select>
+                  </td>
+                  <td>
+                    <button
+                      onClick={e => {
+                        e.preventDefault();
+                        if (member && member.id) {
+                          onAddTransaction(member.id);
+                        } else {
+                          onAddTransaction();
+                        }
+                      }}
+                      className="add-transaction-btn"
+                      style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                      disabled={transactionStatus === 'loading'}
+                    >
+                      {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
+                    </button>
+                  </td>
+                </tr>
+                {/* Ledger Rows */}
+                {ledger && ledger.length > 0 ? (
+                  ledger.map((tx, idx) => (
+                    <tr key={tx.id || idx}>
+                      {editingTransaction === tx.id ? (
+                        <>
+                          <td>
+                            <input
+                              type="date"
+                              value={editTransactionForm.date}
+                              onChange={e => setEditTransactionForm({...editTransactionForm, date: e.target.value})}
+                              className="add-transaction-input"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={editTransactionForm.note}
+                              onChange={e => setEditTransactionForm({...editTransactionForm, note: e.target.value})}
+                              className="add-transaction-input"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              value={editTransactionForm.amount}
+                              onChange={e => setEditTransactionForm({...editTransactionForm, amount: e.target.value})}
+                              className="add-transaction-input"
+                            />
+                          </td>
+                          <td>
+                            <select
+                              value={editTransactionForm.type}
+                              onChange={e => setEditTransactionForm({...editTransactionForm, type: e.target.value})}
+                              className="add-transaction-input"
+                            >
+                              <option value="payment">Payment</option>
+                              <option value="purchase">Purchase</option>
+                            </select>
+                          </td>
+                          <td>
+                            <button
+                              onClick={() => handleUpdateTransaction(tx.id)}
+                              className="add-transaction-btn"
+                              style={{ marginRight: '0.5rem' }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingTransaction(null)}
+                              className="add-transaction-btn"
+                              style={{ background: '#666' }}
+                            >
+                              Cancel
+                            </button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td>{formatDateLong(tx.date)}</td>
+                          <td>{tx.note}</td>
+                          <td>${Number(tx.amount).toFixed(2)}</td>
+                          <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                          <td>
+                            <button
+                              onClick={() => handleEditTransaction(tx)}
+                              className="add-transaction-btn"
+                              style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5">No transactions found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            {/* Manual Refresh Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <button
+                onClick={() => fetchLedger(selectedMember?.id || member?.id)}
+                style={{
+                  background: '#eee',
+                  color: '#555',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontSize: '0.95rem',
+                  padding: '0.3rem 0.9rem',
+                  cursor: 'pointer',
+                  opacity: 0.7,
+                  transition: 'opacity 0.2s',
+                }}
+                onMouseOver={e => (e.currentTarget.style.opacity = 1)}
+                onMouseOut={e => (e.currentTarget.style.opacity = 0.7)}
+                aria-label="Refresh ledger"
+              >
+                Refresh
+              </button>
+            </div>
+          </>
         )}
 
         <button

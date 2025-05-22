@@ -920,6 +920,8 @@ function App() {
                       transactionStatus={transactionStatus}
                       session={session}
                       setMemberLedger={setMemberLedger}
+                      fetchLedger={fetchLedger}
+                      selectedMember={selectedMember}
                     />
                   </Elements>
                 </div>
