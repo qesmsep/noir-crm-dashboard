@@ -133,12 +133,15 @@ function App() {
       setLedgerLoading(false);
       if (res.ok && result.data) {
         setMemberLedger(result.data || []);
+        return result.data || [];
       } else {
         setMemberLedger([]);
+        return [];
       }
     } catch (err) {
       setLedgerLoading(false);
       setMemberLedger([]);
+      return [];
     }
   }
 
@@ -165,11 +168,10 @@ function App() {
       const result = await res.json();
       if (res.ok && result.data) {
         setTransactionStatus('Transaction added!');
-        setTimeout(() => {
-          fetchLedger(memberId);
-        }, 2000);
+        const updatedLedger = await fetchLedger(memberId); // Use the returned ledger data
         setNewTransaction({ type: 'payment', amount: '', note: '' });
-        const balance = (memberLedger || []).reduce(
+        // Recompute balance from the freshly updated ledger
+        const balance = updatedLedger.reduce(
           (acc, t) => acc + Number(t.amount),
           0
         );
