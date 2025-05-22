@@ -59,10 +59,10 @@ export default async function handler(req, res) {
       if (!id || !type || isNaN(amt)) {
         return res.status(400).json({ error: "Missing required fields" });
       }
-      const timestamp = date ? new Date(date).toISOString() : new Date().toISOString();
+      const dateString = date ? date : new Date().toISOString().split('T')[0];
       const { data, error } = await supabaseAdmin
         .from("ledger")
-        .update({ type, amount: amt, note, date: timestamp })
+        .update({ type, amount: amt, note, date: dateString })
         .eq('id', id)
         .select();
       if (error) {
