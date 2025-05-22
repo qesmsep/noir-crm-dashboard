@@ -620,8 +620,8 @@ body {
 /* Custom FullCalendar Event Text Styles */
 .fc-event-main-frame {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
-  font-size: 1.08em !important;
-  font-weight: 600 !important;
+  font-size: 1.0em !important;
+  font-weight: 400 !important;
   letter-spacing: 0.01em;
   color: #222 !important;
   padding: 0.1em 0.3em;
@@ -633,9 +633,9 @@ body {
   padding: 0.1em 0.2em;
 }
 .fc-event-title {
-  font-size: 1.12em !important;
+  font-size: .8em !important;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif !important;
-  font-weight: 700 !important;
+  font-weight: 400 !important;
   color: #222 !important;
   line-height: 1.2;
   letter-spacing: 0.01em;
