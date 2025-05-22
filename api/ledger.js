@@ -28,27 +28,28 @@ export default async function handler(req, res) {
 
     if (req.method === "POST") {
       const { member_id, account_id, type, amount, note, date } = req.body;
-      let amt = Number(amount);
-      if (type === 'purchase') amt = -Math.abs(amt);
-      if ((!member_id && !account_id) || !type || isNaN(amt)) {
+      if (!account_id || !type || !amount) {
         return res.status(400).json({ error: "Missing required fields" });
       }
-      const timestamp = date ? new Date(date).toISOString() : new Date().toISOString();
+      // Insert the transaction and return the inserted row
       const { data, error } = await supabaseAdmin
         .from("ledger")
-        .insert(
-          [{ member_id: member_id || null, account_id: account_id || null, type, amount: amt, note, date: timestamp }],
-          { returning: 'representation' }
-        );
+        .insert([
+          {
+            member_id: member_id || null,
+            account_id,
+            type,
+            amount,
+            note,
+            date: date || new Date().toISOString().split('T')[0]
+          }
+        ])
+        .select()
+        .single();
       if (error) {
-        console.error("Ledger POST error:", error);
         return res.status(500).json({ error: error.message });
       }
-      if (!data || data.length === 0) {
-        console.error("Ledger POST returned no data");
-        return res.status(500).json({ error: 'No data returned from insert' });
-      }
-      return res.status(200).json({ data: data[0] });
+      return res.status(200).json({ data });
     }
 
     if (req.method === "PUT") {
