@@ -200,7 +200,8 @@ export default function FullCalendarTimeline({ reloadKey }) {
       overflowY: 'auto',
       position: 'relative'
     }}>
-      <div style={{ width: '100%', overflowX: 'auto', position: 'relative' }}>
+      {/* Calendar in its own scrollable container */}
+      <div style={{ width: '100%', overflowX: 'auto' }}>
         <FullCalendar
           plugins={[resourceTimelinePlugin, interactionPlugin]}
           initialView="resourceTimelineDay"
@@ -228,7 +229,9 @@ export default function FullCalendarTimeline({ reloadKey }) {
           select={handleSelectSlot}
           className="noir-fc-timeline"
         />
-        {/* Total Guests Row (block, not absolute) */}
+      </div>
+      {/* Total Guests Row in its own scrollable container */}
+      <div style={{ width: '100%', overflowX: 'auto' }}>
         <div style={{
           display: 'flex',
           flexDirection: 'row',
