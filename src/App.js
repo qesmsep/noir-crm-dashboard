@@ -719,9 +719,9 @@ function App() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                  <button type="button" onClick={() => setEditingTransaction(null)} style={{ padding: '0.75rem 1.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
                   <button type="button" onClick={() => handleDeleteTransaction(editingTransaction)} style={{ padding: '0.75rem 1.5rem', background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Delete</button>
                   <button type="submit" style={{ padding: '0.75rem 1.5rem', background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Save Changes</button>
+                  <button type="button" onClick={() => setEditingTransaction(null)} style={{ padding: '0.75rem 1.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
                 </div>
               </form>
             </div>
