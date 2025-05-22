@@ -932,7 +932,8 @@ function App() {
                     position: 'relative'
                   }}
                 >
-                  {/* Top bar with Back to List and Add Member */}
+                  {/* Add spacing above top bar */}
+                  <div style={{ height: '1.5rem' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                     <button
                       onClick={() => setSelectedMember(null)}

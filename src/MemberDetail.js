@@ -304,7 +304,6 @@ const MemberDetail = ({
   return (
     <div className="member-detail-container">
       <div className="member-detail-card" style={{ position: 'relative' }}>
-        <button className="back-button" onClick={onBack}>Back to List</button>
         <h2>Members</h2>
         <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 16, gap: '2rem' }}>
           {/* Primary Member */}
@@ -382,7 +381,7 @@ const MemberDetail = ({
               className="add-transaction-input"
               placeholder="Attribute Detail"
             />
-            <button onClick={handleAddAttribute} className="add-transaction-btn">Add Attribute</button>
+            <button onClick={handleAddAttribute} className="add-transaction-btn">Add</button>
           </div>
 
           {/* Notes */}
