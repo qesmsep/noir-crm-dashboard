@@ -197,44 +197,62 @@ export default function FullCalendarTimeline({ reloadKey }) {
       maxWidth: '100vw',
       height: '80vh',
       minHeight: 400,
-      overflowX: 'auto',
-      overflowY: 'auto'
+      overflowY: 'auto',
+      position: 'relative'
     }}>
-      <FullCalendar
-        plugins={[resourceTimelinePlugin, interactionPlugin]}
-        initialView="resourceTimelineDay"
-        resources={resources}
-        events={events}
-        height="100%"
-        slotMinTime="18:00:00" // 6pm
-        slotMaxTime="25:00:00" // 1am next day
-        slotDuration="00:15:00" // 15-minute columns
-        snapDuration="00:15:00" // allow 15-minute increments
-        slotLabelInterval="00:30:00" // show half-hour marks
-        resourceAreaHeaderContent="Tables"
-        resourceAreaWidth="90px"
-        headerToolbar={{
-          left: 'today prev,next',
-          center: 'title',
-          right: '' // no day/week buttons
-        }}
-        schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
-        editable={true}
-        eventDrop={handleEventDrop}
-        eventResize={handleEventResize}
-        eventClick={handleEventClick}
-        selectable={true}
-        select={handleSelectSlot}
-        className="noir-fc-timeline"
-      />
-      {/* Total Guests Row */}
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginTop: 8, background: '#f3f2ef', borderRadius: 6, padding: '0.5rem 0.5rem', fontWeight: 600, fontSize: '1rem', overflowX: 'auto' }}>
-        <div style={{ minWidth: 90, textAlign: 'right', color: '#888', paddingRight: 8 }}>Total Guests</div>
-        {slots.map((slot, idx) => (
-          <div key={slot.toISOString()} style={{ minWidth: 60, textAlign: 'center', color: '#333' }}>
-            {guestTotals[idx]}
-          </div>
-        ))}
+      <div style={{ width: '100%', overflowX: 'auto', position: 'relative' }}>
+        <FullCalendar
+          plugins={[resourceTimelinePlugin, interactionPlugin]}
+          initialView="resourceTimelineDay"
+          resources={resources}
+          events={events}
+          height="100%"
+          slotMinTime="18:00:00" // 6pm
+          slotMaxTime="25:00:00" // 1am next day
+          slotDuration="00:15:00" // 15-minute columns
+          snapDuration="00:15:00" // allow 15-minute increments
+          slotLabelInterval="00:30:00" // show half-hour marks
+          resourceAreaHeaderContent="Tables"
+          resourceAreaWidth="90px"
+          headerToolbar={{
+            left: 'today prev,next',
+            center: 'title',
+            right: '' // no day/week buttons
+          }}
+          schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
+          editable={true}
+          eventDrop={handleEventDrop}
+          eventResize={handleEventResize}
+          eventClick={handleEventClick}
+          selectable={true}
+          select={handleSelectSlot}
+          className="noir-fc-timeline"
+        />
+        {/* Total Guests Row */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 0,
+          background: '#f3f2ef',
+          borderRadius: 6,
+          padding: '0.5rem 0.5rem',
+          fontWeight: 600,
+          fontSize: '1rem',
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'none',
+          zIndex: 2
+        }}>
+          <div style={{ minWidth: 90, textAlign: 'right', color: '#888', paddingRight: 8, background: '#f3f2ef', pointerEvents: 'auto' }}>Total Guests</div>
+          {slots.map((slot, idx) => (
+            <div key={slot.toISOString()} style={{ minWidth: 60, maxWidth: 60, textAlign: 'center', color: '#333', background: '#f3f2ef', pointerEvents: 'auto' }}>
+              {guestTotals[idx]}
+            </div>
+          ))}
+        </div>
       </div>
       {/* Reservation Edit/Create Modal */}
       {showModal && (selectedReservation || newReservation) && (
