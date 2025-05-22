@@ -3,11 +3,14 @@ import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
+import ReservationForm from './ReservationForm';
 
 export default function FullCalendarTimeline({ reloadKey }) {
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState([]);
   const [localReloadKey, setLocalReloadKey] = useState(0);
+  const [selectedReservation, setSelectedReservation] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     // Fetch tables as resources, sorted by number
@@ -34,6 +37,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
         start: e.start_time,
         end: e.end_time,
         resourceId: String(e.table_id),
+        type: 'event',
       })).concat(
         (resRes.data || []).map(r => ({
           id: String(r.id),
@@ -41,6 +45,8 @@ export default function FullCalendarTimeline({ reloadKey }) {
           start: r.start_time,
           end: r.end_time,
           resourceId: String(r.table_id),
+          ...r,
+          type: 'reservation',
         }))
       );
       setEvents(mapped);
@@ -96,6 +102,27 @@ export default function FullCalendarTimeline({ reloadKey }) {
     }
   }
 
+  // Handler for clicking a reservation
+  function handleEventClick(info) {
+    // Only allow editing reservations, not events
+    if (info.event.extendedProps.type === 'reservation') {
+      setSelectedReservation({ ...info.event.extendedProps, id: info.event.id });
+      setShowModal(true);
+    }
+  }
+
+  // Handler for saving reservation edits
+  async function handleSaveEditReservation(updated) {
+    const res = await fetch(`/api/reservations?id=${selectedReservation.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    });
+    setShowModal(false);
+    setSelectedReservation(null);
+    setLocalReloadKey(k => k + 1);
+  }
+
   return (
     <div style={{
       width: '100%',
@@ -126,7 +153,55 @@ export default function FullCalendarTimeline({ reloadKey }) {
         editable={true}
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
+        eventClick={handleEventClick}
       />
+      {/* Reservation Edit Modal */}
+      {showModal && selectedReservation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff',
+            padding: '2rem',
+            borderRadius: '8px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+            minWidth: '350px',
+            maxWidth: '95vw',
+            textAlign: 'left',
+            position: 'relative',
+          }}>
+            <button onClick={() => { setShowModal(false); setSelectedReservation(null); }} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
+            <h3>Edit Reservation</h3>
+            <div style={{ marginBottom: '1rem', color: '#555' }}>
+              <div><strong>Name:</strong> {selectedReservation.name}</div>
+              <div><strong>Phone:</strong> {selectedReservation.phone}</div>
+              <div><strong>Email:</strong> {selectedReservation.email}</div>
+              <div><strong>Notes:</strong> {selectedReservation.notes}</div>
+              <div><strong>Table:</strong> {resources.find(r => r.id === String(selectedReservation.table_id))?.title || selectedReservation.table_id}</div>
+            </div>
+            <ReservationForm
+              initialStart={selectedReservation.start_time || selectedReservation.start}
+              initialEnd={selectedReservation.end_time || selectedReservation.end}
+              onSave={async (form) => {
+                await handleSaveEditReservation({
+                  start_time: form.start_time,
+                  end_time: form.end_time,
+                  party_size: form.party_size
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
