@@ -594,7 +594,7 @@ body {
 /*.fc-timeline-event-harness {
   display: flex;
   align-items: center;
-  height: 38px !important; /* Thicker event blocks */
+  height: 38px !important; 
 }
 /*.fc-timeline-event {
   min-height: 32px !important;
