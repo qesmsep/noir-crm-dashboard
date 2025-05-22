@@ -1901,8 +1901,11 @@ function App() {
                   });
                   setMemberLookup(data.member);
                   setNonMemberFields({ firstName: '', lastName: '', email: '' });
-                  // Only reset state if successful
+                  setShowReservationModal(false); // Only close on success
+                  setSlotInfo(null);
+                  setReloadKey(k => k + 1);
                 } catch (err) {
+                  console.log('Reservation failed (member):', err);
                   // Do not close modal, let popup show
                 }
               } else {
@@ -2055,7 +2058,7 @@ function App() {
                               source: 'public_widget'
                             });
                             setNonMemberFields({ firstName: '', lastName: '', email: '' });
-                            setShowNonMemberModal(false);
+                            setShowNonMemberModal(false); // Only close on success
                             setReloadKey(k => k + 1);
                             setPhone('');
                             setFirstName('');
@@ -2064,6 +2067,7 @@ function App() {
                             setTime('18:00');
                             setReserveStatus('Reservation confirmed!');
                           } catch (err) {
+                            console.log('Reservation failed (non-member):', err);
                             // Do not close modal, let popup show
                           }
                         }}
