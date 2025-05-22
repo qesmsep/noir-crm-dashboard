@@ -949,7 +949,7 @@ function App() {
                 >
                   {/* Add spacing above top bar */}
                   <div style={{ height: '1.5rem' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
                     <button
                       onClick={() => setSelectedMember(null)}
                       style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
