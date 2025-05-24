@@ -42,7 +42,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
       })).concat(
         (resRes.data || []).map(r => ({
           id: String(r.id),
-          title: `${r.name} | Party Size: ${r.party_size}`,
+          title: `${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}`,
           start: r.start_time,
           end: r.end_time,
           resourceId: String(r.table_id),

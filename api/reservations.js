@@ -74,7 +74,14 @@ async function findNextAvailableTime(start_time, durationMinutes, party_size) {
 export default async function handler(req, res) {
   const { method } = req;
   if (method === 'GET') {
-    const { data, error } = await supabase.from('reservations').select('*');
+    const { data, error } = await supabase
+      .from('reservations')
+      .select(`
+        *,
+        tables (
+          number
+        )
+      `);
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ data });
   }
