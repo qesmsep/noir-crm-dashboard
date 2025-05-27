@@ -118,6 +118,29 @@ function App() {
   const [reserveStatus, setReserveStatus] = useState('');
   const [showNonMemberModal, setShowNonMemberModal] = useState(false);
   const [eventType, setEventType] = useState('');
+  const [nextAvailableTime, setNextAvailableTime] = useState(null);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [transactionModalMessage, setTransactionModalMessage] = useState('');
+  const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState('');
+  const [charging, setCharging] = useState(false);
+  const [chargeStatus, setChargeStatus] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [editTransactionForm, setEditTransactionForm] = useState({
+    note: '',
+    amount: '',
+    type: '',
+    date: ''
+  });
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [addMemberForm, setAddMemberForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    dob: '',
+    membership: '',
+    photo: ''
+  });
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
