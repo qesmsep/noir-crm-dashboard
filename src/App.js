@@ -117,33 +117,22 @@ function App() {
   const [memberLookup, setMemberLookup] = useState(null);
   const [reserveStatus, setReserveStatus] = useState('');
   const [showNonMemberModal, setShowNonMemberModal] = useState(false);
-  // Add missing state variables
-  const [charging, setCharging] = useState(false);
-  const [chargeStatus, setChargeStatus] = useState(null);
-  const [editingTransaction, setEditingTransaction] = useState(null);
-  const [editTransactionForm, setEditTransactionForm] = useState({
-    note: '',
-    amount: '',
-    type: '',
-    date: ''
-  });
-  // Add state for selected member for transaction
-  const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState('');
-  const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [transactionModalMessage, setTransactionModalMessage] = useState('');
-  // Add state for Add Member modal
-  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  const [addMemberForm, setAddMemberForm] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    dob: '',
-    membership: '',
-    photo: ''
-  });
-  // Add state for next available time popup
-  const [nextAvailableTime, setNextAvailableTime] = useState(null);
+  const [eventType, setEventType] = useState('');
+
+  const eventTypes = [
+    { value: 'birthday', label: '🎂 Birthday' },
+    { value: 'engagement', label: '💍 Engagement' },
+    { value: 'anniversary', label: '🥂 Anniversary' },
+    { value: 'party', label: '🎉 Party / Celebration' },
+    { value: 'graduation', label: '🎓 Graduation' },
+    { value: 'corporate', label: '🧑‍💼 Corporate Event' },
+    { value: 'holiday', label: '❄️ Holiday Gathering' },
+    { value: 'networking', label: '🤝 Networking' },
+    { value: 'fundraiser', label: '🎗️ Fundraiser / Charity' },
+    { value: 'bachelor', label: '🥳 Bachelor / Bachelorette Party' },
+    { value: 'fun', label: '🍸 Fun Night Out' },
+    { value: 'date', label: '💕 Date Night' },
+  ];
 
   // Generate times array for 6:00pm to midnight, every 15 min
   const times = [];
@@ -1932,7 +1921,10 @@ function App() {
               const res = await fetch('/api/reservations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                  ...payload,
+                  event_type: eventType
+                })
               });
               const result = await res.json();
               if (!res.ok) {
@@ -1970,6 +1962,21 @@ function App() {
                     <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
                     <span>{partySize}</span>
                     <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
+                  </div>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label>Event Type</label>
+                    <select
+                      value={eventType}
+                      onChange={e => setEventType(e.target.value)}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                    >
+                      <option value="">Select an event type...</option>
+                      {eventTypes.map(type => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div style={{ background: '#f9f9f9', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
                     <div style={{ marginBottom: '1rem' }}>
