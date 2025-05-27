@@ -18,12 +18,27 @@ for(let h = startHour; h < endHour; h++){
 
 export default function ReservationForm({ initialStart, initialEnd, onSave, table_id }) {
   const [form, setForm] = useState({
-    name: '', phone: '', email: '', party_size: 1, notes: '',
+    name: '', phone: '', email: '', party_size: 1, notes: '', event_type: '',
   });
   const [date, setDate] = useState(new Date(initialStart));
   const [time, setTime] = useState(
     new Date(initialStart).toTimeString().slice(0,5)
   );
+
+  const eventTypes = [
+    { value: 'birthday', label: '🎂 Birthday' },
+    { value: 'engagement', label: '💍 Engagement' },
+    { value: 'anniversary', label: '🥂 Anniversary' },
+    { value: 'party', label: '🎉 Party / Celebration' },
+    { value: 'graduation', label: '🎓 Graduation' },
+    { value: 'corporate', label: '🧑‍💼 Corporate Event' },
+    { value: 'holiday', label: '❄️ Holiday Gathering' },
+    { value: 'networking', label: '🤝 Networking' },
+    { value: 'fundraiser', label: '🎗️ Fundraiser / Charity' },
+    { value: 'bachelor', label: '🥳 Bachelor / Bachelorette Party' },
+    { value: 'fun', label: '🍸 Fun Night Out' },
+    { value: 'date', label: '💕 Date Night' },
+  ];
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -54,6 +69,17 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
         <button type="button" onClick={() => setForm(f => ({ ...f, party_size: Math.max(1, f.party_size - 1) }))}>-</button>
         <span>{form.party_size} guests</span>
         <button type="button" onClick={() => setForm(f => ({ ...f, party_size: f.party_size + 1 }))}>+</button>
+      </div>
+      <div>
+        <label>Event Type</label>
+        <select name="event_type" value={form.event_type} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}>
+          <option value="">Select an event type...</option>
+          {eventTypes.map(type => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </select>
       </div>
       <textarea name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} />
       <div>

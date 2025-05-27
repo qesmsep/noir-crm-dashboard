@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ data });
   }
   if (method === 'POST') {
-    const { name, phone, email, party_size, notes, start_time, end_time, source } = req.body;
+    const { name, phone, email, party_size, notes, start_time, end_time, source, event_type } = req.body;
     console.log('POST /api/reservations - party_size:', party_size);
     const table_id = await assignTable(start_time, end_time, party_size);
     console.log('POST /api/reservations - assignTable result:', table_id);
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
     }
     const { data, error } = await supabase
       .from('reservations')
-      .insert({ name, phone, email, party_size, notes, start_time, end_time, table_id, source })
+      .insert({ name, phone, email, party_size, notes, start_time, end_time, table_id, source, event_type })
       .single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json({ data });
@@ -111,6 +111,7 @@ export default async function handler(req, res) {
     if (req.body.table_id !== undefined) updateFields.table_id = req.body.table_id;
     if (req.body.start_time !== undefined) updateFields.start_time = req.body.start_time;
     if (req.body.end_time !== undefined) updateFields.end_time = req.body.end_time;
+    if (req.body.event_type !== undefined) updateFields.event_type = req.body.event_type;
     if (Object.keys(updateFields).length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }

@@ -32,6 +32,21 @@ export default function FullCalendarTimeline({ reloadKey }) {
       fetch('/api/events').then(r => r.json()),
       fetch('/api/reservations').then(r => r.json())
     ]).then(([evRes, resRes]) => {
+      const eventTypeEmojis = {
+        birthday: '🎂',
+        engagement: '💍',
+        anniversary: '🥂',
+        party: '🎉',
+        graduation: '🎓',
+        corporate: '🧑‍💼',
+        holiday: '❄️',
+        networking: '🤝',
+        fundraiser: '🎗️',
+        bachelor: '🥳',
+        fun: '🍸',
+        date: '💕',
+      };
+
       const mapped = (evRes.data || []).map(e => ({
         id: String(e.id),
         title: e.title,
@@ -42,7 +57,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
       })).concat(
         (resRes.data || []).map(r => ({
           id: String(r.id),
-          title: `${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}`,
+          title: `${r.event_type ? eventTypeEmojis[r.event_type] + ' ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}`,
           start: r.start_time,
           end: r.end_time,
           resourceId: String(r.table_id),
