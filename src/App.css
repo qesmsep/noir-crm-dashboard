@@ -604,7 +604,7 @@ body {
 }
 
 /* DataGrid cell frame */
-.fc-datagrid-cell-frame {
+/*.fc-datagrid-cell-frame {
   padding: 8px;
   height: 100%;
   display: flex;
@@ -613,7 +613,7 @@ body {
   border-right: 1px solid #e0e0e0;
 }
 
-/*/* Decrease font size for react-big-calendar */
+/* Decrease font size for react-big-calendar */
 /*.app-container .rbc-calendar,
 .app-container .rbc-calendar * {
   font-size: 0.92rem !important;
