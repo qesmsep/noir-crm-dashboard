@@ -14,6 +14,7 @@ import { Elements } from '@stripe/react-stripe-js';
 import FullCalendarTimeline from './components/FullCalendarTimeline';
 import CalendarAvailabilityControl from './components/CalendarAvailabilityControl';
 import { toCST, toCSTISOString, createDateFromTimeString } from './utils/dateUtils';
+import PrivateEventBooking from './components/PrivateEventBooking';
 
 // Responsive helper
 function useIsMobile() {
@@ -531,6 +532,14 @@ function App() {
     }
     fetchBookingWindow();
   }, []);
+
+  // Add route for /private-event/:id
+  const pathname = window.location.pathname;
+  const privateEventMatch = pathname.match(/^\/private-event\/(\d+)/);
+  if (privateEventMatch) {
+    const eventId = privateEventMatch[1];
+    return <PrivateEventBooking eventId={eventId} />;
+  }
 
   if (!session) {
     return (
