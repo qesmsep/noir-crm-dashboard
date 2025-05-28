@@ -6,7 +6,7 @@ import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
 import { toCST, toCSTISOString, formatDateTime } from '../utils/dateUtils';
 
-export default function FullCalendarTimeline({ reloadKey }) {
+export default function FullCalendarTimeline({ reloadKey, bookingStartDate, bookingEndDate }) {
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState([]);
   const [localReloadKey, setLocalReloadKey] = useState(0);
@@ -318,6 +318,8 @@ export default function FullCalendarTimeline({ reloadKey }) {
                   await handleSaveNewReservation(form);
                 }
               }}
+              bookingStartDate={bookingStartDate}
+              bookingEndDate={bookingEndDate}
             />
           </div>
         </div>

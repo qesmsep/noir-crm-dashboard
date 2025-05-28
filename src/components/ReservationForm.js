@@ -16,7 +16,7 @@ for(let h = startHour; h < endHour; h++){
   }
 }
 
-export default function ReservationForm({ initialStart, initialEnd, onSave, table_id }) {
+export default function ReservationForm({ initialStart, initialEnd, onSave, table_id, bookingStartDate, bookingEndDate }) {
   const [form, setForm] = useState({
     name: '', phone: '', email: '', party_size: 1, notes: '', event_type: '',
   });
@@ -87,7 +87,8 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
           selected={date}
           onChange={d => setDate(d)}
           dateFormat="MMMM d, yyyy"
-          minDate={new Date()}
+          minDate={bookingStartDate || new Date()}
+          maxDate={bookingEndDate || null}
           className="datepicker-input"
         />
       </div>
