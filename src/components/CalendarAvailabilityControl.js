@@ -150,7 +150,7 @@ const CalendarAvailabilityControl = () => {
       }
 
       const newOpen = {
-        date: newOpenDate,
+        date: newOpenDate.toISOString().split('T')[0],
         time_ranges: newOpenTimeRanges,
         label: newOpenLabel,
         type: 'exceptional_open'
