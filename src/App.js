@@ -39,10 +39,10 @@ function formatPhone(phone) {
 }
 function formatDOB(dob) {
   if (!dob) return "";
-  // Parse as local date if in YYYY-MM-DD format
+  // Parse as UTC date if in YYYY-MM-DD format
   if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
     const [year, month, day] = dob.split('-').map(Number);
-    const d = new Date(year, month - 1, day);
+    const d = new Date(Date.UTC(year, month - 1, day));
     return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   }
   const d = new Date(dob);
@@ -475,14 +475,14 @@ function App() {
         endHour = 24;
       }
 
-      for (let h = startHour; h < endHour; h++) {
-        for (let m = 0; m < 60; m += 15) {
-          if (h === startHour && m < startMinute) continue;
-          if (h === endHour && m >= endMinute) continue;
-          const hh = String(h).padStart(2, '0');
-          const mm = String(m).padStart(2, '0');
-          times.push(`${hh}:${mm}`);
-        }
+      let current = new Date(2000, 0, 1, startHour, startMinute, 0, 0);
+      const end = new Date(2000, 0, 1, endHour, endMinute, 0, 0);
+
+      while (current < end) {
+        const hh = String(current.getHours()).padStart(2, '0');
+        const mm = String(current.getMinutes()).padStart(2, '0');
+        times.push(`${hh}:${mm}`);
+        current.setMinutes(current.getMinutes() + 15);
       }
     });
     
