@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { toCST, formatDate } from '../src/utils/dateUtils';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -25,11 +26,11 @@ export default async function handler(req, res) {
     .single();
   if (settingErr) return res.status(500).json({ error: settingErr.message });
 
-  // Compute tomorrow's date string YYYY-MM-DD
-  const now = new Date();
+  // Compute tomorrow's date string YYYY-MM-DD in CST
+  const now = toCST(new Date());
   const tomorrow = new Date(now);
   tomorrow.setDate(now.getDate() + 1);
-  const targetDate = tomorrow.toISOString().slice(0, 10);
+  const targetDate = formatDate(tomorrow, { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
 
   // Fetch members renewing tomorrow (RPC or manual filter)
   // Assumes you have a Postgres function get_renewals(target_date) defined

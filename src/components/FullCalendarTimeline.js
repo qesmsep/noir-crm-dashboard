@@ -4,6 +4,7 @@ import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
+import { toCST, toCSTISOString, formatDateTime } from '../utils/dateUtils';
 
 export default function FullCalendarTimeline({ reloadKey }) {
   const [resources, setResources] = useState([]);
@@ -59,7 +60,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
           id: String(r.id),
           title: `${r.source === 'member' ? '🖤 ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
           extendedProps: {
-            created_at: r.created_at ? new Date(r.created_at).toLocaleString([], { 
+            created_at: r.created_at ? formatDateTime(new Date(r.created_at), { 
               month: 'short', 
               day: 'numeric', 
               hour: 'numeric', 
@@ -81,8 +82,8 @@ export default function FullCalendarTimeline({ reloadKey }) {
   async function handleEventDrop(info) {
     const event = info.event;
     const id = event.id;
-    const newStart = event.start.toISOString();
-    const newEnd = event.end.toISOString();
+    const newStart = toCSTISOString(event.start);
+    const newEnd = toCSTISOString(event.end);
     // FullCalendar v6: event.getResources() returns an array
     const newTableId = event.getResources && event.getResources().length > 0
       ? event.getResources()[0].id
@@ -108,8 +109,8 @@ export default function FullCalendarTimeline({ reloadKey }) {
   async function handleEventResize(info) {
     const event = info.event;
     const id = event.id;
-    const newStart = event.start.toISOString();
-    const newEnd = event.end.toISOString();
+    const newStart = toCSTISOString(event.start);
+    const newEnd = toCSTISOString(event.end);
     const res = await fetch(`/api/reservations?id=${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -150,11 +151,11 @@ export default function FullCalendarTimeline({ reloadKey }) {
   // Handler for slot selection to create a new reservation
   function handleSelectSlot(arg) {
     // arg.start, arg.end, arg.resource (table id)
-    const start = arg.start;
+    const start = toCST(arg.start);
     const end = new Date(start.getTime() + 90 * 60000); // 90 minutes later
     setNewReservation({
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
+      start_time: toCSTISOString(start),
+      end_time: toCSTISOString(end),
       table_id: arg.resource?.id || arg.resourceId || arg.resource || '',
     });
     setShowModal(true);
@@ -182,7 +183,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
   // Helper: get all 15-min slots between 6pm and 1am
   function getTimeSlots() {
     const slots = [];
-    const start = new Date();
+    const start = toCST(new Date());
     start.setHours(18, 0, 0, 0); // 6pm
     for (let i = 0; i < 28; i++) { // 7 hours * 4 = 28 slots
       const slotStart = new Date(start.getTime() + i * 15 * 60000);
@@ -200,8 +201,8 @@ export default function FullCalendarTimeline({ reloadKey }) {
       let total = 0;
       for (const ev of events) {
         if (ev.type === 'reservation' && ev.start && ev.end && ev.party_size) {
-          const evStart = new Date(ev.start);
-          const evEnd = new Date(ev.end);
+          const evStart = toCST(new Date(ev.start));
+          const evEnd = toCST(new Date(ev.end));
           if (!(evEnd <= slotStart || evStart >= slotEnd)) {
             total += Number(ev.party_size);
           }
@@ -268,24 +269,19 @@ export default function FullCalendarTimeline({ reloadKey }) {
         />
       </div>
       {/* Total Guests Row in its own scrollable container, below calendar */}
-      <div style={{ width: '100%', overflowX: 'auto' }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginTop: 0,
-          background: '#f3f2ef',
-          borderRadius: 6,
-          padding: '0.5rem 0.5rem',
-          fontWeight: 600,
-          fontSize: '1rem',
-          borderTop: '2px solid #e0e0e0',
-          minHeight: 40
-        }}>
-          <div style={{ minWidth: 90, textAlign: 'right', color: '#888', paddingRight: 8 }}>Total Guests</div>
-          {slots.map((slot, idx) => (
-            <div key={slot.toISOString()} style={{ minWidth: 60, maxWidth: 60, textAlign: 'center', color: '#333' }}>
-              {guestTotals[idx]}
+      <div style={{ width: '100%', overflowX: 'auto', flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', gap: '1px', background: '#eee', padding: '0.5rem 0' }}>
+          {slots.map((slot, i) => (
+            <div key={i} style={{ 
+              flex: '1 0 60px', 
+              textAlign: 'center',
+              fontSize: '0.8rem',
+              color: '#666'
+            }}>
+              {formatDateTime(slot, { hour: 'numeric', minute: '2-digit' })}
+              <div style={{ marginTop: '0.25rem', fontWeight: 'bold' }}>
+                {guestTotals[i]} guests
+              </div>
             </div>
           ))}
         </div>

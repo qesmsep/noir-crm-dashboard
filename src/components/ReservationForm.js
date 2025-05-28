@@ -1,8 +1,8 @@
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import '../App.css';
-
 import React, { useState } from 'react';
+import { createDateFromTimeString, toCSTISOString } from '../utils/dateUtils';
 
 // Generate time options for 6:00pm to midnight, every 15 min
 const times = [];
@@ -44,18 +44,17 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
 
   const handleSubmit = async e => {
     e.preventDefault();
-    // Build ISO start_time from date + time
-    const [hh, mm] = time.split(':');
-    const start = new Date(date);
-    start.setHours(Number(hh), Number(mm), 0, 0);
+    // Build start time in CST
+    const start = createDateFromTimeString(time, date);
     // Determine duration...
     const durationMinutes = form.party_size <= 2 ? 90 : 120;
     const end = new Date(start.getTime() + durationMinutes * 60000);
+    
     await onSave({
       ...form,
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      table_id: table_id // Include the table_id in the payload
+      start_time: toCSTISOString(start),
+      end_time: toCSTISOString(end),
+      table_id: table_id
     });
   };
 
@@ -97,7 +96,11 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
         <select value={time} onChange={e => setTime(e.target.value)}>
           {times.map(t => (
             <option key={t} value={t}>
-              {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              {createDateFromTimeString(t).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                timeZone: 'America/Chicago'
+              })}
             </option>
           ))}
         </select>

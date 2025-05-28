@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { toCST } from '../utils/dateUtils';
 
 const localizer = momentLocalizer(moment);
 
@@ -32,17 +33,17 @@ export default function CalendarView({ onSelectSlot, onSelectEvent, reloadKey })
       const mapped = (evRes.data || []).map(e => ({
         id: e.id,
         title: e.title,
-        start: new Date(e.start_time),
-        end: new Date(e.end_time),
+        start: toCST(new Date(e.start_time)),
+        end: toCST(new Date(e.end_time)),
         allDay: false,
-        resourceId: e.table_id // assumes your event has table_id
+        resourceId: e.table_id
       })).concat((resRes.data || []).map(r => ({
         id: r.id,
         title: `Res: ${r.name}`,
-        start: new Date(r.start_time),
-        end: new Date(r.end_time),
+        start: toCST(new Date(r.start_time)),
+        end: toCST(new Date(r.end_time)),
         allDay: false,
-        resourceId: r.table_id // assumes your reservation has table_id
+        resourceId: r.table_id
       })));
       setEvents(mapped);
     }
