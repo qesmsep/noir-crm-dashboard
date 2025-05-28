@@ -153,6 +153,7 @@ function App() {
   const [pendingReservation, setPendingReservation] = useState(null);
   const [baseHours, setBaseHours] = useState([]);
   const [exceptionalOpens, setExceptionalOpens] = useState([]);
+  const [exceptionalClosures, setExceptionalClosures] = useState([]);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -455,6 +456,18 @@ function App() {
       if (!error && data) setExceptionalOpens(data);
     }
     fetchExceptionalOpens();
+  }, []);
+
+  // Add at the top of App function:
+  useEffect(() => {
+    async function fetchExceptionalClosures() {
+      const { data, error } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'exceptional_closure');
+      if (!error && data) setExceptionalClosures(data);
+    }
+    fetchExceptionalClosures();
   }, []);
 
   // Helper function for generating times from time ranges
@@ -2053,7 +2066,13 @@ function App() {
                       dateFormat="MMMM d, yyyy"
                       minDate={new Date()}
                       className="form-control"
-                      filterDate={d => getAvailableTimes(d).length > 0}
+                      filterDate={d => {
+                        const dateStr = toCST(d).toISOString().split('T')[0];
+                        const isClosed = exceptionalClosures.some(
+                          ec => ec.date && ec.date.slice(0, 10) === dateStr
+                        );
+                        return !isClosed && getAvailableTimes(d).length > 0;
+                      }}
                     />
                   </div>
                   <div className="form-group">
