@@ -255,10 +255,10 @@ export default function FullCalendarTimeline({ reloadKey }) {
             return {
               html: `
                 <div class="fc-event-main-frame">
-                  <div class="fc-event-title-container">
+                  <div class="fc-event-title-container" style="padding: 4px 8px;">
                     <div class="fc-event-title">${eventInfo.event.title}</div>
                     ${eventInfo.event.extendedProps.created_at ? 
-                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 2px;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
+                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 4px;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
                       : ''}
                   </div>
                 </div>
