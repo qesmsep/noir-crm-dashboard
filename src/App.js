@@ -152,6 +152,7 @@ function App() {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingReservation, setPendingReservation] = useState(null);
   const [baseHours, setBaseHours] = useState([]);
+  const [exceptionalOpens, setExceptionalOpens] = useState([]);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -444,40 +445,27 @@ function App() {
     fetchBaseHours();
   }, []);
 
-  // Modify the times array generation to respect base hours
-  const getAvailableTimes = (selectedDate) => {
-    // Check if date is in the past using CST
-    const now = toCST(new Date());
-    const selectedDateCST = toCST(selectedDate);
-    if (selectedDateCST < now) {
-      return []; // No times available for past dates
+  // Add at the top of App function:
+  useEffect(() => {
+    async function fetchExceptionalOpens() {
+      const { data, error } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'exceptional_open');
+      if (!error && data) setExceptionalOpens(data);
     }
+    fetchExceptionalOpens();
+  }, []);
 
-    const dayOfWeek = selectedDateCST.getDay();
-    console.log('Selected date:', selectedDateCST);
-    console.log('Day of week:', dayOfWeek);
-    console.log('Base hours:', baseHours);
-    
-    const dayHours = baseHours.find(h => Number(h.day_of_week) === dayOfWeek);
-    console.log('Found day hours:', dayHours);
-    
-    if (!dayHours || !dayHours.time_ranges || dayHours.time_ranges.length === 0) {
-      return []; // No hours available for this day
-    }
-
+  // Helper function for generating times from time ranges
+  function generateTimesFromRanges(time_ranges) {
     const times = [];
-    dayHours.time_ranges.forEach(range => {
+    time_ranges.forEach(range => {
       let [startHour, startMinute] = range.start.split(':').map(Number);
       let [endHour, endMinute] = range.end.split(':').map(Number);
-
-      // Treat 00:00 as 24:00 for end of day
-      if (endHour === 0 && endMinute === 0) {
-        endHour = 24;
-      }
-
+      if (endHour === 0 && endMinute === 0) endHour = 24;
       let current = new Date(2000, 0, 1, startHour, startMinute, 0, 0);
       const end = new Date(2000, 0, 1, endHour, endMinute, 0, 0);
-
       while (current < end) {
         const hh = String(current.getHours()).padStart(2, '0');
         const mm = String(current.getMinutes()).padStart(2, '0');
@@ -485,9 +473,29 @@ function App() {
         current.setMinutes(current.getMinutes() + 15);
       }
     });
-    
-    console.log('Generated times:', times);
     return times;
+  }
+
+  // Update getAvailableTimes:
+  const getAvailableTimes = (selectedDate) => {
+    const now = toCST(new Date());
+    const selectedDateCST = toCST(selectedDate);
+    if (selectedDateCST < now) {
+      return [];
+    }
+    const selectedDateStr = selectedDateCST.toISOString().split('T')[0];
+    const exceptional = exceptionalOpens.find(
+      eo => eo.date && new Date(eo.date).toISOString().split('T')[0] === selectedDateStr
+    );
+    if (exceptional && exceptional.time_ranges && exceptional.time_ranges.length > 0) {
+      return generateTimesFromRanges(exceptional.time_ranges);
+    }
+    const dayOfWeek = selectedDateCST.getDay();
+    const dayHours = baseHours.find(h => Number(h.day_of_week) === dayOfWeek);
+    if (!dayHours || !dayHours.time_ranges || dayHours.time_ranges.length === 0) {
+      return [];
+    }
+    return generateTimesFromRanges(dayHours.time_ranges);
   };
 
   if (!session) {
