@@ -58,6 +58,14 @@ export default function FullCalendarTimeline({ reloadKey }) {
         (resRes.data || []).map(r => ({
           id: String(r.id),
           title: `${r.source === 'member' ? '🖤 ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
+          extendedProps: {
+            created_at: r.created_at ? new Date(r.created_at).toLocaleString([], { 
+              month: 'short', 
+              day: 'numeric', 
+              hour: 'numeric', 
+              minute: '2-digit'
+            }) : null
+          },
           start: r.start_time,
           end: r.end_time,
           resourceId: String(r.table_id),
@@ -243,6 +251,20 @@ export default function FullCalendarTimeline({ reloadKey }) {
           selectable={true}
           select={handleSelectSlot}
           className="noir-fc-timeline"
+          eventContent={(eventInfo) => {
+            return {
+              html: `
+                <div class="fc-event-main-frame">
+                  <div class="fc-event-title-container">
+                    <div class="fc-event-title">${eventInfo.event.title}</div>
+                    ${eventInfo.event.extendedProps.created_at ? 
+                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 2px;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
+                      : ''}
+                  </div>
+                </div>
+              `
+            };
+          }}
         />
       </div>
       {/* Total Guests Row in its own scrollable container, below calendar */}
