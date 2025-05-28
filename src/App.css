@@ -594,6 +594,25 @@ body {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
+/* Timeline events container */
+.fc-timeline-events {
+  position: relative;
+  z-index: 3;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* DataGrid cell frame */
+.fc-datagrid-cell-frame {
+  padding: 8px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+}
+
 /*/* Decrease font size for react-big-calendar */
 /*.app-container .rbc-calendar,
 .app-container .rbc-calendar * {
