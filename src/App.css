@@ -595,7 +595,7 @@ body {
 }
 
 /* Timeline events container */
-.fc-timeline-events {
+/*.fc-timeline-events {
   position: relative;
   z-index: 3;
   min-height: 100%;
