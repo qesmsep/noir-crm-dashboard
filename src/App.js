@@ -1308,15 +1308,6 @@ function App() {
                 Admin
               </button>
               <button
-                className={section === 'lookup' ? 'nav-active' : ''}
-                onClick={() => {
-                  setSection('lookup');
-                  setSidebarOpen(false);
-                }}
-              >
-                Lookup
-              </button>
-              <button
                 className={section === 'makeReservation' ? 'nav-active' : ''}
                 onClick={() => {
                   setSection('makeReservation');
@@ -1382,14 +1373,6 @@ function App() {
               Admin
             </button>
             <button
-              className={section === 'lookup' ? 'nav-active' : ''}
-              onClick={() => {
-                setSection('lookup');
-              }}
-            >
-              Lookup
-            </button>
-            <button
               className={section === 'makeReservation' ? 'nav-active' : ''}
               onClick={() => setSection('makeReservation')}
             >
@@ -1425,6 +1408,78 @@ function App() {
         >
           {section === 'members' && (
             <>
+              {/* Member Lookup UI at the top of Members section */}
+              <div style={{ marginBottom: '2rem' }}>
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or phone"
+                  value={lookupQuery}
+                  onChange={e => setLookupQuery(e.target.value)}
+                  style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
+                />
+                <ul className="member-list">
+                  {members.filter(m => {
+                    const q = lookupQuery.trim().toLowerCase();
+                    if (!q) return false;
+                    return (
+                      (m.first_name && m.first_name.toLowerCase().includes(q)) ||
+                      (m.last_name && m.last_name.toLowerCase().includes(q)) ||
+                      (m.email && m.email.toLowerCase().includes(q)) ||
+                      (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+                    );
+                  }).length === 0 && lookupQuery ? (
+                    <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
+                  ) : (
+                    members.filter(m => {
+                      const q = lookupQuery.trim().toLowerCase();
+                      if (!q) return false;
+                      return (
+                        (m.first_name && m.first_name.toLowerCase().includes(q)) ||
+                        (m.last_name && m.last_name.toLowerCase().includes(q)) ||
+                        (m.email && m.email.toLowerCase().includes(q)) ||
+                        (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+                      );
+                    }).map(member => (
+                      <li
+                        key={member.member_id}
+                        className="member-item"
+                        style={{ position: "relative", cursor: "pointer", width: "100%" }}
+                        onClick={() => {
+                          setSelectedMember(member);
+                          fetchLedger(member.account_id);
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        onKeyDown={e => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            setSelectedMember(member);
+                            fetchLedger(member.account_id);
+                          }
+                        }}
+                      >
+                        {member.photo && (
+                          <img
+                            src={member.photo}
+                            alt={`${member.first_name} ${member.last_name}`}
+                            className="member-photo"
+                          />
+                        )}
+                        <div className="member-info">
+                          <strong>
+                            {member.first_name} {member.last_name}
+                          </strong>
+                          <div>Member since: {formatDateLong(member.join_date)}</div>
+                          <div>Phone: {formatPhone(member.phone)}</div>
+                          <div>Email: {member.email}</div>
+                          <div>Date of Birth: {formatDOB(member.dob)}</div>
+                        </div>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+              {/* End Member Lookup UI */}
+              {/* Existing member list, filtered if no lookup query */}
               {!selectedMember ? (
                 <>
                   <h1 className="app-title">Noir CRM – Members</h1>
@@ -1816,145 +1871,6 @@ function App() {
               </div>
             </>
           )}
-          {section === 'lookup' && (
-            <div style={{ padding: '2rem', maxWidth: "100vw", width: "100%" }}>
-              <h2>Member Lookup</h2>
-              <input
-                type="text"
-                placeholder="Search by name, email, or phone"
-                value={lookupQuery}
-                onChange={e => setLookupQuery(e.target.value)}
-                style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
-              />
-              <ul className="member-list">
-                {members.filter(m => {
-                  const q = lookupQuery.trim().toLowerCase();
-                  if (!q) return false;
-                  return (
-                    (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-                    (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-                    (m.email && m.email.toLowerCase().includes(q)) ||
-                    (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-                  );
-                }).length === 0 && lookupQuery ? (
-                  <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
-                ) : (
-                  members.filter(m => {
-                    const q = lookupQuery.trim().toLowerCase();
-                    if (!q) return false;
-                    return (
-                      (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-                      (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-                      (m.email && m.email.toLowerCase().includes(q)) ||
-                      (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-                    );
-                  }).map(member => (
-                    <li
-                      key={member.member_id}
-                      className="member-item"
-                      style={{ position: "relative", cursor: "pointer", width: "100%" }}
-                      onClick={() => {
-                        setSelectedMember(member);
-                        fetchLedger(member.account_id);
-                        setSection('members');
-                      }}
-                      tabIndex={0}
-                      role="button"
-                      onKeyDown={e => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          setSelectedMember(member);
-                          fetchLedger(member.account_id);
-                          setSection('members');
-                        }
-                      }}
-                    >
-                      {editingMemberId === member.member_id ? (
-                        <form
-                          onSubmit={e => {
-                            e.preventDefault();
-                            handleSaveEditMember();
-                          }}
-                          style={{ width: "100%" }}
-                        >
-                          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                            <label>
-                              First Name:
-                              <input value={editMemberForm.first_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, first_name: e.target.value })} />
-                            </label>
-                            <label>
-                              Last Name:
-                              <input value={editMemberForm.last_name || ""} onChange={e => setEditMemberForm({ ...editMemberForm, last_name: e.target.value })} />
-                            </label>
-                            <label>
-                              Email:
-                              <input value={editMemberForm.email || ""} onChange={e => setEditMemberForm({ ...editMemberForm, email: e.target.value })} />
-                            </label>
-                            <label>
-                              Phone:
-                              <input value={editMemberForm.phone || ""} onChange={e => setEditMemberForm({ ...editMemberForm, phone: e.target.value })} />
-                            </label>
-                            <label>
-                              Date of Birth:
-                              <input value={editMemberForm.dob || ""} onChange={e => setEditMemberForm({ ...editMemberForm, dob: e.target.value })} />
-                            </label>
-                            <label>
-                              Membership:
-                              <input value={editMemberForm.membership || ""} onChange={e => setEditMemberForm({ ...editMemberForm, membership: e.target.value })} />
-                            </label>
-                            <label>
-                              Photo:
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={async e => {
-                                  const file = e.target.files[0];
-                                  if (file) {
-                                    const url = await handlePhotoUpload(file, false);
-                                    if (url && editingMemberId) {
-                                      await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
-                                      setEditMemberForm(form => ({ ...form, photo: url }));
-                                      setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
-                                    }
-                                  }
-                                }}
-                              />
-                              {editMemberForm.photo && (
-                                <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: "0.5rem", width: "120px" }} />
-                              )}
-                            </label>
-                          </div>
-                          <div style={{ marginTop: "0.5rem" }}>
-                            <button type="submit" style={{ marginRight: "0.5rem" }}>Save</button>
-                            <button type="button" onClick={handleCancelEditMember}>Cancel</button>
-                          </div>
-                        </form>
-                      ) : (
-                        <>
-                          {member.photo && (
-                            <img
-                              src={member.photo}
-                              alt={`${member.first_name} ${member.last_name}`}
-                              className="member-photo"
-                            />
-                          )}
-                          <div className="member-info">
-                            <strong>
-                              {member.first_name} {member.last_name}
-                            </strong>
-                            <div>Member since: {formatDateLong(member.join_date)}</div>
-                            <div>Phone: {formatPhone(member.phone)}</div>
-                            <div>Email: {member.email}</div>
-                            <div>Date of Birth: {formatDOB(member.dob)}</div>
-                          </div>
-                        </>
-                      )}
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          )}
-          {/* SPLIT: Make Reservation and Calendar tabs */}
           {section === 'makeReservation' && (() => {
             // --- Reserve On The Spot logic ---
             async function handleReserveNow() {
