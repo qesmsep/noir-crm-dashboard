@@ -268,24 +268,6 @@ export default function FullCalendarTimeline({ reloadKey }) {
           }}
         />
       </div>
-      {/* Total Guests Row in its own scrollable container, below calendar */}
-      <div style={{ width: '100%', overflowX: 'auto', flex: '0 0 auto' }}>
-        <div style={{ display: 'flex', gap: '1px', background: '#eee', padding: '0.5rem 0' }}>
-          {slots.map((slot, i) => (
-            <div key={i} style={{ 
-              flex: '1 0 60px', 
-              textAlign: 'center',
-              fontSize: '0.8rem',
-              color: '#666'
-            }}>
-              {formatDateTime(slot, { hour: 'numeric', minute: '2-digit' })}
-              <div style={{ marginTop: '0.25rem', fontWeight: 'bold' }}>
-                {guestTotals[i]} guests
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
       {/* Reservation Edit/Create Modal */}
       {showModal && (selectedReservation || newReservation) && (
         <div style={{
