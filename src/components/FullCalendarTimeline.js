@@ -14,60 +14,66 @@ export default function FullCalendarTimeline({ reloadKey }) {
   const [newReservation, setNewReservation] = useState(null);
 
   useEffect(() => {
-    // Fetch tables as resources, sorted by number
-    fetch('/api/tables')
-      .then(res => res.json())
-      .then(data => {
-        setResources((data.data || [])
-          .sort((a, b) => a.number - b.number)
-          .map(t => ({
-            id: String(t.id),
-            title: `Table ${t.number}`,
-          }))
-        );
-      });
+    async function fetchTablesAndReservations() {
+      try {
+        const [tablesRes, reservationsRes] = await Promise.all([
+          fetch('/api/tables'),
+          fetch('/api/reservations')
+        ]);
+        const tablesData = await tablesRes.json();
+        const reservationsData = await reservationsRes.json();
 
-    // Fetch reservations/events
-    Promise.all([
-      fetch('/api/events').then(r => r.json()),
-      fetch('/api/reservations').then(r => r.json())
-    ]).then(([evRes, resRes]) => {
-      const eventTypeEmojis = {
-        birthday: '🎂',
-        engagement: '💍',
-        anniversary: '🥂',
-        party: '🎉',
-        graduation: '🎓',
-        corporate: '🧑‍💼',
-        holiday: '❄️',
-        networking: '🤝',
-        fundraiser: '🎗️',
-        bachelor: '🥳',
-        fun: '🍸',
-        date: '💕',
-      };
+        if (tablesRes.ok && reservationsRes.ok) {
+          setResources((tablesData.data || [])
+            .sort((a, b) => a.number - b.number)
+            .map(t => ({
+              id: String(t.id),
+              title: `Table ${t.number}`,
+            }))
+          );
+          
+          // Map event types to emojis
+          const eventTypeEmojis = {
+            birthday: '🎂',
+            engagement: '💍',
+            anniversary: '🥂',
+            party: '🎉',
+            graduation: '🎓',
+            corporate: '🧑‍💼',
+            holiday: '❄️',
+            networking: '🤝',
+            fundraiser: '🎗️',
+            bachelor: '🥳',
+            fun: '🍸',
+            date: '💕'
+          };
 
-      const mapped = (evRes.data || []).map(e => ({
-        id: String(e.id),
-        title: e.title,
-        start: e.start_time,
-        end: e.end_time,
-        resourceId: String(e.table_id),
-        type: 'event',
-      })).concat(
-        (resRes.data || []).map(r => ({
-          id: String(r.id),
-          title: `${r.event_type ? eventTypeEmojis[r.event_type] + ' ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}`,
-          start: r.start_time,
-          end: r.end_time,
-          resourceId: String(r.table_id),
-          ...r,
-          type: 'reservation',
-        }))
-      );
-      setEvents(mapped);
-    });
-  }, [reloadKey, localReloadKey]);
+          // Map reservations to events
+          const events = (reservationsData.reservations || []).map(r => {
+            const isNoirMember = r.source === 'member';
+            const eventEmoji = r.event_type ? eventTypeEmojis[r.event_type] : '';
+            return {
+              id: r.id,
+              resourceId: r.table_id,
+              start: r.start_time,
+              end: r.end_time,
+              title: `${isNoirMember ? '🖤 ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${eventEmoji ? ` ${eventEmoji}` : ''}`,
+              extendedProps: {
+                ...r,
+                type: 'reservation'
+              }
+            };
+          });
+
+          setEvents(events);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    }
+
+    fetchTablesAndReservations();
+  }, [reloadKey]);
 
   // Handler for drag-and-drop or resize
   async function handleEventDrop(info) {
