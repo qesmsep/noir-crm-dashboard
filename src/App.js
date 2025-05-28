@@ -39,6 +39,12 @@ function formatPhone(phone) {
 }
 function formatDOB(dob) {
   if (!dob) return "";
+  // Parse as local date if in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    const [year, month, day] = dob.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  }
   const d = new Date(dob);
   if (isNaN(d)) return dob;
   return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
@@ -452,7 +458,7 @@ function App() {
     console.log('Day of week:', dayOfWeek);
     console.log('Base hours:', baseHours);
     
-    const dayHours = baseHours.find(h => h.day_of_week === dayOfWeek);
+    const dayHours = baseHours.find(h => Number(h.day_of_week) === dayOfWeek);
     console.log('Found day hours:', dayHours);
     
     if (!dayHours || !dayHours.time_ranges || dayHours.time_ranges.length === 0) {
