@@ -154,6 +154,8 @@ function App() {
   const [baseHours, setBaseHours] = useState([]);
   const [exceptionalOpens, setExceptionalOpens] = useState([]);
   const [exceptionalClosures, setExceptionalClosures] = useState([]);
+  const [bookingStartDate, setBookingStartDate] = useState(null);
+  const [bookingEndDate, setBookingEndDate] = useState(null);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -510,6 +512,25 @@ function App() {
     }
     return generateTimesFromRanges(dayHours.time_ranges);
   };
+
+  // Fetch booking window dates from Supabase on mount
+  useEffect(() => {
+    async function fetchBookingWindow() {
+      const { data: startData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'booking_start_date')
+        .single();
+      const { data: endData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'booking_end_date')
+        .single();
+      if (startData && startData.value) setBookingStartDate(new Date(startData.value));
+      if (endData && endData.value) setBookingEndDate(new Date(endData.value));
+    }
+    fetchBookingWindow();
+  }, []);
 
   if (!session) {
     return (
@@ -2064,9 +2085,12 @@ function App() {
                       selected={date}
                       onChange={d => setDate(d)}
                       dateFormat="MMMM d, yyyy"
-                      minDate={new Date()}
+                      minDate={bookingStartDate || new Date()}
+                      maxDate={bookingEndDate || null}
                       className="form-control"
                       filterDate={d => {
+                        if (bookingStartDate && d < bookingStartDate) return false;
+                        if (bookingEndDate && d > bookingEndDate) return false;
                         const dateStr = toCST(d).toISOString().split('T')[0];
                         const isClosed = exceptionalClosures.some(
                           ec => ec.date && ec.date.slice(0, 10) === dateStr
