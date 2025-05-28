@@ -144,6 +144,7 @@ function App() {
   });
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingReservation, setPendingReservation] = useState(null);
+  const [baseHours, setBaseHours] = useState([]);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -417,6 +418,50 @@ function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [section, selectedMember]);
+
+  // Add this useEffect to fetch base hours
+  useEffect(() => {
+    async function fetchBaseHours() {
+      const { data, error } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'base');
+      
+      if (!error && data) {
+        setBaseHours(data);
+      }
+    }
+    fetchBaseHours();
+  }, []);
+
+  // Modify the times array generation to respect base hours
+  const getAvailableTimes = (selectedDate) => {
+    const dayOfWeek = selectedDate.getDay();
+    const dayHours = baseHours.find(h => h.day_of_week === dayOfWeek);
+    
+    if (!dayHours || !dayHours.time_ranges || dayHours.time_ranges.length === 0) {
+      return []; // No hours available for this day
+    }
+
+    const times = [];
+    dayHours.time_ranges.forEach(range => {
+      const [startHour, startMinute] = range.start.split(':').map(Number);
+      const [endHour, endMinute] = range.end.split(':').map(Number);
+      
+      for (let h = startHour; h < endHour; h++) {
+        for (let m = 0; m < 60; m += 15) {
+          if (h === startHour && m < startMinute) continue;
+          if (h === endHour && m >= endMinute) continue;
+          
+          const hh = String(h).padStart(2, '0');
+          const mm = String(m).padStart(2, '0');
+          times.push(`${hh}:${mm}`);
+        }
+      }
+    });
+    
+    return times;
+  };
 
   if (!session) {
     return (
@@ -1958,12 +2003,17 @@ function App() {
                       value={time}
                       onChange={e => setTime(e.target.value)}
                       className="form-control"
+                      disabled={getAvailableTimes(date).length === 0}
                     >
-                      {times.map(t => (
-                        <option key={t} value={t}>
-                          {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                        </option>
-                      ))}
+                      {getAvailableTimes(date).length === 0 ? (
+                        <option value="">No available times</option>
+                      ) : (
+                        getAvailableTimes(date).map(t => (
+                          <option key={t} value={t}>
+                            {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div className="form-group">

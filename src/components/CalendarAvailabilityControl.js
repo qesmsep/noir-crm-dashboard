@@ -7,10 +7,7 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 
 const CalendarAvailabilityControl = () => {
   // Base Hours State
-  const [baseHours, setBaseHours] = useState({
-    enabledDays: Array(7).fill(false),
-    timeRanges: Array(7).fill().map(() => [{ start: '18:00', end: '23:00' }])
-  });
+  const [baseHours, setBaseHours] = useState(Array(7).fill().map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
 
   // Exceptional Opens State
   const [exceptionalOpens, setExceptionalOpens] = useState([]);
@@ -24,7 +21,8 @@ const CalendarAvailabilityControl = () => {
   const [newClosureReason, setNewClosureReason] = useState('');
 
   // Error State
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Load existing data
   useEffect(() => {
@@ -65,7 +63,10 @@ const CalendarAvailabilityControl = () => {
           timeRanges[hour.day_of_week] = hour.time_ranges;
         });
 
-        setBaseHours({ enabledDays, timeRanges });
+        setBaseHours(timeRanges.map((ranges, index) => ({
+          enabled: enabledDays[index],
+          timeRanges: ranges
+        })));
       }
 
       if (opensData) setExceptionalOpens(opensData);
@@ -78,59 +79,57 @@ const CalendarAvailabilityControl = () => {
 
   // Base Hours Handlers
   const toggleDay = (dayIndex) => {
-    const newEnabledDays = [...baseHours.enabledDays];
-    newEnabledDays[dayIndex] = !newEnabledDays[dayIndex];
-    setBaseHours({ ...baseHours, enabledDays: newEnabledDays });
+    const newBaseHours = [...baseHours];
+    newBaseHours[dayIndex].enabled = !newBaseHours[dayIndex].enabled;
+    setBaseHours(newBaseHours);
   };
 
   const updateTimeRange = (dayIndex, rangeIndex, field, value) => {
-    const newTimeRanges = [...baseHours.timeRanges];
-    newTimeRanges[dayIndex][rangeIndex][field] = value;
-    setBaseHours({ ...baseHours, timeRanges: newTimeRanges });
+    const newTimeRanges = [...baseHours[dayIndex].timeRanges];
+    newTimeRanges[rangeIndex][field] = value;
+    const newBaseHours = [...baseHours];
+    newBaseHours[dayIndex].timeRanges = newTimeRanges;
+    setBaseHours(newBaseHours);
   };
 
   const addTimeRange = (dayIndex) => {
-    const newTimeRanges = [...baseHours.timeRanges];
-    newTimeRanges[dayIndex].push({ start: '18:00', end: '23:00' });
-    setBaseHours({ ...baseHours, timeRanges: newTimeRanges });
+    const newTimeRanges = [...baseHours[dayIndex].timeRanges];
+    newTimeRanges.push({ start: '18:00', end: '23:00' });
+    const newBaseHours = [...baseHours];
+    newBaseHours[dayIndex].timeRanges = newTimeRanges;
+    setBaseHours(newBaseHours);
   };
 
   const removeTimeRange = (dayIndex, rangeIndex) => {
-    const newTimeRanges = [...baseHours.timeRanges];
-    newTimeRanges[dayIndex].splice(rangeIndex, 1);
-    setBaseHours({ ...baseHours, timeRanges: newTimeRanges });
+    const newTimeRanges = [...baseHours[dayIndex].timeRanges];
+    newTimeRanges.splice(rangeIndex, 1);
+    const newBaseHours = [...baseHours];
+    newBaseHours[dayIndex].timeRanges = newTimeRanges;
+    setBaseHours(newBaseHours);
   };
 
   const saveBaseHours = async () => {
+    setError('');
+    setSuccessMessage('');
     try {
-      setError(null);
-      // First, delete all existing base hours
-      const { error: deleteError } = await supabase
-        .from('venue_hours')
-        .delete()
-        .eq('type', 'base');
+      // Delete existing base hours
+      await supabase.from('venue_hours').delete().eq('type', 'base');
+      
+      // Insert new base hours
+      const baseHoursToSave = baseHours.map((day, index) => ({
+        type: 'base',
+        day_of_week: index,
+        time_ranges: day.enabled ? day.timeRanges : []
+      })).filter(day => day.time_ranges.length > 0);
 
-      if (deleteError) throw deleteError;
-
-      // Then, insert new base hours for enabled days
-      const baseHoursToInsert = baseHours.enabledDays
-        .map((enabled, dayIndex) => enabled ? {
-          type: 'base',
-          day_of_week: dayIndex,
-          time_ranges: baseHours.timeRanges[dayIndex]
-        } : null)
-        .filter(Boolean);
-
-      if (baseHoursToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('venue_hours')
-          .insert(baseHoursToInsert);
-
-        if (insertError) throw insertError;
-      }
-    } catch (error) {
-      console.error('Error saving base hours:', error);
-      setError('Failed to save base hours. Please try again.');
+      const { error: insertError } = await supabase.from('venue_hours').insert(baseHoursToSave);
+      
+      if (insertError) throw insertError;
+      
+      setSuccessMessage('Base hours updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000); // Clear message after 3 seconds
+    } catch (err) {
+      setError('Failed to save base hours: ' + err.message);
     }
   };
 
@@ -252,11 +251,8 @@ const CalendarAvailabilityControl = () => {
 
   return (
     <div className="availability-control">
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      {error && <div className="error-message">{error}</div>}
+      {successMessage && <div className="success-message">{successMessage}</div>}
       
       {/* Base Hours Section */}
       <section className="availability-section">
@@ -267,14 +263,14 @@ const CalendarAvailabilityControl = () => {
               <label className="weekday-label">
                 <input
                   type="checkbox"
-                  checked={baseHours.enabledDays[index]}
+                  checked={baseHours[index].enabled}
                   onChange={() => toggleDay(index)}
                 />
                 {day}
               </label>
-              {baseHours.enabledDays[index] && (
+              {baseHours[index].enabled && (
                 <div className="time-ranges">
-                  {baseHours.timeRanges[index].map((range, rangeIndex) => (
+                  {baseHours[index].timeRanges.map((range, rangeIndex) => (
                     <div key={rangeIndex} className="time-range">
                       <input
                         type="time"
@@ -290,7 +286,7 @@ const CalendarAvailabilityControl = () => {
                       <button
                         className="remove-range"
                         onClick={() => removeTimeRange(index, rangeIndex)}
-                        disabled={baseHours.timeRanges[index].length === 1}
+                        disabled={baseHours[index].timeRanges.length === 1}
                       >
                         ×
                       </button>
