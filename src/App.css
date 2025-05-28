@@ -598,8 +598,8 @@ body {
 .fc-timeline-events {
   position: relative;
   z-index: 3;
-  min-height: 24px;
-  display: flex;
+  min-height: 100%;
+  /*display: flex; */
   align-items: center;
 }
 
