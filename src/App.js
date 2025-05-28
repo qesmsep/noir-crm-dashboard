@@ -429,7 +429,10 @@ function App() {
         .eq('type', 'base');
       
       if (!error && data) {
+        console.log('Loaded base hours:', data);
         setBaseHours(data);
+      } else if (error) {
+        console.error('Error loading base hours:', error);
       }
     }
     fetchBaseHours();
@@ -445,7 +448,12 @@ function App() {
     }
 
     const dayOfWeek = selectedDateCST.getDay();
+    console.log('Selected date:', selectedDateCST);
+    console.log('Day of week:', dayOfWeek);
+    console.log('Base hours:', baseHours);
+    
     const dayHours = baseHours.find(h => h.day_of_week === dayOfWeek);
+    console.log('Found day hours:', dayHours);
     
     if (!dayHours || !dayHours.time_ranges || dayHours.time_ranges.length === 0) {
       return []; // No hours available for this day
@@ -468,6 +476,7 @@ function App() {
       }
     });
     
+    console.log('Generated times:', times);
     return times;
   };
 
