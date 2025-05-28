@@ -2045,6 +2045,7 @@ function App() {
                       dateFormat="MMMM d, yyyy"
                       minDate={new Date()}
                       className="form-control"
+                      filterDate={d => getAvailableTimes(d).length > 0}
                     />
                   </div>
                   <div className="form-group">
