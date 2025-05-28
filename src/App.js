@@ -14,7 +14,6 @@ import { Elements } from '@stripe/react-stripe-js';
 import FullCalendarTimeline from './components/FullCalendarTimeline';
 import CalendarAvailabilityControl from './components/CalendarAvailabilityControl';
 import { toCST, toCSTISOString, createDateFromTimeString } from './utils/dateUtils';
-import PrivateEventsManager from './components/PrivateEventsManager';
 
 // Responsive helper
 function useIsMobile() {
@@ -1714,7 +1713,7 @@ function App() {
                           {idx < hour.time_ranges.length - 1 ? ', ' : ''}
                         </span>
                       ))}
-                    </div>
+                </div>
                   ))}
                 </div>
               </div>
@@ -1722,11 +1721,6 @@ function App() {
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                 <h2>Calendar Availability Control</h2>
                 <CalendarAvailabilityControl />
-              </div>
-
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-                <h2>Private Events</h2>
-                <PrivateEventsManager />
               </div>
 
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
@@ -1824,7 +1818,7 @@ function App() {
                 <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                   <h2>Promote User to Admin</h2>
                   <form onSubmit={handlePromote} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <input
+              <input
                       type="email"
                       placeholder="User email"
                       value={promoteEmail}
@@ -1834,11 +1828,11 @@ function App() {
                     />
                     <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
                       Promote
-                    </button>
+            </button>
                   </form>
                   {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
-                </div>
-              </div>
+            </div>
+          </div>
             </>
           )}
           {section === 'lookup' && (
@@ -2080,17 +2074,17 @@ function App() {
                   <div className="form-group">
                     <label>Party Size</label>
                     <div className="party-size-control">
-                      <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
+                    <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
                       <span>{partySize} guests</span>
-                      <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
-                    </div>
+                    <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
+                  </div>
                   </div>
                   <div className="form-group">
-                    <label>Date</label>
-                    <DatePicker
-                      selected={date}
-                      onChange={d => setDate(d)}
-                      dateFormat="MMMM d, yyyy"
+                      <label>Date</label>
+                      <DatePicker
+                        selected={date}
+                        onChange={d => setDate(d)}
+                        dateFormat="MMMM d, yyyy"
                       minDate={bookingStartDate || new Date()}
                       maxDate={bookingEndDate || null}
                       className="form-control"
@@ -2103,16 +2097,16 @@ function App() {
                         );
                         return !isClosed && getAvailableTimes(d).length > 0;
                       }}
-                    />
-                  </div>
+                      />
+                    </div>
                   <div className="form-group">
-                    <label>Time</label>
-                    <select
-                      value={time}
-                      onChange={e => setTime(e.target.value)}
+                      <label>Time</label>
+                      <select
+                        value={time}
+                        onChange={e => setTime(e.target.value)}
                       className="form-control"
                       disabled={getAvailableTimes(date).length === 0}
-                    >
+                      >
                       {getAvailableTimes(date).length === 0 ? (
                         <option value="">No available times</option>
                       ) : (
@@ -2139,10 +2133,10 @@ function App() {
                       {eventTypes.map(type => (
                         <option key={type.value} value={type.value}>
                           {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   <button
                     onClick={handleReserveNow}
                     className="reserve-button"
@@ -2154,7 +2148,7 @@ function App() {
                       {reserveStatus}
                     </div>
                   )}
-                </div>
+                  </div>
 
                 {showNonMemberModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
@@ -2191,8 +2185,8 @@ function App() {
                         />
                       </div>
                       <div className="modal-actions">
-                        <button
-                          onClick={async () => {
+                  <button
+                    onClick={async () => {
                             if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
                               setReserveStatus('Please enter first name, last name, and email for non-members.');
                               return;
@@ -2200,10 +2194,10 @@ function App() {
                             try {
                               await createReservation({
                                 name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
-                                phone,
+                          phone,
                                 email: nonMemberFields.email,
-                                party_size: partySize,
-                                notes: '',
+                          party_size: partySize,
+                          notes: '',
                                 start_time: getStartTime(),
                                 end_time: getEndTime(),
                                 source: 'public_widget',
@@ -2211,12 +2205,12 @@ function App() {
                               });
                               setNonMemberFields({ firstName: '', lastName: '', email: '' });
                               setShowNonMemberModal(false);
-                              setReloadKey(k => k + 1);
-                              setPhone('');
-                              setFirstName('');
-                              setLastName('');
-                              setPartySize(1);
-                              setTime('18:00');
+                      setReloadKey(k => k + 1);
+                      setPhone('');
+                      setFirstName('');
+                      setLastName('');
+                      setPartySize(1);
+                      setTime('18:00');
                               setReserveStatus('Reservation confirmed!');
                             } catch (err) {
                               console.log('Reservation failed (non-member):', err);
@@ -2231,8 +2225,8 @@ function App() {
                           className="secondary"
                         >
                           Cancel
-                        </button>
-                      </div>
+                  </button>
+                </div>
                     </div>
                   </div>
                 )}
