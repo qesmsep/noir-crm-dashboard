@@ -467,14 +467,18 @@ function App() {
 
     const times = [];
     dayHours.time_ranges.forEach(range => {
-      const [startHour, startMinute] = range.start.split(':').map(Number);
-      const [endHour, endMinute] = range.end.split(':').map(Number);
-      
+      let [startHour, startMinute] = range.start.split(':').map(Number);
+      let [endHour, endMinute] = range.end.split(':').map(Number);
+
+      // Treat 00:00 as 24:00 for end of day
+      if (endHour === 0 && endMinute === 0) {
+        endHour = 24;
+      }
+
       for (let h = startHour; h < endHour; h++) {
         for (let m = 0; m < 60; m += 15) {
           if (h === startHour && m < startMinute) continue;
           if (h === endHour && m >= endMinute) continue;
-          
           const hh = String(h).padStart(2, '0');
           const mm = String(m).padStart(2, '0');
           times.push(`${hh}:${mm}`);
@@ -619,6 +623,12 @@ function App() {
     // Add missing functions
     const formatDateLong = (dateString) => {
       if (!dateString) return null;
+      // Parse as local date if in YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
+      }
       const date = new Date(dateString);
       if (isNaN(date)) return null;
       return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
