@@ -19,6 +19,8 @@ const CalendarAvailabilityControl = () => {
   const [exceptionalClosures, setExceptionalClosures] = useState([]);
   const [newClosureDate, setNewClosureDate] = useState(null);
   const [newClosureReason, setNewClosureReason] = useState('');
+  const [newClosureTimeRanges, setNewClosureTimeRanges] = useState([{ start: '18:00', end: '23:00' }]);
+  const [newClosureFullDay, setNewClosureFullDay] = useState(true);
 
   // Error State
   const [error, setError] = useState('');
@@ -195,36 +197,34 @@ const CalendarAvailabilityControl = () => {
   // Exceptional Closures Handlers
   const addExceptionalClosure = async () => {
     if (!newClosureDate) return;
-
     try {
       setError(null);
       // Check for overlapping dates
       const isOverlapping = exceptionalOpens.some(open => 
         new Date(open.date).toDateString() === newClosureDate.toDateString()
       );
-
       if (isOverlapping) {
         setError('Cannot add closure on an exceptional open date.');
         return;
       }
-
       const newClosure = {
-        date: newClosureDate,
+        date: newClosureDate.toISOString().split('T')[0],
         reason: newClosureReason,
-        type: 'exceptional_closure'
+        type: 'exceptional_closure',
+        full_day: newClosureFullDay,
+        time_ranges: newClosureFullDay ? null : newClosureTimeRanges
       };
-
       const { data, error } = await supabase
         .from('venue_hours')
         .insert([newClosure])
         .select();
-
       if (error) throw error;
-
       if (data) {
         setExceptionalClosures([...exceptionalClosures, data[0]]);
         setNewClosureDate(null);
         setNewClosureReason('');
+        setNewClosureTimeRanges([{ start: '18:00', end: '23:00' }]);
+        setNewClosureFullDay(true);
       }
     } catch (error) {
       console.error('Error adding exceptional closure:', error);
@@ -400,6 +400,54 @@ const CalendarAvailabilityControl = () => {
             placeholder="Reason for closure (optional)"
             className="closure-reason"
           />
+          <label style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="checkbox"
+              checked={newClosureFullDay}
+              onChange={e => setNewClosureFullDay(e.target.checked)}
+            />
+            Full Day
+          </label>
+          {!newClosureFullDay && (
+            <div className="time-ranges">
+              {newClosureTimeRanges.map((range, index) => (
+                <div key={index} className="time-range">
+                  <input
+                    type="time"
+                    value={range.start}
+                    onChange={e => {
+                      const newRanges = [...newClosureTimeRanges];
+                      newRanges[index].start = e.target.value;
+                      setNewClosureTimeRanges(newRanges);
+                    }}
+                  />
+                  <span>to</span>
+                  <input
+                    type="time"
+                    value={range.end}
+                    onChange={e => {
+                      const newRanges = [...newClosureTimeRanges];
+                      newRanges[index].end = e.target.value;
+                      setNewClosureTimeRanges(newRanges);
+                    }}
+                  />
+                  <button
+                    className="remove-range"
+                    onClick={() => {
+                      const newRanges = [...newClosureTimeRanges];
+                      newRanges.splice(index, 1);
+                      setNewClosureTimeRanges(newRanges);
+                    }}
+                    disabled={newClosureTimeRanges.length === 1}
+                  >×</button>
+                </div>
+              ))}
+              <button
+                className="add-range"
+                onClick={() => setNewClosureTimeRanges([...newClosureTimeRanges, { start: '18:00', end: '23:00' }])}
+              >+ Add Time Range</button>
+            </div>
+          )}
           <button className="add-exception-btn" onClick={addExceptionalClosure}>
             Add Closure
           </button>
@@ -412,6 +460,11 @@ const CalendarAvailabilityControl = () => {
                   ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
                   : new Date(closure.date).toLocaleDateString()
               }</span>
+              {closure.full_day ? (
+                <span style={{ color: '#a59480', fontStyle: 'italic' }}>Full Day</span>
+              ) : (
+                <span>{closure.time_ranges && closure.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
+              )}
               {closure.reason && <span className="closure-reason">{closure.reason}</span>}
               <button 
                 className="delete-exception"
