@@ -1,18 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+import { supabase } from '../src/supabaseClient';
+
+const supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // Helper to auto-assign smallest free table
 async function assignTable(start_time, end_time, party_size) {
   // Use the same logic for all party sizes: find the smallest available table with sufficient capacity
-  const { data: tables } = await supabase
+  const { data: tables } = await supabaseClient
     .from('tables').select('*').gte('capacity', party_size).order('capacity');
   for (const t of tables) {
     // Fetch all events for this table
-    const { data: events } = await supabase
+    const { data: events } = await supabaseClient
       .from('events').select('start_time, end_time, table_id')
       .eq('table_id', t.id);
     // Fetch all reservations for this table
-    const { data: reservations } = await supabase
+    const { data: reservations } = await supabaseClient
       .from('reservations').select('start_time, end_time, table_id')
       .eq('table_id', t.id);
     // Check for time overlap with events
@@ -30,7 +32,7 @@ async function assignTable(start_time, end_time, party_size) {
 
 // Helper to find the next available time for a table with sufficient capacity
 async function findNextAvailableTime(start_time, durationMinutes, party_size) {
-  const { data: tables } = await supabase
+  const { data: tables } = await supabaseClient
     .from('tables').select('*').gte('capacity', party_size).order('capacity');
   const searchStart = new Date(start_time);
   const searchEnd = new Date(searchStart.getTime() + 7 * 24 * 60 * 60 * 1000); // search up to 7 days ahead
@@ -38,9 +40,9 @@ async function findNextAvailableTime(start_time, durationMinutes, party_size) {
 
   for (const t of tables) {
     // Fetch all events and reservations for this table, sorted by start_time
-    const { data: events } = await supabase
+    const { data: events } = await supabaseClient
       .from('events').select('start_time, end_time').eq('table_id', t.id);
-    const { data: reservations } = await supabase
+    const { data: reservations } = await supabaseClient
       .from('reservations').select('start_time, end_time').eq('table_id', t.id);
     const blocks = [...(events || []), ...(reservations || [])]
       .map(b => ({
@@ -70,6 +72,126 @@ async function findNextAvailableTime(start_time, durationMinutes, party_size) {
   }
   return earliest ? earliest.toISOString() : null;
 }
+
+export const getReservations = async (startDate, endDate) => {
+    const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+            *,
+            tables (
+                id,
+                number,
+                capacity
+            )
+        `)
+        .gte('start_time', startDate.toISOString())
+        .lte('end_time', endDate.toISOString())
+        .order('start_time', { ascending: true });
+
+    if (error) throw error;
+    return data;
+};
+
+export const createReservation = async (reservationData) => {
+    // If this is a private event reservation, check if the table is available during the event
+    if (reservationData.is_private_event) {
+        const { data: privateEvent } = await supabase
+            .from('private_events')
+            .select('*')
+            .eq('id', reservationData.private_event_id)
+            .single();
+
+        if (!privateEvent) {
+            throw new Error('Private event not found');
+        }
+
+        // Check if the table is already reserved during this event
+        const { data: existingReservations } = await supabase
+            .from('reservations')
+            .select('*')
+            .eq('table_id', reservationData.table_id)
+            .gte('start_time', privateEvent.start_time)
+            .lte('end_time', privateEvent.end_time);
+
+        if (existingReservations && existingReservations.length > 0) {
+            throw new Error('This table is already reserved during the private event');
+        }
+    }
+
+    const { data, error } = await supabase
+        .from('reservations')
+        .insert([reservationData])
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const updateReservation = async (id, reservationData) => {
+    // If this is a private event reservation, check if the table is available during the event
+    if (reservationData.is_private_event) {
+        const { data: privateEvent } = await supabase
+            .from('private_events')
+            .select('*')
+            .eq('id', reservationData.private_event_id)
+            .single();
+
+        if (!privateEvent) {
+            throw new Error('Private event not found');
+        }
+
+        // Check if the table is already reserved during this event (excluding this reservation)
+        const { data: existingReservations } = await supabase
+            .from('reservations')
+            .select('*')
+            .eq('table_id', reservationData.table_id)
+            .neq('id', id)
+            .gte('start_time', privateEvent.start_time)
+            .lte('end_time', privateEvent.end_time);
+
+        if (existingReservations && existingReservations.length > 0) {
+            throw new Error('This table is already reserved during the private event');
+        }
+    }
+
+    const { data, error } = await supabase
+        .from('reservations')
+        .update(reservationData)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const deleteReservation = async (id) => {
+    const { error } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', id);
+
+    if (error) throw error;
+};
+
+export const getReservationById = async (id) => {
+    const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+            *,
+            tables (
+                id,
+                number,
+                capacity
+            )
+        `)
+        .eq('id', id)
+        .single();
+
+    if (error) throw error;
+    return data;
+};
 
 export default async function handler(req, res) {
   const { method } = req;

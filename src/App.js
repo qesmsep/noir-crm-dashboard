@@ -14,6 +14,7 @@ import { Elements } from '@stripe/react-stripe-js';
 import FullCalendarTimeline from './components/FullCalendarTimeline';
 import CalendarAvailabilityControl from './components/CalendarAvailabilityControl';
 import { toCST, toCSTISOString, createDateFromTimeString } from './utils/dateUtils';
+import PrivateEventsManager from './components/PrivateEventsManager';
 
 // Responsive helper
 function useIsMobile() {
@@ -1721,6 +1722,11 @@ function App() {
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                 <h2>Calendar Availability Control</h2>
                 <CalendarAvailabilityControl />
+              </div>
+
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>Private Events</h2>
+                <PrivateEventsManager />
               </div>
 
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>

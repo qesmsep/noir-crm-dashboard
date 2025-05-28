@@ -4,7 +4,9 @@ import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
+import PrivateEventReservationModal from './PrivateEventReservationModal';
 import { toCST, toCSTISOString, formatDateTime } from '../utils/dateUtils';
+import { getPrivateEvents } from '../../api/private_events';
 
 export default function FullCalendarTimeline({ reloadKey, bookingStartDate, bookingEndDate }) {
   const [resources, setResources] = useState([]);
@@ -13,6 +15,8 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [newReservation, setNewReservation] = useState(null);
+  const [showPrivateEventModal, setShowPrivateEventModal] = useState(false);
+  const [selectedPrivateEvent, setSelectedPrivateEvent] = useState(null);
 
   useEffect(() => {
     // Fetch tables as resources, sorted by number
@@ -28,11 +32,12 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
         );
       });
 
-    // Fetch reservations/events
+    // Fetch reservations/events/private events
     Promise.all([
       fetch('/api/events').then(r => r.json()),
-      fetch('/api/reservations').then(r => r.json())
-    ]).then(([evRes, resRes]) => {
+      fetch('/api/reservations').then(r => r.json()),
+      getPrivateEvents(new Date(), new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)) // Next 90 days
+    ]).then(([evRes, resRes, privateEvents]) => {
       const eventTypeEmojis = {
         birthday: '🎂',
         engagement: '💍',
@@ -73,6 +78,21 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
           ...r,
           type: 'reservation',
         }))
+      ).concat(
+        (privateEvents || []).map(e => ({
+          id: String(e.id),
+          title: `🎉 ${e.title}`,
+          start: e.start_time,
+          end: e.end_time,
+          resourceId: 'all', // Show on all tables
+          backgroundColor: '#4a90e2',
+          borderColor: '#357abd',
+          textColor: '#ffffff',
+          extendedProps: {
+            description: e.description,
+            type: 'private_event'
+          }
+        }))
       );
       setEvents(mapped);
     });
@@ -88,6 +108,12 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     const newTableId = event.getResources && event.getResources().length > 0
       ? event.getResources()[0].id
       : event.extendedProps.resourceId;
+
+    // Don't allow moving private events
+    if (event.extendedProps.type === 'private_event') {
+      info.revert();
+      return;
+    }
 
     const res = await fetch(`/api/reservations?id=${id}`, {
       method: 'PATCH',
@@ -111,6 +137,13 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     const id = event.id;
     const newStart = toCSTISOString(event.start);
     const newEnd = toCSTISOString(event.end);
+
+    // Don't allow resizing private events
+    if (event.extendedProps.type === 'private_event') {
+      info.revert();
+      return;
+    }
+
     const res = await fetch(`/api/reservations?id=${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -127,10 +160,12 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     }
   }
 
-  // Handler for clicking a reservation
+  // Handler for clicking a reservation or private event
   function handleEventClick(info) {
-    // Only allow editing reservations, not events
-    if (info.event.extendedProps.type === 'reservation') {
+    if (info.event.extendedProps.type === 'private_event') {
+      setSelectedPrivateEvent(info.event);
+      setShowPrivateEventModal(true);
+    } else if (info.event.extendedProps.type === 'reservation') {
       setSelectedReservation({ ...info.event.extendedProps, id: info.event.id });
       setShowModal(true);
     }
@@ -150,6 +185,20 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
 
   // Handler for slot selection to create a new reservation
   function handleSelectSlot(arg) {
+    // Check if the selected slot overlaps with any private event
+    const selectedStart = new Date(arg.start);
+    const selectedEnd = new Date(arg.end);
+    const overlappingPrivateEvent = events.find(event => 
+      event.extendedProps.type === 'private_event' &&
+      new Date(event.start) <= selectedEnd &&
+      new Date(event.end) >= selectedStart
+    );
+
+    if (overlappingPrivateEvent) {
+      alert('Cannot create a reservation during a private event.');
+      return;
+    }
+
     // arg.start, arg.end, arg.resource (table id)
     const start = toCST(arg.start);
     const end = new Date(start.getTime() + 90 * 60000); // 90 minutes later
@@ -323,6 +372,19 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
             />
           </div>
         </div>
+      )}
+
+      {/* Private Event Reservation Modal */}
+      {showPrivateEventModal && selectedPrivateEvent && (
+        <PrivateEventReservationModal
+          show={showPrivateEventModal}
+          onHide={() => {
+            setShowPrivateEventModal(false);
+            setSelectedPrivateEvent(null);
+          }}
+          eventId={selectedPrivateEvent.id}
+          tables={resources}
+        />
       )}
     </div>
   );
