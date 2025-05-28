@@ -45,6 +45,16 @@ const CalendarAvailabilityControl = () => {
   const [maxDaysOutLoading, setMaxDaysOutLoading] = useState(true);
   const [maxDaysOutSaving, setMaxDaysOutSaving] = useState(false);
 
+  // Add state for booking dates
+  const [bookingStartDate, setBookingStartDate] = useState(new Date());
+  const [bookingEndDate, setBookingEndDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 60);
+    return d;
+  });
+  const [bookingDatesLoading, setBookingDatesLoading] = useState(true);
+  const [bookingDatesSaving, setBookingDatesSaving] = useState(false);
+
   // Load from Supabase on mount
   useEffect(() => {
     async function fetchMaxDaysOut() {
@@ -62,6 +72,26 @@ const CalendarAvailabilityControl = () => {
     fetchMaxDaysOut();
   }, []);
 
+  useEffect(() => {
+    async function fetchBookingDates() {
+      setBookingDatesLoading(true);
+      const { data: startData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'booking_start_date')
+        .single();
+      const { data: endData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'booking_end_date')
+        .single();
+      if (startData && startData.value) setBookingStartDate(new Date(startData.value));
+      if (endData && endData.value) setBookingEndDate(new Date(endData.value));
+      setBookingDatesLoading(false);
+    }
+    fetchBookingDates();
+  }, []);
+
   // Save to Supabase when changed
   async function handleMaxDaysOutChange(val) {
     setMaxDaysOut(val);
@@ -71,6 +101,15 @@ const CalendarAvailabilityControl = () => {
       .upsert({ key: 'max_days_out', value: String(val) });
     setMaxDaysOutSaving(false);
     if (error) setError('Failed to save max days out: ' + error.message);
+  }
+
+  async function handleBookingDatesChange(start, end) {
+    setBookingStartDate(start);
+    setBookingEndDate(end);
+    setBookingDatesSaving(true);
+    await supabase.from('settings').upsert({ key: 'booking_start_date', value: start.toISOString().split('T')[0] });
+    await supabase.from('settings').upsert({ key: 'booking_end_date', value: end.toISOString().split('T')[0] });
+    setBookingDatesSaving(false);
   }
 
   // Load existing data
@@ -397,6 +436,39 @@ const CalendarAvailabilityControl = () => {
         {maxDaysOutSaving && <span style={{ color: '#888', marginLeft: 8 }}>Saving...</span>}
         <span style={{ color: '#888', fontSize: '0.95em', marginLeft: 8 }}>
           (How far in advance users can book)
+        </span>
+      </div>
+      {/* Booking Window Setting */}
+      <div style={{ marginBottom: '1.5rem', background: '#faf9f7', padding: '1rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 420 }}>
+        <label style={{ fontWeight: 600, color: '#333', marginRight: 10, display: 'block', marginBottom: 8 }}>
+          Booking Window:
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div>
+            <span style={{ color: '#555', fontSize: '0.98em' }}>Start Date:</span>
+            <DatePicker
+              selected={bookingStartDate}
+              onChange={date => handleBookingDatesChange(date, bookingEndDate)}
+              dateFormat="yyyy-MM-dd"
+              className="date-picker"
+              disabled={bookingDatesLoading || bookingDatesSaving}
+            />
+          </div>
+          <div>
+            <span style={{ color: '#555', fontSize: '0.98em' }}>End Date:</span>
+            <DatePicker
+              selected={bookingEndDate}
+              onChange={date => handleBookingDatesChange(bookingStartDate, date)}
+              dateFormat="yyyy-MM-dd"
+              className="date-picker"
+              disabled={bookingDatesLoading || bookingDatesSaving}
+            />
+          </div>
+          {bookingDatesLoading && <span style={{ color: '#888' }}>Loading...</span>}
+          {bookingDatesSaving && <span style={{ color: '#888' }}>Saving...</span>}
+        </div>
+        <span style={{ color: '#888', fontSize: '0.95em', marginLeft: 2 }}>
+          (Users can book between these dates)
         </span>
       </div>
       {error && <div className="error-message">{error}</div>}
