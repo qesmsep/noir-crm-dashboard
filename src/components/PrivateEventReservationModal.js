@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Button, Alert } from 'react-bootstrap';
-import { getPrivateEventById } from '../../api/private_events';
-import { createReservation } from '../../api/reservations';
+import { getPrivateEventById } from '../api/private_events';
+import { createReservation } from '../api/reservations';
 import { format } from 'date-fns';
 
 const PrivateEventReservationModal = ({ show, onHide, eventId, tables }) => {

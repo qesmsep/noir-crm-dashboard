@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPrivateEvents, createPrivateEvent, updatePrivateEvent, deletePrivateEvent } from '../../api/private_events';
+import { getPrivateEvents, createPrivateEvent, updatePrivateEvent, deletePrivateEvent } from '../api/private_events';
 import { format } from 'date-fns';
 import { Button, Modal, Form, Table, Alert } from 'react-bootstrap';
 

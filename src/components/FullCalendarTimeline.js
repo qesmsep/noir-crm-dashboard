@@ -6,7 +6,7 @@ import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
 import PrivateEventReservationModal from './PrivateEventReservationModal';
 import { toCST, toCSTISOString, formatDateTime } from '../utils/dateUtils';
-import { getPrivateEvents } from '../../api/private_events';
+import { getPrivateEvents } from '../api/private_events';
 
 export default function FullCalendarTimeline({ reloadKey, bookingStartDate, bookingEndDate }) {
   const [resources, setResources] = useState([]);
