@@ -225,6 +225,33 @@ export default function FullCalendarTimeline({ reloadKey }) {
     }}>
       {/* Calendar in its own scrollable container, fills available space */}
       <div style={{ width: '100%', overflowX: 'auto', flex: '1 1 auto', minHeight: 0 }}>
+        <style>
+          {`
+            .fc-event {
+              margin: 0 !important;
+              padding: 0 !important;
+              border: none !important;
+            }
+            .fc-event-main {
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .fc-event-main-frame {
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .fc-event-title-container {
+              padding: 2px 4px !important;
+              margin: 0 !important;
+            }
+            .fc-timeline-slot {
+              height: 30px !important;
+            }
+            .fc-timeline-slot-lane {
+              height: 30px !important;
+            }
+          `}
+        </style>
         <FullCalendar
           plugins={[resourceTimelinePlugin, interactionPlugin]}
           initialView="resourceTimelineDay"
@@ -255,10 +282,10 @@ export default function FullCalendarTimeline({ reloadKey }) {
             return {
               html: `
                 <div class="fc-event-main-frame" style="padding: 0;">
-                  <div class="fc-event-title-container" style="padding: 4px 8px; margin: 0;">
-                    <div class="fc-event-title" style="margin: 0;">${eventInfo.event.title}</div>
+                  <div class="fc-event-title-container" style="padding: 2px 4px; margin: 0;">
+                    <div class="fc-event-title" style="margin: 0; line-height: 1.2;">${eventInfo.event.title}</div>
                     ${eventInfo.event.extendedProps.created_at ? 
-                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 4px; margin-bottom: 0;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
+                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 2px; margin-bottom: 0; line-height: 1.2;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
                       : ''}
                   </div>
                 </div>
