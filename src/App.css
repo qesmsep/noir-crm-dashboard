@@ -576,7 +576,22 @@ body {
 }
 
 .fc-timeline-slot {
-  border-right: 1px solid #e0e0e0 !important;
+  background: #f8f8f8;
+}
+
+/* Timeline lane frame styles */
+.fc-timeline-lane-frame {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin: 2px;
+  padding: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.fc-timeline-lane-frame:hover {
+  border-color: var(--color-cork);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 /* Decrease font size for react-big-calendar */
