@@ -254,17 +254,19 @@ export default function FullCalendarTimeline({ reloadKey }) {
           eventContent={(eventInfo) => {
             return {
               html: `
-                <div class="fc-event-main-frame">
-                  <div class="fc-event-title-container" style="padding: 4px 8px;">
-                    <div class="fc-event-title">${eventInfo.event.title}</div>
+                <div class="fc-event-main-frame" style="padding: 0;">
+                  <div class="fc-event-title-container" style="padding: 4px 8px; margin: 0;">
+                    <div class="fc-event-title" style="margin: 0;">${eventInfo.event.title}</div>
                     ${eventInfo.event.extendedProps.created_at ? 
-                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 4px;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
+                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 4px; margin-bottom: 0;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
                       : ''}
                   </div>
                 </div>
               `
             };
           }}
+          eventMinHeight={0}
+          eventMinWidth={0}
         />
       </div>
       {/* Total Guests Row in its own scrollable container, below calendar */}
