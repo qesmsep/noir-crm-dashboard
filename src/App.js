@@ -436,7 +436,14 @@ function App() {
 
   // Modify the times array generation to respect base hours
   const getAvailableTimes = (selectedDate) => {
-    const dayOfWeek = selectedDate.getDay();
+    // Check if date is in the past using CST
+    const now = toCST(new Date());
+    const selectedDateCST = toCST(selectedDate);
+    if (selectedDateCST < now) {
+      return []; // No times available for past dates
+    }
+
+    const dayOfWeek = selectedDateCST.getDay();
     const dayHours = baseHours.find(h => h.day_of_week === dayOfWeek);
     
     if (!dayHours || !dayHours.time_ranges || dayHours.time_ranges.length === 0) {
@@ -1912,17 +1919,17 @@ function App() {
 
             function getStartTime() {
               const [hh, mm] = time.split(':');
-              const start = new Date(date);
+              const start = toCST(new Date(date));
               start.setHours(Number(hh), Number(mm), 0, 0);
-              return start.toISOString();
+              return toCSTISOString(start);
             }
             function getEndTime() {
               const [hh, mm] = time.split(':');
-              const start = new Date(date);
+              const start = toCST(new Date(date));
               start.setHours(Number(hh), Number(mm), 0, 0);
               const duration = partySize <= 2 ? 90 : 120;
               const end = new Date(start.getTime() + duration * 60000);
-              return end.toISOString();
+              return toCSTISOString(end);
             }
 
             async function createReservation(payload) {
@@ -2010,7 +2017,11 @@ function App() {
                       ) : (
                         getAvailableTimes(date).map(t => (
                           <option key={t} value={t}>
-                            {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            {createDateFromTimeString(t).toLocaleTimeString('en-US', { 
+                              hour: 'numeric', 
+                              minute: '2-digit',
+                              timeZone: 'America/Chicago'
+                            })}
                           </option>
                         ))
                       )}
