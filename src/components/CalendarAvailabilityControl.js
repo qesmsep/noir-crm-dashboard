@@ -366,7 +366,7 @@ const CalendarAvailabilityControl = () => {
             <div key={open.id} className="exception-item">
               <span>{
                 open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date)
-                  ? new Date(Date.UTC(...open.date.split('-').map(Number))).toLocaleDateString()
+                  ? (() => { const [y, m, d] = open.date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(); })()
                   : new Date(open.date).toLocaleDateString()
               }</span>
               <span>{open.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
@@ -409,7 +409,7 @@ const CalendarAvailabilityControl = () => {
             <div key={closure.id} className="exception-item">
               <span>{
                 closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date)
-                  ? new Date(Date.UTC(...closure.date.split('-').map(Number))).toLocaleDateString()
+                  ? (() => { const [y, m, d] = closure.date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(); })()
                   : new Date(closure.date).toLocaleDateString()
               }</span>
               {closure.reason && <span className="closure-reason">{closure.reason}</span>}
