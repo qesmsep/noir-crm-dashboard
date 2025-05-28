@@ -1327,10 +1327,10 @@ function App() {
                           marginBottom: 0
                         }}>
                           <li
-                            className="member-item"
+                        className="member-item"
                             style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}
-                            onClick={() => {
-                              setSelectedMember(member);
+                        onClick={() => {
+                          setSelectedMember(member);
                               fetchLedger(member.account_id);
                             }}
                           >
@@ -1351,9 +1351,9 @@ function App() {
                               <div>Email: {member.email}</div>
                               <div>Date of Birth: {formatDOB(member.dob)}</div>
                             </div>
-                          </li>
+                      </li>
                         </div>
-                      ))}
+                    ))}
                     </div>
                   ))}
                 </>
@@ -1382,9 +1382,9 @@ function App() {
                     <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
                       {members.filter(m => m.account_id === selectedMember.account_id).map((member, idx, arr) => (
                         <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
-                          <MemberDetail
+                    <MemberDetail
                             member={member}
-                            session={session}
+                      session={session}
                             onEditMember={handleEditMember}
                           />
                         </div>
@@ -2078,8 +2078,8 @@ function App() {
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
                         />
                       </div>
-                      <button
-                        onClick={async () => {
+                  <button
+                    onClick={async () => {
                           if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
                             setReserveStatus('Please enter first name, last name, and email for non-members.');
                             return;
@@ -2087,30 +2087,30 @@ function App() {
                           try {
                             await createReservation({
                               name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
-                              phone,
+                          phone,
                               email: nonMemberFields.email,
-                              party_size: partySize,
-                              notes: '',
+                          party_size: partySize,
+                          notes: '',
                               start_time: getStartTime(),
                               end_time: getEndTime(),
                               source: 'public_widget'
                             });
                             setNonMemberFields({ firstName: '', lastName: '', email: '' });
                             setShowNonMemberModal(false); // Only close on success
-                            setReloadKey(k => k + 1);
-                            setPhone('');
-                            setFirstName('');
-                            setLastName('');
-                            setPartySize(1);
-                            setTime('18:00');
+                      setReloadKey(k => k + 1);
+                      setPhone('');
+                      setFirstName('');
+                      setLastName('');
+                      setPartySize(1);
+                      setTime('18:00');
                             setReserveStatus('Reservation confirmed!');
                           } catch (err) {
                             console.log('Reservation failed (non-member):', err);
                             // Do not close modal, let popup show
                           }
-                        }}
-                        style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
-                      >
+                    }}
+                    style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
+                  >
                         Confirm Reservation
                       </button>
                       <button
@@ -2118,8 +2118,8 @@ function App() {
                         style={{ width: '100%', padding: '0.75rem', background: '#ccc', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem', marginTop: '1rem' }}
                       >
                         Cancel
-                      </button>
-                    </div>
+                  </button>
+                </div>
                   </div>
                 )}
                 {/* Add this near the reservation UI */}

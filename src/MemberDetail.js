@@ -409,7 +409,7 @@ const MemberDetail = ({
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-          <button
+              <button
             className="edit-member-btn"
             onClick={() => {
               if (typeof onEditMember === 'function') onEditMember(member);
@@ -425,17 +425,17 @@ const MemberDetail = ({
             }}
           >
             Edit Member
-          </button>
-          <button
-            className="delete-member-btn"
-            onClick={() => {
-              if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+            </button>
+        <button
+          className="delete-member-btn"
+          onClick={() => {
+            if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
                 handleDeleteMember(member.member_id, member.supabase_user_id);
-              }
-            }}
-          >
-            Delete Member
-          </button>
+            }
+          }}
+        >
+          Delete Member
+        </button>
         </div>
       </div>
     </div>

@@ -18,9 +18,9 @@ export default function CalendarView({ onSelectSlot, onSelectEvent, reloadKey })
       const tableResources = (tablesJson.data || [])
         .sort((a, b) => a.number - b.number)
         .map(t => ({
-          resourceId: t.id,
-          resourceTitle: `Table ${t.number}`
-        }));
+        resourceId: t.id,
+        resourceTitle: `Table ${t.number}`
+      }));
       setTables(tableResources);
 
       // Fetch events and reservations

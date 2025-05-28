@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     // Generate a new account_id for this submission
     const account_id = uuidv4();
 
-    // Main member
+      // Main member
     const member1 = {
       member_id: uuidv4(),
       account_id,
