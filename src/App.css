@@ -653,3 +653,160 @@ body {
   border-right: none !important;
 }
 */
+
+/* Reserve On The Spot Form Styles */
+.reserve-form {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+.reserve-form h2 {
+  color: var(--color-night-sky);
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.2rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--color-night-sky);
+  font-weight: 500;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--color-greige);
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--color-cork);
+  box-shadow: 0 0 0 2px rgba(165, 148, 128, 0.1);
+}
+
+.party-size-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.party-size-control button {
+  background: var(--color-wedding-day);
+  border: 1px solid var(--color-greige);
+  color: var(--color-night-sky);
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.party-size-control button:hover {
+  background: var(--color-cork);
+  color: #fff;
+  border-color: var(--color-cork);
+}
+
+.party-size-control span {
+  font-size: 1.1rem;
+  color: var(--color-night-sky);
+  min-width: 60px;
+  text-align: center;
+}
+
+.reserve-button {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--color-cork);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.reserve-button:hover {
+  background: var(--color-night-sky);
+}
+
+.reserve-status {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.reserve-status.success {
+  background: #e7faec;
+  color: #228B22;
+}
+
+.reserve-status.error {
+  background: #fde8e8;
+  color: #e53e3e;
+}
+
+/* Non-member modal styles */
+.non-member-modal {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+}
+
+.non-member-modal h3 {
+  color: var(--color-night-sky);
+  margin-bottom: 1.5rem;
+  font-size: 1.3rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-actions button.primary {
+  background: var(--color-cork);
+  color: #fff;
+}
+
+.modal-actions button.secondary {
+  background: var(--color-greige);
+  color: var(--color-night-sky);
+}
+
+.modal-actions button:hover {
+  opacity: 0.9;
+}

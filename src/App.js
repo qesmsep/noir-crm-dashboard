@@ -1970,10 +1970,10 @@ function App() {
             }
 
             return (
-              <div style={{ padding: '2rem', maxWidth: 650, margin: '0 auto' }}>
-                <div style={{ flex: 1, background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                  <h2 style={{ marginBottom: '1rem' }}>Reserve On The Spot</h2>
-                  <div style={{ marginBottom: '1rem' }}>
+              <div style={{ padding: '2rem' }}>
+                <div className="reserve-form">
+                  <h2>Reserve On The Spot</h2>
+                  <div className="form-group">
                     <label>Phone Number</label>
                     <input
                       type="text"
@@ -1985,21 +1985,47 @@ function App() {
                         setMemberLookup(null);
                         setReserveStatus('');
                       }}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                      className="form-control"
                     />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                    <label>Party size</label>
-                    <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
-                    <span>{partySize}</span>
-                    <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
+                  <div className="form-group">
+                    <label>Party Size</label>
+                    <div className="party-size-control">
+                      <button type="button" onClick={() => setPartySize(Math.max(1, partySize - 1))}>−</button>
+                      <span>{partySize} guests</span>
+                      <button type="button" onClick={() => setPartySize(partySize + 1)}>+</button>
+                    </div>
                   </div>
-                  <div style={{ marginBottom: '1rem' }}>
+                  <div className="form-group">
+                    <label>Date</label>
+                    <DatePicker
+                      selected={date}
+                      onChange={d => setDate(d)}
+                      dateFormat="MMMM d, yyyy"
+                      minDate={new Date()}
+                      className="form-control"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Time</label>
+                    <select
+                      value={time}
+                      onChange={e => setTime(e.target.value)}
+                      className="form-control"
+                    >
+                      {times.map(t => (
+                        <option key={t} value={t}>
+                          {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
                     <label>Event Type</label>
                     <select
                       value={eventType}
                       onChange={e => setEventType(e.target.value)}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                      className="form-control"
                     >
                       <option value="">Select an event type...</option>
                       {eventTypes.map(type => (
@@ -2009,135 +2035,105 @@ function App() {
                       ))}
                     </select>
                   </div>
-                  <div style={{ background: '#f9f9f9', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
-                    <div style={{ marginBottom: '1rem' }}>
-                      <label>Date</label>
-                      <DatePicker
-                        selected={date}
-                        onChange={d => setDate(d)}
-                        dateFormat="MMMM d, yyyy"
-                        minDate={new Date()}
-                        filterDate={d => [4,5,6].includes(d.getDay())}
-                        className="datepicker-input"
-                      />
-                    </div>
-                    <div>
-                      <label>Time</label>
-                      <select
-                        value={time}
-                        onChange={e => setTime(e.target.value)}
-                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
-                      >
-                        {times.map(t => (
-                          <option key={t} value={t}>
-                            {new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
                   <button
                     onClick={handleReserveNow}
-                    style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
+                    className="reserve-button"
                   >
                     Reserve Now
                   </button>
-                  {reserveStatus && <div style={{ marginTop: '1rem', color: reserveStatus.includes('confirmed') ? 'green' : 'red' }}>{reserveStatus}</div>}
+                  {reserveStatus && (
+                    <div className={`reserve-status ${reserveStatus.includes('confirmed') ? 'success' : 'error'}`}>
+                      {reserveStatus}
+                    </div>
+                  )}
                 </div>
+
                 {showNonMemberModal && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: 500 }}>
+                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+                    <div className="non-member-modal">
                       <h3>Enter Non-Member Details</h3>
-                      <div style={{ marginBottom: '1rem' }}>
+                      <div className="form-group">
                         <label>First Name</label>
                         <input
                           type="text"
                           placeholder="First name"
                           value={nonMemberFields.firstName}
                           onChange={e => setNonMemberFields(f => ({ ...f, firstName: e.target.value }))}
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                          className="form-control"
                         />
                       </div>
-                      <div style={{ marginBottom: '1rem' }}>
+                      <div className="form-group">
                         <label>Last Name</label>
                         <input
                           type="text"
                           placeholder="Last name"
                           value={nonMemberFields.lastName}
                           onChange={e => setNonMemberFields(f => ({ ...f, lastName: e.target.value }))}
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                          className="form-control"
                         />
                       </div>
-                      <div style={{ marginBottom: '1rem' }}>
+                      <div className="form-group">
                         <label>Email</label>
                         <input
                           type="email"
                           placeholder="Email"
                           value={nonMemberFields.email}
                           onChange={e => setNonMemberFields(f => ({ ...f, email: e.target.value }))}
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}
+                          className="form-control"
                         />
                       </div>
-                  <button
-                    onClick={async () => {
-                          if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
-                            setReserveStatus('Please enter first name, last name, and email for non-members.');
-                            return;
-                          }
-                          try {
-                            await createReservation({
-                              name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
-                          phone,
-                              email: nonMemberFields.email,
-                          party_size: partySize,
-                          notes: '',
-                              start_time: getStartTime(),
-                              end_time: getEndTime(),
-                              source: 'public_widget'
-                            });
-                            setNonMemberFields({ firstName: '', lastName: '', email: '' });
-                            setShowNonMemberModal(false); // Only close on success
-                      setReloadKey(k => k + 1);
-                      setPhone('');
-                      setFirstName('');
-                      setLastName('');
-                      setPartySize(1);
-                      setTime('18:00');
-                            setReserveStatus('Reservation confirmed!');
-                          } catch (err) {
-                            console.log('Reservation failed (non-member):', err);
-                            // Do not close modal, let popup show
-                          }
-                    }}
-                    style={{ width: '100%', padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
-                  >
-                        Confirm Reservation
-                      </button>
-                      <button
-                        onClick={() => setShowNonMemberModal(false)}
-                        style={{ width: '100%', padding: '0.75rem', background: '#ccc', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem', marginTop: '1rem' }}
-                      >
-                        Cancel
-                  </button>
-                </div>
-                  </div>
-                )}
-                {/* Add this near the reservation UI */}
-                {nextAvailableTime && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', maxWidth: 400, textAlign: 'center' }}>
-                      <h3>No table available at your requested time</h3>
-                      <p>The next available time for your party size is:</p>
-                      <p style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{new Date(nextAvailableTime).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}</p>
-                      <button onClick={() => setNextAvailableTime(null)} style={{ marginTop: '1.5rem', padding: '0.5rem 1.5rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}>OK</button>
+                      <div className="modal-actions">
+                        <button
+                          onClick={async () => {
+                            if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
+                              setReserveStatus('Please enter first name, last name, and email for non-members.');
+                              return;
+                            }
+                            try {
+                              await createReservation({
+                                name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
+                                phone,
+                                email: nonMemberFields.email,
+                                party_size: partySize,
+                                notes: '',
+                                start_time: getStartTime(),
+                                end_time: getEndTime(),
+                                source: 'public_widget',
+                                event_type: eventType
+                              });
+                              setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                              setShowNonMemberModal(false);
+                              setReloadKey(k => k + 1);
+                              setPhone('');
+                              setFirstName('');
+                              setLastName('');
+                              setPartySize(1);
+                              setTime('18:00');
+                              setReserveStatus('Reservation confirmed!');
+                            } catch (err) {
+                              console.log('Reservation failed (non-member):', err);
+                            }
+                          }}
+                          className="primary"
+                        >
+                          Confirm Reservation
+                        </button>
+                        <button
+                          onClick={() => setShowNonMemberModal(false)}
+                          className="secondary"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
+
                 {showConfirmationModal && (
                   <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                    <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: 500 }}>
+                    <div className="non-member-modal">
                       <h3>Confirm Reservation</h3>
-                      <div style={{ marginBottom: '1.5rem' }}>
+                      <div className="form-group">
                         <p><strong>Name:</strong> {pendingReservation?.name}</p>
                         <p><strong>Phone:</strong> {pendingReservation?.phone}</p>
                         <p><strong>Email:</strong> {pendingReservation?.email}</p>
@@ -2146,16 +2142,16 @@ function App() {
                         <p><strong>Time:</strong> {new Date(pendingReservation?.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
                         <p><strong>Event Type:</strong> {eventTypes.find(t => t.value === pendingReservation?.event_type)?.label || 'None'}</p>
                       </div>
-                      <div style={{ display: 'flex', gap: '1rem' }}>
+                      <div className="modal-actions">
                         <button
                           onClick={confirmReservation}
-                          style={{ flex: 1, padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
+                          className="primary"
                         >
                           Confirm
                         </button>
                         <button
                           onClick={() => setShowConfirmationModal(false)}
-                          style={{ flex: 1, padding: '0.75rem', background: '#ccc', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
+                          className="secondary"
                         >
                           Cancel
                         </button>
