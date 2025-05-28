@@ -364,7 +364,11 @@ const CalendarAvailabilityControl = () => {
         <div className="exceptions-list">
           {exceptionalOpens.map((open) => (
             <div key={open.id} className="exception-item">
-              <span>{new Date(open.date).toLocaleDateString()}</span>
+              <span>{
+                open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date)
+                  ? new Date(Date.UTC(...open.date.split('-').map(Number))).toLocaleDateString()
+                  : new Date(open.date).toLocaleDateString()
+              }</span>
               <span>{open.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
               {open.label && <span className="event-label">{open.label}</span>}
               <button 
@@ -403,7 +407,11 @@ const CalendarAvailabilityControl = () => {
         <div className="exceptions-list">
           {exceptionalClosures.map((closure) => (
             <div key={closure.id} className="exception-item">
-              <span>{new Date(closure.date).toLocaleDateString()}</span>
+              <span>{
+                closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date)
+                  ? new Date(Date.UTC(...closure.date.split('-').map(Number))).toLocaleDateString()
+                  : new Date(closure.date).toLocaleDateString()
+              }</span>
               {closure.reason && <span className="closure-reason">{closure.reason}</span>}
               <button 
                 className="delete-exception"
