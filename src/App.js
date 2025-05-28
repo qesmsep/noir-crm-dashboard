@@ -1386,7 +1386,7 @@ function App() {
                             member={member}
                       session={session}
                             onEditMember={handleEditMember}
-                          />
+                    />
                         </div>
                       ))}
                     </div>
