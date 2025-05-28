@@ -5,6 +5,14 @@ import { supabase } from '../api/supabaseClient';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Helper to format time in 12-hour am/pm
+function formatTime12h(timeStr) {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':');
+  const date = new Date(2000, 0, 1, Number(h), Number(m));
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 const CalendarAvailabilityControl = () => {
   // Base Hours State
   const [baseHours, setBaseHours] = useState(Array(7).fill().map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
@@ -513,7 +521,7 @@ const CalendarAvailabilityControl = () => {
                       ? (() => { const [y, m, d] = open.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
                       : new Date(open.date).toLocaleDateString()
                   }</span>
-                  <span>{open.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
+                  <span>{open.time_ranges.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</span>
                   {open.label && <span className="event-label">{open.label}</span>}
                   <button className="delete-exception" onClick={() => handleEditOpen(open)}>Edit</button>
                   <button className="delete-exception" onClick={() => deleteExceptionalOpen(open.id)}>Delete</button>
@@ -672,7 +680,7 @@ const CalendarAvailabilityControl = () => {
                   {closure.full_day ? (
                     <span style={{ color: '#a59480', fontStyle: 'italic' }}>Full Day</span>
                   ) : (
-                    <span>{closure.time_ranges && closure.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
+                    <span>{closure.time_ranges && closure.time_ranges.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</span>
                   )}
                   {closure.reason && <span className="closure-reason">{closure.reason}</span>}
                   <button className="delete-exception" onClick={() => handleEditClosure(closure)}>Edit</button>
