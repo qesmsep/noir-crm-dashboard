@@ -57,7 +57,7 @@ export default function FullCalendarTimeline({ reloadKey }) {
       })).concat(
         (resRes.data || []).map(r => ({
           id: String(r.id),
-          title: `${r.event_type ? eventTypeEmojis[r.event_type] + ' ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}`,
+          title: `${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
           start: r.start_time,
           end: r.end_time,
           resourceId: String(r.table_id),
