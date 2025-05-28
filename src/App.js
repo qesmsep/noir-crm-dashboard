@@ -12,6 +12,7 @@ import ReservationForm from './components/ReservationForm';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import FullCalendarTimeline from './components/FullCalendarTimeline';
+import CalendarAvailabilityControl from './components/CalendarAvailabilityControl';
 
 // Responsive helper
 function useIsMobile() {
@@ -1580,22 +1581,11 @@ function App() {
           )}
           {section === 'admin' && (
             <>
-              <h2>Reservations & Events Calendar</h2>
-              <CalendarView
-                onSelectSlot={(slot) => setSlotInfo(slot)}
-                onSelectEvent={(event) => setEventInfo(event)}
-              />
-              {slotInfo && (
-                <div>
-                  <p>Selected slot: {slotInfo.start.toString()} - {slotInfo.end.toString()}</p>
-                  {/* You can replace this with a ReservationForm modal */}
-                </div>
-              )}
-              {eventInfo && (
-                <div>
-                  <p>Selected event/reservation ID: {eventInfo.id}</p>
-                </div>
-              )}
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>Calendar Availability Control</h2>
+                <CalendarAvailabilityControl />
+              </div>
+
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                 <h2>Create New User</h2>
                 <form onSubmit={handleCreateUser} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
@@ -1687,69 +1677,25 @@ function App() {
                   </tbody>
                 </table>
               </div>
-          {/* Reminder Settings Panel */}
-          <div className="admin-panel">
-            <h2>Reminder Settings</h2>
-            <label>
-              Send reminder at hour (0-23):
-              <input
-                type="number"
-                value={reminderHour}
-                onChange={e => setReminderHour(e.target.value)}
-                style={{ width: '4rem', marginLeft: '0.5rem' }}
-              />
-            </label>
-            <button onClick={async () => {
-              await fetch('/api/reminderSettings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hour: reminderHour })
-              });
-              alert('Updated');
-            }}>
-              Save
-            </button>
-          </div>
-          <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-daybreak)', paddingTop: '1.5rem' }}>
-            <h2>Send Custom Email</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '600px' }}>
-              <input
-                type="text"
-                placeholder="Recipient (comma-separated)"
-                value={customEmailTo}
-                onChange={e => setCustomEmailTo(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-greige)' }}
-              />
-              <input
-                type="text"
-                placeholder="Subject"
-                value={customEmailSubject}
-                onChange={e => setCustomEmailSubject(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-greige)' }}
-              />
-              <textarea
-                rows={4}
-                placeholder="Message body"
-                value={customEmailBody}
-                onChange={e => setCustomEmailBody(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-greige)', resize: 'vertical' }}
-              />
-              <button
-                onClick={async () => {
-                  const res = await fetch('/api/sendCustomEmail', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ to: customEmailTo, subject: customEmailSubject, text: customEmailBody })
-                  });
-                  const json = await res.json();
-                  alert(json.error ? 'Error: ' + json.error : 'Email sent successfully');
-                }}
-                style={{ padding: '0.6rem 1.2rem', background: 'var(--color-cork)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '0.5rem' }}
-              >
-                Send Email
-              </button>
-            </div>
-          </div>
+              <div>
+                <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                  <h2>Promote User to Admin</h2>
+                  <form onSubmit={handlePromote} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <input
+                      type="email"
+                      placeholder="User email"
+                      value={promoteEmail}
+                      onChange={e => setPromoteEmail(e.target.value)}
+                      required
+                      style={{ padding: "0.5rem", fontSize: "1rem", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
+                    />
+                    <button type="submit" style={{ padding: "0.5rem 1.5rem", background: "#a59480", color: "#fff", border: "none", borderRadius: "4px", fontWeight: 600, cursor: "pointer" }}>
+                      Promote
+                    </button>
+                  </form>
+                  {promoteStatus && <div style={{ marginTop: "1rem", color: "#353535", fontWeight: 600 }}>{promoteStatus}</div>}
+                </div>
+              </div>
             </>
           )}
           {section === 'lookup' && (
