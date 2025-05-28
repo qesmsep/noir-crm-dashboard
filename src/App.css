@@ -605,7 +605,7 @@ body {
 
 /* DataGrid cell frame */
 .fc-datagrid-cell-frame {
-  padding: 8px;
+  padding: 0px;
   height: 100%;
   display: flex;
   align-items: center;
