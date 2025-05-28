@@ -40,11 +40,6 @@ const CalendarAvailabilityControl = () => {
   const [editingClosureId, setEditingClosureId] = useState(null);
   const [editingClosure, setEditingClosure] = useState(null);
 
-  // Add state for max days out
-  const [maxDaysOut, setMaxDaysOut] = useState(60);
-  const [maxDaysOutLoading, setMaxDaysOutLoading] = useState(true);
-  const [maxDaysOutSaving, setMaxDaysOutSaving] = useState(false);
-
   // Add state for booking dates
   const [bookingStartDate, setBookingStartDate] = useState(new Date());
   const [bookingEndDate, setBookingEndDate] = useState(() => {
@@ -56,22 +51,6 @@ const CalendarAvailabilityControl = () => {
   const [bookingDatesSaving, setBookingDatesSaving] = useState(false);
 
   // Load from Supabase on mount
-  useEffect(() => {
-    async function fetchMaxDaysOut() {
-      setMaxDaysOutLoading(true);
-      const { data, error } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'max_days_out')
-        .single();
-      if (!error && data && data.value) {
-        setMaxDaysOut(Number(data.value));
-      }
-      setMaxDaysOutLoading(false);
-    }
-    fetchMaxDaysOut();
-  }, []);
-
   useEffect(() => {
     async function fetchBookingDates() {
       setBookingDatesLoading(true);
@@ -93,16 +72,6 @@ const CalendarAvailabilityControl = () => {
   }, []);
 
   // Save to Supabase when changed
-  async function handleMaxDaysOutChange(val) {
-    setMaxDaysOut(val);
-    setMaxDaysOutSaving(true);
-    const { error } = await supabase
-      .from('settings')
-      .upsert({ key: 'max_days_out', value: String(val) });
-    setMaxDaysOutSaving(false);
-    if (error) setError('Failed to save max days out: ' + error.message);
-  }
-
   async function handleBookingDatesChange(start, end) {
     setBookingStartDate(start);
     setBookingEndDate(end);
@@ -418,26 +387,6 @@ const CalendarAvailabilityControl = () => {
 
   return (
     <div className="availability-control">
-      {/* Max Days Out Setting */}
-      <div style={{ marginBottom: '1.5rem', background: '#faf9f7', padding: '1rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 350 }}>
-        <label style={{ fontWeight: 600, color: '#333', marginRight: 10 }}>
-          Max days out for reservations:
-          <input
-            type="number"
-            min={1}
-            max={365}
-            value={maxDaysOut}
-            onChange={e => handleMaxDaysOutChange(Number(e.target.value))}
-            style={{ marginLeft: 10, width: 80, padding: '0.4rem', borderRadius: 4, border: '1px solid #ccc' }}
-            disabled={maxDaysOutLoading || maxDaysOutSaving}
-          />
-        </label>
-        {maxDaysOutLoading && <span style={{ color: '#888', marginLeft: 8 }}>Loading...</span>}
-        {maxDaysOutSaving && <span style={{ color: '#888', marginLeft: 8 }}>Saving...</span>}
-        <span style={{ color: '#888', fontSize: '0.95em', marginLeft: 8 }}>
-          (How far in advance users can book)
-        </span>
-      </div>
       {/* Booking Window Setting */}
       <div style={{ marginBottom: '1.5rem', background: '#faf9f7', padding: '1rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 420 }}>
         <label style={{ fontWeight: 600, color: '#333', marginRight: 10, display: 'block', marginBottom: 8 }}>
