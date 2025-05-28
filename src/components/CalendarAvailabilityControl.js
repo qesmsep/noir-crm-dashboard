@@ -26,6 +26,12 @@ const CalendarAvailabilityControl = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Add state for editing exceptional opens/closures
+  const [editingOpenId, setEditingOpenId] = useState(null);
+  const [editingOpen, setEditingOpen] = useState(null);
+  const [editingClosureId, setEditingClosureId] = useState(null);
+  const [editingClosure, setEditingClosure] = useState(null);
+
   // Load existing data
   useEffect(() => {
     loadAvailabilityData();
@@ -249,6 +255,87 @@ const CalendarAvailabilityControl = () => {
     }
   };
 
+  // Add update handlers for opens/closures
+  const handleEditOpen = (open) => {
+    setEditingOpenId(open.id);
+    setEditingOpen({
+      ...open,
+      date: open.date ? new Date(open.date) : null,
+      time_ranges: open.time_ranges || [{ start: '18:00', end: '23:00' }],
+      label: open.label || ''
+    });
+  };
+
+  const handleEditClosure = (closure) => {
+    setEditingClosureId(closure.id);
+    setEditingClosure({
+      ...closure,
+      date: closure.date ? new Date(closure.date) : null,
+      time_ranges: closure.time_ranges || [{ start: '18:00', end: '23:00' }],
+      full_day: closure.full_day !== false,
+      reason: closure.reason || ''
+    });
+  };
+
+  const handleCancelEditOpen = () => {
+    setEditingOpenId(null);
+    setEditingOpen(null);
+  };
+
+  const handleCancelEditClosure = () => {
+    setEditingClosureId(null);
+    setEditingClosure(null);
+  };
+
+  const handleSaveEditOpen = async () => {
+    if (!editingOpen) return;
+    try {
+      setError(null);
+      const updated = {
+        date: editingOpen.date ? editingOpen.date.toISOString().split('T')[0] : null,
+        time_ranges: editingOpen.time_ranges,
+        label: editingOpen.label,
+        type: 'exceptional_open'
+      };
+      const { data, error } = await supabase
+        .from('venue_hours')
+        .update(updated)
+        .eq('id', editingOpenId)
+        .select();
+      if (error) throw error;
+      setExceptionalOpens(opens => opens.map(o => o.id === editingOpenId ? { ...o, ...updated } : o));
+      setEditingOpenId(null);
+      setEditingOpen(null);
+    } catch (err) {
+      setError('Failed to update exceptional open: ' + err.message);
+    }
+  };
+
+  const handleSaveEditClosure = async () => {
+    if (!editingClosure) return;
+    try {
+      setError(null);
+      const updated = {
+        date: editingClosure.date ? editingClosure.date.toISOString().split('T')[0] : null,
+        time_ranges: editingClosure.full_day ? null : editingClosure.time_ranges,
+        full_day: editingClosure.full_day,
+        reason: editingClosure.reason,
+        type: 'exceptional_closure'
+      };
+      const { data, error } = await supabase
+        .from('venue_hours')
+        .update(updated)
+        .eq('id', editingClosureId)
+        .select();
+      if (error) throw error;
+      setExceptionalClosures(closures => closures.map(c => c.id === editingClosureId ? { ...c, ...updated } : c));
+      setEditingClosureId(null);
+      setEditingClosure(null);
+    } catch (err) {
+      setError('Failed to update exceptional closure: ' + err.message);
+    }
+  };
+
   return (
     <div className="availability-control">
       {error && <div className="error-message">{error}</div>}
@@ -364,19 +451,74 @@ const CalendarAvailabilityControl = () => {
         <div className="exceptions-list">
           {exceptionalOpens.map((open) => (
             <div key={open.id} className="exception-item">
-              <span>{
-                open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date)
-                  ? (() => { const [y, m, d] = open.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
-                  : new Date(open.date).toLocaleDateString()
-              }</span>
-              <span>{open.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
-              {open.label && <span className="event-label">{open.label}</span>}
-              <button 
-                className="delete-exception"
-                onClick={() => deleteExceptionalOpen(open.id)}
-              >
-                Delete
-              </button>
+              {editingOpenId === open.id ? (
+                <>
+                  <DatePicker
+                    selected={editingOpen.date}
+                    onChange={date => setEditingOpen(e => ({ ...e, date }))}
+                    className="date-picker"
+                  />
+                  <div className="time-ranges">
+                    {editingOpen.time_ranges.map((range, idx) => (
+                      <div key={idx} className="time-range">
+                        <input
+                          type="time"
+                          value={range.start}
+                          onChange={e => {
+                            const trs = [...editingOpen.time_ranges];
+                            trs[idx].start = e.target.value;
+                            setEditingOpen(e => ({ ...e, time_ranges: trs }));
+                          }}
+                        />
+                        <span>to</span>
+                        <input
+                          type="time"
+                          value={range.end}
+                          onChange={e => {
+                            const trs = [...editingOpen.time_ranges];
+                            trs[idx].end = e.target.value;
+                            setEditingOpen(e => ({ ...e, time_ranges: trs }));
+                          }}
+                        />
+                        <button
+                          className="remove-range"
+                          onClick={() => {
+                            const trs = [...editingOpen.time_ranges];
+                            trs.splice(idx, 1);
+                            setEditingOpen(e => ({ ...e, time_ranges: trs }));
+                          }}
+                          disabled={editingOpen.time_ranges.length === 1}
+                        >×</button>
+                      </div>
+                    ))}
+                    <button
+                      className="add-range"
+                      onClick={() => setEditingOpen(e => ({ ...e, time_ranges: [...e.time_ranges, { start: '18:00', end: '23:00' }] }))}
+                    >+ Add Time Range</button>
+                  </div>
+                  <input
+                    type="text"
+                    value={editingOpen.label}
+                    onChange={e => setEditingOpen(ed => ({ ...ed, label: e.target.value }))}
+                    className="event-label"
+                    placeholder="Event label (optional)"
+                  />
+                  <button className="add-exception-btn" onClick={handleSaveEditOpen}>Save</button>
+                  <button className="delete-exception" onClick={handleCancelEditOpen}>Cancel</button>
+                </>
+              ) : (
+                <>
+                  <span>{
+                    open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date)
+                      ? (() => { const [y, m, d] = open.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
+                      : new Date(open.date).toLocaleDateString()
+                  }</span>
+                  <span>{open.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
+                  {open.label && <span className="event-label">{open.label}</span>}
+                  <button className="delete-exception" onClick={() => handleEditOpen(open)}>Edit</button>
+                  <button className="delete-exception" onClick={() => deleteExceptionalOpen(open.id)}>Delete</button>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -455,23 +597,88 @@ const CalendarAvailabilityControl = () => {
         <div className="exceptions-list">
           {exceptionalClosures.map((closure) => (
             <div key={closure.id} className="exception-item">
-              <span>{
-                closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date)
-                  ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
-                  : new Date(closure.date).toLocaleDateString()
-              }</span>
-              {closure.full_day ? (
-                <span style={{ color: '#a59480', fontStyle: 'italic' }}>Full Day</span>
+              {editingClosureId === closure.id ? (
+                <>
+                  <DatePicker
+                    selected={editingClosure.date}
+                    onChange={date => setEditingClosure(e => ({ ...e, date }))}
+                    className="date-picker"
+                  />
+                  <input
+                    type="text"
+                    value={editingClosure.reason}
+                    onChange={e => setEditingClosure(ed => ({ ...ed, reason: e.target.value }))}
+                    className="closure-reason"
+                    placeholder="Reason for closure (optional)"
+                  />
+                  <label style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={editingClosure.full_day}
+                      onChange={e => setEditingClosure(ed => ({ ...ed, full_day: e.target.checked }))}
+                    />
+                    Full Day
+                  </label>
+                  {!editingClosure.full_day && (
+                    <div className="time-ranges">
+                      {editingClosure.time_ranges.map((range, idx) => (
+                        <div key={idx} className="time-range">
+                          <input
+                            type="time"
+                            value={range.start}
+                            onChange={e => {
+                              const trs = [...editingClosure.time_ranges];
+                              trs[idx].start = e.target.value;
+                              setEditingClosure(ed => ({ ...ed, time_ranges: trs }));
+                            }}
+                          />
+                          <span>to</span>
+                          <input
+                            type="time"
+                            value={range.end}
+                            onChange={e => {
+                              const trs = [...editingClosure.time_ranges];
+                              trs[idx].end = e.target.value;
+                              setEditingClosure(ed => ({ ...ed, time_ranges: trs }));
+                            }}
+                          />
+                          <button
+                            className="remove-range"
+                            onClick={() => {
+                              const trs = [...editingClosure.time_ranges];
+                              trs.splice(idx, 1);
+                              setEditingClosure(ed => ({ ...ed, time_ranges: trs }));
+                            }}
+                            disabled={editingClosure.time_ranges.length === 1}
+                          >×</button>
+                        </div>
+                      ))}
+                      <button
+                        className="add-range"
+                        onClick={() => setEditingClosure(ed => ({ ...ed, time_ranges: [...ed.time_ranges, { start: '18:00', end: '23:00' }] }))}
+                      >+ Add Time Range</button>
+                    </div>
+                  )}
+                  <button className="add-exception-btn" onClick={handleSaveEditClosure}>Save</button>
+                  <button className="delete-exception" onClick={handleCancelEditClosure}>Cancel</button>
+                </>
               ) : (
-                <span>{closure.time_ranges && closure.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
+                <>
+                  <span>{
+                    closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date)
+                      ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
+                      : new Date(closure.date).toLocaleDateString()
+                  }</span>
+                  {closure.full_day ? (
+                    <span style={{ color: '#a59480', fontStyle: 'italic' }}>Full Day</span>
+                  ) : (
+                    <span>{closure.time_ranges && closure.time_ranges.map(range => `${range.start}-${range.end}`).join(', ')}</span>
+                  )}
+                  {closure.reason && <span className="closure-reason">{closure.reason}</span>}
+                  <button className="delete-exception" onClick={() => handleEditClosure(closure)}>Edit</button>
+                  <button className="delete-exception" onClick={() => deleteExceptionalClosure(closure.id)}>Delete</button>
+                </>
               )}
-              {closure.reason && <span className="closure-reason">{closure.reason}</span>}
-              <button 
-                className="delete-exception"
-                onClick={() => deleteExceptionalClosure(closure.id)}
-              >
-                Delete
-              </button>
             </div>
           ))}
         </div>
