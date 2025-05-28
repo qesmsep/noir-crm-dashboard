@@ -141,6 +141,8 @@ function App() {
     membership: '',
     photo: ''
   });
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [pendingReservation, setPendingReservation] = useState(null);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -1900,26 +1902,18 @@ function App() {
               const res = await fetch(`/api/checkMemberByPhone?phone=${encodeURIComponent(formattedPhone)}`);
               const data = await res.json();
               if (data.member) {
-                try {
-                  await createReservation({
-                    name: `${data.member.first_name} ${data.member.last_name}`,
-                    phone: data.member.phone,
-                    email: data.member.email,
-                    party_size: partySize,
-                    notes: '',
-                    start_time: getStartTime(),
-                    end_time: getEndTime(),
-                    source: 'member'
-                  });
-                  setMemberLookup(data.member);
-                  setNonMemberFields({ firstName: '', lastName: '', email: '' });
-                  setShowReservationModal(false); // Only close on success
-                  setSlotInfo(null);
-                  setReloadKey(k => k + 1);
-                } catch (err) {
-                  console.log('Reservation failed (member):', err);
-                  // Do not close modal, let popup show
-                }
+                setPendingReservation({
+                  name: `${data.member.first_name} ${data.member.last_name}`,
+                  phone: data.member.phone,
+                  email: data.member.email,
+                  party_size: partySize,
+                  notes: '',
+                  start_time: getStartTime(),
+                  end_time: getEndTime(),
+                  source: 'member',
+                  event_type: eventType
+                });
+                setShowConfirmationModal(true);
               } else {
                 setShowNonMemberModal(true);
               }
@@ -1946,7 +1940,7 @@ function App() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   ...payload,
-                  event_type: eventType
+                  event_type: payload.event_type
                 })
               });
               const result = await res.json();
@@ -1958,6 +1952,20 @@ function App() {
                   alert(result.error || 'Reservation failed');
                 }
                 throw new Error(result.error || 'Reservation failed');
+              }
+            }
+
+            async function confirmReservation() {
+              try {
+                await createReservation(pendingReservation);
+                setMemberLookup(pendingReservation);
+                setNonMemberFields({ firstName: '', lastName: '', email: '' });
+                setShowReservationModal(false);
+                setShowConfirmationModal(false);
+                setSlotInfo(null);
+                setReloadKey(k => k + 1);
+              } catch (err) {
+                console.log('Reservation failed (member):', err);
               }
             }
 
@@ -2122,6 +2130,36 @@ function App() {
                       <p>The next available time for your party size is:</p>
                       <p style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{new Date(nextAvailableTime).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}</p>
                       <button onClick={() => setNextAvailableTime(null)} style={{ marginTop: '1.5rem', padding: '0.5rem 1.5rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}>OK</button>
+                    </div>
+                  </div>
+                )}
+                {showConfirmationModal && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+                    <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: 500 }}>
+                      <h3>Confirm Reservation</h3>
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <p><strong>Name:</strong> {pendingReservation?.name}</p>
+                        <p><strong>Phone:</strong> {pendingReservation?.phone}</p>
+                        <p><strong>Email:</strong> {pendingReservation?.email}</p>
+                        <p><strong>Party Size:</strong> {pendingReservation?.party_size}</p>
+                        <p><strong>Date:</strong> {new Date(pendingReservation?.start_time).toLocaleDateString()}</p>
+                        <p><strong>Time:</strong> {new Date(pendingReservation?.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
+                        <p><strong>Event Type:</strong> {eventTypes.find(t => t.value === pendingReservation?.event_type)?.label || 'None'}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                          onClick={confirmReservation}
+                          style={{ flex: 1, padding: '0.75rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setShowConfirmationModal(false)}
+                          style={{ flex: 1, padding: '0.75rem', background: '#ccc', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
