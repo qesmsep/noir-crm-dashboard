@@ -485,7 +485,7 @@ function App() {
     }
     const selectedDateStr = selectedDateCST.toISOString().split('T')[0];
     const exceptional = exceptionalOpens.find(
-      eo => eo.date && new Date(eo.date).toISOString().split('T')[0] === selectedDateStr
+      eo => eo.date && eo.date.slice(0, 10) === selectedDateStr
     );
     if (exceptional && exceptional.time_ranges && exceptional.time_ranges.length > 0) {
       return generateTimesFromRanges(exceptional.time_ranges);
