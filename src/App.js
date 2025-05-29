@@ -63,66 +63,32 @@ function PrivateEventBookingWrapper() {
   return <PrivateEventBooking eventId={id} />;
 }
 
-function MainAppLayout(props) {
-  // The full main app UI (sidebar, layout, and all section logic) from the previous if (session) { return (...) } block
-  // Paste the full JSX content here
-  return (
-    <>
-      {/* Transaction Modal */}
-      {showTransactionModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          background: 'rgba(0,0,0,0.5)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <div style={{
-            background: '#fff',
-            padding: '2rem',
-            borderRadius: '8px',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-            minWidth: '300px',
-            maxWidth: '90%',
-            textAlign: 'center',
-          }}>
-            <h3 style={{ marginBottom: '1rem', color: '#333' }}>Transaction Status</h3>
-            <p style={{ marginBottom: '2rem', color: '#666' }}>{transactionModalMessage}</p>
-            <button
-              onClick={() => {
-                setShowTransactionModal(false);
-                if (selectedMember?.account_id) {
-                  fetchLedger(selectedMember.account_id);
-                }
-              }}
-              style={{
-                background: '#a59480',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '0.75rem 2rem',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
-      {/* ...rest of the main app UI (sidebar, layout, and all section logic) goes here... */}
-    </>
-  );
+function MainAppLayout() {
+  // All state, handlers, and main app UI previously in App go here
+  // ...
+  // (Move all useState, useEffect, and functions from App here)
+  // ...
+  // (Paste the full main app UI return here)
 }
 
 function App() {
-  // ...all your state and handlers...
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    // Listen for auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+      }
+    );
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   if (!session) {
     return (
