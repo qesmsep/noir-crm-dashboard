@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../api/supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 export default function PrivateEventBooking({ eventId }) {
+  const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -68,7 +70,7 @@ export default function PrivateEventBooking({ eventId }) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#fff', padding: '2.5rem 2rem', borderRadius: 14, boxShadow: '0 4px 32px rgba(0,0,0,0.18)', minWidth: 340, maxWidth: 420, width: '100%', position: 'relative' }}>
-        <button onClick={() => window.location.href = '/'} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 28, color: '#888', cursor: 'pointer', fontWeight: 700, lineHeight: 1 }} aria-label="Close">&times;</button>
+        <button onClick={() => navigate('/')} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 28, color: '#888', cursor: 'pointer', fontWeight: 700, lineHeight: 1 }} aria-label="Close">&times;</button>
         <h2 style={{ marginBottom: 8 }}>{event.title}</h2>
         <div style={{ color: '#888', marginBottom: 16 }}>
           {event.event_type && <span style={{ marginRight: 8 }}>{event.event_type}</span>}
