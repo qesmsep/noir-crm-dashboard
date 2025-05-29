@@ -64,6 +64,10 @@ const CalendarAvailabilityControl = () => {
   // Add state for private events ledger
   const [privateEvents, setPrivateEvents] = useState([]);
 
+  // Add state and handlers for editing/deleting events
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [editingEvent, setEditingEvent] = useState({});
+
   // Load from Supabase on mount
   useEffect(() => {
     async function fetchBookingDates() {
@@ -445,6 +449,30 @@ const CalendarAvailabilityControl = () => {
     fetchPrivateEvents();
   }, [createdPrivateEvent]);
 
+  // Add handler for editing/deleting events
+  const handleEditEvent = (ev) => {
+    setEditingEventId(ev.id);
+    setEditingEvent({ ...ev });
+  };
+
+  const handleSaveEditEvent = async (id) => {
+    // Save changes to Supabase
+    const { title, event_type, start_time, end_time } = editingEvent;
+    const { error } = await supabase.from('events').update({ title, event_type, start_time, end_time }).eq('id', id);
+    if (!error) {
+      setPrivateEvents(events => events.map(e => e.id === id ? { ...e, title, event_type, start_time, end_time } : e));
+      setEditingEventId(null);
+    }
+  };
+
+  const handleDeleteEvent = async (id) => {
+    if (!window.confirm('Delete this event?')) return;
+    const { error } = await supabase.from('events').delete().eq('id', id);
+    if (!error) {
+      setPrivateEvents(events => events.filter(e => e.id !== id));
+    }
+  };
+
   return (
     <div className="availability-control">
       {/* Add Create Private Event form at the top of the admin panel */}
@@ -554,15 +582,46 @@ const CalendarAvailabilityControl = () => {
               ) : (
                 privateEvents.map(ev => (
                   <tr key={ev.id}>
-                    <td style={{ padding: '0.7rem' }}>{ev.title}</td>
-                    <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
-                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
-                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
+                    <td style={{ padding: '0.7rem' }}>
+                      {editingEventId === ev.id ? (
+                        <input value={editingEvent.title} onChange={e => setEditingEvent({ ...editingEvent, title: e.target.value })} />
+                      ) : ev.title}
+                    </td>
+                    <td style={{ padding: '0.7rem' }}>
+                      {editingEventId === ev.id ? (
+                        <input value={editingEvent.event_type} onChange={e => setEditingEvent({ ...editingEvent, event_type: e.target.value })} />
+                      ) : ev.event_type}
+                    </td>
+                    <td style={{ padding: '0.7rem' }}>
+                      {editingEventId === ev.id ? (
+                        <input type="date" value={editingEvent.start_time.slice(0,10)} onChange={e => setEditingEvent({ ...editingEvent, start_time: e.target.value + editingEvent.start_time.slice(10) })} />
+                      ) : new Date(ev.start_time).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '0.7rem' }}>
+                      {editingEventId === ev.id ? (
+                        <>
+                          <input type="time" value={editingEvent.start_time.slice(11,16)} onChange={e => setEditingEvent({ ...editingEvent, start_time: editingEvent.start_time.slice(0,11) + e.target.value + editingEvent.start_time.slice(16) })} />
+                          -
+                          <input type="time" value={editingEvent.end_time.slice(11,16)} onChange={e => setEditingEvent({ ...editingEvent, end_time: editingEvent.end_time.slice(0,11) + e.target.value + editingEvent.end_time.slice(16) })} />
+                        </>
+                      ) : `${new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                    </td>
                     <td style={{ padding: '0.7rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '70%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc', marginRight: 4 }} onFocus={e => e.target.select()} />
                         <button style={{ marginLeft: 2, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
                         <a href={window.location.origin + `/private-event/${ev.id}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 6, color: '#4a90e2', fontWeight: 600, textDecoration: 'underline', fontSize: '0.98em' }}>Open</a>
+                        {editingEventId === ev.id ? (
+                          <>
+                            <button style={{ marginLeft: 6, background: '#a59480', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleSaveEditEvent(ev.id)}>Save</button>
+                            <button style={{ marginLeft: 2, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => setEditingEventId(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <button style={{ marginLeft: 6, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleEditEvent(ev)}>Edit</button>
+                            <button style={{ marginLeft: 2, background: '#e74c3c', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleDeleteEvent(ev.id)}>Delete</button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
