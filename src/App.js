@@ -157,6 +157,7 @@ function App() {
   const [exceptionalClosures, setExceptionalClosures] = useState([]);
   const [bookingStartDate, setBookingStartDate] = useState(null);
   const [bookingEndDate, setBookingEndDate] = useState(null);
+  const [privateEvents, setPrivateEvents] = useState([]);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -500,18 +501,35 @@ function App() {
       return [];
     }
     const selectedDateStr = selectedDateCST.toISOString().split('T')[0];
-    const exceptional = exceptionalOpens.find(
-      eo => eo.date && eo.date.slice(0, 10) === selectedDateStr
-    );
-    if (exceptional && exceptional.time_ranges && exceptional.time_ranges.length > 0) {
-      return generateTimesFromRanges(exceptional.time_ranges);
-    }
-    const dayOfWeek = selectedDateCST.getDay();
-    const dayHours = baseHours.find(h => Number(h.day_of_week) === dayOfWeek);
-    if (!dayHours || !dayHours.time_ranges || dayHours.time_ranges.length === 0) {
-      return [];
-    }
-    return generateTimesFromRanges(dayHours.time_ranges);
+    // Block if a private event covers the whole day
+    const privateEventAllDay = privateEvents.find(ev => {
+      const evStart = new Date(ev.start_time);
+      const evEnd = new Date(ev.end_time);
+      return ev.private &&
+        evStart.toISOString().split('T')[0] === selectedDateStr &&
+        evEnd.toISOString().split('T')[0] === selectedDateStr &&
+        (evStart.getHours() === 0 && evEnd.getHours() === 23);
+    });
+    if (privateEventAllDay) return [];
+    // Get all private events for this date
+    const privateEventsForDate = privateEvents.filter(ev => {
+      const evStart = new Date(ev.start_time);
+      const evEnd = new Date(ev.end_time);
+      return ev.private &&
+        evStart.toISOString().split('T')[0] === selectedDateStr;
+    });
+    // Get normal available times
+    let times = generateTimesFromRanges(baseHours.find(h => Number(h.day_of_week) === selectedDateCST.getDay()).time_ranges);
+    // Remove times that overlap with private events
+    times = times.filter(t => {
+      const slot = createDateFromTimeString(t, selectedDateCST);
+      return !privateEventsForDate.some(ev => {
+        const evStart = new Date(ev.start_time);
+        const evEnd = new Date(ev.end_time);
+        return slot >= evStart && slot < evEnd;
+      });
+    });
+    return times;
   };
 
   // Fetch booking window dates from Supabase on mount
@@ -531,6 +549,18 @@ function App() {
       if (endData && endData.value) setBookingEndDate(new Date(endData.value));
     }
     fetchBookingWindow();
+  }, []);
+
+  // Fetch private events on mount
+  useEffect(() => {
+    async function fetchPrivateEvents() {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('private', true);
+      if (!error && data) setPrivateEvents(data);
+    }
+    fetchPrivateEvents();
   }, []);
 
   // Add route for /private-event/:id
@@ -1980,6 +2010,16 @@ function App() {
                         if (bookingStartDate && d < bookingStartDate) return false;
                         if (bookingEndDate && d > bookingEndDate) return false;
                         const dateStr = toCST(d).toISOString().split('T')[0];
+                        // Block if a private event covers the whole day
+                        const privateEventAllDay = privateEvents.find(ev => {
+                          const evStart = new Date(ev.start_time);
+                          const evEnd = new Date(ev.end_time);
+                          return ev.private &&
+                            evStart.toISOString().split('T')[0] === dateStr &&
+                            evEnd.toISOString().split('T')[0] === dateStr &&
+                            (evStart.getHours() === 0 && evEnd.getHours() === 23);
+                        });
+                        if (privateEventAllDay) return false;
                         const isClosed = exceptionalClosures.some(
                           ec => ec.date && ec.date.slice(0, 10) === dateStr
                         );
