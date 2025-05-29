@@ -718,8 +718,8 @@ function App() {
       setChargeStatus(null);
       try {
         const res = await fetch('/api/chargeBalance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ member_id: selectedMember.member_id }),
         });
         const data = await res.json();
@@ -749,16 +749,16 @@ function App() {
       try {
         const res = await fetch('/api/ledger', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
             id: txId,
             ...editTransactionForm,
             date: editTransactionForm.date ? editTransactionForm.date : undefined,
             amount: editTransactionForm.type === 'purchase' ? 
               -Math.abs(Number(editTransactionForm.amount)) : 
               Math.abs(Number(editTransactionForm.amount))
-          })
-        });
+                        })
+                      });
         if (res.ok) {
           setEditingTransaction(null);
           // Refresh ledger

@@ -18,13 +18,11 @@ export default function PrivateEventBooking({ eventId }) {
   useEffect(() => {
     async function fetchEvent() {
       setLoading(true);
-      console.log('Fetching event with ID:', eventId);
       const { data, error } = await supabase
         .from('events')
         .select('*')
         .eq('id', eventId)
         .single();
-      console.log('Supabase event fetch result:', { data, error });
       if (error || !data) {
         setError('Event not found.');
       } else {
