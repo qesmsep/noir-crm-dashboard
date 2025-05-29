@@ -64,10 +64,6 @@ const CalendarAvailabilityControl = () => {
   // Add state for private events ledger
   const [privateEvents, setPrivateEvents] = useState([]);
 
-  // Add state for editing a private event
-  const [editingEventId, setEditingEventId] = useState(null);
-  const [editingEvent, setEditingEvent] = useState(null);
-
   // Load from Supabase on mount
   useEffect(() => {
     async function fetchBookingDates() {
@@ -449,37 +445,6 @@ const CalendarAvailabilityControl = () => {
     fetchPrivateEvents();
   }, [createdPrivateEvent]);
 
-  // Handler to start editing
-  const handleEditEvent = (event) => {
-    setEditingEventId(event.id);
-    setEditingEvent({ ...event });
-  };
-
-  // Handler to save edit
-  const handleSaveEditEvent = async () => {
-    if (!editingEvent.title || !editingEvent.event_type || !editingEvent.start_time || !editingEvent.end_time) return;
-    await supabase.from('events').update({
-      title: editingEvent.title,
-      event_type: editingEvent.event_type,
-      start_time: editingEvent.start_time,
-      end_time: editingEvent.end_time
-    }).eq('id', editingEventId);
-    setEditingEventId(null);
-    setEditingEvent(null);
-    // Refresh events
-    const { data } = await supabase.from('events').select('*').eq('private', true).order('start_time', { ascending: false });
-    setPrivateEvents(data || []);
-  };
-
-  // Handler to delete event
-  const handleDeleteEvent = async (id) => {
-    if (!window.confirm('Delete this private event?')) return;
-    await supabase.from('events').delete().eq('id', id);
-    // Refresh events
-    const { data } = await supabase.from('events').select('*').eq('private', true).order('start_time', { ascending: false });
-    setPrivateEvents(data || []);
-  };
-
   return (
     <div className="availability-control">
       {/* Add Create Private Event form at the top of the admin panel */}
@@ -581,44 +546,25 @@ const CalendarAvailabilityControl = () => {
                 <th style={{ padding: '0.7rem' }}>Date</th>
                 <th style={{ padding: '0.7rem' }}>Time</th>
                 <th style={{ padding: '0.7rem' }}>Link</th>
-                <th style={{ padding: '0.7rem' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {privateEvents.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: '#888', padding: '1.2rem' }}>No private events found.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: '#888', padding: '1.2rem' }}>No private events found.</td></tr>
               ) : (
                 privateEvents.map(ev => (
                   <tr key={ev.id}>
-                    {editingEventId === ev.id ? (
-                      <>
-                        <td style={{ padding: '0.7rem' }}><input value={editingEvent.title} onChange={e => setEditingEvent({ ...editingEvent, title: e.target.value })} /></td>
-                        <td style={{ padding: '0.7rem' }}><input value={editingEvent.event_type} onChange={e => setEditingEvent({ ...editingEvent, event_type: e.target.value })} /></td>
-                        <td style={{ padding: '0.7rem' }}><input type="date" value={editingEvent.start_time.slice(0,10)} onChange={e => setEditingEvent({ ...editingEvent, start_time: e.target.value + editingEvent.start_time.slice(10) })} /></td>
-                        <td style={{ padding: '0.7rem' }}><input type="time" value={editingEvent.start_time.slice(11,16)} onChange={e => setEditingEvent({ ...editingEvent, start_time: editingEvent.start_time.slice(0,11) + e.target.value + editingEvent.start_time.slice(16) })} /> - <input type="time" value={editingEvent.end_time.slice(11,16)} onChange={e => setEditingEvent({ ...editingEvent, end_time: editingEvent.end_time.slice(0,11) + e.target.value + editingEvent.end_time.slice(16) })} /></td>
-                        <td style={{ padding: '0.7rem' }}>
-                          <button onClick={handleSaveEditEvent} style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer', marginRight: 4 }}>Save</button>
-                          <button onClick={() => { setEditingEventId(null); setEditingEvent(null); }} style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                        </td>
-                        <td></td>
-                      </>
-                    ) : (
-                      <>
-                        <td style={{ padding: '0.7rem' }}>{ev.title}</td>
-                        <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
-                        <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
-                        <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
-                        <td style={{ padding: '0.7rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '70%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc', marginRight: 4 }} onFocus={e => e.target.select()} />
-                            <button style={{ marginLeft: 2, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
-                            <a href={window.location.origin + `/private-event/${ev.id}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 6, color: '#4a90e2', fontWeight: 600, textDecoration: 'underline', fontSize: '0.98em' }}>Open</a>
-                            <button onClick={() => handleEditEvent(ev)} style={{ marginLeft: 6, background: '#f7d674', color: '#444', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
-                            <button onClick={() => handleDeleteEvent(ev.id)} style={{ marginLeft: 4, background: '#e57373', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
-                          </div>
-                        </td>
-                      </>
-                    )}
+                    <td style={{ padding: '0.7rem' }}>{ev.title}</td>
+                    <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
+                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
+                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
+                    <td style={{ padding: '0.7rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '70%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc', marginRight: 4 }} onFocus={e => e.target.select()} />
+                        <button style={{ marginLeft: 2, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
+                        <a href={window.location.origin + `/private-event/${ev.id}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 6, color: '#4a90e2', fontWeight: 600, textDecoration: 'underline', fontSize: '0.98em' }}>Open</a>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
