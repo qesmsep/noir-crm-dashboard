@@ -523,15 +523,16 @@ const CalendarAvailabilityControl = () => {
               type="text"
               value={window.location.origin + `/private-event/${createdPrivateEvent.id}`}
               readOnly
-              style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 6, border: '1px solid #ccc', fontSize: '1.05rem' }}
+              style={{ width: '80%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 6, border: '1px solid #ccc', fontSize: '1.05rem', marginRight: 4 }}
               onFocus={e => e.target.select()}
             />
             <button
-              style={{ marginTop: '0.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 6, padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+              style={{ marginTop: '0.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 6, padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer', marginRight: 6 }}
               onClick={() => {
                 navigator.clipboard.writeText(window.location.origin + `/private-event/${createdPrivateEvent.id}`);
               }}
             >Copy Link</button>
+            <a href={window.location.origin + `/private-event/${createdPrivateEvent.id}`} target="_blank" rel="noopener noreferrer" style={{ color: '#4a90e2', fontWeight: 600, textDecoration: 'underline', fontSize: '1.05em', marginLeft: 6 }}>Open</a>
           </div>
         )}
         {/* Private Events Ledger Table */}
@@ -558,8 +559,11 @@ const CalendarAvailabilityControl = () => {
                     <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
                     <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
                     <td style={{ padding: '0.7rem' }}>
-                      <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '90%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc' }} onFocus={e => e.target.select()} />
-                      <button style={{ marginLeft: 6, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '70%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc', marginRight: 4 }} onFocus={e => e.target.select()} />
+                        <button style={{ marginLeft: 2, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
+                        <a href={window.location.origin + `/private-event/${ev.id}`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 6, color: '#4a90e2', fontWeight: 600, textDecoration: 'underline', fontSize: '0.98em' }}>Open</a>
+                      </div>
                     </td>
                   </tr>
                 ))
