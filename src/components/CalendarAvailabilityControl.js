@@ -61,6 +61,9 @@ const CalendarAvailabilityControl = () => {
   const [privateEventStatus, setPrivateEventStatus] = useState('');
   const [createdPrivateEvent, setCreatedPrivateEvent] = useState(null);
 
+  // Add state for private events ledger
+  const [privateEvents, setPrivateEvents] = useState([]);
+
   // Load from Supabase on mount
   useEffect(() => {
     async function fetchBookingDates() {
@@ -429,23 +432,38 @@ const CalendarAvailabilityControl = () => {
     }
   }
 
+  // Fetch all private events on mount and after creating a new one
+  useEffect(() => {
+    async function fetchPrivateEvents() {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('private', true)
+        .order('start_time', { ascending: false });
+      if (!error && data) setPrivateEvents(data);
+    }
+    fetchPrivateEvents();
+  }, [createdPrivateEvent]);
+
   return (
     <div className="availability-control">
       {/* Add Create Private Event form at the top of the admin panel */}
-      <div style={{ marginBottom: '2rem', background: '#faf9f7', padding: '1.5rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 480 }}>
-        <h3>Create Private Event</h3>
-        <form onSubmit={handleCreatePrivateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ marginBottom: '2.5rem', background: '#fff', padding: '2rem 2.5rem', borderRadius: '12px', border: '1px solid #ececec', maxWidth: 520, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+        <h2 style={{ marginBottom: '1.2rem', color: '#222', fontWeight: 700 }}>Create Private Event</h2>
+        <form onSubmit={handleCreatePrivateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           <input
             type="text"
             placeholder="Event Name"
             value={privateEvent.name}
             onChange={e => setPrivateEvent(ev => ({ ...ev, name: e.target.value }))}
             required
+            style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
           />
           <select
             value={privateEvent.event_type}
             onChange={e => setPrivateEvent(ev => ({ ...ev, event_type: e.target.value }))}
             required
+            style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
           >
             <option value="">Select event type...</option>
             <option value="private">Private Event</option>
@@ -462,57 +480,93 @@ const CalendarAvailabilityControl = () => {
             <option value="fun">Fun Night Out</option>
             <option value="date">Date Night</option>
           </select>
-          <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             <div>
-              <label>Date</label>
+              <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Date</label>
               <DatePicker
                 selected={privateEvent.date}
                 onChange={d => setPrivateEvent(ev => ({ ...ev, date: d }))}
                 dateFormat="MMMM d, yyyy"
                 minDate={new Date()}
                 required
+                className="datepicker-input"
               />
             </div>
             <div>
-              <label>Start</label>
+              <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Start</label>
               <input
                 type="time"
                 value={privateEvent.start}
                 onChange={e => setPrivateEvent(ev => ({ ...ev, start: e.target.value }))}
                 required
+                style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
               />
             </div>
             <div>
-              <label>End</label>
+              <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>End</label>
               <input
                 type="time"
                 value={privateEvent.end}
                 onChange={e => setPrivateEvent(ev => ({ ...ev, end: e.target.value }))}
                 required
+                style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
               />
             </div>
           </div>
-          <button type="submit">Create Private Event</button>
-          {privateEventStatus && <div style={{ color: privateEventStatus.includes('created') ? 'green' : 'red' }}>{privateEventStatus}</div>}
+          <button type="submit" style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: 8, padding: '0.8rem 0', fontWeight: 700, fontSize: '1.1rem', marginTop: 8 }}>Create Private Event</button>
+          {privateEventStatus && <div style={{ color: privateEventStatus.includes('created') ? 'green' : 'red', fontWeight: 600 }}>{privateEventStatus}</div>}
         </form>
         {createdPrivateEvent && (
-          <div style={{ marginTop: '1rem' }}>
+          <div style={{ marginTop: '1.2rem' }}>
             <strong>Shareable Link:</strong>
             <input
               type="text"
               value={window.location.origin + `/private-event/${createdPrivateEvent.id}`}
               readOnly
-              style={{ width: '100%', marginTop: '0.5rem' }}
+              style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 6, border: '1px solid #ccc', fontSize: '1.05rem' }}
               onFocus={e => e.target.select()}
             />
             <button
-              style={{ marginTop: '0.5rem' }}
+              style={{ marginTop: '0.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 6, padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
               onClick={() => {
                 navigator.clipboard.writeText(window.location.origin + `/private-event/${createdPrivateEvent.id}`);
               }}
             >Copy Link</button>
           </div>
         )}
+        {/* Private Events Ledger Table */}
+        <div style={{ marginTop: '2.5rem' }}>
+          <h3 style={{ marginBottom: '1rem', color: '#333', fontWeight: 600 }}>Private Events Ledger</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#faf9f7', borderRadius: 8, overflow: 'hidden', fontSize: '1.05rem' }}>
+            <thead>
+              <tr style={{ background: '#ececec', color: '#444' }}>
+                <th style={{ padding: '0.7rem' }}>Event Name</th>
+                <th style={{ padding: '0.7rem' }}>Type</th>
+                <th style={{ padding: '0.7rem' }}>Date</th>
+                <th style={{ padding: '0.7rem' }}>Time</th>
+                <th style={{ padding: '0.7rem' }}>Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              {privateEvents.length === 0 ? (
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: '#888', padding: '1.2rem' }}>No private events found.</td></tr>
+              ) : (
+                privateEvents.map(ev => (
+                  <tr key={ev.id}>
+                    <td style={{ padding: '0.7rem' }}>{ev.title}</td>
+                    <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
+                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
+                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
+                    <td style={{ padding: '0.7rem' }}>
+                      <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '90%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc' }} onFocus={e => e.target.select()} />
+                      <button style={{ marginLeft: 6, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
       {/* Booking Window Setting */}
       <div style={{ marginBottom: '1.5rem', background: '#faf9f7', padding: '1rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 420 }}>

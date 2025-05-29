@@ -1766,27 +1766,9 @@ function App() {
           {section === 'admin' && (
             <>
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-                <h2>Current Venue Hours</h2>
-                <div style={{ marginBottom: "1rem" }}>
-                  {baseHours.map(hour => (
-                    <div key={hour.day_of_week} style={{ marginBottom: "0.5rem" }}>
-                      <strong>{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][hour.day_of_week]}:</strong>{' '}
-                      {hour.time_ranges.map((range, idx) => (
-                        <span key={idx}>
-                          {range.start} - {range.end}
-                          {idx < hour.time_ranges.length - 1 ? ', ' : ''}
-                        </span>
-                      ))}
-                </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                 <h2>Calendar Availability Control</h2>
                 <CalendarAvailabilityControl />
               </div>
-
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                 <h2>Create New User</h2>
                 <form onSubmit={handleCreateUser} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
