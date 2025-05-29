@@ -50,6 +50,17 @@ const CalendarAvailabilityControl = () => {
   const [bookingDatesLoading, setBookingDatesLoading] = useState(true);
   const [bookingDatesSaving, setBookingDatesSaving] = useState(false);
 
+  // Add state for private event creation
+  const [privateEvent, setPrivateEvent] = useState({
+    name: '',
+    event_type: '',
+    date: null,
+    start: '18:00',
+    end: '20:00',
+  });
+  const [privateEventStatus, setPrivateEventStatus] = useState('');
+  const [createdPrivateEvent, setCreatedPrivateEvent] = useState(null);
+
   // Load from Supabase on mount
   useEffect(() => {
     async function fetchBookingDates() {
@@ -385,8 +396,124 @@ const CalendarAvailabilityControl = () => {
     }
   };
 
+  // Handler to create private event
+  async function handleCreatePrivateEvent(e) {
+    e.preventDefault();
+    setPrivateEventStatus('');
+    if (!privateEvent.name || !privateEvent.event_type || !privateEvent.date || !privateEvent.start || !privateEvent.end) {
+      setPrivateEventStatus('Please fill all fields.');
+      return;
+    }
+    // Compose start/end datetime in CST
+    const dateStr = privateEvent.date.toISOString().split('T')[0];
+    const start = `${dateStr}T${privateEvent.start}:00-06:00`;
+    const end = `${dateStr}T${privateEvent.end}:00-06:00`;
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: privateEvent.name,
+        event_type: privateEvent.event_type,
+        start_time: start,
+        end_time: end,
+        private: true
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setCreatedPrivateEvent(data.data);
+      setPrivateEventStatus('Private event created!');
+      setPrivateEvent({ name: '', event_type: '', date: null, start: '18:00', end: '20:00' });
+    } else {
+      setPrivateEventStatus('Failed to create event.');
+    }
+  }
+
   return (
     <div className="availability-control">
+      {/* Add Create Private Event form at the top of the admin panel */}
+      <div style={{ marginBottom: '2rem', background: '#faf9f7', padding: '1.5rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 480 }}>
+        <h3>Create Private Event</h3>
+        <form onSubmit={handleCreatePrivateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <input
+            type="text"
+            placeholder="Event Name"
+            value={privateEvent.name}
+            onChange={e => setPrivateEvent(ev => ({ ...ev, name: e.target.value }))}
+            required
+          />
+          <select
+            value={privateEvent.event_type}
+            onChange={e => setPrivateEvent(ev => ({ ...ev, event_type: e.target.value }))}
+            required
+          >
+            <option value="">Select event type...</option>
+            <option value="private">Private Event</option>
+            <option value="birthday">Birthday</option>
+            <option value="engagement">Engagement</option>
+            <option value="anniversary">Anniversary</option>
+            <option value="party">Party</option>
+            <option value="graduation">Graduation</option>
+            <option value="corporate">Corporate Event</option>
+            <option value="holiday">Holiday Gathering</option>
+            <option value="networking">Networking</option>
+            <option value="fundraiser">Fundraiser</option>
+            <option value="bachelor">Bachelor/Bachelorette</option>
+            <option value="fun">Fun Night Out</option>
+            <option value="date">Date Night</option>
+          </select>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <div>
+              <label>Date</label>
+              <DatePicker
+                selected={privateEvent.date}
+                onChange={d => setPrivateEvent(ev => ({ ...ev, date: d }))}
+                dateFormat="MMMM d, yyyy"
+                minDate={new Date()}
+                required
+              />
+            </div>
+            <div>
+              <label>Start</label>
+              <input
+                type="time"
+                value={privateEvent.start}
+                onChange={e => setPrivateEvent(ev => ({ ...ev, start: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <label>End</label>
+              <input
+                type="time"
+                value={privateEvent.end}
+                onChange={e => setPrivateEvent(ev => ({ ...ev, end: e.target.value }))}
+                required
+              />
+            </div>
+          </div>
+          <button type="submit">Create Private Event</button>
+          {privateEventStatus && <div style={{ color: privateEventStatus.includes('created') ? 'green' : 'red' }}>{privateEventStatus}</div>}
+        </form>
+        {createdPrivateEvent && (
+          <div style={{ marginTop: '1rem' }}>
+            <strong>Shareable Link:</strong>
+            <input
+              type="text"
+              value={window.location.origin + `/private-event/${createdPrivateEvent.id}`}
+              readOnly
+              style={{ width: '100%', marginTop: '0.5rem' }}
+              onFocus={e => e.target.select()}
+            />
+            <button
+              style={{ marginTop: '0.5rem' }}
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.origin + `/private-event/${createdPrivateEvent.id}`);
+              }}
+            >Copy Link</button>
+          </div>
+        )}
+      </div>
       {/* Booking Window Setting */}
       <div style={{ marginBottom: '1.5rem', background: '#faf9f7', padding: '1rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 420 }}>
         <label style={{ fontWeight: 600, color: '#333', marginRight: 10, display: 'block', marginBottom: 8 }}>
