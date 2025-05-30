@@ -1804,11 +1804,13 @@ function App() {
           )}
           {section === 'admin' && (
             <>
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "2rem 2.5rem", borderRadius: "12px", background: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <h2 style={{ marginBottom: '1.5rem', color: '#222', fontWeight: 700 }}>User Management</h2>
-                {/* Create New User */}
-                <h3 style={{ marginBottom: '1rem', color: '#333', fontWeight: 600 }}>Create New User</h3>
-                <form onSubmit={handleCreateUser} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>Calendar Availability Control</h2>
+                <CalendarAvailabilityControl />
+              </div>
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>Create New User</h2>
+                <form onSubmit={handleCreateUser} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
                   <input
                     type="email"
                     placeholder="User email"
@@ -1896,10 +1898,6 @@ function App() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "2rem 2.5rem", borderRadius: "12px", background: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <h2 style={{ marginBottom: '1.5rem', color: '#222', fontWeight: 700 }}>Calendar Availability Control</h2>
-                <CalendarAvailabilityControl />
               </div>
             </>
           )}
