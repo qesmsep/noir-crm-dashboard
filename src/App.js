@@ -519,7 +519,9 @@ function App() {
         evStart.toISOString().split('T')[0] === selectedDateStr;
     });
     // Get normal available times
-    let times = generateTimesFromRanges(baseHours.find(h => Number(h.day_of_week) === selectedDateCST.getDay()).time_ranges);
+    const baseHour = baseHours.find(h => Number(h.day_of_week) === selectedDateCST.getDay());
+    if (!baseHour || !baseHour.time_ranges) return [];
+    let times = generateTimesFromRanges(baseHour.time_ranges);
     // Remove times that overlap with private events
     times = times.filter(t => {
       const slot = createDateFromTimeString(t, selectedDateCST);
