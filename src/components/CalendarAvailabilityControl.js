@@ -469,7 +469,7 @@ const CalendarAvailabilityControl = () => {
   return (
     <div className="availability-control">
       {/* Add Create Private Event form at the top of the admin panel */}
-      <div style={{ marginBottom: '2.5rem', background: '#fff', padding: '2rem 2.5rem', borderRadius: '12px', border: '1px solid #ececec', maxWidth: 520, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+      <div style={{ marginBottom: '2.5rem', background: '#fff', padding: '2rem 2.5rem', borderRadius: '12px', border: '1px solid #ececec', maxWidth: 800, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
         <h2 style={{ marginBottom: '1.2rem', color: '#222', fontWeight: 700 }}>Create Private Event</h2>
         <form onSubmit={handleCreatePrivateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           <input
