@@ -58,19 +58,20 @@ export default async function handler(req, res) {
   }
   let balance = 0;
   for (const t of ledger || []) {
-    if (t.type === 'payment') balance += Number(t.amount);
-    else if (t.type === 'purchase') balance -= Number(t.amount);
+    balance += Number(t.amount);
   }
-  // Only charge if balance is positive (i.e., member owes money)
-  if (balance <= 0) {
+  // Only charge if balance is negative (i.e., member owes money)
+  if (balance >= 0) {
     return res.status(400).json({ error: 'No outstanding balance' });
   }
+  // Convert to positive for Stripe charge
+  const chargeAmount = Math.abs(balance);
 
   // 3. Create Stripe PaymentIntent and confirm
   let intent;
   try {
     intent = await stripe.paymentIntents.create({
-      amount: Math.round(balance * 100), // in cents
+      amount: Math.round(chargeAmount * 100), // in cents
       currency: 'usd',
       customer: stripe_customer_id,
       payment_method: defaultPaymentMethodId,
@@ -87,7 +88,7 @@ export default async function handler(req, res) {
     .insert({
       member_id,
       type: 'payment',
-      amount: balance,
+      amount: chargeAmount,
       note: 'Balance charged via Stripe',
     });
   if (ledgerInsertError) {
