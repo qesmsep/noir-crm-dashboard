@@ -411,10 +411,16 @@ const CalendarAvailabilityControl = () => {
       setPrivateEventStatus('Please fill all fields.');
       return;
     }
-    // Compose start/end datetime in CST
-    const dateStr = privateEvent.date.toISOString().split('T')[0];
-    const start = `${dateStr}T${privateEvent.start}:00-06:00`;
-    const end = `${dateStr}T${privateEvent.end}:00-06:00`;
+    // Construct start/end datetime in local time and convert to UTC ISO string
+    const date = privateEvent.date;
+    const [startHour, startMinute] = privateEvent.start.split(':');
+    const [endHour, endMinute] = privateEvent.end.split(':');
+    const startDate = new Date(date);
+    startDate.setHours(Number(startHour), Number(startMinute), 0, 0);
+    const endDate = new Date(date);
+    endDate.setHours(Number(endHour), Number(endMinute), 0, 0);
+    const start = startDate.toISOString();
+    const end = endDate.toISOString();
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
