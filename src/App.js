@@ -722,7 +722,7 @@ function App() {
         const res = await fetch('/api/chargeBalance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ member_id: selectedMember.member_id }),
+          body: JSON.stringify({ member_id: selectedMember.member_id, account_id: selectedMember.account_id }),
         });
         const data = await res.json();
         if (res.ok && data.success) {

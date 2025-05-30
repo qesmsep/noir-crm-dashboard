@@ -12,9 +12,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id } = req.body;
-  if (!member_id) {
-    return res.status(400).json({ error: 'member_id is required' });
+  const { member_id, account_id } = req.body;
+  if (!member_id || !account_id) {
+    return res.status(400).json({ error: 'member_id and account_id are required' });
   }
 
   // 1. Get Stripe customer id for member
@@ -48,11 +48,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No default payment method found on customer or subscription' });
   }
 
-  // 2. Get ledger for member and compute balance
+  // 2. Get ledger for account and compute balance
   const { data: ledger, error: ledgerError } = await supabase
     .from('ledger')
     .select('amount,type')
-    .eq('member_id', member_id);
+    .eq('account_id', account_id);
   if (ledgerError) {
     return res.status(500).json({ error: 'Failed to fetch ledger' });
   }
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   for (const t of ledger || []) {
     balance += Number(t.amount);
   }
-  // Only charge if balance is negative (i.e., member owes money)
+  // Only charge if balance is negative (i.e., account owes money)
   if (balance >= 0) {
     return res.status(400).json({ error: 'No outstanding balance' });
   }
@@ -87,6 +87,7 @@ export default async function handler(req, res) {
     .from('ledger')
     .insert({
       member_id,
+      account_id,
       type: 'payment',
       amount: chargeAmount,
       note: 'Balance charged via Stripe',
