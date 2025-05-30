@@ -573,6 +573,13 @@ function App() {
     return <PrivateEventBooking eventId={eventId} />;
   }
 
+  // Add route for /private-event/:id/rsvp
+  const privateEventRSVPMatched = pathname.match(/^\/private-event\/(\d+)\/rsvp/);
+  if (privateEventRSVPMatched) {
+    const eventId = privateEventRSVPMatched[1];
+    return <PrivateEventBooking eventId={eventId} rsvpMode={true} />;
+  }
+
   if (!session) {
     return (
       <div className="auth-container">

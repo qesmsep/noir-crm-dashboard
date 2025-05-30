@@ -571,6 +571,7 @@ const CalendarAvailabilityControl = () => {
                     <td style={{ padding: '0.7rem' }}>
                       <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '90%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc' }} onFocus={e => e.target.select()} />
                       <button style={{ marginLeft: 6, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
+                      <button style={{ marginLeft: 6, background: '#4a90e2', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}/rsvp`)}>Copy RSVP Link</button>
                       <button style={{ marginLeft: 6, background: '#e57373', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleDeletePrivateEvent(ev.id)}>Delete</button>
                     </td>
                   </tr>
