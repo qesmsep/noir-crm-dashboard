@@ -553,7 +553,7 @@ function App() {
     fetchBookingWindow();
   }, []);
 
-  // Fetch private events on mount
+  // Fetch private events on mount and whenever a new event is created
   useEffect(() => {
     async function fetchPrivateEvents() {
       const { data, error } = await supabase
