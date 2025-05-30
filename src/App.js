@@ -1897,6 +1897,10 @@ function App() {
                   </tbody>
                 </table>
               </div>
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "2rem 2.5rem", borderRadius: "12px", background: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                <h2 style={{ marginBottom: '1.5rem', color: '#222', fontWeight: 700 }}>Calendar Availability Control</h2>
+                <CalendarAvailabilityControl />
+              </div>
             </>
           )}
           {section === 'makeReservation' && (() => {
