@@ -565,12 +565,11 @@ const CalendarAvailabilityControl = () => {
                 <th style={{ padding: '0.7rem' }}>Type</th>
                 <th style={{ padding: '0.7rem' }}>Date</th>
                 <th style={{ padding: '0.7rem' }}>Time</th>
-                <th style={{ padding: '0.7rem' }}>Link</th>
               </tr>
             </thead>
             <tbody>
               {privateEvents.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: '#888', padding: '1.2rem' }}>No private events found.</td></tr>
+                <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '1.2rem' }}>No private events found.</td></tr>
               ) : (
                 privateEvents.map(ev => (
                   <tr key={ev.id}>
@@ -578,13 +577,6 @@ const CalendarAvailabilityControl = () => {
                     <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
                     <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
                     <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
-                    <td style={{ padding: '0.7rem' }}>
-                      <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '90%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc' }} onFocus={e => e.target.select()} />
-                      <button style={{ marginLeft: 6, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
-                      <button style={{ marginLeft: 6, background: '#4a90e2', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}/rsvp`)}>Copy RSVP Link</button>
-                      <button style={{ marginLeft: 6, background: '#7c6b58', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => setRsvpModalEventId(ev.id)}>Open RSVP Modal</button>
-                      <button style={{ marginLeft: 6, background: '#e57373', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleDeletePrivateEvent(ev.id)}>Delete</button>
-                    </td>
                   </tr>
                 ))
               )}
