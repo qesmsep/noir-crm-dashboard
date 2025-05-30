@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { supabase } from '../api/supabaseClient';
+import PrivateEventBooking from './PrivateEventBooking';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -63,6 +64,9 @@ const CalendarAvailabilityControl = () => {
 
   // Add state for private events ledger
   const [privateEvents, setPrivateEvents] = useState([]);
+
+  // Add state for RSVP modal
+  const [rsvpModalEventId, setRsvpModalEventId] = useState(null);
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -572,6 +576,7 @@ const CalendarAvailabilityControl = () => {
                       <input type="text" value={window.location.origin + `/private-event/${ev.id}`} readOnly style={{ width: '90%', fontSize: '0.98em', padding: '0.2rem', borderRadius: 4, border: '1px solid #ccc' }} onFocus={e => e.target.select()} />
                       <button style={{ marginLeft: 6, background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}`)}>Copy</button>
                       <button style={{ marginLeft: 6, background: '#4a90e2', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(window.location.origin + `/private-event/${ev.id}/rsvp`)}>Copy RSVP Link</button>
+                      <button style={{ marginLeft: 6, background: '#7c6b58', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => setRsvpModalEventId(ev.id)}>Open RSVP Modal</button>
                       <button style={{ marginLeft: 6, background: '#e57373', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleDeletePrivateEvent(ev.id)}>Delete</button>
                     </td>
                   </tr>
@@ -959,6 +964,15 @@ const CalendarAvailabilityControl = () => {
           ))}
         </div>
       </section>
+      {rsvpModalEventId && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 16px rgba(0,0,0,0.09)', padding: '2rem', position: 'relative', maxWidth: 440, width: '100%' }}>
+            <button onClick={() => setRsvpModalEventId(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
+            <h3 style={{ marginBottom: 16 }}>RSVP for Private Event</h3>
+            <PrivateEventBooking eventId={rsvpModalEventId} rsvpMode={true} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
