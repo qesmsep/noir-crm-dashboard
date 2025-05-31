@@ -750,7 +750,7 @@ const CalendarAvailabilityControl = () => {
 
       {/* Exceptional Opens Section */}
       <section className="availability-section">
-        <h2>Exceptional Opens</h2>
+        <h2>Custom Open Days</h2>
         <div className="add-exception">
           <DatePicker
             selected={newOpenDate}
@@ -798,7 +798,7 @@ const CalendarAvailabilityControl = () => {
             className="event-label"
           />
           <button className="add-exception-btn" onClick={addExceptionalOpen}>
-            Add Exceptional Open
+            Add Custom Open Day
           </button>
         </div>
         <div className="exceptions-list">
@@ -879,7 +879,7 @@ const CalendarAvailabilityControl = () => {
 
       {/* Exceptional Closures Section */}
       <section className="availability-section">
-        <h2>Exceptional Closures</h2>
+        <h2>Custom Closed Days</h2>
         <div className="add-exception">
           <DatePicker
             selected={newClosureDate}
