@@ -277,7 +277,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
                 html: `
                   <div class="fc-event-main-frame" style="display: flex; align-items: center; gap: 0.5em;">
                     <span style="font-size: 1.2em; color: #b07d2c;">&#128274;</span>
-                    <span style="font-weight: bold; color: #333;">${eventInfo.event.title.replace('Private Event: ', '')}</span>
+                    <span style="font-weight: bold; color: white;">${eventInfo.event.title.replace('Private Event: ', '')}</span>
                   </div>
                 `
               };
