@@ -36,20 +36,21 @@ export default async function handler(req, res) {
     const session = event.data.object;
 
     // Pull email and customer ID
-    const email = session.customer_email;
+    const email = (session.customer_email || '').trim().toLowerCase();
     const stripeCustomerId = session.customer;
-
+    const amountPaid = session.amount_total ? session.amount_total / 100 : null;
     // Connect to Supabase
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-    // Find member by email
+    // Find member by email (case-insensitive)
     const { data: member, error } = await supabase
       .from('members')
-      .select('member_id')
-      .eq('email', email)
+      .select('member_id, account_id')
+      .ilike('email', email)
       .single();
 
     if (error || !member) {
+      console.error('Member not found for email:', email);
       return res.status(404).json({ error: "Member not found" });
     }
 
@@ -58,50 +59,43 @@ export default async function handler(req, res) {
       .from('members')
       .update({ stripe_customer_id: stripeCustomerId, status: 'active' })
       .eq('member_id', member.member_id);
+
+    // Insert ledger entry for payment
+    if (amountPaid) {
+      await supabase.from('ledger').insert([{
+        account_id: member.account_id,
+        member_id: member.member_id,
+        type: 'payment',
+        amount: amountPaid,
+        note: 'Noir Membership Dues',
+        date: new Date().toISOString(),
+      }]);
+    }
   }
 
   // Handle automatic subscription renewals
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object;
     const stripeCustomerId = invoice.customer;
-    const amountPaid = invoice.amount_paid; // in cents
+    const amountPaid = invoice.amount_paid ? invoice.amount_paid / 100 : null;
     // Connect to Supabase
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
     // Find member by stripe_customer_id
     const { data: member, error: memberErr } = await supabase
       .from('members')
-      .select('member_id, membership')
+      .select('member_id, account_id, membership')
       .eq('stripe_customer_id', stripeCustomerId)
       .single();
-    if (!memberErr && member) {
+    if (!memberErr && member && amountPaid) {
       const date = new Date(invoice.status_transitions.paid_at * 1000).toISOString();
-      if (member.membership === 'Host') {
-        // Charge renewal fee
-        await supabase.from('ledger').insert([{
-          member_id: member.member_id,
-          type: 'purchase',
-          amount: 1,
-          note: 'Host membership renewal',
-          date
-        }]);
-        // Reset host credit
-        await supabase.from('ledger').insert([{
-          member_id: member.member_id,
-          type: 'payment',
-          amount: 100,
-          note: 'Host membership credit reset',
-          date
-        }]);
-      } else {
-        // Standard renewal credit
-        await supabase.from('ledger').insert([{
-          member_id: member.member_id,
-          type: 'payment',
-          amount: amountPaid / 100,
-          note: 'Subscription renewal',
-          date
-        }]);
-      }
+      await supabase.from('ledger').insert([{
+        account_id: member.account_id,
+        member_id: member.member_id,
+        type: 'payment',
+        amount: amountPaid,
+        note: 'Noir Membership Dues',
+        date
+      }]);
     }
   }
 
