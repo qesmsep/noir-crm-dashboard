@@ -2042,6 +2042,24 @@ function App() {
                     ))}
                   </tbody>
                 </table>
+                {/* Move Create User button here, below the table */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                  <button 
+                    onClick={() => setShowCreateUserModal(true)}
+                    style={{ 
+                      padding: "0.5rem 1.5rem", 
+                      background: "#a59480", 
+                      color: "#fff", 
+                      border: "none", 
+                      borderRadius: "4px", 
+                      fontWeight: 600, 
+                      cursor: "pointer" 
+                    }}
+                  >
+                    Create User
+                  </button>
+                </div>
+                {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
               </div>
             </>
           )}
