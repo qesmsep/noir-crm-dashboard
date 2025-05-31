@@ -293,8 +293,12 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
                 <div class="fc-event-title-container">
                   <div class="fc-event-title">${eventInfo.event.title}</div>
                   ${eventInfo.event.extendedProps.created_at ? 
-                    `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 2px;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
-                    : ''}
+                    (() => {
+                      const d = new Date(eventInfo.event.extendedProps.created_at);
+                      const formatted = `${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+                      return `<div class=\"fc-event-subtitle\" style=\"font-size: 0.8em; color: #666; margin-top: 2px;\">Created: ${formatted}</div>`;
+                    })()
+                  : ''}
                 </div>
               </div>
             `
