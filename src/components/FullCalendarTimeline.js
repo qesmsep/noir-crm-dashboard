@@ -13,6 +13,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [newReservation, setNewReservation] = useState(null);
+  const [eventData, setEventData] = useState({ evRes: null, resRes: null });
 
   useEffect(() => {
     // Fetch tables as resources, sorted by number
@@ -33,63 +34,67 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
       fetch('/api/events').then(r => r.json()),
       fetch('/api/reservations').then(r => r.json())
     ]).then(([evRes, resRes]) => {
-      const eventTypeEmojis = {
-        birthday: '🎂',
-        engagement: '💍',
-        anniversary: '🥂',
-        party: '🎉',
-        graduation: '🎓',
-        corporate: '🧑‍💼',
-        holiday: '❄️',
-        networking: '🤝',
-        fundraiser: '🎗️',
-        bachelor: '🥳',
-        fun: '🍸',
-        date: '💕',
-      };
-
-      const mapped = (evRes.data || []).map(e => {
-        const isPrivate = e.private === true;
-        const event = {
-          id: String(e.id),
-          title: isPrivate ? 'Private Event: ' + e.title : e.title,
-          start: e.start_time,
-          end: e.end_time,
-          resourceId: String(e.table_id),
-          type: 'event',
-          backgroundColor: isPrivate ? '#e0e0e0' : undefined,
-          textColor: isPrivate ? '#333' : undefined
-        };
-        if (isPrivate) {
-          // Block off the whole venue by creating an event for each resource
-          return resources.map(r => ({
-            ...event,
-            resourceId: r.id
-          }));
-        }
-        return event;
-      }).flat().concat(
-        (resRes.data || []).map(r => ({
-          id: String(r.id),
-          title: `${r.source === 'member' ? '🖤 ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
-          extendedProps: {
-            created_at: r.created_at ? formatDateTime(new Date(r.created_at), { 
-              month: 'short', 
-              day: 'numeric', 
-              hour: 'numeric', 
-              minute: '2-digit'
-            }) : null
-          },
-          start: r.start_time,
-          end: r.end_time,
-          resourceId: String(r.table_id),
-          ...r,
-          type: 'reservation',
-        }))
-      );
-      setEvents(mapped);
+      setEventData({ evRes, resRes });
     });
   }, [reloadKey, localReloadKey]);
+
+  useEffect(() => {
+    if (!resources.length || !eventData.evRes || !eventData.resRes) return;
+    const eventTypeEmojis = {
+      birthday: '🎂',
+      engagement: '💍',
+      anniversary: '🥂',
+      party: '🎉',
+      graduation: '🎓',
+      corporate: '🧑‍💼',
+      holiday: '❄️',
+      networking: '🤝',
+      fundraiser: '🎗️',
+      bachelor: '🥳',
+      fun: '🍸',
+      date: '💕',
+    };
+    const mapped = (eventData.evRes.data || []).map(e => {
+      const isPrivate = e.private === true;
+      const event = {
+        id: String(e.id),
+        title: isPrivate ? 'Private Event: ' + e.title : e.title,
+        start: e.start_time,
+        end: e.end_time,
+        resourceId: String(e.table_id),
+        type: 'event',
+        backgroundColor: isPrivate ? '#e0e0e0' : undefined,
+        textColor: isPrivate ? '#333' : undefined
+      };
+      if (isPrivate) {
+        // Block off the whole venue by creating an event for each resource
+        return resources.map(r => ({
+          ...event,
+          resourceId: r.id
+        }));
+      }
+      return event;
+    }).flat().concat(
+      (eventData.resRes.data || []).map(r => ({
+        id: String(r.id),
+        title: `${r.source === 'member' ? '🖤 ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
+        extendedProps: {
+          created_at: r.created_at ? formatDateTime(new Date(r.created_at), { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: 'numeric', 
+            minute: '2-digit'
+          }) : null
+        },
+        start: r.start_time,
+        end: r.end_time,
+        resourceId: String(r.table_id),
+        ...r,
+        type: 'reservation',
+      }))
+    );
+    setEvents(mapped);
+  }, [resources, eventData]);
 
   // Handler for drag-and-drop or resize
   async function handleEventDrop(info) {
