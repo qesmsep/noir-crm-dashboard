@@ -1832,8 +1832,9 @@ function App() {
                 <h2>Calendar Availability Control</h2>
                 <CalendarAvailabilityControl />
               </div>
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-                <h2>Create New User</h2>
+
+              {/* Move Create User button here */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
                 <button 
                   onClick={() => setShowCreateUserModal(true)}
                   style={{ 
@@ -1848,8 +1849,8 @@ function App() {
                 >
                   Create User
                 </button>
-                {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
               </div>
+              {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
 
               {/* Create User Modal */}
               {showCreateUserModal && (
@@ -1963,6 +1964,7 @@ function App() {
                   </div>
                 </div>
               )}
+
               <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
                 <h2>All Users</h2>
                 <table className="user-table" style={{ width: "100%", borderCollapse: "collapse" }}>
