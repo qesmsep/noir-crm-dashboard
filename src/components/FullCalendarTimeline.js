@@ -367,6 +367,34 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
           </div>
         </div>
       )}
+      {/* Calendar Legend */}
+      <div style={{
+        marginTop: '1.5rem',
+        padding: '1rem',
+        background: '#f7f6f3',
+        borderRadius: '8px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '1.5rem',
+        alignItems: 'center',
+        fontSize: '1.05em',
+        color: '#3a2c1a',
+      }}>
+        <span><span style={{fontSize: '1.2em'}}>🖤</span> Member Reservation</span>
+        <span><span style={{fontSize: '1.2em'}}>🎉</span> Party</span>
+        <span><span style={{fontSize: '1.2em'}}>🥳</span> Bachelor/Bachelorette</span>
+        <span><span style={{fontSize: '1.2em'}}>🎂</span> Birthday</span>
+        <span><span style={{fontSize: '1.2em'}}>💍</span> Engagement</span>
+        <span><span style={{fontSize: '1.2em'}}>🥂</span> Anniversary</span>
+        <span><span style={{fontSize: '1.2em'}}>🎓</span> Graduation</span>
+        <span><span style={{fontSize: '1.2em'}}>🧑‍💼</span> Corporate</span>
+        <span><span style={{fontSize: '1.2em'}}>❄️</span> Holiday</span>
+        <span><span style={{fontSize: '1.2em'}}>🤝</span> Networking</span>
+        <span><span style={{fontSize: '1.2em'}}>🎗️</span> Fundraiser</span>
+        <span><span style={{fontSize: '1.2em'}}>🍸</span> Fun Night Out</span>
+        <span><span style={{fontSize: '1.2em'}}>💕</span> Date Night</span>
+        <span><span style={{fontSize: '1.2em', color: '#b07d2c'}}>&#128274;</span> Private Event (Venue Blocked)</span>
+      </div>
     </div>
   );
 }
