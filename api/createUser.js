@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const { email, name } = req.body;
+  const { email, first_name, last_name, phone, role } = req.body;
 
   if (!email) {
     res.status(400).json({ error: 'Email is required' });
@@ -23,7 +23,12 @@ module.exports = async (req, res) => {
   const { data, error } = await supabase.auth.admin.createUser({
     email,
     email_confirm: false,
-    user_metadata: name ? { name } : {},
+    user_metadata: {
+      first_name,
+      last_name,
+      phone,
+      role: role || 'view'
+    },
     // Send invitation email (magic link)
     redirectTo: process.env.NEXT_PUBLIC_BASE_URL || process.env.REACT_APP_BASE_URL,
   });
