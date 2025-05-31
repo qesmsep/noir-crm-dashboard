@@ -78,7 +78,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     }).flat().concat(
       (eventData.resRes.data || []).map(r => ({
         id: String(r.id),
-        title: `${r.source === 'member' ? '🖤 ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
+        title: `${r.source === 'member' ? '🖤 ' : ''}${r.name}${r.tables?.number ? ' | Table ' + r.tables.number : ''} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
         extendedProps: {
           created_at: r.created_at ? formatDateTime(new Date(r.created_at), { 
             month: 'short', 
