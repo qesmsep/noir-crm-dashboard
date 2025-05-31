@@ -264,7 +264,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
         resourceAreaWidth="90px"
         headerToolbar={{
           left: 'today prev,next',
-          center: 'title',
+          center: '',
           right: '' // removed next day label
         }}
         schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
