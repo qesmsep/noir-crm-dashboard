@@ -271,6 +271,17 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
           select={handleSelectSlot}
           className="noir-fc-timeline"
           eventContent={(eventInfo) => {
+            const isPrivate = eventInfo.event.title && eventInfo.event.title.startsWith('Private Event:');
+            if (isPrivate) {
+              return {
+                html: `
+                  <div class="fc-event-main-frame" style="display: flex; align-items: center; gap: 0.5em;">
+                    <span style="font-size: 1.2em; color: #b07d2c;">&#128274;</span>
+                    <span style="font-weight: bold; color: #333;">${eventInfo.event.title.replace('Private Event: ', '')}</span>
+                  </div>
+                `
+              };
+            }
             return {
               html: `
                 <div class="fc-event-main-frame">
