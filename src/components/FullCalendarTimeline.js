@@ -14,6 +14,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
   const [showModal, setShowModal] = useState(false);
   const [newReservation, setNewReservation] = useState(null);
   const [eventData, setEventData] = useState({ evRes: null, resRes: null });
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
     // Fetch tables as resources, sorted by number
@@ -244,7 +245,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     }}>
       {/* Day of the week heading */}
       <div style={{ fontSize: '1.3em', fontWeight: 600, marginBottom: '0.5em', color: '#3a2c1a' }}>
-        {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+        {currentDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
       </div>
       {/* Calendar in its own scrollable container, fills available space */}
       <div style={{ width: '100%', overflowX: 'auto', flex: '1 1 auto', minHeight: 0 }}>
@@ -256,9 +257,9 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
         height="100%"
         slotMinTime="18:00:00" // 6pm
         slotMaxTime="25:00:00" // 1am next day
-          slotDuration="00:15:00" // 15-minute columns
-          snapDuration="00:15:00" // allow 15-minute increments
-          slotLabelInterval="00:30:00" // show half-hour marks
+        slotDuration="00:15:00" // 15-minute columns
+        snapDuration="00:15:00" // allow 15-minute increments
+        slotLabelInterval="00:30:00" // show half-hour marks
         resourceAreaHeaderContent="Tables"
         resourceAreaWidth="90px"
         headerToolbar={{
@@ -270,36 +271,41 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
         editable={true}
         eventDrop={handleEventDrop}
         eventResize={handleEventResize}
-          eventClick={handleEventClick}
-          selectable={true}
-          select={handleSelectSlot}
-          className="noir-fc-timeline"
-          eventContent={(eventInfo) => {
-            const isPrivate = eventInfo.event.title && eventInfo.event.title.startsWith('Private Event:');
-            if (isPrivate) {
-              return {
-                html: `
-                  <div class="fc-event-main-frame" style="display: flex; align-items: center; gap: 0.5em;">
-                    <span style="font-size: 1.2em; color: #b07d2c;">&#128274;</span>
-                    <span style="font-weight: bold; color: white;">${eventInfo.event.title.replace('Private Event: ', '')}</span>
-                  </div>
-                `
-              };
-            }
+        eventClick={handleEventClick}
+        selectable={true}
+        select={handleSelectSlot}
+        className="noir-fc-timeline"
+        eventContent={(eventInfo) => {
+          const isPrivate = eventInfo.event.title && eventInfo.event.title.startsWith('Private Event:');
+          if (isPrivate) {
             return {
               html: `
-                <div class="fc-event-main-frame">
-                  <div class="fc-event-title-container">
-                    <div class="fc-event-title">${eventInfo.event.title}</div>
-                    ${eventInfo.event.extendedProps.created_at ? 
-                      `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 2px;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
-                      : ''}
-                  </div>
+                <div class="fc-event-main-frame" style="display: flex; align-items: center; gap: 0.5em;">
+                  <span style="font-size: 1.2em; color: #b07d2c;">&#128274;</span>
+                  <span style="font-weight: bold; color: white;">${eventInfo.event.title.replace('Private Event: ', '')}</span>
                 </div>
               `
             };
-          }}
-        />
+          }
+          return {
+            html: `
+              <div class="fc-event-main-frame">
+                <div class="fc-event-title-container">
+                  <div class="fc-event-title">${eventInfo.event.title}</div>
+                  ${eventInfo.event.extendedProps.created_at ? 
+                    `<div class="fc-event-subtitle" style="font-size: 0.8em; color: #666; margin-top: 2px;">Created: ${eventInfo.event.extendedProps.created_at}</div>` 
+                    : ''}
+                </div>
+              </div>
+            `
+          };
+        }}
+        datesSet={(arg) => {
+          // arg.start is the first visible date, arg.end is exclusive
+          // For day view, use arg.start
+          setCurrentDate(new Date(arg.start));
+        }}
+      />
       </div>
       {/* Reservation Edit/Create Modal */}
       {showModal && (selectedReservation || newReservation) && (
