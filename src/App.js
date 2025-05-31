@@ -1993,7 +1993,36 @@ function App() {
                           </td>
                           <td>
                             <button onClick={() => handleSaveUser(user.id)} style={{ marginRight: "0.5rem" }}>Save</button>
-                            <button onClick={handleCancelEdit}>Cancel</button>
+                            <button onClick={handleCancelEdit} style={{ marginRight: "0.5rem" }}>Cancel</button>
+                            <button
+                              style={{ color: '#fff', background: '#e74c3c', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}
+                              onClick={async () => {
+                                if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+                                try {
+                                  const res = await fetch('/api/deleteAuthUser', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      supabase_user_id: user.id,
+                                      member_id: null,
+                                      requester_token: session.access_token
+                                    })
+                                  });
+                                  const data = await res.json();
+                                  if (res.ok && data.success) {
+                                    setUsers(users.filter(u => u.id !== user.id));
+                                    setEditUserId(null);
+                                    alert('User deleted.');
+                                  } else {
+                                    alert('Failed to delete user: ' + (data.error || 'Unknown error'));
+                                  }
+                                } catch (e) {
+                                  alert('Failed to delete user: ' + e.message);
+                                }
+                              }}
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ) : (
