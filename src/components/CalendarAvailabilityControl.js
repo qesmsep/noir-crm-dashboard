@@ -68,6 +68,11 @@ const CalendarAvailabilityControl = () => {
   // Add state for RSVP modal
   const [rsvpModalEventId, setRsvpModalEventId] = useState(null);
 
+  // Add state for editing private event
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editEventForm, setEditEventForm] = useState({ name: '', event_type: '', date: null, start: '', end: '' });
+
   // Load from Supabase on mount
   useEffect(() => {
     async function fetchBookingDates() {
@@ -466,6 +471,71 @@ const CalendarAvailabilityControl = () => {
     }
   }
 
+  // Handler to open edit modal
+  function handleOpenEditModal(event) {
+    setEditingEvent(event);
+    setEditEventForm({
+      name: event.title,
+      event_type: event.event_type,
+      date: new Date(event.start_time),
+      start: new Date(event.start_time).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+      end: new Date(event.end_time).toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })
+    });
+    setEditModalOpen(true);
+  }
+
+  // Handler to close edit modal
+  function handleCloseEditModal() {
+    setEditModalOpen(false);
+    setEditingEvent(null);
+  }
+
+  // Handler to save edits
+  async function handleSaveEditEvent() {
+    if (!editingEvent) return;
+    const dateStr = editEventForm.date.toISOString().split('T')[0];
+    const [startHour, startMinute] = editEventForm.start.split(':');
+    const [endHour, endMinute] = editEventForm.end.split(':');
+    const startDate = new Date(editEventForm.date);
+    startDate.setHours(Number(startHour), Number(startMinute), 0, 0);
+    const endDate = new Date(editEventForm.date);
+    endDate.setHours(Number(endHour), Number(endMinute), 0, 0);
+    const start = startDate.toISOString();
+    const end = endDate.toISOString();
+    const res = await fetch(`/api/events?id=${editingEvent.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: editEventForm.name,
+        event_type: editEventForm.event_type,
+        start_time: start,
+        end_time: end,
+        private: true
+      })
+    });
+    if (res.ok) {
+      setEditModalOpen(false);
+      setEditingEvent(null);
+      setEditEventForm({ name: '', event_type: '', date: null, start: '', end: '' });
+      // Refresh events
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('private', true)
+        .order('start_time', { ascending: false });
+      if (!error && data) setPrivateEvents(data);
+    }
+  }
+
+  // Handler to delete event from modal
+  async function handleDeleteEditEvent() {
+    if (!editingEvent) return;
+    await handleDeletePrivateEvent(editingEvent.id);
+    setEditModalOpen(false);
+    setEditingEvent(null);
+    setEditEventForm({ name: '', event_type: '', date: null, start: '', end: '' });
+  }
+
   return (
     <div className="availability-control">
       {/* Add Create Private Event form at the top of the admin panel */}
@@ -565,6 +635,7 @@ const CalendarAvailabilityControl = () => {
                 <th style={{ padding: '0.7rem' }}>Type</th>
                 <th style={{ padding: '0.7rem' }}>Date</th>
                 <th style={{ padding: '0.7rem' }}>Time</th>
+                <th style={{ padding: '0.7rem' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -577,6 +648,9 @@ const CalendarAvailabilityControl = () => {
                     <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
                     <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
                     <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
+                    <td style={{ padding: '0.7rem' }}>
+                      <button style={{ background: '#7c6b58', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleOpenEditModal(ev)}>Edit</button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -968,6 +1042,82 @@ const CalendarAvailabilityControl = () => {
             <button onClick={() => setRsvpModalEventId(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
             <h3 style={{ marginBottom: 16 }}>RSVP for Private Event</h3>
             <PrivateEventBooking eventId={rsvpModalEventId} rsvpMode={true} />
+          </div>
+        </div>
+      )}
+      {editModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 16px rgba(0,0,0,0.09)', padding: '2rem', position: 'relative', maxWidth: 440, width: '100%' }}>
+            <button onClick={handleCloseEditModal} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
+            <h3 style={{ marginBottom: 16 }}>Edit Private Event</h3>
+            <form onSubmit={e => { e.preventDefault(); handleSaveEditEvent(); }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <input
+                type="text"
+                placeholder="Event Name"
+                value={editEventForm.name}
+                onChange={e => setEditEventForm(f => ({ ...f, name: e.target.value }))}
+                required
+                style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
+              />
+              <select
+                value={editEventForm.event_type}
+                onChange={e => setEditEventForm(f => ({ ...f, event_type: e.target.value }))}
+                required
+                style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
+              >
+                <option value="">Select event type...</option>
+                <option value="private">Private Event</option>
+                <option value="birthday">Birthday</option>
+                <option value="engagement">Engagement</option>
+                <option value="anniversary">Anniversary</option>
+                <option value="party">Party</option>
+                <option value="graduation">Graduation</option>
+                <option value="corporate">Corporate Event</option>
+                <option value="holiday">Holiday Gathering</option>
+                <option value="networking">Networking</option>
+                <option value="fundraiser">Fundraiser</option>
+                <option value="bachelor">Bachelor/Bachelorette</option>
+                <option value="fun">Fun Night Out</option>
+                <option value="date">Date Night</option>
+              </select>
+              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                <div>
+                  <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Date</label>
+                  <DatePicker
+                    selected={editEventForm.date}
+                    onChange={d => setEditEventForm(f => ({ ...f, date: d }))}
+                    dateFormat="MMMM d, yyyy"
+                    minDate={new Date()}
+                    required
+                    className="datepicker-input"
+                  />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Start</label>
+                  <input
+                    type="time"
+                    value={editEventForm.start}
+                    onChange={e => setEditEventForm(f => ({ ...f, start: e.target.value }))}
+                    required
+                    style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>End</label>
+                  <input
+                    type="time"
+                    value={editEventForm.end}
+                    onChange={e => setEditEventForm(f => ({ ...f, end: e.target.value }))}
+                    required
+                    style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: 8 }}>
+                <button type="submit" style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: 8, padding: '0.8rem 0', fontWeight: 700, fontSize: '1.1rem', flex: 1 }}>Save</button>
+                <button type="button" onClick={handleDeleteEditEvent} style={{ background: '#e57373', color: '#fff', border: 'none', borderRadius: 8, padding: '0.8rem 0', fontWeight: 700, fontSize: '1.1rem', flex: 1 }}>Delete</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
