@@ -242,6 +242,10 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
       display: 'flex',
       flexDirection: 'column',
     }}>
+      {/* Day of the week heading */}
+      <div style={{ fontSize: '1.3em', fontWeight: 600, marginBottom: '0.5em', color: '#3a2c1a' }}>
+        {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+      </div>
       {/* Calendar in its own scrollable container, fills available space */}
       <div style={{ width: '100%', overflowX: 'auto', flex: '1 1 auto', minHeight: 0 }}>
       <FullCalendar
@@ -260,7 +264,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
         headerToolbar={{
           left: 'today prev,next',
           center: 'title',
-          right: '' // no day/week buttons
+          right: '' // removed next day label
         }}
         schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
         editable={true}
