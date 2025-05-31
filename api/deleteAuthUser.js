@@ -82,17 +82,22 @@ export default async function handler(req, res) {
     }
   }
 
-  // Delete the member row (always)
-  const supabaseDb = createClient(supabaseUrl, service_role_key);
-  console.log('Deleting member with id:', member_id);
-  const { data: deletedRows, error: dbError } = await supabaseDb
-    .from('members')
-    .delete()
-    .eq('member_id', member_id)
-    .select();
-  if (dbError) {
-    return res.status(500).json({ error: 'Failed to delete member row', details: dbError.message });
+  // Only delete the member row if member_id is provided
+  if (member_id) {
+    const supabaseDb = createClient(supabaseUrl, service_role_key);
+    console.log('Deleting member with id:', member_id);
+    const { data: deletedRows, error: dbError } = await supabaseDb
+      .from('members')
+      .delete()
+      .eq('member_id', member_id)
+      .select();
+    if (dbError) {
+      return res.status(500).json({ error: 'Failed to delete member row', details: dbError.message });
+    }
+    console.log('Deleted member row:', deletedRows);
+    return res.status(200).json({ success: true, deleted: deletedRows });
+  } else {
+    // If no member_id, just return success
+    return res.status(200).json({ success: true });
   }
-  console.log('Deleted member row:', deletedRows);
-  return res.status(200).json({ success: true, deleted: deletedRows });
 }
