@@ -8,8 +8,8 @@ export default async function handler(req, res) {
   }
 
   const { member_id, supabase_user_id: initial_supabase_user_id, requester_token } = req.body;
-  if (!member_id) {
-    return res.status(400).json({ error: 'Missing member_id' });
+  if (!member_id && !initial_supabase_user_id) {
+    return res.status(400).json({ error: 'Missing member_id or supabase_user_id' });
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
