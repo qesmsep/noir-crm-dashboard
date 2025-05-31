@@ -48,14 +48,27 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
         date: '💕',
       };
 
-      const mapped = (evRes.data || []).map(e => ({
-        id: String(e.id),
-        title: e.title,
-        start: e.start_time,
-        end: e.end_time,
-        resourceId: String(e.table_id),
-        type: 'event',
-      })).concat(
+      const mapped = (evRes.data || []).map(e => {
+        const isPrivate = e.private === true;
+        const event = {
+          id: String(e.id),
+          title: isPrivate ? 'Private Event: ' + e.title : e.title,
+          start: e.start_time,
+          end: e.end_time,
+          resourceId: String(e.table_id),
+          type: 'event',
+          backgroundColor: isPrivate ? '#e0e0e0' : undefined,
+          textColor: isPrivate ? '#333' : undefined
+        };
+        if (isPrivate) {
+          // Block off the whole venue by creating an event for each resource
+          return resources.map(r => ({
+            ...event,
+            resourceId: r.id
+          }));
+        }
+        return event;
+      }).flat().concat(
         (resRes.data || []).map(r => ({
           id: String(r.id),
           title: `${r.source === 'member' ? '🖤 ' : ''}${r.name} | Table ${r.tables?.number || '?'} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
@@ -226,28 +239,28 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     }}>
       {/* Calendar in its own scrollable container, fills available space */}
       <div style={{ width: '100%', overflowX: 'auto', flex: '1 1 auto', minHeight: 0 }}>
-        <FullCalendar
-          plugins={[resourceTimelinePlugin, interactionPlugin]}
-          initialView="resourceTimelineDay"
-          resources={resources}
-          events={events}
-          height="100%"
-          slotMinTime="18:00:00" // 6pm
-          slotMaxTime="25:00:00" // 1am next day
+      <FullCalendar
+        plugins={[resourceTimelinePlugin, interactionPlugin]}
+        initialView="resourceTimelineDay"
+        resources={resources}
+        events={events}
+        height="100%"
+        slotMinTime="18:00:00" // 6pm
+        slotMaxTime="25:00:00" // 1am next day
           slotDuration="00:15:00" // 15-minute columns
           snapDuration="00:15:00" // allow 15-minute increments
           slotLabelInterval="00:30:00" // show half-hour marks
-          resourceAreaHeaderContent="Tables"
-          resourceAreaWidth="90px"
-          headerToolbar={{
-            left: 'today prev,next',
-            center: 'title',
-            right: '' // no day/week buttons
-          }}
-          schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
-          editable={true}
-          eventDrop={handleEventDrop}
-          eventResize={handleEventResize}
+        resourceAreaHeaderContent="Tables"
+        resourceAreaWidth="90px"
+        headerToolbar={{
+          left: 'today prev,next',
+          center: 'title',
+          right: '' // no day/week buttons
+        }}
+        schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
+        editable={true}
+        eventDrop={handleEventDrop}
+        eventResize={handleEventResize}
           eventClick={handleEventClick}
           selectable={true}
           select={handleSelectSlot}
