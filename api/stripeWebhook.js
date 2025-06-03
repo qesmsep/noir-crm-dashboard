@@ -26,8 +26,9 @@ export default async function handler(req, res) {
 
   try {
     // Verify webhook signature
+    const buf = await buffer(req);
     event = stripe.webhooks.constructEvent(
-      req.body,
+      buf,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
