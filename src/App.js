@@ -917,23 +917,14 @@ function App() {
     useEffect(() => {
       const fetchPendingCharges = async () => {
         if (!accountId) return;
-        
         try {
           const { data, error } = await supabase
             .from('ledger')
-            .select(`
-              *,
-              members (
-                first_name,
-                last_name
-              )
-            `)
+            .select(`*, members (first_name, last_name)`)
             .eq('account_id', accountId)
             .eq('status', 'pending_invoice')
             .order('date', { ascending: false });
-
           if (error) throw error;
-
           setPendingCharges(data || []);
           const total = (data || []).reduce((sum, charge) => sum + Math.abs(charge.amount), 0);
           setPendingChargesTotal(total);
@@ -941,7 +932,6 @@ function App() {
           console.error('Error fetching pending charges:', error);
         }
       };
-
       fetchPendingCharges();
     }, [accountId, supabase]);
 
