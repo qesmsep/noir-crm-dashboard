@@ -1,59 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-export default function PaymentMethods({ member, onClose }) {
+const PaymentMethods = ({ account_id, onClose }) => {
+  const stripe = useStripe();
+  const elements = useElements();
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddCard, setShowAddCard] = useState(false);
   const [cardError, setCardError] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const stripe = useStripe();
-  const elements = useElements();
 
   useEffect(() => {
-    fetchPaymentMethods();
-  }, [member.member_id]);
+    if (account_id) {
+      fetchPaymentMethods();
+    }
+  }, [account_id]);
 
   const fetchPaymentMethods = async () => {
     try {
-      const res = await fetch(`/api/listPaymentMethods?member_id=${member.member_id}`);
-      const data = await res.json();
-      if (res.ok) {
-        setPaymentMethods(data.paymentMethods);
-      } else {
-        setError(data.error || 'Failed to load payment methods');
-      }
+      const response = await fetch(`/api/listPaymentMethods?account_id=${account_id}`);
+      if (!response.ok) throw new Error('Failed to fetch payment methods');
+      const data = await response.json();
+      setPaymentMethods(data.payment_methods);
     } catch (err) {
-      setError('Failed to load payment methods');
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSetDefault = async (paymentMethodId) => {
     try {
-      const res = await fetch('/api/setDefaultPaymentMethod', {
+      const response = await fetch('/api/setDefaultPaymentMethod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          member_id: member.member_id,
-          payment_method_id: paymentMethodId,
-        }),
+        body: JSON.stringify({ account_id, payment_method_id: paymentMethodId }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        // Refresh payment methods
-        fetchPaymentMethods();
-      } else {
-        setError(data.error || 'Failed to set default payment method');
-      }
+      if (!response.ok) throw new Error('Failed to set default payment method');
+      await fetchPaymentMethods();
     } catch (err) {
-      setError('Failed to set default payment method');
+      setError(err.message);
     }
   };
 
-  const handleAddCard = async (e) => {
-    e.preventDefault();
+  const handleAddCard = async (event) => {
+    event.preventDefault();
     if (!stripe || !elements) return;
 
     setProcessing(true);
@@ -71,148 +63,133 @@ export default function PaymentMethods({ member, onClose }) {
     }
 
     try {
-      const res = await fetch('/api/setupPaymentMethod', {
+      const response = await fetch('/api/setupPaymentMethod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          member_id: member.member_id,
+          account_id,
           payment_method_id: paymentMethod.id,
         }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        setShowAddCard(false);
-        fetchPaymentMethods();
-      } else {
-        setCardError(data.error || 'Failed to add card');
-      }
+
+      if (!response.ok) throw new Error('Failed to add payment method');
+      
+      await fetchPaymentMethods();
+      setShowAddCard(false);
+      elements.getElement(CardElement).clear();
     } catch (err) {
-      setCardError('Failed to add card');
+      setCardError(err.message);
+    } finally {
+      setProcessing(false);
     }
-    setProcessing(false);
   };
 
   if (loading) {
-    return <div>Loading payment methods...</div>;
+    return <div className="text-center py-4">Loading payment methods...</div>;
   }
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h3>Payment Methods</h3>
-      {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
-      
-      {paymentMethods.length > 0 ? (
-        <div style={{ marginBottom: '1rem' }}>
-          {paymentMethods.map((pm) => (
-            <div
-              key={pm.id}
-              style={{
-                padding: '1rem',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                marginBottom: '0.5rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <div>
-                <strong>{pm.brand.toUpperCase()}</strong> ending in {pm.last4}
-                <div style={{ fontSize: '0.9rem', color: '#666' }}>
-                  Expires {pm.exp_month}/{pm.exp_year}
-                </div>
-              </div>
-              {pm.isDefault ? (
-                <span style={{ color: '#666' }}>Default</span>
-              ) : (
-                <button
-                  onClick={() => handleSetDefault(pm.id)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#a59480',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Set as Default
-                </button>
-              )}
-            </div>
-          ))}
+    <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Payment Methods</h2>
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6">
+          {error}
         </div>
-      ) : (
-        <div style={{ marginBottom: '1rem', color: '#666' }}>No payment methods found</div>
       )}
 
-      {showAddCard ? (
-        <form onSubmit={handleAddCard} style={{ marginTop: '1rem' }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <CardElement
-              options={{
-                style: {
-                  base: {
-                    fontSize: '16px',
-                    color: '#424770',
-                    '::placeholder': {
-                      color: '#aab7c4',
+      <div className="space-y-4">
+        {paymentMethods.map((method) => (
+          <div
+            key={method.id}
+            className="flex items-center justify-between p-4 border rounded-lg"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="text-gray-600">
+                {method.brand.toUpperCase()} •••• {method.last4}
+              </div>
+              <div className="text-sm text-gray-500">
+                Expires {method.exp_month}/{method.exp_year}
+              </div>
+              {method.is_default && (
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                  Default
+                </span>
+              )}
+            </div>
+            {!method.is_default && (
+              <button
+                onClick={() => handleSetDefault(method.id)}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                Set as Default
+              </button>
+            )}
+          </div>
+        ))}
+
+        {showAddCard ? (
+          <form onSubmit={handleAddCard} className="space-y-4">
+            <div className="border rounded-lg p-4">
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '16px',
+                      color: '#424770',
+                      '::placeholder': {
+                        color: '#aab7c4',
+                      },
+                    },
+                    invalid: {
+                      color: '#9e2146',
                     },
                   },
-                  invalid: {
-                    color: '#9e2146',
-                  },
-                },
-              }}
-            />
-          </div>
-          {cardError && <div style={{ color: 'red', marginBottom: '1rem' }}>{cardError}</div>}
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button
-              type="submit"
-              disabled={!stripe || processing}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#a59480',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              {processing ? 'Adding...' : 'Add Card'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowAddCard(false)}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#e5e1d8',
-                color: '#555',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <button
-          onClick={() => setShowAddCard(true)}
-          style={{
-            padding: '0.5rem 1rem',
-            background: '#a59480',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Add New Card
-        </button>
-      )}
+                }}
+              />
+            </div>
+            {cardError && (
+              <div className="text-red-600 text-sm">{cardError}</div>
+            )}
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => setShowAddCard(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                disabled={processing}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={!stripe || processing}
+              >
+                {processing ? 'Adding...' : 'Add Card'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            onClick={() => setShowAddCard(true)}
+            className="w-full px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50"
+          >
+            + Add New Card
+          </button>
+        )}
+      </div>
     </div>
   );
-} 
+};
+
+export default PaymentMethods; 
