@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     .from('members')
     .select('stripe_customer_id')
     .eq('account_id', thisMember.account_id)
-    .eq('member_type', 'Primary')
+    .eq('member_type', 'primary')
     .single();
 
   if (primaryErr || !primary || !primary.stripe_customer_id) {
