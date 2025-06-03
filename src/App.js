@@ -612,8 +612,7 @@ function App() {
           appearance={{ theme: ThemeSupa }}
           providers={[]} // No social sign-in
           theme="dark"
-          magicLink={true}
-          view="magic_link"
+          view="sign_in"
         />
       </div>
     );
