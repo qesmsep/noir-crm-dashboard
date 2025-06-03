@@ -1,0 +1,60 @@
+import React from 'react';
+
+const UpcomingPaymentsCard = ({ upcomingRenewals }) => {
+  const membershipAmounts = {
+    'Host': 1,
+    'Noir Host': 1,
+    'Noir Solo': 100,
+    'Solo': 100,
+    'Noir Duo': 125,
+    'Duo': 125,
+    'Premier': 250,
+    'Reserve': 1000
+  };
+
+  return (
+    <div style={{
+      background: '#fff',
+      padding: '2rem',
+      borderRadius: '12px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+      minWidth: '250px',
+      marginTop: '2rem'
+    }}>
+      <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Next 10 Payments Due</h3>
+      {upcomingRenewals.length === 0 ? (
+        <div>No upcoming payments.</div>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {upcomingRenewals.slice(0, 10).map(m => {
+            const tier = m.membership?.match(/host|solo|duo|premier|reserve/i)?.[0]?.toLowerCase();
+            const amount = membershipAmounts[Object.keys(membershipAmounts).find(key => 
+              key.toLowerCase().includes(tier || '')
+            )] || 0;
+            return (
+              <li key={m.member_id} style={{ 
+                padding: '0.75rem 0', 
+                borderBottom: '1px solid #eee',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{m.first_name} {m.last_name}</div>
+                  <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                    {m.nextRenewal ? m.nextRenewal.toLocaleDateString() : 'N/A'}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 600, color: '#333' }}>
+                  ${amount.toFixed(2)}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+export default UpcomingPaymentsCard; 

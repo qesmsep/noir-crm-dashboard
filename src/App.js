@@ -15,6 +15,10 @@ import FullCalendarTimeline from './components/FullCalendarTimeline';
 import CalendarAvailabilityControl from './components/CalendarAvailabilityControl';
 import { toCST, toCSTISOString, createDateFromTimeString } from './utils/dateUtils';
 import PrivateEventBooking from './components/PrivateEventBooking';
+import TotalMembersCard from './components/dashboard/TotalMembersCard';
+import MonthlyRevenueCard from './components/dashboard/MonthlyRevenueCard';
+import UpcomingPaymentsCard from './components/dashboard/UpcomingPaymentsCard';
+import TotalBalanceCard from './components/dashboard/TotalBalanceCard';
 
 // Responsive helper
 function useIsMobile() {
@@ -1573,138 +1577,17 @@ function App() {
           }}
         >
           {section === 'dashboard' && (
-            <div style={{ padding: '2rem', width: '100%' }}>
-              <h1>Dashboard</h1>
-              <div style={{ 
-                display: 'flex', 
-                gap: '2rem', 
-                marginTop: '2rem',
-                flexWrap: 'wrap'
-              }}>
-                <div style={{
-                  background: '#fff',
-                  padding: '2rem',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                  minWidth: '250px'
-                }}>
-                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Total Members</h3>
-                  <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#333' }}>
-                    {members.length}
-                  </div>
-                </div>
-                <div style={{
-                  background: '#fff',
-                  padding: '2rem',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                  minWidth: '250px',
-                  marginTop: '2rem'
-                }}>
-                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Upcoming Renewals (Next 7 Days)</h3>
-                  {upcomingRenewals.length === 0 ? (
-                    <div>No renewals in the next 7 days.</div>
-                  ) : (
-                    <ul>
-                      {upcomingRenewals.map(m => (
-                        <li key={m.member_id}>
-                          {m.first_name} {m.last_name} — {m.nextRenewal ? m.nextRenewal.toLocaleDateString() : 'N/A'}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div style={{
-                  background: '#fff',
-                  padding: '2rem',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                  minWidth: '250px',
-                  marginTop: '2rem'
-                }}>
-                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>{new Date().toLocaleString('default', { month: 'long' })} Revenue</h3>
-                  <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333' }}>
-                    ${projectedMonthlyDues.toFixed(2)}
-                  </div>
-                </div>
-                <div style={{
-                  background: '#fff',
-                  padding: '2rem',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                  minWidth: '250px',
-                  marginTop: '2rem'
-                }}>
-                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Next 10 Payments Due</h3>
-                  {upcomingRenewals.length === 0 ? (
-                    <div>No upcoming payments.</div>
-                  ) : (
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                      {upcomingRenewals.slice(0, 10).map(m => {
-                        const membershipAmounts = {
-                          'Host': 1,
-                          'Noir Host': 1,
-                          'Noir Solo': 100,
-                          'Solo': 100,
-                          'Noir Duo': 125,
-                          'Duo': 125,
-                          'Premier': 250,
-                          'Reserve': 1000
-                        };
-                        const tier = m.membership?.match(/host|solo|duo|premier|reserve/i)?.[0]?.toLowerCase();
-                        const amount = membershipAmounts[Object.keys(membershipAmounts).find(key => 
-                          key.toLowerCase().includes(tier || '')
-                        )] || 0;
-                        return (
-                          <li key={m.member_id} style={{ 
-                            padding: '0.75rem 0', 
-                            borderBottom: '1px solid #eee',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{m.first_name} {m.last_name}</div>
-                              <div style={{ fontSize: '0.9rem', color: '#666' }}>
-                                {m.nextRenewal ? m.nextRenewal.toLocaleDateString() : 'N/A'}
-                              </div>
-                            </div>
-                            <div style={{ fontWeight: 600, color: '#333' }}>
-                              ${amount.toFixed(2)}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-                <div style={{
-                  background: '#fff',
-                  padding: '2rem',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                  minWidth: '250px',
-                  marginTop: '2rem'
-                }}>
-                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Total Balance Due</h3>
-                  <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333' }}>
-                    ${members.reduce((total, member) => {
-                      const balance = memberLedger
-                        .filter(tx => tx.member_id === member.member_id)
-                        .reduce((acc, tx) => acc + Number(tx.amount), 0);
-                      return total + (balance < 0 ? Math.abs(balance) : 0);
-                    }, 0).toFixed(2)}
-                  </div>
-                  <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.5rem' }}>
-                    {members.filter(member => {
-                      const balance = memberLedger
-                        .filter(tx => tx.member_id === member.member_id)
-                        .reduce((acc, tx) => acc + Number(tx.amount), 0);
-                      return balance < 0;
-                    }).length} accounts with outstanding balance
-                  </div>
-                </div>
+            <div style={{ padding: '2rem' }}>
+              <h1 style={{ marginBottom: '2rem' }}>Noir CRM Dashboard</h1>
+              
+              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                <TotalMembersCard members={members} />
+                <MonthlyRevenueCard projectedMonthlyDues={projectedMonthlyDues} />
+                <UpcomingPaymentsCard upcomingRenewals={upcomingRenewals} />
+                <TotalBalanceCard members={members} memberLedger={memberLedger} />
               </div>
+
+              {/* ... rest of the existing JSX ... */}
             </div>
           )}
           {section === 'members' && (
