@@ -38,6 +38,8 @@ const MemberDetail = ({
     type: '',
     date: ''
   });
+  // Payment Modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Member attributes and notes (API-driven)
   const [attributes, setAttributes] = useState([]);
@@ -409,7 +411,7 @@ const MemberDetail = ({
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-              <button
+          <button
             className="edit-member-btn"
             onClick={() => {
               if (typeof onEditMember === 'function') onEditMember(member);
@@ -425,19 +427,78 @@ const MemberDetail = ({
             }}
           >
             Edit Member
-            </button>
-        <button
-          className="delete-member-btn"
-          onClick={() => {
-            if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+          </button>
+          <button
+            className="edit-member-btn"
+            onClick={() => setShowPaymentModal(true)}
+            style={{
+              background: '#4a90e2',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.6rem 1.5rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Edit Payment Method
+          </button>
+          <button
+            className="delete-member-btn"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
                 handleDeleteMember(member.member_id, member.supabase_user_id);
-            }
-          }}
-        >
-          Delete Member
-        </button>
+              }
+            }}
+          >
+            Delete Member
+          </button>
         </div>
       </div>
+      {/* Payment Method Modal */}
+      {showPaymentModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff',
+            padding: '2rem',
+            borderRadius: '8px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+            width: '90%',
+            maxWidth: '400px',
+            textAlign: 'center',
+          }}>
+            <h3 style={{ marginBottom: '1rem', color: '#333' }}>Payment Methods</h3>
+            {/* Placeholder for payment method list & controls */}
+            <p>No payment methods added yet.</p>
+            <button
+              onClick={() => setShowPaymentModal(false)}
+              style={{
+                marginTop: '1rem',
+                background: '#a59480',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '0.6rem 1.5rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
