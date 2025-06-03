@@ -60,7 +60,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function App() {
-  // All useState hooks at the top
+  // All useState hooks
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [session, setSession] = useState(null);
