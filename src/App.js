@@ -166,6 +166,7 @@ function App() {
   const [bookingStartDate, setBookingStartDate] = useState(null);
   const [bookingEndDate, setBookingEndDate] = useState(null);
   const [privateEvents, setPrivateEvents] = useState([]);
+  const [upcomingRenewals, setUpcomingRenewals] = useState([]);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -587,6 +588,24 @@ function App() {
       if (!error && data) setPrivateEvents(data);
     }
     fetchPrivateEvents();
+  }, []);
+
+  useEffect(() => {
+    async function fetchUpcomingRenewals() {
+      const today = new Date();
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(today.getDate() + 7);
+
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .gte('renewal_date', today.toISOString().split('T')[0])
+        .lte('renewal_date', sevenDaysFromNow.toISOString().split('T')[0])
+        .order('renewal_date', { ascending: true });
+
+      if (!error) setUpcomingRenewals(data || []);
+    }
+    fetchUpcomingRenewals();
   }, []);
 
   // Add route for /private-event/:id
@@ -1512,6 +1531,27 @@ function App() {
                   <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#333' }}>
                     {members.length}
                   </div>
+                </div>
+                <div style={{
+                  background: '#fff',
+                  padding: '2rem',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                  minWidth: '250px',
+                  marginTop: '2rem'
+                }}>
+                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Upcoming Renewals (Next 7 Days)</h3>
+                  {upcomingRenewals.length === 0 ? (
+                    <div>No renewals in the next 7 days.</div>
+                  ) : (
+                    <ul>
+                      {upcomingRenewals.map(m => (
+                        <li key={m.member_id}>
+                          {m.first_name} {m.last_name} — {new Date(m.renewal_date).toLocaleDateString()}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </div>
