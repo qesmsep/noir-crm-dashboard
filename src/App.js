@@ -167,6 +167,9 @@ function App() {
   const [pendingCharges, setPendingCharges] = useState([]);
   const [pendingChargesTotal, setPendingChargesTotal] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const accountId = selectedMember?.account_id;
 
   // Define eventTypes at the top
   const eventTypes = [
