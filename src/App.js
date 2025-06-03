@@ -442,8 +442,6 @@ function App() {
 
         // Calculate upcoming renewals
         const today = new Date();
-        const sevenDaysFromNow = new Date();
-        sevenDaysFromNow.setDate(today.getDate() + 7);
 
         const getNextRenewal = (joinDate) => {
           if (!joinDate) return null;
@@ -460,13 +458,13 @@ function App() {
           return candidate;
         };
 
-        const upcoming = (data || []).filter(m => {
-          const nextRenewal = getNextRenewal(m.join_date);
-          return nextRenewal && nextRenewal >= today && nextRenewal <= sevenDaysFromNow;
-        }).map(m => ({
-          ...m,
-          nextRenewal: getNextRenewal(m.join_date)
-        }));
+        const upcoming = (data || [])
+          .map(m => ({
+            ...m,
+            nextRenewal: getNextRenewal(m.join_date)
+          }))
+          .filter(m => m.nextRenewal) // Filter out any null nextRenewal dates
+          .sort((a, b) => a.nextRenewal - b.nextRenewal); // Sort by nextRenewal date
 
         setUpcomingRenewals(upcoming);
       }
