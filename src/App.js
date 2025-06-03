@@ -1684,16 +1684,55 @@ function App() {
                           {memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? 'Balance Due:' : 'Current Credit:'}
                         </strong>{' '}
                         ${Math.abs((memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0)).toFixed(2)}
-                        {session.user?.user_metadata?.role === 'admin' && selectedMember.stripe_customer_id && (
+                        {session.user?.user_metadata?.role === 'admin' && (
                           <>
-                            <button
-                              onClick={handleChargeBalance}
-                              disabled={charging}
-                              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: charging ? 'not-allowed' : 'pointer' }}
-                            >
-                              {charging ? 'Charging...' : 'Charge Balance'}
-                            </button>
-                            {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
+                            {selectedMember.stripe_customer_id ? (
+                              <>
+                                <button
+                                  onClick={handleChargeBalance}
+                                  disabled={charging}
+                                  style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: charging ? 'not-allowed' : 'pointer' }}
+                                >
+                                  {charging ? 'Charging...' : 'Charge Balance'}
+                                </button>
+                                {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
+                              </>
+                            ) : (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const response = await fetch('/api/linkStripeCustomer', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        member_id: selectedMember.member_id,
+                                        first_name: selectedMember.first_name,
+                                        last_name: selectedMember.last_name,
+                                        email: selectedMember.email,
+                                      }),
+                                    });
+                                    const result = await response.json();
+                                    if (result.success) {
+                                      // Update the member in the local state
+                                      setMembers(members.map(m => 
+                                        m.member_id === selectedMember.member_id 
+                                          ? { ...m, stripe_customer_id: result.stripe_customer.id }
+                                          : m
+                                      ));
+                                      setSelectedMember({ ...selectedMember, stripe_customer_id: result.stripe_customer.id });
+                                      alert('Member linked to Stripe successfully!');
+                                    } else {
+                                      alert('Failed to link member to Stripe: ' + result.error);
+                                    }
+                                  } catch (err) {
+                                    alert('Error linking member to Stripe: ' + err.message);
+                                  }
+                                }}
+                                style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+                              >
+                                Link to Stripe
+                              </button>
+                            )}
                           </>
                         )}
                         {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
