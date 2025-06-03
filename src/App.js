@@ -65,7 +65,7 @@ function App() {
   const [members, setMembers] = useState([]);
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteStatus, setPromoteStatus] = useState('');
-  const [section, setSection] = useState('members');
+  const [section, setSection] = useState('dashboard');
   const [reminderHour, setReminderHour] = useState('');
   const [customEmailTo, setCustomEmailTo] = useState('tim@828.life');
   const [customEmailSubject, setCustomEmailSubject] = useState('');
@@ -1380,6 +1380,15 @@ function App() {
                 Admin
               </button>
               <button
+                className={section === 'dashboard' ? 'nav-active' : ''}
+                onClick={() => {
+                  setSection('dashboard');
+                  setSidebarOpen(false);
+                }}
+              >
+                Dashboard
+              </button>
+              <button
                 className={section === 'makeReservation' ? 'nav-active' : ''}
                 onClick={() => {
                   setSection('makeReservation');
@@ -1445,6 +1454,12 @@ function App() {
               Admin
             </button>
             <button
+              className={section === 'dashboard' ? 'nav-active' : ''}
+              onClick={() => setSection('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button
               className={section === 'makeReservation' ? 'nav-active' : ''}
               onClick={() => setSection('makeReservation')}
             >
@@ -1478,6 +1493,11 @@ function App() {
             overflowX: "hidden"
           }}
         >
+          {section === 'dashboard' && (
+            <div style={{ padding: '2rem', width: '100%' }}>
+              <h1>This is your dashboard</h1>
+            </div>
+          )}
           {section === 'members' && (
             <>
               {/* Member Lookup UI at the top of Members section */}
