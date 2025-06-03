@@ -19,6 +19,11 @@ import TotalMembersCard from './components/dashboard/TotalMembersCard';
 import MonthlyRevenueCard from './components/dashboard/MonthlyRevenueCard';
 import UpcomingPaymentsCard from './components/dashboard/UpcomingPaymentsCard';
 import TotalBalanceCard from './components/dashboard/TotalBalanceCard';
+import DashboardPage from './components/pages/DashboardPage';
+import MembersPage from './components/pages/MembersPage';
+import AdminPage from './components/pages/AdminPage';
+import ReservationPage from './components/pages/ReservationPage';
+import CalendarPage from './components/pages/CalendarPage';
 
 // Responsive helper
 function useIsMobile() {
@@ -1577,589 +1582,61 @@ function App() {
           }}
         >
           {section === 'dashboard' && (
-            <div style={{ padding: '2rem' }}>
-              <h1 style={{ marginBottom: '2rem' }}>Noir CRM Dashboard</h1>
-              
-              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                <TotalMembersCard members={members} />
-                <MonthlyRevenueCard projectedMonthlyDues={projectedMonthlyDues} />
-                <UpcomingPaymentsCard upcomingRenewals={upcomingRenewals} />
-                <TotalBalanceCard members={members} memberLedger={memberLedger} />
-              </div>
-
-              {/* ... rest of the existing JSX ... */}
-            </div>
+            <DashboardPage 
+              members={members}
+              projectedMonthlyDues={projectedMonthlyDues}
+              upcomingRenewals={upcomingRenewals}
+              memberLedger={memberLedger}
+            />
           )}
           {section === 'members' && (
-            <>
-              {/* Member Lookup UI at the top of Members section */}
-              <div style={{ marginBottom: '2rem' }}>
-                <input
-                  type="text"
-                  placeholder="Search by name, email, or phone"
-                  value={lookupQuery}
-                  onChange={e => setLookupQuery(e.target.value)}
-                  style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
-                />
-                  <ul className="member-list">
-                  {members.filter(m => {
-                    const q = lookupQuery.trim().toLowerCase();
-                    if (!q) return false;
-                    return (
-                      (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-                      (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-                      (m.email && m.email.toLowerCase().includes(q)) ||
-                      (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-                    );
-                  }).length === 0 && lookupQuery ? (
-                    <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
-                  ) : (
-                    members.filter(m => {
-                      const q = lookupQuery.trim().toLowerCase();
-                      if (!q) return false;
-                      return (
-                        (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-                        (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-                        (m.email && m.email.toLowerCase().includes(q)) ||
-                        (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-                      );
-                    }).map(member => (
-                      <li
-                        key={member.member_id}
-                        className="member-item"
-                        style={{ position: "relative", cursor: "pointer", width: "100%" }}
-                        onClick={() => {
-                          setSelectedMember(member);
-                          fetchLedger(member.account_id);
-                        }}
-                        tabIndex={0}
-                        role="button"
-                        onKeyDown={e => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            setSelectedMember(member);
-                            fetchLedger(member.account_id);
-                          }
-                        }}
-                      >
-                            {member.photo && (
-                              <img
-                                src={member.photo}
-                                alt={`${member.first_name} ${member.last_name}`}
-                                className="member-photo"
-                              />
-                            )}
-                            <div className="member-info">
-                              <strong>
-                            {member.first_name} {member.last_name}
-                              </strong>
-                          <div>Member since: {formatDateLong(member.join_date)}</div>
-                              <div>Phone: {formatPhone(member.phone)}</div>
-                              <div>Email: {member.email}</div>
-                              <div>Date of Birth: {formatDOB(member.dob)}</div>
-                            </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-              {/* End Member Lookup UI */}
-              {/* Existing member list, filtered if no lookup query */}
-              {!selectedMember ? (
-                <>
-                  <h1 className="app-title">Noir CRM – Members</h1>
-                  {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
-                    <div key={accountId} className="account-group" style={{
-                      marginBottom: '1rem',
-                      padding: '1rem',
-                      background: '#fff',
-                      borderRadius: '12px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1.2rem'
-                    }}>
-                      {accountMembers.map((member, idx) => (
-                        <div key={member.member_id} style={{
-                          padding: '0.5rem 0',
-                          background: 'none',
-                          boxShadow: 'none',
-                          borderRadius: 0,
-                          marginBottom: 0
-                        }}>
-                          <li
-                        className="member-item"
-                            style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}
-                        onClick={() => {
-                          setSelectedMember(member);
-                              fetchLedger(member.account_id);
-                            }}
-                          >
-                            {member.photo && (
-                              <img
-                                src={member.photo}
-                                alt={`${member.first_name} ${member.last_name}`}
-                                    className="member-photo"
-                                style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, marginRight: 20, background: '#f6f5f2' }}
-                                  />
-                                )}
-                            <div className="member-info" style={{ flex: 1 }}>
-                                <strong>
-                                {member.first_name} {member.last_name}
-                                </strong>
-                              <div>Member since: {formatDateLong(member.join_date)}</div>
-                              <div>Phone: {formatPhone(member.phone)}</div>
-                              <div>Email: {member.email}</div>
-                              <div>Date of Birth: {formatDOB(member.dob)}</div>
-                              </div>
-                      </li>
-                        </div>
-                    ))}
-                    </div>
-                  ))}
-                </>
-              ) : (
-                // Member Detail View (not modal, full width minus sidebar)
-                <div className="member-detail-view"
-                  style={{
-                    margin: "0 auto",
-                    background: "#faf9f7",
-                    borderRadius: "12px",
-                    boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-                    boxSizing: "border-box",
-                    overflowX: "hidden",
-                    padding: '2rem 1.5rem',
-                    position: 'relative'
-                  }}
-                >
-                  {/* Add spacing above top bar */}
-                  <div style={{ height: '1.5rem' }} />
-                  
-                  <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.75rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem', opacity: 0.6 }}>
-                    Account ID: {selectedMember.account_id}
-                  </div>
-                  <Elements stripe={stripePromise}>
-                    {/* First row: member columns */}
-                    <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
-                      {members.filter(m => m.account_id === selectedMember.account_id).map((member, idx, arr) => (
-                        <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
-                    <Elements stripe={stripePromise}>
-                      <MemberDetail
-                        member={member}
-                        session={session}
-                        onEditMember={handleEditMember}
-                      />
-                    </Elements>
-                </div>
-                      ))}
-                    </div>
-                    {/* Second row: shared ledger for the account */}
-                    <div style={{ width: '100%', position: 'relative' }}>
-                      <h3>Ledger</h3>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <strong>
-                          {memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? 'Balance Due:' : 'Current Credit:'}
-                        </strong>{' '}
-                        ${Math.abs((memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0)).toFixed(2)}
-                        {session.user?.user_metadata?.role === 'admin' && selectedMember.stripe_customer_id && (
-                          <>
-                            <button
-                              onClick={handleChargeBalance}
-                              disabled={charging || (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0)}
-                              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0) ? 'pointer' : 'not-allowed' }}
-                            >
-                              {charging ? 'Charging...' : 'Charge Balance'}
-                            </button>
-                            {(memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0) && (
-                              <span style={{ marginLeft: '1rem', color: '#888' }}>
-                                No outstanding balance to charge.
-                              </span>
-              )}
-            </>
-          )}
-                        {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
-                </div>
-                      <table className="ledger-table">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Member</th>
-                            <th>Description</th>
-                            <th>Amount</th>
-                            <th>Type</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Add Transaction Row */}
-                          <tr>
-                            <td>
-                              <input
-                                type="date"
-                                name="date"
-                                value={newTransaction.date || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
-                                className="add-transaction-input"
-                                style={{ minWidth: 120 }}
-                              />
-                            </td>
-                            <td>
-                              <select
-                                name="member_id"
-                                value={selectedTransactionMemberId}
-                                onChange={e => setSelectedTransactionMemberId(e.target.value)}
-                                className="add-transaction-input"
-                                style={{ minWidth: 120 }}
-                              >
-                                <option value="">Select Member</option>
-                                {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
-                                  <option key={m.member_id} value={m.member_id}>
-                                    {m.first_name} {m.last_name}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                name="note"
-                                placeholder="Note"
-                                value={newTransaction.note || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
-                                className="add-transaction-input"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                name="amount"
-                                placeholder="Amount"
-                                value={newTransaction.amount || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                                className="add-transaction-input"
-                              />
-                            </td>
-                            <td>
-                              <select
-                                name="type"
-                                value={newTransaction.type || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
-                                className="add-transaction-input"
-                              >
-                                <option value="">Type</option>
-                                <option value="payment">Payment</option>
-                                <option value="purchase">Purchase</option>
-                              </select>
-                            </td>
-                            <td>
-                              <button
-                                onClick={e => {
-                                  e.preventDefault();
-                                  if (!selectedTransactionMemberId) {
-                                    setTransactionStatus('Please select a member.');
-                                    return;
-                                  }
-                                  handleAddTransaction(selectedTransactionMemberId, selectedMember.account_id);
-                                }}
-                                className="add-transaction-btn"
-                                style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                                disabled={transactionStatus === 'loading'}
-                              >
-                                {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
-                              </button>
-                            </td>
-                          </tr>
-                          {/* Ledger Rows */}
-                          {memberLedger && memberLedger.length > 0 ? (
-                            memberLedger.map((tx, idx) => {
-                              const member = members.find(m => m.member_id === tx.member_id);
-                              return (
-                                <tr key={tx.id || idx}>
-                                  <td>{formatDateLong(tx.date)}</td>
-                                  <td>{member ? `${member.first_name} ${member.last_name}` : ''}</td>
-                                  <td>{tx.note}</td>
-                                  <td>${Number(tx.amount).toFixed(2)}</td>
-                                  <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
-                                  <td>
-                                    <button
-                                      onClick={() => handleEditTransaction(tx)}
-                                      className="add-transaction-btn"
-                                      style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                                    >
-                                      Edit
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          ) : (
-                            <tr>
-                              <td colSpan="6">No transactions found.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                      {/* Manual Refresh Button */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                        <button
-                          onClick={() => fetchLedger(selectedMember.account_id)}
-                          style={{
-                            background: '#eee',
-                            color: '#555',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            fontSize: '0.95rem',
-                            padding: '0.3rem 0.9rem',
-                            cursor: 'pointer',
-                            opacity: 0.7,
-                            transition: 'opacity 0.2s',
-                          }}
-                          onMouseOver={e => (e.currentTarget.style.opacity = 1)}
-                          onMouseOut={e => (e.currentTarget.style.opacity = 0.7)}
-                          aria-label="Refresh ledger"
-                        >
-                          Refresh
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
-                    <button
-                      onClick={() => setSelectedMember(null)}
-                      style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Back to List
-                    </button>
-                    <button
-                      onClick={() => setShowAddMemberModal(true)}
-                      style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      + Add Member
-                    </button>
-                  </div>
-                    </div>
-                  </Elements>
-                </div>
-              )}
-            </>
+            <MembersPage 
+              members={members}
+              lookupQuery={lookupQuery}
+              setLookupQuery={setLookupQuery}
+              selectedMember={selectedMember}
+              setSelectedMember={setSelectedMember}
+              fetchLedger={fetchLedger}
+              memberLedger={memberLedger}
+              membersByAccount={membersByAccount}
+              formatDateLong={formatDateLong}
+              formatPhone={formatPhone}
+              formatDOB={formatDOB}
+            />
           )}
           {section === 'admin' && (
-            <>
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-                <h2>Calendar Availability Control</h2>
-                <CalendarAvailabilityControl />
-              </div>
-
-             
-              {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
-
-              {/* Create User Modal */}
-              {showCreateUserModal && (
-                <div style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  width: '100vw',
-                  height: '100vh',
-                  background: 'rgba(0,0,0,0.5)',
-                  zIndex: 9999,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <div style={{
-                    background: '#fff',
-                    padding: '2rem',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-                    width: '90%',
-                    maxWidth: '500px',
-                  }}>
-                    <h3 style={{ marginBottom: '1.5rem', color: '#333' }}>Create New User</h3>
-                    <form onSubmit={handleCreateUser}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>First Name</label>
-                  <input
-                            type="text"
-                            value={createUserForm.first_name}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, first_name: e.target.value }))}
-                    required
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Last Name</label>
-                  <input
-                    type="text"
-                            value={createUserForm.last_name}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, last_name: e.target.value }))}
-                            required
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          />
-              </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Email</label>
-                  <input
-                    type="email"
-                            value={createUserForm.email}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Phone</label>
-                          <input
-                            type="tel"
-                            value={createUserForm.phone}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, phone: e.target.value }))}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Role</label>
-                          <select
-                            value={createUserForm.role}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, role: e.target.value }))}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          >
-                            <option value="view">View</option>
-                            <option value="member">Member</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateUserModal(false)}
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            background: '#e5e1d8',
-                            color: '#555',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Cancel
-                  </button>
-                        <button
-                          type="submit"
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            background: '#a59480',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Create User
-                        </button>
-                      </div>
-                </form>
-              </div>
-                </div>
-              )}
-
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-                <h2>All Users</h2>
-                <table className="user-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>First Name</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Last Name</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Email</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Phone</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Role</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map(user => (
-                      editUserId === user.id ? (
-                        <tr key={user.id}>
-                          <td><input value={editForm.first_name} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} /></td>
-                          <td><input value={editForm.last_name} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} /></td>
-                          <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
-                          <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
-                          <td>
-                            <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
-                              <option value="admin">admin</option>
-                              <option value="member">member</option>
-                              <option value="view">view</option>
-                            </select>
-                          </td>
-                          <td>
-                            <button onClick={() => handleSaveUser(user.id)} style={{ marginRight: "0.5rem" }}>Save</button>
-                            <button onClick={handleCancelEdit} style={{ marginRight: "0.5rem" }}>Cancel</button>
-                            <button
-                              style={{ color: '#fff', background: '#e74c3c', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}
-                              onClick={async () => {
-                                if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
-                                try {
-                                  const res = await fetch('/api/deleteAuthUser', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      supabase_user_id: user.id,
-                                      member_id: null,
-                                      requester_token: session.access_token
-                                    })
-                                  });
-                                  const data = await res.json();
-                                  if (res.ok && data.success) {
-                                    setUsers(users.filter(u => u.id !== user.id));
-                                    setEditUserId(null);
-                                    alert('User deleted.');
-                                  } else {
-                                    alert('Failed to delete user: ' + (data.error || 'Unknown error'));
-                                  }
-                                } catch (e) {
-                                  alert('Failed to delete user: ' + e.message);
-                                }
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        <tr key={user.id}>
-                          <td>{user.user_metadata?.first_name || ""}</td>
-                          <td>{user.user_metadata?.last_name || ""}</td>
-                          <td>{user.email}</td>
-                          <td>{user.user_metadata?.phone || ""}</td>
-                          <td>{user.user_metadata?.role || "view"}</td>
-                          <td>
-                            <button onClick={() => handleEditUser(user)} style={{ marginRight: "0.5rem" }}>Edit</button>
-                          </td>
-                        </tr>
-                      )
-                    ))}
-                  </tbody>
-                </table>
-                {/* Move Create User button here, below the table */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button
-                    onClick={() => setShowCreateUserModal(true)}
-                    style={{ 
-                      padding: "0.5rem 1.5rem", 
-                      background: "#a59480", 
-                      color: "#fff", 
-                      border: "none", 
-                      borderRadius: "4px", 
-                      fontWeight: 600, 
-                      cursor: "pointer" 
-                    }}
-                  >
-                    Create User
-              </button>
-            </div>
-                {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
-          </div>
-            </>
+            <AdminPage 
+              users={users}
+              setUsers={setUsers}
+              editUserId={editUserId}
+              setEditUserId={setEditUserId}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              // ...add other admin props as needed
+            />
+          )}
+          {section === 'makeReservation' && (
+            <ReservationPage 
+              phone={phone}
+              setPhone={setPhone}
+              partySize={partySize}
+              setPartySize={setPartySize}
+              date={date}
+              setDate={setDate}
+              time={time}
+              setTime={setTime}
+              // ...add other reservation props as needed
+            />
+          )}
+          {section === 'calendar' && (
+            <CalendarPage 
+              reloadKey={reloadKey}
+              bookingStartDate={bookingStartDate}
+              bookingEndDate={bookingEndDate}
+              eventInfo={eventInfo}
+              setEventInfo={setEventInfo}
+              // ...add other calendar props as needed
+            />
           )}
           {section === 'makeReservation' && (() => {
             // --- Reserve On The Spot logic ---
@@ -2461,17 +1938,6 @@ function App() {
               </div>
             );
           })()}
-          {section === 'calendar' && (
-            <div style={{ padding: '2rem', maxWidth: '100vw', width: '90%' }}>
-              <h2>Seating Calendar</h2>
-              <FullCalendarTimeline reloadKey={reloadKey} bookingStartDate={bookingStartDate} bookingEndDate={bookingEndDate} />
-              {eventInfo && (
-                <div style={{ marginTop: '1rem' }}>
-                  <p>Event/Reservation ID: {eventInfo.id}</p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
         {/* Next Available Time Popup - always visible if set */}
         {nextAvailableTime && (
