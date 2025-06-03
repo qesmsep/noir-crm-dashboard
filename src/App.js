@@ -58,7 +58,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function App() {
-  // Reservation form extra state for calendar section
+  // All useState hooks at the top
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [session, setSession] = useState(null);
@@ -71,9 +71,7 @@ function App() {
   const [customEmailSubject, setCustomEmailSubject] = useState('');
   const [customEmailBody, setCustomEmailBody] = useState('');
   const [lookupQuery, setLookupQuery] = useState('');
-  // Sidebar state for mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Create User form state
   const [createEmail, setCreateEmail] = useState('');
   const [createName, setCreateName] = useState('');
   const [createStatus, setCreateStatus] = useState('');
@@ -85,7 +83,6 @@ function App() {
     phone: '',
     role: 'view'
   });
-  // User management state for Admin tab
   const [users, setUsers] = useState([]);
   const [editUserId, setEditUserId] = useState(null);
   const [editForm, setEditForm] = useState({
@@ -95,7 +92,6 @@ function App() {
     phone: "",
     role: "view"
   });
-  // Member editing state
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editMemberForm, setEditMemberForm] = useState({
     first_name: "",
@@ -113,14 +109,12 @@ function App() {
     company2: "",
     photo2: ""
   });
-  // Ledger modal state
   const [selectedMember, setSelectedMember] = useState(null);
   const [memberLedger, setMemberLedger] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [newTransaction, setNewTransaction] = useState({ type: 'payment', amount: '', note: '' });
   const [transactionStatus, setTransactionStatus] = useState('');
   const isMobile = useIsMobile();
-  // Calendar modal state
   const [slotInfo, setSlotInfo] = useState(null);
   const [eventInfo, setEventInfo] = useState(null);
   const [showReservationModal, setShowReservationModal] = useState(false);
@@ -169,103 +163,70 @@ function App() {
   const [upcomingRenewals, setUpcomingRenewals] = useState([]);
   const [projectedMonthlyDues, setProjectedMonthlyDues] = useState(0);
 
-  const eventTypes = [
-    { value: 'birthday', label: '🎂 Birthday' },
-    { value: 'engagement', label: '💍 Engagement' },
-    { value: 'anniversary', label: '🥂 Anniversary' },
-    { value: 'party', label: '🎉 Party / Celebration' },
-    { value: 'graduation', label: '🎓 Graduation' },
-    { value: 'corporate', label: '🧑‍💼 Corporate Event' },
-    { value: 'holiday', label: '❄️ Holiday Gathering' },
-    { value: 'networking', label: '🤝 Networking' },
-    { value: 'fundraiser', label: '🎗️ Fundraiser / Charity' },
-    { value: 'bachelor', label: '🥳 Bachelor / Bachelorette Party' },
-    { value: 'fun', label: '🍸 Fun Night Out' },
-    { value: 'date', label: '💕 Date Night' },
-  ];
+  // All useEffect hooks at the top
+  useEffect(() => {
+    if (!members.length) return;
 
-  // Generate times array for 6:00pm to midnight, every 15 min
-  const times = [];
-  for (let h = 18; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      const hh = String(h).padStart(2, '0');
-      const mm = String(m).padStart(2, '0');
-      times.push(`${hh}:${mm}`);
+    // Map membership text to monthly amount
+    const membershipAmounts = {
+      'Host': 1,
+      'Noir Host': 1,
+      'Noir Solo': 100,
+      'Solo': 100,
+      'Noir Duo': 125,
+      'Duo': 125,
+      'Premier': 250,
+      'Reserve': 1000
+    };
+
+    // Helper to extract tier from membership string
+    function getTier(membership) {
+      if (!membership) return null;
+      if (/host/i.test(membership)) return 'Host';
+      if (/solo/i.test(membership)) return 'Noir Solo';
+      if (/duo/i.test(membership)) return 'Noir Duo';
+      if (/premier/i.test(membership)) return 'Premier';
+      if (/reserve/i.test(membership)) return 'Reserve';
+      return null;
     }
-  }
 
-  // Fetch ledger for a member using API route
-  async function fetchLedger(accountId) {
-    setLedgerLoading(true);
-    try {
-      const res = await fetch(`/api/ledger?account_id=${encodeURIComponent(accountId)}`);
-      const result = await res.json();
-      setLedgerLoading(false);
-      if (res.ok && result.data) {
-        setMemberLedger(result.data || []);
-        return result.data || [];
-      } else {
-        setMemberLedger([]);
-        return [];
+    const today = new Date();
+    const thisMonth = today.getMonth();
+    const thisYear = today.getFullYear();
+
+    const getNextRenewal = (joinDate) => {
+      if (!joinDate) return null;
+      const jd = new Date(joinDate);
+      let year = today.getFullYear();
+      let month = today.getMonth();
+      const day = jd.getDate();
+      let candidate = new Date(year, month, day);
+      if (candidate < today) {
+        if (month === 11) { year += 1; month = 0; }
+        else { month += 1; }
+        candidate = new Date(year, month, day);
       }
-    } catch (err) {
-      setLedgerLoading(false);
-      setMemberLedger([]);
-      return [];
-    }
-  }
+      return candidate;
+    };
 
-  // Add new transaction to ledger via API route
-  async function handleAddTransaction(memberId, accountId) {
-    setTransactionStatus('');
-    if (!newTransaction.amount || isNaN(Number(newTransaction.amount))) {
-      setTransactionStatus('Enter a valid amount.');
-      return;
-    }
-    setLedgerLoading(true);
-    try {
-      let amt = Number(newTransaction.amount);
-      if (newTransaction.type === 'purchase') amt = -Math.abs(amt);
-      else amt = Math.abs(amt);
-      const res = await fetch('/api/ledger', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          member_id: memberId,
-          account_id: accountId,
-          type: newTransaction.type,
-          amount: amt,
-          note: newTransaction.note,
-          date: newTransaction.date ? newTransaction.date : undefined
-        })
-      });
-      const result = await res.json();
-      if (res.ok && result.data) {
-        setTransactionStatus('Transaction added!');
-        setMemberLedger(prev => [...prev, result.data]);
-        setNewTransaction({ type: 'payment', amount: '', note: '' });
-        setSelectedTransactionMemberId('');
-        // Recompute balance from the optimistically updated ledger
-        const balance = [...memberLedger, result.data].reduce(
-          (acc, t) => acc + Number(t.amount),
-          0
+    const projected = members
+      .filter(m => {
+        const nextRenewal = getNextRenewal(m.join_date);
+        return (
+          nextRenewal &&
+          nextRenewal.getMonth() === thisMonth &&
+          nextRenewal.getFullYear() === thisYear
         );
-        setMembers(ms => ms.map(m => m.member_id === memberId ? { ...m, balance } : m));
-        // Show modal with success message
-        setTransactionModalMessage('Transaction added successfully!');
-        setShowTransactionModal(true);
-      } else {
-        setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));
-        setTransactionModalMessage('Failed to add transaction: ' + (result.error || 'Unknown error'));
-        setShowTransactionModal(true);
-      }
-    } catch (err) {
-      setTransactionStatus('Failed: ' + err.message);
-      setTransactionModalMessage('Failed to add transaction: ' + err.message);
-      setShowTransactionModal(true);
-    }
-    setLedgerLoading(false);
-  }
+      })
+      .reduce((sum, m) => {
+        const tier = getTier(m.membership);
+        const amt = membershipAmounts[tier] || 0;
+        return sum + amt;
+      }, 0);
+
+    setProjectedMonthlyDues(projected);
+  }, [members]);
+
   useEffect(() => {
     async function fetchUsers() {
       if (section === "admin") {
@@ -857,70 +818,6 @@ function App() {
         alert('Error deleting transaction: ' + err.message);
       }
     }
-
-    // Move this useEffect to the top level, right after useState hooks
-    useEffect(() => {
-      if (!members.length) return;
-
-      // Map membership text to monthly amount
-      const membershipAmounts = {
-        'Host': 1,
-        'Noir Host': 1,
-        'Noir Solo': 100,
-        'Solo': 100,
-        'Noir Duo': 125,
-        'Duo': 125,
-        'Premier': 250,
-        'Reserve': 1000
-      };
-
-      // Helper to extract tier from membership string
-      function getTier(membership) {
-        if (!membership) return null;
-        if (/host/i.test(membership)) return 'Host';
-        if (/solo/i.test(membership)) return 'Noir Solo';
-        if (/duo/i.test(membership)) return 'Noir Duo';
-        if (/premier/i.test(membership)) return 'Premier';
-        if (/reserve/i.test(membership)) return 'Reserve';
-        return null;
-      }
-
-      const today = new Date();
-      const thisMonth = today.getMonth();
-      const thisYear = today.getFullYear();
-
-      const getNextRenewal = (joinDate) => {
-        if (!joinDate) return null;
-        const jd = new Date(joinDate);
-        let year = today.getFullYear();
-        let month = today.getMonth();
-        const day = jd.getDate();
-        let candidate = new Date(year, month, day);
-        if (candidate < today) {
-          if (month === 11) { year += 1; month = 0; }
-          else { month += 1; }
-          candidate = new Date(year, month, day);
-        }
-        return candidate;
-      };
-
-      const projected = members
-        .filter(m => {
-          const nextRenewal = getNextRenewal(m.join_date);
-          return (
-            nextRenewal &&
-            nextRenewal.getMonth() === thisMonth &&
-            nextRenewal.getFullYear() === thisYear
-          );
-        })
-        .reduce((sum, m) => {
-          const tier = getTier(m.membership);
-          const amt = membershipAmounts[tier] || 0;
-          return sum + amt;
-        }, 0);
-
-      setProjectedMonthlyDues(projected);
-    }, [members]);
 
     return (
       <>
