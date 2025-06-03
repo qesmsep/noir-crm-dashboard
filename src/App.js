@@ -858,6 +858,7 @@ function App() {
       }
     }
 
+    // Move this useEffect to the top level, right after useState hooks
     useEffect(() => {
       if (!members.length) return;
 
