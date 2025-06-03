@@ -1494,26 +1494,7 @@ function App() {
         >
           {section === 'dashboard' && (
             <div style={{ padding: '2rem', width: '100%' }}>
-              <h1>Dashboard</h1>
-              <div style={{ 
-                display: 'flex', 
-                gap: '2rem', 
-                marginTop: '2rem',
-                flexWrap: 'wrap'
-              }}>
-                <div style={{
-                  background: '#fff',
-                  padding: '2rem',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                  minWidth: '250px'
-                }}>
-                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Total Members</h3>
-                  <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#333' }}>
-                    {members.length}
-                  </div>
-                </div>
-              </div>
+              <h1>This is your dashboard</h1>
             </div>
           )}
           {section === 'members' && (
