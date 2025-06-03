@@ -1573,7 +1573,7 @@ function App() {
       type: tx.type || '',
       date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : ''
     });
-  }
+  };
 }
 
 export default App;
