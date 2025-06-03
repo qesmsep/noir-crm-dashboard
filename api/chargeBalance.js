@@ -1,3 +1,5 @@
+// api/chargeBalance.js
+
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -12,79 +14,69 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id, account_id } = req.body;
-  if (!member_id || !account_id) {
-    return res.status(400).json({ error: 'member_id and account_id are required' });
+  const { account_id } = req.body;
+  if (!account_id) {
+    return res.status(400).json({ error: 'account_id is required' });
   }
 
-  // 1) Fetch this member’s account_id (already have account_id, but still fetch to validate member)
-  const { data: thisMember, error: memErr } = await supabase
-    .from('members')
-    .select('account_id')
-    .eq('member_id', member_id)
-    .single();
-  if (memErr || !thisMember) {
-    return res.status(404).json({ error: 'Member not found' });
-  }
-
-  // 2) Find primary member’s Stripe customer for that account
-  const { data: primary, error: primaryErr } = await supabase
-    .from('members')
+  // 1. Fetch stripe_customer_id from accounts
+  const { data: acct, error: acctErr } = await supabase
+    .from('accounts')
     .select('stripe_customer_id')
-    .eq('account_id', thisMember.account_id)
-    .eq('member_type', 'primary')
+    .eq('account_id', account_id)
     .single();
-
-  if (primaryErr || !primary || !primary.stripe_customer_id) {
-    return res.status(400).json({ error: 'Primary Stripe customer not found for account' });
+  if (acctErr || !acct || !acct.stripe_customer_id) {
+    return res
+      .status(400)
+      .json({ error: 'Stripe customer not found for account' });
   }
+  const stripe_customer_id = acct.stripe_customer_id;
 
-  const stripe_customer_id = primary.stripe_customer_id;
-
-  // Retrieve default payment method from customer or subscription
+  // 2. Retrieve default payment method (invoice_settings or active subscription)
   let defaultPaymentMethodId = null;
-  // Try customer's invoice settings
   const stripeCustomer = await stripe.customers.retrieve(stripe_customer_id);
   defaultPaymentMethodId = stripeCustomer.invoice_settings.default_payment_method;
-  // If none, try the active subscription's default payment method or source
+
   if (!defaultPaymentMethodId) {
     const subs = await stripe.subscriptions.list({
       customer: stripe_customer_id,
       status: 'active',
-      limit: 1
+      limit: 1,
     });
     if (subs.data.length > 0) {
-      defaultPaymentMethodId = subs.data[0].default_payment_method || subs.data[0].default_source;
+      defaultPaymentMethodId =
+        subs.data[0].default_payment_method || subs.data[0].default_source;
     }
   }
   if (!defaultPaymentMethodId) {
-    return res.status(400).json({ error: 'No default payment method found on customer or subscription' });
+    return res
+      .status(400)
+      .json({ error: 'No default payment method found' });
   }
 
-  // 3. Get ledger for account and compute balance
-  const { data: ledger, error: ledgerError } = await supabase
+  // 3. Compute account balance from ledger
+  const { data: ledgerRows, error: ledgerErr } = await supabase
     .from('ledger')
-    .select('amount,type')
+    .select('amount')
     .eq('account_id', account_id);
-  if (ledgerError) {
-    return res.status(500).json({ error: 'Failed to fetch ledger' });
+  if (ledgerErr) {
+    return res.status(500).json({ error: ledgerErr.message });
   }
-  let balance = 0;
-  for (const t of ledger || []) {
-    balance += Number(t.amount);
-  }
-  // Only charge if balance is negative (i.e., account owes money)
+
+  const balance = (ledgerRows || []).reduce(
+    (sum, t) => sum + Number(t.amount),
+    0
+  );
   if (balance >= 0) {
     return res.status(400).json({ error: 'No outstanding balance' });
   }
-  // Convert to positive for Stripe charge
-  const chargeAmount = Math.abs(balance);
+  const amountToCharge = Math.round(Math.abs(balance) * 100); // in cents
 
-  // 4. Create Stripe PaymentIntent and confirm
+  // 4. Create & confirm a Stripe PaymentIntent
   let intent;
   try {
     intent = await stripe.paymentIntents.create({
-      amount: Math.round(chargeAmount * 100), // in cents
+      amount: amountToCharge,
       currency: 'usd',
       customer: stripe_customer_id,
       payment_method: defaultPaymentMethodId,
@@ -92,21 +84,24 @@ export default async function handler(req, res) {
       confirm: true,
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Stripe charge failed', details: err.message });
+    return res
+      .status(500)
+      .json({ error: 'Stripe charge failed', details: err.message });
   }
 
-  // 5. Insert payment into ledger
-  const { error: ledgerInsertError } = await supabase
+  // 5. Log payment in ledger
+  const { error: insertErr } = await supabase
     .from('ledger')
     .insert({
-      member_id,
       account_id,
       type: 'payment',
-      amount: chargeAmount,
+      amount: Math.abs(balance),
       note: 'Balance charged via Stripe',
     });
-  if (ledgerInsertError) {
-    return res.status(500).json({ error: 'Failed to update ledger', details: ledgerInsertError.message });
+  if (insertErr) {
+    return res
+      .status(500)
+      .json({ error: 'Failed to update ledger', details: insertErr.message });
   }
 
   return res.status(200).json({ success: true, paymentIntent: intent });
