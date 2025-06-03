@@ -163,6 +163,95 @@ function App() {
   const [upcomingRenewals, setUpcomingRenewals] = useState([]);
   const [projectedMonthlyDues, setProjectedMonthlyDues] = useState(0);
 
+  // Define eventTypes at the top
+  const eventTypes = [
+    { value: 'birthday', label: '🎂 Birthday' },
+    { value: 'engagement', label: '💍 Engagement' },
+    { value: 'anniversary', label: '🥂 Anniversary' },
+    { value: 'party', label: '🎉 Party / Celebration' },
+    { value: 'graduation', label: '🎓 Graduation' },
+    { value: 'corporate', label: '🧑‍💼 Corporate Event' },
+    { value: 'holiday', label: '❄️ Holiday Gathering' },
+    { value: 'networking', label: '🤝 Networking' },
+    { value: 'fundraiser', label: '🎗️ Fundraiser / Charity' },
+    { value: 'bachelor', label: '🥳 Bachelor / Bachelorette Party' },
+    { value: 'fun', label: '🍸 Fun Night Out' },
+    { value: 'date', label: '💕 Date Night' },
+  ];
+
+  // Define fetchLedger at the top
+  async function fetchLedger(accountId) {
+    setLedgerLoading(true);
+    try {
+      const res = await fetch(`/api/ledger?account_id=${encodeURIComponent(accountId)}`);
+      const result = await res.json();
+      setLedgerLoading(false);
+      if (res.ok && result.data) {
+        setMemberLedger(result.data || []);
+        return result.data || [];
+      } else {
+        setMemberLedger([]);
+        return [];
+      }
+    } catch (err) {
+      setLedgerLoading(false);
+      setMemberLedger([]);
+      return [];
+    }
+  }
+
+  // Define handleAddTransaction at the top
+  async function handleAddTransaction(memberId, accountId) {
+    setTransactionStatus('');
+    if (!newTransaction.amount || isNaN(Number(newTransaction.amount))) {
+      setTransactionStatus('Enter a valid amount.');
+      return;
+    }
+    setLedgerLoading(true);
+    try {
+      let amt = Number(newTransaction.amount);
+      if (newTransaction.type === 'purchase') amt = -Math.abs(amt);
+      else amt = Math.abs(amt);
+      const res = await fetch('/api/ledger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: memberId,
+          account_id: accountId,
+          type: newTransaction.type,
+          amount: amt,
+          note: newTransaction.note,
+          date: newTransaction.date ? newTransaction.date : undefined
+        })
+      });
+      const result = await res.json();
+      if (res.ok && result.data) {
+        setTransactionStatus('Transaction added!');
+        setMemberLedger(prev => [...prev, result.data]);
+        setNewTransaction({ type: 'payment', amount: '', note: '' });
+        setSelectedTransactionMemberId('');
+        // Recompute balance from the optimistically updated ledger
+        const balance = [...memberLedger, result.data].reduce(
+          (acc, t) => acc + Number(t.amount),
+          0
+        );
+        setMembers(ms => ms.map(m => m.member_id === memberId ? { ...m, balance } : m));
+        // Show modal with success message
+        setTransactionModalMessage('Transaction added successfully!');
+        setShowTransactionModal(true);
+      } else {
+        setTransactionStatus('Failed: ' + (result.error || 'Unknown error'));
+        setTransactionModalMessage('Failed to add transaction: ' + (result.error || 'Unknown error'));
+        setShowTransactionModal(true);
+      }
+    } catch (err) {
+      setTransactionStatus('Failed: ' + err.message);
+      setTransactionModalMessage('Failed to add transaction: ' + err.message);
+      setShowTransactionModal(true);
+    }
+    setLedgerLoading(false);
+  }
+
   // All useEffect hooks at the top
   useEffect(() => {
     if (!members.length) return;
