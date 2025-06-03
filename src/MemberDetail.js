@@ -1,6 +1,9 @@
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import PaymentMethods from './PaymentMethods';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -46,6 +49,13 @@ const MemberDetail = ({
   // State for adding attributes
   const [newAttrKey, setNewAttrKey] = useState('');
   const [newAttrValue, setNewAttrValue] = useState('');
+
+  const stripe = useStripe();
+  const elements = useElements();
+  const [setupStatus, setSetupStatus] = useState(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+
+  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
   // Load attributes from API
   const fetchAttributes = async () => {
@@ -302,6 +312,64 @@ const MemberDetail = ({
     }
   };
 
+  const handleSetupPaymentMethod = async (e) => {
+    e.preventDefault();
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setSetupLoading(true);
+    setSetupStatus(null);
+
+    try {
+      const { error, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: elements.getElement(CardElement),
+      });
+
+      if (error) {
+        setSetupStatus(`Error: ${error.message}`);
+        return;
+      }
+
+      // Send payment method to our API
+      const response = await fetch('/api/setupPaymentMethod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: member.member_id,
+          payment_method_id: paymentMethod.id,
+        }),
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        setSetupStatus('Payment method added successfully!');
+        // Refresh Stripe data
+        if (member?.stripe_customer_id) {
+          fetch('/api/getStripeCustomer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stripe_customer_id: member.stripe_customer_id }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              setStripeData(data);
+            })
+            .catch(() => {
+              setStripeError('Error fetching Stripe info');
+            });
+        }
+      } else {
+        setSetupStatus(`Error: ${result.error}`);
+      }
+    } catch (err) {
+      setSetupStatus(`Error: ${err.message}`);
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
   return (
     <div className="member-detail-container">
       <div className="member-detail-card" style={{ position: 'relative' }}>
@@ -437,7 +505,124 @@ const MemberDetail = ({
           Delete Member
         </button>
         </div>
+
+        {member?.stripe_customer_id && session?.user?.user_metadata?.role === 'admin' && (
+          <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #d1cfc7', borderRadius: '4px' }}>
+            <h4>Payment Method Setup</h4>
+            {!stripeData?.default_payment_method ? (
+              <form onSubmit={handleSetupPaymentMethod}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <CardElement
+                    options={{
+                      style: {
+                        base: {
+                          fontSize: '16px',
+                          color: '#424770',
+                          '::placeholder': {
+                            color: '#aab7c4',
+                          },
+                        },
+                        invalid: {
+                          color: '#9e2146',
+                        },
+                      },
+                    }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!stripe || setupLoading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#000',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: setupLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {setupLoading ? 'Setting up...' : 'Add Payment Method'}
+                </button>
+                {setupStatus && (
+                  <div style={{ marginTop: '1rem', color: setupStatus.includes('Error') ? '#9e2146' : '#2e7d32' }}>
+                    {setupStatus}
+                  </div>
+                )}
+              </form>
+            ) : (
+              <div style={{ color: '#2e7d32' }}>
+                ✓ Payment method is set up
+              </div>
+            )}
+          </div>
+        )}
+
+        {member.stripe_customer_id && (
+          <div style={{ marginTop: '1rem' }}>
+            <button
+              onClick={() => setShowPaymentMethods(true)}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#a59480',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Manage Payment Methods
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Payment Methods Modal */}
+      {showPaymentMethods && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff',
+            padding: '2rem',
+            borderRadius: '8px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+            width: '90%',
+            maxWidth: '500px',
+            position: 'relative',
+          }}>
+            <button
+              onClick={() => setShowPaymentMethods(false)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'none',
+                border: 'none',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                color: '#666',
+              }}
+            >
+              ×
+            </button>
+            <Elements stripe={stripe}>
+              <PaymentMethods
+                member={member}
+                onClose={() => setShowPaymentMethods(false)}
+              />
+            </Elements>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
