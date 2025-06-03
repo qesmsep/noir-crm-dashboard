@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -7,11 +8,40 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { stripe_customer_id } = req.body;
+  // Extract member_id from the request body
+  const { member_id } = req.body;
 
-  if (!stripe_customer_id) {
-    return res.status(400).json({ error: 'stripe_customer_id is required' });
+  if (!member_id) {
+    return res.status(400).json({ error: 'member_id is required' });
   }
+
+  // Initialize Supabase client
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+  // 1) Fetch this member’s account_id
+  const { data: thisMember, error: memErr } = await supabase
+    .from('members')
+    .select('account_id')
+    .eq('member_id', member_id)
+    .single();
+
+  if (memErr || !thisMember) {
+    return res.status(404).json({ error: 'Member not found' });
+  }
+
+  // 2) Find primary member for that account
+  const { data: primary, error: primaryErr } = await supabase
+    .from('members')
+    .select('stripe_customer_id')
+    .eq('account_id', thisMember.account_id)
+    .eq('member_type', 'Primary')
+    .single();
+
+  if (primaryErr || !primary || !primary.stripe_customer_id) {
+    return res.status(400).json({ error: 'Primary Stripe customer not found for account' });
+  }
+
+  const stripe_customer_id = primary.stripe_customer_id;
 
   try {
     // Get subscriptions for the customer
