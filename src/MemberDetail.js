@@ -429,10 +429,48 @@ const MemberDetail = ({
             Edit Member
           </button>
           <button
-            className="edit-member-btn"
+            className="delete-member-btn"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+                handleDeleteMember(member.member_id, member.supabase_user_id);
+              }
+            }}
+          >
+            Delete Member
+          </button>
+        </div>
+      </div>
+      {/* Ledger section and Add Member/Payment Method buttons */}
+      <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Ledger Table */}
+        <div>
+          {/* ...your ledger rendering code here if any, or leave blank if not needed in this file... */}
+        </div>
+        {/* Add Member and Edit Payment Method Buttons */}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <button
+            className="add-member-btn"
+            onClick={() => {
+              // This should be handled by parent, but placeholder here if needed
+              if (typeof window.setShowAddMemberModal === 'function') window.setShowAddMemberModal(true);
+            }}
+            style={{
+              background: '#a59480',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.6rem 1.5rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            + Add Member
+          </button>
+          <button
+            className="add-member-btn"
             onClick={() => setShowPaymentModal(true)}
             style={{
-              background: '#4a90e2',
+              background: '#a59480',
               color: '#fff',
               border: 'none',
               borderRadius: '4px',
@@ -442,16 +480,6 @@ const MemberDetail = ({
             }}
           >
             Edit Payment Method
-          </button>
-          <button
-            className="delete-member-btn"
-            onClick={() => {
-              if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-                handleDeleteMember(member.member_id, member.supabase_user_id);
-              }
-            }}
-          >
-            Delete Member
           </button>
         </div>
       </div>
@@ -496,6 +524,55 @@ const MemberDetail = ({
             >
               Close
             </button>
+            <button
+              onClick={async () => {
+                // Use account_id instead of member_id
+                setLinkingStripe(true);
+                setLinkResult(null);
+                try {
+                  const response = await fetch('/api/linkStripeCustomer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      account_id: member.account_id,
+                      // Optionally, pass first_name, last_name, email if needed
+                    }),
+                  });
+                  const result = await response.json();
+                  if (result.success) {
+                    setLinkResult({ status: 'success', stripeId: result.stripe_customer.id });
+                  } else {
+                    setLinkResult({ status: 'error', error: result.error });
+                  }
+                } catch (err) {
+                  setLinkResult({ status: 'error', error: err.message });
+                }
+                setLinkingStripe(false);
+              }}
+              style={{
+                marginTop: '1rem',
+                background: '#4a90e2',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '0.6rem 1.5rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              disabled={linkingStripe}
+            >
+              {linkingStripe ? 'Linking...' : 'Link/Update Payment Method'}
+            </button>
+            {linkResult && linkResult.status === 'success' && (
+              <div style={{ color: 'green', marginTop: '1rem' }}>
+                Stripe customer linked: {linkResult.stripeId}
+              </div>
+            )}
+            {linkResult && linkResult.status === 'error' && (
+              <div style={{ color: 'red', marginTop: '1rem' }}>
+                Error: {linkResult.error}
+              </div>
+            )}
           </div>
         </div>
       )}
