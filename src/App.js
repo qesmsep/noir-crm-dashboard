@@ -167,6 +167,7 @@ function App() {
   const [bookingEndDate, setBookingEndDate] = useState(null);
   const [privateEvents, setPrivateEvents] = useState([]);
   const [upcomingRenewals, setUpcomingRenewals] = useState([]);
+  const [projectedMonthlyDues, setProjectedMonthlyDues] = useState(0);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -856,6 +857,69 @@ function App() {
         alert('Error deleting transaction: ' + err.message);
       }
     }
+
+    useEffect(() => {
+      if (!members.length) return;
+
+      // Map membership text to monthly amount
+      const membershipAmounts = {
+        'Host': 1,
+        'Noir Host': 1,
+        'Noir Solo': 100,
+        'Solo': 100,
+        'Noir Duo': 125,
+        'Duo': 125,
+        'Premier': 250,
+        'Reserve': 1000
+      };
+
+      // Helper to extract tier from membership string
+      function getTier(membership) {
+        if (!membership) return null;
+        if (/host/i.test(membership)) return 'Host';
+        if (/solo/i.test(membership)) return 'Noir Solo';
+        if (/duo/i.test(membership)) return 'Noir Duo';
+        if (/premier/i.test(membership)) return 'Premier';
+        if (/reserve/i.test(membership)) return 'Reserve';
+        return null;
+      }
+
+      const today = new Date();
+      const thisMonth = today.getMonth();
+      const thisYear = today.getFullYear();
+
+      const getNextRenewal = (joinDate) => {
+        if (!joinDate) return null;
+        const jd = new Date(joinDate);
+        let year = today.getFullYear();
+        let month = today.getMonth();
+        const day = jd.getDate();
+        let candidate = new Date(year, month, day);
+        if (candidate < today) {
+          if (month === 11) { year += 1; month = 0; }
+          else { month += 1; }
+          candidate = new Date(year, month, day);
+        }
+        return candidate;
+      };
+
+      const projected = members
+        .filter(m => {
+          const nextRenewal = getNextRenewal(m.join_date);
+          return (
+            nextRenewal &&
+            nextRenewal.getMonth() === thisMonth &&
+            nextRenewal.getFullYear() === thisYear
+          );
+        })
+        .reduce((sum, m) => {
+          const tier = getTier(m.membership);
+          const amt = membershipAmounts[tier] || 0;
+          return sum + amt;
+        }, 0);
+
+      setProjectedMonthlyDues(projected);
+    }, [members]);
 
     return (
       <>
@@ -1564,6 +1628,19 @@ function App() {
                       ))}
                     </ul>
                   )}
+                </div>
+                <div style={{
+                  background: '#fff',
+                  padding: '2rem',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                  minWidth: '250px',
+                  marginTop: '2rem'
+                }}>
+                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Projected Membership Dues (This Month)</h3>
+                  <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333' }}>
+                    ${projectedMonthlyDues.toFixed(2)}
+                  </div>
                 </div>
               </div>
             </div>
