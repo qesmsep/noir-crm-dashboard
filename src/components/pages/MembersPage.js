@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Elements } from '@stripe/react-stripe-js';
 import MemberDetail from '../../MemberDetail';
 import MemberLedger from './MemberLedger';
+import SendMessageModal from '../messages/SendMessageModal';
+import MessageHistory from '../messages/MessageHistory';
 
 // You may want to further break this down into smaller components later
 const MembersPage = ({
@@ -34,6 +36,10 @@ const MembersPage = ({
   selectedTransactionMemberId,
   ledgerLoading
 }) => {
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [messageHistoryKey, setMessageHistoryKey] = useState(0);
+  const isAdmin = session?.user?.user_metadata?.role === 'admin';
+
   return (
     <div style={{ padding: '2rem' }}>
       {/* Member Lookup UI at the top of Members section */}
@@ -195,6 +201,24 @@ const MembersPage = ({
                 </div>
               ))}
             </div>
+            {/* Admin-only Send Message button */}
+            {isAdmin && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <button
+                  onClick={() => setShowSendModal(true)}
+                  style={{ padding: '0.6rem 1.5rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600 }}
+                >
+                  Send Message
+                </button>
+                <SendMessageModal
+                  open={showSendModal}
+                  onClose={() => setShowSendModal(false)}
+                  member={selectedMember}
+                  adminEmail={session?.user?.email}
+                  onSent={() => setMessageHistoryKey(k => k + 1)}
+                />
+              </div>
+            )}
             {/* Ledger Section */}
             <MemberLedger
               members={members}
@@ -217,6 +241,8 @@ const MembersPage = ({
               ledgerLoading={ledgerLoading}
               session={session}
             />
+            {/* Message History */}
+            <MessageHistory memberId={selectedMember.member_id} key={messageHistoryKey} />
           </Elements>
         </div>
       )}
