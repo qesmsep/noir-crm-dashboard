@@ -1360,6 +1360,15 @@ function App() {
                 &times;
               </button>
               <button
+                className={section === 'dashboard' ? 'nav-active' : ''}
+                onClick={() => {
+                  setSection('dashboard');
+                  setSidebarOpen(false);
+                }}
+              >
+                Dashboard
+              </button>
+              <button
                 className={section === 'members' ? 'nav-active' : ''}
                 onClick={() => {
                   setSection('members');
@@ -1377,15 +1386,6 @@ function App() {
                 }}
               >
                 Admin
-              </button>
-              <button
-                className={section === 'dashboard' ? 'nav-active' : ''}
-                onClick={() => {
-                  setSection('dashboard');
-                  setSidebarOpen(false);
-                }}
-              >
-                Dashboard
               </button>
               <button
                 className={section === 'makeReservation' ? 'nav-active' : ''}
@@ -1436,6 +1436,12 @@ function App() {
             gap: "1.5rem"
           }}>
             <button
+              className={section === 'dashboard' ? 'nav-active' : ''}
+              onClick={() => setSection('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button
               className={section === 'members' ? 'nav-active' : ''}
               onClick={() => {
                 setSection('members');
@@ -1451,12 +1457,6 @@ function App() {
               }}
             >
               Admin
-            </button>
-            <button
-              className={section === 'dashboard' ? 'nav-active' : ''}
-              onClick={() => setSection('dashboard')}
-            >
-              Dashboard
             </button>
             <button
               className={section === 'makeReservation' ? 'nav-active' : ''}
@@ -1494,7 +1494,26 @@ function App() {
         >
           {section === 'dashboard' && (
             <div style={{ padding: '2rem', width: '100%' }}>
-              <h1>This is your dashboard</h1>
+              <h1>Dashboard</h1>
+              <div style={{ 
+                display: 'flex', 
+                gap: '2rem', 
+                marginTop: '2rem',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{
+                  background: '#fff',
+                  padding: '2rem',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                  minWidth: '250px'
+                }}>
+                  <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Total Members</h3>
+                  <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#333' }}>
+                    {members.length}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           {section === 'members' && (
@@ -1669,18 +1688,14 @@ function App() {
                           <>
                             <button
                               onClick={handleChargeBalance}
-                              disabled={charging || (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0)}
-                              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0) ? 'pointer' : 'not-allowed' }}
+                              disabled={charging}
+                              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: charging ? 'not-allowed' : 'pointer' }}
                             >
                               {charging ? 'Charging...' : 'Charge Balance'}
                             </button>
-                            {(memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0) && (
-                              <span style={{ marginLeft: '1rem', color: '#888' }}>
-                                No outstanding balance to charge.
-                              </span>
-              )}
-            </>
-          )}
+                            {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
+                          </>
+                        )}
                         {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
                 </div>
                       <table className="ledger-table">
