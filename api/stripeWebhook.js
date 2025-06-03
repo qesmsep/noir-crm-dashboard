@@ -8,6 +8,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-08-16',
 });
 
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
 export const config = {
   api: {
     bodyParser: false, // Stripe requires the raw body
@@ -16,88 +18,214 @@ export const config = {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).end('Method Not Allowed');
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get the raw body for Stripe signature verification
-  const buf = await buffer(req);
   const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
   let event;
+
   try {
-    event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
+    // Verify webhook signature
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
   } catch (err) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: 'Invalid signature' });
   }
 
-  // Only handle checkout.session.completed events
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
+  try {
+    // Handle new member signup payments
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      
+      // Get the client reference ID (account_id) from the session
+      const accountId = session.client_reference_id;
+      
+      // Ignore if no account ID
+      if (!accountId) {
+        return res.json({ received: true });
+      }
 
-    // Pull email and customer ID
-    const email = (session.customer_email || '').trim().toLowerCase();
-    const stripeCustomerId = session.customer;
-    const amountPaid = session.amount_total ? session.amount_total / 100 : null;
-    // Connect to Supabase
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      // Find the account
+      const { data: account, error: accountError } = await supabase
+        .from('accounts')
+        .select('account_id')
+        .eq('account_id', accountId)
+        .limit(1)
+        .single();
 
-    // Find member by email (case-insensitive)
-    const { data: member, error } = await supabase
-      .from('members')
-      .select('member_id, account_id')
-      .ilike('email', email)
-      .single();
+      // Ignore if no account found
+      if (accountError || !account) {
+        return res.json({ received: true });
+      }
 
-    if (error || !member) {
-      console.error('Member not found for email:', email);
-      return res.status(404).json({ error: "Member not found" });
+      // Get the primary member for this account
+      const { data: primaryMember, error: memberError } = await supabase
+        .from('members')
+        .select('member_id')
+        .eq('account_id', account.account_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (memberError || !primaryMember) {
+        return res.json({ received: true });
+      }
+
+      // Update the account with the Stripe customer ID
+      const { error: updateError } = await supabase
+        .from('accounts')
+        .update({ stripe_customer_id: session.customer })
+        .eq('account_id', account.account_id);
+
+      if (updateError) {
+        console.error('Error updating account with Stripe customer ID:', updateError);
+        return res.status(500).json({ error: 'Failed to update account' });
+      }
+
+      // Add the payment to the ledger
+      const { error: ledgerError } = await supabase
+        .from('ledger')
+        .insert({
+          account_id: account.account_id,
+          member_id: primaryMember.member_id,
+          amount: session.amount_total / 100, // Convert from cents to dollars
+          type: 'payment',
+          note: 'Initial membership payment',
+          date: new Date().toISOString(),
+          stripe_checkout_session_id: session.id
+        });
+
+      if (ledgerError) {
+        console.error('Error adding payment to ledger:', ledgerError);
+        return res.status(500).json({ error: 'Failed to update ledger' });
+      }
+
+      return res.json({ success: true });
     }
 
-    // Update the member's stripe_customer_id and status
-    await supabase
-      .from('members')
-      .update({ stripe_customer_id: stripeCustomerId, status: 'active' })
-      .eq('member_id', member.member_id);
+    // Handle subscription renewal events
+    if (event.type === 'invoice.paid') {
+      const invoice = event.data.object;
+      
+      // Only process subscription invoices
+      if (invoice.subscription) {
+        // Get the customer ID from the invoice
+        const customerId = invoice.customer;
+        
+        // Find the account with this Stripe customer ID
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('account_id')
+          .eq('stripe_customer_id', customerId)
+          .limit(1)
+          .single();
 
-    // Insert ledger entry for payment
-    if (amountPaid) {
-      await supabase.from('ledger').insert([{
-        account_id: member.account_id,
-        member_id: member.member_id,
-        type: 'payment',
-        amount: amountPaid,
-        note: 'Noir Membership Dues',
-        date: new Date().toISOString(),
-      }]);
+        if (accountError || !account) {
+          return res.json({ received: true });
+        }
+
+        // Get the primary member for this account to associate with the payment
+        const { data: primaryMember, error: memberError } = await supabase
+          .from('members')
+          .select('member_id')
+          .eq('account_id', account.account_id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (memberError || !primaryMember) {
+          return res.json({ received: true });
+        }
+
+        // Add the payment to the ledger
+        const { error: ledgerError } = await supabase
+          .from('ledger')
+          .insert({
+            account_id: account.account_id,
+            member_id: primaryMember.member_id,
+            amount: invoice.amount_paid / 100, // Convert from cents to dollars
+            type: 'payment',
+            note: `Subscription renewal payment for ${new Date(invoice.period_start * 1000).toLocaleDateString()} - ${new Date(invoice.period_end * 1000).toLocaleDateString()}`,
+            date: new Date().toISOString(),
+            stripe_invoice_id: invoice.id
+          });
+
+        if (ledgerError) {
+          console.error('Error adding payment to ledger:', ledgerError);
+          return res.status(500).json({ error: 'Failed to update ledger' });
+        }
+
+        return res.json({ success: true });
+      }
     }
+
+    // Handle manual payment events
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+      
+      // Get the customer ID from the payment intent
+      const customerId = paymentIntent.customer;
+      
+      // Ignore payments without a customer ID
+      if (!customerId) {
+        return res.json({ received: true });
+      }
+
+      // Try to find the account with this Stripe customer ID
+      const { data: account, error: accountError } = await supabase
+        .from('accounts')
+        .select('account_id')
+        .eq('stripe_customer_id', customerId)
+        .limit(1)
+        .single();
+
+      // Ignore payments from non-members
+      if (accountError || !account) {
+        return res.json({ received: true });
+      }
+
+      // Get the primary member for this account to associate with the payment
+      const { data: primaryMember, error: memberError } = await supabase
+        .from('members')
+        .select('member_id')
+        .eq('account_id', account.account_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (memberError || !primaryMember) {
+        return res.json({ received: true });
+      }
+
+      // Add the payment to the ledger
+      const { error: ledgerError } = await supabase
+        .from('ledger')
+        .insert({
+          account_id: account.account_id,
+          member_id: primaryMember.member_id,
+          amount: paymentIntent.amount / 100, // Convert from cents to dollars
+          type: 'payment',
+          note: `Manual payment${paymentIntent.description ? `: ${paymentIntent.description}` : ''}`,
+          date: new Date().toISOString(),
+          stripe_payment_intent_id: paymentIntent.id
+        });
+
+      if (ledgerError) {
+        console.error('Error adding payment to ledger:', ledgerError);
+        return res.status(500).json({ error: 'Failed to update ledger' });
+      }
+
+      return res.json({ success: true });
+    }
+
+    // Return a 200 response for all other events
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Error processing webhook:', err);
+    res.status(500).json({ error: 'Webhook processing failed' });
   }
-
-  // Handle automatic subscription renewals
-  if (event.type === 'invoice.payment_succeeded') {
-    const invoice = event.data.object;
-    const stripeCustomerId = invoice.customer;
-    const amountPaid = invoice.amount_paid ? invoice.amount_paid / 100 : null;
-    // Connect to Supabase
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    // Find member by stripe_customer_id
-    const { data: member, error: memberErr } = await supabase
-      .from('members')
-      .select('member_id, account_id, membership')
-      .eq('stripe_customer_id', stripeCustomerId)
-      .single();
-    if (!memberErr && member && amountPaid) {
-      const date = new Date(invoice.status_transitions.paid_at * 1000).toISOString();
-      await supabase.from('ledger').insert([{
-        account_id: member.account_id,
-        member_id: member.member_id,
-        type: 'payment',
-        amount: amountPaid,
-        note: 'Noir Membership Dues',
-        date
-      }]);
-    }
-  }
-
-  res.json({ received: true });
 }

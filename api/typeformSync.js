@@ -35,7 +35,22 @@ export default async function handler(req, res) {
     // Generate a new account_id for this submission
     const account_id = uuidv4();
 
-      // Main member
+    // Create the account record
+    const { error: accountError } = await supabase
+      .from('accounts')
+      .insert({
+        account_id,
+        stripe_customer_id: null,
+        created_at: new Date().toISOString()
+      });
+
+    if (accountError) {
+      console.error('Error creating account:', accountError);
+      res.status(500).json({ error: accountError.message });
+      return;
+    }
+
+    // Main member
     const member1 = {
       member_id: uuidv4(),
       account_id,
@@ -91,6 +106,11 @@ export default async function handler(req, res) {
         const customers = await stripe.customers.list({ email: member1.email, limit: 1 });
         if (customers.data.length > 0) {
           member1.stripe_customer_id = customers.data[0].id;
+          // Update the account with the Stripe customer ID
+          await supabase
+            .from('accounts')
+            .update({ stripe_customer_id: customers.data[0].id })
+            .eq('account_id', account_id);
         }
       } catch {}
     }
