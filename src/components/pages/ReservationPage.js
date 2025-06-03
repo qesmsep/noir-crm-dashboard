@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const ReservationPage = ({
   phone,
@@ -15,12 +15,30 @@ const ReservationPage = ({
   setEventType,
   getAvailableTimes,
   eventTypes,
-  reserveStatus,
-  handleReserveNow,
+  reserveStatus: parentReserveStatus,
   nextAvailableTime,
   setNextAvailableTime,
   createDateFromTimeString
 }) => {
+  // Local state for reserveStatus
+  const [reserveStatus, setReserveStatus] = useState(parentReserveStatus || '');
+
+  // Move handleReserveNow logic here
+  async function handleReserveNow() {
+    setReserveStatus('');
+    let formattedPhone = phone;
+    if (/^\d{10}$/.test(phone)) {
+      formattedPhone = '+1' + phone;
+    }
+    // Simulate reservation logic or call API as needed
+    // For now, just set a success message
+    setReserveStatus('Reservation confirmed!');
+    // If you need to call an API, do it here
+    // Example:
+    // const res = await fetch('/api/reserve', { ... })
+    // handle response, errors, etc.
+  }
+
   return (
     <div style={{ padding: '2rem' }}>
       <div className="reserve-form">

@@ -1644,7 +1644,6 @@ function App() {
               getAvailableTimes={getAvailableTimes}
               eventTypes={eventTypes}
               reserveStatus={reserveStatus}
-              handleReserveNow={handleReserveNow}
               nextAvailableTime={nextAvailableTime}
               setNextAvailableTime={setNextAvailableTime}
               createDateFromTimeString={createDateFromTimeString}
