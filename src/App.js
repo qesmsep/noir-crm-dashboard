@@ -15,6 +15,7 @@ import FullCalendarTimeline from './components/FullCalendarTimeline';
 import CalendarAvailabilityControl from './components/CalendarAvailabilityControl';
 import { toCST, toCSTISOString, createDateFromTimeString } from './utils/dateUtils';
 import PrivateEventBooking from './components/PrivateEventBooking';
+import Dashboard from './components/Dashboard';
 
 // Responsive helper
 function useIsMobile() {
@@ -65,7 +66,7 @@ function App() {
   const [members, setMembers] = useState([]);
   const [promoteEmail, setPromoteEmail] = useState('');
   const [promoteStatus, setPromoteStatus] = useState('');
-  const [section, setSection] = useState('members');
+  const [section, setSection] = useState('dashboard');
   const [reminderHour, setReminderHour] = useState('');
   const [customEmailTo, setCustomEmailTo] = useState('tim@828.life');
   const [customEmailSubject, setCustomEmailSubject] = useState('');
@@ -621,65 +622,7 @@ function App() {
 
   if (session) {
     const isAdmin = session.user?.user_metadata?.role === "admin";
-    // Helper for uploading a photo to Supabase Storage and returning the public URL
-    // Delete member handler
-    // Now expects the full member object, not just the ID
-    async function handleDeleteMember(member) {
-      if (!window.confirm('Are you sure you want to delete this member? This cannot be undone.')) return;
-      try {
-        const res = await fetch('/api/deleteAuthUser', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            member_id: member.member_id,
-            supabase_user_id: member.supabase_user_id,
-            requester_token: session.access_token
-          }),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          setMembers(members.filter(m => m.member_id !== member.member_id));
-          setSelectedMember(null);
-          setEditingMemberId(null);
-          alert('Member deleted.');
-        } else {
-          alert('Failed to delete member: ' + (data.error || 'Unknown error'));
-        }
-      } catch (e) {
-        alert('Failed to delete member: ' + e.message);
-      }
-    }
-    async function handlePhotoUpload(file, isCounterpart = false) {
-      if (!file) return null;
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `${fileName}`;
-      let { error } = await supabase.storage.from('member-photos').upload(filePath, file);
-      if (error) {
-        alert('Failed to upload photo: ' + error.message);
-        return null;
-      }
-      const { data } = supabase.storage.from('member-photos').getPublicUrl(filePath);
-      const url = data?.publicUrl || null;
-      // After getting the publicUrl, update the members table and local state
-      if (url && editingMemberId) {
-        if (isCounterpart) {
-          // Update photo2
-          await supabase.from('members').update({ photo2: url }).eq('member_id', editingMemberId);
-          setEditMemberForm(form => ({ ...form, photo2: url }));
-          setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo2: url } : m));
-          setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo2: url } : sel);
-        } else {
-          // Update photo
-          await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
-          setEditMemberForm(form => ({ ...form, photo: url }));
-          setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
-          setSelectedMember(sel => sel && sel.member_id === editingMemberId ? { ...sel, photo: url } : sel);
-        }
-      }
-      return url;
-    }
-
+    
     if (!isAdmin) {
       return (
         <div style={{ padding: "4rem", textAlign: "center" }}>
@@ -705,779 +648,114 @@ function App() {
       );
     }
 
-    if (!members.length) {
-      return <div>Loading members...</div>;
-    }
-
-    // Reservation save handler for modal
-    async function handleSaveReservation(formData) {
-      await fetch('/api/reservations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      setShowReservationModal(false);
-      setSlotInfo(null);
-      setReloadKey(k => k + 1);
-    }
-
-    // Handler for selecting slot in calendar for table assignment
-    const onSelectSlotForTableAssignment = slot => {
-      setSlotInfo(slot);
-      setShowReservationModal(true);
-    };
-
-    // Group members by account_id
-    const membersByAccount = members.reduce((acc, member) => {
-      if (!acc[member.account_id]) acc[member.account_id] = [];
-      acc[member.account_id].push(member);
-      return acc;
-    }, {});
-
-    // Add missing functions
-    const formatDateLong = (dateString) => {
-      if (!dateString) return null;
-      // Parse as local date if in YYYY-MM-DD format
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-        const [year, month, day] = dateString.split('-').map(Number);
-        const date = new Date(year, month - 1, day);
-        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
-      }
-      const date = new Date(dateString);
-      if (isNaN(date)) return null;
-      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
-    };
-
-    const handleChargeBalance = async () => {
-      setCharging(true);
-      setChargeStatus(null);
-      try {
-        const res = await fetch('/api/chargeBalance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ member_id: selectedMember.member_id, account_id: selectedMember.account_id }),
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          setChargeStatus('Charged successfully');
-          handleAddTransaction(selectedMember.member_id, selectedMember.account_id);
-        } else {
-          setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
-        }
-      } catch (e) {
-        setChargeStatus(`Error: ${e.message}`);
-      }
-      setCharging(false);
-    };
-
-    const handleEditTransaction = (tx) => {
-      setEditingTransaction(tx.id);
-      setEditTransactionForm({
-        note: tx.note || '',
-        amount: Math.abs(tx.amount).toString(),
-        type: tx.type || '',
-        date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : ''
-      });
-    };
-
-    const handleUpdateTransaction = async (txId) => {
-      try {
-        const res = await fetch('/api/ledger', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: txId,
-            ...editTransactionForm,
-            date: editTransactionForm.date ? editTransactionForm.date : undefined,
-            amount: editTransactionForm.type === 'purchase' ? 
-              -Math.abs(Number(editTransactionForm.amount)) : 
-              Math.abs(Number(editTransactionForm.amount))
-          })
-        });
-        if (res.ok) {
-          setEditingTransaction(null);
-          // Refresh ledger
-          if (selectedMember?.member_id) {
-            fetchLedger(selectedMember.account_id);
-          }
-        } else {
-          alert('Failed to update transaction');
-        }
-      } catch (err) {
-        alert('Error updating transaction: ' + err.message);
-      }
-    };
-
-    // Add this function near other transaction handlers
-    async function handleDeleteTransaction(txId) {
-      if (!window.confirm('Are you sure you want to delete this transaction?')) return;
-      try {
-        const res = await fetch(`/api/ledger?id=${txId}`, { method: 'DELETE' });
-        if (res.ok) {
-          setEditingTransaction(null);
-          // Refresh ledger
-          if (selectedMember?.account_id) {
-            fetchLedger(selectedMember.account_id);
-          }
-        } else {
-          alert('Failed to delete transaction');
-        }
-      } catch (err) {
-        alert('Error deleting transaction: ' + err.message);
-      }
-    }
-
     return (
-      <>
-        {/* Transaction Modal */}
-        {showTransactionModal && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <div style={{
-              background: '#fff',
-              padding: '2rem',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-              minWidth: '300px',
-              maxWidth: '90%',
-              textAlign: 'center',
-            }}>
-              <h3 style={{ marginBottom: '1rem', color: '#333' }}>Transaction Status</h3>
-              <p style={{ marginBottom: '2rem', color: '#666' }}>{transactionModalMessage}</p>
-              <button
-                onClick={() => {
-                  setShowTransactionModal(false);
-                  if (selectedMember?.account_id) {
-                    fetchLedger(selectedMember.account_id);
-                  }
-                }}
-                style={{
-                  background: '#a59480',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '0.75rem 2rem',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Transaction Modal */}
-        {editingTransaction && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <div style={{
-              background: '#fff',
-              padding: '2rem',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-              minWidth: '350px',
-              maxWidth: '95vw',
-              textAlign: 'left',
-              position: 'relative',
-            }}>
-              <button onClick={() => setEditingTransaction(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
-              <h3>Edit Transaction</h3>
-              <form onSubmit={async e => { e.preventDefault(); await handleUpdateTransaction(editingTransaction); }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <div>
-                    <label>Date</label>
-                    <input type="date" value={editTransactionForm.date || ''} onChange={e => setEditTransactionForm(f => ({ ...f, date: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-                  </div>
-                  <div>
-                    <label>Type</label>
-                    <select value={editTransactionForm.type || ''} onChange={e => setEditTransactionForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}>
-                      <option value="">Type</option>
-                      <option value="payment">Payment</option>
-                      <option value="purchase">Purchase</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label>Amount</label>
-                    <input type="number" value={editTransactionForm.amount || ''} onChange={e => setEditTransactionForm(f => ({ ...f, amount: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-                  </div>
-                  <div>
-                    <label>Note</label>
-                    <input type="text" value={editTransactionForm.note || ''} onChange={e => setEditTransactionForm(f => ({ ...f, note: e.target.value }))} style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction)} style={{ padding: '0.75rem 1.5rem', background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Delete</button>
-                  <button type="submit" style={{ padding: '0.75rem 1.5rem', background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Save Changes</button>
-                  <button type="button" onClick={() => setEditingTransaction(null)} style={{ padding: '0.75rem 1.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Add Member Modal */}
-        {showAddMemberModal && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <div style={{
-              background: '#fff',
-              padding: '2rem',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-              width: '90%',
-              maxWidth: '500px',
-            }}>
-              <h3 style={{ marginBottom: '1.5rem', color: '#333' }}>Add New Member</h3>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  // 1. Format phone number as +1XXXXXXXXXX
-                  let phone = addMemberForm.phone || '';
-                  let digits = phone.replace(/\D/g, '');
-                  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
-                  if (digits.length === 10) phone = `+1${digits}`;
-                  else phone = phone; // fallback to original if not 10 digits
-
-                  // 2. Copy over stripe_customer_id from selectedMember (account_id)
-                  const stripe_customer_id = selectedMember.stripe_customer_id || null;
-
-                  // 3. Fill in created_at with current timestamp
-                  const created_at = new Date().toISOString();
-
-                  // Create new member with same account_id as selected member
-                  const { data, error } = await supabase.from('members').insert({
-                    ...addMemberForm,
-                    phone,
-                    account_id: selectedMember.account_id,
-                    member_id: uuidv4(),
-                    status: 'active',
-                    balance: 0,
-                    join_date: new Date().toISOString(),
-                    created_at,
-                    stripe_customer_id
-                  }).select();
-
-                  if (error) throw error;
-
-                  // Update local state
-                  setMembers(prev => [...prev, data[0]]);
-                  setShowAddMemberModal(false);
-                  setAddMemberForm({
-                    first_name: '',
-                    last_name: '',
-                    email: '',
-                    phone: '',
-                    dob: '',
-                    membership: '',
-                    photo: ''
-                  });
-                } catch (err) {
-                  alert('Failed to add member: ' + err.message);
-                }
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>First Name</label>
-                    <input
-                      type="text"
-                      value={addMemberForm.first_name}
-                      onChange={e => setAddMemberForm(prev => ({ ...prev, first_name: e.target.value }))}
-                      required
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Last Name</label>
-                    <input
-                      type="text"
-                      value={addMemberForm.last_name}
-                      onChange={e => setAddMemberForm(prev => ({ ...prev, last_name: e.target.value }))}
-                      required
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Email</label>
-                    <input
-                      type="email"
-                      value={addMemberForm.email}
-                      onChange={e => setAddMemberForm(prev => ({ ...prev, email: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Phone</label>
-                    <input
-                      type="tel"
-                      value={addMemberForm.phone}
-                      onChange={e => setAddMemberForm(prev => ({ ...prev, phone: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Date of Birth</label>
-                    <input
-                      type="date"
-                      value={addMemberForm.dob}
-                      onChange={e => setAddMemberForm(prev => ({ ...prev, dob: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Membership Type</label>
-                    <input
-                      type="text"
-                      value={addMemberForm.membership}
-                      onChange={e => setAddMemberForm(prev => ({ ...prev, membership: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Photo</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async e => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const url = await handlePhotoUpload(file);
-                          if (url) {
-                            setAddMemberForm(prev => ({ ...prev, photo: url }));
-                          }
-                        }
-                      }}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddMemberModal(false)}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: '#e5e1d8',
-                      color: '#555',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: '#a59480',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Add Member
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Member Modal */}
-        {editingMemberId && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <div style={{
-              background: '#fff',
-              padding: '2rem',
-              borderRadius: '8px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-              width: '90%',
-              maxWidth: '500px',
-            }}>
-              <h3 style={{ marginBottom: '1.5rem', color: '#333' }}>Edit Member</h3>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                await handleSaveEditMember();
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>First Name</label>
-                    <input
-                      type="text"
-                      value={editMemberForm.first_name || ''}
-                      onChange={e => setEditMemberForm(prev => ({ ...prev, first_name: e.target.value }))}
-                      required
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Last Name</label>
-                    <input
-                      type="text"
-                      value={editMemberForm.last_name || ''}
-                      onChange={e => setEditMemberForm(prev => ({ ...prev, last_name: e.target.value }))}
-                      required
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Email</label>
-                    <input
-                      type="email"
-                      value={editMemberForm.email || ''}
-                      onChange={e => setEditMemberForm(prev => ({ ...prev, email: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Phone</label>
-                    <input
-                      type="tel"
-                      value={editMemberForm.phone || ''}
-                      onChange={e => setEditMemberForm(prev => ({ ...prev, phone: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Date of Birth</label>
-                    <input
-                      type="date"
-                      value={editMemberForm.dob || ''}
-                      onChange={e => setEditMemberForm(prev => ({ ...prev, dob: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Membership Type</label>
-                    <input
-                      type="text"
-                      value={editMemberForm.membership || ''}
-                      onChange={e => setEditMemberForm(prev => ({ ...prev, membership: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Photo</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async e => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const url = await handlePhotoUpload(file, false);
-                          if (url && editingMemberId) {
-                            await supabase.from('members').update({ photo: url }).eq('member_id', editingMemberId);
-                            setEditMemberForm(form => ({ ...form, photo: url }));
-                            setMembers(ms => ms.map(m => m.member_id === editingMemberId ? { ...m, photo: url } : m));
-                          }
-                        }
-                      }}
-                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                    />
-                    {editMemberForm.photo && (
-                      <img src={editMemberForm.photo} alt="Photo" className="member-photo" style={{ marginTop: '0.5rem', width: '120px' }} />
-                    )}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                  <button
-                    type="button"
-                    onClick={handleCancelEditMember}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: '#e5e1d8',
-                      color: '#555',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: '#a59480',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Hamburger button for mobile */}
-        {isMobile && (
-          <button
-            className={sidebarOpen ? "hamburger open" : "hamburger"}
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open navigation"
-            style={{
-              position: "fixed",
-              top: "1.5rem",
-              right: "10.5rem",
-              width: "3rem",
-              height: "3rem",
-              minWidth: "3rem",
-              minHeight: "3rem",
-              maxWidth: "3rem",
-              maxHeight: "3rem",
-              zIndex: 2002,
-              background: "#fff",
-              border: "1.5px solid #e2dfd8",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "right",
-              justifyContent: "right",
-              fontSize: "1.7rem",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.09)",
-              cursor: "pointer",
-              transition: "background 0.2s"
-            }}
-          >
-            <span style={{ fontWeight: 700, fontSize: "2rem", lineHeight: 1 }}>&#9776;</span>
-          </button>
-        )}
-        {/* Sidebar overlay and sidebar for mobile */}
-        {isMobile && sidebarOpen && (
-          <>
-            {/* Overlay */}
-            <div
-              onClick={() => setSidebarOpen(false)}
+      <div style={{ display: 'flex', minHeight: '100vh' }}>
+        {/* Sidebar */}
+        <div style={{
+          width: 250,
+          background: '#3a2c1a',
+          color: '#fff',
+          padding: '2rem 1rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem'
+        }}>
+          <h2 style={{ margin: 0, padding: '0 1rem' }}>Noir CRM</h2>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <button
+              onClick={() => setSection('dashboard')}
               style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                width: "100vw",
-                height: "100vh",
-                background: "rgba(44, 41, 38, 0.36)",
-                zIndex: 2000,
-                transition: "opacity 0.2s",
-              }}
-              aria-label="Close sidebar"
-              tabIndex={0}
-              role="button"
-            />
-            {/* Sidebar */}
-            <div
-              className="sidebar-nav open"
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                width: "80vw",
-                maxWidth: 280,
-                minWidth: 180,
-                height: "100vh",
-                background: "#f3f2ef",
-                boxShadow: "2px 0 16px rgba(40,40,40,0.13)",
-                zIndex: 2001,
-                display: "flex",
-                flexDirection: "column",
-                gap: "1.5rem",
-                padding: "1.25rem 1rem 2rem 1rem",
-                boxSizing: "border-box",
-                transition: "transform 0.22s cubic-bezier(.6,.2,.2,1)",
-                transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+                background: section === 'dashboard' ? '#a59480' : 'transparent',
+                border: 'none',
+                padding: '0.75rem 1rem',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '4px'
               }}
             >
-              {/* Close button */}
-              <button
-                onClick={() => setSidebarOpen(false)}
-                style={{
-                  background: "#fff",
-                  border: "1.5px solid #e2dfd8",
-                  color: "#353535",
-                  alignSelf: "flex-end",
-                  fontSize: "2rem",
-                  marginBottom: "1.5rem",
-                  cursor: "pointer",
-                  padding: 0,
-                  width: "2.5rem",
-                  height: "2.5rem",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-                }}
-                aria-label="Close navigation"
-              >
-                &times;
-              </button>
-              <button
-                className={section === 'members' ? 'nav-active' : ''}
-                onClick={() => {
-                  setSection('members');
-                  setSelectedMember(null);
-                  setSidebarOpen(false);
-                }}
-              >
-                Members
-              </button>
-              <button
-                className={section === 'admin' ? 'nav-active' : ''}
-                onClick={() => {
-                  setSection('admin');
-                  setSidebarOpen(false);
-                }}
-              >
-                Admin
-              </button>
-              <button
-                className={section === 'makeReservation' ? 'nav-active' : ''}
-                onClick={() => {
-                  setSection('makeReservation');
-                  setSidebarOpen(false);
-                }}
-              >
-                Make Reservation
-              </button>
-              <button
-                className={section === 'calendar' ? 'nav-active' : ''}
-                onClick={() => {
-                  setSection('calendar');
-                  setSidebarOpen(false);
-                }}
-              >
-                Calendar
-              </button>
-              <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  window.location.reload();
-                  setSidebarOpen(false);
-                }}
-              >
-                Log Out
-              </button>
-            </div>
-          </>
-        )}
-        {/* Desktop sidebar */}
-        {!isMobile && (
-          <div className="sidebar-nav" style={{
-            minWidth: 210,
-            width: 210,
-            background: "#f3f2ef",
-            borderRight: "1.5px solid #e2dfd8",
-            minHeight: "100vh",
-            padding: "2rem 1rem 2rem 1.5rem",
-            boxSizing: "border-box",
-            position: "fixed",
-            top: 0,
-            left: 0,
-            zIndex: 10,
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.5rem"
-          }}>
+              Dashboard
+            </button>
             <button
-              className={section === 'members' ? 'nav-active' : ''}
-              onClick={() => {
-                setSection('members');
-                setSelectedMember(null);
+              onClick={() => setSection('members')}
+              style={{
+                background: section === 'members' ? '#a59480' : 'transparent',
+                border: 'none',
+                padding: '0.75rem 1rem',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '4px'
               }}
             >
               Members
             </button>
             <button
-              className={section === 'admin' ? 'nav-active' : ''}
-              onClick={() => {
-                setSection('admin');
+              onClick={() => setSection('calendar')}
+              style={{
+                background: section === 'calendar' ? '#a59480' : 'transparent',
+                border: 'none',
+                padding: '0.75rem 1rem',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '4px'
               }}
             >
-              Admin
+              Calendar
             </button>
             <button
-              className={section === 'makeReservation' ? 'nav-active' : ''}
               onClick={() => setSection('makeReservation')}
+              style={{
+                background: section === 'makeReservation' ? '#a59480' : 'transparent',
+                border: 'none',
+                padding: '0.75rem 1rem',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '4px'
+              }}
             >
               Make Reservation
             </button>
             <button
-              className={section === 'calendar' ? 'nav-active' : ''}
-              onClick={() => setSection('calendar')}
+              onClick={() => setSection('users')}
+              style={{
+                background: section === 'users' ? '#a59480' : 'transparent',
+                border: 'none',
+                padding: '0.75rem 1rem',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '4px'
+              }}
             >
-              Calendar
+              Users
             </button>
             <button
               onClick={async () => {
                 await supabase.auth.signOut();
                 window.location.reload();
               }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '0.75rem 1rem',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                marginTop: 'auto'
+              }}
             >
-              Log Out
+              Sign Out
             </button>
-          </div>
-        )}
-        <div
-          className="app-container"
-          style={{
-            marginLeft: isMobile ? 0 : 220,
-            padding: isMobile ? "1rem" : "2.5rem",
-            minHeight: "100vh",
-            background: "#f8f7f4",
-            maxWidth: "90%",
-            width: "90%",
-            overflowX: "hidden"
-          }}
-        >
+          </nav>
+        </div>
+
+        {/* Main Content */}
+        <div style={{ flex: 1, background: '#f7f6f3' }}>
+          {section === 'dashboard' && <Dashboard />}
           {section === 'members' && (
             <>
               {/* Member Lookup UI at the top of Members section */}
@@ -1826,226 +1104,16 @@ function App() {
               )}
             </>
           )}
-          {section === 'admin' && (
-            <>
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-                <h2>Calendar Availability Control</h2>
-                <CalendarAvailabilityControl />
-              </div>
-
-             
-              {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
-
-              {/* Create User Modal */}
-              {showCreateUserModal && (
-                <div style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  width: '100vw',
-                  height: '100vh',
-                  background: 'rgba(0,0,0,0.5)',
-                  zIndex: 9999,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <div style={{
-                    background: '#fff',
-                    padding: '2rem',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-                    width: '90%',
-                    maxWidth: '500px',
-                  }}>
-                    <h3 style={{ marginBottom: '1.5rem', color: '#333' }}>Create New User</h3>
-                    <form onSubmit={handleCreateUser}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>First Name</label>
-                          <input
-                            type="text"
-                            value={createUserForm.first_name}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, first_name: e.target.value }))}
-                            required
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Last Name</label>
-                          <input
-                            type="text"
-                            value={createUserForm.last_name}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, last_name: e.target.value }))}
-                            required
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Email</label>
-                          <input
-                            type="email"
-                            value={createUserForm.email}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, email: e.target.value }))}
-                            required
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Phone</label>
-                          <input
-                            type="tel"
-                            value={createUserForm.phone}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, phone: e.target.value }))}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Role</label>
-                          <select
-                            value={createUserForm.role}
-                            onChange={e => setCreateUserForm(prev => ({ ...prev, role: e.target.value }))}
-                            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-                          >
-                            <option value="view">View</option>
-                            <option value="member">Member</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateUserModal(false)}
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            background: '#e5e1d8',
-                            color: '#555',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            background: '#a59480',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Create User
-                        </button>
-                      </div>
-                    </form>
-                  </div>
+          {section === 'calendar' && (
+            <div style={{ padding: '2rem', maxWidth: '100vw', width: '90%' }}>
+              <h2>Seating Calendar</h2>
+              <FullCalendarTimeline reloadKey={reloadKey} bookingStartDate={bookingStartDate} bookingEndDate={bookingEndDate} />
+              {eventInfo && (
+                <div style={{ marginTop: '1rem' }}>
+                  <p>Event/Reservation ID: {eventInfo.id}</p>
                 </div>
               )}
-
-              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
-                <h2>All Users</h2>
-                <table className="user-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>First Name</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Last Name</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Email</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Phone</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Role</th>
-                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map(user => (
-                      editUserId === user.id ? (
-                        <tr key={user.id}>
-                          <td><input value={editForm.first_name} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} /></td>
-                          <td><input value={editForm.last_name} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} /></td>
-                          <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
-                          <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
-                          <td>
-                            <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
-                              <option value="admin">admin</option>
-                              <option value="member">member</option>
-                              <option value="view">view</option>
-                            </select>
-                          </td>
-                          <td>
-                            <button onClick={() => handleSaveUser(user.id)} style={{ marginRight: "0.5rem" }}>Save</button>
-                            <button onClick={handleCancelEdit} style={{ marginRight: "0.5rem" }}>Cancel</button>
-                            <button
-                              style={{ color: '#fff', background: '#e74c3c', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}
-                              onClick={async () => {
-                                if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
-                                try {
-                                  const res = await fetch('/api/deleteAuthUser', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      supabase_user_id: user.id,
-                                      member_id: null,
-                                      requester_token: session.access_token
-                                    })
-                                  });
-                                  const data = await res.json();
-                                  if (res.ok && data.success) {
-                                    setUsers(users.filter(u => u.id !== user.id));
-                                    setEditUserId(null);
-                                    alert('User deleted.');
-                                  } else {
-                                    alert('Failed to delete user: ' + (data.error || 'Unknown error'));
-                                  }
-                                } catch (e) {
-                                  alert('Failed to delete user: ' + e.message);
-                                }
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        <tr key={user.id}>
-                          <td>{user.user_metadata?.first_name || ""}</td>
-                          <td>{user.user_metadata?.last_name || ""}</td>
-                          <td>{user.email}</td>
-                          <td>{user.user_metadata?.phone || ""}</td>
-                          <td>{user.user_metadata?.role || "view"}</td>
-                          <td>
-                            <button onClick={() => handleEditUser(user)} style={{ marginRight: "0.5rem" }}>Edit</button>
-                          </td>
-                        </tr>
-                      )
-                    ))}
-                  </tbody>
-                </table>
-                {/* Move Create User button here, below the table */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                  <button 
-                    onClick={() => setShowCreateUserModal(true)}
-                    style={{ 
-                      padding: "0.5rem 1.5rem", 
-                      background: "#a59480", 
-                      color: "#fff", 
-                      border: "none", 
-                      borderRadius: "4px", 
-                      fontWeight: 600, 
-                      cursor: "pointer" 
-                    }}
-                  >
-                    Create User
-                  </button>
-                </div>
-                {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
-              </div>
-            </>
+            </div>
           )}
           {section === 'makeReservation' && (() => {
             // --- Reserve On The Spot logic ---
@@ -2347,30 +1415,108 @@ function App() {
               </div>
             );
           })()}
-          {section === 'calendar' && (
-            <div style={{ padding: '2rem', maxWidth: '100vw', width: '90%' }}>
-              <h2>Seating Calendar</h2>
-              <FullCalendarTimeline reloadKey={reloadKey} bookingStartDate={bookingStartDate} bookingEndDate={bookingEndDate} />
-              {eventInfo && (
-                <div style={{ marginTop: '1rem' }}>
-                  <p>Event/Reservation ID: {eventInfo.id}</p>
+          {section === 'users' && (
+            <>
+              <div className="admin-panel" style={{ marginBottom: "2rem", border: "1px solid #ececec", padding: "1.5rem", borderRadius: "8px", background: "#faf9f7" }}>
+                <h2>All Users</h2>
+                <table className="user-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>First Name</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Last Name</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Email</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Phone</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Role</th>
+                      <th style={{ textAlign: "left", padding: "0.5rem" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map(user => (
+                      editUserId === user.id ? (
+                        <tr key={user.id}>
+                          <td><input value={editForm.first_name} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} /></td>
+                          <td><input value={editForm.last_name} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} /></td>
+                          <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
+                          <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
+                          <td>
+                            <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
+                              <option value="admin">admin</option>
+                              <option value="member">member</option>
+                              <option value="view">view</option>
+                            </select>
+                          </td>
+                          <td>
+                            <button onClick={() => handleSaveUser(user.id)} style={{ marginRight: "0.5rem" }}>Save</button>
+                            <button onClick={handleCancelEdit} style={{ marginRight: "0.5rem" }}>Cancel</button>
+                            <button
+                              style={{ color: '#fff', background: '#e74c3c', border: 'none', borderRadius: '4px', padding: '0.5rem 1rem', fontWeight: 600, cursor: 'pointer' }}
+                              onClick={async () => {
+                                if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+                                try {
+                                  const res = await fetch('/api/deleteAuthUser', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      supabase_user_id: user.id,
+                                      member_id: null,
+                                      requester_token: session.access_token
+                                    })
+                                  });
+                                  const data = await res.json();
+                                  if (res.ok && data.success) {
+                                    setUsers(users.filter(u => u.id !== user.id));
+                                    setEditUserId(null);
+                                    alert('User deleted.');
+                                  } else {
+                                    alert('Failed to delete user: ' + (data.error || 'Unknown error'));
+                                  }
+                                } catch (e) {
+                                  alert('Failed to delete user: ' + e.message);
+                                }
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={user.id}>
+                          <td>{user.user_metadata?.first_name || ""}</td>
+                          <td>{user.user_metadata?.last_name || ""}</td>
+                          <td>{user.email}</td>
+                          <td>{user.user_metadata?.phone || ""}</td>
+                          <td>{user.user_metadata?.role || "view"}</td>
+                          <td>
+                            <button onClick={() => handleEditUser(user)} style={{ marginRight: "0.5rem" }}>Edit</button>
+                          </td>
+                        </tr>
+                      )
+                    ))}
+                  </tbody>
+                </table>
+                {/* Move Create User button here, below the table */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                  <button 
+                    onClick={() => setShowCreateUserModal(true)}
+                    style={{ 
+                      padding: "0.5rem 1.5rem", 
+                      background: "#a59480", 
+                      color: "#fff", 
+                      border: "none", 
+                      borderRadius: "4px", 
+                      fontWeight: 600, 
+                      cursor: "pointer" 
+                    }}
+                  >
+                    Create User
+                  </button>
                 </div>
-              )}
-            </div>
+                {createStatus && <div style={{ marginTop: "0.5rem", color: "#353535", fontWeight: 600 }}>{createStatus}</div>}
+              </div>
+            </>
           )}
         </div>
-        {/* Next Available Time Popup - always visible if set */}
-        {nextAvailableTime && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', maxWidth: 400, textAlign: 'center' }}>
-              <h3>No table available at your requested time</h3>
-              <p>The next available time for your party size is:</p>
-              <p style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>{new Date(nextAvailableTime).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}</p>
-              <button onClick={() => setNextAvailableTime(null)} style={{ marginTop: '1.5rem', padding: '0.5rem 1.5rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}>OK</button>
-            </div>
-          </div>
-        )}
-      </>
+      </div>
     );
   }
 }
