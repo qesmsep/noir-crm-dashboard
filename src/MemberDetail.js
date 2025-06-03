@@ -438,12 +438,13 @@ const MemberDetail = ({
           >
             Edit Member
             </button>
-            {session?.user?.user_metadata?.role === 'admin' && 
-             member.stripe_customer_id && 
-             ledger && 
+            {session?.user?.user_metadata?.role === 'admin' &&
+             member.stripe_customer_id &&
+             ledger &&
+             // Compute balance: negative means money owed
              (() => {
                const balance = ledger.reduce((acc, t) => acc + Number(t.amount), 0);
-               return balance < 0; // Only show if there's a negative balance (money due)
+               return balance < 0;
              })() && (
               <button
                 onClick={async () => {
