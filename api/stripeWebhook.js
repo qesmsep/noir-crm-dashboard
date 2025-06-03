@@ -60,6 +60,17 @@ export default async function handler(req, res) {
       .update({ stripe_customer_id: stripeCustomerId, status: 'active' })
       .eq('member_id', member.member_id);
 
+    // Get the payment method used in the checkout session
+    const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+    if (paymentIntent.payment_method) {
+      // Set the payment method as default for the customer
+      await stripe.customers.update(stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: paymentIntent.payment_method,
+        },
+      });
+    }
+
     // Insert ledger entry for payment
     if (amountPaid) {
       await supabase.from('ledger').insert([{
