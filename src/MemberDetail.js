@@ -171,12 +171,12 @@ const MemberDetail = ({
   };
 
   useEffect(() => {
-    if (member?.stripe_customer_id) {
+    if (member?.account_id) {
       setStripeLoading(true);
       fetch('/api/getStripeCustomer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stripe_customer_id: member.stripe_customer_id }),
+        body: JSON.stringify({ account_id: member.account_id }),
       })
         .then((res) => res.json())
         .then((data) => {
@@ -188,7 +188,7 @@ const MemberDetail = ({
           setStripeLoading(false);
         });
     }
-  }, [member?.stripe_customer_id]);
+  }, [member?.account_id]);
 
   if (!member) return null;
 
@@ -526,7 +526,6 @@ const MemberDetail = ({
             </button>
             <button
               onClick={async () => {
-                // Use account_id instead of member_id
                 setLinkingStripe(true);
                 setLinkResult(null);
                 try {
