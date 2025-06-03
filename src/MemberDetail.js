@@ -355,6 +355,18 @@ const MemberDetail = ({
           <strong>Next Renewal:</strong> {nextRenewal}
         </div>
 
+        {/* Add balance display */}
+        <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8f7f4', borderRadius: '4px' }}>
+          <strong>Current Balance:</strong>{' '}
+          <span style={{ 
+            color: ledger && ledger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? '#e74c3c' : '#27ae60',
+            fontWeight: 600 
+          }}>
+            ${Math.abs((ledger || []).reduce((acc, t) => acc + Number(t.amount), 0)).toFixed(2)}
+            {ledger && ledger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? ' (Due)' : ' (Credit)'}
+          </span>
+        </div>
+
         {/* Attributes & Notes section (API-driven) */}
         <div className="add-transaction-panel">
           {/* Attributes */}
@@ -426,6 +438,46 @@ const MemberDetail = ({
           >
             Edit Member
             </button>
+            {session?.user?.user_metadata?.role === 'admin' && member.stripe_customer_id && ledger && ledger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 && (
+              <button
+                onClick={async () => {
+                  setCharging(true);
+                  setChargeStatus(null);
+                  try {
+                    const res = await fetch('/api/chargeBalance', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ member_id: member.member_id, account_id: member.account_id }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                      setChargeStatus('Charged successfully');
+                      if (typeof fetchLedger === 'function') {
+                        fetchLedger(member.account_id);
+                      }
+                    } else {
+                      setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
+                    }
+                  } catch (e) {
+                    setChargeStatus(`Error: ${e.message}`);
+                  }
+                  setCharging(false);
+                }}
+                disabled={charging}
+                style={{
+                  background: '#a59480',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '0.6rem 1.5rem',
+                  fontWeight: 600,
+                  cursor: charging ? 'not-allowed' : 'pointer',
+                  opacity: charging ? 0.7 : 1
+                }}
+              >
+                {charging ? 'Charging...' : 'Charge Balance'}
+              </button>
+            )}
         <button
           className="delete-member-btn"
           onClick={() => {
