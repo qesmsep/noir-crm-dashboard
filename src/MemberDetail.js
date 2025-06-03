@@ -508,72 +508,9 @@ const MemberDetail = ({
             </button>
             </div>
 
-            {member?.stripe_customer_id && session?.user?.user_metadata?.role === 'admin' && (
-              <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #d1cfc7', borderRadius: '4px' }}>
-                <h4>Payment Method Setup</h4>
-                {!stripeData?.default_payment_method ? (
-                  <form onSubmit={handleSetupPaymentMethod}>
-                    <div style={{ marginBottom: '1rem' }}>
-                      <CardElement
-                        options={{
-                          style: {
-                            base: {
-                              fontSize: '16px',
-                              color: '#424770',
-                              '::placeholder': {
-                                color: '#aab7c4',
-                              },
-                            },
-                            invalid: {
-                              color: '#9e2146',
-                            },
-                          },
-                        }}
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={!stripe || setupLoading}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        backgroundColor: '#000',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: setupLoading ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {setupLoading ? 'Setting up...' : 'Add Payment Method'}
-                    </button>
-                    {setupStatus && (
-                      <div style={{ marginTop: '1rem', color: setupStatus.includes('Error') ? '#9e2146' : '#2e7d32' }}>
-                        {setupStatus}
-                      </div>
-                    )}
-                  </form>
-                ) : (
-                  <div style={{ color: '#2e7d32' }}>
-                    ✓ Payment method is set up
-                  </div>
-                )}
-              </div>
-            )}
+            
 
-            {/* Add this at the bottom of the content, before the closing div */}
-            <div className="border-t border-gray-200 mt-6 pt-6 px-6 pb-6 flex justify-between items-center">
-              <button
-                onClick={() => setShowPaymentMethods(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Manage Payment Methods
-              </button>
-              <button
-                onClick={onBack}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Close
-              </button>
-            </div>
+            
           </div>
         </div>
 
