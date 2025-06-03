@@ -1602,6 +1602,9 @@ function App() {
               formatDateLong={formatDateLong}
               formatPhone={formatPhone}
               formatDOB={formatDOB}
+              stripePromise={stripePromise}
+              handleEditMember={handleEditMember}
+              session={session}
             />
           )}
           {section === 'admin' && (
@@ -1612,7 +1615,16 @@ function App() {
               setEditUserId={setEditUserId}
               editForm={editForm}
               setEditForm={setEditForm}
-              // ...add other admin props as needed
+              handleEditUser={handleEditUser}
+              handleCancelEdit={handleCancelEdit}
+              handleSaveUser={handleSaveUser}
+              showCreateUserModal={showCreateUserModal}
+              setShowCreateUserModal={setShowCreateUserModal}
+              createUserForm={createUserForm}
+              setCreateUserForm={setCreateUserForm}
+              handleCreateUser={handleCreateUser}
+              createStatus={createStatus}
+              session={session}
             />
           )}
           {section === 'makeReservation' && (
@@ -1625,7 +1637,17 @@ function App() {
               setDate={setDate}
               time={time}
               setTime={setTime}
-              // ...add other reservation props as needed
+              bookingStartDate={bookingStartDate}
+              bookingEndDate={bookingEndDate}
+              eventType={eventType}
+              setEventType={setEventType}
+              getAvailableTimes={getAvailableTimes}
+              eventTypes={eventTypes}
+              reserveStatus={reserveStatus}
+              handleReserveNow={handleReserveNow}
+              nextAvailableTime={nextAvailableTime}
+              setNextAvailableTime={setNextAvailableTime}
+              createDateFromTimeString={createDateFromTimeString}
             />
           )}
           {section === 'calendar' && (
@@ -1634,8 +1656,6 @@ function App() {
               bookingStartDate={bookingStartDate}
               bookingEndDate={bookingEndDate}
               eventInfo={eventInfo}
-              setEventInfo={setEventInfo}
-              // ...add other calendar props as needed
             />
           )}
           {section === 'makeReservation' && (() => {

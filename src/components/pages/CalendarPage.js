@@ -1,12 +1,16 @@
 import React from 'react';
+import FullCalendarTimeline from '../FullCalendarTimeline';
 
-const CalendarPage = (props) => {
-  // The full logic and JSX for the calendar section should be moved here from App.js
-  // For now, just a placeholder
+const CalendarPage = ({ reloadKey, bookingStartDate, bookingEndDate, eventInfo }) => {
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Calendar Page (to be implemented)</h1>
-      {/* Move the full calendar section JSX and logic here */}
+    <div style={{ padding: '2rem', maxWidth: '100vw', width: '90%' }}>
+      <h2>Seating Calendar</h2>
+      <FullCalendarTimeline reloadKey={reloadKey} bookingStartDate={bookingStartDate} bookingEndDate={bookingEndDate} />
+      {eventInfo && (
+        <div style={{ marginTop: '1rem' }}>
+          <p>Event/Reservation ID: {eventInfo.id}</p>
+        </div>
+      )}
     </div>
   );
 };
