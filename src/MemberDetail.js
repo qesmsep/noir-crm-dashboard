@@ -1,9 +1,6 @@
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
-import PaymentMethods from './components/PaymentMethods';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -49,13 +46,6 @@ const MemberDetail = ({
   // State for adding attributes
   const [newAttrKey, setNewAttrKey] = useState('');
   const [newAttrValue, setNewAttrValue] = useState('');
-
-  const stripe = useStripe();
-  const elements = useElements();
-  const [setupStatus, setSetupStatus] = useState(null);
-  const [setupLoading, setSetupLoading] = useState(false);
-
-  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
   // Load attributes from API
   const fetchAttributes = async () => {
@@ -312,281 +302,141 @@ const MemberDetail = ({
     }
   };
 
-  const handleSetupPaymentMethod = async (e) => {
-    e.preventDefault();
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setSetupLoading(true);
-    setSetupStatus(null);
-
-    try {
-      const { error, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: elements.getElement(CardElement),
-      });
-
-      if (error) {
-        setSetupStatus(`Error: ${error.message}`);
-        return;
-      }
-
-      // Send payment method to our API
-      const response = await fetch('/api/setupPaymentMethod', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          member_id: member.member_id,
-          payment_method_id: paymentMethod.id,
-        }),
-      });
-
-      const result = await response.json();
-      if (response.ok) {
-        setSetupStatus('Payment method added successfully!');
-        // Refresh Stripe data
-        if (member?.stripe_customer_id) {
-          fetch('/api/getStripeCustomer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ stripe_customer_id: member.stripe_customer_id }),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              setStripeData(data);
-            })
-            .catch(() => {
-              setStripeError('Error fetching Stripe info');
-            });
-        }
-      } else {
-        setSetupStatus(`Error: ${result.error}`);
-      }
-    } catch (err) {
-      setSetupStatus(`Error: ${err.message}`);
-    } finally {
-      setSetupLoading(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="member-detail-container">
-          <div className="member-detail-card" style={{ position: 'relative' }}>
-            <h2>Members</h2>
-            <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 16, gap: '2rem' }}>
-              {/* Primary Member */}
-              <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                {member.photo && (
-                  <img
-                    src={member.photo}
-                    alt="Primary Member"
-                    style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, marginRight: 20 }}
-                  />
-                )}
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 20, marginBottom: '0.25rem' }}>
-                    {member.first_name} {member.last_name}
-                  </div>
-                  {member.membership && (
-                    <div style={{ fontWeight: 400, fontSize: 16, color: '#7c6b58', marginBottom: '0.5rem' }}>
-                      {member.membership}
-                    </div>
-                  )}
-                  {member.email && (
-                    <div>
-                      Email: <a href={`mailto:${member.email}`}>{member.email}</a>
-                    </div>
-                  )}
-                  {member.phone && (
-                    <div>
-                      Phone: <a href={`tel:${member.phone}`}>{formatPhoneNumber(member.phone)}</a>
-                    </div>
-                  )}
-                  {member.dob && <div style={{ whiteSpace: 'nowrap' }}>Birthday: {formatDateLong(member.dob)}</div>}
-                  {member.company && <div>Company: {member.company}</div>}
-                </div>
-              </div>
-            </div>
-            {/* Discreetly show member UUID at bottom right */}
-            <div style={{ position: 'absolute', right: 16, bottom: 12, fontSize: '0.85rem', color: '#888', opacity: 0.6, userSelect: 'all' }}>
-              Member UUID: {member.member_id}
-            </div>
-            {/* Referral and Renewal Block */}
-            <div>
-              <strong>Referred By:</strong> {member.referral || 'N/A'}
-            </div>
-            <div>
-              <strong>Member Since:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
-            </div>
-            <div>
-              <strong>Next Renewal:</strong> {nextRenewal}
-            </div>
-
-            {/* Attributes & Notes section (API-driven) */}
-            <div className="add-transaction-panel">
-              {/* Attributes */}
-              <h3>Attributes</h3>
-              {attributes.map((attr, i) => (
-                <div key={i} className="attribute-item">
-                  <div className="attribute-info">
-                    <strong>{attr.key}:</strong> {attr.value}
-                  </div>
-                  <div className="attribute-actions">
-                    <button className="edit-attribute-btn" onClick={() => handleEditAttribute(attr)}>Edit</button>
-                  </div>
-                </div>
-              ))}
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <input
-                  value={newAttrKey}
-                  onChange={e => setNewAttrKey(e.target.value)}
-                  className="add-transaction-input"
-                  placeholder="Attribute Type"
-                />
-                <input
-                  value={newAttrValue}
-                  onChange={e => setNewAttrValue(e.target.value)}
-                  className="add-transaction-input"
-                  placeholder="Attribute Detail"
-                />
-                <button onClick={handleAddAttribute} className="add-transaction-btn">Add</button>
-              </div>
-
-              {/* Notes */}
-              <h3>Notes History</h3>
-              <ul>
-                {notesLog.map(n => (
-                  <li key={n.id} className="note-item">
-                    {formatDateLong(n.created_at)}: {n.note}
-                    <button className="edit-note-btn" onClick={() => handleEditNote(n)}>Edit</button>
-                  </li>
-                ))}
-              </ul>
-              <div className="add-transaction-panel">
-                <textarea
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  className="add-transaction-input"
-                  placeholder="New note..."
-                  rows={2}
-                  style={{ minHeight: '60px', width: '100%' }}
-                />
-                <button onClick={handleAddNote} className="add-transaction-btn">Add Note</button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                  <button
-                className="edit-member-btn"
-                onClick={() => {
-                  if (typeof onEditMember === 'function') onEditMember(member);
-                }}
-                style={{
-                  background: '#4a90e2',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '0.6rem 1.5rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Edit Member
-                </button>
-            <button
-              className="delete-member-btn"
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-                    handleDeleteMember(member.member_id, member.supabase_user_id);
-                }
-              }}
-            >
-              Delete Member
-            </button>
-            </div>
-
-            {member?.stripe_customer_id && session?.user?.user_metadata?.role === 'admin' && (
-              <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #d1cfc7', borderRadius: '4px' }}>
-                <h4>Payment Method Setup</h4>
-                {!stripeData?.default_payment_method ? (
-                  <form onSubmit={handleSetupPaymentMethod}>
-                    <div style={{ marginBottom: '1rem' }}>
-                      <CardElement
-                        options={{
-                          style: {
-                            base: {
-                              fontSize: '16px',
-                              color: '#424770',
-                              '::placeholder': {
-                                color: '#aab7c4',
-                              },
-                            },
-                            invalid: {
-                              color: '#9e2146',
-                            },
-                          },
-                        }}
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={!stripe || setupLoading}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        backgroundColor: '#000',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: setupLoading ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {setupLoading ? 'Setting up...' : 'Add Payment Method'}
-                    </button>
-                    {setupStatus && (
-                      <div style={{ marginTop: '1rem', color: setupStatus.includes('Error') ? '#9e2146' : '#2e7d32' }}>
-                        {setupStatus}
-                      </div>
-                    )}
-                  </form>
-                ) : (
-                  <div style={{ color: '#2e7d32' }}>
-                    ✓ Payment method is set up
-                  </div>
-                )}
-              </div>
+    <div className="member-detail-container">
+      <div className="member-detail-card" style={{ position: 'relative' }}>
+        <h2>Members</h2>
+        <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 16, gap: '2rem' }}>
+          {/* Primary Member */}
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            {member.photo && (
+              <img
+                src={member.photo}
+                alt="Primary Member"
+                style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, marginRight: 20 }}
+              />
             )}
-
-            {/* Add this at the bottom of the content, before the closing div */}
-            <div className="border-t border-gray-200 mt-6 pt-6 px-6 pb-6 flex justify-between items-center">
-              <button
-                onClick={() => setShowPaymentMethods(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Manage Payment Methods
-              </button>
-              <button
-                onClick={onBack}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Close
-              </button>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 20, marginBottom: '0.25rem' }}>
+                {member.first_name} {member.last_name}
+              </div>
+              {member.membership && (
+                <div style={{ fontWeight: 400, fontSize: 16, color: '#7c6b58', marginBottom: '0.5rem' }}>
+                  {member.membership}
+                </div>
+              )}
+              {member.email && (
+                <div>
+                  Email: <a href={`mailto:${member.email}`}>{member.email}</a>
+                </div>
+              )}
+              {member.phone && (
+                <div>
+                  Phone: <a href={`tel:${member.phone}`}>{formatPhoneNumber(member.phone)}</a>
+                </div>
+              )}
+              {member.dob && <div style={{ whiteSpace: 'nowrap' }}>Birthday: {formatDateLong(member.dob)}</div>}
+              {member.company && <div>Company: {member.company}</div>}
             </div>
           </div>
         </div>
+        {/* Discreetly show member UUID at bottom right */}
+        <div style={{ position: 'absolute', right: 16, bottom: 12, fontSize: '0.85rem', color: '#888', opacity: 0.6, userSelect: 'all' }}>
+          Member UUID: {member.member_id}
+        </div>
+        {/* Referral and Renewal Block */}
+        <div>
+          <strong>Referred By:</strong> {member.referral || 'N/A'}
+        </div>
+        <div>
+          <strong>Member Since:</strong> {member.join_date ? formatDateLong(member.join_date) : 'N/A'}
+        </div>
+        <div>
+          <strong>Next Renewal:</strong> {nextRenewal}
+        </div>
 
-        {showPaymentMethods && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Elements stripe={stripe}>
-              <PaymentMethods
-                account_id={member.account_id}
-                onClose={() => setShowPaymentMethods(false)}
-              />
-            </Elements>
+        {/* Attributes & Notes section (API-driven) */}
+        <div className="add-transaction-panel">
+          {/* Attributes */}
+          <h3>Attributes</h3>
+          {attributes.map((attr, i) => (
+            <div key={i} className="attribute-item">
+              <div className="attribute-info">
+                <strong>{attr.key}:</strong> {attr.value}
+              </div>
+              <div className="attribute-actions">
+                <button className="edit-attribute-btn" onClick={() => handleEditAttribute(attr)}>Edit</button>
+              </div>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <input
+              value={newAttrKey}
+              onChange={e => setNewAttrKey(e.target.value)}
+              className="add-transaction-input"
+              placeholder="Attribute Type"
+            />
+            <input
+              value={newAttrValue}
+              onChange={e => setNewAttrValue(e.target.value)}
+              className="add-transaction-input"
+              placeholder="Attribute Detail"
+            />
+            <button onClick={handleAddAttribute} className="add-transaction-btn">Add</button>
           </div>
-        )}
+
+          {/* Notes */}
+          <h3>Notes History</h3>
+          <ul>
+            {notesLog.map(n => (
+              <li key={n.id} className="note-item">
+                {formatDateLong(n.created_at)}: {n.note}
+                <button className="edit-note-btn" onClick={() => handleEditNote(n)}>Edit</button>
+              </li>
+            ))}
+          </ul>
+          <div className="add-transaction-panel">
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="add-transaction-input"
+              placeholder="New note..."
+              rows={2}
+              style={{ minHeight: '60px', width: '100%' }}
+            />
+            <button onClick={handleAddNote} className="add-transaction-btn">Add Note</button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button
+            className="edit-member-btn"
+            onClick={() => {
+              if (typeof onEditMember === 'function') onEditMember(member);
+            }}
+            style={{
+              background: '#4a90e2',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.6rem 1.5rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Edit Member
+            </button>
+        <button
+          className="delete-member-btn"
+          onClick={() => {
+            if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
+                handleDeleteMember(member.member_id, member.supabase_user_id);
+            }
+          }}
+        >
+          Delete Member
+        </button>
+        </div>
       </div>
     </div>
   );
