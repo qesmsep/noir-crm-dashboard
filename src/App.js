@@ -756,57 +756,72 @@ function App() {
         {/* Main Content */}
         <div style={{ flex: 1, background: '#f7f6f3' }}>
           {section === 'dashboard' && <Dashboard />}
-          {section === 'members' && (
-            <>
-              {/* Member Lookup UI at the top of Members section */}
-              <div style={{ marginBottom: '2rem' }}>
-                <input
-                  type="text"
-                  placeholder="Search by name, email, or phone"
-                  value={lookupQuery}
-                  onChange={e => setLookupQuery(e.target.value)}
-                  style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
-                />
-                  <ul className="member-list">
-                  {members.filter(m => {
-                    const q = lookupQuery.trim().toLowerCase();
-                    if (!q) return false;
-                    return (
-                      (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-                      (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-                      (m.email && m.email.toLowerCase().includes(q)) ||
-                      (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-                    );
-                  }).length === 0 && lookupQuery ? (
-                    <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
-                  ) : (
-                    members.filter(m => {
-                      const q = lookupQuery.trim().toLowerCase();
-                      if (!q) return false;
-                      return (
-                        (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-                        (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-                        (m.email && m.email.toLowerCase().includes(q)) ||
-                        (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-                      );
-                    }).map(member => (
-                      <li
-                        key={member.member_id}
-                        className="member-item"
-                        style={{ position: "relative", cursor: "pointer", width: "100%" }}
-                        onClick={() => {
-                          setSelectedMember(member);
-                          fetchLedger(member.account_id);
-                        }}
-                        tabIndex={0}
-                        role="button"
-                        onKeyDown={e => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            setSelectedMember(member);
-                            fetchLedger(member.account_id);
-                          }
-                        }}
-                      >
+          {section === 'members' && (() => {
+            // Debugging: log members and membersByAccount
+            console.log('members:', members);
+            console.log('membersByAccount:', membersByAccount);
+
+            // Defensive: show loading or empty state
+            if (!Array.isArray(members) || members.length === 0) {
+              return <div style={{ padding: '2rem' }}>No members found or still loading...</div>;
+            }
+            if (!membersByAccount || Object.keys(membersByAccount).length === 0) {
+              return <div style={{ padding: '2rem' }}>No member accounts found.</div>;
+            }
+
+            // Error boundary for Members section
+            try {
+              return (
+                <>
+                  {/* Member Lookup UI at the top of Members section */}
+                  <div style={{ marginBottom: '2rem' }}>
+                    <input
+                      type="text"
+                      placeholder="Search by name, email, or phone"
+                      value={lookupQuery}
+                      onChange={e => setLookupQuery(e.target.value)}
+                      style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
+                    />
+                    <ul className="member-list">
+                      {members.filter(m => {
+                        const q = lookupQuery.trim().toLowerCase();
+                        if (!q) return false;
+                        return (
+                          (m.first_name && m.first_name.toLowerCase().includes(q)) ||
+                          (m.last_name && m.last_name.toLowerCase().includes(q)) ||
+                          (m.email && m.email.toLowerCase().includes(q)) ||
+                          (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+                        );
+                      }).length === 0 && lookupQuery ? (
+                        <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
+                      ) : (
+                        members.filter(m => {
+                          const q = lookupQuery.trim().toLowerCase();
+                          if (!q) return false;
+                          return (
+                            (m.first_name && m.first_name.toLowerCase().includes(q)) ||
+                            (m.last_name && m.last_name.toLowerCase().includes(q)) ||
+                            (m.email && m.email.toLowerCase().includes(q)) ||
+                            (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+                          );
+                        }).map(member => (
+                          <li
+                            key={member.member_id}
+                            className="member-item"
+                            style={{ position: "relative", cursor: "pointer", width: "100%" }}
+                            onClick={() => {
+                              setSelectedMember(member);
+                              fetchLedger(member.account_id);
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            onKeyDown={e => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                setSelectedMember(member);
+                                fetchLedger(member.account_id);
+                              }
+                            }}
+                          >
                             {member.photo && (
                               <img
                                 src={member.photo}
@@ -816,294 +831,298 @@ function App() {
                             )}
                             <div className="member-info">
                               <strong>
-                            {member.first_name} {member.last_name}
-                              </strong>
-                          <div>Member since: {formatDateLong(member.join_date)}</div>
-                              <div>Phone: {formatPhone(member.phone)}</div>
-                              <div>Email: {member.email}</div>
-                              <div>Date of Birth: {formatDOB(member.dob)}</div>
-                            </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-              {/* End Member Lookup UI */}
-              {/* Existing member list, filtered if no lookup query */}
-              {!selectedMember ? (
-                <>
-                  <h1 className="app-title">Noir CRM – Members</h1>
-                  {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
-                    <div key={accountId} className="account-group" style={{
-                      marginBottom: '1rem',
-                      padding: '1rem',
-                      background: '#fff',
-                      borderRadius: '12px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1.2rem'
-                    }}>
-                      {accountMembers.map((member, idx) => (
-                        <div key={member.member_id} style={{
-                          padding: '0.5rem 0',
-                          background: 'none',
-                          boxShadow: 'none',
-                          borderRadius: 0,
-                          marginBottom: 0
-                        }}>
-                          <li
-                        className="member-item"
-                            style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}
-                            onClick={() => {
-                              setSelectedMember(member);
-                              fetchLedger(member.account_id);
-                            }}
-                          >
-                            {member.photo && (
-                              <img
-                                src={member.photo}
-                                alt={`${member.first_name} ${member.last_name}`}
-                                    className="member-photo"
-                                style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, marginRight: 20, background: '#f6f5f2' }}
-                                  />
-                                )}
-                            <div className="member-info" style={{ flex: 1 }}>
-                                <strong>
                                 {member.first_name} {member.last_name}
-                                </strong>
+                              </strong>
                               <div>Member since: {formatDateLong(member.join_date)}</div>
                               <div>Phone: {formatPhone(member.phone)}</div>
                               <div>Email: {member.email}</div>
                               <div>Date of Birth: {formatDOB(member.dob)}</div>
-                              </div>
-                        </li>
-                          </div>
-                      ))}
-                    </div>
-                  ))}
-                </>
-              ) : (
-                // Member Detail View (not modal, full width minus sidebar)
-                <div className="member-detail-view"
-                  style={{
-                    margin: "0 auto",
-                    background: "#faf9f7",
-                    borderRadius: "12px",
-                    boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-                    boxSizing: "border-box",
-                    overflowX: "hidden",
-                    padding: '2rem 1.5rem',
-                    position: 'relative'
-                  }}
-                >
-                  {/* Add spacing above top bar */}
-                  <div style={{ height: '1.5rem' }} />
-                  
-                  <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.75rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem', opacity: 0.6 }}>
-                    Account ID: {selectedMember.account_id}
+                            </div>
+                          </li>
+                        ))
+                      )}
+                    </ul>
                   </div>
-                  <Elements stripe={stripePromise}>
-                    {/* First row: member columns */}
-                    <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
-                      {members.filter(m => m.account_id === selectedMember.account_id).map((member, idx, arr) => (
-                        <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
-                    <MemberDetail
-                            member={member}
-                      session={session}
-                            onEditMember={handleEditMember}
-                    />
-                </div>
-                      ))}
-                    </div>
-                    {/* Second row: shared ledger for the account */}
-                    <div style={{ width: '100%', position: 'relative' }}>
-                      <h3>Ledger</h3>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <strong>
-                          {memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? 'Balance Due:' : 'Current Credit:'}
-                        </strong>{' '}
-                        ${Math.abs((memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0)).toFixed(2)}
-                        {session.user?.user_metadata?.role === 'admin' && selectedMember.stripe_customer_id && (
-                          <>
-                            <button
-                              onClick={handleChargeBalance}
-                              disabled={charging || (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0)}
-                              style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0) ? 'pointer' : 'not-allowed' }}
-                            >
-                              {charging ? 'Charging...' : 'Charge Balance'}
-                            </button>
-                            {(memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0) && (
-                              <span style={{ marginLeft: '1rem', color: '#888' }}>
-                                No outstanding balance to charge.
-                              </span>
-              )}
-            </>
-          )}
-                        {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
-                </div>
-                      <table className="ledger-table">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Member</th>
-                            <th>Description</th>
-                            <th>Amount</th>
-                            <th>Type</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Add Transaction Row */}
-                          <tr>
-                            <td>
-                              <input
-                                type="date"
-                                name="date"
-                                value={newTransaction.date || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
-                                className="add-transaction-input"
-                                style={{ minWidth: 120 }}
-                              />
-                            </td>
-                            <td>
-                              <select
-                                name="member_id"
-                                value={selectedTransactionMemberId}
-                                onChange={e => setSelectedTransactionMemberId(e.target.value)}
-                                className="add-transaction-input"
-                                style={{ minWidth: 120 }}
-                              >
-                                <option value="">Select Member</option>
-                                {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
-                                  <option key={m.member_id} value={m.member_id}>
-                                    {m.first_name} {m.last_name}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                name="note"
-                                placeholder="Note"
-                                value={newTransaction.note || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
-                                className="add-transaction-input"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                name="amount"
-                                placeholder="Amount"
-                                value={newTransaction.amount || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                                className="add-transaction-input"
-                              />
-                            </td>
-                            <td>
-                              <select
-                                name="type"
-                                value={newTransaction.type || ''}
-                                onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
-                                className="add-transaction-input"
-                              >
-                                <option value="">Type</option>
-                                <option value="payment">Payment</option>
-                                <option value="purchase">Purchase</option>
-                              </select>
-                            </td>
-                            <td>
-                              <button
-                                onClick={e => {
-                                  e.preventDefault();
-                                  if (!selectedTransactionMemberId) {
-                                    setTransactionStatus('Please select a member.');
-                                    return;
-                                  }
-                                  handleAddTransaction(selectedTransactionMemberId, selectedMember.account_id);
+                  {/* End Member Lookup UI */}
+                  {/* Existing member list, filtered if no lookup query */}
+                  {!selectedMember ? (
+                    <>
+                      <h1 className="app-title">Noir CRM – Members</h1>
+                      {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
+                        <div key={accountId} className="account-group" style={{
+                          marginBottom: '1rem',
+                          padding: '1rem',
+                          background: '#fff',
+                          borderRadius: '12px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '1.2rem'
+                        }}>
+                          {accountMembers.map((member, idx) => (
+                            <div key={member.member_id} style={{
+                              padding: '0.5rem 0',
+                              background: 'none',
+                              boxShadow: 'none',
+                              borderRadius: 0,
+                              marginBottom: 0
+                            }}>
+                              <li
+                                className="member-item"
+                                style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}
+                                onClick={() => {
+                                  setSelectedMember(member);
+                                  fetchLedger(member.account_id);
                                 }}
-                                className="add-transaction-btn"
-                                style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                                disabled={transactionStatus === 'loading'}
                               >
-                                {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
-                              </button>
-                            </td>
-                          </tr>
-                          {/* Ledger Rows */}
-                          {memberLedger && memberLedger.length > 0 ? (
-                            memberLedger.map((tx, idx) => {
-                              const member = members.find(m => m.member_id === tx.member_id);
-                              return (
-                                <tr key={tx.id || idx}>
-                                  <td>{formatDateLong(tx.date)}</td>
-                                  <td>{member ? `${member.first_name} ${member.last_name}` : ''}</td>
-                                  <td>{tx.note}</td>
-                                  <td>${Number(tx.amount).toFixed(2)}</td>
-                                  <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
-                                  <td>
-                                    <button
-                                      onClick={() => handleEditTransaction(tx)}
-                                      className="add-transaction-btn"
-                                      style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                                    >
-                                      Edit
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          ) : (
-                            <tr>
-                              <td colSpan="6">No transactions found.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                      {/* Manual Refresh Button */}
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                        <button
-                          onClick={() => fetchLedger(selectedMember.account_id)}
-                          style={{
-                            background: '#eee',
-                            color: '#555',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            fontSize: '0.95rem',
-                            padding: '0.3rem 0.9rem',
-                            cursor: 'pointer',
-                            opacity: 0.7,
-                            transition: 'opacity 0.2s',
-                          }}
-                          onMouseOver={e => (e.currentTarget.style.opacity = 1)}
-                          onMouseOut={e => (e.currentTarget.style.opacity = 0.7)}
-                          aria-label="Refresh ledger"
-                        >
-                          Refresh
-                        </button>
+                                {member.photo && (
+                                  <img
+                                    src={member.photo}
+                                    alt={`${member.first_name} ${member.last_name}`}
+                                    className="member-photo"
+                                    style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, marginRight: 20, background: '#f6f5f2' }}
+                                  />
+                                )}
+                                <div className="member-info" style={{ flex: 1 }}>
+                                  <strong>
+                                    {member.first_name} {member.last_name}
+                                  </strong>
+                                  <div>Member since: {formatDateLong(member.join_date)}</div>
+                                  <div>Phone: {formatPhone(member.phone)}</div>
+                                  <div>Email: {member.email}</div>
+                                  <div>Date of Birth: {formatDOB(member.dob)}</div>
+                                </div>
+                              </li>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    // Member Detail View (not modal, full width minus sidebar)
+                    <div className="member-detail-view"
+                      style={{
+                        margin: "0 auto",
+                        background: "#faf9f7",
+                        borderRadius: "12px",
+                        boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
+                        boxSizing: "border-box",
+                        overflowX: "hidden",
+                        padding: '2rem 1.5rem',
+                        position: 'relative'
+                      }}
+                    >
+                      {/* Add spacing above top bar */}
+                      <div style={{ height: '1.5rem' }} />
+                      
+                      <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.75rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem', opacity: 0.6 }}>
+                        Account ID: {selectedMember.account_id}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
-                    <button
-                      onClick={() => setSelectedMember(null)}
-                      style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Back to List
-                    </button>
-                    <button
-                      onClick={() => setShowAddMemberModal(true)}
-                      style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      + Add Member
-                    </button>
-                  </div>
+                      <Elements stripe={stripePromise}>
+                        {/* First row: member columns */}
+                        <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
+                          {members.filter(m => m.account_id === selectedMember.account_id).map((member, idx, arr) => (
+                            <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
+                              <MemberDetail
+                                member={member}
+                                session={session}
+                                onEditMember={handleEditMember}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        {/* Second row: shared ledger for the account */}
+                        <div style={{ width: '100%', position: 'relative' }}>
+                          <h3>Ledger</h3>
+                          <div style={{ marginBottom: '1rem' }}>
+                            <strong>
+                              {memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? 'Balance Due:' : 'Current Credit:'}
+                            </strong>{' '}
+                            ${Math.abs((memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0)).toFixed(2)}
+                            {session.user?.user_metadata?.role === 'admin' && selectedMember.stripe_customer_id && (
+                              <>
+                                <button
+                                  onClick={handleChargeBalance}
+                                  disabled={charging || (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0)}
+                                  style={{ marginLeft: '1rem', padding: '0.5rem 1rem', cursor: (memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0) ? 'pointer' : 'not-allowed' }}
+                                >
+                                  {charging ? 'Charging...' : 'Charge Balance'}
+                                </button>
+                                {(memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) >= 0) && (
+                                  <span style={{ marginLeft: '1rem', color: '#888' }}>
+                                    No outstanding balance to charge.
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {chargeStatus && <span style={{ marginLeft: '1rem' }}>{chargeStatus}</span>}
+                          </div>
+                          <table className="ledger-table">
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>Member</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Type</th>
+                                <th>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {/* Add Transaction Row */}
+                              <tr>
+                                <td>
+                                  <input
+                                    type="date"
+                                    name="date"
+                                    value={newTransaction.date || ''}
+                                    onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                                    className="add-transaction-input"
+                                    style={{ minWidth: 120 }}
+                                  />
+                                </td>
+                                <td>
+                                  <select
+                                    name="member_id"
+                                    value={selectedTransactionMemberId}
+                                    onChange={e => setSelectedTransactionMemberId(e.target.value)}
+                                    className="add-transaction-input"
+                                    style={{ minWidth: 120 }}
+                                  >
+                                    <option value="">Select Member</option>
+                                    {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
+                                      <option key={m.member_id} value={m.member_id}>
+                                        {m.first_name} {m.last_name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    type="text"
+                                    name="note"
+                                    placeholder="Note"
+                                    value={newTransaction.note || ''}
+                                    onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
+                                    className="add-transaction-input"
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    name="amount"
+                                    placeholder="Amount"
+                                    value={newTransaction.amount || ''}
+                                    onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                                    className="add-transaction-input"
+                                  />
+                                </td>
+                                <td>
+                                  <select
+                                    name="type"
+                                    value={newTransaction.type || ''}
+                                    onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                                    className="add-transaction-input"
+                                  >
+                                    <option value="">Type</option>
+                                    <option value="payment">Payment</option>
+                                    <option value="purchase">Purchase</option>
+                                  </select>
+                                </td>
+                                <td>
+                                  <button
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      if (!selectedTransactionMemberId) {
+                                        setTransactionStatus('Please select a member.');
+                                        return;
+                                      }
+                                      handleAddTransaction(selectedTransactionMemberId, selectedMember.account_id);
+                                    }}
+                                    className="add-transaction-btn"
+                                    style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                                    disabled={transactionStatus === 'loading'}
+                                  >
+                                    {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
+                                  </button>
+                                </td>
+                              </tr>
+                              {/* Ledger Rows */}
+                              {memberLedger && memberLedger.length > 0 ? (
+                                memberLedger.map((tx, idx) => {
+                                  const member = members.find(m => m.member_id === tx.member_id);
+                                  return (
+                                    <tr key={tx.id || idx}>
+                                      <td>{formatDateLong(tx.date)}</td>
+                                      <td>{member ? `${member.first_name} ${member.last_name}` : ''}</td>
+                                      <td>{tx.note}</td>
+                                      <td>${Number(tx.amount).toFixed(2)}</td>
+                                      <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
+                                      <td>
+                                        <button
+                                          onClick={() => handleEditTransaction(tx)}
+                                          className="add-transaction-btn"
+                                          style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
+                                        >
+                                          Edit
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              ) : (
+                                <tr>
+                                  <td colSpan="6">No transactions found.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                          {/* Manual Refresh Button */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                            <button
+                              onClick={() => fetchLedger(selectedMember.account_id)}
+                              style={{
+                                background: '#eee',
+                                color: '#555',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                                fontSize: '0.95rem',
+                                padding: '0.3rem 0.9rem',
+                                cursor: 'pointer',
+                                opacity: 0.7,
+                                transition: 'opacity 0.2s',
+                              }}
+                              onMouseOver={e => (e.currentTarget.style.opacity = 1)}
+                              onMouseOut={e => (e.currentTarget.style.opacity = 0.7)}
+                              aria-label="Refresh ledger"
+                            >
+                              Refresh
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem' }}>
+                            <button
+                              onClick={() => setSelectedMember(null)}
+                              style={{ background: '#e5e1d8', color: '#555', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Back to List
+                            </button>
+                            <button
+                              onClick={() => setShowAddMemberModal(true)}
+                              style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              + Add Member
+                            </button>
+                          </div>
+                        </div>
+                      </Elements>
                     </div>
-                  </Elements>
-                </div>
-              )}
-            </>
-          )}
+                  )}
+                </>
+              );
+            } catch (err) {
+              return <div style={{ color: 'red', padding: '2rem' }}>Error rendering members: {err.message}</div>;
+            }
+          })()}
           {section === 'calendar' && (
             <div style={{ padding: '2rem', maxWidth: '100vw', width: '90%' }}>
               <h2>Seating Calendar</h2>
