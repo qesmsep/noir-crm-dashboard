@@ -15,6 +15,8 @@ import FullCalendarTimeline from './components/FullCalendarTimeline';
 import CalendarAvailabilityControl from './components/CalendarAvailabilityControl';
 import { toCST, toCSTISOString, createDateFromTimeString } from './utils/dateUtils';
 import PrivateEventBooking from './components/PrivateEventBooking';
+import ChatModal from './components/ChatModal';
+import MassMessagePlaceholder from './components/MassMessagePlaceholder';
 
 // Responsive helper
 function useIsMobile() {
@@ -162,6 +164,9 @@ function App() {
   const [privateEvents, setPrivateEvents] = useState([]);
   const [upcomingRenewals, setUpcomingRenewals] = useState([]);
   const [projectedMonthlyDues, setProjectedMonthlyDues] = useState(0);
+  const [pendingCharges, setPendingCharges] = useState([]);
+  const [pendingChargesTotal, setPendingChargesTotal] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Define eventTypes at the top
   const eventTypes = [
@@ -905,6 +910,85 @@ function App() {
         alert('Error deleting transaction: ' + err.message);
       }
     }
+
+    useEffect(() => {
+      const fetchPendingCharges = async () => {
+        if (!accountId) return;
+        
+        try {
+          const { data, error } = await supabase
+            .from('ledger')
+            .select(`
+              *,
+              members (
+                first_name,
+                last_name
+              )
+            `)
+            .eq('account_id', accountId)
+            .eq('status', 'pending_invoice')
+            .order('date', { ascending: false });
+
+          if (error) throw error;
+
+          setPendingCharges(data || []);
+          const total = (data || []).reduce((sum, charge) => sum + Math.abs(charge.amount), 0);
+          setPendingChargesTotal(total);
+        } catch (error) {
+          console.error('Error fetching pending charges:', error);
+        }
+      };
+
+      fetchPendingCharges();
+    }, [accountId, supabase]);
+
+    const handleCreateInvoice = async () => {
+      if (!pendingCharges.length) return;
+
+      try {
+        // Create a new invoice
+        const { data: invoice, error: invoiceError } = await supabase
+          .from('invoices')
+          .insert({
+            account_id: accountId,
+            amount: pendingChargesTotal,
+            status: 'draft',
+            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+            items: pendingCharges.map(charge => ({
+              description: charge.note,
+              amount: Math.abs(charge.amount),
+              ledger_id: charge.id
+            }))
+          })
+          .select()
+          .single();
+
+        if (invoiceError) throw invoiceError;
+
+        // Update ledger entries to link to the invoice
+        const { error: updateError } = await supabase
+          .from('ledger')
+          .update({ 
+            status: 'invoiced',
+            invoice_id: invoice.id 
+          })
+          .in('id', pendingCharges.map(c => c.id));
+
+        if (updateError) throw updateError;
+
+        // Refresh the pending charges
+        setPendingCharges([]);
+        setPendingChargesTotal(0);
+        
+        // Show success message
+        setModalMessage('Invoice created successfully');
+        setShowModal(true);
+      } catch (error) {
+        console.error('Error creating invoice:', error);
+        setModalMessage('Failed to create invoice');
+        setShowModal(true);
+      }
+    };
 
     return (
       <>
@@ -2600,6 +2684,44 @@ function App() {
               <button onClick={() => setNextAvailableTime(null)} style={{ marginTop: '1.5rem', padding: '0.5rem 1.5rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem' }}>OK</button>
             </div>
           </div>
+        )}
+        {/* Floating Chat Icon */}
+        {selectedMember && (
+          <button
+            onClick={() => setChatOpen(true)}
+            style={{
+              position: 'fixed',
+              bottom: 24,
+              right: 24,
+              zIndex: 9998,
+              background: '#a59480',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '50%',
+              width: 56,
+              height: 56,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.13)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 28,
+              cursor: 'pointer',
+            }}
+            aria-label="Open chat"
+          >
+            💬
+          </button>
+        )}
+        {/* Chat Modal */}
+        <ChatModal
+          open={chatOpen && !!selectedMember}
+          onClose={() => setChatOpen(false)}
+          member={selectedMember}
+          account={selectedMember}
+          phoneNumberId={process.env.REACT_APP_OPENPHONE_PHONE_NUMBER_ID}
+        />
+        {section === 'members' && !selectedMember && (
+          <MassMessagePlaceholder />
         )}
       </>
     );
