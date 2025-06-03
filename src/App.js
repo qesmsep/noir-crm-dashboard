@@ -388,6 +388,36 @@ function App() {
         console.error('Error fetching members:', error);
       } else {
         setMembers(data);
+
+        // Calculate upcoming renewals
+        const today = new Date();
+        const sevenDaysFromNow = new Date();
+        sevenDaysFromNow.setDate(today.getDate() + 7);
+
+        const getNextRenewal = (joinDate) => {
+          if (!joinDate) return null;
+          const jd = new Date(joinDate);
+          let year = today.getFullYear();
+          let month = today.getMonth();
+          const day = jd.getDate();
+          let candidate = new Date(year, month, day);
+          if (candidate < today) {
+            if (month === 11) { year += 1; month = 0; }
+            else { month += 1; }
+            candidate = new Date(year, month, day);
+          }
+          return candidate;
+        };
+
+        const upcoming = (data || []).filter(m => {
+          const nextRenewal = getNextRenewal(m.join_date);
+          return nextRenewal && nextRenewal >= today && nextRenewal <= sevenDaysFromNow;
+        }).map(m => ({
+          ...m,
+          nextRenewal: getNextRenewal(m.join_date)
+        }));
+
+        setUpcomingRenewals(upcoming);
       }
     }
     fetchMembers();
@@ -588,24 +618,6 @@ function App() {
       if (!error && data) setPrivateEvents(data);
     }
     fetchPrivateEvents();
-  }, []);
-
-  useEffect(() => {
-    async function fetchUpcomingRenewals() {
-      const today = new Date();
-      const sevenDaysFromNow = new Date();
-      sevenDaysFromNow.setDate(today.getDate() + 7);
-
-      const { data, error } = await supabase
-        .from('members')
-        .select('*')
-        .gte('renewal_date', today.toISOString().split('T')[0])
-        .lte('renewal_date', sevenDaysFromNow.toISOString().split('T')[0])
-        .order('renewal_date', { ascending: true });
-
-      if (!error) setUpcomingRenewals(data || []);
-    }
-    fetchUpcomingRenewals();
   }, []);
 
   // Add route for /private-event/:id
@@ -1547,7 +1559,7 @@ function App() {
                     <ul>
                       {upcomingRenewals.map(m => (
                         <li key={m.member_id}>
-                          {m.first_name} {m.last_name} — {new Date(m.renewal_date).toLocaleDateString()}
+                          {m.first_name} {m.last_name} — {m.nextRenewal ? m.nextRenewal.toLocaleDateString() : 'N/A'}
                         </li>
                       ))}
                     </ul>
