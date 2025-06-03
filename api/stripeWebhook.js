@@ -31,6 +31,7 @@ export default async function handler(req, res) {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
+    console.log('Received Stripe webhook event:', event.type);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).json({ error: 'Invalid signature' });
@@ -40,13 +41,22 @@ export default async function handler(req, res) {
     // Handle new member signup payments
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
+      const debugInfo = {
+        eventType: event.type,
+        sessionId: session.id,
+        customerId: session.customer,
+        clientReferenceId: session.client_reference_id,
+        amount: session.amount_total
+      };
+      console.log('Processing checkout.session.completed:', debugInfo);
       
       // Get the client reference ID (account_id) from the session
       const accountId = session.client_reference_id;
       
       // Ignore if no account ID
       if (!accountId) {
-        return res.json({ received: true });
+        console.log('No account ID found in session');
+        return res.json({ received: true, debug: { ...debugInfo, error: 'No account ID found' } });
       }
 
       // Find the account
@@ -59,7 +69,8 @@ export default async function handler(req, res) {
 
       // Ignore if no account found
       if (accountError || !account) {
-        return res.json({ received: true });
+        console.log('No account found for ID:', accountId, accountError);
+        return res.json({ received: true, debug: { ...debugInfo, error: 'No account found', accountError } });
       }
 
       // Get the primary member for this account
@@ -72,7 +83,8 @@ export default async function handler(req, res) {
         .single();
 
       if (memberError || !primaryMember) {
-        return res.json({ received: true });
+        console.log('No primary member found for account:', accountId, memberError);
+        return res.json({ received: true, debug: { ...debugInfo, error: 'No primary member found', memberError } });
       }
 
       // Update the account with the Stripe customer ID
@@ -83,7 +95,7 @@ export default async function handler(req, res) {
 
       if (updateError) {
         console.error('Error updating account with Stripe customer ID:', updateError);
-        return res.status(500).json({ error: 'Failed to update account' });
+        return res.status(500).json({ error: 'Failed to update account', debug: { ...debugInfo, updateError } });
       }
 
       // Add the payment to the ledger
@@ -101,15 +113,21 @@ export default async function handler(req, res) {
 
       if (ledgerError) {
         console.error('Error adding payment to ledger:', ledgerError);
-        return res.status(500).json({ error: 'Failed to update ledger' });
+        return res.status(500).json({ error: 'Failed to update ledger', debug: { ...debugInfo, ledgerError } });
       }
 
-      return res.json({ success: true });
+      console.log('Successfully processed payment for account:', accountId);
+      return res.json({ success: true, debug: debugInfo });
     }
 
     // Handle subscription renewal events
     if (event.type === 'invoice.paid') {
       const invoice = event.data.object;
+      console.log('Processing invoice.paid:', {
+        invoiceId: invoice.id,
+        customerId: invoice.customer,
+        amount: invoice.amount_paid
+      });
       
       // Only process subscription invoices
       if (invoice.subscription) {
@@ -125,6 +143,7 @@ export default async function handler(req, res) {
           .single();
 
         if (accountError || !account) {
+          console.log('No account found for customer ID:', customerId, accountError);
           return res.json({ received: true });
         }
 
@@ -138,6 +157,7 @@ export default async function handler(req, res) {
           .single();
 
         if (memberError || !primaryMember) {
+          console.log('No primary member found for account:', account.account_id, memberError);
           return res.json({ received: true });
         }
 
@@ -159,6 +179,7 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: 'Failed to update ledger' });
         }
 
+        console.log('Successfully processed subscription renewal for account:', account.account_id);
         return res.json({ success: true });
       }
     }
@@ -166,12 +187,18 @@ export default async function handler(req, res) {
     // Handle manual payment events
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object;
+      console.log('Processing payment_intent.succeeded:', {
+        paymentIntentId: paymentIntent.id,
+        customerId: paymentIntent.customer,
+        amount: paymentIntent.amount
+      });
       
       // Get the customer ID from the payment intent
       const customerId = paymentIntent.customer;
       
       // Ignore payments without a customer ID
       if (!customerId) {
+        console.log('No customer ID found in payment intent');
         return res.json({ received: true });
       }
 
@@ -185,6 +212,7 @@ export default async function handler(req, res) {
 
       // Ignore payments from non-members
       if (accountError || !account) {
+        console.log('No account found for customer ID:', customerId, accountError);
         return res.json({ received: true });
       }
 
@@ -198,6 +226,7 @@ export default async function handler(req, res) {
         .single();
 
       if (memberError || !primaryMember) {
+        console.log('No primary member found for account:', account.account_id, memberError);
         return res.json({ received: true });
       }
 
@@ -219,10 +248,12 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to update ledger' });
       }
 
+      console.log('Successfully processed manual payment for account:', account.account_id);
       return res.json({ success: true });
     }
 
     // Return a 200 response for all other events
+    console.log('Received unhandled event type:', event.type);
     res.json({ received: true });
   } catch (err) {
     console.error('Error processing webhook:', err);
