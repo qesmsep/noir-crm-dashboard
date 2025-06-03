@@ -446,42 +446,6 @@ const MemberDetail = ({
         <div>
           {/* ...your ledger rendering code here if any, or leave blank if not needed in this file... */}
         </div>
-        {/* Add Member and Edit Payment Method Buttons */}
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button
-            className="add-member-btn"
-            onClick={() => {
-              // This should be handled by parent, but placeholder here if needed
-              if (typeof window.setShowAddMemberModal === 'function') window.setShowAddMemberModal(true);
-            }}
-            style={{
-              background: '#a59480',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '0.6rem 1.5rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            + Add Member
-          </button>
-          <button
-            className="add-member-btn"
-            onClick={() => setShowPaymentModal(true)}
-            style={{
-              background: '#a59480',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '0.6rem 1.5rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Edit Payment Method
-          </button>
-        </div>
       </div>
       {/* Payment Method Modal */}
       {showPaymentModal && (
