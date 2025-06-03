@@ -507,9 +507,6 @@ const MemberDetail = ({
               Delete Member
             </button>
             </div>
-
-            
-
             
           </div>
         </div>
