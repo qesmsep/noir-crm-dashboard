@@ -1605,6 +1605,20 @@ function App() {
               stripePromise={stripePromise}
               handleEditMember={handleEditMember}
               session={session}
+              newTransaction={newTransaction}
+              setNewTransaction={setNewTransaction}
+              handleAddTransaction={handleAddTransaction}
+              transactionStatus={transactionStatus}
+              editingTransaction={editingTransaction}
+              setEditingTransaction={setEditingTransaction}
+              editTransactionForm={editTransactionForm}
+              setEditTransactionForm={setEditTransactionForm}
+              handleEditTransaction={handleEditTransaction}
+              handleUpdateTransaction={handleUpdateTransaction}
+              handleDeleteTransaction={handleDeleteTransaction}
+              setSelectedTransactionMemberId={setSelectedTransactionMemberId}
+              selectedTransactionMemberId={selectedTransactionMemberId}
+              ledgerLoading={ledgerLoading}
             />
           )}
           {section === 'admin' && (

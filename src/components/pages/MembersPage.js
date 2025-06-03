@@ -1,6 +1,7 @@
 import React from 'react';
 import { Elements } from '@stripe/react-stripe-js';
 import MemberDetail from '../../MemberDetail';
+import MemberLedger from './MemberLedger';
 
 // You may want to further break this down into smaller components later
 const MembersPage = ({
@@ -18,6 +19,20 @@ const MembersPage = ({
   stripePromise,
   handleEditMember,
   session,
+  newTransaction,
+  setNewTransaction,
+  handleAddTransaction,
+  transactionStatus,
+  editingTransaction,
+  setEditingTransaction,
+  editTransactionForm,
+  setEditTransactionForm,
+  handleEditTransaction,
+  handleUpdateTransaction,
+  handleDeleteTransaction,
+  setSelectedTransactionMemberId,
+  selectedTransactionMemberId,
+  ledgerLoading
 }) => {
   return (
     <div style={{ padding: '2rem' }}>
@@ -180,7 +195,28 @@ const MembersPage = ({
                 </div>
               ))}
             </div>
-            {/* Ledger and other details can be added here as needed */}
+            {/* Ledger Section */}
+            <MemberLedger
+              members={members}
+              memberLedger={memberLedger}
+              selectedMember={selectedMember}
+              newTransaction={newTransaction}
+              setNewTransaction={setNewTransaction}
+              handleAddTransaction={handleAddTransaction}
+              transactionStatus={transactionStatus}
+              editingTransaction={editingTransaction}
+              setEditingTransaction={setEditingTransaction}
+              editTransactionForm={editTransactionForm}
+              setEditTransactionForm={setEditTransactionForm}
+              handleEditTransaction={handleEditTransaction}
+              handleUpdateTransaction={handleUpdateTransaction}
+              handleDeleteTransaction={handleDeleteTransaction}
+              fetchLedger={fetchLedger}
+              setSelectedTransactionMemberId={setSelectedTransactionMemberId}
+              selectedTransactionMemberId={selectedTransactionMemberId}
+              ledgerLoading={ledgerLoading}
+              session={session}
+            />
           </Elements>
         </div>
       )}
