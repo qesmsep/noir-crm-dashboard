@@ -855,8 +855,8 @@ function App() {
                           <li
                         className="member-item"
                             style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}
-                        onClick={() => {
-                          setSelectedMember(member);
+                            onClick={() => {
+                              setSelectedMember(member);
                               fetchLedger(member.account_id);
                             }}
                           >
@@ -877,9 +877,9 @@ function App() {
                               <div>Email: {member.email}</div>
                               <div>Date of Birth: {formatDOB(member.dob)}</div>
                               </div>
-                      </li>
-                        </div>
-                    ))}
+                        </li>
+                          </div>
+                      ))}
                     </div>
                   ))}
                 </>
@@ -1519,61 +1519,6 @@ function App() {
       </div>
     );
   }
-}
-
-// Add this helper function for formatting dates
-function formatDateLong(dateString) {
-  if (!dateString) return null;
-  // Parse as local date if in YYYY-MM-DD format
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    const [year, month, day] = dateString.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
-  }
-  const date = new Date(dateString);
-  if (isNaN(date)) return null;
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
-}
-
-// Group members by account_id
-const membersByAccount = members.reduce((acc, member) => {
-  if (!acc[member.account_id]) acc[member.account_id] = [];
-  acc[member.account_id].push(member);
-  return acc;
-}, {});
-
-// Add this function for charging balance
-async function handleChargeBalance() {
-  setCharging(true);
-  setChargeStatus(null);
-  try {
-    const res = await fetch('/api/chargeBalance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id: selectedMember.member_id, account_id: selectedMember.account_id }),
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      setChargeStatus('Charged successfully');
-      handleAddTransaction(selectedMember.member_id, selectedMember.account_id);
-    } else {
-      setChargeStatus(`Error: ${data.error || 'Charge failed'}`);
-    }
-  } catch (e) {
-    setChargeStatus(`Error: ${e.message}`);
-  }
-  setCharging(false);
-}
-
-// Add this function for editing a transaction
-function handleEditTransaction(tx) {
-  setEditingTransaction(tx.id);
-  setEditTransactionForm({
-    note: tx.note || '',
-    amount: Math.abs(tx.amount).toString(),
-    type: tx.type || '',
-    date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : ''
-  });
 }
 
 export default App;
