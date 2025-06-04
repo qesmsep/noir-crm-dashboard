@@ -48,7 +48,14 @@ export default async function handler(req, res) {
           text: content,
         }),
       });
-      const apiResult = await response.json();
+
+      const textResponse = await response.text();
+      let apiResult;
+      try {
+        apiResult = JSON.parse(textResponse);
+      } catch (e) {
+        apiResult = { error: 'Invalid JSON response from OpenPhone', raw: textResponse };
+      }
       const status = response.ok ? 'sent' : 'failed';
       // Store in messages table
       await supabase.from('messages').insert({
