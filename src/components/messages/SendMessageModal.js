@@ -61,11 +61,19 @@ const SendMessageModal = ({ open, onClose, members = [], adminEmail, onSent }) =
         })
       });
       let result;
-      try {
-        result = await res.json();
-      } catch (jsonErr) {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          result = await res.json();
+        } catch (jsonErr) {
+          const text = await res.text();
+          setError('Invalid JSON response: ' + text.slice(0, 200));
+          setSending(false);
+          return;
+        }
+      } else {
         const text = await res.text();
-        setError('Unexpected response from server: ' + text.slice(0, 200));
+        setError('Unexpected non-JSON response: ' + text.slice(0, 200));
         setSending(false);
         return;
       }
