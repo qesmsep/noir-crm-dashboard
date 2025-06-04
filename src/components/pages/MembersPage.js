@@ -200,16 +200,8 @@ const MembersPage = ({
                     />
                   </Elements>
                   {/* Admin-only Send Message button for each member */}
-                  {isAdmin && (
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                      <button
-                        onClick={() => { setShowSendModal(true); setModalMember(member); }}
-                        style={{ padding: '0.5rem 1.2rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600 }}
-                      >
-                        Send Message
-                      </button>
-                    </div>
-                  )}
+                  {/* Removed the Send Message button from underneath each member */}
+
                   {/* SendMessageModal for this member */}
                   {isAdmin && showSendModal && modalMember?.member_id === member.member_id && (
                     <SendMessageModal
