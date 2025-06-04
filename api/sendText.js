@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       const response = await fetch('https://api.openphone.co/v1/messages', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${OPENPHONE_API_KEY}`,
+          'Authorization': OPENPHONE_API_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
