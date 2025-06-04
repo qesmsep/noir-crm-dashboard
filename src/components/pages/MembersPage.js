@@ -228,7 +228,7 @@ const MembersPage = ({
                 <SendMessageModal
                   open={showSendModal}
                   onClose={() => setShowSendModal(false)}
-                  member={selectedMember}
+                  members={members.filter(m => m.account_id === selectedMember.account_id)}
                   adminEmail={session?.user?.email}
                   onSent={() => setMessageHistoryKey(k => k + 1)}
                 />
