@@ -24,7 +24,8 @@ const SendMessageModal = ({ open, onClose, members = [], adminEmail, onSent }) =
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [selectedMemberIds, setSelectedMemberIds] = useState(members.map(m => m.member_id));
+  // Dropdown: 'all' or member_id
+  const [recipient, setRecipient] = useState('all');
 
   const handleTemplateChange = (e) => {
     const selected = TEMPLATES.find(t => t.value === e.target.value);
@@ -32,24 +33,22 @@ const SendMessageModal = ({ open, onClose, members = [], adminEmail, onSent }) =
     setMessage(selected.text.replace('{{first_name}}', members[0]?.first_name || ''));
   };
 
-  const handleCheckboxChange = (memberId) => {
-    setSelectedMemberIds(prev =>
-      prev.includes(memberId)
-        ? prev.filter(id => id !== memberId)
-        : [...prev, memberId]
-    );
-  };
-
   const handleSend = async () => {
     setSending(true);
     setError('');
     setSuccess('');
+    let member_ids = [];
+    if (recipient === 'all') {
+      member_ids = members.map(m => m.member_id);
+    } else {
+      member_ids = [recipient];
+    }
     try {
       const res = await fetch('/api/sendText', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          member_ids: selectedMemberIds,
+          member_ids,
           content: message,
           sent_by: adminEmail
         })
@@ -86,20 +85,19 @@ const SendMessageModal = ({ open, onClose, members = [], adminEmail, onSent }) =
       <div style={{ background: '#fff', padding: '2rem', borderRadius: 10, minWidth: 340, maxWidth: 420, width: '100%', boxShadow: '0 4px 24px rgba(0,0,0,0.13)' }}>
         <h2 style={{ marginTop: 0 }}>Send Message</h2>
         <div style={{ marginBottom: '1rem', fontWeight: 500 }}>
-          To:
-          <div style={{ marginTop: 6 }}>
+          <label>To:</label>
+          <select
+            value={recipient}
+            onChange={e => setRecipient(e.target.value)}
+            style={{ width: '100%', padding: '0.5rem', marginTop: 4 }}
+          >
+            <option value="all">All Members</option>
             {members.map(m => (
-              <label key={m.member_id} style={{ display: 'block', marginBottom: 2, fontWeight: 400 }}>
-                <input
-                  type="checkbox"
-                  checked={selectedMemberIds.includes(m.member_id)}
-                  onChange={() => handleCheckboxChange(m.member_id)}
-                  style={{ marginRight: 6 }}
-                />
-                {m.first_name} {m.last_name} {m.phone && <span style={{ color: '#888' }}>({m.phone})</span>}
-              </label>
+              <option key={m.member_id} value={m.member_id}>
+                {m.first_name} {m.last_name} {m.phone ? `(${m.phone})` : ''}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
         <div style={{ marginBottom: '1rem' }}>
           <label>Template:</label>
@@ -120,7 +118,7 @@ const SendMessageModal = ({ open, onClose, members = [], adminEmail, onSent }) =
         {success && <div style={{ color: 'green', marginBottom: 8 }}>{success}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={{ padding: '0.5rem 1.2rem', background: '#eee', border: 'none', borderRadius: 6 }}>Cancel</button>
-          <button onClick={handleSend} disabled={sending || !message.trim() || selectedMemberIds.length === 0} style={{ padding: '0.5rem 1.2rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600 }}>
+          <button onClick={handleSend} disabled={sending || !message.trim() || (recipient !== 'all' && !recipient)} style={{ padding: '0.5rem 1.2rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600 }}>
             {sending ? 'Sending...' : 'Send'}
           </button>
         </div>
