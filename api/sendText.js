@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const OPENPHONE_API_KEY = process.env.OPENPHONE_API_KEY;
-const OPENPHONE_PHONE_NUMBER_ID = process.env.REACT_APP_OPENPHONE_PHONE_NUMBER_ID;
+const OPENPHONE_PHONE_NUMBER_ID = process.env.OPENPHONE_PHONE_NUMBER_ID;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
