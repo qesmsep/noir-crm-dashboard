@@ -51,10 +51,14 @@ export default async function handler(req, res) {
 
       const textResponse = await response.text();
       let apiResult;
-      try {
-        apiResult = JSON.parse(textResponse);
-      } catch (e) {
-        apiResult = { error: 'Invalid JSON response from OpenPhone', raw: textResponse };
+      if (textResponse.trim().startsWith('<!DOCTYPE html')) {
+        apiResult = { error: 'HTML response received — likely SSL or domain issue', raw: textResponse };
+      } else {
+        try {
+          apiResult = JSON.parse(textResponse);
+        } catch (e) {
+          apiResult = { error: 'Invalid JSON response from OpenPhone', raw: textResponse };
+        }
       }
       const status = response.ok ? 'sent' : 'failed';
       // Store in messages table
