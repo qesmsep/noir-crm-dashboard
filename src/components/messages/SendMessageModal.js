@@ -39,9 +39,16 @@ const SendMessageModal = ({ open, onClose, members = [], adminEmail, onSent }) =
     setSuccess('');
     let member_ids = [];
     if (recipient === 'all') {
-      member_ids = members.map(m => m.member_id);
+      member_ids = members.map(m => String(m.member_id));
     } else {
-      member_ids = [recipient];
+      member_ids = [String(recipient)];
+    }
+    // Debug log
+    console.log('Sending message:', { member_ids, content: message, sent_by: adminEmail });
+    if (!member_ids.length || !message.trim()) {
+      setError('Recipient(s) and message content are required.');
+      setSending(false);
+      return;
     }
     try {
       const res = await fetch('/api/sendText', {
