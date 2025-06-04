@@ -202,6 +202,7 @@ const MembersPage = ({
               ))}
             </div>
             {/* Admin-only Send Message button */}
+            {console.log('isAdmin:', isAdmin, 'session:', session)}
             {isAdmin && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <button
