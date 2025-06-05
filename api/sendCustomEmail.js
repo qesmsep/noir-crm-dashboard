@@ -1,5 +1,3 @@
-
-
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({
@@ -12,14 +10,9 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
-  }
-  const { to, subject, text } = req.body;
+export async function sendCustomEmail({ to, subject, text }) {
   if (!to || !subject || !text) {
-    return res.status(400).json({ error: 'to, subject, and text are required' });
+    throw new Error('to, subject, and text are required');
   }
   try {
     await transporter.sendMail({
@@ -28,7 +21,21 @@ export default async function handler(req, res) {
       subject,
       text
     });
-    return res.status(200).json({ success: true });
+    return { success: true };
+  } catch (err) {
+    throw new Error(err.message);
+  }
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+  const { to, subject, text } = req.body;
+  try {
+    const result = await sendCustomEmail({ to, subject, text });
+    return res.status(200).json(result);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
