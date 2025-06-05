@@ -207,14 +207,14 @@ module.exports = async (req, res) => {
   const partySizeMatch = message.match(/(\d+)\s*guests?/);
   const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
 
-  // Extract date and time
+  // Extract date and time - handle multiple formats
   const dateMatch = message.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  const timeMatch = message.match(/@\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  const timeMatch = message.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
 
   if (!dateMatch || !timeMatch) {
     return res.status(400).json({ 
       error: 'Invalid date or time format',
-      message: 'Please specify a date (MM/DD/YY) and time (e.g., @ 8pm)'
+      message: 'Please specify a date (MM/DD/YY) and time (e.g., at 8pm or @ 8pm)'
     });
   }
 
