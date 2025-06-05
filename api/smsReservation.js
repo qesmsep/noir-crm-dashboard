@@ -6,7 +6,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 // Parse SMS message to extract reservation details
 function parseReservationMessage(message) {
   console.log('Parsing message:', message);
-  const reservationRegex = /RESERVATION\s+(\d+)\s+guests\s+(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+@\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
+  const reservationRegex = /reservation\s+(\d+)\s+guests\s+(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+@\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
   const match = message.match(reservationRegex);
   
   if (!match) {
