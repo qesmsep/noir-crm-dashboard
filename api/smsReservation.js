@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import { sendCustomEmail } from './sendCustomEmail';
+const { createClient } = require('@supabase/supabase-js');
+const { sendCustomEmail } = require('./sendCustomEmail');
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -125,7 +125,7 @@ async function assignTable(start_time, end_time, party_size) {
   return null;
 }
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   console.log('SMS reservation handler received request:', {
     method: req.method,
     body: req.body
