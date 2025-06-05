@@ -104,10 +104,10 @@ export default async function handler(req, res) {
         tables!inner (
           number
         )
-      `)
-      .single();
+      `);
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(201).json({ data });
+    if (!data || data.length === 0) return res.status(500).json({ error: 'No reservation data returned' });
+    return res.status(201).json({ data: data[0] });
   }
   if (method === 'PATCH') {
     // Support id from URL (req.query.id) or body
