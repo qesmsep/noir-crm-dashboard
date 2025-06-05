@@ -264,7 +264,9 @@ module.exports = async (req, res) => {
   const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
 
   // Extract date and time - handle multiple formats
-  const dateTimeMatch = message.match(/(?:on|at|@)\s+([^@\n]+?)(?:\s+at|\s+@|\s*$)/i);
+  const dateTimeMatch = message.match(/(?:on|at|@)\s+([^@\n]+?)(?:\s+at|\s+@|\s*$)/i) || 
+                       message.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+                       message.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i);
   const timeMatch = message.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
 
   if (!dateTimeMatch || !timeMatch) {
