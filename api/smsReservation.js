@@ -255,78 +255,56 @@ module.exports = async (req, res) => {
   const member = memberData[0];
   console.log('Found member:', member);
 
-  // Parse the message to extract reservation details
-  const message = req.body.text.toLowerCase();
-  console.log('Parsing message:', message);
+  // Parse the message to extract reservation details using combined regex for "Reservation for X guests at TIME on DATE"
+  // Normalize message and lower-case for matching
+  const msg = messageText.toLowerCase();
 
-  // Extract party size
-  const partySizeMatch = message.match(/(\d+)\s*guests?/);
-  const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
-
-  // Extract date and time - handle multiple formats
-  const dateTimeMatch = message.match(/(?:on|at|@)\s+([^@\n]+?)(?:\s+at|\s+@|\s*$)/i) || 
-                       message.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
-                       message.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i);
-  const timeMatch = message.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-
-  if (!dateTimeMatch || !timeMatch) {
-    return res.status(400).json({ 
-      error: 'Invalid date or time format',
-      message: 'Please specify a date (e.g., "this friday", "June 7th", or "6/7/25") and time (e.g., at 8pm or @ 8pm)'
+  // Regex to match "reservation for X guests at TIME on DATE"
+  const fullMatch = msg.match(/reservation\s+for\s+(\d+)\s+guests\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  if (!fullMatch) {
+    return res.status(400).json({
+      error: 'Invalid message format',
+      message: 'Please use the format: Reservation for [number] guests at [time] on [MM/DD/YY]'
     });
   }
 
-  // Parse date
-  let dateStr = dateTimeMatch[1].trim();
-  
-  // If the date is in MM/DD/YY format, ensure it's properly formatted
-  if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
-    const [month, day, year] = dateStr.split('/');
-    dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
-  }
-  
-  // If the date is at the end of the message, try to extract it
-  if (!dateStr || dateStr === '') {
-    const endDateMatch = message.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})$/);
-    if (endDateMatch) {
-      dateStr = endDateMatch[1];
-      const [month, day, year] = dateStr.split('/');
-      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
-    }
-  }
-  
-  // If we still don't have a date, try to find it anywhere in the message
-  if (!dateStr || dateStr === '') {
-    const anyDateMatch = message.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
-    if (anyDateMatch) {
-      dateStr = anyDateMatch[1];
-      const [month, day, year] = dateStr.split('/');
-      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
-    }
-  }
-  
+  const party_size = parseInt(fullMatch[1]);
+  const timeStr = fullMatch[2].trim();
+  let dateStr = fullMatch[3].trim();
+  // Normalize two-digit year to four-digit
+  const [month, day, yearPart] = dateStr.split('/');
+  const fullYear = yearPart.length === 2 ? '20' + yearPart : yearPart;
+  dateStr = `${month}/${day}/${fullYear}`;
+
+  // Parse date using the existing helper
   const date = parseNaturalDate(dateStr);
   if (!date) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Invalid date format',
-      message: 'Please specify a valid date (e.g., "this friday", "June 7th", or "6/7/25")'
+      message: 'Please specify a valid date like 6/7/25'
     });
   }
 
-  // Parse time
-  let [__, hours, minutes = '00', period = 'pm'] = timeMatch;
-  hours = parseInt(hours);
-  if (period.toLowerCase() === 'pm' && hours < 12) hours += 12;
-  if (period.toLowerCase() === 'am' && hours === 12) hours = 0;
+  // Parse time (e.g., "10pm", "10:00 pm")
+  let hours = 0, minutes = 0;
+  const tMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (tMatch) {
+    hours = parseInt(tMatch[1]);
+    minutes = tMatch[2] ? parseInt(tMatch[2]) : 0;
+    const meridiem = tMatch[3];
+    if (meridiem === 'pm' && hours < 12) hours += 12;
+    if (meridiem === 'am' && hours === 12) hours = 0;
+  }
 
-  // Create start time in CST
-  const start = new Date(date);
-  start.setHours(hours, parseInt(minutes), 0, 0);
-  const start_time = toUTC(start).toISOString();
+  // Create start time in CST then convert to UTC
+  const startDate = new Date(date);
+  startDate.setHours(hours, minutes, 0, 0);
+  const start_time = toUTC(startDate).toISOString();
 
-  // Calculate end time (90 minutes for 2 or fewer guests, 120 minutes for more)
-  const end = new Date(start.getTime() + (party_size <= 2 ? 90 : 120) * 60000);
-  const end_time = toUTC(end).toISOString();
+  // Set end time 90 or 120 minutes later
+  const duration = party_size <= 2 ? 90 : 120;
+  const endDate = new Date(startDate.getTime() + duration * 60000);
+  const end_time = toUTC(endDate).toISOString();
 
   const reservationDetails = {
     party_size,
