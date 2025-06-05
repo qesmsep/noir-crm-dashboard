@@ -299,12 +299,18 @@ module.exports = async (req, res) => {
   // Create start time in CST then convert to UTC
   const startDate = new Date(date);
   startDate.setHours(hours, minutes, 0, 0);
-  const start_time = toUTC(startDate).toISOString();
+  
+  // Convert to UTC while preserving the date
+  const utcDate = new Date(startDate);
+  utcDate.setHours(utcDate.getHours() + 5); // Add 5 hours to convert CST to UTC
+  const start_time = utcDate.toISOString();
 
   // Set end time 90 or 120 minutes later
   const duration = party_size <= 2 ? 90 : 120;
   const endDate = new Date(startDate.getTime() + duration * 60000);
-  const end_time = toUTC(endDate).toISOString();
+  const utcEndDate = new Date(endDate);
+  utcEndDate.setHours(utcEndDate.getHours() + 5); // Add 5 hours to convert CST to UTC
+  const end_time = utcEndDate.toISOString();
 
   const reservationDetails = {
     party_size,
@@ -347,7 +353,7 @@ module.exports = async (req, res) => {
       email: member.email,
       source: 'sms',
       event_type: 'Fun Night Out',
-      notes: member.status === 'active' ? '♥ - fun night out' : '- fun night out'
+      notes: member.status === 'active' ? '♥' : 'fun night out'
     })
     .select(`
       *,
