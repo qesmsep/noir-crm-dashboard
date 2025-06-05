@@ -3,36 +3,94 @@ import { sendCustomEmail } from './sendCustomEmail';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-// Parse SMS message to extract reservation details
+// Enhanced parsing for flexible SMS formats
 function parseReservationMessage(message) {
   console.log('Parsing message:', message);
-  const reservationRegex = /reservation\s+(\d+)\s+guests\s+(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+@\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
-  const match = message.match(reservationRegex);
-  
-  if (!match) {
-    console.log('Message did not match reservation format');
+  // Normalize message (remove extra spaces, make case-insensitive for keywords)
+  const msg = message.replace(/\s+/g, ' ').trim();
+
+  // Regex for reservation keyword (case-insensitive)
+  const reservationKeyword = /\b(reservation|reserve)\b/i;
+  if (!reservationKeyword.test(msg)) {
+    console.log('No reservation keyword found');
     return null;
   }
 
-  const [_, partySize, month, day, year, hour, minute, meridiem] = match;
-  console.log('Parsed reservation details:', { partySize, month, day, year, hour, minute, meridiem });
-  
-  // Convert to 24-hour format
-  let hour24 = parseInt(hour);
-  if (meridiem?.toLowerCase() === 'pm' && hour24 < 12) hour24 += 12;
-  if (meridiem?.toLowerCase() === 'am' && hour24 === 12) hour24 = 0;
+  // Extract party size
+  const partySizeMatch = msg.match(/(\d+)\s+guests?/i);
+  const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : null;
 
-  // Create date object
-  const fullYear = year.length === 2 ? `20${year}` : year;
-  const date = new Date(fullYear, month - 1, day, hour24, minute ? parseInt(minute) : 0);
-  
-  // Calculate end time (2 hours after start)
-  const endDate = new Date(date.getTime() + 2 * 60 * 60 * 1000);
+  // Extract date (support MM/DD/YY, MM-DD-YYYY, YYYY-MM-DD, MM/DD, etc.)
+  let dateMatch = msg.match(/(\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4})/);
+  let dateStr = dateMatch ? dateMatch[1] : null;
+  let dateObj = null;
+  if (dateStr) {
+    // Try to parse various formats
+    if (/\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      // YYYY-MM-DD
+      dateObj = new Date(dateStr);
+    } else if (/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(dateStr)) {
+      // MM/DD/YY or MM-DD-YYYY
+      const parts = dateStr.split(/[\/\-]/);
+      let month = parseInt(parts[0]) - 1;
+      let day = parseInt(parts[1]);
+      let year = parts[2].length === 2 ? 2000 + parseInt(parts[2]) : parseInt(parts[2]);
+      dateObj = new Date(year, month, day);
+    }
+  }
+
+  // Extract time (support 8pm, 8:00pm, 20:00, 8 pm, etc.)
+  let timeMatch = msg.match(/@\s*([\d:apm\s]+)/i);
+  let hour = 20, minute = 0; // default 8pm if not found
+  if (timeMatch) {
+    let timeStr = timeMatch[1].trim().toLowerCase();
+    let timeParts = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if (timeParts) {
+      hour = parseInt(timeParts[1]);
+      minute = timeParts[2] ? parseInt(timeParts[2]) : 0;
+      const meridiem = timeParts[3];
+      if (meridiem === 'pm' && hour < 12) hour += 12;
+      if (meridiem === 'am' && hour === 12) hour = 0;
+    } else if (/\d{2}:\d{2}/.test(timeStr)) {
+      // 24-hour format
+      const [h, m] = timeStr.split(':');
+      hour = parseInt(h);
+      minute = parseInt(m);
+    }
+  }
+
+  // If date is missing, fail
+  if (!dateObj || isNaN(dateObj.getTime())) {
+    console.log('Could not parse date');
+    return null;
+  }
+
+  // Set the time
+  dateObj.setHours(hour, minute, 0, 0);
+  const start_time = dateObj.toISOString();
+  const end_time = new Date(dateObj.getTime() + 2 * 60 * 60 * 1000).toISOString();
+
+  // Extract TYPE (event_type)
+  let eventTypeMatch = msg.match(/type\s+(\w+)/i);
+  let event_type = eventTypeMatch ? eventTypeMatch[1] : 'Fun Night Out';
+
+  // Extract NOTES
+  let notesMatch = msg.match(/notes?\s+"([^"]+)"/i) || msg.match(/notes?\s+([\w\s]+)/i);
+  let notes = notesMatch ? notesMatch[1].trim() : event_type;
+  if (!notes) notes = 'Fun Night Out';
+
+  // Fallbacks
+  if (!party_size) {
+    console.log('Could not parse party size');
+    return null;
+  }
 
   return {
-    party_size: parseInt(partySize),
-    start_time: date.toISOString(),
-    end_time: endDate.toISOString()
+    party_size,
+    start_time,
+    end_time,
+    event_type,
+    notes
   };
 }
 
@@ -153,8 +211,8 @@ export default async function handler(req, res) {
       end_time: reservationDetails.end_time,
       table_id,
       source: 'sms',
-      event_type: 'fun night out',
-      notes: 'fun night out'
+      event_type: reservationDetails.event_type,
+      notes: reservationDetails.notes
     })
     .select()
     .single();
