@@ -99,6 +99,12 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from('reservations')
       .insert({ name, phone, email, party_size, notes, start_time, end_time, table_id, source, event_type })
+      .select(`
+        *,
+        tables (
+          number
+        )
+      `)
       .single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json({ data });
