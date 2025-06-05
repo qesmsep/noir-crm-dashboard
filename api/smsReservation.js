@@ -136,7 +136,7 @@ export default async function handler(req, res) {
   const { data: reservation, error: reservationError } = await supabase
     .from('reservations')
     .insert({
-      name: member.name,
+      name: `${member.first_name} ${member.last_name}`,
       phone: member.phone,
       email: member.email,
       party_size: reservationDetails.party_size,
@@ -171,7 +171,7 @@ export default async function handler(req, res) {
 
   const emailContent = `
     <h2>Reservation Confirmation</h2>
-    <p>Dear ${member.name},</p>
+    <p>Dear ${member.first_name} ${member.last_name},</p>
     <p>Your reservation has been confirmed for:</p>
     <p><strong>Date:</strong> ${formattedDate}</p>
     <p><strong>Party Size:</strong> ${reservationDetails.party_size} guests</p>
@@ -187,6 +187,19 @@ export default async function handler(req, res) {
     console.log('Confirmation email sent to:', member.email);
   } catch (emailError) {
     console.error('Error sending confirmation email:', emailError);
+  }
+
+  // Send confirmation text message
+  const textMessage = `Your reservation for ${formattedDate} with ${reservationDetails.party_size} guests has been confirmed. We look forward to seeing you!`;
+  try {
+    await fetch('/api/sendMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: member.phone, message: textMessage })
+    });
+    console.log('Confirmation text message sent to:', member.phone);
+  } catch (textError) {
+    console.error('Error sending confirmation text message:', textError);
   }
 
   return res.status(200).json({
