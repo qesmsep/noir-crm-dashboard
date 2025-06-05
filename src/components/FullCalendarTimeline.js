@@ -60,8 +60,8 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
       const event = {
         id: String(e.id),
         title: isPrivate ? 'Private Event: ' + e.title : e.title,
-        start: e.start_time,
-        end: e.end_time,
+        start: toCST(new Date(e.start_time)).toISOString(),
+        end: toCST(new Date(e.end_time)).toISOString(),
         resourceId: String(e.table_id),
         type: 'event',
         backgroundColor: isPrivate ? '#e0e0e0' : undefined,
@@ -87,8 +87,8 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
             minute: '2-digit'
           }) : null
         },
-          start: r.start_time,
-          end: r.end_time,
+          start: toCST(new Date(r.start_time)).toISOString(),
+          end: toCST(new Date(r.end_time)).toISOString(),
           resourceId: String(r.table_id),
         ...r,
         type: 'reservation',
