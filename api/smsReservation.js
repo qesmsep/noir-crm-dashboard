@@ -69,9 +69,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { from, body } = req.body;
-  if (!from || !body) {
-    console.log('Missing required fields:', { from, body });
+  const { from, body, text } = req.body;
+  const messageText = body || text;
+  if (!from || !messageText) {
+    console.log('Missing required fields:', { from, messageText });
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -103,9 +104,9 @@ export default async function handler(req, res) {
   console.log('Found member:', member);
 
   // Parse reservation details from message
-  const reservationDetails = parseReservationMessage(body);
+  const reservationDetails = parseReservationMessage(messageText);
   if (!reservationDetails) {
-    console.log('Invalid message format:', body);
+    console.log('Invalid message format:', messageText);
     return res.status(400).json({ 
       error: 'Invalid message format',
       message: 'Please use the format: RESERVATION [number] guests [MM/DD/YY] @ [time]'

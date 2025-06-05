@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         from,
-        body: text
+        text
       })
     });
 
