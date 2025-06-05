@@ -5,16 +5,21 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 // Utility functions for handling dates and times in CST
 function toCST(date) {
-  // Create a new date in CST
+  // Convert UTC to CST (UTC-5 or UTC-6 depending on DST)
   const cstDate = new Date(date);
-  cstDate.setHours(date.getHours());
+  const utcHours = cstDate.getUTCHours();
+  const cstHours = utcHours - 5; // Default to UTC-5
+  cstDate.setUTCHours(cstHours);
   return cstDate;
 }
 
-function toCSTISOString(date) {
-  // Convert to ISO string while preserving the hours
-  const cstDate = toCST(date);
-  return cstDate.toISOString();
+function toUTC(date) {
+  // Convert CST to UTC (UTC+5 or UTC+6 depending on DST)
+  const utcDate = new Date(date);
+  const cstHours = utcDate.getHours();
+  const utcHours = cstHours + 5; // Default to UTC+5
+  utcDate.setHours(utcHours);
+  return utcDate;
 }
 
 // Enhanced parsing for flexible SMS formats
@@ -217,11 +222,11 @@ module.exports = async (req, res) => {
   // Create start time in CST
   const start = new Date(date);
   start.setHours(hours, parseInt(minutes), 0, 0);
-  const start_time = toCSTISOString(start);
+  const start_time = toUTC(start).toISOString();
 
   // Calculate end time (90 minutes for 2 or fewer guests, 120 minutes for more)
   const end = new Date(start.getTime() + (party_size <= 2 ? 90 : 120) * 60000);
-  const end_time = toCSTISOString(end);
+  const end_time = toUTC(end).toISOString();
 
   const reservationDetails = {
     party_size,
