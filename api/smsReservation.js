@@ -302,14 +302,28 @@ module.exports = async (req, res) => {
   
   // Convert to UTC while preserving the date
   const utcDate = new Date(startDate);
-  utcDate.setHours(utcDate.getHours() + 5); // Add 5 hours to convert CST to UTC
+  // Add 5 hours to convert CST to UTC, but handle date rollover
+  const utcHours = utcDate.getHours() + 5;
+  if (utcHours >= 24) {
+    utcDate.setDate(utcDate.getDate() + 1);
+    utcDate.setHours(utcHours - 24);
+  } else {
+    utcDate.setHours(utcHours);
+  }
   const start_time = utcDate.toISOString();
 
   // Set end time 90 or 120 minutes later
   const duration = party_size <= 2 ? 90 : 120;
   const endDate = new Date(startDate.getTime() + duration * 60000);
   const utcEndDate = new Date(endDate);
-  utcEndDate.setHours(utcEndDate.getHours() + 5); // Add 5 hours to convert CST to UTC
+  // Add 5 hours to convert CST to UTC, but handle date rollover
+  const utcEndHours = utcEndDate.getHours() + 5;
+  if (utcEndHours >= 24) {
+    utcEndDate.setDate(utcEndDate.getDate() + 1);
+    utcEndDate.setHours(utcEndHours - 24);
+  } else {
+    utcEndDate.setHours(utcEndHours);
+  }
   const end_time = utcEndDate.toISOString();
 
   const reservationDetails = {
