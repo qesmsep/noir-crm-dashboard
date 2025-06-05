@@ -36,6 +36,18 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
       fetch('/api/events').then(r => r.json()),
       fetch('/api/reservations').then(r => r.json())
     ]).then(([evRes, resRes]) => {
+      // Debug log: show all reservations fetched for date range
+      if (resRes && resRes.data) {
+        console.log('[FullCalendarTimeline] Reservations fetched:', resRes.data.map(r => ({
+          id: r.id,
+          name: r.name,
+          party_size: r.party_size,
+          start_time: r.start_time,
+          end_time: r.end_time,
+          status: r.status,
+          event_type: r.event_type
+        })));
+      }
       setEventData({ evRes, resRes });
     });
 
@@ -99,25 +111,51 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
       }
       return event;
     }).flat().concat(
-      (eventData.resRes.data || []).map(r => ({
-          id: String(r.id),
-        title: `${r.source === 'member' ? '🖤 ' : ''}${r.name}${r.tables?.number ? ' | Table ' + r.tables.number : ''} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
-        extendedProps: {
-          created_at: r.created_at ? formatDateTime(new Date(r.created_at), { 
-            month: 'short', 
-            day: 'numeric', 
-            hour: 'numeric', 
-            minute: '2-digit'
-          }) : null
-        },
-          start: toCST(new Date(r.start_time)).toISOString(),
-          end: toCST(new Date(r.end_time)).toISOString(),
-          resourceId: String(r.table_id),
-        ...r,
-        type: 'reservation',
-        }))
-      );
-      setEvents(mapped);
+      // Only include reservations with relevant statuses and in the visible date range
+      (eventData.resRes.data || [])
+        .filter(r => {
+          // Show all statuses except 'cancelled' (adjust as needed)
+          const allowedStatuses = ['confirmed', 'pending', 'seated', 'completed', null, undefined];
+          // If status is not present, treat as allowed
+          const statusOk = allowedStatuses.includes(r.status);
+          // Optionally, filter by date range if bookingStartDate/bookingEndDate are provided
+          // (You may want to uncomment these lines if you want to restrict to visible range)
+          // const resStart = new Date(r.start_time);
+          // const inRange = (!bookingStartDate || resStart >= bookingStartDate) && (!bookingEndDate || resStart <= bookingEndDate);
+          // return statusOk && inRange;
+          return statusOk;
+        })
+        .map(r => {
+          // Debug log before rendering each reservation
+          console.log('[FullCalendarTimeline] Rendering reservation:', {
+            id: r.id,
+            name: r.name,
+            party_size: r.party_size,
+            start_time: r.start_time,
+            end_time: r.end_time,
+            status: r.status,
+            event_type: r.event_type
+          });
+          return {
+            id: String(r.id),
+            title: `${r.source === 'member' ? '🖤 ' : ''}${r.name}${r.tables?.number ? ' | Table ' + r.tables.number : ''} | Party Size: ${r.party_size}${r.event_type ? ' ' + eventTypeEmojis[r.event_type] : ''}`,
+            extendedProps: {
+              created_at: r.created_at ? formatDateTime(new Date(r.created_at), { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: 'numeric', 
+                minute: '2-digit'
+              }) : null
+            },
+            start: toCST(new Date(r.start_time)).toISOString(),
+            end: toCST(new Date(r.end_time)).toISOString(),
+            resourceId: String(r.table_id),
+            ...r,
+            type: 'reservation',
+          };
+        })
+    );
+    setEvents(mapped);
   }, [resources, eventData]);
 
   // Handler for drag-and-drop or resize
