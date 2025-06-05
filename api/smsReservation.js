@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendCustomEmail } from './sendCustomEmail';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // Parse SMS message to extract reservation details
 function parseReservationMessage(message) {
