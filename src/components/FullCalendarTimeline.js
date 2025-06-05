@@ -116,16 +116,8 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
       // Only include reservations with relevant statuses and in the visible date range
       (eventData.resRes.data || [])
         .filter(r => {
-          // Show all statuses except 'cancelled' (adjust as needed)
-          const allowedStatuses = ['confirmed', 'pending', 'seated', 'completed', null, undefined];
-          // If status is not present, treat as allowed
-          const statusOk = allowedStatuses.includes(r.status);
-          // Optionally, filter by date range if bookingStartDate/bookingEndDate are provided
-          // (You may want to uncomment these lines if you want to restrict to visible range)
-          // const resStart = new Date(r.start_time);
-          // const inRange = (!bookingStartDate || resStart >= bookingStartDate) && (!bookingEndDate || resStart <= bookingEndDate);
-          // return statusOk && inRange;
-          return statusOk;
+          // Show all reservations except those explicitly marked as cancelled
+          return r.status !== 'cancelled';
         })
         .map(r => {
           // Debug log before rendering each reservation
