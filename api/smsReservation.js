@@ -228,7 +228,24 @@ module.exports = async (req, res) => {
     });
   }
 
-  console.log('Reservation created:', result);
+  // Get the full reservation details including table number
+  const { data: reservation, error: reservationError } = await supabase
+    .from('reservations')
+    .select(`
+      *,
+      tables (
+        number
+      )
+    `)
+    .eq('id', result.data.id)
+    .single();
+
+  if (reservationError) {
+    console.error('Error fetching reservation details:', reservationError);
+    return res.status(500).json({ error: 'Error fetching reservation details' });
+  }
+
+  console.log('Reservation created:', reservation);
 
   // Send confirmation email
   const startTime = new Date(reservationDetails.start_time);
@@ -276,6 +293,6 @@ module.exports = async (req, res) => {
 
   return res.status(200).json({
     message: 'Reservation confirmed',
-    reservation: result
+    reservation: reservation
   });
 } 
