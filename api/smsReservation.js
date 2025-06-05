@@ -18,8 +18,18 @@ function toUTC(date) {
   const utcDate = new Date(date);
   const cstHours = utcDate.getHours();
   const utcHours = cstHours + 5; // Default to UTC+5
-  utcDate.setHours(utcHours);
-  return utcDate;
+  
+  // Create a new date to handle date changes
+  const newDate = new Date(utcDate);
+  newDate.setHours(utcHours);
+  
+  // If the hours wrapped around to the next day, adjust the date
+  if (utcHours >= 24) {
+    newDate.setDate(newDate.getDate() + 1);
+    newDate.setHours(utcHours - 24);
+  }
+  
+  return newDate;
 }
 
 // Enhanced parsing for flexible SMS formats
