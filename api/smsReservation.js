@@ -146,6 +146,7 @@ export default async function handler(req, res) {
       source: 'sms',
       event_type: 'reservation'
     })
+    .select()
     .single();
 
   console.log('Insert response:', { reservation, reservationError });
