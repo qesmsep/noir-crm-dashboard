@@ -212,8 +212,7 @@ export default async function handler(req, res) {
       table_id,
       source: 'sms',
       event_type: reservationDetails.event_type,
-      notes: reservationDetails.notes,
-      status: 'confirmed'
+      notes: reservationDetails.notes
     })
     .select()
     .single();
