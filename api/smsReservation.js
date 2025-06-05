@@ -199,36 +199,36 @@ export default async function handler(req, res) {
 
   console.log('Assigned table:', table_id);
 
-  // Create reservation
-  const { data: reservation, error: reservationError } = await supabase
-    .from('reservations')
-    .insert({
-      name: `${member.first_name} ${member.last_name}`,
-      phone: member.phone,
-      email: member.email,
-      party_size: reservationDetails.party_size,
-      start_time: reservationDetails.start_time,
-      end_time: reservationDetails.end_time,
-      table_id,
-      source: 'sms',
-      event_type: reservationDetails.event_type,
-      notes: reservationDetails.notes,
-      status: 'confirmed'
-    })
-    .select(`
-      *,
-      tables (*)
-    `)
-    .single();
+  // Format reservation data like the Reserve on the Spot modal
+  const reservationData = {
+    name: `${member.first_name} ${member.last_name}`,
+    phone: member.phone,
+    email: member.email,
+    party_size: reservationDetails.party_size,
+    notes: reservationDetails.notes,
+    start_time: reservationDetails.start_time,
+    end_time: reservationDetails.end_time,
+    source: 'sms',  // Keep source as 'sms' for accurate tracking
+    event_type: reservationDetails.event_type
+  };
 
-  console.log('Insert response:', { reservation, reservationError });
+  // Use the same endpoint as the Reserve on the Spot modal
+  const res = await fetch('https://noir-crm-dashboard.vercel.app/api/reservations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(reservationData)
+  });
 
-  if (reservationError) {
-    console.error('Error creating reservation:', reservationError);
-    return res.status(500).json({ error: 'Error creating reservation' });
+  const result = await res.json();
+  if (!res.ok) {
+    console.error('Error creating reservation:', result);
+    return res.status(res.status).json({ 
+      error: result.error || 'Error creating reservation',
+      message: result.message || 'Sorry, we could not create your reservation. Please try again or contact us directly.'
+    });
   }
 
-  console.log('Reservation created:', reservation);
+  console.log('Reservation created:', result);
 
   // Send confirmation email
   const startTime = new Date(reservationDetails.start_time);
@@ -276,6 +276,6 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     message: 'Reservation confirmed',
-    reservation
+    reservation: result
   });
 } 
