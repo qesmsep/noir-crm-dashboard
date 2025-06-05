@@ -58,8 +58,15 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
         event: '*', 
         schema: 'public', 
         table: 'reservations' 
-      }, () => {
-        setLocalReloadKey(k => k + 1);
+      }, (payload) => {
+        console.log('Real-time update received:', payload);
+        // Fetch fresh data when any change occurs
+        Promise.all([
+          fetch('/api/events').then(r => r.json()),
+          fetch('/api/reservations').then(r => r.json())
+        ]).then(([evRes, resRes]) => {
+          setEventData({ evRes, resRes });
+        });
       })
       .subscribe();
 
