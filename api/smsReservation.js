@@ -32,6 +32,62 @@ function toUTC(date) {
   return newDate;
 }
 
+// Parse natural language date
+function parseNaturalDate(dateStr) {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  // Handle "today" and "tomorrow"
+  if (dateStr.toLowerCase() === 'today') return today;
+  if (dateStr.toLowerCase() === 'tomorrow') return tomorrow;
+  
+  // Handle "this" and "next" with days of the week
+  const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const thisNextMatch = dateStr.toLowerCase().match(/(this|next)\s+(\w+)/);
+  if (thisNextMatch) {
+    const [_, modifier, day] = thisNextMatch;
+    const targetDay = daysOfWeek.indexOf(day.toLowerCase());
+    if (targetDay === -1) return null;
+    
+    const result = new Date(today);
+    const currentDay = today.getDay();
+    const daysToAdd = (targetDay - currentDay + 7) % 7;
+    if (modifier === 'next') {
+      result.setDate(result.getDate() + daysToAdd + 7);
+    } else {
+      result.setDate(result.getDate() + daysToAdd);
+    }
+    return result;
+  }
+  
+  // Handle month names and ordinal dates (e.g., "June 7th")
+  const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const monthDayMatch = dateStr.toLowerCase().match(/(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?/);
+  if (monthDayMatch) {
+    const [_, month, day] = monthDayMatch;
+    const monthIndex = monthNames.indexOf(month.toLowerCase());
+    if (monthIndex === -1) return null;
+    
+    const result = new Date(today.getFullYear(), monthIndex, parseInt(day));
+    // If the date is in the past, assume next year
+    if (result < today) {
+      result.setFullYear(result.getFullYear() + 1);
+    }
+    return result;
+  }
+  
+  // Handle MM/DD/YY format
+  const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (dateMatch) {
+    const [_, month, day, year] = dateMatch;
+    const fullYear = year.length === 2 ? '20' + year : year;
+    return new Date(fullYear, month - 1, day);
+  }
+  
+  return null;
+}
+
 // Enhanced parsing for flexible SMS formats
 function parseReservationMessage(message) {
   console.log('Parsing message:', message);
@@ -208,20 +264,25 @@ module.exports = async (req, res) => {
   const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
 
   // Extract date and time - handle multiple formats
-  const dateMatch = message.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  const dateTimeMatch = message.match(/(?:on|at|@)\s+([^@\n]+?)(?:\s+at|\s+@|\s*$)/i);
   const timeMatch = message.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
 
-  if (!dateMatch || !timeMatch) {
+  if (!dateTimeMatch || !timeMatch) {
     return res.status(400).json({ 
       error: 'Invalid date or time format',
-      message: 'Please specify a date (MM/DD/YY) and time (e.g., at 8pm or @ 8pm)'
+      message: 'Please specify a date (e.g., "this friday", "June 7th", or "6/7/25") and time (e.g., at 8pm or @ 8pm)'
     });
   }
 
   // Parse date
-  const [_, month, day, year] = dateMatch;
-  const fullYear = year.length === 2 ? '20' + year : year;
-  const date = new Date(fullYear, month - 1, day);
+  const dateStr = dateTimeMatch[1].trim();
+  const date = parseNaturalDate(dateStr);
+  if (!date) {
+    return res.status(400).json({ 
+      error: 'Invalid date format',
+      message: 'Please specify a valid date (e.g., "this friday", "June 7th", or "6/7/25")'
+    });
+  }
 
   // Parse time
   let [__, hours, minutes = '00', period = 'pm'] = timeMatch;
