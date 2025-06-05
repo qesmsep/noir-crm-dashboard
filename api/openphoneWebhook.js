@@ -32,8 +32,8 @@ export default async function handler(req, res) {
 
   // Forward to SMS reservation handler
   try {
-    // Extract the base URL from NEXT_PUBLIC_SUPABASE_URL
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL.split('/rest/v1')[0];
+    // Use the deployment URL from the request headers
+    const baseUrl = `https://${req.headers.host}`;
     console.log('Calling SMS reservation handler at:', `${baseUrl}/api/smsReservation`);
     
     const response = await fetch(`${baseUrl}/api/smsReservation`, {
