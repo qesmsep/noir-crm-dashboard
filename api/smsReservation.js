@@ -5,12 +5,17 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 // Parse SMS message to extract reservation details
 function parseReservationMessage(message) {
+  console.log('Parsing message:', message);
   const reservationRegex = /RESERVATION\s+(\d+)\s+guests\s+(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+@\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
   const match = message.match(reservationRegex);
   
-  if (!match) return null;
+  if (!match) {
+    console.log('Message did not match reservation format');
+    return null;
+  }
 
   const [_, partySize, month, day, year, hour, minute, meridiem] = match;
+  console.log('Parsed reservation details:', { partySize, month, day, year, hour, minute, meridiem });
   
   // Convert to 24-hour format
   let hour24 = parseInt(hour);
@@ -54,17 +59,25 @@ async function assignTable(start_time, end_time, party_size) {
 }
 
 export default async function handler(req, res) {
+  console.log('SMS reservation handler received request:', {
+    method: req.method,
+    body: req.body
+  });
+
   if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { from, body } = req.body;
   if (!from || !body) {
+    console.log('Missing required fields:', { from, body });
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   // Normalize phone number
   const normalizedPhone = from.replace(/\D/g, '');
+  console.log('Normalized phone:', normalizedPhone);
 
   // Check if sender is a member
   const { data: memberData, error: memberError } = await supabase
@@ -74,10 +87,12 @@ export default async function handler(req, res) {
     .or(`phone.eq.${normalizedPhone},phone.eq.${from}`);
 
   if (memberError) {
+    console.error('Error checking member status:', memberError);
     return res.status(500).json({ error: 'Error checking member status' });
   }
 
   if (!memberData || memberData.length === 0) {
+    console.log('No member found for phone:', from);
     return res.status(403).json({ 
       error: 'Not a member',
       message: 'Sorry, this service is only available to members. Please contact us to become a member.'
@@ -85,15 +100,19 @@ export default async function handler(req, res) {
   }
 
   const member = memberData[0];
+  console.log('Found member:', member);
 
   // Parse reservation details from message
   const reservationDetails = parseReservationMessage(body);
   if (!reservationDetails) {
+    console.log('Invalid message format:', body);
     return res.status(400).json({ 
       error: 'Invalid message format',
       message: 'Please use the format: RESERVATION [number] guests [MM/DD/YY] @ [time]'
     });
   }
+
+  console.log('Reservation details:', reservationDetails);
 
   // Check availability and assign table
   const table_id = await assignTable(
@@ -103,11 +122,14 @@ export default async function handler(req, res) {
   );
 
   if (!table_id) {
+    console.log('No available tables found');
     return res.status(409).json({ 
       error: 'No available tables',
       message: 'Sorry, we are not able to accommodate your requested time. Please try a different time or contact us directly.'
     });
   }
+
+  console.log('Assigned table:', table_id);
 
   // Create reservation
   const { data: reservation, error: reservationError } = await supabase
@@ -126,8 +148,11 @@ export default async function handler(req, res) {
     .single();
 
   if (reservationError) {
+    console.error('Error creating reservation:', reservationError);
     return res.status(500).json({ error: 'Error creating reservation' });
   }
+
+  console.log('Reservation created:', reservation);
 
   // Send confirmation email
   const startTime = new Date(reservationDetails.start_time);
@@ -149,11 +174,16 @@ export default async function handler(req, res) {
     <p>We look forward to seeing you!</p>
   `;
 
-  await sendCustomEmail({
-    to: member.email,
-    subject: 'Reservation Confirmation',
-    html: emailContent
-  });
+  try {
+    await sendCustomEmail({
+      to: member.email,
+      subject: 'Reservation Confirmation',
+      html: emailContent
+    });
+    console.log('Confirmation email sent to:', member.email);
+  } catch (emailError) {
+    console.error('Error sending confirmation email:', emailError);
+  }
 
   return res.status(200).json({
     message: 'Reservation confirmed',

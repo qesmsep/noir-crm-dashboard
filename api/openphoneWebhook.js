@@ -3,7 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
+  console.log('Webhook received:', {
+    method: req.method,
+    body: req.body,
+    headers: req.headers
+  });
+
   if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -11,18 +18,23 @@ export default async function handler(req, res) {
   // TODO: Add signature verification when OpenPhone provides this feature
 
   const { event, data } = req.body;
+  console.log('Event data:', { event, data });
 
   // Only process incoming message events
   if (event !== 'message.received') {
+    console.log('Event type not handled:', event);
     return res.status(200).json({ message: 'Event type not handled' });
   }
 
   const { from, text } = data;
+  console.log('Processing message:', { from, text });
 
   // Forward to SMS reservation handler
   try {
     // Extract the base URL from NEXT_PUBLIC_SUPABASE_URL
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL.split('/rest/v1')[0];
+    console.log('Calling SMS reservation handler at:', `${baseUrl}/api/smsReservation`);
+    
     const response = await fetch(`${baseUrl}/api/smsReservation`, {
       method: 'POST',
       headers: {
@@ -35,9 +47,11 @@ export default async function handler(req, res) {
     });
 
     const result = await response.json();
+    console.log('SMS reservation handler response:', result);
 
     // If the reservation was successful, send a confirmation SMS
     if (response.ok) {
+      console.log('Sending confirmation SMS to:', from);
       await fetch('https://api.openphone.co/v1/messages', {
         method: 'POST',
         headers: {
@@ -52,6 +66,7 @@ export default async function handler(req, res) {
       });
     } else {
       // Send error message back to the member
+      console.log('Sending error SMS to:', from);
       await fetch('https://api.openphone.co/v1/messages', {
         method: 'POST',
         headers: {
