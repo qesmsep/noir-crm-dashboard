@@ -17,16 +17,17 @@ export default async function handler(req, res) {
   // Verify webhook signature if OpenPhone provides one
   // TODO: Add signature verification when OpenPhone provides this feature
 
-  const { event, data } = req.body;
-  console.log('Event data:', { event, data });
+  const { type, data } = req.body;
+  console.log('Event data:', { type, data });
 
   // Only process incoming message events
-  if (event !== 'message.received') {
-    console.log('Event type not handled:', event);
+  if (type !== 'message.received') {
+    console.log('Event type not handled:', type);
     return res.status(200).json({ message: 'Event type not handled' });
   }
 
-  const { from, text } = data;
+  // Extract message details from OpenPhone format
+  const { from, text } = data.object;
   console.log('Processing message:', { from, text });
 
   // Forward to SMS reservation handler
