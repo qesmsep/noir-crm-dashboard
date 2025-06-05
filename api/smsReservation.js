@@ -277,7 +277,14 @@ module.exports = async (req, res) => {
   }
 
   // Parse date
-  const dateStr = dateTimeMatch[1].trim();
+  let dateStr = dateTimeMatch[1].trim();
+  
+  // If the date is in MM/DD/YY format, ensure it's properly formatted
+  if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
+    const [month, day, year] = dateStr.split('/');
+    dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
+  }
+  
   const date = parseNaturalDate(dateStr);
   if (!date) {
     return res.status(400).json({ 
