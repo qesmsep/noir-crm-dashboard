@@ -213,16 +213,16 @@ module.exports = async (req, res) => {
   };
 
   // Use the same endpoint as the Reserve on the Spot modal
-  const res = await fetch('https://noir-crm-dashboard.vercel.app/api/reservations', {
+  const reservationResponse = await fetch('https://noir-crm-dashboard.vercel.app/api/reservations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(reservationData)
   });
 
-  const result = await res.json();
-  if (!res.ok) {
+  const result = await reservationResponse.json();
+  if (!reservationResponse.ok) {
     console.error('Error creating reservation:', result);
-    return res.status(res.status).json({ 
+    return res.status(reservationResponse.status).json({ 
       error: result.error || 'Error creating reservation',
       message: result.message || 'Sorry, we could not create your reservation. Please try again or contact us directly.'
     });
