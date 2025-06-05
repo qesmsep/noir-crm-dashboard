@@ -265,52 +265,36 @@ module.exports = async (req, res) => {
 
   console.log('Assigned table:', table_id);
 
-  // Format reservation data like the Reserve on the Spot modal
-  const reservationData = {
-    name: `${member.first_name} ${member.last_name}`,
-    phone: member.phone,
-    email: member.email,
-    party_size: reservationDetails.party_size,
-    notes: reservationDetails.notes,
-    start_time: reservationDetails.start_time,
-    end_time: reservationDetails.end_time,
-    source: 'sms',  // Keep source as 'sms' for accurate tracking
-    event_type: reservationDetails.event_type
-  };
-
-  // Use the same endpoint as the Reserve on the Spot modal
-  const reservationResponse = await fetch('https://noir-crm-dashboard.vercel.app/api/reservations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(reservationData)
-  });
-
-  const result = await reservationResponse.json();
-  if (!reservationResponse.ok) {
-    console.error('Error creating reservation:', result);
-    return res.status(reservationResponse.status).json({ 
-      error: result.error || 'Error creating reservation',
-      message: result.message || 'Sorry, we could not create your reservation. Please try again or contact us directly.'
-    });
-  }
-
-  // Get the full reservation details including table number
+  // Create the reservation
   const { data: reservation, error: reservationError } = await supabase
     .from('reservations')
+    .insert({
+      member_id: member.member_id,
+      start_time,
+      end_time,
+      party_size,
+      table_id,
+      name: `${member.first_name} ${member.last_name}`,
+      phone: member.phone,
+      email: member.email,
+      source: 'sms',
+      event_type: 'Fun Night Out',
+      notes: member.status === 'active' ? '♥ - fun night out' : '- fun night out'
+    })
     .select(`
       *,
       tables (
         number
       )
     `)
-    .eq('table_id', table_id)  // Use table_id instead of result.data.id
-    .eq('start_time', reservationDetails.start_time)
-    .eq('end_time', reservationDetails.end_time)
     .single();
 
   if (reservationError) {
-    console.error('Error fetching reservation details:', reservationError);
-    return res.status(500).json({ error: 'Error fetching reservation details' });
+    console.error('Error creating reservation:', reservationError);
+    return res.status(500).json({ 
+      error: reservationError.error || 'Error creating reservation',
+      message: reservationError.message || 'Sorry, we could not create your reservation. Please try again or contact us directly.'
+    });
   }
 
   console.log('Reservation created:', reservation);
