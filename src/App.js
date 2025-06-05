@@ -22,7 +22,6 @@ import TotalBalanceCard from './components/dashboard/TotalBalanceCard';
 import DashboardPage from './components/pages/DashboardPage';
 import MembersPage from './components/pages/MembersPage';
 import AdminPage from './components/pages/AdminPage';
-import ReservationPage from './components/pages/ReservationPage';
 import CalendarPage from './components/pages/CalendarPage';
 
 // Responsive helper
@@ -1642,26 +1641,7 @@ function App() {
             />
           )}
           {section === 'makeReservation' && (
-            <ReservationPage 
-              phone={phone}
-              setPhone={setPhone}
-              partySize={partySize}
-              setPartySize={setPartySize}
-              date={date}
-              setDate={setDate}
-              time={time}
-              setTime={setTime}
-              bookingStartDate={bookingStartDate}
-              bookingEndDate={bookingEndDate}
-              eventType={eventType}
-              setEventType={setEventType}
-              getAvailableTimes={getAvailableTimes}
-              eventTypes={eventTypes}
-              reserveStatus={reserveStatus}
-              nextAvailableTime={nextAvailableTime}
-              setNextAvailableTime={setNextAvailableTime}
-              createDateFromTimeString={createDateFromTimeString}
-            />
+            null
           )}
           {section === 'calendar' && (
             <CalendarPage 
