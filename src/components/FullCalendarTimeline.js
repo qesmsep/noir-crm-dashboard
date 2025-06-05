@@ -5,6 +5,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
 import { toCST, toCSTISOString, formatDateTime } from '../utils/dateUtils';
+import { supabase } from '../api/supabaseClient';
 
 export default function FullCalendarTimeline({ reloadKey, bookingStartDate, bookingEndDate }) {
   const [resources, setResources] = useState([]);
@@ -37,6 +38,28 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     ]).then(([evRes, resRes]) => {
       setEventData({ evRes, resRes });
     });
+
+    // Subscribe to real-time updates for reservations
+    const subscription = supabase
+      .channel('reservations')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'reservations' 
+      }, () => {
+        // Refresh data when any change occurs
+        fetch('/api/reservations')
+          .then(r => r.json())
+          .then(resRes => {
+            setEventData(prev => ({ ...prev, resRes }));
+          });
+      })
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [reloadKey, localReloadKey]);
 
   useEffect(() => {
