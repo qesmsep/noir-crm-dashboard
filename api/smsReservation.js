@@ -5,10 +5,14 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 // Utility functions for handling dates and times in CST
 function toCST(date) {
-  return new Date(date.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  // Create a new date in CST
+  const cstDate = new Date(date);
+  cstDate.setHours(date.getHours());
+  return cstDate;
 }
 
 function toCSTISOString(date) {
+  // Convert to ISO string while preserving the hours
   const cstDate = toCST(date);
   return cstDate.toISOString();
 }
@@ -211,7 +215,7 @@ module.exports = async (req, res) => {
   if (period.toLowerCase() === 'am' && hours === 12) hours = 0;
 
   // Create start time in CST
-  const start = toCST(date);
+  const start = new Date(date);
   start.setHours(hours, parseInt(minutes), 0, 0);
   const start_time = toCSTISOString(start);
 
