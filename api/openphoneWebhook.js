@@ -26,8 +26,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Event type not handled' });
   }
 
-  // Extract message details from OpenPhone format
-  const { from, text } = data.object;
+  // Extract message details from OpenPhone format with fallbacks
+  const { from, text } = {
+    from: data?.object?.from || '',
+    text: data?.object?.text || data?.object?.body || ''
+  };
   console.log('Full data.object:', JSON.stringify(data.object, null, 2));
   console.log('Processing message:', { from, text });
 
@@ -43,8 +46,8 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: from || '',
-        text: text || ''
+        from,
+        text
       })
     });
 
