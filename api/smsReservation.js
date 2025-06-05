@@ -285,6 +285,16 @@ module.exports = async (req, res) => {
     dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
   }
   
+  // If the date is at the end of the message, try to extract it
+  if (!dateStr || dateStr === '') {
+    const endDateMatch = message.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})$/);
+    if (endDateMatch) {
+      dateStr = endDateMatch[1];
+      const [month, day, year] = dateStr.split('/');
+      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
+    }
+  }
+  
   const date = parseNaturalDate(dateStr);
   if (!date) {
     return res.status(400).json({ 
