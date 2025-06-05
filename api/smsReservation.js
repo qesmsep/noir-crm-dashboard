@@ -295,6 +295,16 @@ module.exports = async (req, res) => {
     }
   }
   
+  // If we still don't have a date, try to find it anywhere in the message
+  if (!dateStr || dateStr === '') {
+    const anyDateMatch = message.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (anyDateMatch) {
+      dateStr = anyDateMatch[1];
+      const [month, day, year] = dateStr.split('/');
+      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
+    }
+  }
+  
   const date = parseNaturalDate(dateStr);
   if (!date) {
     return res.status(400).json({ 
