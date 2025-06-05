@@ -3,6 +3,16 @@ const { sendCustomEmail } = require('./sendCustomEmail');
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+// Utility functions for handling dates and times in CST
+function toCST(date) {
+  return new Date(date.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+}
+
+function toCSTISOString(date) {
+  const cstDate = toCST(date);
+  return cstDate.toISOString();
+}
+
 // Enhanced parsing for flexible SMS formats
 function parseReservationMessage(message) {
   console.log('Parsing message:', message);
@@ -170,15 +180,52 @@ module.exports = async (req, res) => {
   const member = memberData[0];
   console.log('Found member:', member);
 
-  // Parse reservation details from message
-  const reservationDetails = parseReservationMessage(messageText);
-  if (!reservationDetails) {
-    console.log('Invalid message format:', messageText);
+  // Parse the message to extract reservation details
+  const message = req.body.text.toLowerCase();
+  console.log('Parsing message:', message);
+
+  // Extract party size
+  const partySizeMatch = message.match(/(\d+)\s*guests?/);
+  const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
+
+  // Extract date and time
+  const dateMatch = message.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  const timeMatch = message.match(/@\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+
+  if (!dateMatch || !timeMatch) {
     return res.status(400).json({ 
-      error: 'Invalid message format',
-      message: 'Please use the format: RESERVATION [number] guests [MM/DD/YY] @ [time]'
+      error: 'Invalid date or time format',
+      message: 'Please specify a date (MM/DD/YY) and time (e.g., @ 8pm)'
     });
   }
+
+  // Parse date
+  const [_, month, day, year] = dateMatch;
+  const fullYear = year.length === 2 ? '20' + year : year;
+  const date = new Date(fullYear, month - 1, day);
+
+  // Parse time
+  let [__, hours, minutes = '00', period = 'pm'] = timeMatch;
+  hours = parseInt(hours);
+  if (period.toLowerCase() === 'pm' && hours < 12) hours += 12;
+  if (period.toLowerCase() === 'am' && hours === 12) hours = 0;
+
+  // Create start time in CST
+  const start = toCST(date);
+  start.setHours(hours, parseInt(minutes), 0, 0);
+  const start_time = toCSTISOString(start);
+
+  // Calculate end time (90 minutes for 2 or fewer guests, 120 minutes for more)
+  const end = new Date(start.getTime() + (party_size <= 2 ? 90 : 120) * 60000);
+  const end_time = toCSTISOString(end);
+
+  const reservationDetails = {
+    party_size,
+    start_time,
+    end_time,
+    event_type: 'Fun Night Out',
+    notes: 'Fun Night Out'
+  };
 
   console.log('Reservation details:', reservationDetails);
 
