@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 
   // Extract message details from OpenPhone format
   const { from, text } = data.object;
-  console.log('Full data.object:', data.object);
+  console.log('Full data.object:', JSON.stringify(data.object, null, 2));
   console.log('Processing message:', { from, text });
 
   // Forward to SMS reservation handler
