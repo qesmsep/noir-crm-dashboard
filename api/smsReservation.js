@@ -41,6 +41,11 @@ async function assignTable(start_time, end_time, party_size) {
   const { data: tables } = await supabase
     .from('tables').select('*').gte('capacity', party_size).order('capacity');
   for (const t of tables) {
+    // Skip tables without a number
+    if (!t.number) {
+      console.log('Skipping table with missing number:', t);
+      continue;
+    }
     const { data: events } = await supabase
       .from('events').select('start_time, end_time, table_id')
       .eq('table_id', t.id);
@@ -53,7 +58,11 @@ async function assignTable(start_time, end_time, party_size) {
     const hasReservationConflict = (reservations || []).some(r =>
       !(new Date(r.end_time) <= new Date(start_time) || new Date(r.start_time) >= new Date(end_time))
     );
-    if (!hasEventConflict && !hasReservationConflict) return t.id;
+    if (!hasEventConflict && !hasReservationConflict) {
+      // Log the table details
+      console.log('Assigned table:', t.id, 'number:', t.number);
+      return t.id;
+    }
   }
   return null;
 }
