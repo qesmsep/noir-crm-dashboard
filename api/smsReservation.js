@@ -148,6 +148,8 @@ export default async function handler(req, res) {
     })
     .single();
 
+  console.log('Insert response:', { reservation, reservationError });
+
   if (reservationError) {
     console.error('Error creating reservation:', reservationError);
     return res.status(500).json({ error: 'Error creating reservation' });
