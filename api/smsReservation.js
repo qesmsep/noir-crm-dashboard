@@ -179,7 +179,7 @@ export default async function handler(req, res) {
     await sendCustomEmail({
       to: member.email,
       subject: 'Reservation Confirmation',
-      html: emailContent
+      text: emailContent
     });
     console.log('Confirmation email sent to:', member.email);
   } catch (emailError) {
