@@ -193,7 +193,7 @@ export default async function handler(req, res) {
   // Send confirmation text message
   const textMessage = `Your reservation for ${formattedDate} with ${reservationDetails.party_size} guests has been confirmed. We look forward to seeing you!`;
   try {
-    await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL}/api/sendMessage`, {
+    await fetch('https://noir-crm-dashboard.vercel.app/api/sendMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to: member.phone, message: textMessage })
