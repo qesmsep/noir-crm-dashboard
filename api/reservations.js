@@ -101,7 +101,7 @@ export default async function handler(req, res) {
       .insert({ name, phone, email, party_size, notes, start_time, end_time, table_id, source, event_type })
       .select(`
         *,
-        tables (
+        tables!inner (
           number
         )
       `)
