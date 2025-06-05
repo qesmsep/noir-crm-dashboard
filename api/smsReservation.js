@@ -144,7 +144,8 @@ export default async function handler(req, res) {
       end_time: reservationDetails.end_time,
       table_id,
       source: 'sms',
-      event_type: 'reservation'
+      event_type: 'member reservation',
+      notes: 'fun night out'
     })
     .select()
     .single();
