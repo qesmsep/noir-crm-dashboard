@@ -237,7 +237,9 @@ module.exports = async (req, res) => {
         number
       )
     `)
-    .eq('id', result.data.id)
+    .eq('table_id', table_id)  // Use table_id instead of result.data.id
+    .eq('start_time', reservationDetails.start_time)
+    .eq('end_time', reservationDetails.end_time)
     .single();
 
   if (reservationError) {
