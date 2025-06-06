@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
   try {
-    const response = await fetch('https://api.openphone.co/v1/phone_numbers', {
+    const response = await fetch('https://api.openphone.com/v1/phone_numbers', {
       headers: {
         'Authorization': process.env.OPENPHONE_API_KEY,
         'Content-Type': 'application/json',

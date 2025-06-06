@@ -57,7 +57,7 @@ export default async function handler(req, res) {
     // If the reservation was successful, send a confirmation SMS
     if (response.ok) {
       console.log('Sending confirmation SMS to:', from);
-      await fetch('https://api.openphone.co/v1/messages', {
+      await fetch('https://api.openphone.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     } else {
       // Send error message back to the member
       console.log('Sending error SMS to:', from);
-      await fetch('https://api.openphone.co/v1/messages', {
+      await fetch('https://api.openphone.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

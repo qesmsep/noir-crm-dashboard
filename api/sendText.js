@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     }
     try {
       // Send SMS via OpenPhone API
-      const response = await fetch('https://api.openphone.co/v1/messages', {
+      const response = await fetch('https://api.openphone.com/v1/messages', {
         method: 'POST',
         headers: {
           'Authorization': OPENPHONE_API_KEY,
