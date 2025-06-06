@@ -44,9 +44,9 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: toPhone,
+          to: [toPhone],
           from: OPENPHONE_PHONE_NUMBER_ID,
-          text: content,
+          content: content,
         }),
       });
 
