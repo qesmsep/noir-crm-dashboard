@@ -418,18 +418,19 @@ module.exports = async (req, res) => {
     console.error('Error sending confirmation email:', emailError);
   }
 
-  // Send confirmation text message
-  const textMessage = `Your reservation for ${formattedDate} with ${reservationDetails.party_size} guests has been confirmed. We look forward to seeing you!`;
-  try {
-    await fetch('https://noir-crm-dashboard.vercel.app/api/sendMessage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: member.phone, message: textMessage })
-    });
-    console.log('Confirmation text message sent to:', member.phone);
-  } catch (textError) {
-    console.error('Error sending confirmation text message:', textError);
-  }
+  // Send confirmation SMS
+  const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`
+    },
+    body: JSON.stringify({
+      to: member.phone,
+      from: process.env.OPENPHONE_PHONE_NUMBER,
+      text: `Your reservation at Noir has been confirmed for ${party_size} guests on ${date.toLocaleDateString()} at ${hours}:${minutes.toString().padStart(2, '0')} ${meridiem}. We look forward to seeing you!`
+    })
+  });
 
   return res.status(200).json({
     message: 'Reservation confirmed',
