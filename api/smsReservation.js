@@ -102,33 +102,63 @@ function parseReservationMessage(message) {
   }
 
   // Extract party size
-  const partySizeMatch = msg.match(/(\d+)\s+guests?/i);
-  const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : null;
+  const partySizeMatch = msg.match(/(\d+)\s*guests?/);
+  const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
 
-  // Extract date (support MM/DD/YY, MM-DD-YYYY, YYYY-MM-DD, MM/DD, etc.)
-  let dateMatch = msg.match(/(\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4})/);
-  let dateStr = dateMatch ? dateMatch[1] : null;
-  let dateObj = null;
-  if (dateStr) {
-    // Try to parse various formats
-    if (/\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      // YYYY-MM-DD
-      dateObj = new Date(dateStr);
-    } else if (/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(dateStr)) {
-      // MM/DD/YY or MM-DD-YYYY
-      const parts = dateStr.split(/[\/\-]/);
-      let month = parseInt(parts[0]) - 1;
-      let day = parseInt(parts[1]);
-      let year = parts[2].length === 2 ? 2000 + parseInt(parts[2]) : parseInt(parts[2]);
-      dateObj = new Date(year, month, day);
+  // Extract date and time - handle multiple formats
+  const dateTimeMatch = msg.match(/(?:on|at|@)\s+([^@\n]+?)(?:\s+at|\s+@|\s*$)/i) || 
+                       msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+                       msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i);
+  const timeMatch = msg.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+
+  if (!dateTimeMatch || !timeMatch) {
+    return res.status(400).json({ 
+      error: 'Invalid date or time format',
+      message: 'Please specify a date (e.g., "this friday", "June 7th", or "6/7/25") and time (e.g., at 8pm or @ 8pm)'
+    });
+  }
+
+  // Parse date
+  let dateStr = dateTimeMatch[1].trim();
+  
+  // If the date is in MM/DD/YY format, ensure it's properly formatted
+  if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
+    const [month, day, year] = dateStr.split('/');
+    dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
+  }
+  
+  // If the date is at the end of the message, try to extract it
+  if (!dateStr || dateStr === '') {
+    const endDateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})$/);
+    if (endDateMatch) {
+      dateStr = endDateMatch[1];
+      const [month, day, year] = dateStr.split('/');
+      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
     }
+  }
+  
+  // If we still don't have a date, try to find it anywhere in the message
+  if (!dateStr || dateStr === '') {
+    const anyDateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (anyDateMatch) {
+      dateStr = anyDateMatch[1];
+      const [month, day, year] = dateStr.split('/');
+      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
+    }
+  }
+  
+  const date = parseNaturalDate(dateStr);
+  if (!date) {
+    return res.status(400).json({ 
+      error: 'Invalid date format',
+      message: 'Please specify a valid date (e.g., "this friday", "June 7th", or "6/7/25")'
+    });
   }
 
   // Extract time (support 8pm, 8:00pm, 20:00, 8 pm, etc.)
-  let timeMatch = msg.match(/@\s*([\d:apm\s]+)/i);
+  let timeStr = timeMatch[1].trim().toLowerCase();
   let hour = 20, minute = 0; // default 8pm if not found
   if (timeMatch) {
-    let timeStr = timeMatch[1].trim().toLowerCase();
     let timeParts = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
     if (timeParts) {
       hour = parseInt(timeParts[1]);
@@ -145,15 +175,15 @@ function parseReservationMessage(message) {
   }
 
   // If date is missing, fail
-  if (!dateObj || isNaN(dateObj.getTime())) {
+  if (!date) {
     console.log('Could not parse date');
     return null;
   }
 
   // Set the time
-  dateObj.setHours(hour, minute, 0, 0);
-  const start_time = dateObj.toISOString();
-  const end_time = new Date(dateObj.getTime() + 2 * 60 * 60 * 1000).toISOString();
+  date.setHours(hour, minute, 0, 0);
+  const start_time = date.toISOString();
+  const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
 
   // Extract TYPE (event_type)
   let eventTypeMatch = msg.match(/type\s+(\w+)/i);
