@@ -456,8 +456,8 @@ module.exports = async (req, res) => {
       'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`
     },
     body: JSON.stringify({
-      to: member.phone,
-      from: process.env.OPENPHONE_PHONE_NUMBER,
+      from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+      to: from,
       text: `Your reservation at Noir has been confirmed for ${party_size} guests on ${date.toLocaleDateString()} at ${hours}:${minutes.toString().padStart(2, '0')} ${meridiem}. We look forward to seeing you!`
     })
   });
