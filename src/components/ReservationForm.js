@@ -62,15 +62,19 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
   const handleSubmit = async e => {
     e.preventDefault();
     
-    // Check membership status if phone number is provided
-    if (form.phone) {
-      const memberStatus = await checkMembershipStatus(form.phone);
-      setIsMember(memberStatus);
-      
-      if (!memberStatus) {
-        setShowCreditCardModal(true);
-        return;
-      }
+    // Require phone number
+    if (!form.phone) {
+      alert('Please provide a phone number to proceed with the reservation.');
+      return;
+    }
+
+    // Check membership status
+    const memberStatus = await checkMembershipStatus(form.phone);
+    setIsMember(memberStatus);
+    
+    if (!memberStatus) {
+      setShowCreditCardModal(true);
+      return;
     }
 
     await submitReservation();
