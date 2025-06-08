@@ -62,6 +62,8 @@ function formatDOB(dob) {
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+console.log('Supabase URL:', supabaseUrl);
+console.log('Supabase Key exists:', !!supabaseKey);
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initialize Stripe
@@ -442,6 +444,7 @@ function App() {
 
   useEffect(() => {
     async function fetchMembers() {
+      console.log('Fetching members...');
       const { data, error } = await supabase
         .from('members')
         .select('*')
@@ -450,6 +453,7 @@ function App() {
       if (error) {
         console.error('Error fetching members:', error);
       } else {
+        console.log('Members fetched successfully:', data?.length || 0, 'members');
         setMembers(data);
 
         // Calculate upcoming renewals
