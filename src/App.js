@@ -67,7 +67,7 @@ console.log('Supabase Key exists:', !!supabaseKey);
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initialize Stripe
-const stripePromise = loadStripe(process.env.STRIPE_PUBLISHABLE_KEY);
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function App() {
   // Forced debug UI for environment variables
@@ -76,7 +76,7 @@ function App() {
       <h2>DEBUG ENV</h2>
       <div>REACT_APP_SUPABASE_URL: {String(process.env.REACT_APP_SUPABASE_URL)}</div>
       <div>REACT_APP_SUPABASE_ANON_KEY: {String(process.env.REACT_APP_SUPABASE_ANON_KEY)}</div>
-      <div>STRIPE_PUBLISHABLE_KEY: {String(process.env.STRIPE_PUBLISHABLE_KEY)}</div>
+      <div>REACT_APP_STRIPE_PUBLISHABLE_KEY: {String(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY)}</div>
     </div>
   );
 }
