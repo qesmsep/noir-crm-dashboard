@@ -1,11 +1,27 @@
-.modal-overlay {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
-  z-index: 3000;
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
+
 .modal-content {
-  background: #fff; padding: 1.5rem; border-radius: 6px; box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
 }
+
 .attribute-item {
   display: flex;
   justify-content: space-between;
@@ -786,33 +802,32 @@ body {
 
 .modal-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 1rem;
   margin-top: 1.5rem;
 }
 
 .modal-actions button {
-  flex: 1;
-  padding: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
   border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  font-weight: 500;
 }
 
 .modal-actions button.primary {
-  background: var(--color-cork);
-  color: #fff;
+  background: #007bff;
+  color: white;
 }
 
 .modal-actions button.secondary {
-  background: var(--color-greige);
-  color: var(--color-night-sky);
+  background: #6c757d;
+  color: white;
 }
 
-.modal-actions button:hover {
-  opacity: 0.9;
+.modal-actions button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* Calendar Availability Control Styles */
@@ -1059,39 +1074,36 @@ body {
 }
 
 .credit-card-hold-modal {
-  background: #fff;
+  background: white;
   padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   max-width: 500px;
   width: 90%;
 }
 
 .credit-card-hold-modal h3 {
-  color: var(--color-night-sky);
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
+  margin: 0 0 1rem;
+  color: #333;
 }
 
 .credit-card-hold-modal p {
+  margin: 0 0 1.5rem;
   color: #666;
-  margin-bottom: 1.5rem;
-  line-height: 1.5;
 }
 
 .card-element-container {
   padding: 1rem;
-  border: 1px solid var(--color-greige);
-  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   background: #f8f9fa;
   margin-bottom: 1rem;
 }
 
 .error-message {
-  color: #e53e3e;
-  background: #fde8e8;
-  padding: 0.75rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
+  color: #dc3545;
+  margin: 1rem 0;
+  padding: 0.5rem;
+  background: #fff3f3;
+  border-radius: 4px;
 }

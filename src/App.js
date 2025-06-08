@@ -953,21 +953,22 @@ function App() {
     }
 
     // Add this function to handle non-member reservation submission
-    async function handleNonMemberReservation() {
+    async function handleNonMemberReservation(formData) {
       try {
         // Create reservation for non-member
         const response = await fetch('/api/reservations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            first_name: nonMemberFields.firstName,
-            last_name: nonMemberFields.lastName,
-            email: nonMemberFields.email,
-            phone: phone,
-            party_size: partySize,
-            date: date.toISOString(),
-            time: time,
-            event_type: eventType
+            first_name: formData.name.split(' ')[0],
+            last_name: formData.name.split(' ').slice(1).join(' '),
+            email: formData.email,
+            phone: formData.phone,
+            party_size: formData.party_size,
+            date: formData.start_time,
+            time: formData.start_time.split('T')[1].slice(0, 5),
+            event_type: formData.event_type,
+            notes: formData.notes
           })
         });
 
@@ -1027,7 +1028,7 @@ function App() {
                 </div>
                 <div className="button-group">
                   <button onClick={() => setShowNonMemberModal(false)}>Cancel</button>
-                  <button onClick={handleNonMemberReservation}>Continue to Payment</button>
+                  <button onClick={() => handleNonMemberReservation(nonMemberFields)}>Continue to Payment</button>
                 </div>
               </div>
             </div>
