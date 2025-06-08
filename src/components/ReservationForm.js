@@ -21,7 +21,10 @@ for(let h = startHour; h < endHour; h++){
 
 export default function ReservationForm({ initialStart, initialEnd, onSave, table_id, bookingStartDate, bookingEndDate }) {
   const [form, setForm] = useState({
-    name: '', phone: '', email: '', party_size: 1, notes: '', event_type: '',
+    phone: '',
+    party_size: 1,
+    event_type: '',
+    notes: ''
   });
   const [date, setDate] = useState(new Date(initialStart));
   const [time, setTime] = useState(
@@ -30,6 +33,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
   const [showCreditCardModal, setShowCreditCardModal] = useState(false);
   const [isMember, setIsMember] = useState(null);
   const [holdId, setHoldId] = useState(null);
+  const [nonMemberInfo, setNonMemberInfo] = useState(null);
 
   const eventTypes = [
     { value: 'birthday', label: '🎂 Birthday' },
@@ -89,6 +93,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
     
     await onSave({
       ...form,
+      ...nonMemberInfo, // Include non-member info if available
       start_time: toCSTISOString(start),
       end_time: toCSTISOString(end),
       table_id: table_id,
@@ -96,8 +101,9 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
     });
   };
 
-  const handleHoldSuccess = (newHoldId) => {
+  const handleHoldSuccess = (newHoldId, customerInfo) => {
     setHoldId(newHoldId);
+    setNonMemberInfo(customerInfo);
     setShowCreditCardModal(false);
     submitReservation();
   };
@@ -111,9 +117,13 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
   return (
     <>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <input name="name" placeholder="Name" value={form.name} onChange={handleChange} required />
-        <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} />
-        <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
+        <input 
+          name="phone" 
+          placeholder="Phone Number *" 
+          value={form.phone} 
+          onChange={handleChange} 
+          required 
+        />
         <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
           <label>Party size</label>
           <button type="button" onClick={() => setForm(f => ({ ...f, party_size: Math.max(1, f.party_size - 1) }))}>-</button>
@@ -157,7 +167,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
             ))}
           </select>
         </div>
-        <button type="submit">Book</button>
+        <button type="submit">Reserve Now</button>
       </form>
 
       {showCreditCardModal && (
