@@ -988,7 +988,11 @@ function App() {
     return (
       <Elements stripe={stripePromise}>
         <div className="app">
-          {/* ... existing app content ... */}
+          {section === 'dashboard' && <DashboardPage />}
+          {section === 'members' && <MembersPage />}
+          {section === 'admin' && <AdminPage />}
+          {section === 'calendar' && <CalendarPage />}
+
           {showNonMemberModal && (
             <div className="modal">
               <div className="modal-content">
