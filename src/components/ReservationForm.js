@@ -91,29 +91,42 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
     const durationMinutes = form.party_size <= 2 ? 90 : 120;
     const end = new Date(start.getTime() + durationMinutes * 60000);
 
-    // Upsert into potential_members (for non-members)
-    if (nonMemberInfo && form.phone) {
-      const formattedPhone = form.phone.replace(/\D/g, '');
+    // Format phone
+    const formattedPhone = form.phone.replace(/\D/g, '');
+
+    // Check if phone is already a member
+    let isMember = false;
+    try {
+      const resp = await fetch(`/api/check-membership?phone=${encodeURIComponent(form.phone)}`);
+      const data = await resp.json();
+      isMember = !!data.isMember;
+    } catch (err) {
+      // fallback: treat as not a member
+    }
+
+    // Upsert into potential_members if not a member
+    if (!isMember) {
       await fetch('/api/upsertPotentialMember', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           member_id: formattedPhone,
-          first_name: nonMemberInfo.firstName,
-          last_name: nonMemberInfo.lastName,
-          email: nonMemberInfo.email
-        })
-      });
-      // Send confirmation SMS
-      await fetch('/api/sendText', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          member_ids: [formattedPhone],
-          content: `Your reservation is confirmed for ${form.party_size} guests on ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. We look forward to seeing you!`
+          first_name: nonMemberInfo?.firstName || form.first_name || '',
+          last_name: nonMemberInfo?.lastName || form.last_name || '',
+          email: nonMemberInfo?.email || form.email || ''
         })
       });
     }
+
+    // Send confirmation SMS to all reservations
+    await fetch('/api/sendText', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        member_ids: [formattedPhone],
+        content: `Thank you for your reservation. It's been confirmed for ${form.party_size} guests on ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. We look forward to seeing you soon.`
+      })
+    });
 
     await onSave({
       ...form,
