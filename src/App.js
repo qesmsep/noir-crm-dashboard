@@ -176,6 +176,11 @@ function App() {
   const [projectedMonthlyDues, setProjectedMonthlyDues] = useState(0);
   const [showCreditCardHoldModal, setShowCreditCardHoldModal] = useState(false);
   const [pendingReservationId, setPendingReservationId] = useState(null);
+  const [debugInfo, setDebugInfo] = useState({
+    supabaseUrl: process.env.REACT_APP_SUPABASE_URL,
+    hasSupabaseKey: !!process.env.REACT_APP_SUPABASE_ANON_KEY,
+    hasStripeKey: !!process.env.STRIPE_PUBLISHABLE_KEY
+  });
 
   // Define eventTypes at the top
   const eventTypes = [
@@ -993,6 +998,15 @@ function App() {
     return (
       <Elements stripe={stripePromise}>
         <div className="app">
+          {debugInfo.supabaseUrl ? (
+            <div style={{ padding: '10px', background: '#f0f0f0', margin: '10px' }}>
+              <h3>Debug Info:</h3>
+              <p>Supabase URL: {debugInfo.supabaseUrl}</p>
+              <p>Has Supabase Key: {debugInfo.hasSupabaseKey ? 'Yes' : 'No'}</p>
+              <p>Has Stripe Key: {debugInfo.hasStripeKey ? 'Yes' : 'No'}</p>
+            </div>
+          ) : null}
+          
           {section === 'dashboard' && <DashboardPage />}
           {section === 'members' && <MembersPage />}
           {section === 'admin' && <AdminPage />}
