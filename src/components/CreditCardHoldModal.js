@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { PaymentElement, useStripe, useElements, Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import '../App.css';
 
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+
 export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) {
-  const stripe = useStripe();
-  const elements = useElements();
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [formData, setFormData] = useState({
@@ -50,41 +51,63 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
   };
 
   // Step 2: Show PaymentElement and confirm payment
-  const handlePaymentSubmit = async (event) => {
-    event.preventDefault();
-    if (!stripe || !elements) {
-      setError('Stripe is not loaded. Please try again in a moment.');
-      return;
-    }
-    setProcessing(true);
-    setError(null);
-    try {
-      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          payment_method_data: {
-            billing_details: {
-              name: `${formData.firstName} ${formData.lastName}`.trim(),
-              email: formData.email
-            }
-          },
-          // return_url: window.location.href, // Not needed for holds
-        },
-        redirect: 'if_required',
-      });
-      if (stripeError) {
-        setError(stripeError.message);
-        setProcessing(false);
+  function PaymentStep() {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [payError, setPayError] = useState(null);
+    const [payProcessing, setPayProcessing] = useState(false);
+
+    const handlePaymentSubmit = async (event) => {
+      event.preventDefault();
+      if (!stripe || !elements) {
+        setPayError('Stripe is not loaded. Please try again in a moment.');
         return;
       }
-      // Success! Pass paymentIntent id and customer info
-      onSuccess(paymentIntent.id, formData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setProcessing(false);
-    }
-  };
+      setPayProcessing(true);
+      setPayError(null);
+      try {
+        const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+          elements,
+          confirmParams: {
+            payment_method_data: {
+              billing_details: {
+                name: `${formData.firstName} ${formData.lastName}`.trim(),
+                email: formData.email
+              }
+            },
+          },
+          redirect: 'if_required',
+        });
+        if (stripeError) {
+          setPayError(stripeError.message);
+          setPayProcessing(false);
+          return;
+        }
+        onSuccess(paymentIntent.id, formData);
+      } catch (err) {
+        setPayError(err.message);
+      } finally {
+        setPayProcessing(false);
+      }
+    };
+
+    return (
+      <form onSubmit={handlePaymentSubmit}>
+        <div className="form-group">
+          <PaymentElement options={{ layout: 'tabs' }} />
+        </div>
+        {payError && (
+          <div className="error-message">{payError}</div>
+        )}
+        <div className="button-row">
+          <button type="button" onClick={onCancel} disabled={payProcessing} className="cancel-button">Cancel</button>
+          <button type="submit" disabled={payProcessing} className="submit-button">
+            {payProcessing ? 'Processing...' : 'Complete Reservation'}
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <div className="modal">
@@ -146,20 +169,9 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
           </form>
         )}
         {step === 2 && clientSecret && (
-          <form onSubmit={handlePaymentSubmit}>
-            <div className="form-group">
-              <PaymentElement options={{ layout: 'tabs' }} />
-            </div>
-            {error && (
-              <div className="error-message">{error}</div>
-            )}
-            <div className="button-row">
-              <button type="button" onClick={onCancel} disabled={processing} className="cancel-button">Cancel</button>
-              <button type="submit" disabled={processing} className="submit-button">
-                {processing ? 'Processing...' : 'Complete Reservation'}
-              </button>
-            </div>
-          </form>
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <PaymentStep />
+          </Elements>
         )}
       </div>
     </div>
