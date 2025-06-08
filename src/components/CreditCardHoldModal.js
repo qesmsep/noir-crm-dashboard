@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import '../App.css';
 
@@ -13,6 +13,12 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
     email: ''
   });
 
+  useEffect(() => {
+    console.log('CreditCardHoldModal mounted');
+    console.log('stripe:', stripe);
+    console.log('elements:', elements);
+  }, [stripe, elements]);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -24,6 +30,7 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
     event.preventDefault();
     
     if (!stripe || !elements) {
+      setError('Stripe is not loaded. Please try again in a moment.');
       return;
     }
 
@@ -136,27 +143,35 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
             <label>Credit Card Information *</label>
             <div className="card-element-container" style={{ 
               padding: '12px',
-              border: '1px solid #ccc',
+              border: '2px solid #e53e3e',
               borderRadius: '4px',
-              backgroundColor: 'white'
+              backgroundColor: 'white',
+              minHeight: '60px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
-              <CardElement
-                options={{
-                  style: {
-                    base: {
-                      fontSize: '16px',
-                      color: '#424770',
-                      '::placeholder': {
-                        color: '#aab7c4',
+              {typeof CardElement !== 'undefined' ? (
+                <CardElement
+                  options={{
+                    style: {
+                      base: {
+                        fontSize: '16px',
+                        color: '#424770',
+                        '::placeholder': {
+                          color: '#aab7c4',
+                        },
+                        backgroundColor: 'white',
                       },
-                      backgroundColor: 'white',
+                      invalid: {
+                        color: '#9e2146',
+                      },
                     },
-                    invalid: {
-                      color: '#9e2146',
-                    },
-                  },
-                }}
-              />
+                  }}
+                />
+              ) : (
+                <span style={{ color: '#e53e3e' }}>CardElement not available</span>
+              )}
             </div>
           </div>
           
