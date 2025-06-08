@@ -6,21 +6,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { paymentMethodId, amount } = req.body;
+    const { amount } = req.body;
 
-    // Create a payment intent with capture_method: 'manual' to create a hold
+    // Create a PaymentIntent for the Payment Element
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount * 100, // Convert to cents
       currency: 'usd',
-      payment_method: paymentMethodId,
-      capture_method: 'manual',
-      confirm: true,
-      description: 'Reservation hold',
+      capture_method: 'manual', // for a hold
+      // Optionally, you can add metadata or customer info here
     });
 
     res.status(200).json({ 
-      holdId: paymentIntent.id,
-      clientSecret: paymentIntent.client_secret 
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id
     });
   } catch (error) {
     console.error('Error creating hold:', error);
