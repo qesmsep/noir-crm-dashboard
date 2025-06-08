@@ -19,20 +19,36 @@ export default async function handler(req, res) {
     // Format phone number to match database format
     const formattedPhone = phone.replace(/\D/g, '');
 
-    // Query members table for the phone number
-    const { data, error } = await supabase
+    // Query members table for the phone number (primary or secondary)
+    const { data: memberData, error: memberError } = await supabase
       .from('members')
       .select('member_id')
       .or(`phone.eq.${formattedPhone},phone2.eq.${formattedPhone}`)
       .single();
 
-    if (error) {
-      console.error('Error checking membership:', error);
+    if (memberError && memberError.code !== 'PGRST116') {
+      // PGRST116 = No rows found
+      console.error('Error checking membership:', memberError);
       return res.status(500).json({ error: 'Error checking membership status' });
     }
 
-    // If data exists, the phone number belongs to a member
-    return res.status(200).json({ isMember: !!data });
+    if (memberData) {
+      return res.status(200).json({ isMember: true });
+    }
+
+    // Check potential_members table
+    const { data: potentialData, error: potentialError } = await supabase
+      .from('potential_members')
+      .select('member_id')
+      .eq('member_id', formattedPhone)
+      .single();
+
+    if (potentialError && potentialError.code !== 'PGRST116') {
+      console.error('Error checking potential_members:', potentialError);
+      return res.status(500).json({ error: 'Error checking potential_members status' });
+    }
+
+    return res.status(200).json({ isMember: !!potentialData });
   } catch (error) {
     console.error('Error checking membership:', error);
     return res.status(500).json({ error: 'Error checking membership status' });

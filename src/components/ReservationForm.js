@@ -90,7 +90,31 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
     // Determine duration...
     const durationMinutes = form.party_size <= 2 ? 90 : 120;
     const end = new Date(start.getTime() + durationMinutes * 60000);
-    
+
+    // Upsert into potential_members (for non-members)
+    if (nonMemberInfo && form.phone) {
+      const formattedPhone = form.phone.replace(/\D/g, '');
+      await fetch('/api/upsertPotentialMember', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: formattedPhone,
+          first_name: nonMemberInfo.firstName,
+          last_name: nonMemberInfo.lastName,
+          email: nonMemberInfo.email
+        })
+      });
+      // Send confirmation SMS
+      await fetch('/api/sendText', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_ids: [formattedPhone],
+          content: `Your reservation is confirmed for ${form.party_size} guests on ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. We look forward to seeing you!`
+        })
+      });
+    }
+
     await onSave({
       ...form,
       ...nonMemberInfo, // Include non-member info if available
