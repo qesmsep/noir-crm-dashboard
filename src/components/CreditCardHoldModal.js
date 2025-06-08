@@ -5,6 +5,10 @@ import '../App.css';
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
+function getHoldAmount(partySize) {
+  return 1;
+}
+
 export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) {
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -15,6 +19,8 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
   });
   const [clientSecret, setClientSecret] = useState(null);
   const [step, setStep] = useState(1);
+
+  const holdAmount = getHoldAmount(partySize);
 
   const handleChange = (e) => {
     setFormData({
@@ -33,7 +39,6 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
     setProcessing(true);
     setError(null);
     try {
-      const holdAmount = partySize * 25;
       const response = await fetch('/api/create-hold', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,6 +99,9 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
     return (
       <form onSubmit={handlePaymentSubmit}>
         <div className="form-group">
+          <div className="hold-amount" style={{ fontSize: '1.2rem', color: '#2c5282', fontWeight: 600, marginBottom: '1rem' }}>
+            Hold Amount: ${holdAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' }).replace('$','')}
+          </div>
           <PaymentElement options={{ layout: 'tabs' }} />
         </div>
         {payError && (
@@ -153,9 +161,9 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
                 Thank you for your reservation. To hold your reservation we request a hold on the credit card. 
                 This will be released upon your arrival.
               </p>
-              <p className="hold-amount">
-                A refundable hold of ${partySize * 25} (${25} per guest) will be placed on your card.
-              </p>
+              <div className="hold-amount" style={{ fontSize: '1.2rem', color: '#2c5282', fontWeight: 600, marginBottom: '1rem' }}>
+                Hold Amount: ${holdAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' }).replace('$','')}
+              </div>
             </div>
             {error && (
               <div className="error-message">{error}</div>
