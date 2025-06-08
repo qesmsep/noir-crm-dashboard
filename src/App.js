@@ -23,6 +23,7 @@ import DashboardPage from './components/pages/DashboardPage';
 import MembersPage from './components/pages/MembersPage';
 import AdminPage from './components/pages/AdminPage';
 import CalendarPage from './components/pages/CalendarPage';
+import CreditCardHoldModal from './components/CreditCardHoldModal';
 
 // Responsive helper
 function useIsMobile() {
@@ -132,10 +133,8 @@ function App() {
   const [time, setTime] = useState('18:00');
   const [phone, setPhone] = useState('');
   const [membershipNumber, setMembershipNumber] = useState('');
-  const [nonMemberFields, setNonMemberFields] = useState({ firstName: '', lastName: '', email: '' });
   const [memberLookup, setMemberLookup] = useState(null);
   const [reserveStatus, setReserveStatus] = useState('');
-  const [showNonMemberModal, setShowNonMemberModal] = useState(false);
   const [eventType, setEventType] = useState('');
   const [nextAvailableTime, setNextAvailableTime] = useState(null);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
@@ -170,6 +169,9 @@ function App() {
   const [privateEvents, setPrivateEvents] = useState([]);
   const [upcomingRenewals, setUpcomingRenewals] = useState([]);
   const [projectedMonthlyDues, setProjectedMonthlyDues] = useState(0);
+  const [showCreditCardModal, setShowCreditCardModal] = useState(false);
+  const [holdId, setHoldId] = useState(null);
+  const [nonMemberInfo, setNonMemberInfo] = useState(null);
 
   // Define eventTypes at the top
   const eventTypes = [
@@ -1675,7 +1677,7 @@ function App() {
                 });
                 setShowConfirmationModal(true);
               } else {
-                setShowNonMemberModal(true);
+                setShowCreditCardModal(true);
               }
             }
 
@@ -1719,7 +1721,6 @@ function App() {
               try {
                 await createReservation(pendingReservation);
                 setMemberLookup(pendingReservation);
-                setNonMemberFields({ firstName: '', lastName: '', email: '' });
                 setShowReservationModal(false);
                 setShowConfirmationModal(false);
                 setSlotInfo(null);
@@ -1741,7 +1742,6 @@ function App() {
                       value={phone}
                       onChange={e => {
                         setPhone(e.target.value);
-                        setNonMemberFields({ firstName: '', lastName: '', email: '' });
                         setMemberLookup(null);
                         setReserveStatus('');
                       }}
@@ -1837,85 +1837,37 @@ function App() {
                   )}
                   </div>
 
-                {showNonMemberModal && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-                    <div className="non-member-modal">
-                      <h3>Enter Non-Member Details</h3>
-                      <div className="form-group">
-                        <label>First Name</label>
-                        <input
-                          type="text"
-                          placeholder="First name"
-                          value={nonMemberFields.firstName}
-                          onChange={e => setNonMemberFields(f => ({ ...f, firstName: e.target.value }))}
-                          className="form-control"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Last Name</label>
-                        <input
-                          type="text"
-                          placeholder="Last name"
-                          value={nonMemberFields.lastName}
-                          onChange={e => setNonMemberFields(f => ({ ...f, lastName: e.target.value }))}
-                          className="form-control"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Email</label>
-                        <input
-                          type="email"
-                          placeholder="Email"
-                          value={nonMemberFields.email}
-                          onChange={e => setNonMemberFields(f => ({ ...f, email: e.target.value }))}
-                          className="form-control"
-                        />
-                      </div>
-                      <div className="modal-actions">
-                  <button
-                    onClick={async () => {
-                            if (!nonMemberFields.firstName || !nonMemberFields.lastName || !nonMemberFields.email) {
-                              setReserveStatus('Please enter first name, last name, and email for non-members.');
-                              return;
-                            }
-                            try {
-                              await createReservation({
-                                name: `${nonMemberFields.firstName} ${nonMemberFields.lastName}`.trim(),
+                {showCreditCardModal && (
+                  <Elements stripe={stripePromise}>
+                    <CreditCardHoldModal
+                      partySize={partySize}
+                      onSuccess={(newHoldId, customerInfo) => {
+                        setHoldId(newHoldId);
+                        setNonMemberInfo(customerInfo);
+                        setShowCreditCardModal(false);
+                        // Now call createReservation with all info
+                        createReservation({
+                          name: `${customerInfo.firstName} ${customerInfo.lastName}`.trim(),
                           phone,
-                                email: nonMemberFields.email,
+                          email: customerInfo.email,
                           party_size: partySize,
                           notes: '',
-                                start_time: getStartTime(),
-                                end_time: getEndTime(),
-                                source: 'public_widget',
-                                event_type: eventType
-                              });
-                              setNonMemberFields({ firstName: '', lastName: '', email: '' });
-                              setShowNonMemberModal(false);
-                      setReloadKey(k => k + 1);
-                      setPhone('');
-                      setFirstName('');
-                      setLastName('');
-                      setPartySize(1);
-                      setTime('18:00');
-                              setReserveStatus('Reservation confirmed!');
-                            } catch (err) {
-                              console.log('Reservation failed (non-member):', err);
-                            }
-                          }}
-                          className="primary"
-                        >
-                          Confirm Reservation
-                        </button>
-                        <button
-                          onClick={() => setShowNonMemberModal(false)}
-                          className="secondary"
-                        >
-                          Cancel
-                  </button>
-                </div>
-                    </div>
-                  </div>
+                          start_time: getStartTime(),
+                          end_time: getEndTime(),
+                          source: 'public_widget',
+                          event_type: eventType,
+                          hold_id: newHoldId
+                        });
+                        setReloadKey(k => k + 1);
+                        setPhone('');
+                        setPartySize(1);
+                        setTime('18:00');
+                        setEventType('');
+                        setReserveStatus('Reservation confirmed!');
+                      }}
+                      onCancel={() => setShowCreditCardModal(false)}
+                    />
+                  </Elements>
                 )}
 
                 {showConfirmationModal && (
