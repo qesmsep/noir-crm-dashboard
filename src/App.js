@@ -70,7 +70,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function App() {
-  // Forced debug UI for environment variables
+  // Remove the forced debug UI and restore the original App function logic here.
   return (
     <div style={{ padding: 40 }}>
       <h2>DEBUG ENV</h2>
