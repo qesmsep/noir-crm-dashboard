@@ -6,6 +6,7 @@ import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
 import { toCST, toCSTISOString, formatDateTime } from '../utils/dateUtils';
 import { supabase } from '../api/supabaseClient';
+import CreditCardHoldModal from './CreditCardHoldModal';
 
 export default function FullCalendarTimeline({ reloadKey, bookingStartDate, bookingEndDate }) {
   const [resources, setResources] = useState([]);
@@ -16,6 +17,8 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
   const [newReservation, setNewReservation] = useState(null);
   const [eventData, setEventData] = useState({ evRes: null, resRes: null });
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [pendingReservationId, setPendingReservationId] = useState(null);
+  const [showCreditCardHoldModal, setShowCreditCardHoldModal] = useState(false);
 
   useEffect(() => {
     // Fetch tables as resources, sorted by number
@@ -418,8 +421,72 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
               }}
               bookingStartDate={bookingStartDate}
               bookingEndDate={bookingEndDate}
+              onNonMemberSubmit={async (formData) => {
+                try {
+                  // Create reservation for non-member
+                  const response = await fetch('/api/reservations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      first_name: formData.name.split(' ')[0],
+                      last_name: formData.name.split(' ').slice(1).join(' '),
+                      email: formData.email,
+                      phone: formData.phone,
+                      party_size: formData.party_size,
+                      date: formData.start_time,
+                      time: formData.start_time.split('T')[1].slice(0, 5),
+                      event_type: formData.event_type,
+                      notes: formData.notes,
+                      table_id: formData.table_id
+                    })
+                  });
+
+                  const data = await response.json();
+                  if (!response.ok) {
+                    throw new Error(data.error || 'Failed to create reservation');
+                  }
+
+                  // Show credit card hold modal
+                  setPendingReservationId(data.reservation_id);
+                  setShowModal(false);
+                  setShowCreditCardHoldModal(true);
+                } catch (error) {
+                  alert('Error: ' + error.message);
+                }
+              }}
             />
           </div>
+        </div>
+      )}
+      {/* Credit Card Hold Modal */}
+      {showCreditCardHoldModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <CreditCardHoldModal
+            reservationId={pendingReservationId}
+            partySize={newReservation?.party_size || 1}
+            onSuccess={() => {
+              setShowCreditCardHoldModal(false);
+              setPendingReservationId(null);
+              setNewReservation(null);
+              window.location.reload(); // Refresh to show new reservation
+            }}
+            onCancel={() => {
+              setShowCreditCardHoldModal(false);
+              setPendingReservationId(null);
+              setNewReservation(null);
+            }}
+          />
         </div>
       )}
       {/* Calendar Legend */}
