@@ -16,7 +16,7 @@ for(let h = startHour; h < endHour; h++){
   }
 }
 
-export default function ReservationForm({ initialStart, initialEnd, onSave, table_id, bookingStartDate, bookingEndDate, onNonMemberSubmit }) {
+export default function ReservationForm({ initialStart, initialEnd, onSave, table_id, bookingStartDate, bookingEndDate }) {
   const [form, setForm] = useState({
     name: '', phone: '', email: '', party_size: 1, notes: '', event_type: '',
   });
@@ -50,27 +50,19 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
     const durationMinutes = form.party_size <= 2 ? 90 : 120;
     const end = new Date(start.getTime() + durationMinutes * 60000);
     
-    const reservationData = {
+    await onSave({
       ...form,
       start_time: toCSTISOString(start),
       end_time: toCSTISOString(end),
       table_id: table_id
-    };
-
-    if (onNonMemberSubmit) {
-      // If onNonMemberSubmit is provided, use it for non-member flow
-      onNonMemberSubmit(reservationData);
-    } else {
-      // Otherwise use the normal flow
-      await onSave(reservationData);
-    }
+    });
   };
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       <input name="name" placeholder="Name" value={form.name} onChange={handleChange} required />
-      <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} required />
-      <input name="email" placeholder="Email" value={form.email} onChange={handleChange} required />
+      <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} />
+      <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
       <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
         <label>Party size</label>
         <button type="button" onClick={() => setForm(f => ({ ...f, party_size: Math.max(1, f.party_size - 1) }))}>-</button>
