@@ -87,10 +87,6 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
     <div className="modal">
       <div className="modal-content">
         <h2>Complete Your Reservation</h2>
-        <p>
-          A refundable hold of ${partySize * 25} (${25} per guest) will be placed on your card.
-          This hold will be released after your visit.
-        </p>
         
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -130,8 +126,20 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
           </div>
 
           <div className="form-group">
+            <p className="hold-notice">
+              Thank you for your reservation. To hold your reservation we request a hold on the credit card. 
+              This will be released upon your arrival.
+            </p>
+            <p className="hold-amount">
+              A refundable hold of ${partySize * 25} (${25} per guest) will be placed on your card.
+            </p>
             <label>Credit Card Information *</label>
-            <div className="card-element-container">
+            <div className="card-element-container" style={{ 
+              padding: '12px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              backgroundColor: 'white'
+            }}>
               <CardElement
                 options={{
                   style: {
@@ -141,6 +149,7 @@ export default function CreditCardHoldModal({ partySize, onSuccess, onCancel }) 
                       '::placeholder': {
                         color: '#aab7c4',
                       },
+                      backgroundColor: 'white',
                     },
                     invalid: {
                       color: '#9e2146',
