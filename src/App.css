@@ -1057,3 +1057,41 @@ body {
   font-size: 0.9rem;
   border: 1px solid #c3e6cb;
 }
+
+.credit-card-hold-modal {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  max-width: 500px;
+  width: 90%;
+}
+
+.credit-card-hold-modal h3 {
+  color: var(--color-night-sky);
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.credit-card-hold-modal p {
+  color: #666;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.card-element-container {
+  padding: 1rem;
+  border: 1px solid var(--color-greige);
+  border-radius: 6px;
+  background: #f8f9fa;
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  color: #e53e3e;
+  background: #fde8e8;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
