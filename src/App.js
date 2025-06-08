@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { createClient } from '@supabase/supabase-js';
 import './App.css';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
@@ -24,6 +23,7 @@ import MembersPage from './components/pages/MembersPage';
 import AdminPage from './components/pages/AdminPage';
 import CalendarPage from './components/pages/CalendarPage';
 import CreditCardHoldModal from './components/CreditCardHoldModal';
+import { supabase } from './api/supabaseClient';
 
 // Responsive helper
 function useIsMobile() {
@@ -60,9 +60,12 @@ function formatDOB(dob) {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Debug logging
+console.log('Environment Variables:', {
+  supabaseUrl: process.env.REACT_APP_SUPABASE_URL ? 'Set' : 'Not Set',
+  supabaseKey: process.env.REACT_APP_SUPABASE_ANON_KEY ? 'Set' : 'Not Set',
+  stripeKey: process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ? 'Set' : 'Not Set'
+});
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
