@@ -10,7 +10,7 @@
     "@fullcalendar/resource-timeline": "^6.1.17",
     "@sendgrid/mail": "^8.1.5",
     "@stripe/react-stripe-js": "^3.7.0",
-    "@stripe/stripe-js": "^7.3.0",
+    "@stripe/stripe-js": "^7.3.1",
     "@supabase/auth-ui-react": "*",
     "@supabase/auth-ui-shared": "*",
     "@supabase/supabase-js": "^2.49.4",
