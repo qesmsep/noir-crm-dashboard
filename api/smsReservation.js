@@ -209,7 +209,7 @@ function parseReservationMessage(message) {
   };
 }
 
-// Helper to auto-assign smallest free table (copied from reservations.js)
+// Helper to auto-assign smallest free table
 async function assignTable(start_time, end_time, party_size) {
   const { data: tables } = await supabase
     .from('tables').select('*').gte('capacity', party_size).order('capacity');
@@ -232,7 +232,6 @@ async function assignTable(start_time, end_time, party_size) {
       !(new Date(r.end_time) <= new Date(start_time) || new Date(r.start_time) >= new Date(end_time))
     );
     if (!hasEventConflict && !hasReservationConflict) {
-      // Log the table details
       console.log('Assigned table:', t.id, 'number:', t.number);
       return t.id;
     }
@@ -251,127 +250,44 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { from, body, text } = req.body;
-  const messageText = body || text;
-  if (!from || !messageText) {
-    console.log('Missing required fields:', { from, messageText });
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
+  const { 
+    phone, // Required: customer's phone number
+    name, // Required: customer's name
+    email, // Optional: customer's email
+    party_size, // Required: number of guests
+    start_time, // Required: ISO string of reservation start time
+    end_time, // Required: ISO string of reservation end time
+    event_type = 'Fun Night Out', // Optional: type of event
+    notes = '', // Optional: additional notes
+    source = 'sms' // Optional: source of reservation
+  } = req.body;
 
-  // Normalize phone number
-  const normalizedPhone = from.replace(/\D/g, '');
-  console.log('Normalized phone:', normalizedPhone);
+  // Validate required fields
+  if (!phone || !name || !party_size || !start_time || !end_time) {
+    console.log('Missing required fields:', { phone, name, party_size, start_time, end_time });
+    return res.status(400).json({ 
+      error: 'Missing required fields',
+      message: 'Please provide phone, name, party_size, start_time, and end_time'
+    });
+  }
 
   // Check if sender is a member
   const { data: memberData, error: memberError } = await supabase
     .from('members')
     .select('*')
     .limit(1)
-    .or(`phone.eq.${normalizedPhone},phone.eq.${from}`);
+    .or(`phone.eq.${phone.replace(/\D/g, '')},phone.eq.${phone}`);
 
   if (memberError) {
     console.error('Error checking member status:', memberError);
     return res.status(500).json({ error: 'Error checking member status' });
   }
 
-  if (!memberData || memberData.length === 0) {
-    console.log('No member found for phone:', from);
-    return res.status(403).json({ 
-      error: 'Not a member',
-      message: 'Sorry, this service is only available to members. Please contact us to become a member.'
-    });
-  }
-
-  const member = memberData[0];
-  console.log('Found member:', member);
-
-  // Parse the message to extract reservation details using combined regex for "Reservation for X guests at TIME on DATE"
-  // Normalize message and lower-case for matching
-  const msg = messageText.toLowerCase();
-
-  // Regex to match "reservation for X guests at TIME on DATE"
-  const fullMatch = msg.match(/reservation\s+for\s+(\d+)\s+guests\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
-  if (!fullMatch) {
-    return res.status(400).json({
-      error: 'Invalid message format',
-      message: 'Please use the format: Reservation for [number] guests at [time] on [MM/DD/YY]'
-    });
-  }
-
-  const party_size = parseInt(fullMatch[1]);
-  const timeStr = fullMatch[2].trim();
-  let dateStr = fullMatch[3].trim();
-  // Normalize two-digit year to four-digit
-  const [month, day, yearPart] = dateStr.split('/');
-  const fullYear = yearPart.length === 2 ? '20' + yearPart : yearPart;
-  dateStr = `${month}/${day}/${fullYear}`;
-
-  // Parse date using the existing helper
-  const date = parseNaturalDate(dateStr);
-  if (!date) {
-    return res.status(400).json({
-      error: 'Invalid date format',
-      message: 'Please specify a valid date like 6/7/25'
-    });
-  }
-
-  // Parse time (e.g., "10pm", "10:00 pm")
-  let hours = 0, minutes = 0;
-  const tMatch = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-  if (tMatch) {
-    hours = parseInt(tMatch[1]);
-    minutes = tMatch[2] ? parseInt(tMatch[2]) : 0;
-    const meridiem = tMatch[3];
-    if (meridiem === 'pm' && hours < 12) hours += 12;
-    if (meridiem === 'am' && hours === 12) hours = 0;
-  }
-
-  // Create start time in CST then convert to UTC
-  const startDate = new Date(date);
-  startDate.setHours(hours, minutes, 0, 0);
-  
-  // Convert to UTC while preserving the date
-  const utcDate = new Date(startDate);
-  // Add 5 hours to convert CST to UTC, but handle date rollover
-  const utcHours = utcDate.getHours() + 5;
-  if (utcHours >= 24) {
-    utcDate.setDate(utcDate.getDate() + 1);
-    utcDate.setHours(utcHours - 24);
-  } else {
-    utcDate.setHours(utcHours);
-  }
-  const start_time = utcDate.toISOString();
-
-  // Set end time 90 or 120 minutes later
-  const duration = party_size <= 2 ? 90 : 120;
-  const endDate = new Date(startDate.getTime() + duration * 60000);
-  const utcEndDate = new Date(endDate);
-  // Add 5 hours to convert CST to UTC, but handle date rollover
-  const utcEndHours = utcEndDate.getHours() + 5;
-  if (utcEndHours >= 24) {
-    utcEndDate.setDate(utcEndDate.getDate() + 1);
-    utcEndDate.setHours(utcEndHours - 24);
-  } else {
-    utcEndDate.setHours(utcEndHours);
-  }
-  const end_time = utcEndDate.toISOString();
-
-  const reservationDetails = {
-    party_size,
-    start_time,
-    end_time,
-    event_type: 'Fun Night Out',
-    notes: 'Fun Night Out'
-  };
-
-  console.log('Reservation details:', reservationDetails);
+  const member = memberData?.[0];
+  const isMember = !!member;
 
   // Check availability and assign table
-  const table_id = await assignTable(
-    reservationDetails.start_time,
-    reservationDetails.end_time,
-    reservationDetails.party_size
-  );
+  const table_id = await assignTable(start_time, end_time, party_size);
 
   if (!table_id) {
     console.log('No available tables found');
@@ -387,17 +303,17 @@ module.exports = async (req, res) => {
   const { data: reservation, error: reservationError } = await supabase
     .from('reservations')
     .insert({
-      member_id: member.member_id,
+      member_id: member?.member_id,
       start_time,
       end_time,
       party_size,
       table_id,
-      name: `${member.first_name} ${member.last_name}`,
-      phone: member.phone,
-      email: member.email,
-      source: 'sms',
-      event_type: 'Fun Night Out',
-      notes: member.status === 'active' ? '♥' : 'fun night out'
+      name,
+      phone,
+      email,
+      source,
+      event_type,
+      notes: isMember ? '♥' : notes || event_type
     })
     .select(`
       *,
@@ -418,7 +334,7 @@ module.exports = async (req, res) => {
   console.log('Reservation created:', reservation);
 
   // Send confirmation email
-  const startTime = new Date(reservationDetails.start_time);
+  const startTime = new Date(reservation.start_time);
   const formattedDate = startTime.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -433,7 +349,7 @@ module.exports = async (req, res) => {
     <p>Dear ${member.first_name} ${member.last_name},</p>
     <p>Your reservation has been confirmed for:</p>
     <p><strong>Date:</strong> ${formattedDate}</p>
-    <p><strong>Party Size:</strong> ${reservationDetails.party_size} guests</p>
+    <p><strong>Party Size:</strong> ${reservation.party_size} guests</p>
     <p>We look forward to seeing you!</p>
   `;
 
@@ -457,13 +373,14 @@ module.exports = async (req, res) => {
     },
     body: JSON.stringify({
       from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-      to: from,
-      text: `Hi ${member.first_name}, your reservation at Noir has been confirmed for ${party_size} guests on ${date.toLocaleDateString()} at ${hours}:${minutes.toString().padStart(2, '0')} ${meridiem}. We look forward to seeing you!`
+      to: phone,
+      text: `Hi ${member.first_name}, your reservation at Noir has been confirmed for ${party_size} guests on ${new Date(start_time).toLocaleDateString()} at ${new Date(start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
     })
   });
 
-  return res.status(200).json({
-    message: 'Reservation confirmed',
-    reservation: reservation
+  return res.status(201).json({
+    success: true,
+    reservation,
+    message: `Reservation confirmed for ${name} on ${new Date(start_time).toLocaleDateString()} at ${new Date(start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} for ${party_size} guests${reservation.tables?.number ? ` at Table ${reservation.tables.number}` : ''}.`
   });
-} 
+}; 
