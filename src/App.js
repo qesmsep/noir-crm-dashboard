@@ -280,29 +280,6 @@ function App() {
   useEffect(() => {
     if (!members.length) return;
 
-    // Map membership text to monthly amount
-    const membershipAmounts = {
-      'Host': 1,
-      'Noir Host': 1,
-      'Noir Solo': 100,
-      'Solo': 100,
-      'Noir Duo': 125,
-      'Duo': 125,
-      'Premier': 250,
-      'Reserve': 1000
-    };
-
-    // Helper to extract tier from membership string
-    function getTier(membership) {
-      if (!membership) return null;
-      if (/host/i.test(membership)) return 'Host';
-      if (/solo/i.test(membership)) return 'Noir Solo';
-      if (/duo/i.test(membership)) return 'Noir Duo';
-      if (/premier/i.test(membership)) return 'Premier';
-      if (/reserve/i.test(membership)) return 'Reserve';
-      return null;
-    }
-
     const today = new Date();
     const thisMonth = today.getMonth();
     const thisYear = today.getFullYear();
@@ -331,11 +308,7 @@ function App() {
           nextRenewal.getFullYear() === thisYear
         );
       })
-      .reduce((sum, m) => {
-        const tier = getTier(m.membership);
-        const amt = membershipAmounts[tier] || 0;
-        return sum + amt;
-      }, 0);
+      .reduce((sum, m) => sum + (m.monthly_dues || 0), 0);
 
     setProjectedMonthlyDues(projected);
   }, [members]);
