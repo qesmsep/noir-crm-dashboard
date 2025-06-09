@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'member_ids (array) and content are required' });
   }
 
-  // Fetch members' phone numbers from members table
+  // Fetch members' phone numbers
   const { data: members, error: memberError } = await supabase
     .from('members')
     .select('member_id, first_name, last_name, phone')
@@ -26,23 +26,10 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to fetch members', details: memberError.message });
   }
 
-  // Fetch potential members' phone numbers from potential_members table
-  const { data: potentialMembers, error: potentialMemberError } = await supabase
-    .from('potential_members')
-    .select('member_id, first_name, last_name, phone')
-    .in('member_id', member_ids);
-
-  if (potentialMemberError) {
-    return res.status(500).json({ error: 'Failed to fetch potential members', details: potentialMemberError.message });
-  }
-
-  // Combine members and potential members
-  const allMembers = [...members, ...potentialMembers];
-
   // Prepare results
   const results = [];
 
-  for (const member of allMembers) {
+  for (const member of members) {
     const toPhone = member.phone;
     if (!toPhone) {
       results.push({ member_id: member.member_id, status: 'failed', error: 'No phone number' });
