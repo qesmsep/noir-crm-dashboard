@@ -4,6 +4,7 @@ import MemberDetail from '../../MemberDetail';
 import MemberLedger from './MemberLedger';
 import SendMessageModal from '../messages/SendMessageModal';
 import MessageHistory from '../messages/MessageHistory';
+import AddMemberModal from '../members/AddMemberModal';
 
 // You may want to further break this down into smaller components later
 const MembersPage = ({
@@ -40,11 +41,34 @@ const MembersPage = ({
   const [modalMember, setModalMember] = useState(null);
   const [messageHistoryKey, setMessageHistoryKey] = useState(0);
   const isAdmin = session?.user?.user_metadata?.role === 'admin';
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+
+  const handleSaveNewMember = async (memberData) => {
+    try {
+      const response = await fetch('/api/members', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(memberData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save member');
+      }
+
+      // Refresh the members list
+      window.location.reload();
+    } catch (error) {
+      console.error('Error saving member:', error);
+      alert('Failed to save member. Please try again.');
+    }
+  };
 
   return (
     <div style={{ padding: '2rem' }}>
       {/* Member Lookup UI at the top of Members section */}
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Search by name, email, or phone"
@@ -52,8 +76,37 @@ const MembersPage = ({
           onChange={e => setLookupQuery(e.target.value)}
           style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
         />
-        <ul className="member-list">
-          {members.filter(m => {
+        <button
+          onClick={() => setShowAddMemberModal(true)}
+          style={{
+            background: '#2c5282',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '0.6rem 1.4rem',
+            fontWeight: 600,
+            fontSize: '1rem',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(44,82,130,0.08)'
+          }}
+        >
+          Add New Member
+        </button>
+      </div>
+      <ul className="member-list">
+        {members.filter(m => {
+          const q = lookupQuery.trim().toLowerCase();
+          if (!q) return false;
+          return (
+            (m.first_name && m.first_name.toLowerCase().includes(q)) ||
+            (m.last_name && m.last_name.toLowerCase().includes(q)) ||
+            (m.email && m.email.toLowerCase().includes(q)) ||
+            (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
+          );
+        }).length === 0 && lookupQuery ? (
+          <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
+        ) : (
+          members.filter(m => {
             const q = lookupQuery.trim().toLowerCase();
             if (!q) return false;
             return (
@@ -62,57 +115,44 @@ const MembersPage = ({
               (m.email && m.email.toLowerCase().includes(q)) ||
               (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
             );
-          }).length === 0 && lookupQuery ? (
-            <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
-          ) : (
-            members.filter(m => {
-              const q = lookupQuery.trim().toLowerCase();
-              if (!q) return false;
-              return (
-                (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-                (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-                (m.email && m.email.toLowerCase().includes(q)) ||
-                (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-              );
-            }).map(member => (
-              <li
-                key={member.member_id}
-                className="member-item"
-                style={{ position: "relative", cursor: "pointer", width: "100%" }}
-                onClick={() => {
+          }).map(member => (
+            <li
+              key={member.member_id}
+              className="member-item"
+              style={{ position: "relative", cursor: "pointer", width: "100%" }}
+              onClick={() => {
+                setSelectedMember(member);
+                fetchLedger(member.account_id);
+              }}
+              tabIndex={0}
+              role="button"
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
                   setSelectedMember(member);
                   fetchLedger(member.account_id);
-                }}
-                tabIndex={0}
-                role="button"
-                onKeyDown={e => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setSelectedMember(member);
-                    fetchLedger(member.account_id);
-                  }
-                }}
-              >
-                {member.photo && (
-                  <img
-                    src={member.photo}
-                    alt={`${member.first_name} ${member.last_name}`}
-                    className="member-photo"
-                  />
-                )}
-                <div className="member-info">
-                  <strong>
-                    {member.first_name} {member.last_name}
-                  </strong>
-                  <div>Member since: {formatDateLong(member.join_date)}</div>
-                  <div>Phone: {formatPhone(member.phone)}</div>
-                  <div>Email: {member.email}</div>
-                  <div>Date of Birth: {formatDOB(member.dob)}</div>
-                </div>
-              </li>
-            ))
-          )}
-        </ul>
-      </div>
+                }
+              }}
+            >
+              {member.photo && (
+                <img
+                  src={member.photo}
+                  alt={`${member.first_name} ${member.last_name}`}
+                  className="member-photo"
+                />
+              )}
+              <div className="member-info">
+                <strong>
+                  {member.first_name} {member.last_name}
+                </strong>
+                <div>Member since: {formatDateLong(member.join_date)}</div>
+                <div>Phone: {formatPhone(member.phone)}</div>
+                <div>Email: {member.email}</div>
+                <div>Date of Birth: {formatDOB(member.dob)}</div>
+              </div>
+            </li>
+          ))
+        )}
+      </ul>
       {/* End Member Lookup UI */}
       {/* Existing member list, filtered if no lookup query */}
       {!selectedMember ? (
@@ -261,6 +301,13 @@ const MembersPage = ({
           </Elements>
         </div>
       )}
+
+      {/* Add Member Modal */}
+      <AddMemberModal
+        isOpen={showAddMemberModal}
+        onClose={() => setShowAddMemberModal(false)}
+        onSave={handleSaveNewMember}
+      />
     </div>
   );
 };
