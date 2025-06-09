@@ -59,28 +59,75 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Generate UUIDs
-    const account_id = uuidv4();
-    const primary_member_id = uuidv4();
-    const secondary_member_id = showSecondaryMember ? uuidv4() : null;
+    try {
+      // Generate UUIDs
+      const account_id = uuidv4();
+      const primary_member_id = uuidv4();
+      const secondary_member_id = showSecondaryMember ? uuidv4() : null;
 
-    const memberData = {
-      account_id,
-      primary_member: {
-        ...primaryMember,
-        member_id: primary_member_id,
-        is_primary: true
-      },
-      secondary_member: showSecondaryMember ? {
-        ...secondaryMember,
-        member_id: secondary_member_id,
-        is_primary: false,
-        account_id
-      } : null
-    };
+      // Handle photo uploads if present
+      let primaryPhotoUrl = null;
+      let secondaryPhotoUrl = null;
 
-    await onSave(memberData);
-    onClose();
+      if (primaryMember.photo) {
+        const formData = new FormData();
+        formData.append('file', primaryMember.photo);
+        formData.append('member_id', primary_member_id);
+        
+        const uploadResponse = await fetch('/api/upload-photo', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload primary member photo');
+        }
+        
+        const { url } = await uploadResponse.json();
+        primaryPhotoUrl = url;
+      }
+
+      if (showSecondaryMember && secondaryMember.photo) {
+        const formData = new FormData();
+        formData.append('file', secondaryMember.photo);
+        formData.append('member_id', secondary_member_id);
+        
+        const uploadResponse = await fetch('/api/upload-photo', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload secondary member photo');
+        }
+        
+        const { url } = await uploadResponse.json();
+        secondaryPhotoUrl = url;
+      }
+
+      const memberData = {
+        account_id,
+        primary_member: {
+          ...primaryMember,
+          member_id: primary_member_id,
+          is_primary: true,
+          photo: primaryPhotoUrl
+        },
+        secondary_member: showSecondaryMember ? {
+          ...secondaryMember,
+          member_id: secondary_member_id,
+          is_primary: false,
+          account_id,
+          photo: secondaryPhotoUrl
+        } : null
+      };
+
+      await onSave(memberData);
+      onClose();
+    } catch (error) {
+      console.error('Error saving member:', error);
+      alert(`Failed to save member: ${error.message}`);
+    }
   };
 
   if (!isOpen) return null;
