@@ -18,7 +18,9 @@ export default async function handler(req, res) {
       .from('members')
       .insert([{
         ...primary_member,
+        member_id: primary_member.member_id,
         account_id,
+        member_type: 'primary',
         join_date: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -34,7 +36,9 @@ export default async function handler(req, res) {
         .from('members')
         .insert([{
           ...secondary_member,
+          member_id: secondary_member.member_id,
           account_id,
+          member_type: 'secondary',
           join_date: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
