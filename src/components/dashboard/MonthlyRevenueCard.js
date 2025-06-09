@@ -87,32 +87,10 @@ export const MonthlyMembershipRevenueCard = ({ memberLedger, projectedMonthlyDue
   // 2. To be received: projectedMonthlyDues - collected
   const toBeReceived = Math.max(0, (projectedMonthlyDues || 0) - membershipPayments);
 
-  // 3. Next month forecast: sum of upcomingRenewals for next month
+  // 3. Next month forecast: sum of monthly_dues for upcomingRenewals in next month
   const nextMonthForecast = (upcomingRenewals || [])
     .filter(m => m.nextRenewal && isNextMonth(m.nextRenewal))
-    .reduce((sum, m) => {
-      // Use the same membershipAmounts logic as in App.js
-      const membershipAmounts = {
-        'Host': 1,
-        'Noir Host': 1,
-        'Noir Solo': 100,
-        'Solo': 100,
-        'Noir Duo': 125,
-        'Duo': 125,
-        'Premier': 250,
-        'Reserve': 1000
-      };
-      let tier = null;
-      if (m.membership) {
-        if (/host/i.test(m.membership)) tier = 'Host';
-        else if (/solo/i.test(m.membership)) tier = 'Noir Solo';
-        else if (/duo/i.test(m.membership)) tier = 'Noir Duo';
-        else if (/premier/i.test(m.membership)) tier = 'Premier';
-        else if (/reserve/i.test(m.membership)) tier = 'Reserve';
-      }
-      const amt = membershipAmounts[tier] || 0;
-      return sum + amt;
-    }, 0);
+    .reduce((sum, m) => sum + (m.monthly_dues || 0), 0);
 
   return (
     <div style={{

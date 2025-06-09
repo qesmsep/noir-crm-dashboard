@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 const MEMBERSHIP_TIERS = [
-  'Solo',
-  'Duo',
-  'Premier'
+  { label: 'Solo', value: 'Solo', dues: 100 },
+  { label: 'Duo', value: 'Duo', dues: 125 },
+  { label: 'Premier', value: 'Premier', dues: 250 },
+  { label: 'Reserve', value: 'Reserve', dues: 1000 },
+  { label: 'Host', value: 'Host', dues: 1 }
 ];
 
 const ALLOWED_MEMBER_FIELDS = [
-  'account_id', 'first_name', 'last_name', 'email', 'phone', 'stripe_customer_id', 'status',
-  'join_date', 'renewal_date', 'company', 'address', 'address_2', 'city', 'state', 'zip', 'country',
-  'referral', 'membership', 'photo', 'dob', 'auth_code', 'token', 'balance', 'created_at',
-  'supabase_user_id', 'member_type', 'member_id'
+  'account_id', 'first_name', 'last_name', 'email', 'phone', 'stripe_customer_id',
+  'join_date', 'company', 'address', 'address_2', 'city', 'state', 'zip', 'country',
+  'referral', 'membership', 'monthly_dues', 'photo', 'dob', 'auth_code', 'token', 'created_at',
+  'member_type', 'member_id'
 ];
 
 function cleanMemberObject(obj) {
@@ -37,6 +39,7 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
     country: '',
     referral: '',
     membership: '',
+    monthly_dues: 0,
     dob: '',
     photo: ''
   });
@@ -53,7 +56,12 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
 
   const handlePrimaryMemberChange = (e) => {
     const { name, value } = e.target;
-    setPrimaryMember(prev => ({ ...prev, [name]: value }));
+    let update = { [name]: value };
+    if (name === 'membership') {
+      const tier = MEMBERSHIP_TIERS.find(t => t.value === value);
+      update.monthly_dues = tier ? tier.dues : 0;
+    }
+    setPrimaryMember(prev => ({ ...prev, ...update }));
   };
 
   const handleSecondaryMemberChange = (e) => {
@@ -228,7 +236,7 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
                 >
                   <option value="">Select a tier</option>
                   {MEMBERSHIP_TIERS.map(tier => (
-                    <option key={tier} value={tier}>{tier}</option>
+                    <option key={tier.value} value={tier.value}>{tier.label}</option>
                   ))}
                 </select>
               </div>

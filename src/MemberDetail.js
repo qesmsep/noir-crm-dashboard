@@ -215,7 +215,7 @@ const MemberDetail = ({
     return phone.trim();
   };
 
-  const handleDeleteMember = async (member_id, supabase_user_id) => {
+  const handleDeleteMember = async (member_id) => {
     try {
       // Get session for access token
       const { data: { session } } = await supabase.auth.getSession();
@@ -228,7 +228,6 @@ const MemberDetail = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           member_id,
-          supabase_user_id,
           requester_token: session.access_token
         }),
       });
@@ -430,7 +429,7 @@ const MemberDetail = ({
           className="delete-member-btn"
           onClick={() => {
             if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-                handleDeleteMember(member.member_id, member.supabase_user_id);
+                handleDeleteMember(member.member_id);
             }
           }}
         >

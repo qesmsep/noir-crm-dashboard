@@ -109,7 +109,7 @@ function App() {
     phone: "",
     dob: "",
     membership: "",
-    balance: "",
+    monthly_dues: 0,
     photo: "",
     first_name2: "",
     last_name2: "",
@@ -157,6 +157,7 @@ function App() {
     phone: '',
     dob: '',
     membership: '',
+    monthly_dues: 0,
     photo: ''
   });
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -399,7 +400,7 @@ function App() {
       phone: "",
       dob: "",
       membership: "",
-      balance: "",
+      monthly_dues: 0,
       photo: "",
       first_name2: "",
       last_name2: "",
@@ -1090,7 +1091,6 @@ function App() {
                     account_id: selectedMember.account_id,
                     member_id: uuidv4(),
                     status: 'active',
-                    balance: 0,
                     join_date: new Date().toISOString(),
                     created_at,
                     stripe_customer_id
@@ -1108,6 +1108,7 @@ function App() {
                     phone: '',
                     dob: '',
                     membership: '',
+                    monthly_dues: 0,
                     photo: ''
                   });
                 } catch (err) {
@@ -1167,7 +1168,7 @@ function App() {
                     <input
                       type="text"
                       value={addMemberForm.membership}
-                      onChange={e => setAddMemberForm(prev => ({ ...prev, membership: e.target.value }))}
+                      onChange={e => setAddMemberForm(prev => ({ ...prev, membership: e.target.value, monthly_dues: getMonthlyDues(e.target.value) }))}
                       style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                     />
                   </div>
@@ -1305,7 +1306,7 @@ function App() {
                     <input
                       type="text"
                       value={editMemberForm.membership || ''}
-                      onChange={e => setEditMemberForm(prev => ({ ...prev, membership: e.target.value }))}
+                      onChange={e => setEditMemberForm(prev => ({ ...prev, membership: e.target.value, monthly_dues: getMonthlyDues(e.target.value) }))}
                       style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                     />
                   </div>

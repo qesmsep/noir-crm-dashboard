@@ -36,10 +36,7 @@ const UpcomingPaymentsCard = ({ upcomingRenewals }) => {
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {accountList.slice(0, 5).map(m => {
-            const tier = m.membership?.match(/host|solo|duo|premier|reserve/i)?.[0]?.toLowerCase();
-            const amount = membershipAmounts[Object.keys(membershipAmounts).find(key => 
-              key.toLowerCase().includes(tier || '')
-            )] || 0;
+            const amount = m.monthly_dues || 0;
             return (
               <li key={m.account_id} style={{ 
                 padding: '0.75rem 0', 

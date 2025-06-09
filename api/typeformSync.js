@@ -56,9 +56,9 @@ export default async function handler(req, res) {
       account_id,
       first_name:   findAnswer(['a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d']),
       last_name:    findAnswer(['9c123e7b-2643-4819-9b4d-4a9f236302c9']),
-      email:        findAnswer(['ee4bcd7b-768d-49fb-b7cc-80cdd25c750a'], 'email'),
+      email:        findAnswer(['ee4bcd7d-768d-49fb-b7cc-80cdd25c750a'], 'email'),
       phone:        findAnswer(['6ed12e4b-95a2-4b30-96b2-a7095f673db6'], 'phone_number'),
-      company:      findAnswer(['d32131fd-318b-4fcd-41eed4096d36', 'd32131fd-318b-4e39-8fcd-41eed4096d36']),
+      company:      findAnswer(['d32131fd-318b-4cbd-41eed4096d36', 'd32131fd-318b-4e39-8fcd-41eed4096d36']),
       dob:          findAnswer(['1432cfc0-d3dc-48fc-8561-bf0053ccc097'], 'date'),
       address:      findAnswer(['d8ef8992-e207-4165-a296-67dd22de7cc6']),
       address_2:    findAnswer(['fb3d4079-af85-4914-962a-71c9316b89e2']),
@@ -69,13 +69,14 @@ export default async function handler(req, res) {
       membership:   findAnswer(['8101b9b5-5734-4db6-a2d1-27f122c05f9e'], 'choice'),
       photo:        findAnswer(['ddc3eeeb-f2ae-4070-846d-c3194008d0d9'], 'file_url'),
       referral:     findAnswer(['dff5344e-93e0-4ae5-967c-b92e0ad51f65']),
-      status:       'pending',
-      balance:      0,
+      monthly_dues: 0,
       stripe_customer_id: null,
       join_date:    form.submitted_at,
-      renewal_date: null,
       token:        form.token || null,
     };
+    // Set monthly_dues based on membership
+    const duesMap = { 'Solo': 100, 'Duo': 125, 'Premier': 250, 'Reserve': 1000, 'Host': 1 };
+    member1.monthly_dues = duesMap[member1.membership] || 0;
 
     // Second member (if present)
     const member2FirstName = findAnswer(['4418ddd8-d940-4896-9589-565b78c252c8']);

@@ -6,16 +6,28 @@ const supabase = createClient(
 );
 
 const ALLOWED_MEMBER_FIELDS = [
-  'account_id', 'first_name', 'last_name', 'email', 'phone', 'stripe_customer_id', 'status',
-  'join_date', 'renewal_date', 'company', 'address', 'address_2', 'city', 'state', 'zip', 'country',
-  'referral', 'membership', 'photo', 'dob', 'auth_code', 'token', 'balance', 'created_at',
-  'supabase_user_id', 'member_type', 'member_id'
+  'account_id', 'first_name', 'last_name', 'email', 'phone', 'stripe_customer_id',
+  'join_date', 'company', 'address', 'address_2', 'city', 'state', 'zip', 'country',
+  'referral', 'membership', 'monthly_dues', 'photo', 'dob', 'auth_code', 'token', 'created_at',
+  'member_type', 'member_id'
 ];
 
 function cleanMemberObject(obj) {
   return Object.fromEntries(
     Object.entries(obj).filter(([key]) => ALLOWED_MEMBER_FIELDS.includes(key))
   );
+}
+
+function getMonthlyDues(membership) {
+  if (!membership) return 0;
+  const map = {
+    'Solo': 100,
+    'Duo': 125,
+    'Premier': 250,
+    'Reserve': 1000,
+    'Host': 1
+  };
+  return map[membership] || 0;
 }
 
 export default async function handler(req, res) {
@@ -29,10 +41,12 @@ export default async function handler(req, res) {
     const now = new Date().toISOString();
     const primaryMemberClean = cleanMemberObject({
       ...primary_member,
+      monthly_dues: primary_member.monthly_dues || getMonthlyDues(primary_member.membership),
       created_at: now
     });
     const secondaryMemberClean = secondary_member ? cleanMemberObject({
       ...secondary_member,
+      monthly_dues: secondary_member.monthly_dues || getMonthlyDues(secondary_member.membership),
       created_at: now
     }) : null;
 
