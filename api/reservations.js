@@ -179,23 +179,14 @@ export default async function handler(req, res) {
   if (method === 'DELETE') {
     const id = req.query.id || req.body.id;
     if (!id) return res.status(400).json({ error: 'Reservation id is required' });
-    // Fetch reservation to get hold_id
+    // Fetch reservation by id only
     const { data: reservation, error: fetchError } = await supabase
       .from('reservations')
-      .select('id, hold_id')
+      .select('id')
       .eq('id', id)
       .single();
     if (fetchError || !reservation) {
       return res.status(404).json({ error: 'Reservation not found' });
-    }
-    // If hold_id exists, cancel the PaymentIntent
-    if (reservation.hold_id) {
-      try {
-        await stripe.paymentIntents.cancel(reservation.hold_id);
-      } catch (err) {
-        console.error('Failed to cancel Stripe hold:', err);
-        // Continue to delete reservation even if Stripe fails
-      }
     }
     // Delete reservation
     const { error: deleteError } = await supabase
