@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 const MEMBERSHIP_TIERS = [
-  'Individual',
+  'Solo',
   'Duo',
-  'Family',
-  'Corporate'
+  'Premier'
 ];
 
 const ALLOWED_MEMBER_FIELDS = [
@@ -84,19 +83,24 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
       }
 
       const now = new Date().toISOString();
+      const today = new Date().toISOString().split('T')[0];
       const primaryMemberClean = cleanMemberObject({
         ...primaryMember,
         member_id: primary_member_id,
         account_id,
         member_type: 'primary',
-        created_at: now
+        created_at: now,
+        status: 'active',
+        join_date: today
       });
       const secondaryMemberClean = showSecondaryMember ? cleanMemberObject({
         ...secondaryMember,
         member_id: secondary_member_id,
         account_id,
         member_type: 'secondary',
-        created_at: now
+        created_at: now,
+        status: 'active',
+        join_date: today
       }) : null;
       const memberData = {
         account_id,
