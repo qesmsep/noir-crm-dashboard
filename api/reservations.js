@@ -108,34 +108,16 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message });
     if (!data || data.length === 0) return res.status(500).json({ error: 'No reservation data returned' });
 
-    // --- NEW: Upsert into potential_members and send SMS ---
+    // --- NEW: Send confirmation SMS ---
     const formattedPhone = phone ? phone.replace(/\D/g, '') : '';
     if (formattedPhone) {
-      // Check if already a member
-      const { data: memberData, error: memberError } = await supabase
-        .from('members')
-        .select('member_id')
-        .or(`phone.eq.${formattedPhone},phone2.eq.${formattedPhone}`)
-        .single();
-      if (!memberData) {
-        // Upsert into potential_members
-        await supabase
-          .from('potential_members')
-          .upsert({
-            member_id: formattedPhone,
-            first_name: name?.split(' ')[0] || '',
-            last_name: name?.split(' ').slice(1).join(' ') || '',
-            email: email || ''
-          });
-      }
-      // Send confirmation SMS
       try {
         await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/sendText`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             member_ids: [formattedPhone],
-            content: `Thank you for your reservation. It's been confirmed for ${party_size} guests on ${new Date(start_time).toLocaleDateString()} at ${new Date(start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. We look forward to seeing you soon.`
+            content: `Thank you for making a reservation. It has been confirmed.`
           })
         });
       } catch (err) {
