@@ -26,7 +26,7 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
     referral: '',
     membership_tier: '',
     dob: '',
-    photo: null
+    photo: ''
   });
 
   const [secondaryMember, setSecondaryMember] = useState({
@@ -35,25 +35,17 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
     email: '',
     phone: '',
     dob: '',
-    photo: null
+    photo: ''
   });
 
   const handlePrimaryMemberChange = (e) => {
-    const { name, value, type, files } = e.target;
-    if (type === 'file') {
-      setPrimaryMember(prev => ({ ...prev, [name]: files[0] }));
-    } else {
-      setPrimaryMember(prev => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setPrimaryMember(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSecondaryMemberChange = (e) => {
-    const { name, value, type, files } = e.target;
-    if (type === 'file') {
-      setSecondaryMember(prev => ({ ...prev, [name]: files[0] }));
-    } else {
-      setSecondaryMember(prev => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setSecondaryMember(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -70,39 +62,11 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
       let secondaryPhotoUrl = null;
 
       if (primaryMember.photo) {
-        const formData = new FormData();
-        formData.append('file', primaryMember.photo);
-        formData.append('member_id', primary_member_id);
-        
-        const uploadResponse = await fetch('/api/upload-photo', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload primary member photo');
-        }
-        
-        const { url } = await uploadResponse.json();
-        primaryPhotoUrl = url;
+        primaryPhotoUrl = primaryMember.photo;
       }
 
       if (showSecondaryMember && secondaryMember.photo) {
-        const formData = new FormData();
-        formData.append('file', secondaryMember.photo);
-        formData.append('member_id', secondary_member_id);
-        
-        const uploadResponse = await fetch('/api/upload-photo', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload secondary member photo');
-        }
-        
-        const { url } = await uploadResponse.json();
-        secondaryPhotoUrl = url;
+        secondaryPhotoUrl = secondaryMember.photo;
       }
 
       const memberData = {
@@ -337,12 +301,13 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
                 />
               </div>
               <div>
-                <label>Photo</label>
+                <label>Photo URL</label>
                 <input
-                  type="file"
+                  type="url"
                   name="photo"
+                  value={primaryMember.photo}
                   onChange={handlePrimaryMemberChange}
-                  accept="image/*"
+                  placeholder="https://..."
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
               </div>
@@ -422,12 +387,13 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
                   />
                 </div>
                 <div>
-                  <label>Photo</label>
+                  <label>Photo URL</label>
                   <input
-                    type="file"
+                    type="url"
                     name="photo"
+                    value={secondaryMember.photo}
                     onChange={handleSecondaryMemberChange}
-                    accept="image/*"
+                    placeholder="https://..."
                     style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
                   />
                 </div>
