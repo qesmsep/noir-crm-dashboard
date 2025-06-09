@@ -112,13 +112,15 @@ export default async function handler(req, res) {
     const formattedPhone = phone ? phone.replace(/\D/g, '') : '';
     if (formattedPhone) {
       try {
+        const smsPayload = {
+          direct_phone: formattedPhone,
+          content: `Thank you for making a reservation. It has been confirmed.`
+        };
+        console.log('Sending SMS confirmation with payload:', smsPayload);
         await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/sendText`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            member_ids: [formattedPhone],
-            content: `Thank you for making a reservation. It has been confirmed.`
-          })
+          body: JSON.stringify(smsPayload)
         });
       } catch (err) {
         console.error('Failed to send confirmation SMS:', err);
