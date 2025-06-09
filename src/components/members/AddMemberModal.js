@@ -74,13 +74,11 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
         primary_member: {
           ...primaryMember,
           member_id: primary_member_id,
-          is_primary: true,
           photo: primaryPhotoUrl
         },
         secondary_member: showSecondaryMember ? {
           ...secondaryMember,
           member_id: secondary_member_id,
-          is_primary: false,
           account_id,
           photo: secondaryPhotoUrl
         } : null
