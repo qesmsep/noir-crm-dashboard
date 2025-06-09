@@ -679,6 +679,24 @@ function App() {
     fetchPrivateEvents();
   }, []);
 
+  useEffect(() => {
+    async function fetchAllLedger() {
+      if (section !== 'dashboard') return;
+      try {
+        const res = await fetch('/api/ledger');
+        const result = await res.json();
+        if (res.ok && result.data) {
+          setMemberLedger(result.data || []);
+        } else {
+          setMemberLedger([]);
+        }
+      } catch (err) {
+        setMemberLedger([]);
+      }
+    }
+    fetchAllLedger();
+  }, [section]);
+
   // Add route for /private-event/:id
   const pathname = window.location.pathname;
   const privateEventMatch = pathname.match(/^\/private-event\/(\d+)/);

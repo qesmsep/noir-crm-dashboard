@@ -11,9 +11,6 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const { member_id, account_id } = req.query;
-      if (!member_id && !account_id) {
-        return res.status(400).json({ error: "Missing member_id or account_id" });
-      }
       let query = supabaseAdmin.from("ledger").select("*");
       if (member_id) query = query.eq("member_id", member_id);
       if (account_id) query = query.eq("account_id", account_id);
