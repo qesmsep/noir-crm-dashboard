@@ -67,16 +67,10 @@ export const MonthlyMembershipRevenueCard = ({ memberLedger, projectedMonthlyDue
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
-  const nextMonth = (thisMonth + 1) % 12;
-  const nextMonthYear = thisMonth === 11 ? thisYear + 1 : thisYear;
 
   const isThisMonth = (dateStr) => {
     const d = new Date(dateStr);
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
-  };
-  const isNextMonth = (dateStr) => {
-    const d = new Date(dateStr);
-    return d.getMonth() === nextMonth && d.getFullYear() === nextMonthYear;
   };
 
   // 1. Collected: payments with 'membership' in note for this month
@@ -86,11 +80,6 @@ export const MonthlyMembershipRevenueCard = ({ memberLedger, projectedMonthlyDue
 
   // 2. To be received: projectedMonthlyDues - collected
   const toBeReceived = Math.max(0, (projectedMonthlyDues || 0) - membershipPayments);
-
-  // 3. Next month forecast: sum of monthly_dues for upcomingRenewals in next month
-  const nextMonthForecast = (upcomingRenewals || [])
-    .filter(m => m.nextRenewal && isNextMonth(m.nextRenewal))
-    .reduce((sum, m) => sum + (m.monthly_dues || 0), 0);
 
   return (
     <div style={{
@@ -112,11 +101,6 @@ export const MonthlyMembershipRevenueCard = ({ memberLedger, projectedMonthlyDue
       <div style={{ fontSize: '1.1rem', color: '#444', marginBottom: '0.5rem' }}>
         <span title="Projected membership dues for this month minus collected.">
           To Be Received: <b>${toBeReceived.toFixed(2)}</b>
-        </span>
-      </div>
-      <div style={{ fontSize: '1.1rem', color: '#444', marginBottom: '0.5rem' }}>
-        <span title="Forecasted membership dues for next month based on upcoming renewals.">
-          Next Month Forecast: <b>${nextMonthForecast.toFixed(2)}</b>
         </span>
       </div>
     </div>
