@@ -92,6 +92,23 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
 
       const now = new Date().toISOString();
       const today = new Date().toISOString().split('T')[0];
+
+      // Assign monthly_dues based on membership and member_type
+      let primaryDues = 0;
+      let secondaryDues = 0;
+      if (/duo/i.test(primaryMember.membership)) {
+        primaryDues = 100;
+        secondaryDues = 25;
+      } else if (/solo/i.test(primaryMember.membership)) {
+        primaryDues = 100;
+      } else if (/premier/i.test(primaryMember.membership)) {
+        primaryDues = 250;
+      } else if (/reserve/i.test(primaryMember.membership)) {
+        primaryDues = 1000;
+      } else if (/host/i.test(primaryMember.membership)) {
+        primaryDues = 1;
+      }
+
       const primaryMemberClean = cleanMemberObject({
         ...primaryMember,
         member_id: primary_member_id,
@@ -99,7 +116,8 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
         member_type: 'primary',
         created_at: now,
         status: 'active',
-        join_date: today
+        join_date: today,
+        monthly_dues: primaryDues
       });
       const secondaryMemberClean = showSecondaryMember ? cleanMemberObject({
         ...secondaryMember,
@@ -108,7 +126,9 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
         member_type: 'secondary',
         created_at: now,
         status: 'active',
-        join_date: today
+        join_date: today,
+        membership: primaryMember.membership, // ensure membership matches
+        monthly_dues: secondaryDues
       }) : null;
       const memberData = {
         account_id,
