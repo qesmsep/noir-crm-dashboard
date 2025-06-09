@@ -19,7 +19,7 @@ for(let h = startHour; h < endHour; h++){
   }
 }
 
-export default function ReservationForm({ initialStart, initialEnd, onSave, table_id, bookingStartDate, bookingEndDate }) {
+export default function ReservationForm({ initialStart, initialEnd, onSave, table_id, bookingStartDate, bookingEndDate, onDelete, isEdit }) {
   const [form, setForm] = useState({
     phone: '',
     party_size: 1,
@@ -153,7 +153,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
 
   return (
     <>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 320 }}>
         <input 
           name="phone" 
           placeholder="Phone Number *" 
@@ -204,7 +204,44 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
             ))}
           </select>
         </div>
-        <button type="submit">Reserve Now</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', gap: '1rem' }}>
+          {isEdit && onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              style={{
+                background: '#e53e3e',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.6rem 1.4rem',
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(229,62,62,0.08)'
+              }}
+            >
+              Delete Reservation
+            </button>
+          )}
+          <button
+            type="submit"
+            style={{
+              background: '#2c5282',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.6rem 1.4rem',
+              fontWeight: 600,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              marginLeft: 'auto',
+              boxShadow: '0 2px 8px rgba(44,82,130,0.08)'
+            }}
+          >
+            {isEdit ? 'Save' : 'Reserve Now'}
+          </button>
+        </div>
       </form>
 
       {showCreditCardModal && (
