@@ -254,6 +254,17 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
     setLocalReloadKey(k => k + 1);
   }
 
+  // Handler for deleting a reservation
+  async function handleDeleteReservation(reservationId) {
+    if (!reservationId) return;
+    if (window.confirm('Are you sure you want to delete this reservation? This will also release any credit card hold.')) {
+      await fetch(`/api/reservations?id=${reservationId}`, { method: 'DELETE' });
+      setShowModal(false);
+      setSelectedReservation(null);
+      setLocalReloadKey(k => k + 1);
+    }
+  }
+
   // Helper: get all 15-min slots between 6pm and 1am
   function getTimeSlots() {
     const slots = [];
@@ -418,14 +429,7 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
               }}
               bookingStartDate={bookingStartDate}
               bookingEndDate={bookingEndDate}
-              onDelete={selectedReservation ? async () => {
-                if (window.confirm('Are you sure you want to delete this reservation? This will also release any credit card hold.')) {
-                  await fetch(`/api/reservations?id=${selectedReservation.id}`, { method: 'DELETE' });
-                  setShowModal(false);
-                  setSelectedReservation(null);
-                  setLocalReloadKey(k => k + 1);
-                }
-              } : undefined}
+              onDelete={selectedReservation ? () => handleDeleteReservation(selectedReservation.id) : undefined}
               isEdit={!!selectedReservation}
             />
           </div>
