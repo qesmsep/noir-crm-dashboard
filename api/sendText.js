@@ -7,6 +7,9 @@ const OPENPHONE_API_KEY = process.env.OPENPHONE_API_KEY;
 const OPENPHONE_PHONE_NUMBER_ID = process.env.OPENPHONE_PHONE_NUMBER_ID;
 
 export default async function handler(req, res) {
+  if (req.method === 'POST') {
+    console.log('sendText handler invoked with body:', req.body);
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
