@@ -935,6 +935,19 @@ function App() {
       }
     }
 
+    // Helper function to get monthly dues based on membership type
+    const getMonthlyDues = (membership) => {
+      if (!membership) return 0;
+      const map = {
+        'Solo': 100,
+        'Duo': 125,
+        'Premier': 250,
+        'Reserve': 1000,
+        'Host': 1
+      };
+      return map[membership] || 0;
+    };
+
     return (
       <>
         {/* Transaction Modal */}
