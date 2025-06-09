@@ -108,14 +108,32 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message });
     if (!data || data.length === 0) return res.status(500).json({ error: 'No reservation data returned' });
 
-    // --- NEW: Send confirmation SMS ---
+    // --- NEW: Send personalized confirmation SMS ---
+    const reservation = data[0];
+    // Format start time
+    const startDateObj = new Date(reservation.start_time);
+    const formattedDate = startDateObj.toLocaleDateString(undefined, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    let timeString = startDateObj.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    timeString = timeString.replace(':00', '').replace(' AM', 'am').replace(' PM', 'pm');
+
+    const messageContent = `Thank you, ${reservation.name}. Your reservation has been confirmed for ${formattedDate} at ${timeString} for ${reservation.party_size} guests. Please respond directly to this text message if you need to make any changes or if you have any questions.`;
+
     // Always ensure formattedPhone starts with '+'
     const formattedPhone = phone ? '+' + phone.replace(/\D/g, '') : '';
     if (formattedPhone) {
       try {
         const smsPayload = {
           direct_phone: formattedPhone,
-          content: `Thank you for making a reservation. It has been confirmed.`
+          content: messageContent
         };
         console.log('Sending SMS confirmation with payload:', smsPayload);
         console.log('Attempting to send confirmation SMS to', formattedPhone);
@@ -134,7 +152,7 @@ export default async function handler(req, res) {
     }
     // --- END NEW ---
 
-    return res.status(201).json({ data: data[0] });
+    return res.status(201).json({ data: reservation });
   }
   if (method === 'PATCH') {
     // Support id from URL (req.query.id) or body
