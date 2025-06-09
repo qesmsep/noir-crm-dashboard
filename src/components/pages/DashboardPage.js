@@ -1,6 +1,7 @@
 import React from 'react';
 import TotalMembersCard from '../dashboard/TotalMembersCard';
 import MonthlyRevenueCard from '../dashboard/MonthlyRevenueCard';
+import { MonthlyMembershipRevenueCard } from '../dashboard/MonthlyRevenueCard';
 import UpcomingPaymentsCard from '../dashboard/UpcomingPaymentsCard';
 import TotalBalanceCard from '../dashboard/TotalBalanceCard';
 
@@ -11,6 +12,7 @@ const DashboardPage = ({ members, projectedMonthlyDues, upcomingRenewals, member
       <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
         <TotalMembersCard members={members} />
         <MonthlyRevenueCard memberLedger={memberLedger} />
+        <MonthlyMembershipRevenueCard memberLedger={memberLedger} />
         <UpcomingPaymentsCard upcomingRenewals={upcomingRenewals} />
         <TotalBalanceCard members={members} memberLedger={memberLedger} />
       </div>
