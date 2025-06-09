@@ -11,16 +11,16 @@ const MonthlyRevenueCard = ({ memberLedger }) => {
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   };
 
-  // Calculate revenue by type
-  const renewalRevenue = (memberLedger || [])
-    .filter(tx => tx.type === 'payment' && isThisMonth(tx.date))
-    .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-  const purchasesRevenue = (memberLedger || [])
+  // Sum all purchases and payments for the month
+  const purchases = (memberLedger || [])
     .filter(tx => tx.type === 'purchase' && isThisMonth(tx.date))
     .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
-  const totalRevenue = renewalRevenue + purchasesRevenue;
+  const payments = (memberLedger || [])
+    .filter(tx => tx.type === 'payment' && isThisMonth(tx.date))
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  const totalRevenue = purchases + payments;
 
   return (
     <div style={{
@@ -38,8 +38,8 @@ const MonthlyRevenueCard = ({ memberLedger }) => {
         ${totalRevenue.toFixed(2)}
       </div>
       <div style={{ marginTop: '1rem', color: '#444', fontSize: '1.1rem' }}>
-        <div>Membership Renewal Revenue: <b>${renewalRevenue.toFixed(2)}</b></div>
-        <div>Purchases Revenue: <b>${purchasesRevenue.toFixed(2)}</b></div>
+        <div>Payments: <b>${payments.toFixed(2)}</b></div>
+        <div>Purchases: <b>${purchases.toFixed(2)}</b></div>
       </div>
     </div>
   );
