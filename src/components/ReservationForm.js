@@ -127,7 +127,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
         content: `Thank you for your reservation. It's been confirmed for ${form.party_size} guests on ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. We look forward to seeing you soon.`
       })
     });
-
+    
     await onSave({
       ...form,
       ...nonMemberInfo, // Include non-member info if available
@@ -161,49 +161,49 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
           onChange={handleChange} 
           required 
         />
-        <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
-          <label>Party size</label>
-          <button type="button" onClick={() => setForm(f => ({ ...f, party_size: Math.max(1, f.party_size - 1) }))}>-</button>
-          <span>{form.party_size} guests</span>
-          <button type="button" onClick={() => setForm(f => ({ ...f, party_size: f.party_size + 1 }))}>+</button>
-        </div>
-        <div>
-          <label>Event Type</label>
-          <select name="event_type" value={form.event_type} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}>
-            <option value="">Select an event type...</option>
-            {eventTypes.map(type => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <textarea name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} />
-        <div>
-          <label>Date</label>
-          <DatePicker
-            selected={date}
-            onChange={d => setDate(d)}
-            dateFormat="MMMM d, yyyy"
-            minDate={bookingStartDate || new Date()}
-            maxDate={bookingEndDate || null}
-            className="datepicker-input"
-          />
-        </div>
-        <div>
-          <label>Time</label>
-          <select value={time} onChange={e => setTime(e.target.value)}>
-            {times.map(t => (
-              <option key={t} value={t}>
-                {createDateFromTimeString(t).toLocaleTimeString('en-US', { 
-                  hour: 'numeric', 
-                  minute: '2-digit',
-                  timeZone: 'America/Chicago'
-                })}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div style={{ display:'flex', alignItems:'center', gap:'0.5rem' }}>
+        <label>Party size</label>
+        <button type="button" onClick={() => setForm(f => ({ ...f, party_size: Math.max(1, f.party_size - 1) }))}>-</button>
+        <span>{form.party_size} guests</span>
+        <button type="button" onClick={() => setForm(f => ({ ...f, party_size: f.party_size + 1 }))}>+</button>
+      </div>
+      <div>
+        <label>Event Type</label>
+        <select name="event_type" value={form.event_type} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc' }}>
+          <option value="">Select an event type...</option>
+          {eventTypes.map(type => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <textarea name="notes" placeholder="Notes" value={form.notes} onChange={handleChange} />
+      <div>
+        <label>Date</label>
+        <DatePicker
+          selected={date}
+          onChange={d => setDate(d)}
+          dateFormat="MMMM d, yyyy"
+          minDate={bookingStartDate || new Date()}
+          maxDate={bookingEndDate || null}
+          className="datepicker-input"
+        />
+      </div>
+      <div>
+        <label>Time</label>
+        <select value={time} onChange={e => setTime(e.target.value)}>
+          {times.map(t => (
+            <option key={t} value={t}>
+              {createDateFromTimeString(t).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                timeZone: 'America/Chicago'
+              })}
+            </option>
+          ))}
+        </select>
+      </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', gap: '1rem' }}>
           {isEdit && onDelete && (
             <button
@@ -242,7 +242,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
             {isEdit ? 'Save' : 'Reserve Now'}
           </button>
         </div>
-      </form>
+    </form>
 
       {showCreditCardModal && (
         <Elements stripe={stripePromise}>
