@@ -24,7 +24,7 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
     zip: '',
     country: '',
     referral: '',
-    membership_tier: '',
+    membership: '',
     dob: '',
     photo: ''
   });
@@ -35,7 +35,8 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
     email: '',
     phone: '',
     dob: '',
-    photo: ''
+    photo: '',
+    membership: ''
   });
 
   const handlePrimaryMemberChange = (e) => {
@@ -194,10 +195,10 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
                 />
               </div>
               <div>
-                <label>Membership Tier *</label>
+                <label>Membership *</label>
                 <select
-                  name="membership_tier"
-                  value={primaryMember.membership_tier}
+                  name="membership"
+                  value={primaryMember.membership}
                   onChange={handlePrimaryMemberChange}
                   required
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
