@@ -399,6 +399,31 @@ export default function FullCalendarTimeline({ reloadKey, bookingStartDate, book
                 <div><strong>Email:</strong> {selectedReservation.email}</div>
                 <div><strong>Notes:</strong> {selectedReservation.notes}</div>
                 <div><strong>Table:</strong> {resources.find(r => r.id === String(selectedReservation.table_id))?.title || selectedReservation.table_id}</div>
+                <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button
+                    onClick={async () => {
+                      if (window.confirm('Are you sure you want to delete this reservation? This will also release any credit card hold.')) {
+                        await fetch(`/api/reservations?id=${selectedReservation.id}`, { method: 'DELETE' });
+                        setShowModal(false);
+                        setSelectedReservation(null);
+                        setLocalReloadKey(k => k + 1);
+                      }
+                    }}
+                    style={{
+                      background: '#e53e3e',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.6rem 1.4rem',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(229,62,62,0.08)'
+                    }}
+                  >
+                    Delete Reservation
+                  </button>
+                </div>
               </div>
             )}
             <ReservationForm
