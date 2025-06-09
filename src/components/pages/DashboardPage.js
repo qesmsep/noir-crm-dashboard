@@ -4,6 +4,7 @@ import MonthlyRevenueCard from '../dashboard/MonthlyRevenueCard';
 import { MonthlyMembershipRevenueCard } from '../dashboard/MonthlyRevenueCard';
 import UpcomingPaymentsCard from '../dashboard/UpcomingPaymentsCard';
 import TotalBalanceCard from '../dashboard/TotalBalanceCard';
+import UpcomingBirthdaysCard from '../dashboard/UpcomingBirthdaysCard';
 
 const DashboardPage = ({ members, projectedMonthlyDues, upcomingRenewals, memberLedger }) => {
   return (
@@ -13,6 +14,7 @@ const DashboardPage = ({ members, projectedMonthlyDues, upcomingRenewals, member
         <TotalMembersCard members={members} />
         <MonthlyRevenueCard memberLedger={memberLedger} />
         <MonthlyMembershipRevenueCard memberLedger={memberLedger} />
+        <UpcomingBirthdaysCard members={members} />
         <UpcomingPaymentsCard upcomingRenewals={upcomingRenewals} />
         <TotalBalanceCard members={members} memberLedger={memberLedger} />
       </div>

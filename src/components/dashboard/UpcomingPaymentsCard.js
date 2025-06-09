@@ -30,12 +30,12 @@ const UpcomingPaymentsCard = ({ upcomingRenewals }) => {
       minWidth: '250px',
       marginTop: '2rem'
     }}>
-      <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Next 10 Payments Due</h3>
+      <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Next 5 Payments Due</h3>
       {accountList.length === 0 ? (
         <div>No upcoming payments.</div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {accountList.slice(0, 10).map(m => {
+          {accountList.slice(0, 5).map(m => {
             const tier = m.membership?.match(/host|solo|duo|premier|reserve/i)?.[0]?.toLowerCase();
             const amount = membershipAmounts[Object.keys(membershipAmounts).find(key => 
               key.toLowerCase().includes(tier || '')
