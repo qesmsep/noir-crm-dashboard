@@ -117,11 +117,13 @@ export default async function handler(req, res) {
           content: `Thank you for making a reservation. It has been confirmed.`
         };
         console.log('Sending SMS confirmation with payload:', smsPayload);
-        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/sendText`, {
+        const baseUrl = `https://${req.headers.host}`;
+        const smsRes = await fetch(`${baseUrl}/api/sendText`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(smsPayload)
         });
+        console.log('SMS API response status:', smsRes.status);
       } catch (err) {
         console.error('Failed to send confirmation SMS:', err);
       }
