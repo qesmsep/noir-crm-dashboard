@@ -109,7 +109,8 @@ export default async function handler(req, res) {
     if (!data || data.length === 0) return res.status(500).json({ error: 'No reservation data returned' });
 
     // --- NEW: Send confirmation SMS ---
-    const formattedPhone = phone ? phone.replace(/\D/g, '') : '';
+    // Always ensure formattedPhone starts with '+'
+    const formattedPhone = phone ? '+' + phone.replace(/\D/g, '') : '';
     if (formattedPhone) {
       try {
         const smsPayload = {

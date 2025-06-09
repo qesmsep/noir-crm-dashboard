@@ -28,16 +28,18 @@ export default async function handler(req, res) {
   // If direct_phone is provided, send SMS directly
   if (direct_phone) {
     try {
-      const response = await fetch('https://api.openphone.com/v1/messages', {
+      // Ensure direct_phone is sanitized to include '+'
+      const toPhone = direct_phone.startsWith('+') ? direct_phone : '+' + direct_phone;
+      const response = await fetch('https://api.openphone.com/v2/messages', {
         method: 'POST',
         headers: {
-          'Authorization': OPENPHONE_API_KEY,
+          'Authorization': `Bearer ${OPENPHONE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: [direct_phone],
+          to: [toPhone],
           from: OPENPHONE_PHONE_NUMBER_ID,
-          content: content,
+          text: content,
         }),
       });
 
@@ -53,7 +55,7 @@ export default async function handler(req, res) {
         }
       }
       const status = response.ok ? 'sent' : 'failed';
-      results.push({ phone: direct_phone, status, apiResult });
+      results.push({ phone: toPhone, status, apiResult });
     } catch (err) {
       results.push({ phone: direct_phone, status: 'failed', error: err.message });
     }
@@ -69,23 +71,23 @@ export default async function handler(req, res) {
     }
 
     for (const member of members) {
-      const toPhone = member.phone;
+      const toPhone = member.phone ? (member.phone.startsWith('+') ? member.phone : '+' + member.phone) : null;
       if (!toPhone) {
         results.push({ member_id: member.member_id, status: 'failed', error: 'No phone number' });
         continue;
       }
       try {
         // Send SMS via OpenPhone API
-        const response = await fetch('https://api.openphone.com/v1/messages', {
+        const response = await fetch('https://api.openphone.com/v2/messages', {
           method: 'POST',
           headers: {
-            'Authorization': OPENPHONE_API_KEY,
+            'Authorization': `Bearer ${OPENPHONE_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             to: [toPhone],
             from: OPENPHONE_PHONE_NUMBER_ID,
-            content: content,
+            text: content,
           }),
         });
 
