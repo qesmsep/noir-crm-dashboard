@@ -22,6 +22,13 @@ const MonthlyRevenueCard = ({ memberLedger }) => {
 
   const totalRevenue = purchases + payments;
 
+  // Debug logs
+  console.log('memberLedger:', memberLedger);
+  console.log('Filtered purchases:', (memberLedger || []).filter(tx => tx.type === 'purchase' && isThisMonth(tx.date)));
+  console.log('Filtered payments:', (memberLedger || []).filter(tx => tx.type === 'payment' && isThisMonth(tx.date)));
+  console.log('Summed purchases:', purchases);
+  console.log('Summed payments:', payments);
+
   return (
     <div style={{
       background: '#fff',
