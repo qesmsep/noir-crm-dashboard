@@ -30,16 +30,16 @@ export default async function handler(req, res) {
     try {
       // Ensure direct_phone is sanitized to include '+'
       const toPhone = direct_phone.startsWith('+') ? direct_phone : '+' + direct_phone;
-      const response = await fetch('https://api.openphone.com/v2/messages', {
+      const response = await fetch('https://api.openphone.com/v1/messages', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${OPENPHONE_API_KEY}`,
+          'Authorization': OPENPHONE_API_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           to: [toPhone],
           from: OPENPHONE_PHONE_NUMBER_ID,
-          text: content,
+          content: content,
         }),
       });
 
@@ -78,16 +78,16 @@ export default async function handler(req, res) {
       }
       try {
         // Send SMS via OpenPhone API
-        const response = await fetch('https://api.openphone.com/v2/messages', {
+        const response = await fetch('https://api.openphone.com/v1/messages', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${OPENPHONE_API_KEY}`,
+            'Authorization': OPENPHONE_API_KEY,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             to: [toPhone],
             from: OPENPHONE_PHONE_NUMBER_ID,
-            text: content,
+            content: content,
           }),
         });
 
