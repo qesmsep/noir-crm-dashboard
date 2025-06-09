@@ -125,7 +125,7 @@ export default async function handler(req, res) {
     });
     timeString = timeString.replace(':00', '').replace(' AM', 'am').replace(' PM', 'pm');
 
-    const messageContent = `Thank you, ${reservation.name}. Your reservation has been confirmed for ${formattedDate} at ${timeString} for ${reservation.party_size} guests. Please respond directly to this text message if you need to make any changes or if you have any questions.`;
+    const messageContent = `Thank you, ${reservation.name}. Your reservation has been confirmed for Noir on ${formattedDate} at ${timeString} for ${reservation.party_size} guests. Please respond directly to this text message if you need to make any changes or if you have any questions.`;
 
     // Always ensure formattedPhone starts with '+'
     const formattedPhone = phone ? '+' + phone.replace(/\D/g, '') : '';
