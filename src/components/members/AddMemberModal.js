@@ -8,6 +8,19 @@ const MEMBERSHIP_TIERS = [
   'Corporate'
 ];
 
+const ALLOWED_MEMBER_FIELDS = [
+  'account_id', 'first_name', 'last_name', 'email', 'phone', 'stripe_customer_id', 'status',
+  'join_date', 'renewal_date', 'company', 'address', 'address_2', 'city', 'state', 'zip', 'country',
+  'referral', 'membership', 'photo', 'dob', 'auth_code', 'token', 'balance', 'created_at',
+  'supabase_user_id', 'member_type', 'member_id'
+];
+
+function cleanMemberObject(obj) {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([key]) => ALLOWED_MEMBER_FIELDS.includes(key))
+  );
+}
+
 const AddMemberModal = ({ isOpen, onClose, onSave }) => {
   const [showSecondaryMember, setShowSecondaryMember] = useState(false);
   const [primaryMember, setPrimaryMember] = useState({
@@ -70,19 +83,25 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
         secondaryPhotoUrl = secondaryMember.photo;
       }
 
+      const now = new Date().toISOString();
+      const primaryMemberClean = cleanMemberObject({
+        ...primaryMember,
+        member_id: primary_member_id,
+        account_id,
+        member_type: 'primary',
+        created_at: now
+      });
+      const secondaryMemberClean = showSecondaryMember ? cleanMemberObject({
+        ...secondaryMember,
+        member_id: secondary_member_id,
+        account_id,
+        member_type: 'secondary',
+        created_at: now
+      }) : null;
       const memberData = {
         account_id,
-        primary_member: {
-          ...primaryMember,
-          member_id: primary_member_id,
-          photo: primaryPhotoUrl
-        },
-        secondary_member: showSecondaryMember ? {
-          ...secondaryMember,
-          member_id: secondary_member_id,
-          account_id,
-          photo: secondaryPhotoUrl
-        } : null
+        primary_member: primaryMemberClean,
+        secondary_member: secondaryMemberClean
       };
 
       await onSave(memberData);
