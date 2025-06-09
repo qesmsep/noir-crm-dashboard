@@ -299,7 +299,7 @@ function App() {
       return candidate;
     };
 
-    const projected = members
+    const filtered = members
       .filter(m => {
         const nextRenewal = getNextRenewal(m.join_date);
         return (
@@ -307,9 +307,13 @@ function App() {
           nextRenewal.getMonth() === thisMonth &&
           nextRenewal.getFullYear() === thisYear
         );
-      })
-      .reduce((sum, m) => sum + (m.monthly_dues || 0), 0);
+      });
+    const projected = filtered.reduce((sum, m) => sum + (m.monthly_dues || 0), 0);
 
+    // Debug logs
+    console.log('--- Next Month Forecast Debug ---');
+    console.log('Members considered:', filtered.map(m => ({ name: m.name, monthly_dues: m.monthly_dues, join_date: m.join_date })));
+    console.log('Projected sum:', projected);
     setProjectedMonthlyDues(projected);
   }, [members]);
 
