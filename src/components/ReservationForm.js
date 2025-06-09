@@ -123,7 +123,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        member_ids: [formattedPhone],
+        direct_phone: formattedPhone,
         content: `Thank you for your reservation. It's been confirmed for ${form.party_size} guests on ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. We look forward to seeing you soon.`
       })
     });
