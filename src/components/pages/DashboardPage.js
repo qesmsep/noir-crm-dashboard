@@ -13,7 +13,7 @@ const DashboardPage = ({ members, projectedMonthlyDues, upcomingRenewals, member
       <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
         <TotalMembersCard members={members} />
         <MonthlyRevenueCard memberLedger={memberLedger} />
-        <MonthlyMembershipRevenueCard memberLedger={memberLedger} />
+        <MonthlyMembershipRevenueCard memberLedger={memberLedger} projectedMonthlyDues={projectedMonthlyDues} upcomingRenewals={upcomingRenewals} />
         <UpcomingBirthdaysCard members={members} />
         <UpcomingPaymentsCard upcomingRenewals={upcomingRenewals} />
         <TotalBalanceCard members={members} memberLedger={memberLedger} />

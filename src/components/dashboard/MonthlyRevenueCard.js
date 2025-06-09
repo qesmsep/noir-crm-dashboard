@@ -63,20 +63,56 @@ const MonthlyRevenueCard = ({ memberLedger }) => {
   );
 };
 
-export const MonthlyMembershipRevenueCard = ({ memberLedger }) => {
+export const MonthlyMembershipRevenueCard = ({ memberLedger, projectedMonthlyDues, upcomingRenewals }) => {
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
+  const nextMonth = (thisMonth + 1) % 12;
+  const nextMonthYear = thisMonth === 11 ? thisYear + 1 : thisYear;
 
   const isThisMonth = (dateStr) => {
     const d = new Date(dateStr);
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   };
+  const isNextMonth = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.getMonth() === nextMonth && d.getFullYear() === nextMonthYear;
+  };
 
-  // Membership revenue: payments with 'membership' in note
+  // 1. Collected: payments with 'membership' in note for this month
   const membershipPayments = (memberLedger || [])
     .filter(tx => tx.type === 'payment' && isThisMonth(tx.date) && tx.note && /membership/i.test(tx.note))
     .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  // 2. To be received: projectedMonthlyDues - collected
+  const toBeReceived = Math.max(0, (projectedMonthlyDues || 0) - membershipPayments);
+
+  // 3. Next month forecast: sum of upcomingRenewals for next month
+  const nextMonthForecast = (upcomingRenewals || [])
+    .filter(m => m.nextRenewal && isNextMonth(m.nextRenewal))
+    .reduce((sum, m) => {
+      // Use the same membershipAmounts logic as in App.js
+      const membershipAmounts = {
+        'Host': 1,
+        'Noir Host': 1,
+        'Noir Solo': 100,
+        'Solo': 100,
+        'Noir Duo': 125,
+        'Duo': 125,
+        'Premier': 250,
+        'Reserve': 1000
+      };
+      let tier = null;
+      if (m.membership) {
+        if (/host/i.test(m.membership)) tier = 'Host';
+        else if (/solo/i.test(m.membership)) tier = 'Noir Solo';
+        else if (/duo/i.test(m.membership)) tier = 'Noir Duo';
+        else if (/premier/i.test(m.membership)) tier = 'Premier';
+        else if (/reserve/i.test(m.membership)) tier = 'Reserve';
+      }
+      const amt = membershipAmounts[tier] || 0;
+      return sum + amt;
+    }, 0);
 
   return (
     <div style={{
@@ -90,12 +126,19 @@ export const MonthlyMembershipRevenueCard = ({ memberLedger }) => {
       <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>
         {now.toLocaleString('default', { month: 'long' })} Membership Revenue
       </h3>
-      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333' }}>
-        ${membershipPayments.toFixed(2)}
-      </div>
-      <div style={{ marginTop: '1rem', color: '#444', fontSize: '1.1rem' }}>
+      <div style={{ fontSize: '1.1rem', color: '#444', marginBottom: '0.5rem' }}>
         <span title="Sum of all payments with 'membership' in the note for this month.">
-          Membership Dues Collected
+          Collected: <b>${membershipPayments.toFixed(2)}</b>
+        </span>
+      </div>
+      <div style={{ fontSize: '1.1rem', color: '#444', marginBottom: '0.5rem' }}>
+        <span title="Projected membership dues for this month minus collected.">
+          To Be Received: <b>${toBeReceived.toFixed(2)}</b>
+        </span>
+      </div>
+      <div style={{ fontSize: '1.1rem', color: '#444', marginBottom: '0.5rem' }}>
+        <span title="Forecasted membership dues for next month based on upcoming renewals.">
+          Next Month Forecast: <b>${nextMonthForecast.toFixed(2)}</b>
         </span>
       </div>
     </div>
