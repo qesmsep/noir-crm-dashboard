@@ -10,7 +10,7 @@ const DashboardPage = ({ members, projectedMonthlyDues, upcomingRenewals, member
       <h1 style={{ marginBottom: '2rem' }}>Noir CRM Dashboard</h1>
       <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
         <TotalMembersCard members={members} />
-        <MonthlyRevenueCard projectedMonthlyDues={projectedMonthlyDues} />
+        <MonthlyRevenueCard memberLedger={memberLedger} />
         <UpcomingPaymentsCard upcomingRenewals={upcomingRenewals} />
         <TotalBalanceCard members={members} memberLedger={memberLedger} />
       </div>
