@@ -12,6 +12,15 @@ const UpcomingPaymentsCard = ({ upcomingRenewals }) => {
     'Reserve': 1000
   };
 
+  // Group by account_id
+  const accounts = {};
+  for (const m of upcomingRenewals) {
+    if (!accounts[m.account_id]) {
+      accounts[m.account_id] = m;
+    }
+  }
+  const accountList = Object.values(accounts);
+
   return (
     <div style={{
       background: '#fff',
@@ -22,17 +31,17 @@ const UpcomingPaymentsCard = ({ upcomingRenewals }) => {
       marginTop: '2rem'
     }}>
       <h3 style={{ margin: '0 0 1rem 0', color: '#666' }}>Next 10 Payments Due</h3>
-      {upcomingRenewals.length === 0 ? (
+      {accountList.length === 0 ? (
         <div>No upcoming payments.</div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {upcomingRenewals.slice(0, 10).map(m => {
+          {accountList.slice(0, 10).map(m => {
             const tier = m.membership?.match(/host|solo|duo|premier|reserve/i)?.[0]?.toLowerCase();
             const amount = membershipAmounts[Object.keys(membershipAmounts).find(key => 
               key.toLowerCase().includes(tier || '')
             )] || 0;
             return (
-              <li key={m.member_id} style={{ 
+              <li key={m.account_id} style={{ 
                 padding: '0.75rem 0', 
                 borderBottom: '1px solid #eee',
                 display: 'flex',
