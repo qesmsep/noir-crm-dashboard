@@ -7,17 +7,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id } = req.query;
-  if (!member_id) {
-    return res.status(400).json({ error: 'member_id is required' });
+  const { member_id, account_id } = req.query;
+  if (!member_id && !account_id) {
+    return res.status(400).json({ error: 'member_id or account_id is required' });
   }
 
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('member_id', member_id)
-    .order('timestamp', { ascending: false });
+  let query = supabase.from('messages').select('*');
+  if (member_id) query = query.eq('member_id', member_id);
+  if (account_id) query = query.eq('account_id', account_id);
+  query = query.order('timestamp', { ascending: false });
 
+  const { data, error } = await query;
   if (error) {
     return res.status(500).json({ error: 'Failed to fetch messages', details: error.message });
   }

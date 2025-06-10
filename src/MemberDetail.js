@@ -335,7 +335,7 @@ const MemberDetail = ({
                 </div>
               )}
               {member.dob && <div style={{ whiteSpace: 'nowrap' }}>Birthday: {formatDateLong(member.dob)}</div>}
-              {member.company && <div>Company: {member.company}</div>}
+              <div>Company: {member.company ? member.company : 'null'}</div>
             </div>
           </div>
         </div>

@@ -1,9 +1,14 @@
-
-
 import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
+  // Enable CORS for local development
+  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
   const { start_time, end_time, party_size } = req.query;
   if (!start_time || !end_time || !party_size) {
     return res.status(400).json({ error: 'start_time, end_time, and party_size are required' });
@@ -18,6 +23,7 @@ export default async function handler(req, res) {
   // Filter out tables with conflicting events or reservations
   const free = [];
   for (const t of tables) {
+    console.log('Testing slot for table', t.id, 'capacity', t.capacity);
     // Check events overlap
     const { count: evCount } = await supabase
       .from('events')
@@ -29,6 +35,7 @@ export default async function handler(req, res) {
       .select('id', { count: 'exact' })
       .eq('table_id', t.id)
       .or(`and(start_time.lte.${end_time},end_time.gte.${start_time})`);
+    console.log(`Table ${t.id}: evCount=${evCount}, resCount=${resCount}`);
     if (evCount === 0 && resCount === 0) free.push(t);
   }
   res.status(200).json({ free });

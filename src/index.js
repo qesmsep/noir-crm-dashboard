@@ -1,5 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { ChakraProvider } from "@chakra-ui/react";
+import { BrowserRouter } from "react-router-dom";
+import { AppContextProvider } from "./context/AppContext";
+import { theme } from "./theme";
 import App from './App';
 import './App.css';
 import reportWebVitals from './reportWebVitals';
@@ -7,7 +11,13 @@ import reportWebVitals from './reportWebVitals';
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <ChakraProvider theme={theme}>
+        <AppContextProvider>
+          <App />
+        </AppContextProvider>
+      </ChakraProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
 

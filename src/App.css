@@ -1157,3 +1157,17 @@ body {
   border-radius: 4px;
   border: 1px solid #feb2b2;
 }
+
+@font-face {
+  font-family: 'CONEBARS';
+  src: url('./assets/fonts/CONEBARS.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'IvyJournal-Thin';
+  src: url('./assets/fonts/IvyJournal-Thin.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}

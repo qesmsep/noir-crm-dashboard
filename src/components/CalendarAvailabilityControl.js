@@ -3,6 +3,7 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { supabase } from '../api/supabaseClient';
 import PrivateEventBooking from './PrivateEventBooking';
+import { Button } from '@chakra-ui/react';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -14,7 +15,7 @@ function formatTime12h(timeStr) {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-const CalendarAvailabilityControl = () => {
+const CalendarAvailabilityControl = ({ section }) => {
   // Base Hours State
   const [baseHours, setBaseHours] = useState(Array(7).fill().map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
 
@@ -72,6 +73,9 @@ const CalendarAvailabilityControl = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editEventForm, setEditEventForm] = useState({ name: '', event_type: '', date: null, start: '', end: '' });
+
+  // Add state for creating private event
+  const [showCreatePrivateEventForm, setShowCreatePrivateEventForm] = useState(false);
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -536,591 +540,523 @@ const CalendarAvailabilityControl = () => {
     setEditEventForm({ name: '', event_type: '', date: null, start: '', end: '' });
   }
 
-  return (
-    <div className="availability-control">
-      {/* Add Create Private Event form at the top of the admin panel */}
-      <div style={{ marginBottom: '2.5rem', background: '#fff', padding: '2rem 2.5rem', borderRadius: '12px', border: '1px solid #ececec', maxWidth: 800, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
-        <h2 style={{ marginBottom: '1.2rem', color: '#222', fontWeight: 700 }}>Create Private Event</h2>
-        <form onSubmit={handleCreatePrivateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-          <input
-            type="text"
-            placeholder="Event Name"
-            value={privateEvent.name}
-            onChange={e => setPrivateEvent(ev => ({ ...ev, name: e.target.value }))}
-            required
-            style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
-          />
-          <select
-            value={privateEvent.event_type}
-            onChange={e => setPrivateEvent(ev => ({ ...ev, event_type: e.target.value }))}
-            required
-            style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
-          >
-            <option value="">Select event type...</option>
-            <option value="private">Private Event</option>
-            <option value="birthday">Birthday</option>
-            <option value="engagement">Engagement</option>
-            <option value="anniversary">Anniversary</option>
-            <option value="party">Party</option>
-            <option value="graduation">Graduation</option>
-            <option value="corporate">Corporate Event</option>
-            <option value="holiday">Holiday Gathering</option>
-            <option value="networking">Networking</option>
-            <option value="fundraiser">Fundraiser</option>
-            <option value="bachelor">Bachelor/Bachelorette</option>
-            <option value="fun">Fun Night Out</option>
-            <option value="date">Date Night</option>
-          </select>
-          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-            <div>
-              <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Date</label>
-              <DatePicker
-                selected={privateEvent.date}
-                onChange={d => setPrivateEvent(ev => ({ ...ev, date: d }))}
-                dateFormat="MMMM d, yyyy"
-                minDate={new Date()}
-                required
-                className="datepicker-input"
-              />
+  // Render different content based on section
+  const renderContent = () => {
+    switch (section) {
+      case 'booking_window':
+        return (
+          <div style={{ background: '#faf9f7', padding: '1rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 420 }}>
+            <div style={{ borderBottom: '2px solid #b7a78b', fontWeight: 600, fontSize: '1.5rem', marginBottom: 16, paddingBottom: 4, color: '#222' }}>
+              Booking Window
             </div>
-            <div>
-              <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Start</label>
-              <input
-                type="time"
-                value={privateEvent.start}
-                onChange={e => setPrivateEvent(ev => ({ ...ev, start: e.target.value }))}
-                required
-                style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>End</label>
-              <input
-                type="time"
-                value={privateEvent.end}
-                onChange={e => setPrivateEvent(ev => ({ ...ev, end: e.target.value }))}
-                required
-                style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
-              />
-            </div>
-          </div>
-          <button type="submit" style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: 8, padding: '0.8rem 0', fontWeight: 700, fontSize: '1.1rem', marginTop: 8 }}>Create Private Event</button>
-          {privateEventStatus && <div style={{ color: privateEventStatus.includes('created') ? 'green' : 'red', fontWeight: 600 }}>{privateEventStatus}</div>}
-        </form>
-        {createdPrivateEvent && (
-          <div style={{ marginTop: '1.2rem' }}>
-            <strong>Shareable Link:</strong>
-            <input
-              type="text"
-              value={window.location.origin + `/private-event/${createdPrivateEvent.id}`}
-              readOnly
-              style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 6, border: '1px solid #ccc', fontSize: '1.05rem' }}
-              onFocus={e => e.target.select()}
-            />
-            <button
-              style={{ marginTop: '0.5rem', background: '#e5e1d8', color: '#555', border: 'none', borderRadius: 6, padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.origin + `/private-event/${createdPrivateEvent.id}`);
-              }}
-            >Copy Link</button>
-          </div>
-        )}
-        {/* Private Events Ledger Table */}
-        <div style={{ marginTop: '2.5rem' }}>
-          <h3 style={{ marginBottom: '1rem', color: '#333', fontWeight: 600 }}>Private Events Ledger</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#faf9f7', borderRadius: 8, overflow: 'hidden', fontSize: '1.05rem' }}>
-            <thead>
-              <tr style={{ background: '#ececec', color: '#444' }}>
-                <th style={{ padding: '0.7rem' }}>Event Name</th>
-                <th style={{ padding: '0.7rem' }}>Type</th>
-                <th style={{ padding: '0.7rem' }}>Date</th>
-                <th style={{ padding: '0.7rem' }}>Time</th>
-                <th style={{ padding: '0.7rem' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {privateEvents.length === 0 ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '1.2rem' }}>No private events found.</td></tr>
-              ) : (
-                privateEvents.map(ev => (
-                  <tr key={ev.id}>
-                    <td style={{ padding: '0.7rem' }}>{ev.title}</td>
-                    <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
-                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
-                    <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
-                    <td style={{ padding: '0.7rem' }}>
-                      <button style={{ background: '#7c6b58', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleOpenEditModal(ev)}>Edit</button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {/* Booking Window Setting */}
-      <div style={{ marginBottom: '1.5rem', background: '#faf9f7', padding: '1rem', borderRadius: '8px', border: '1px solid #ececec', maxWidth: 420 }}>
-        <label style={{ fontWeight: 600, color: '#333', marginRight: 10, display: 'block', marginBottom: 8 }}>
-          Booking Window:
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div>
-            <span style={{ color: '#555', fontSize: '0.98em' }}>Start Date:</span>
-            <DatePicker
-              selected={bookingStartDate}
-              onChange={date => handleBookingDatesChange(date, bookingEndDate)}
-              dateFormat="yyyy-MM-dd"
-              className="date-picker"
-              disabled={bookingDatesLoading || bookingDatesSaving}
-            />
-          </div>
-          <div>
-            <span style={{ color: '#555', fontSize: '0.98em' }}>End Date:</span>
-            <DatePicker
-              selected={bookingEndDate}
-              onChange={date => handleBookingDatesChange(bookingStartDate, date)}
-              dateFormat="yyyy-MM-dd"
-              className="date-picker"
-              disabled={bookingDatesLoading || bookingDatesSaving}
-            />
-          </div>
-          {bookingDatesLoading && <span style={{ color: '#888' }}>Loading...</span>}
-          {bookingDatesSaving && <span style={{ color: '#888' }}>Saving...</span>}
-        </div>
-        <span style={{ color: '#888', fontSize: '0.95em', marginLeft: 2 }}>
-          (Users can book between these dates)
-        </span>
-      </div>
-      {error && <div className="error-message">{error}</div>}
-      {successMessage && <div className="success-message">{successMessage}</div>}
-      
-      {/* Base Hours Section */}
-      <section className="availability-section">
-        <h2>Base Hours</h2>
-        <div className="weekday-controls">
-          {WEEKDAYS.map((day, index) => (
-            <div key={day} className="weekday-group">
-              <label className="weekday-label">
-                <input
-                  type="checkbox"
-                  checked={baseHours[index].enabled}
-                  onChange={() => toggleDay(index)}
-                />
-                {day}
-              </label>
-              {baseHours[index].enabled && (
-                <div className="time-ranges">
-                  {baseHours[index].timeRanges.map((range, rangeIndex) => (
-                    <div key={rangeIndex} className="time-range">
-                      <input
-                        type="time"
-                        value={range.start}
-                        onChange={(e) => updateTimeRange(index, rangeIndex, 'start', e.target.value)}
-                      />
-                      <span>to</span>
-                      <input
-                        type="time"
-                        value={range.end}
-                        onChange={(e) => updateTimeRange(index, rangeIndex, 'end', e.target.value)}
-                      />
-                      <button
-                        className="remove-range"
-                        onClick={() => removeTimeRange(index, rangeIndex)}
-                        disabled={baseHours[index].timeRanges.length === 1}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    className="add-range"
-                    onClick={() => addTimeRange(index)}
-                  >
-                    + Add Time Range
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <button className="save-base-hours" onClick={saveBaseHours}>
-          Save Base Hours
-        </button>
-      </section>
-
-      {/* Exceptional Opens Section */}
-      <section className="availability-section">
-        <h2>Custom Open Days</h2>
-        <div className="add-exception">
-          <DatePicker
-            selected={newOpenDate}
-            onChange={setNewOpenDate}
-            placeholderText="Select date"
-            className="date-picker"
-            minDate={new Date()}
-          />
-          <div className="time-ranges">
-            {newOpenTimeRanges.map((range, index) => (
-              <div key={index} className="time-range">
-                <input
-                  type="time"
-                  value={range.start}
-                  onChange={(e) => {
-                    const newRanges = [...newOpenTimeRanges];
-                    newRanges[index].start = e.target.value;
-                    setNewOpenTimeRanges(newRanges);
-                  }}
-                />
-                <span>to</span>
-                <input
-                  type="time"
-                  value={range.end}
-                  onChange={(e) => {
-                    const newRanges = [...newOpenTimeRanges];
-                    newRanges[index].end = e.target.value;
-                    setNewOpenTimeRanges(newRanges);
-                  }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div>
+                <span style={{ color: '#555', fontSize: '0.98em' }}>Start Date:</span>
+                <DatePicker
+                  selected={bookingStartDate}
+                  onChange={date => handleBookingDatesChange(date, bookingEndDate)}
+                  dateFormat="yyyy-MM-dd"
+                  className="date-picker"
+                  disabled={bookingDatesLoading || bookingDatesSaving}
                 />
               </div>
-            ))}
-            <button
-              className="add-range"
-              onClick={() => setNewOpenTimeRanges([...newOpenTimeRanges, { start: '18:00', end: '23:00' }])}
+              <div>
+                <span style={{ color: '#555', fontSize: '0.98em' }}>End Date:</span>
+                <DatePicker
+                  selected={bookingEndDate}
+                  onChange={date => handleBookingDatesChange(bookingStartDate, date)}
+                  dateFormat="yyyy-MM-dd"
+                  className="date-picker"
+                  disabled={bookingDatesLoading || bookingDatesSaving}
+                />
+              </div>
+              {bookingDatesLoading && <span style={{ color: '#888' }}>Loading...</span>}
+              {bookingDatesSaving && <span style={{ color: '#888' }}>Saving...</span>}
+            </div>
+            <Button
+              colorScheme="blue"
+              isLoading={bookingDatesSaving}
+              onClick={() => handleBookingDatesChange(bookingStartDate, bookingEndDate)}
+              mt={4}
             >
-              + Add Time Range
-            </button>
+              Save Booking Window
+            </Button>
+            <span style={{ color: '#888', fontSize: '0.95em', marginLeft: 2 }}>
+              (Users can book between these dates)
+            </span>
           </div>
-          <input
-            type="text"
-            value={newOpenLabel}
-            onChange={(e) => setNewOpenLabel(e.target.value)}
-            placeholder="Event label (optional)"
-            className="event-label"
-          />
-          <button className="add-exception-btn" onClick={addExceptionalOpen}>
-            Add Custom Open Day
-          </button>
-        </div>
-        <div className="exceptions-list">
-          {exceptionalOpens.map((open) => (
-            <div key={open.id} className="exception-item">
-              {editingOpenId === open.id ? (
-                <>
-                  <DatePicker
-                    selected={editingOpen.date}
-                    onChange={date => setEditingOpen(e => ({ ...e, date }))}
-                    className="date-picker"
-                  />
-                  <div className="time-ranges">
-                    {editingOpen.time_ranges.map((range, idx) => (
-                      <div key={idx} className="time-range">
-                        <input
-                          type="time"
-                          value={range.start}
-                          onChange={e => {
-                            const trs = [...editingOpen.time_ranges];
-                            trs[idx].start = e.target.value;
-                            setEditingOpen(e => ({ ...e, time_ranges: trs }));
-                          }}
-                        />
-                        <span>to</span>
-                        <input
-                          type="time"
-                          value={range.end}
-                          onChange={e => {
-                            const trs = [...editingOpen.time_ranges];
-                            trs[idx].end = e.target.value;
-                            setEditingOpen(e => ({ ...e, time_ranges: trs }));
-                          }}
-                        />
-                        <button
-                          className="remove-range"
-                          onClick={() => {
-                            const trs = [...editingOpen.time_ranges];
-                            trs.splice(idx, 1);
-                            setEditingOpen(e => ({ ...e, time_ranges: trs }));
-                          }}
-                          disabled={editingOpen.time_ranges.length === 1}
-                        >×</button>
-                      </div>
-                    ))}
-                    <button
-                      className="add-range"
-                      onClick={() => setEditingOpen(e => ({ ...e, time_ranges: [...e.time_ranges, { start: '18:00', end: '23:00' }] }))}
-                    >+ Add Time Range</button>
-                  </div>
-                  <input
-                    type="text"
-                    value={editingOpen.label}
-                    onChange={e => setEditingOpen(ed => ({ ...ed, label: e.target.value }))}
-                    className="event-label"
-                    placeholder="Event label (optional)"
-                  />
-                  <button className="add-exception-btn" onClick={handleSaveEditOpen}>Save</button>
-                  <button className="delete-exception" onClick={handleCancelEditOpen}>Cancel</button>
-                </>
-              ) : (
-                <>
-                  <span>{
-                    open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date)
-                      ? (() => { const [y, m, d] = open.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
-                      : new Date(open.date).toLocaleDateString()
-                  }</span>
-                  <span>{open.time_ranges.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</span>
-                  {open.label && <span className="event-label">{open.label}</span>}
-                  <button className="delete-exception" onClick={() => handleEditOpen(open)}>Edit</button>
-                  <button className="delete-exception" onClick={() => deleteExceptionalOpen(open.id)}>Delete</button>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
+        );
 
-      {/* Exceptional Closures Section */}
-      <section className="availability-section">
-        <h2>Custom Closed Days</h2>
-        <div className="add-exception">
-          <DatePicker
-            selected={newClosureDate}
-            onChange={setNewClosureDate}
-            placeholderText="Select date"
-            className="date-picker"
-            minDate={new Date()}
-          />
-          <input
-            type="text"
-            value={newClosureReason}
-            onChange={(e) => setNewClosureReason(e.target.value)}
-            placeholder="Reason for closure (optional)"
-            className="closure-reason"
-          />
-          <label style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <input
-              type="checkbox"
-              checked={newClosureFullDay}
-              onChange={e => setNewClosureFullDay(e.target.checked)}
-            />
-            Full Day
-          </label>
-          {!newClosureFullDay && (
-            <div className="time-ranges">
-              {newClosureTimeRanges.map((range, index) => (
-                <div key={index} className="time-range">
-                  <input
-                    type="time"
-                    value={range.start}
-                    onChange={e => {
-                      const newRanges = [...newClosureTimeRanges];
-                      newRanges[index].start = e.target.value;
-                      setNewClosureTimeRanges(newRanges);
-                    }}
-                  />
-                  <span>to</span>
-                  <input
-                    type="time"
-                    value={range.end}
-                    onChange={e => {
-                      const newRanges = [...newClosureTimeRanges];
-                      newRanges[index].end = e.target.value;
-                      setNewClosureTimeRanges(newRanges);
-                    }}
-                  />
-                  <button
-                    className="remove-range"
-                    onClick={() => {
-                      const newRanges = [...newClosureTimeRanges];
-                      newRanges.splice(index, 1);
-                      setNewClosureTimeRanges(newRanges);
-                    }}
-                    disabled={newClosureTimeRanges.length === 1}
-                  >×</button>
-                </div>
-              ))}
-              <button
-                className="add-range"
-                onClick={() => setNewClosureTimeRanges([...newClosureTimeRanges, { start: '18:00', end: '23:00' }])}
-              >+ Add Time Range</button>
-            </div>
-          )}
-          <button className="add-exception-btn" onClick={addExceptionalClosure}>
-            Add Closure
-          </button>
-        </div>
-        <div className="exceptions-list">
-          {exceptionalClosures.map((closure) => (
-            <div key={closure.id} className="exception-item">
-              {editingClosureId === closure.id ? (
-                <>
-                  <DatePicker
-                    selected={editingClosure.date}
-                    onChange={date => setEditingClosure(e => ({ ...e, date }))}
-                    className="date-picker"
-                  />
-                  <input
-                    type="text"
-                    value={editingClosure.reason}
-                    onChange={e => setEditingClosure(ed => ({ ...ed, reason: e.target.value }))}
-                    className="closure-reason"
-                    placeholder="Reason for closure (optional)"
-                  />
-                  <label style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      case 'base':
+        return (
+          <section className="availability-section">
+            <h2>Base Hours</h2>
+            <div className="base-hours">
+              {WEEKDAYS.map((day, index) => (
+                <div key={day} className="day-row">
+                  <label>
                     <input
                       type="checkbox"
-                      checked={editingClosure.full_day}
-                      onChange={e => setEditingClosure(ed => ({ ...ed, full_day: e.target.checked }))}
+                      checked={baseHours[index].enabled}
+                      onChange={() => toggleDay(index)}
                     />
-                    Full Day
+                    {day}
                   </label>
-                  {!editingClosure.full_day && (
+                  {baseHours[index].enabled && (
                     <div className="time-ranges">
-                      {editingClosure.time_ranges.map((range, idx) => (
-                        <div key={idx} className="time-range">
+                      {baseHours[index].timeRanges.map((range, rangeIndex) => (
+                        <div key={rangeIndex} className="time-range">
                           <input
                             type="time"
                             value={range.start}
-                            onChange={e => {
-                              const trs = [...editingClosure.time_ranges];
-                              trs[idx].start = e.target.value;
-                              setEditingClosure(ed => ({ ...ed, time_ranges: trs }));
-                            }}
+                            onChange={(e) => updateTimeRange(index, rangeIndex, 'start', e.target.value)}
                           />
                           <span>to</span>
                           <input
                             type="time"
                             value={range.end}
-                            onChange={e => {
-                              const trs = [...editingClosure.time_ranges];
-                              trs[idx].end = e.target.value;
-                              setEditingClosure(ed => ({ ...ed, time_ranges: trs }));
-                            }}
+                            onChange={(e) => updateTimeRange(index, rangeIndex, 'end', e.target.value)}
                           />
-                          <button
-                            className="remove-range"
-                            onClick={() => {
-                              const trs = [...editingClosure.time_ranges];
-                              trs.splice(idx, 1);
-                              setEditingClosure(ed => ({ ...ed, time_ranges: trs }));
-                            }}
-                            disabled={editingClosure.time_ranges.length === 1}
-                          >×</button>
                         </div>
                       ))}
                       <button
                         className="add-range"
-                        onClick={() => setEditingClosure(ed => ({ ...ed, time_ranges: [...ed.time_ranges, { start: '18:00', end: '23:00' }] }))}
-                      >+ Add Time Range</button>
+                        onClick={() => addTimeRange(index)}
+                      >
+                        + Add Time Range
+                      </button>
                     </div>
                   )}
-                  <button className="add-exception-btn" onClick={handleSaveEditClosure}>Save</button>
-                  <button className="delete-exception" onClick={handleCancelEditClosure}>Cancel</button>
-                </>
-              ) : (
-                <>
-                  <span>{
-                    closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date)
-                      ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
-                      : new Date(closure.date).toLocaleDateString()
-                  }</span>
-                  {closure.full_day ? (
-                    <span style={{ color: '#a59480', fontStyle: 'italic' }}>Full Day</span>
-                  ) : (
-                    <span>{closure.time_ranges && closure.time_ranges.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</span>
-                  )}
-                  {closure.reason && <span className="closure-reason">{closure.reason}</span>}
-                  <button className="delete-exception" onClick={() => handleEditClosure(closure)}>Edit</button>
-                  <button className="delete-exception" onClick={() => deleteExceptionalClosure(closure.id)}>Delete</button>
-                </>
-              )}
+                </div>
+              ))}
+              <button className="save-base-hours" onClick={saveBaseHours}>
+                Save Base Hours
+              </button>
             </div>
-          ))}
-        </div>
-      </section>
-      {rsvpModalEventId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 16px rgba(0,0,0,0.09)', padding: '2rem', position: 'relative', maxWidth: 440, width: '100%' }}>
-            <button onClick={() => setRsvpModalEventId(null)} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
-            <h3 style={{ marginBottom: 16 }}>RSVP for Private Event</h3>
-            <PrivateEventBooking eventId={rsvpModalEventId} rsvpMode={true} />
-          </div>
-        </div>
-      )}
-      {editModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 16px rgba(0,0,0,0.09)', padding: '2rem', position: 'relative', maxWidth: 440, width: '100%' }}>
-            <button onClick={handleCloseEditModal} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', fontSize: 22, cursor: 'pointer' }}>&times;</button>
-            <h3 style={{ marginBottom: 16 }}>Edit Private Event</h3>
-            <form onSubmit={e => { e.preventDefault(); handleSaveEditEvent(); }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          </section>
+        );
+
+      case 'custom_open':
+        return (
+          <section className="availability-section">
+            <div style={{ borderBottom: '2px solid #b7a78b', fontWeight: 600, fontSize: '1.5rem', marginBottom: 16, paddingBottom: 4, color: '#222' }}>
+              Custom Open Days
+            </div>
+            <div className="add-exception">
+              <DatePicker
+                selected={newOpenDate}
+                onChange={setNewOpenDate}
+                placeholderText="Select date"
+                className="date-picker"
+                minDate={new Date()}
+              />
+              <div className="time-ranges">
+                {newOpenTimeRanges.map((range, index) => (
+                  <div key={index} className="time-range">
+                    <input
+                      type="time"
+                      value={range.start}
+                      onChange={(e) => {
+                        const newRanges = [...newOpenTimeRanges];
+                        newRanges[index].start = e.target.value;
+                        setNewOpenTimeRanges(newRanges);
+                      }}
+                    />
+                    <span>to</span>
+                    <input
+                      type="time"
+                      value={range.end}
+                      onChange={(e) => {
+                        const newRanges = [...newOpenTimeRanges];
+                        newRanges[index].end = e.target.value;
+                        setNewOpenTimeRanges(newRanges);
+                      }}
+                    />
+                  </div>
+                ))}
+                <button
+                  className="add-range"
+                  onClick={() => setNewOpenTimeRanges([...newOpenTimeRanges, { start: '18:00', end: '23:00' }])}
+                >
+                  + Add Time Range
+                </button>
+              </div>
               <input
                 type="text"
-                placeholder="Event Name"
-                value={editEventForm.name}
-                onChange={e => setEditEventForm(f => ({ ...f, name: e.target.value }))}
-                required
-                style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
+                value={newOpenLabel}
+                onChange={(e) => setNewOpenLabel(e.target.value)}
+                placeholder="Event label (optional)"
+                className="event-label"
               />
-              <select
-                value={editEventForm.event_type}
-                onChange={e => setEditEventForm(f => ({ ...f, event_type: e.target.value }))}
-                required
-                style={{ padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.1rem' }}
+              <button className="add-exception-btn" onClick={addExceptionalOpen}>
+                Add Custom Open Day
+              </button>
+            </div>
+            <div className="exceptions-list">
+              {exceptionalOpens.map(open => (
+                <div key={open.id} className="exception-item">
+                  {editingOpenId === open.id ? (
+                    <>
+                      <DatePicker
+                        selected={editingOpen.date ? new Date(editingOpen.date) : null}
+                        onChange={date => setEditingOpen(e => ({ ...e, date }))}
+                        className="date-picker"
+                        minDate={new Date()}
+                      />
+                      <div className="time-ranges">
+                        {editingOpen.time_ranges.map((range, index) => (
+                          <div key={index} className="time-range">
+                            <input
+                              type="time"
+                              value={range.start}
+                              onChange={e => setEditingOpen(ed => ({
+                                ...ed,
+                                time_ranges: ed.time_ranges.map((r, i) => i === index ? { ...r, start: e.target.value } : r)
+                              }))}
+                            />
+                            <span>to</span>
+                            <input
+                              type="time"
+                              value={range.end}
+                              onChange={e => setEditingOpen(ed => ({
+                                ...ed,
+                                time_ranges: ed.time_ranges.map((r, i) => i === index ? { ...r, end: e.target.value } : r)
+                              }))}
+                            />
+                          </div>
+                        ))}
+                        <button
+                          className="add-range"
+                          onClick={() => setEditingOpen(e => ({ ...e, time_ranges: [...e.time_ranges, { start: '18:00', end: '23:00' }] }))}
+                        >+ Add Time Range</button>
+                      </div>
+                      <input
+                        type="text"
+                        value={editingOpen.label}
+                        onChange={e => setEditingOpen(ed => ({ ...ed, label: e.target.value }))}
+                        className="event-label"
+                        placeholder="Event label (optional)"
+                      />
+                      <button className="add-exception-btn" onClick={handleSaveEditOpen}>Save</button>
+                      <button className="delete-exception" onClick={handleCancelEditOpen}>Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <span>{
+                        open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date)
+                          ? (() => { const [y, m, d] = open.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
+                          : new Date(open.date).toLocaleDateString()
+                      }</span>
+                      <span>{open.time_ranges.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</span>
+                      {open.label && <span className="event-label">{open.label}</span>}
+                      <button className="delete-exception" onClick={() => handleEditOpen(open)}>Edit</button>
+                      <button className="delete-exception" onClick={() => deleteExceptionalOpen(open.id)}>Delete</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'custom_closed':
+        return (
+          <section className="availability-section">
+            <div style={{ borderBottom: '2px solid #b7a78b', fontWeight: 600, fontSize: '1.5rem', marginBottom: 16, paddingBottom: 4, color: '#222' }}>
+              Custom Closed Days
+            </div>
+            <div className="add-exception">
+              <DatePicker
+                selected={newClosureDate}
+                onChange={setNewClosureDate}
+                placeholderText="Select date"
+                className="date-picker"
+                minDate={new Date()}
+              />
+              <input
+                type="text"
+                value={newClosureReason}
+                onChange={(e) => setNewClosureReason(e.target.value)}
+                placeholder="Reason for closure (optional)"
+                className="closure-reason"
+              />
+              <label style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={newClosureFullDay}
+                  onChange={e => setNewClosureFullDay(e.target.checked)}
+                />
+                Full Day
+              </label>
+              {!newClosureFullDay && (
+                <div className="time-ranges">
+                  {newClosureTimeRanges.map((range, index) => (
+                    <div key={index} className="time-range">
+                      <input
+                        type="time"
+                        value={range.start}
+                        onChange={(e) => {
+                          const newRanges = [...newClosureTimeRanges];
+                          newRanges[index].start = e.target.value;
+                          setNewClosureTimeRanges(newRanges);
+                        }}
+                      />
+                      <span>to</span>
+                      <input
+                        type="time"
+                        value={range.end}
+                        onChange={(e) => {
+                          const newRanges = [...newClosureTimeRanges];
+                          newRanges[index].end = e.target.value;
+                          setNewClosureTimeRanges(newRanges);
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    className="add-range"
+                    onClick={() => setNewClosureTimeRanges([...newClosureTimeRanges, { start: '18:00', end: '23:00' }])}
+                  >
+                    + Add Time Range
+                  </button>
+                </div>
+              )}
+              <button className="add-exception-btn" onClick={addExceptionalClosure}>
+                Add Custom Closed Day
+              </button>
+            </div>
+            <div className="exceptions-list">
+              {exceptionalClosures.map(closure => (
+                <div key={closure.id} className="exception-item">
+                  {editingClosureId === closure.id ? (
+                    <>
+                      <DatePicker
+                        selected={editingClosure.date ? new Date(editingClosure.date) : null}
+                        onChange={date => setEditingClosure(e => ({ ...e, date }))}
+                        className="date-picker"
+                        minDate={new Date()}
+                      />
+                      <input
+                        type="text"
+                        value={editingClosure.reason}
+                        onChange={e => setEditingClosure(ed => ({ ...ed, reason: e.target.value }))}
+                        className="closure-reason"
+                        placeholder="Reason for closure (optional)"
+                      />
+                      <label style={{ margin: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={editingClosure.full_day}
+                          onChange={e => setEditingClosure(ed => ({ ...ed, full_day: e.target.checked }))}
+                        />
+                        Full Day
+                      </label>
+                      {!editingClosure.full_day && (
+                        <div className="time-ranges">
+                          {editingClosure.time_ranges.map((range, index) => (
+                            <div key={index} className="time-range">
+                              <input
+                                type="time"
+                                value={range.start}
+                                onChange={e => setEditingClosure(ed => ({
+                                  ...ed,
+                                  time_ranges: ed.time_ranges.map((r, i) => i === index ? { ...r, start: e.target.value } : r)
+                                }))}
+                              />
+                              <span>to</span>
+                              <input
+                                type="time"
+                                value={range.end}
+                                onChange={e => setEditingClosure(ed => ({
+                                  ...ed,
+                                  time_ranges: ed.time_ranges.map((r, i) => i === index ? { ...r, end: e.target.value } : r)
+                                }))}
+                              />
+                            </div>
+                          ))}
+                          <button
+                            className="add-range"
+                            onClick={() => setEditingClosure(e => ({ ...e, time_ranges: [...e.time_ranges, { start: '18:00', end: '23:00' }] }))}
+                          >+ Add Time Range</button>
+                        </div>
+                      )}
+                      <button className="add-exception-btn" onClick={handleSaveEditClosure}>Save</button>
+                      <button className="delete-exception" onClick={handleCancelEditClosure}>Cancel</button>
+                    </>
+                  ) : (
+                    <>
+                      <span>{
+                        closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date)
+                          ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })()
+                          : new Date(closure.date).toLocaleDateString()
+                      }</span>
+                      {closure.reason && <span className="closure-reason">{closure.reason}</span>}
+                      {closure.full_day ? (
+                        <span>Full Day</span>
+                      ) : (
+                        <span>{closure.time_ranges.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</span>
+                      )}
+                      <button className="delete-exception" onClick={() => handleEditClosure(closure)}>Edit</button>
+                      <button className="delete-exception" onClick={() => deleteExceptionalClosure(closure.id)}>Delete</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case 'private_events':
+        return (
+          <div>
+            {/* Create Private Event Button and Modal */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <button
+                style={{
+                  background: '#a59480',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '0.7rem 1.2rem',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+                onClick={() => setShowCreatePrivateEventForm(true)}
               >
-                <option value="">Select event type...</option>
-                <option value="private">Private Event</option>
-                <option value="birthday">Birthday</option>
-                <option value="engagement">Engagement</option>
-                <option value="anniversary">Anniversary</option>
-                <option value="party">Party</option>
-                <option value="graduation">Graduation</option>
-                <option value="corporate">Corporate Event</option>
-                <option value="holiday">Holiday Gathering</option>
-                <option value="networking">Networking</option>
-                <option value="fundraiser">Fundraiser</option>
-                <option value="bachelor">Bachelor/Bachelorette</option>
-                <option value="fun">Fun Night Out</option>
-                <option value="date">Date Night</option>
-              </select>
-              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                <div>
-                  <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Date</label>
-                  <DatePicker
-                    selected={editEventForm.date}
-                    onChange={d => setEditEventForm(f => ({ ...f, date: d }))}
-                    dateFormat="MMMM d, yyyy"
-                    minDate={new Date()}
-                    required
-                    className="datepicker-input"
-                  />
+                Create Private Event
+              </button>
+              {showCreatePrivateEventForm && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  background: 'rgba(0,0,0,0.35)',
+                  zIndex: 1000,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <div style={{ background: '#faf9f7', border: '1px solid #ececec', borderRadius: 8, padding: '2rem', minWidth: 340, maxWidth: 480, boxShadow: '0 2px 16px rgba(0,0,0,0.13)', position: 'relative' }}>
+                    <button
+                      onClick={() => setShowCreatePrivateEventForm(false)}
+                      style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }}
+                      aria-label="Close"
+                    >×</button>
+                    <h2 style={{ fontWeight: 600, color: '#333', fontSize: '1.3rem', marginBottom: 18 }}>Create Private Event</h2>
+                    <form onSubmit={handleCreatePrivateEvent}>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ fontWeight: 500, color: '#333', display: 'block', marginBottom: 4 }}>Event Name</label>
+                        <input
+                          type="text"
+                          value={privateEvent.name}
+                          onChange={e => setPrivateEvent(ev => ({ ...ev, name: e.target.value }))}
+                          required
+                          style={{ width: '100%', padding: '0.6rem', borderRadius: 4, border: '1px solid #ccc' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ fontWeight: 500, color: '#333', display: 'block', marginBottom: 4 }}>Event Type</label>
+                        <input
+                          type="text"
+                          value={privateEvent.event_type}
+                          onChange={e => setPrivateEvent(ev => ({ ...ev, event_type: e.target.value }))}
+                          required
+                          style={{ width: '100%', padding: '0.6rem', borderRadius: 4, border: '1px solid #ccc' }}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ fontWeight: 500, color: '#333', display: 'block', marginBottom: 4 }}>Date</label>
+                        <DatePicker
+                          selected={privateEvent.date}
+                          onChange={date => setPrivateEvent(ev => ({ ...ev, date }))}
+                          required
+                          className="date-picker"
+                          minDate={new Date()}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 12, display: 'flex', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontWeight: 500, color: '#333', display: 'block', marginBottom: 4 }}>Start Time</label>
+                          <input
+                            type="time"
+                            value={privateEvent.start}
+                            onChange={e => setPrivateEvent(ev => ({ ...ev, start: e.target.value }))}
+                            required
+                            style={{ width: '100%', padding: '0.6rem', borderRadius: 4, border: '1px solid #ccc' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontWeight: 500, color: '#333', display: 'block', marginBottom: 4 }}>End Time</label>
+                          <input
+                            type="time"
+                            value={privateEvent.end}
+                            onChange={e => setPrivateEvent(ev => ({ ...ev, end: e.target.value }))}
+                            required
+                            style={{ width: '100%', padding: '0.6rem', borderRadius: 4, border: '1px solid #ccc' }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        style={{ background: '#7c6b58', color: '#fff', border: 'none', borderRadius: 4, padding: '0.7rem 1.2rem', fontWeight: 600, fontSize: '1rem', marginTop: 8 }}
+                      >
+                        Create Event
+                      </button>
+                      {privateEventStatus && (
+                        <div style={{ color: privateEventStatus.includes('created') ? '#228B22' : '#e53e3e', fontWeight: 600, marginTop: 10 }}>
+                          {privateEventStatus}
+                        </div>
+                      )}
+                    </form>
+                  </div>
                 </div>
-                <div>
-                  <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>Start</label>
-                  <input
-                    type="time"
-                    value={editEventForm.start}
-                    onChange={e => setEditEventForm(f => ({ ...f, start: e.target.value }))}
-                    required
-                    style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontWeight: 600, color: '#555', marginBottom: 4, display: 'block' }}>End</label>
-                  <input
-                    type="time"
-                    value={editEventForm.end}
-                    onChange={e => setEditEventForm(f => ({ ...f, end: e.target.value }))}
-                    required
-                    style={{ padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', fontSize: '1.05rem' }}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: 8 }}>
-                <button type="submit" style={{ background: '#a59480', color: '#fff', border: 'none', borderRadius: 8, padding: '0.8rem 0', fontWeight: 700, fontSize: '1.1rem', flex: 1 }}>Save</button>
-                <button type="button" onClick={handleDeleteEditEvent} style={{ background: '#e57373', color: '#fff', border: 'none', borderRadius: 8, padding: '0.8rem 0', fontWeight: 700, fontSize: '1.1rem', flex: 1 }}>Delete</button>
-              </div>
-            </form>
+              )}
+            </div>
+            {/* Private Events Table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#faf9f7', borderRadius: 8, overflow: 'hidden', fontSize: '1.05rem' }}>
+              <thead>
+                <tr style={{ background: '#ececec', color: '#444' }}>
+                  <th style={{ padding: '0.7rem' }}>Event Name</th>
+                  <th style={{ padding: '0.7rem' }}>Type</th>
+                  <th style={{ padding: '0.7rem' }}>Date</th>
+                  <th style={{ padding: '0.7rem' }}>Time</th>
+                  <th style={{ padding: '0.7rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {privateEvents.length === 0 ? (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', color: '#888', padding: '1.2rem' }}>No private events found.</td></tr>
+                ) : (
+                  privateEvents.map(ev => (
+                    <tr key={ev.id}>
+                      <td style={{ padding: '0.7rem' }}>{ev.title}</td>
+                      <td style={{ padding: '0.7rem' }}>{ev.event_type}</td>
+                      <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleDateString()}</td>
+                      <td style={{ padding: '0.7rem' }}>{new Date(ev.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(ev.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
+                      <td style={{ padding: '0.7rem' }}>
+                        <button style={{ background: '#7c6b58', color: '#fff', border: 'none', borderRadius: 4, padding: '0.3rem 0.7rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => handleOpenEditModal(ev)}>Edit</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="calendar-availability-control">
+      {renderContent()}
+      {error && <div className="error-message">{error}</div>}
+      {successMessage && <div className="success-message">{successMessage}</div>}
     </div>
   );
 };
