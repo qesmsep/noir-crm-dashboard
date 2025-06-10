@@ -2,7 +2,6 @@
   "name": "noir-crm-dashboard",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://localhost:3001",
   "dependencies": {
     "@chakra-ui/icons": "^2.1.1",
     "@chakra-ui/react": "^2.7.1",
