@@ -1,10 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 import Stripe from 'stripe';
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Helper to auto-assign smallest free table
@@ -214,4 +210,6 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ success: true });
   }
-} 
+  res.setHeader('Allow', ['GET','POST','PATCH','DELETE']);
+  res.status(405).end(`Method ${method} Not Allowed`);
+}

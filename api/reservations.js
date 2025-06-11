@@ -76,18 +76,6 @@ async function findNextAvailableTime(start_time, durationMinutes, party_size) {
 export default async function handler(req, res) {
   const { method } = req;
   if (method === 'GET') {
-    const { upcoming } = req.query;
-    if (upcoming === '1') {
-      // Return count of upcoming reservations (start_time >= today)
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const { count, error } = await supabase
-        .from('reservations')
-        .select('id', { count: 'exact', head: true })
-        .gte('start_time', today.toISOString());
-      if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ count });
-    }
     const { data, error } = await supabase
       .from('reservations')
       .select(`

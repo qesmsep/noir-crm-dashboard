@@ -555,7 +555,7 @@ const CalendarAvailabilityControl = ({ section }) => {
                 <DatePicker
                   selected={bookingStartDate}
                   onChange={date => handleBookingDatesChange(date, bookingEndDate)}
-                  dateFormat="yyyy-MM-dd"
+                  dateFormat="MMMM d, yyyy"
                   className="date-picker"
                   disabled={bookingDatesLoading || bookingDatesSaving}
                 />
@@ -565,7 +565,7 @@ const CalendarAvailabilityControl = ({ section }) => {
                 <DatePicker
                   selected={bookingEndDate}
                   onChange={date => handleBookingDatesChange(bookingStartDate, date)}
-                  dateFormat="yyyy-MM-dd"
+                  dateFormat="MMMM d, yyyy"
                   className="date-picker"
                   disabled={bookingDatesLoading || bookingDatesSaving}
                 />

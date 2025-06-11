@@ -4,12 +4,12 @@ import 'react-datepicker/dist/react-datepicker.css';
 import '../App.css';
 import React, { useState, useEffect } from 'react';
 import { createDateFromTimeString, toCSTISOString } from '../utils/dateUtils';
+import { supabase } from '../api/supabaseClient';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import CreditCardHoldModal from './CreditCardHoldModal';
 
-// Only Thurs(4), Fri(5), Sat(6)
-const OPEN_DAYS = [4, 5, 6];
+
 
 // Generate time options for 6:00pm to midnight, every 15 min
 const times = [];
@@ -40,7 +40,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
   });
   const [date, setDate] = useState(() => {
     let d = new Date(effectiveStartDate);
-    while (!OPEN_DAYS.includes(d.getDay())) d.setDate(d.getDate() + 1);
+    // We'll check baseDays after it's loaded
     return d;
   });
   const [time, setTime] = useState('');
@@ -51,14 +51,34 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
   const [nonMemberInfo, setNonMemberInfo] = useState(null);
   const [availableTimes, setAvailableTimes] = useState([]);
 
+  // Dynamic base days state
+  const [baseDays, setBaseDays] = useState([]);
+
   useEffect(() => {
     if (!bookingStartDate) return;
     let d = new Date(effectiveStartDate);
-    while (!OPEN_DAYS.includes(d.getDay())) {
-      d.setDate(d.getDate() + 1);
+    // Wait for baseDays to be loaded
+    if (baseDays.length > 0) {
+      while (!baseDays.includes(d.getDay())) {
+        d.setDate(d.getDate() + 1);
+      }
     }
     setDate(d);
-  }, [bookingStartDate]);
+  }, [bookingStartDate, baseDays]);
+
+  // Fetch baseDays from supabase on mount
+  useEffect(() => {
+    async function loadBaseDays() {
+      // fetch enabled weekdays from Supabase
+      const { data } = await supabase
+        .from('venue_hours')
+        .select('day_of_week')
+        .eq('type', 'base')
+        .gte('time_ranges', '[]');
+      if (data) setBaseDays(data.map(r => r.day_of_week));
+    }
+    loadBaseDays();
+  }, []);
 
   // Fetch available times when date or party_size changes
   useEffect(() => {
@@ -251,7 +271,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
               bookingStartDate && bookingEndDate &&
               d >= bookingStartDate &&
               d <= bookingEndDate &&
-              OPEN_DAYS.includes(d.getDay())
+              baseDays.includes(d.getDay())
             }
             customInput={<Input variant="unstyled" fontWeight="bold" fontSize="lg" width="160px" />}
           />

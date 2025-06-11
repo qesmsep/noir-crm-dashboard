@@ -1,5 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase with service role key
+const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -9,7 +11,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const { member_id, account_id, outstanding } = req.query;
-      let query = supabase.from("ledger").select("*");
+      let query = supabaseAdmin.from("ledger").select("*");
       if (member_id) query = query.eq("member_id", member_id);
       if (account_id) query = query.eq("account_id", account_id);
       query = query.order("date", { ascending: true });
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Missing required fields" });
       }
       // Insert the transaction and return the inserted row
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from("ledger")
         .insert([
           {
@@ -60,7 +62,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Missing required fields" });
       }
       const dateString = date ? date : new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from("ledger")
         .update({ type, amount: amt, note, date: dateString })
         .eq('id', id)
@@ -82,4 +84,4 @@ export default async function handler(req, res) {
     console.error("Ledger handler unexpected error:", err);
     return res.status(500).json({ error: "Internal server error", details: err.message });
   }
-} 
+}
