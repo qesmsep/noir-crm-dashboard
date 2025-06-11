@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   console.log('Ledger handler:', req.method, req.body, req.query);
   try {
     if (req.method === "GET") {
-      const { member_id, account_id } = req.query;
+      const { member_id, account_id, outstanding } = req.query;
       let query = supabaseAdmin.from("ledger").select("*");
       if (member_id) query = query.eq("member_id", member_id);
       if (account_id) query = query.eq("account_id", account_id);
@@ -19,6 +19,11 @@ export default async function handler(req, res) {
       if (error) {
         console.error("Ledger GET error:", error);
         return res.status(500).json({ error: error.message });
+      }
+      if (outstanding === '1') {
+        // Outstanding = sum of all negative balances (purchases - payments)
+        const total = (data || []).reduce((sum, tx) => sum + (tx.type === 'purchase' ? Number(tx.amount) : tx.type === 'payment' ? -Number(tx.amount) : 0), 0);
+        return res.status(200).json({ total });
       }
       return res.status(200).json({ data });
     }
