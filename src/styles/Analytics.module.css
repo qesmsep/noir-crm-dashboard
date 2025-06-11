@@ -1,0 +1,170 @@
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  font-size: 1.1rem;
+  color: #666;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #1a1a1a;
+}
+
+.timeRange {
+  display: flex;
+  background-color: #f0f0f0;
+  border-radius: 0.25rem;
+  padding: 0.25rem;
+}
+
+.timeButton {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  color: #666;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.timeButton:hover {
+  color: #1a1a1a;
+}
+
+.timeButton.active {
+  background-color: white;
+  color: #1a1a1a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.metricCard {
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.metricCard h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metricValue {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1a1a1a;
+}
+
+.metricSubtext {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.timeSlots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.timeSlot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background-color: #f8f8f8;
+  border-radius: 0.25rem;
+}
+
+.time {
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.count {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.revenueChart,
+.growthChart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  height: 200px;
+  margin-top: 1rem;
+}
+
+.revenueBar,
+.growthBar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bar {
+  width: 100%;
+  background-color: #1a1a1a;
+  border-radius: 0.25rem 0.25rem 0 0;
+  transition: height 0.3s ease;
+}
+
+.month {
+  font-size: 0.75rem;
+  color: #666;
+  text-align: center;
+}
+
+.amount {
+  font-size: 0.75rem;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .timeRange {
+    width: 100%;
+  }
+
+  .timeButton {
+    flex: 1;
+  }
+
+  .metricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .revenueChart,
+  .growthChart {
+    height: 150px;
+  }
+} 
