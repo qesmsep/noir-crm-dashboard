@@ -107,7 +107,19 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
   const handleDateChange = (d) => setDate(d);
   const handleTimeChange = (e) => setTime(e.target.value);
   const handlePartySizeChange = (e) => setForm({ ...form, party_size: Number(e.target.value) });
-  const handlePhoneChange = (e) => setForm({ ...form, phone: e.target.value });
+
+  // Format phone number with hyphens as user types
+  function formatPhoneNumber(value) {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0,3)}-${digits.slice(3)}`;
+    return `${digits.slice(0,3)}-${digits.slice(3,6)}-${digits.slice(6,10)}`;
+  }
+
+  const handlePhoneChange = (e) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setForm({ ...form, phone: formatted });
+  };
 
   // Step 2: Modal fields
   const handleModalChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -232,7 +244,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
           <DatePicker
             selected={date}
             onChange={d => setDate(d)}
-            dateFormat="MMM d, yyyy"
+            dateFormat="MMMM dd, yyyy"
             minDate={bookingStartDate}
             maxDate={bookingEndDate}
             filterDate={d =>
@@ -241,7 +253,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
               d <= bookingEndDate &&
               OPEN_DAYS.includes(d.getDay())
             }
-            customInput={<Input variant="unstyled" fontWeight="bold" fontSize="lg" width="110px" />}
+            customInput={<Input variant="unstyled" fontWeight="bold" fontSize="lg" width="160px" />}
           />
         </Box>
         <Box px={6} py={2} borderRight="1px solid #e2e2e2">
