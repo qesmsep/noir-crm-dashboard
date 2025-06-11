@@ -268,7 +268,7 @@ export default function ReservationForm({ initialStart, initialEnd, onSave, tabl
           </Select>
         </Box>
         <Box px={6} py={2} borderRight="1px solid #e2e2e2">
-          <Input name="phone" value={form.phone} onChange={handlePhoneChange} variant="unstyled" fontWeight="bold" fontSize="lg" placeholder="Phone" width="120px" />
+          <Input name="phone" value={form.phone} onChange={handlePhoneChange} variant="unstyled" fontWeight="bold" fontSize="lg" placeholder="Phone" width="220px" />
         </Box>
         <Button onClick={onOpen} bg="#35312b" color="#c2b5a3" borderRadius={0} px={10} py={6} fontWeight="bold" fontSize="lg" height="auto" _hover={{ bg: '#222' }} disabled={!time}>
           Book now
