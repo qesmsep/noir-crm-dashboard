@@ -26,7 +26,7 @@ export default function Dashboard() {
       setStats(s => ({ ...s, loading: true }));
       try {
         // Fetch all members
-        const membersRes = await fetch("/api/members-list");
+        const membersRes = await fetch("/api/members");
         const membersData = await membersRes.json();
         // Fetch ledger
         const ledgerRes = await fetch("/api/ledger");
@@ -37,6 +37,10 @@ export default function Dashboard() {
         // Fetch outstanding balances
         const outstandingRes = await fetch("/api/ledger?outstanding=1");
         const outstandingData = await outstandingRes.json();
+
+        // **DEBUG**: inspect what came back
+        console.log({ membersData, ledgerData, reservationsData, outstandingData });
+
         setStats({
           members: membersData.data || [],
           ledger: ledgerData.data || [],
