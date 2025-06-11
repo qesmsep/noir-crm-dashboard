@@ -1,17 +1,17 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Link, Outlet } from "react-router-dom";
 import { Box, HStack, Button, Spinner, Image } from "@chakra-ui/react";
-import Reservations from "./pages/admin/Reservations";
+import Reservations from "./pages/admin/reservations";
 import { AppContextProvider, useAppContext } from "./context/AppContext";
 import logoImg from './assets/images/noir-wedding-day.png';
 
-const HomePage = lazy(() => import("./pages/HomePage"));
-const Members = lazy(() => import("./pages/Members"));
-const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
-const AdminUsers = lazy(() => import("./pages/admin/MembersAdmin"));
-const Calendar = lazy(() => import("./pages/admin/Calendar"));
-const Logout = lazy(() => import("./pages/admin/Logout"));
-const MemberDetailAdmin = lazy(() => import("./pages/admin/MemberDetailAdmin"));
+const HomePage = lazy(() => import("./pages/homepage"));
+const Members = lazy(() => import("./pages/members"));
+const Dashboard = lazy(() => import("./pages/admin/dashboard"));
+const AdminUsers = lazy(() => import("./pages/admin/members-admin"));
+const Calendar = lazy(() => import("./pages/admin/calendar"));
+const Logout = lazy(() => import("./pages/admin/logout"));
+const MemberDetailAdmin = lazy(() => import("./pages/admin/member-detail-admin"));
 
 function AdminLayout() {
   return (

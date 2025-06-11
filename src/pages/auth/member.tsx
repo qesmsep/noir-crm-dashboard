@@ -67,11 +67,13 @@ export default function MemberAuth() {
     setError('');
 
     try {
+      const params = authMethod === 'phone' 
+        ? { phone: phone as string, type: 'sms' as const }
+        : { email: email as string, type: 'email' as const };
+
       const { error } = await supabase.auth.verifyOtp({
-        phone: authMethod === 'phone' ? phone : undefined,
-        email: authMethod === 'email' ? email : undefined,
-        token: otp,
-        type: 'sms'
+        ...params,
+        token: otp
       });
 
       if (error) throw error;

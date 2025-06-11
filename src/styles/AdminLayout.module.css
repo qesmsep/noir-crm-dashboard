@@ -8,12 +8,9 @@
   width: 250px;
   background-color: #1a1a1a;
   color: white;
-  padding: 1.5rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  position: fixed;
-  height: 100vh;
-  z-index: 100;
 }
 
 .logo {
@@ -28,119 +25,93 @@
   text-decoration: none;
 }
 
-.navItems {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.main {
   flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.nav {
+  margin-top: 2rem;
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
   padding: 0.75rem 1rem;
-  color: #a0a0a0;
+  color: #e0e0e0;
   text-decoration: none;
   border-radius: 0.5rem;
-  transition: all 0.2s;
+  margin-bottom: 0.5rem;
+  transition: background-color 0.2s;
 }
 
 .navItem:hover {
-  background-color: #2a2a2a;
-  color: white;
+  background-color: #333;
 }
 
 .navItem.active {
-  background-color: #2a2a2a;
+  background-color: #333;
   color: white;
 }
 
-.icon {
-  font-size: 1.25rem;
+.navIcon {
+  margin-right: 0.75rem;
+  width: 20px;
+  height: 20px;
 }
 
 .userSection {
   margin-top: auto;
-  position: relative;
+  padding-top: 1rem;
+  border-top: 1px solid #333;
 }
 
-.userButton {
+.userInfo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
   padding: 0.75rem;
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  width: 100%;
-  border-radius: 0.5rem;
-  transition: background-color 0.2s;
-}
-
-.userButton:hover {
-  background-color: #2a2a2a;
+  color: #e0e0e0;
 }
 
 .userAvatar {
   width: 32px;
   height: 32px;
-  background-color: #3a3a3a;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
+  margin-right: 0.75rem;
 }
 
-.userEmail {
-  font-size: 0.875rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.userName {
+  font-weight: 500;
 }
 
-.userMenu {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  background-color: #2a2a2a;
-  border-radius: 0.5rem;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
-}
-
-.menuItem {
-  display: block;
-  padding: 0.75rem 1rem;
-  color: white;
-  text-decoration: none;
-  transition: background-color 0.2s;
-  border: none;
-  background: none;
+.logoutButton {
   width: 100%;
-  text-align: left;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
   cursor: pointer;
-  font-size: 0.875rem;
+  transition: background-color 0.2s;
 }
 
-.menuItem:hover {
-  background-color: #3a3a3a;
-}
-
-.main {
-  flex: 1;
-  margin-left: 250px;
-  padding: 2rem;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
+.logoutButton:hover {
+  background-color: #b91c1c;
 }
 
 .menuButton {
@@ -199,12 +170,23 @@
 }
 
 @media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
   .sidebar {
-    display: none;
+    width: 100%;
+    padding: 1rem;
   }
 
   .main {
-    margin-left: 0;
+    padding: 1rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
   }
 
   .menuButton {

@@ -4,45 +4,52 @@ import Head from 'next/head';
 import { supabase, setupMFA, verifyMFA } from '../../lib/auth';
 import styles from '../../styles/Auth.module.css';
 
-type AuthStep = 'login' | 'mfa' | 'setup-mfa';
+interface MfaSecret {
+  id: string;
+  type: 'totp';
+  totp: {
+    qr_code: string;
+    secret: string;
+    uri: string;
+  };
+  friendly_name?: string;
+}
 
 export default function AdminAuth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
-  const [step, setStep] = useState<AuthStep>('login');
-  const [error, setError] = useState('');
+  const [step, setStep] = useState<'login' | 'setup-mfa' | 'verify-mfa'>('login');
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mfaSecret, setMfaSecret] = useState('');
+  const [mfaSecret, setMfaSecret] = useState<MfaSecret | null>(null);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       });
 
       if (error) throw error;
 
-      // Check if user has MFA enabled
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('mfa_enabled')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profile?.mfa_enabled) {
-        setStep('mfa');
-      } else {
-        // Setup MFA for new admin
-        const secret = await setupMFA(data.user.id);
-        setMfaSecret(secret);
-        setStep('setup-mfa');
+      if (data.user) {
+        // Check if MFA is required
+        const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        
+        if (mfaData?.currentLevel !== 'aal2') {
+          // Setup MFA for new admin
+          const secret = await setupMFA(data.user.id);
+          setMfaSecret(secret);
+          setStep('setup-mfa');
+        } else {
+          router.push('/admin/dashboard');
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -54,19 +61,25 @@ export default function AdminAuth() {
   const handleMFASetup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!mfaSecret) throw new Error('MFA secret not found');
 
       const { data: challenge } = await supabase.auth.mfa.challenge({
-        factorId: 'totp'
+        factorId: mfaSecret.id,
       });
 
       if (!challenge) throw new Error('Failed to create MFA challenge');
 
-      await verifyMFA(user.id, 'totp', challenge.id, mfaCode);
+      const { error } = await supabase.auth.mfa.verify({
+        factorId: mfaSecret.id,
+        challengeId: challenge.id,
+        code: mfaCode,
+      });
+
+      if (error) throw error;
+
       router.push('/admin/dashboard');
     } catch (err: any) {
       setError(err.message);
@@ -78,19 +91,25 @@ export default function AdminAuth() {
   const handleMFAVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!mfaSecret) throw new Error('MFA secret not found');
 
       const { data: challenge } = await supabase.auth.mfa.challenge({
-        factorId: 'totp'
+        factorId: mfaSecret.id,
       });
 
       if (!challenge) throw new Error('Failed to create MFA challenge');
 
-      await verifyMFA(user.id, 'totp', challenge.id, mfaCode);
+      const { error } = await supabase.auth.mfa.verify({
+        factorId: mfaSecret.id,
+        challengeId: challenge.id,
+        code: mfaCode,
+      });
+
+      if (error) throw error;
+
       router.push('/admin/dashboard');
     } catch (err: any) {
       setError(err.message);
@@ -142,7 +161,7 @@ export default function AdminAuth() {
               <p>Scan this QR code with your authenticator app:</p>
               <div className={styles.qrCode}>
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(mfaSecret)}`}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(mfaSecret?.totp.secret || '')}`}
                   alt="MFA QR Code"
                 />
               </div>
@@ -166,7 +185,7 @@ export default function AdminAuth() {
             </div>
           )}
 
-          {step === 'mfa' && (
+          {step === 'verify-mfa' && (
             <form onSubmit={handleMFAVerify} className={styles.mfaForm}>
               <p>Enter the verification code from your authenticator app</p>
               <input

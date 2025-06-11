@@ -13,6 +13,16 @@ interface AnalyticsData {
   memberGrowth: { month: string; count: number }[];
 }
 
+interface TimeSlotCount {
+  time: string;
+  count: number;
+}
+
+interface MonthlyRevenue {
+  month: string;
+  amount: number;
+}
+
 export default function Analytics() {
   const [data, setData] = useState<AnalyticsData>({
     totalMembers: 0,
@@ -58,7 +68,7 @@ export default function Analytics() {
       }, {} as Record<string, number>);
 
       const popularTimeSlots = Object.entries(timeSlotCounts || {})
-        .map(([time, count]) => ({ time, count }))
+        .map(([time, count]) => ({ time, count: Number(count) }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
@@ -76,9 +86,9 @@ export default function Analytics() {
         return acc;
       }, {} as Record<string, number>);
 
-      const revenueData = Object.entries(monthlyRevenue || {}).map(
-        ([month, amount]) => ({ month, amount })
-      );
+      const revenueData = Object.entries(monthlyRevenue || {})
+        .map(([month, amount]) => ({ month, amount: Number(amount) }))
+        .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
       // Calculate member growth
       const { data: members } = await supabase
