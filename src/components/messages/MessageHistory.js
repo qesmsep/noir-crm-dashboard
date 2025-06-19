@@ -1,54 +1,95 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  VStack,
+  Text,
+  Badge,
+  Spinner,
+  useToast,
+  Heading,
+} from '@chakra-ui/react';
 
-const MessageHistory = ({ memberId }) => {
+export default function MessageHistory({ accountId }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
-    if (!memberId) return;
-    setLoading(true);
-    setError('');
-    fetch(`/api/messages?member_id=${memberId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.messages) setMessages(data.messages);
-        else setError(data.error || 'Failed to fetch messages');
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`/api/messages?account_id=${accountId}`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch messages');
+        }
+        const data = await res.json();
+        setMessages(data.messages || []);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: error.message,
+          status: 'error',
+          duration: 3000,
+        });
+      } finally {
         setLoading(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, [memberId]);
+      }
+    };
 
-  if (!memberId) return null;
+    if (accountId) {
+      fetchMessages();
+    }
+  }, [accountId]);
+
+  if (loading) {
+    return (
+      <Box textAlign="center" py={8}>
+        <Spinner size="xl" />
+      </Box>
+    );
+  }
+
+  if (!messages.length) {
+    return (
+      <Box textAlign="center" py={8}>
+        <Text color="gray.500">No messages found</Text>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ marginTop: '2rem' }}>
-      <h3>Message History</h3>
-      {loading ? (
-        <div>Loading...</div>
-      ) : error ? (
-        <div style={{ color: 'red' }}>{error}</div>
-      ) : messages.length === 0 ? (
-        <div>No messages sent to this member yet.</div>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {messages.map(msg => (
-            <li key={msg.id} style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0' }}>
-              <div style={{ fontWeight: 500 }}>{msg.content}</div>
-              <div style={{ fontSize: '0.95rem', color: '#666' }}>
-                Sent: {new Date(msg.timestamp).toLocaleString()} | Status: <span style={{ color: msg.status === 'sent' ? 'green' : 'red' }}>{msg.status}</span>
-                {msg.sent_by && <span> | By: {msg.sent_by}</span>}
-                {msg.error_message && <span style={{ color: 'red' }}> | Error: {msg.error_message}</span>}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <Box bg="white" p={6} borderRadius="lg" boxShadow="sm">
+      <Heading size="md" mb={4}>Message History</Heading>
+      <VStack spacing={4} align="stretch">
+        {messages.map((message) => (
+          <Box
+            key={message.id}
+            p={4}
+            borderWidth={1}
+            borderRadius="md"
+            bg={message.direction === 'outbound' ? 'blue.50' : 'gray.50'}
+          >
+            <Box display="flex" justifyContent="space-between" mb={2}>
+              <Text fontWeight="bold">
+                {message.direction === 'outbound' ? 'To: ' : 'From: '}
+                {message.phone_number}
+              </Text>
+              <Badge
+                colorScheme={
+                  message.status === 'sent' ? 'green' :
+                  message.status === 'failed' ? 'red' :
+                  'yellow'
+                }
+              >
+                {message.status}
+              </Badge>
+            </Box>
+            <Text>{message.content}</Text>
+            <Text fontSize="sm" color="gray.500" mt={2}>
+              {new Date(message.created_at).toLocaleString()}
+            </Text>
+          </Box>
+        ))}
+      </VStack>
+    </Box>
   );
-};
-
-export default MessageHistory; 
+} 

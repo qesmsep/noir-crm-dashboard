@@ -1,4 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
+import {
+  Box,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Input,
+  Select,
+  Button,
+  Text,
+  useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
+  VStack,
+  HStack,
+} from '@chakra-ui/react';
+import PropTypes from 'prop-types';
 
 const MemberLedger = ({
   members,
@@ -21,166 +47,501 @@ const MemberLedger = ({
   ledgerLoading,
   session
 }) => {
+  const [editingId, setEditingId] = useState(null);
+  const [tempEditForm, setTempEditForm] = useState({});
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const toast = useToast();
+
   const formatDateLong = (dateString) => {
     if (!dateString) return null;
-    const date = new Date(dateString);
+    // Prevent timezone shifts by treating as local date at midnight
+    const datePart = dateString.includes('T') ? dateString.split('T')[0] : dateString;
+    const date = new Date(`${datePart}T00:00:00`);
     if (isNaN(date)) return null;
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
   };
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const calculateBalance = () => {
+    return (memberLedger || []).reduce((acc, t) => {
+      // Payments increase credit, purchases decrease credit
+      return acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount));
+    }, 0);
+  };
+
+  const handleStartEdit = (transaction) => {
+    setEditingId(transaction.id);
+    setTempEditForm({
+      date: transaction.date,
+      amount: Math.abs(transaction.amount),
+      type: transaction.type,
+      note: transaction.note,
+      member_id: transaction.member_id
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setTempEditForm({});
+  };
+
+  const handleSaveEdit = async (transaction) => {
+    try {
+      await handleUpdateTransaction({
+        ...transaction,
+        ...tempEditForm
+      });
+      setEditingId(null);
+      setTempEditForm({});
+      // Refresh the ledger data after successful update
+      await fetchLedger(selectedMember.account_id);
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+    }
+  };
+
+  const handleDelete = async (transaction) => {
+    if (window.confirm('Are you sure you want to delete this transaction?')) {
+      try {
+        await handleDeleteTransaction(transaction.id);
+        // Refresh the ledger data after successful deletion
+        await fetchLedger(selectedMember.account_id);
+      } catch (error) {
+        console.error('Error deleting transaction:', error);
+      }
+    }
+  };
+
+  const handlePayBalance = async () => {
+    if (!selectedMember?.account_id) {
+      toast({
+        title: 'Error',
+        description: 'No account selected',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const response = await fetch('/api/chargeBalance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: selectedMember.account_id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to process payment');
+      }
+
+      toast({
+        title: 'Payment Successful',
+        description: 'The balance has been paid successfully',
+        status: 'success',
+        duration: 5000,
+      });
+
+      // Refresh the ledger to show the new payment
+      await fetchLedger(selectedMember.account_id);
+    } catch (error) {
+      toast({
+        title: 'Payment Failed',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const balance = calculateBalance();
+
   return (
-    <div style={{ width: '100%', position: 'relative', marginTop: '2rem' }}>
-      <h3>Ledger</h3>
-      <div style={{ marginBottom: '1rem' }}>
-        <strong>
-          {memberLedger && memberLedger.reduce((acc, t) => acc + Number(t.amount), 0) < 0 ? 'Balance Due:' : 'Current Credit:'}
-        </strong>{' '}
-        ${Math.abs((memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0)).toFixed(2)}
-      </div>
-      <table className="ledger-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Member</th>
-            <th>Description</th>
-            <th>Amount</th>
-            <th>Type</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Box
+      width="100%"
+      position="relative"
+      display="grid"
+      gridTemplateColumns="1fr"
+      gridGap={4}
+      fontFamily="Montserrat, sans-serif"
+    >
+      <Box mb={4}>
+        <Text fontSize="lg" fontWeight="bold">
+          {balance < 0 ? 'Balance Owed:' : 'Current Credit:'}
+        </Text>
+        <HStack spacing={4} align="center">
+          <Text fontSize="2xl" color={balance < 0 ? 'red.500' : 'green.500'}>
+            {formatCurrency(Math.abs(balance))}
+          </Text>
+          {balance < 0 && (
+            <Button
+              colorScheme="blue"
+              size="md"
+              isLoading={isProcessingPayment}
+              onClick={handlePayBalance}
+              fontFamily="Montserrat, sans-serif"
+            >
+              Pay Balance
+            </Button>
+          )}
+        </HStack>
+      </Box>
+
+      <Table variant="simple" size="sm" bg="#aba8a1">
+        <Thead bg="#353535">
+          <Tr>
+            <Th px={6} py={3} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
+              Date
+            </Th>
+            <Th px={6} py={3} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
+              Member
+            </Th>
+            <Th px={6} py={3} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
+              Description
+            </Th>
+            <Th px={6} py={3} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" isNumeric>
+              Amount
+            </Th>
+            <Th px={6} py={3} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
+              Type
+            </Th>
+            <Th px={6} py={3} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
+              Actions
+            </Th>
+          </Tr>
+        </Thead>
+        <Tbody>
           {/* Add Transaction Row */}
-          <tr>
-            <td>
-              <input
+          <Tr>
+            <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+              <Input
                 type="date"
-                name="date"
+                variant="filled"
+                bg="white"
+                size="sm"
                 value={newTransaction.date || ''}
                 onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
-                className="add-transaction-input"
-                style={{ minWidth: 120 }}
               />
-            </td>
-            <td>
-              <select
-                name="member_id"
+            </Td>
+            <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+              <Select
+                variant="filled"
+                bg="white"
+                size="sm"
                 value={selectedTransactionMemberId}
                 onChange={e => setSelectedTransactionMemberId(e.target.value)}
-                className="add-transaction-input"
-                style={{ minWidth: 120 }}
+                placeholder="Select Member"
               >
-                <option value="">Select Member</option>
                 {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
                   <option key={m.member_id} value={m.member_id}>
                     {m.first_name} {m.last_name}
                   </option>
                 ))}
-              </select>
-            </td>
-            <td>
-              <input
-                type="text"
-                name="note"
+              </Select>
+            </Td>
+            <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+              <Input
                 placeholder="Note"
+                variant="filled"
+                bg="white"
+                size="sm"
                 value={newTransaction.note || ''}
                 onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
-                className="add-transaction-input"
               />
-            </td>
-            <td>
-              <input
+            </Td>
+            <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+              <Input
                 type="number"
-                name="amount"
                 placeholder="Amount"
+                variant="filled"
+                bg="white"
+                size="sm"
                 value={newTransaction.amount || ''}
                 onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                className="add-transaction-input"
               />
-            </td>
-            <td>
-              <select
-                name="type"
+            </Td>
+            <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+              <Select
+                variant="filled"
+                bg="white"
+                size="sm"
                 value={newTransaction.type || ''}
                 onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
-                className="add-transaction-input"
+                placeholder="Type"
               >
-                <option value="">Type</option>
                 <option value="payment">Payment</option>
                 <option value="purchase">Purchase</option>
-              </select>
-            </td>
-            <td>
-              <button
-                onClick={e => {
-                  e.preventDefault();
-                  if (!selectedTransactionMemberId) {
-                    // setTransactionStatus('Please select a member.');
-                    return;
-                  }
-                  handleAddTransaction(selectedTransactionMemberId, selectedMember.account_id);
-                }}
-                className="add-transaction-btn"
-                style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                disabled={transactionStatus === 'loading'}
+              </Select>
+            </Td>
+            <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+              <Button
+                size="sm"
+                bg="#353535"
+                color="#ecede8"
+                _hover={{ bg: '#2a2a2a' }}
+                onClick={() => handleAddTransaction(selectedTransactionMemberId, selectedMember.account_id)}
+                isLoading={transactionStatus === 'loading'}
+                isDisabled={!selectedTransactionMemberId || !newTransaction.type || !newTransaction.amount}
               >
-                {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
-              </button>
-            </td>
-          </tr>
+                Add
+              </Button>
+            </Td>
+          </Tr>
+
           {/* Ledger Rows */}
           {memberLedger && memberLedger.length > 0 ? (
             memberLedger.map((tx, idx) => {
               const member = members.find(m => m.member_id === tx.member_id);
+              const isEditing = editingId === tx.id;
+
               return (
-                <tr key={tx.id || idx}>
-                  <td>{formatDateLong(tx.date)}</td>
-                  <td>{member ? `${member.first_name} ${member.last_name}` : ''}</td>
-                  <td>{tx.note}</td>
-                  <td>${Number(tx.amount).toFixed(2)}</td>
-                  <td>{tx.type === 'payment' ? 'Payment' : tx.type === 'purchase' ? 'Purchase' : tx.type}</td>
-                  <td>
-                    <button
-                      onClick={() => handleEditTransaction(tx)}
-                      className="add-transaction-btn"
-                      style={{ background: '#666', padding: '0.25rem 0.5rem', fontSize: '0.9rem' }}
-                    >
-                      Edit
-                    </button>
-                  </td>
-                </tr>
+                <Tr key={tx.id || idx}>
+                  <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        variant="filled"
+                        bg="white"
+                        size="sm"
+                        value={tempEditForm.date || ''}
+                        onChange={e => setTempEditForm({ ...tempEditForm, date: e.target.value })}
+                      />
+                    ) : (
+                      formatDateLong(tx.date)
+                    )}
+                  </Td>
+                  <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+                    {isEditing ? (
+                      <Select
+                        variant="filled"
+                        bg="white"
+                        size="sm"
+                        value={tempEditForm.member_id || ''}
+                        onChange={e => setTempEditForm({ ...tempEditForm, member_id: e.target.value })}
+                      >
+                        {members.filter(m => m.account_id === selectedMember.account_id).map(m => (
+                          <option key={m.member_id} value={m.member_id}>
+                            {m.first_name} {m.last_name}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      member ? `${member.first_name} ${member.last_name}` : ''
+                    )}
+                  </Td>
+                  <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+                    {isEditing ? (
+                      <Input
+                        variant="filled"
+                        bg="white"
+                        size="sm"
+                        value={tempEditForm.note || ''}
+                        onChange={e => setTempEditForm({ ...tempEditForm, note: e.target.value })}
+                      />
+                    ) : (
+                      tx.note
+                    )}
+                  </Td>
+                  <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px" isNumeric>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        variant="filled"
+                        bg="white"
+                        size="sm"
+                        value={tempEditForm.amount || ''}
+                        onChange={e => setTempEditForm({ ...tempEditForm, amount: e.target.value })}
+                      />
+                    ) : (
+                      <Text color={tx.type === 'payment' ? 'green.500' : 'red.500'}>
+                        {formatCurrency(Number(tx.amount))}
+                      </Text>
+                    )}
+                  </Td>
+                  <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+                    {isEditing ? (
+                      <Select
+                        variant="filled"
+                        bg="white"
+                        size="sm"
+                        value={tempEditForm.type || ''}
+                        onChange={e => setTempEditForm({ ...tempEditForm, type: e.target.value })}
+                      >
+                        <option value="payment">Payment</option>
+                        <option value="purchase">Purchase</option>
+                      </Select>
+                    ) : (
+                      tx.type === 'payment' ? 'Payment' : 'Purchase'
+                    )}
+                  </Td>
+                  <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px">
+                    {isEditing ? (
+                      <HStack spacing={2}>
+                        <Button
+                          size="sm"
+                          bg="#353535"
+                          color="#ecede8"
+                          _hover={{ bg: '#2a2a2a' }}
+                          onClick={() => handleSaveEdit(tx)}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          bg="#353535"
+                          color="#ecede8"
+                          _hover={{ bg: '#2a2a2a' }}
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          bg="#353535"
+                          color="#ecede8"
+                          _hover={{ bg: '#2a2a2a' }}
+                          variant="outline"
+                          onClick={() => handleDelete(tx)}
+                        >
+                          Delete
+                        </Button>
+                      </HStack>
+                    ) : (
+                      <Button
+                        size="sm"
+                        bg="#353535"
+                        color="#ecede8"
+                        _hover={{ bg: '#2a2a2a' }}
+                        onClick={() => handleStartEdit(tx)}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </Td>
+                </Tr>
               );
             })
           ) : (
-            <tr>
-              <td colSpan="6">No transactions found.</td>
-            </tr>
+            <Tr>
+              <Td px={6} py={3} borderColor="gray.200" borderBottomWidth="1px" colSpan={6} textAlign="center">No transactions found.</Td>
+            </Tr>
           )}
-        </tbody>
-      </table>
-      {/* Manual Refresh Button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-        <button
+        </Tbody>
+      </Table>
+
+      {/* Edit Transaction Modal */}
+      <Modal isOpen={!!editingTransaction} onClose={() => setEditingTransaction(null)}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Edit Transaction</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl>
+                <FormLabel>Date</FormLabel>
+                <Input
+                  type="date"
+                  value={editTransactionForm.date || ''}
+                  onChange={e => setEditTransactionForm({ ...editTransactionForm, date: e.target.value })}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Amount</FormLabel>
+                <Input
+                  type="number"
+                  value={editTransactionForm.amount || ''}
+                  onChange={e => setEditTransactionForm({ ...editTransactionForm, amount: e.target.value })}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>Type</FormLabel>
+                <Select
+                  value={editTransactionForm.type || ''}
+                  onChange={e => setEditTransactionForm({ ...editTransactionForm, type: e.target.value })}
+                >
+                  <option value="payment">Payment</option>
+                  <option value="purchase">Purchase</option>
+                </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>Note</FormLabel>
+                <Input
+                  value={editTransactionForm.note || ''}
+                  onChange={e => setEditTransactionForm({ ...editTransactionForm, note: e.target.value })}
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={() => setEditingTransaction(null)}>
+              Cancel
+            </Button>
+            <Button colorScheme="blue" onClick={handleUpdateTransaction}>
+              Save Changes
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Refresh Button */}
+      <Box display="flex" justifyContent="flex-end" mt={4}>
+        <Button
+          size="sm"
+          bg="#353535"
+          color="#ecede8"
+          _hover={{ bg: '#2a2a2a' }}
           onClick={() => fetchLedger(selectedMember.account_id)}
-          style={{
-            background: '#eee',
-            color: '#555',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            fontSize: '0.95rem',
-            padding: '0.3rem 0.9rem',
-            cursor: 'pointer',
-            opacity: 0.7,
-            transition: 'opacity 0.2s',
-          }}
-          onMouseOver={e => (e.currentTarget.style.opacity = 1)}
-          onMouseOut={e => (e.currentTarget.style.opacity = 0.7)}
-          aria-label="Refresh ledger"
+          variant="outline"
         >
           Refresh
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   );
+};
+
+MemberLedger.propTypes = {
+  members: PropTypes.arrayOf(
+    PropTypes.shape({
+      member_id: PropTypes.string.isRequired,
+      account_id: PropTypes.string.isRequired,
+      first_name: PropTypes.string,
+      last_name: PropTypes.string,
+    })
+  ).isRequired,
+  memberLedger: PropTypes.array,
+  selectedMember: PropTypes.object,
+  newTransaction: PropTypes.object,
+  setNewTransaction: PropTypes.func,
+  handleAddTransaction: PropTypes.func,
+  transactionStatus: PropTypes.string,
+  editingTransaction: PropTypes.object,
+  setEditingTransaction: PropTypes.func,
+  editTransactionForm: PropTypes.object,
+  setEditTransactionForm: PropTypes.func,
+  handleEditTransaction: PropTypes.func,
+  handleUpdateTransaction: PropTypes.func,
+  handleDeleteTransaction: PropTypes.func,
+  fetchLedger: PropTypes.func,
+  setSelectedTransactionMemberId: PropTypes.func,
+  selectedTransactionMemberId: PropTypes.string,
+  ledgerLoading: PropTypes.bool,
+  session: PropTypes.any,
 };
 
 export default MemberLedger; 

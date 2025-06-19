@@ -1,17 +1,22 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+import { supabase } from '../../lib/supabase';
 
 export default async function handler(req, res) {
-  const { key } = req.query;
-  if (!key) return res.status(400).json({ error: 'Missing key' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-  const { data, error } = await supabase
-    .from('settings')
-    .select('value')
-    .eq('key', key)
-    .single();
+  const { start, end } = req.body;
+  if (!start || !end) {
+    return res.status(400).json({ error: 'Start and end dates are required' });
+  }
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.status(200).json({ value: data?.value || null });
+  try {
+    console.log('Saving booking window:', { start, end });
+    await supabase.from('booking_window').upsert({ booking_start_date: start, booking_end_date: end });
+    console.log('Booking window saved successfully');
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error saving booking window:', error);
+    res.status(500).json({ error: 'Failed to save booking window' });
+  }
 } 

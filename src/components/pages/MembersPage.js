@@ -1,5 +1,37 @@
-import React, { useState } from 'react';
-import { Elements } from '@stripe/react-stripe-js';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../api/supabaseClient';
+import {
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  Select,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Text,
+  VStack,
+  useToast,
+  Badge,
+  HStack,
+  InputGroup,
+  InputLeftElement,
+  useColorModeValue,
+  SimpleGrid,
+  Avatar,
+} from '@chakra-ui/react';
+import { SearchIcon } from '@chakra-ui/icons';
 import MemberDetail from '../../MemberDetail';
 import MemberLedger from './MemberLedger';
 import SendMessageModal from '../messages/SendMessageModal';
@@ -42,274 +74,268 @@ const MembersPage = ({
   const [messageHistoryKey, setMessageHistoryKey] = useState(0);
   const isAdmin = session?.user?.user_metadata?.role === 'admin';
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    membership_type: 'standard',
+    membership_status: 'active'
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const toast = useToast();
+  const cardBg = 'nightSky';
+  const cardBorder = 'daybreak';
+  const cardShadow = 'lg';
+  const cardRadius = 'md';
+  const headingColor = 'weddingDay';
+  const textColor = 'weddingDay';
+  const fontFamily = 'Montserrat, sans-serif';
 
-  const handleSaveNewMember = async (memberData) => {
+  useEffect(() => {
+    fetchMembers();
+  }, []);
+
+  const fetchMembers = async () => {
     try {
-      const response = await fetch('/api/members', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(memberData),
-      });
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (!response.ok) {
-        throw new Error('Failed to save member');
-      }
-
-      // Refresh the members list
-      window.location.reload();
+      if (error) throw error;
+      setMembers(data || []);
     } catch (error) {
-      console.error('Error saving member:', error);
-      alert('Failed to save member. Please try again.');
+      console.error('Error fetching members:', error);
+      setError(error.message);
+      toast({
+        title: "Error",
+        description: "Failed to fetch members",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleCreateMember = async (e) => {
+    e.preventDefault();
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .insert([createForm])
+        .select();
+
+      if (error) throw error;
+
+      setMembers([...members, data[0]]);
+      setShowCreateModal(false);
+      setCreateForm({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        membership_type: 'standard',
+        membership_status: 'active'
+      });
+      toast({
+        title: "Success",
+        description: "Member created successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error creating member:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleDeleteMember = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this member? This cannot be undone.')) return;
+    try {
+      const { error } = await supabase
+        .from('members')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setMembers(members.filter(member => member.id !== id));
+      toast({
+        title: "Success",
+        description: "Member deleted successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const filteredMembers = members.filter(member => {
+    const searchString = `${member.first_name} ${member.last_name} ${member.email} ${member.phone}`.toLowerCase();
+    return searchString.includes(searchTerm.toLowerCase());
+  });
+
   return (
-    <div style={{ padding: '2rem' }}>
-      {/* Member Lookup UI at the top of Members section */}
-      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <input
-          type="text"
-          placeholder="Search by name, email, or phone"
-          value={lookupQuery}
-          onChange={e => setLookupQuery(e.target.value)}
-          style={{ fontSize: '1.2rem', padding: '0.5rem', margin: '1rem 0', borderRadius: '6px', border: '1px solid #ccc', width: '100%', maxWidth: '400px' }}
-        />
-        <button
-          onClick={() => setShowAddMemberModal(true)}
-          style={{
-            background: '#2c5282',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            padding: '0.6rem 1.4rem',
-            fontWeight: 600,
-            fontSize: '1rem',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(44,82,130,0.08)'
-          }}
-        >
-          Add New Member
-        </button>
-      </div>
-      <ul className="member-list">
-        {members.filter(m => {
-          const q = lookupQuery.trim().toLowerCase();
-          if (!q) return false;
-          return (
-            (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-            (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-            (m.email && m.email.toLowerCase().includes(q)) ||
-            (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-          );
-        }).length === 0 && lookupQuery ? (
-          <div style={{ margin: '2rem', color: '#999' }}>No results found.</div>
-        ) : (
-          members.filter(m => {
-            const q = lookupQuery.trim().toLowerCase();
-            if (!q) return false;
-            return (
-              (m.first_name && m.first_name.toLowerCase().includes(q)) ||
-              (m.last_name && m.last_name.toLowerCase().includes(q)) ||
-              (m.email && m.email.toLowerCase().includes(q)) ||
-              (m.phone && m.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')))
-            );
-          }).map(member => (
-            <li
-              key={member.member_id}
-              className="member-item"
-              style={{ position: "relative", cursor: "pointer", width: "100%" }}
-              onClick={() => {
-                setSelectedMember(member);
-                fetchLedger(member.account_id);
-              }}
-              tabIndex={0}
-              role="button"
-              onKeyDown={e => {
-                if (e.key === "Enter" || e.key === " ") {
-                  setSelectedMember(member);
-                  fetchLedger(member.account_id);
-                }
-              }}
+    <VStack fontFamily={fontFamily} spacing={6} align="stretch" p={4}>
+      <Box bg={cardBg} border="1px solid" borderColor={cardBorder} borderRadius={cardRadius} boxShadow={cardShadow} p={6}>
+        <HStack justify="space-between" mb={4}>
+          <Text fontSize="2xl" fontWeight="bold" color={headingColor} fontFamily={fontFamily}>Members</Text>
+          <Button bg="cork" color={textColor} borderRadius="md" onClick={() => setShowCreateModal(true)}>
+            Create Member
+          </Button>
+        </HStack>
+
+        <InputGroup mb={4}>
+          <InputLeftElement pointerEvents="none">
+            <SearchIcon color="gray.300" />
+          </InputLeftElement>
+          <Input
+            placeholder="Search members..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </InputGroup>
+
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6} mt={4}>
+          {filteredMembers.map(member => (
+            <Box
+              key={member.id}
+              bg={useColorModeValue('white', 'gray.800')}
+              p={6}
+              borderRadius="lg"
+              boxShadow="md"
+              transition="all 0.2s"
+              _hover={{ transform: 'scale(1.02)', boxShadow: 'lg' }}
             >
-              {member.photo && (
-                <img
-                  src={member.photo}
-                  alt={`${member.first_name} ${member.last_name}`}
-                  className="member-photo"
-                />
-              )}
-              <div className="member-info">
-                <strong>
-                  {member.first_name} {member.last_name}
-                </strong>
-                <div>Member since: {formatDateLong(member.join_date)}</div>
-                <div>Phone: {formatPhone(member.phone)}</div>
-                <div>Email: {member.email}</div>
-                <div>Date of Birth: {formatDOB(member.dob)}</div>
-              </div>
-            </li>
-          ))
-        )}
-      </ul>
-      {/* End Member Lookup UI */}
-      {/* Existing member list, filtered if no lookup query */}
-      {!selectedMember ? (
-        <>
-          <h1 className="app-title">Noir CRM – Members</h1>
-          {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
-            <div key={accountId} className="account-group" style={{
-              marginBottom: '1rem',
-              padding: '1rem',
-              background: '#fff',
-              borderRadius: '12px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1.2rem'
-            }}>
-              {accountMembers.map((member, idx) => (
-                <div key={member.member_id} style={{
-                  padding: '0.5rem 0',
-                  background: 'none',
-                  boxShadow: 'none',
-                  borderRadius: 0,
-                  marginBottom: 0
-                }}>
-                  <li
-                    className="member-item"
-                    style={{ position: "relative", cursor: "pointer", listStyle: 'none', margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}
-                    onClick={() => {
-                      setSelectedMember(member);
-                      fetchLedger(member.account_id);
-                    }}
-                  >
-                    {member.photo && (
-                      <img
-                        src={member.photo}
-                        alt={`${member.first_name} ${member.last_name}`}
-                        className="member-photo"
-                        style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, marginRight: 20, background: '#f6f5f2' }}
-                      />
-                    )}
-                    <div className="member-info" style={{ flex: 1 }}>
-                      <strong>
-                        {member.first_name} {member.last_name}
-                      </strong>
-                      <div>Member since: {formatDateLong(member.join_date)}</div>
-                      <div>Phone: {formatPhone(member.phone)}</div>
-                      <div>Email: {member.email}</div>
-                      <div>Date of Birth: {formatDOB(member.dob)}</div>
-                    </div>
-                  </li>
-                </div>
-              ))}
-            </div>
+              <HStack spacing={4}>
+                <Avatar name={`${member.first_name} ${member.last_name}`} src={member.photo} size="lg" />
+                <VStack align="start" spacing={1}>
+                  <Text fontSize="xl" fontWeight="bold">
+                    {member.first_name} {member.last_name}
+                  </Text>
+                  {member.email && <Text fontSize="sm" color="gray.500">{member.email}</Text>}
+                  {member.phone && <Text fontSize="sm" color="gray.500">{member.phone}</Text>}
+                </VStack>
+              </HStack>
+
+              <HStack spacing={2} mt={4}>
+                <Badge colorScheme={member.membership_type === 'premium' ? 'purple' : 'green'}>
+                  {member.membership_type}
+                </Badge>
+                <Badge colorScheme={member.membership_status === 'active' ? 'green' : 'red'}>
+                  {member.membership_status}
+                </Badge>
+              </HStack>
+
+              <HStack mt={4} justify="flex-end">
+                <Button variant="ghost" size="sm" onClick={() => setSelectedMember(member)}>
+                  View
+                </Button>
+                <Button colorScheme="red" size="sm" onClick={() => handleDeleteMember(member.id)}>
+                  Delete
+                </Button>
+              </HStack>
+            </Box>
           ))}
-        </>
-      ) : (
-        // Member Detail View (not modal, full width minus sidebar)
-        <div className="member-detail-view"
-          style={{
-            margin: "0 auto",
-            background: "#faf9f7",
-            borderRadius: "12px",
-            boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
-            boxSizing: "border-box",
-            overflowX: "hidden",
-            padding: '2rem 1.5rem',
-            position: 'relative'
-          }}
-        >
-          {/* Add spacing above top bar */}
-          <div style={{ height: '1.5rem' }} />
-          <div style={{ position: 'absolute', right: 0, bottom: 0, color: '#b3b1a7', fontSize: '0.75rem', fontStyle: 'italic', userSelect: 'all', margin: '0.5rem 1.5rem', opacity: 0.6 }}>
-            Account ID: {selectedMember.account_id}
-          </div>
-          <Elements stripe={stripePromise}>
-            {/* First row: member columns */}
-            <div style={{ display: 'flex', gap: 0, marginBottom: '2rem' }}>
-              {members.filter(m => m.account_id === selectedMember.account_id).map((member, idx, arr) => (
-                <div key={member.member_id} style={{ flex: 1, borderRight: idx < arr.length - 1 ? '1px solid #d1cfc7' : 'none', padding: '0 1.5rem' }}>
-                  <Elements stripe={stripePromise}>
-                    <MemberDetail
-                      member={member}
-                      session={session}
-                      onEditMember={handleEditMember}
-                    />
-                  </Elements>
-                  {/* Admin-only Send Message button for each member */}
-                  {/* Removed the Send Message button from underneath each member */}
+        </SimpleGrid>
+      </Box>
 
-                  {/* SendMessageModal for this member */}
-                  {isAdmin && showSendModal && modalMember?.member_id === member.member_id && (
-                    <SendMessageModal
-                      open={showSendModal}
-                      onClose={() => { setShowSendModal(false); setModalMember(null); }}
-                      members={members.filter(m => m.account_id === member.account_id)}
-                      adminEmail={session?.user?.email}
-                      onSent={() => setMessageHistoryKey(k => k + 1)}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-            {/* Admin-only Send Message button */}
-            {console.log('isAdmin:', isAdmin, 'session:', session)}
-            {isAdmin && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <button
-                  onClick={() => setShowSendModal(true)}
-                  style={{ padding: '0.6rem 1.5rem', background: '#4a90e2', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600 }}
-                >
-                  Send Message
-                </button>
-                <SendMessageModal
-                  open={showSendModal}
-                  onClose={() => setShowSendModal(false)}
-                  members={members.filter(m => m.account_id === selectedMember.account_id)}
-                  adminEmail={session?.user?.email}
-                  onSent={() => setMessageHistoryKey(k => k + 1)}
-                />
-              </div>
-            )}
-            {/* Ledger Section */}
-            <MemberLedger
-              members={members}
-              memberLedger={memberLedger}
-              selectedMember={selectedMember}
-              newTransaction={newTransaction}
-              setNewTransaction={setNewTransaction}
-              handleAddTransaction={handleAddTransaction}
-              transactionStatus={transactionStatus}
-              editingTransaction={editingTransaction}
-              setEditingTransaction={setEditingTransaction}
-              editTransactionForm={editTransactionForm}
-              setEditTransactionForm={setEditTransactionForm}
-              handleEditTransaction={handleEditTransaction}
-              handleUpdateTransaction={handleUpdateTransaction}
-              handleDeleteTransaction={handleDeleteTransaction}
-              fetchLedger={fetchLedger}
-              setSelectedTransactionMemberId={setSelectedTransactionMemberId}
-              selectedTransactionMemberId={selectedTransactionMemberId}
-              ledgerLoading={ledgerLoading}
-              session={session}
-            />
-            {/* Message History */}
-            <MessageHistory memberId={selectedMember.member_id} key={messageHistoryKey} />
-          </Elements>
-        </div>
-      )}
-
-      {/* Add Member Modal */}
-      <AddMemberModal
-        isOpen={showAddMemberModal}
-        onClose={() => setShowAddMemberModal(false)}
-        onSave={handleSaveNewMember}
-      />
-    </div>
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader color={headingColor} fontFamily={fontFamily}>Create New Member</ModalHeader>
+          <ModalCloseButton />
+          <form onSubmit={handleCreateMember}>
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel color={textColor} fontFamily={fontFamily}>First Name</FormLabel>
+                  <Input
+                    value={createForm.first_name}
+                    onChange={e => setCreateForm(prev => ({ ...prev, first_name: e.target.value }))}
+                  />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel color={textColor} fontFamily={fontFamily}>Last Name</FormLabel>
+                  <Input
+                    value={createForm.last_name}
+                    onChange={e => setCreateForm(prev => ({ ...prev, last_name: e.target.value }))}
+                  />
+                </FormControl>
+                <FormControl isRequired>
+                  <FormLabel color={textColor} fontFamily={fontFamily}>Email</FormLabel>
+                  <Input
+                    type="email"
+                    value={createForm.email}
+                    onChange={e => setCreateForm(prev => ({ ...prev, email: e.target.value }))}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel color={textColor} fontFamily={fontFamily}>Phone</FormLabel>
+                  <Input
+                    type="tel"
+                    value={createForm.phone}
+                    onChange={e => setCreateForm(prev => ({ ...prev, phone: e.target.value }))}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel color={textColor} fontFamily={fontFamily}>Membership Type</FormLabel>
+                  <Select
+                    value={createForm.membership_type}
+                    onChange={e => setCreateForm(prev => ({ ...prev, membership_type: e.target.value }))}
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="premium">Premium</option>
+                  </Select>
+                </FormControl>
+                <FormControl>
+                  <FormLabel color={textColor} fontFamily={fontFamily}>Status</FormLabel>
+                  <Select
+                    value={createForm.membership_status}
+                    onChange={e => setCreateForm(prev => ({ ...prev, membership_status: e.target.value }))}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </Select>
+                </FormControl>
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={() => setShowCreateModal(false)} bg="cork" color={textColor} borderRadius="md">
+                Cancel
+              </Button>
+              <Button bg="cork" color={textColor} borderRadius="md" type="submit">
+                Create Member
+              </Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+    </VStack>
   );
 };
 
-export default MembersPage; 
+export default MembersPage;

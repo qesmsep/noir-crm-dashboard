@@ -1,1 +1,11 @@
-{"/_error":"pages/_error.js","/api/members":"pages/api/members.js","/_app":"pages/_app.js","/api/upload-photo":"pages/api/upload-photo.js","/_document":"pages/_document.js","/404":"pages/404.html"}
+{
+  "/_app": "pages/_app.js",
+  "/_error": "pages/_error.js",
+  "/_document": "pages/_document.js",
+  "/admin/members": "pages/admin/members.js",
+  "/admin/members/[accountId]": "pages/admin/members/[accountId].js",
+  "/admin/calendar": "pages/admin/calendar.js",
+  "/api/member_attributes": "pages/api/member_attributes.js",
+  "/api/ledger": "pages/api/ledger.js",
+  "/api/messages": "pages/api/messages.js"
+}

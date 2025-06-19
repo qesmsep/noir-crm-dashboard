@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import styles from '@/styles/Settings.module.css';
+import CalendarAvailabilityControl from '@/components/CalendarAvailabilityControl';
+import { Box, Heading, VStack, useColorModeValue } from "@chakra-ui/react";
 
 interface Settings {
   business_name: string;
@@ -127,194 +129,99 @@ export default function Settings() {
   if (loading) {
     return (
       <AdminLayout>
-        <div className={styles.loading}>Loading settings...</div>
+        <Box className={styles.loading}>Loading settings...</Box>
       </AdminLayout>
     );
   }
 
   return (
     <AdminLayout>
-      <div className={styles.header}>
-        <h1>Settings</h1>
-        <button
-          className={styles.saveButton}
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </div>
-
-      {message && (
-        <div
-          className={`${styles.message} ${
-            message.type === 'success' ? styles.success : styles.error
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
-
-      <div className={styles.settingsGrid}>
-        <div className={styles.section}>
-          <h2>Business Information</h2>
-          <div className={styles.formGroup}>
-            <label htmlFor="business_name">Business Name</label>
-            <input
-              type="text"
-              id="business_name"
-              value={settings.business_name}
-              onChange={(e) =>
-                handleInputChange('business_name', '', e.target.value)
-              }
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="business_email">Business Email</label>
-            <input
-              type="email"
-              id="business_email"
-              value={settings.business_email}
-              onChange={(e) =>
-                handleInputChange('business_email', '', e.target.value)
-              }
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="business_phone">Business Phone</label>
-            <input
-              type="tel"
-              id="business_phone"
-              value={settings.business_phone}
-              onChange={(e) =>
-                handleInputChange('business_phone', '', e.target.value)
-              }
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="address">Address</label>
-            <textarea
-              id="address"
-              value={settings.address}
-              onChange={(e) =>
-                handleInputChange('address', '', e.target.value)
-              }
-            />
-          </div>
-        </div>
-
-        <div className={styles.section}>
-          <h2>Operating Hours</h2>
-          {Object.entries(settings.operating_hours).map(([day, hours]) => (
-            <div key={day} className={styles.formGroup}>
-              <label htmlFor={`${day}_hours`}>
-                {day.charAt(0).toUpperCase() + day.slice(1)}
-              </label>
-              <div className={styles.timeInputs}>
+      <Box p={{ base: 4, md: 8 }}>
+        <Heading mb={8} fontSize="2xl" fontWeight="bold" color="gray.800">Settings</Heading>
+        <VStack spacing={8} align="stretch">
+          <Box bg={useColorModeValue('white', 'gray.800')} borderRadius="lg" boxShadow="md" p={6}>
+            <div className={styles.section}>
+              <div className={styles.formGroup}>
+                <label htmlFor="business_name">Business Name</label>
                 <input
-                  type="time"
-                  id={`${day}_open`}
-                  value={hours.open}
+                  type="text"
+                  id="business_name"
+                  value={settings.business_name}
                   onChange={(e) =>
-                    handleInputChange('operating_hours', day, {
-                      ...hours,
-                      open: e.target.value,
-                    })
+                    handleInputChange('business_name', '', e.target.value)
                   }
                 />
-                <span>to</span>
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="business_email">Business Email</label>
                 <input
-                  type="time"
-                  id={`${day}_close`}
-                  value={hours.close}
+                  type="email"
+                  id="business_email"
+                  value={settings.business_email}
                   onChange={(e) =>
-                    handleInputChange('operating_hours', day, {
-                      ...hours,
-                      close: e.target.value,
-                    })
+                    handleInputChange('business_email', '', e.target.value)
+                  }
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="business_phone">Business Phone</label>
+                <input
+                  type="tel"
+                  id="business_phone"
+                  value={settings.business_phone}
+                  onChange={(e) =>
+                    handleInputChange('business_phone', '', e.target.value)
+                  }
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="address">Address</label>
+                <textarea
+                  id="address"
+                  value={settings.address}
+                  onChange={(e) =>
+                    handleInputChange('address', '', e.target.value)
                   }
                 />
               </div>
             </div>
-          ))}
-        </div>
-
-        <div className={styles.section}>
-          <h2>Reservation Settings</h2>
-          <div className={styles.formGroup}>
-            <label htmlFor="max_guests">Maximum Guests per Reservation</label>
-            <input
-              type="number"
-              id="max_guests"
-              value={settings.reservation_settings.max_guests}
-              onChange={(e) =>
-                handleInputChange('reservation_settings', 'max_guests', parseInt(e.target.value))
-              }
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="min_notice">Minimum Notice (hours)</label>
-            <input
-              type="number"
-              id="min_notice"
-              value={settings.reservation_settings.min_notice_hours}
-              onChange={(e) =>
-                handleInputChange('reservation_settings', 'min_notice_hours', parseInt(e.target.value))
-              }
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="max_advance">Maximum Advance Booking (days)</label>
-            <input
-              type="number"
-              id="max_advance"
-              value={settings.reservation_settings.max_advance_days}
-              onChange={(e) =>
-                handleInputChange('reservation_settings', 'max_advance_days', parseInt(e.target.value))
-              }
-            />
-          </div>
-        </div>
-
-        <div className={styles.section}>
-          <h2>Notification Settings</h2>
-          <div className={styles.formGroup}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={settings.notification_settings.email_notifications}
-                onChange={(e) =>
-                  handleInputChange('notification_settings', 'email_notifications', e.target.checked)
-                }
-              />
-              Enable Email Notifications
-            </label>
-          </div>
-          <div className={styles.formGroup}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={settings.notification_settings.sms_notifications}
-                onChange={(e) =>
-                  handleInputChange('notification_settings', 'sms_notifications', e.target.checked)
-                }
-              />
-              Enable SMS Notifications
-            </label>
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="notification_email">Notification Email</label>
-            <input
-              type="email"
-              id="notification_email"
-              value={settings.notification_settings.notification_email}
-              onChange={(e) =>
-                handleInputChange('notification_settings', 'notification_email', e.target.value)
-              }
-            />
-          </div>
-        </div>
-      </div>
+          </Box>
+          <Box bg={useColorModeValue('white', 'gray.800')} borderRadius="lg" boxShadow="md" p={6}>
+            <div className={styles.section}>
+              <div style={{ marginBottom: '2rem' }}>
+                <strong>Booking Window</strong>
+                <div style={{ marginTop: '1rem' }}>
+                  <CalendarAvailabilityControl section="booking_window" />
+                </div>
+              </div>
+              <div style={{ marginBottom: '2rem' }}>
+                <strong>Base Hours</strong>
+                <div style={{ marginTop: '1rem' }}>
+                  <CalendarAvailabilityControl section="base" />
+                </div>
+              </div>
+              <div style={{ marginBottom: '2rem' }}>
+                <strong>Custom Open Days</strong>
+                <div style={{ marginTop: '1rem' }}>
+                  <CalendarAvailabilityControl section="custom_open" />
+                </div>
+              </div>
+              <div style={{ marginBottom: '2rem' }}>
+                <strong>Custom Closed Days</strong>
+                <div style={{ marginTop: '1rem' }}>
+                  <CalendarAvailabilityControl section="custom_closed" />
+                </div>
+              </div>
+              <div style={{ marginBottom: '2rem' }}>
+                <strong>Private Events</strong>
+                <div style={{ marginTop: '1rem' }}>
+                  <CalendarAvailabilityControl section="private_events" />
+                </div>
+              </div>
+            </div>
+          </Box>
+        </VStack>
+      </Box>
     </AdminLayout>
   );
 } 

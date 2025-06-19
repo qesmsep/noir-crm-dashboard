@@ -16,13 +16,20 @@ export default async function handler(req, res) {
   // Find tables with capacity >= party_size
   const { data: tables, error: tblErr } = await supabase
     .from('tables')
-    .select('*')
+    .select('table_id, table_number, capacity')
     .gte('capacity', Number(party_size));
   if (tblErr) return res.status(500).json({ error: tblErr.message });
 
+  // Map to id, number, capacity for frontend
+  const mappedTables = (tables || []).map(t => ({
+    id: t.table_id,
+    number: t.table_number,
+    capacity: parseInt(t.capacity, 10)
+  }));
+
   // Filter out tables with conflicting events or reservations
   const free = [];
-  for (const t of tables) {
+  for (const t of mappedTables) {
     console.log('Testing slot for table', t.id, 'capacity', t.capacity);
     // Check events overlap
     const { count: evCount } = await supabase

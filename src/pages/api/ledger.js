@@ -78,6 +78,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ data: data[0] });
     }
 
+    if (req.method === "DELETE") {
+      const { id } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: "Missing required field: id" });
+      }
+      const { error } = await supabaseAdmin
+        .from("ledger")
+        .delete()
+        .eq("id", id);
+      if (error) {
+        console.error("Ledger DELETE error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      return res.status(200).json({ success: true });
+    }
+
     res.setHeader("Allow", ["GET", "POST", "PUT"]);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   } catch (err) {

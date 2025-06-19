@@ -135,7 +135,7 @@ export default function Analytics() {
   return (
     <AdminLayout>
       <div className={styles.header}>
-        <h1>Analytics</h1>
+       
         <div className={styles.timeRange}>
           <button
             className={`${styles.timeButton} ${

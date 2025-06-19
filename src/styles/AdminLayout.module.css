@@ -1,16 +1,47 @@
+@font-face {
+  font-family: 'Montserrat';
+  src: url('/fonts/Montserrat-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat Bold';
+  src: url('/fonts/Montserrat.Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Montserrat Light';
+  src: url('/fonts/montserrat-light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+.memberCardText {
+  font-family: 'Montserrat Bold', sans-serif;
+}
 .container {
   display: flex;
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: #353535;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 400;
 }
 
 .sidebar {
-  width: 250px;
-  background-color: #1a1a1a;
+  width: flex;
+  background-color: #aba8a1;
   color: white;
-  padding: 1rem;
+  padding: 2rem;
   display: flex;
   flex-direction: column;
+  margin-top: 0rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
+  
 }
 
 .logo {
@@ -27,17 +58,25 @@
 
 .main {
   flex: 1;
-  padding: 2rem;
+  padding: 0;
   overflow-y: auto;
+  background: none;
+  box-shadow: none;
+  border: none;
 }
 
 .header {
   display: flex;
+  background: #353535;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 0rem;
 }
-
+.pageTitleContainer {
+  margin-top: 6rem;
+  padding: 0rem 1.5rem;
+  background-color: #353535;
+}
 .title {
   font-size: 1.5rem;
   font-weight: 600;
@@ -50,13 +89,19 @@
 
 .navItem {
   display: flex;
+  width: 100%;
   align-items: center;
   padding: 0.75rem 1rem;
-  color: #e0e0e0;
+  color: #ecede8;
   text-decoration: none;
   border-radius: 0.5rem;
   margin-bottom: 0.5rem;
   transition: background-color 0.2s;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  font-weight: 400;
 }
 
 .navItem:hover {
@@ -64,14 +109,16 @@
 }
 
 .navItem.active {
-  background-color: #333;
+  background-color: #353535;
   color: white;
 }
 
 .navIcon {
-  margin-right: 0.75rem;
-  width: 20px;
-  height: 20px;
+  margin-right: 1rem;
+  width: 32px;
+  height: 32px;
+  font-size: 2rem;
+  color: #a59480;
 }
 
 .userSection {
@@ -83,7 +130,7 @@
 .userInfo {
   display: flex;
   align-items: center;
-  padding: 0.75rem;
+  padding: 0.25rem;
   color: #e0e0e0;
 }
 
@@ -130,14 +177,14 @@
 .pageTitle {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #1a1a1a;
+  color: #ECEDE8;
 }
 
 .content {
-  background-color: white;
-  border-radius: 0.5rem;
-  padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
 .mobileMenu {

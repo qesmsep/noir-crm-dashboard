@@ -10,6 +10,8 @@
 
 # production
 /build
+/.next/
+/out/
 
 # misc
 .DS_Store
@@ -18,8 +20,43 @@
 .env.test.local
 .env.production.local
 .env
+.env.*
+!.env.example
 
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# vercel
 .vercel
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local Netlify folder
+.netlify
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Supabase
+**/supabase/.temp

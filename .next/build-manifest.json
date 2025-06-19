@@ -1,26 +1,45 @@
 {
   "polyfillFiles": [
-    "static/chunks/polyfills-42372ed130431b0a.js"
+    "static/chunks/polyfills.js"
   ],
-  "devFiles": [],
+  "devFiles": [
+    "static/chunks/react-refresh.js"
+  ],
   "ampDevFiles": [],
   "lowPriorityFiles": [
-    "static/Vrog98lrpKKDbzcdWdxXa/_buildManifest.js",
-    "static/Vrog98lrpKKDbzcdWdxXa/_ssgManifest.js"
+    "static/development/_buildManifest.js",
+    "static/development/_ssgManifest.js"
   ],
-  "rootMainFiles": [],
+  "rootMainFiles": [
+    "static/chunks/webpack.js",
+    "static/chunks/main-app.js"
+  ],
+  "rootMainFilesTree": {},
   "pages": {
     "/_app": [
-      "static/chunks/webpack-4e7214a60fad8e88.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-f863924736f39cfd.js",
-      "static/chunks/pages/_app-5810f0a972a88d88.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/_app.js"
     ],
     "/_error": [
-      "static/chunks/webpack-4e7214a60fad8e88.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-f863924736f39cfd.js",
-      "static/chunks/pages/_error-7a92967bea80186d.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/_error.js"
+    ],
+    "/admin/calendar": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/calendar.js"
+    ],
+    "/admin/members": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/members.js"
+    ],
+    "/admin/members/[accountId]": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/admin/members/[accountId].js"
     ]
   },
   "ampFirstPages": []

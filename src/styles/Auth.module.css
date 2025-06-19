@@ -5,8 +5,8 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-  color: #ffffff;
+  background: linear-gradient(rgba(53,53,53,0.6), rgba(53,53,53,0.6)), url('/images/LPR67899.JPG') center/cover no-repeat;
+  color: #ECEDE8;
 }
 
 .main {
@@ -21,7 +21,7 @@
 }
 
 .authCard {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0,   0.8);
   padding: 2rem;
   border-radius: 1rem;
   width: 100%;
@@ -32,7 +32,7 @@
 .authCard h1 {
   margin: 0 0 2rem;
   font-size: 1.75rem;
-  color: #ffd700;
+  color: #ECEDE8;
 }
 
 .methodSelect {
@@ -57,16 +57,21 @@
 
 .methodButton.active {
   background: rgba(255, 215, 0, 0.1);
-  border-color: #ffd700;
-  color: #ffd700;
+  border-color: #ecede8;
+  color: #ecede8;
+}
+.formControl {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .input {
-  width: 100%;
+  composes: formControl;
   padding: 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background: #ecede8;
+  color: #353535;
   border-radius: 0.5rem;
   font-size: 1rem;
   margin-bottom: 1rem;
@@ -74,15 +79,15 @@
 
 .input:focus {
   outline: none;
-  border-color: #ffd700;
+  border-color: #ecede8;
   box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.1);
 }
 
 .submitButton {
-  width: 100%;
+  composes: formControl;
   padding: 0.75rem;
-  background: linear-gradient(45deg, #ffd700, #ffa500);
-  color: #000000;
+  background: #a59480;
+  color: #ffffff;
   border: none;
   border-radius: 0.5rem;
   font-size: 1rem;
@@ -93,7 +98,7 @@
 
 .submitButton:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(53,53,53,0.15);
 }
 
 .submitButton:disabled {

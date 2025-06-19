@@ -1,8 +1,10 @@
+"use client";
 import { ReactNode, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import styles from '@/styles/AdminLayout.module.css';
+import Image from 'next/image';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -10,6 +12,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, signOut } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -22,7 +25,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/admin/members', label: 'Members', icon: '👥' },
-    { href: '/admin/reservations', label: 'Reservations', icon: '📅' },
+    { href: '/admin/calendar', label: 'Calendar', icon: '📅' },
     { href: '/admin/analytics', label: 'Analytics', icon: '📈' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
   ];
@@ -31,21 +34,25 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     <div className={styles.container}>
       <nav className={styles.sidebar}>
         <div className={styles.logo}>
-          <Link href="/admin/dashboard">
-            <span>Noir CRM</span>
+          <Link href="/">
+            <Image src="/images/noir-wedding-day.png" alt="Noir Logo" width={120} height={60} style={{ objectFit: 'contain', marginBottom: '1rem' }} />
           </Link>
         </div>
-
-        <div className={styles.navItems}>
+        <div className={styles.navItems} style={{ marginTop: '1rem' }}>
+          <Link
+            href="/"
+            className={styles.navItem}
+          >
+            <span className={styles.icon} style={{ marginRight: '0.75rem' }}>🏠</span>
+            <span>Home</span>
+          </Link>
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`${styles.navItem} ${
-                router.pathname === item.href ? styles.active : ''
-              }`}
+              className={`${styles.navItem} ${pathname === item.href ? styles.active : ''}`}
             >
-              <span className={styles.icon}>{item.icon}</span>
+              <span className={styles.icon} style={{ marginRight: '0.75rem' }}>{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           ))}
@@ -75,20 +82,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </nav>
 
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <button
-            className={styles.menuButton}
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            <span className={styles.menuIcon}>☰</span>
-          </button>
-          <h1 className={styles.pageTitle}>
-            {navItems.find((item) => item.href === router.pathname)?.label ||
-              'Dashboard'}
-          </h1>
-        </header>
-
+      <main className={styles.main} style={{ background: 'none', boxShadow: 'none', border: 'none' }}>
         <div className={styles.content}>{children}</div>
       </main>
 
@@ -99,7 +93,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               key={item.href}
               href={item.href}
               className={`${styles.mobileNavItem} ${
-                router.pathname === item.href ? styles.active : ''
+                pathname === item.href ? styles.active : ''
               }`}
               onClick={() => setIsMenuOpen(false)}
             >
