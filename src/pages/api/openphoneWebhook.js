@@ -65,16 +65,136 @@ function parseNaturalDate(dateStr) {
   return null;
 }
 
-// Parse SMS reservation message
-function parseSMSReservation(message) {
-  console.log('Parsing SMS reservation message:', message);
+// Simple in-memory cache for AI responses
+const aiCache = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// AI-powered parsing using local Ollama
+async function parseReservationMessageWithAI(message) {
+  try {
+    // Check cache first
+    const cacheKey = message.toLowerCase().trim();
+    const cached = aiCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log('Using cached AI response for:', message);
+      return cached.result;
+    }
+
+    const prompt = `Parse this SMS reservation request and return ONLY valid JSON:
+
+Message: "${message}"
+
+Instructions:
+- Extract party size (number of people)
+- Extract date (convert to MM/DD/YYYY format)
+- Extract time (convert to 24-hour HH:MM format)
+- If date is relative (like "tomorrow", "next Friday"), calculate the actual date
+- If time is missing, use 20:00 (8pm) as default
+- If party size is missing, use 2 as default
+
+Return ONLY this JSON format:
+{
+  "party_size": number,
+  "date": "MM/DD/YYYY",
+  "time": "HH:MM"
+}
+
+If you cannot parse the message, return:
+{"error": "Could not understand the reservation request"}`;
+
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama3.1:8b', // or 'mistral:7b' for faster processing
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.1,
+          top_p: 0.9,
+          max_tokens: 200
+        }
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Ollama API error:', response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    const aiResponse = result.response.trim();
+    
+    // Try to parse JSON from AI response
+    let parsed;
+    try {
+      // Extract JSON from response (in case AI adds extra text)
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        parsed = JSON.parse(aiResponse);
+      }
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', aiResponse);
+      return null;
+    }
+
+    // Validate and convert AI response to our format
+    if (parsed.error) {
+      return null;
+    }
+
+    // Convert date and time to our expected format
+    const date = new Date(parsed.date);
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date from AI:', parsed.date);
+      return null;
+    }
+
+    const [hours, minutes] = parsed.time.split(':').map(Number);
+    date.setHours(hours, minutes, 0, 0);
+
+    const parsedResult = {
+      partySize: parsed.party_size || 2,
+      startTime: date.toISOString(),
+      endTime: new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      parsedDate: date
+    };
+
+    // Cache the result
+    aiCache.set(cacheKey, {
+      result: parsedResult,
+      timestamp: Date.now()
+    });
+
+    console.log('AI parsed successfully:', parsedResult);
+    return parsedResult;
+
+  } catch (error) {
+    console.error('AI parsing error:', error);
+    return null;
+  }
+}
+
+// Hybrid parsing function
+async function parseSMSReservationHybrid(message) {
+  console.log('Parsing SMS reservation message with hybrid approach:', message);
   
   if (!message.trim().toUpperCase().startsWith('RESERVATION')) {
     return null;
   }
   
+  // Try regex first (fast, free)
   const partySizeMatch = message.match(/for\s+(\d+)\s+guests?/i);
   if (!partySizeMatch) {
+    console.log('Regex failed for party size, trying AI...');
+    const aiResult = await parseReservationMessageWithAI(message);
+    if (aiResult) {
+      return aiResult;
+    }
     return { error: 'Could not parse party size. Please use format: RESERVATION for X guests on date at time' };
   }
   const partySize = parseInt(partySizeMatch[1]);
@@ -85,12 +205,22 @@ function parseSMSReservation(message) {
   const timeMatch = message.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
   
   if (!dateTimeMatch || !timeMatch) {
+    console.log('Regex failed for date/time, trying AI...');
+    const aiResult = await parseReservationMessageWithAI(message);
+    if (aiResult) {
+      return aiResult;
+    }
     return { error: 'Could not parse date or time. Please use format: RESERVATION for X guests on date at time' };
   }
   
   let dateStr = dateTimeMatch[1].trim();
   const date = parseNaturalDate(dateStr);
   if (!date) {
+    console.log('Regex failed for date parsing, trying AI...');
+    const aiResult = await parseReservationMessageWithAI(message);
+    if (aiResult) {
+      return aiResult;
+    }
     return { error: 'Could not parse date. Please use format: RESERVATION for X guests on date at time' };
   }
   
@@ -297,7 +427,7 @@ export async function handler(req, res) {
   }
 
   try {
-    const parsed = parseSMSReservation(text);
+    const parsed = await parseSMSReservationHybrid(text);
     
     if (parsed.error) {
       const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please confirm by texting me back:\n\nRESERVATION for [# of] guests on [date] at [time] and I can assist further.`;

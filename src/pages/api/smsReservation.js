@@ -1,7 +1,12 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendCustomEmail } = require('./sendCustomEmail');
+const { getSupabaseClient } = require('./supabaseClient');
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// Simple in-memory cache for AI responses
+const aiCache = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Utility functions for handling dates and times in CST
 function toCST(date) {
@@ -195,6 +200,142 @@ function parseReservationMessage(message) {
     event_type,
     notes
   };
+}
+
+// AI-powered parsing using local Ollama
+async function parseReservationMessageWithAI(message) {
+  try {
+    // Check cache first
+    const cacheKey = message.toLowerCase().trim();
+    const cached = aiCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log('Using cached AI response for:', message);
+      return cached.result;
+    }
+
+    const prompt = `Parse this SMS reservation request and return ONLY valid JSON:
+
+Message: "${message}"
+
+Instructions:
+- Extract party size (number of people)
+- Extract date (convert to MM/DD/YYYY format)
+- Extract time (convert to 24-hour HH:MM format)
+- If date is relative (like "tomorrow", "next Friday"), calculate the actual date
+- If time is missing, use 20:00 (8pm) as default
+- If party size is missing, use 2 as default
+
+Return ONLY this JSON format:
+{
+  "party_size": number,
+  "date": "MM/DD/YYYY",
+  "time": "HH:MM",
+  "event_type": "Fun Night Out",
+  "notes": "SMS Reservation"
+}
+
+If you cannot parse the message, return:
+{"error": "Could not understand the reservation request"}`;
+
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama3.1:8b', // or 'mistral:7b' for faster processing
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.1,
+          top_p: 0.9,
+          max_tokens: 200
+        }
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Ollama API error:', response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    const aiResponse = result.response.trim();
+    
+    // Try to parse JSON from AI response
+    let parsed;
+    try {
+      // Extract JSON from response (in case AI adds extra text)
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        parsed = JSON.parse(aiResponse);
+      }
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', aiResponse);
+      return null;
+    }
+
+    // Validate and convert AI response to our format
+    if (parsed.error) {
+      return null;
+    }
+
+    // Convert date and time to our expected format
+    const date = new Date(parsed.date);
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date from AI:', parsed.date);
+      return null;
+    }
+
+    const [hours, minutes] = parsed.time.split(':').map(Number);
+    date.setHours(hours, minutes, 0, 0);
+
+    const parsedResult = {
+      party_size: parsed.party_size || 2,
+      start_time: date.toISOString(),
+      end_time: new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      event_type: parsed.event_type || 'Fun Night Out',
+      notes: parsed.notes || 'SMS Reservation'
+    };
+
+    // Cache the result
+    aiCache.set(cacheKey, {
+      result: parsedResult,
+      timestamp: Date.now()
+    });
+
+    console.log('AI parsed successfully:', parsedResult);
+    return parsedResult;
+
+  } catch (error) {
+    console.error('AI parsing error:', error);
+    return null;
+  }
+}
+
+// Hybrid parsing function
+async function parseReservationMessageHybrid(message) {
+  console.log('Parsing message with hybrid approach:', message);
+  
+  // Try regex first (fast, free)
+  const regexResult = parseReservationMessage(message);
+  if (regexResult) {
+    console.log('Regex parsing successful');
+    return regexResult;
+  }
+
+  // Fall back to AI (slower, but more flexible)
+  console.log('Regex failed, trying AI parsing...');
+  const aiResult = await parseReservationMessageWithAI(message);
+  if (aiResult) {
+    console.log('AI parsing successful');
+    return aiResult;
+  }
+
+  console.log('Both regex and AI parsing failed');
+  return null;
 }
 
 // Helper to auto-assign smallest free table

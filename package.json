@@ -30,6 +30,7 @@
     "next": "^15.3.3",
     "node-fetch": "^2.7.0",
     "nodemailer": "^7.0.3",
+    "ollama": "^0.5.16",
     "react": "^18.3.1",
     "react-big-calendar": "^1.18.0",
     "react-bootstrap": "^2.10.10",
