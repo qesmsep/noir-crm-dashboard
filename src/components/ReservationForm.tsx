@@ -133,8 +133,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const [displayPhone, setDisplayPhone] = useState('');
   const [currentReservationData, setCurrentReservationData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const stripe = useStripe();
-  const elements = useElements();
+  const [isClient, setIsClient] = useState(false);
+  const [stripe, setStripe] = useState<any>(null);
+  const [elements, setElements] = useState<any>(null);
   const [exceptionalClosures, setExceptionalClosures] = useState<string[]>([]); // ISO date strings
   const [exceptionalOpens, setExceptionalOpens] = useState<string[]>([]);
   const [privateEventDates, setPrivateEventDates] = useState<string[]>([]);
@@ -146,6 +147,35 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const [showAlternativeTimesModal, setShowAlternativeTimesModal] = useState(false);
 
   const supabase = getSupabaseClient();
+  const cardElementRef = React.useRef<HTMLDivElement>(null);
+
+  // Initialize Stripe on client side only
+  useEffect(() => {
+    setIsClient(true);
+    const initStripe = async () => {
+      const stripeInstance = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+      setStripe(stripeInstance);
+      if (stripeInstance) {
+        const elementsInstance = stripeInstance.elements();
+        setElements(elementsInstance);
+      }
+    };
+    initStripe();
+  }, []);
+
+  // Mount card element when elements is available
+  useEffect(() => {
+    if (isClient && elements && cardElementRef.current) {
+      const cardElement = elements.create('card', {
+        style: { base: { fontSize: '16px' } }
+      });
+      cardElement.mount(cardElementRef.current);
+      
+      return () => {
+        cardElement.unmount();
+      };
+    }
+  }, [isClient, elements]);
 
   useEffect(() => {
     if (!bookingStartDate) return;
@@ -506,7 +536,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
           return;
         }
         // Create payment method
-        const cardElement = elements.getElement(CardElement);
+        const cardElement = elements.getElement('card');
         if (!cardElement) {
           toast({
             title: 'Card error',
@@ -807,14 +837,26 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               />
             </FormControl>
 
-            {!isMember && (
+            {!isMember && isClient && stripe && (
               <FormControl isRequired mt={4}>
                 <FormLabel>Credit Card</FormLabel>
                 <Text fontSize="sm" color="gray.600" mb={2}>
                   Non-members are required to place a credit card hold of ${getHoldAmount(Number(form.party_size))} for your reservation. These funds will be released upon your arrival.
                 </Text>
                 <Box p={2} borderWidth={1} borderRadius="md" bg="gray.50">
-                  <CardElement options={{ style: { base: { fontSize: '16px' } } }} />
+                  <div ref={cardElementRef} style={{ height: '40px' }} />
+                </Box>
+              </FormControl>
+            )}
+
+            {!isMember && !isClient && (
+              <FormControl isRequired mt={4}>
+                <FormLabel>Credit Card</FormLabel>
+                <Text fontSize="sm" color="gray.600" mb={2}>
+                  Non-members are required to place a credit card hold of ${getHoldAmount(Number(form.party_size))} for your reservation. These funds will be released upon your arrival.
+                </Text>
+                <Box p={2} borderWidth={1} borderRadius="md" bg="gray.50" h="40px" display="flex" alignItems="center" justifyContent="center">
+                  <Text fontSize="sm" color="gray.500">Loading payment form...</Text>
                 </Box>
               </FormControl>
             )}
