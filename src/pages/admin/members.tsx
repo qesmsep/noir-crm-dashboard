@@ -15,7 +15,7 @@ import {
 import { PhoneIcon, EmailIcon, CalendarIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import Image from "next/image";
-import { supabase } from "../api/supabaseClient";
+import { getSupabaseClient } from "../api/supabaseClient";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import AddMemberModal from '../../components/members/AddMemberModal';
 
@@ -48,6 +48,7 @@ export default function MembersAdmin() {
 
   async function fetchMembers() {
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('members')
         .select('*')

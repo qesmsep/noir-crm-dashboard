@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { Box, Spinner, Text, Button, SimpleGrid, VStack, Heading, HStack, Input, useToast, Flex, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter } from "@chakra-ui/react";
-import { supabase } from "../../api/supabaseClient";
+import { getSupabaseClient } from "../../api/supabaseClient";
 import MemberDetail from "../../../components/MemberDetail";
 // @ts-ignore
 const MemberLedger = require("../../../components/pages/MemberLedger");
@@ -98,6 +98,7 @@ export default function MemberDetailAdmin() {
 
   async function fetchMembers() {
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('members')
         .select('*')

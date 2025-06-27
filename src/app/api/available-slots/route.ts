@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../pages/api/supabaseClient';
+import { getSupabaseClient } from '../../../pages/api/supabaseClient';
 
 // Helper: generate all time slots (e.g., 6:00pm to midnight, every 15 min)
 function generateTimeSlots() {
@@ -21,6 +21,9 @@ export async function POST(request: Request) {
     if (!date || !party_size) {
       return NextResponse.json({ error: 'Missing date or party_size' }, { status: 400 });
     }
+    
+    const supabase = getSupabaseClient();
+    
     // 1. Get all tables that fit the party size
     const { data: tables, error: tablesError } = await supabase
       .from('tables')
