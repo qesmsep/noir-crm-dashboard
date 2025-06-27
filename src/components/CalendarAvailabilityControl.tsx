@@ -63,6 +63,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   useEffect(() => {
     async function fetchBookingDates() {
       setBookingDatesLoading(true);
+      const supabase = getSupabaseClient();
       const { data: startData } = await supabase
         .from('settings')
         .select('value')
@@ -85,6 +86,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     setBookingEndDate(end);
     setBookingDatesSaving(true);
     try {
+      const supabase = getSupabaseClient();
       const response = await fetch('/api/booking-window', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,6 +144,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     async function loadAvailabilityData() {
       try {
         setError('');
+        const supabase = getSupabaseClient();
         const { data: baseHoursData } = await supabase
           .from('venue_hours')
           .select('*')
@@ -203,6 +206,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     setError('');
     setSuccessMessage('');
     try {
+      const supabase = getSupabaseClient();
       await supabase.from('venue_hours').delete().eq('type', 'base');
       const baseHoursToSave = baseHours.map((day, index) => ({
         type: 'base',
@@ -223,6 +227,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     if (!newOpenDate) return;
     try {
       setError('');
+      const supabase = getSupabaseClient();
       const isOverlapping = exceptionalClosures.some(closure => new Date(closure.date).toDateString() === newOpenDate.toDateString());
       if (isOverlapping) {
         setError('Cannot add exceptional open on a closure date.');
@@ -249,6 +254,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const deleteExceptionalOpen = async (id: number) => {
     try {
       setError('');
+      const supabase = getSupabaseClient();
       const { error } = await supabase.from('venue_hours').delete().eq('id', id);
       if (error) throw error;
       setExceptionalOpens(exceptionalOpens.filter(open => open.id !== id));
@@ -262,6 +268,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     if (!newClosureDate) return;
     try {
       setError('');
+      const supabase = getSupabaseClient();
       const isOverlapping = exceptionalOpens.some(open => new Date(open.date).toDateString() === newClosureDate.toDateString());
       if (isOverlapping) {
         setError('Cannot add closure on an exceptional open date.');
@@ -290,6 +297,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const deleteExceptionalClosure = async (id: number) => {
     try {
       setError('');
+      const supabase = getSupabaseClient();
       const { error } = await supabase.from('venue_hours').delete().eq('id', id);
       if (error) throw error;
       setExceptionalClosures(exceptionalClosures.filter(closure => closure.id !== id));
@@ -306,6 +314,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleSaveEditOpen = async () => {
     if (!editingOpen) return;
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('venue_hours')
         .update({
@@ -337,6 +346,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleSaveEditClosure = async () => {
     if (!editingClosure) return;
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('venue_hours')
         .update({
@@ -371,6 +381,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         setPrivateEventStatus('Please fill all fields.');
         return;
       }
+      const supabase = getSupabaseClient();
       const start_time = new Date(privateEvent.date);
       const [startHour, startMinute] = privateEvent.start.split(':');
       start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
@@ -415,6 +426,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleSaveEditEvent = async () => {
     if (!editingEvent) return;
     try {
+      const supabase = getSupabaseClient();
       const start_time = new Date(editEventForm.date);
       const [startHour, startMinute] = editEventForm.start.split(':');
       start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
@@ -445,6 +457,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleDeleteEditEvent = async () => {
     if (!editingEvent) return;
     try {
+      const supabase = getSupabaseClient();
       const { error } = await supabase
         .from('private_events')
         .delete()
@@ -461,6 +474,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   // Handler to delete a private event from the list
   const handleDeletePrivateEvent = async (id: number) => {
     try {
+      const supabase = getSupabaseClient();
       const { error } = await supabase
         .from('private_events')
         .delete()
