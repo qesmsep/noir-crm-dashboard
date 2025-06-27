@@ -32,7 +32,7 @@ import {
   Divider,
 } from '@chakra-ui/react';
 import { AddIcon, DeleteIcon, EditIcon, ArrowBackIcon } from '@chakra-ui/icons';
-import { supabase } from '../pages/api/supabaseClient';
+import { getSupabaseClient } from '../pages/api/supabaseClient';
 
 interface Member {
   member_id: string;
@@ -123,6 +123,8 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
 
   const [isEditing, setIsEditing] = useState(false);
   const [editMember, setEditMember] = useState({ ...member });
+
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     if (member?.member_id) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../pages/api/supabaseClient';
+import { getSupabaseClient } from '../pages/api/supabaseClient';
 import {
   Box,
   Button,
@@ -49,6 +49,8 @@ const PrivateEventBooking: React.FC<PrivateEventBookingProps> = ({ eventId, rsvp
   const [status, setStatus] = useState('');
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const toast = useToast();
+
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     async function fetchEvent() {

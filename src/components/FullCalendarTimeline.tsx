@@ -7,7 +7,7 @@ import ReservationForm from './ReservationForm';
 import ReservationEditDrawer from './ReservationEditDrawer';
 import DayReservationsDrawer from './DayReservationsDrawer';
 import { toZone, toCSTISOString, formatDateTime } from '../utils/dateUtils';
-import { supabase } from '../pages/api/supabaseClient';
+import { getSupabaseClient } from '../pages/api/supabaseClient';
 import { useSettings } from '../context/SettingsContext';
 import {
   Box,
@@ -107,6 +107,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const { settings } = useSettings();
+
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     async function loadTables() {

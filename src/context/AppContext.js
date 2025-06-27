@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { supabase } from "../pages/api/supabaseClient";
+import { getSupabaseClient } from "../pages/api/supabaseClient";
 
 const AppContext = createContext(null);
 
@@ -8,11 +8,10 @@ export function AppContextProvider({ children }) {
   const [reservations, setReservations] = useState([]);
 
   useEffect(() => {
-    // Check for existing session on mount
+    const supabase = getSupabaseClient();
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) setUser(session.user);
     });
-    // Listen for login/logout
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
     });

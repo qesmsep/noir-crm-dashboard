@@ -28,7 +28,9 @@ import {
 } from '@chakra-ui/react';
 import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
 import { formatDateTime } from '../utils/dateUtils';
-import { supabase } from '../pages/api/supabaseClient';
+import { getSupabaseClient } from '../pages/api/supabaseClient';
+
+const supabase = getSupabaseClient();
 
 // Helper: Format a local datetime string with timezone offset
 function toOffsetISOString(dateString: string) {

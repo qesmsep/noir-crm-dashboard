@@ -10,7 +10,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, useStripe, useElements } from '@stripe/react-stripe-js';
 import { CardNumberElement, CardExpiryElement, CardCvcElement } from '@stripe/react-stripe-js';
-import { supabase } from '../pages/api/supabaseClient';
+import { getSupabaseClient } from '../pages/api/supabaseClient';
 import ReservationForm from '@/components/ReservationForm';
 import ReservationSection from '@/components/ReservationSection';
 
@@ -167,6 +167,7 @@ export default function Home() {
     async function fetchConfig() {
       setLoading(true);
       // Fetch booking window from settings
+      const supabase = getSupabaseClient();
       const { data: startData } = await supabase
         .from('settings')
         .select('value')

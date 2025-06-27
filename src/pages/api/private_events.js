@@ -1,4 +1,5 @@
-import { supabase } from './supabaseClient';
+import { getSupabaseClient } from './supabaseClient';
+const supabase = getSupabaseClient();
 
 export const getPrivateEvents = async (startDate, endDate) => {
     const { data, error } = await supabase
