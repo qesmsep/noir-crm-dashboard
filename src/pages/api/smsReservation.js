@@ -101,86 +101,74 @@ function parseReservationMessage(message) {
     return null;
   }
 
-  // Extract party size
-  const partySizeMatch = msg.match(/(\d+)\s*guests?/);
-  const party_size = partySizeMatch ? parseInt(partySizeMatch[1]) : 2;
+  // Flexible party size extraction
+  let party_size = 2; // default
+  const partySizeRegexes = [
+    /for\s+(\d+)\b/i, // for 2
+    /(\d+)\s*guests?/i, // 2 guests
+    /(\d+)\s*people/i, // 2 people
+    /party of (\d+)/i, // party of 2
+    /for a party of (\d+)/i, // for a party of 2
+    /for (\d+)/i, // for 2
+  ];
+  for (const re of partySizeRegexes) {
+    const match = msg.match(re);
+    if (match) {
+      party_size = parseInt(match[1]);
+      break;
+    }
+  }
 
-  // Extract date and time - handle multiple formats
-  const dateTimeMatch = msg.match(/(?:on|at|@)\s+([^@\n]+?)(?:\s+at|\s+@|\s*$)/i) || 
-                       msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
-                       msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i);
-  const timeMatch = msg.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  // Flexible date and time extraction
+  // Try to find a date (MM/DD/YY, Month Day, this/next Friday, etc.)
+  let dateStr = '';
+  let dateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+                  msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i) ||
+                  msg.match(/(this|next)\s+\w+/i);
+  if (dateMatch) {
+    dateStr = dateMatch[0];
+  }
 
-  if (!dateTimeMatch || !timeMatch) {
-    return res.status(400).json({ 
-      error: 'Invalid date or time format',
-      message: 'Please specify a date (e.g., "this friday", "June 7th", or "6/7/25") and time (e.g., at 8pm or @ 8pm)'
-    });
+  // Try to find a time (at 6:30pm, 18:30, 6pm, 6:30 pm, etc.)
+  let timeStr = '';
+  let timeMatch = msg.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i) ||
+                  msg.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i) ||
+                  msg.match(/(\d{1,2})\s*(am|pm)/i);
+  if (timeMatch) {
+    timeStr = timeMatch[0].replace(/^(at|@)\s*/i, '');
+  }
+
+  // If date or time is missing, try to find them anywhere in the message
+  if (!dateStr) {
+    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (anyDate) dateStr = anyDate[0];
+  }
+  if (!timeStr) {
+    const anyTime = msg.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i) || msg.match(/(\d{1,2})\s*(am|pm)/i);
+    if (anyTime) timeStr = anyTime[0];
   }
 
   // Parse date
-  let dateStr = dateTimeMatch[1].trim();
-  
-  // If the date is in MM/DD/YY format, ensure it's properly formatted
-  if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
-    const [month, day, year] = dateStr.split('/');
-    dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
+  let date = null;
+  if (dateStr) {
+    date = parseNaturalDate(dateStr);
   }
-  
-  // If the date is at the end of the message, try to extract it
-  if (!dateStr || dateStr === '') {
-    const endDateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})$/);
-    if (endDateMatch) {
-      dateStr = endDateMatch[1];
-      const [month, day, year] = dateStr.split('/');
-      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
-    }
-  }
-  
-  // If we still don't have a date, try to find it anywhere in the message
-  if (!dateStr || dateStr === '') {
-    const anyDateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
-    if (anyDateMatch) {
-      dateStr = anyDateMatch[1];
-      const [month, day, year] = dateStr.split('/');
-      dateStr = `${month}/${day}/${year.length === 2 ? '20' + year : year}`;
-    }
-  }
-  
-  const date = parseNaturalDate(dateStr);
   if (!date) {
-    return res.status(400).json({ 
-      error: 'Invalid date format',
-      message: 'Please specify a valid date (e.g., "this friday", "June 7th", or "6/7/25")'
-    });
+    return null;
   }
 
-  // Extract time (support 8pm, 8:00pm, 20:00, 8 pm, etc.)
-  let timeStr = timeMatch[1].trim().toLowerCase();
-  let hour = 20, minute = 0; // default 8pm if not found
-  if (timeMatch) {
-    let timeParts = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  // Parse time
+  let hour = 20, minute = 0; // default 8pm
+  if (timeStr) {
+    let timeParts = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
     if (timeParts) {
       hour = parseInt(timeParts[1]);
       minute = timeParts[2] ? parseInt(timeParts[2]) : 0;
       const meridiem = timeParts[3];
       if (meridiem === 'pm' && hour < 12) hour += 12;
       if (meridiem === 'am' && hour === 12) hour = 0;
-    } else if (/\d{2}:\d{2}/.test(timeStr)) {
-      // 24-hour format
-      const [h, m] = timeStr.split(':');
-      hour = parseInt(h);
-      minute = parseInt(m);
     }
   }
-
-  // If date is missing, fail
-  if (!date) {
-    console.log('Could not parse date');
-    return null;
-  }
-
-  // Set the time
   date.setHours(hour, minute, 0, 0);
   const start_time = date.toISOString();
   const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
