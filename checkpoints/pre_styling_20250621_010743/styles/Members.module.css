@@ -1,0 +1,140 @@
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  font-size: 1.1rem;
+  color: #666;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #1a1a1a;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.searchInput,
+.statusFilter {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  min-width: 200px;
+}
+
+.searchInput:focus,
+.statusFilter:focus {
+  outline: none;
+  border-color: #666;
+}
+
+.tableContainer {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th,
+.table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.table th {
+  background-color: #f8f8f8;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.table th:hover {
+  background-color: #f0f0f0;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f8f8;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.active {
+  background-color: #e6f4ea;
+  color: #1e7e34;
+}
+
+.inactive {
+  background-color: #fbe9e7;
+  color: #d32f2f;
+}
+
+.pending {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.actionButton {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 0.25rem;
+  background-color: white;
+  color: #666;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.actionButton:hover {
+  background-color: #f8f8f8;
+  border-color: #666;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .controls {
+    flex-direction: column;
+  }
+
+  .searchInput,
+  .statusFilter {
+    width: 100%;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.75rem;
+  }
+} 

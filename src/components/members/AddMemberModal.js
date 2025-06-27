@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 const MEMBERSHIP_TIERS = [
+  { label: 'Membership', value: 'Membership', dues: 100 },
+  { label: 'Membership + Partner', value: 'Membership + Partner', dues: 125 },
+  { label: 'Membership + Daytime', value: 'Membership + Daytime', dues: 350 },
+  { label: 'Membership + Partner + Daytime', value: 'Membership + Partner + Daytime', dues: 375 },
+  // Keep legacy support for existing members
   { label: 'Solo', value: 'Solo', dues: 100 },
   { label: 'Duo', value: 'Duo', dues: 125 },
   { label: 'Premier', value: 'Premier', dues: 250 },
@@ -115,7 +120,6 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
         account_id,
         member_type: 'primary',
         created_at: now,
-        status: 'active',
         join_date: today,
         monthly_dues: primaryDues
       });
@@ -125,7 +129,6 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
         account_id,
         member_type: 'secondary',
         created_at: now,
-        status: 'active',
         join_date: today,
         membership: primaryMember.membership, // ensure membership matches
         monthly_dues: secondaryDues
@@ -240,6 +243,17 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
                   type="date"
                   name="dob"
                   value={primaryMember.dob}
+                  onChange={handlePrimaryMemberChange}
+                  required
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                />
+              </div>
+              <div>
+                <label>Join Date *</label>
+                <input
+                  type="date"
+                  name="join_date"
+                  value={primaryMember.join_date || ''}
                   onChange={handlePrimaryMemberChange}
                   required
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}

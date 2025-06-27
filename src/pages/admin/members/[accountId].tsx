@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
-import { Box, Spinner, Text, Button, SimpleGrid, VStack, Heading, HStack, Input, useToast } from "@chakra-ui/react";
+import { Box, Spinner, Text, Button, SimpleGrid, VStack, Heading, HStack, Input, useToast, Flex, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter } from "@chakra-ui/react";
 import { supabase } from "../../api/supabaseClient";
 import MemberDetail from "../../../components/MemberDetail";
-import MemberLedger from "../../../components/pages/MemberLedger";
+// @ts-ignore
+const MemberLedger = require("../../../components/pages/MemberLedger");
 import AddMemberModal from '../../../components/members/AddMemberModal';
 import SendMessageForm from '../../../components/messages/SendMessageForm';
 import AdminLayout from '../../../components/layouts/AdminLayout';
@@ -50,6 +51,8 @@ interface Attribute {
   created_at: string;
 }
 
+interface Note { id: string; note: string; created_at: string; }
+
 function sortMembers(members: any[]) {
   return [...members].sort((a, b) => {
     if (a.primary && !b.primary) return -1;
@@ -75,29 +78,42 @@ export default function MemberDetailAdmin() {
   const [editTransactionForm, setEditTransactionForm] = useState<any>({});
   const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState<string>('');
   const toast = useToast();
-  const [attributes, setAttributes] = useState<Attribute[]>([]);
-  const [attrType, setAttrType] = useState("");
-  const [attrValue, setAttrValue] = useState("");
-  const [editingAttrId, setEditingAttrId] = useState<string | null>(null);
-  const [editingAttrType, setEditingAttrType] = useState("");
-  const [editingAttrValue, setEditingAttrValue] = useState("");
+  const [memberAttributes, setMemberAttributes] = useState<Record<string, Attribute[]>>({});
+  const [attrInputs, setAttrInputs] = useState<Record<string, { type: string; value: string }>>({});
+  const [editingAttr, setEditingAttr] = useState<Record<string, { id: string | null; type: string; value: string }>>({});
+  const [attrNotesHeights, setAttrNotesHeights] = useState<Record<string, number>>({});
+  const [maxAttrNotesHeight, setMaxAttrNotesHeight] = useState<number>(0);
+  const attrNotesRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [pendingDelete, setPendingDelete] = useState<Record<string, string | null>>({});
+  const [confirmingDelete, setConfirmingDelete] = useState<Record<string, string | null>>({});
+  const [memberNotes, setMemberNotes] = useState<Record<string, Note[]>>({});
+  const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
+  const [editingNote, setEditingNote] = useState<Record<string, { id: string | null; note: string }>>({});
+  const [pendingDeleteNote, setPendingDeleteNote] = useState<Record<string, string | null>>({});
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editMember, setEditMember] = useState<Member | null>(null);
+  const [isEditingMember, setIsEditingMember] = useState<string | null>(null);
+  const [editMemberData, setEditMemberData] = useState<Member | null>(null);
+  const [deleteConfirmMode, setDeleteConfirmMode] = useState(false);
+
+  async function fetchMembers() {
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('deactivated', false);
+      if (error) throw error;
+      setMembers(sortMembers(data || []));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!accountId) return;
-    async function fetchMembers() {
-      try {
-        const { data, error } = await supabase
-          .from('members')
-          .select('*')
-          .eq('account_id', accountId);
-        if (error) throw error;
-        setMembers(sortMembers(data || []));
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchMembers();
   }, [accountId]);
 
@@ -258,91 +274,120 @@ export default function MemberDetailAdmin() {
 
   useEffect(() => {
     if (!members.length) return;
-    const member_id = members[0].member_id;
-    async function fetchAttributes() {
-      const res = await fetch(`/api/member_attributes?member_id=${member_id}`);
-      const result = await res.json();
-      setAttributes(result.data || []);
-    }
-    fetchAttributes();
+    const newHeights: Record<string, number> = {};
+    members.forEach(member => {
+      const el = attrNotesRefs.current[member.member_id];
+      if (el) newHeights[member.member_id] = el.offsetHeight;
+    });
+    setAttrNotesHeights(newHeights);
+  }, [memberAttributes, members]);
+
+  useEffect(() => {
+    if (!members.length) return;
+    const fetchAll = async () => {
+      const newAttrs: Record<string, Attribute[]> = {};
+      for (const member of members) {
+        const res = await fetch(`/api/member_attributes?member_id=${member.member_id}`);
+        const result = await res.json();
+        newAttrs[member.member_id] = result.data || [];
+      }
+      setMemberAttributes(newAttrs);
+    };
+    fetchAll();
   }, [members]);
 
-  const handleAddAttribute = async () => {
-    if (!attrType) {
+  const handleAddAttribute = async (member_id: string) => {
+    const input = attrInputs[member_id] || { type: '', value: '' };
+    if (!input.type) {
       toast({ title: 'Attribute type required', status: 'error', duration: 2000 });
       return;
     }
-    const member_id = members[0].member_id;
     const res = await fetch('/api/member_attributes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ member_id, key: attrType, value: attrValue }),
+      body: JSON.stringify({ member_id, key: input.type, value: input.value }),
     });
     const result = await res.json();
     if (result.error) {
       toast({ title: 'Error adding attribute', description: result.error, status: 'error', duration: 3000 });
     } else {
-      setAttrType("");
-      setAttrValue("");
-      setAttributes(result.data || []);
+      setAttrInputs(inputs => ({ ...inputs, [member_id]: { type: '', value: '' } }));
+      setMemberAttributes(attrs => ({ ...attrs, [member_id]: result.data || [] }));
       toast({ title: 'Attribute added', status: 'success', duration: 2000 });
     }
   };
 
-  const handleEditClick = (attr: any) => {
-    setEditingAttrId(attr.id);
-    setEditingAttrType(attr.key);
-    setEditingAttrValue(attr.value);
+  const handleEditClick = (member_id: string, attr: Attribute) => {
+    setEditingAttr(editing => ({ ...editing, [member_id]: { id: attr.id, type: attr.key, value: attr.value } }));
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingAttrType) {
+  const handleSaveEdit = async (member_id: string) => {
+    const edit = editingAttr[member_id];
+    if (!edit || !edit.type) {
       toast({ title: 'Attribute type required', status: 'error', duration: 2000 });
       return;
     }
-    const member_id = members[0].member_id;
-    const res = await fetch('/api/member_attributes', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: editingAttrId, member_id, key: editingAttrType, value: editingAttrValue }),
-    });
-    const result = await res.json();
-    if (result.error) {
-      toast({ title: 'Error updating attribute', description: result.error, status: 'error', duration: 3000 });
-    } else {
-      setEditingAttrId(null);
-      setEditingAttrType("");
-      setEditingAttrValue("");
-      setAttributes(result.data || []);
+    try {
+      const res = await fetch('/api/member_attributes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: edit.id, member_id, key: edit.type, value: edit.value }),
+      });
+      const result = await res.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setEditingAttr(editing => ({ ...editing, [member_id]: { id: null, type: '', value: '' } }));
+      setConfirmingDelete(prev => ({ ...prev, [member_id]: null }));
+
+      // Refetch attributes
+      const refreshed = await fetch(`/api/member_attributes?member_id=${member_id}`);
+      const refreshedResult = await refreshed.json();
+      setMemberAttributes(attrs => ({ ...attrs, [member_id]: refreshedResult.data || [] }));
+
       toast({ title: 'Attribute updated', status: 'success', duration: 2000 });
+    } catch (err: any) {
+      console.error("Error saving attribute:", err);
+      toast({ title: 'Error saving attribute', description: err.message, status: 'error', duration: 3000 });
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditingAttrId(null);
-    setEditingAttrType("");
-    setEditingAttrValue("");
+  const handleCancelEdit = (member_id: string) => {
+    setEditingAttr(editing => ({ ...editing, [member_id]: { id: null, type: '', value: '' } }));
+    setConfirmingDelete(prev => ({ ...prev, [member_id]: null }));
   };
 
-  const handleDeleteAttribute = async () => {
-    if (!editingAttrId) return;
-    if (!window.confirm('Delete this attribute?')) return;
+  const handleDeleteAttribute = async (member_id: string) => {
+    const edit = editingAttr[member_id];
+    if (!edit || !edit.id) return;
+    // No confirm dialog here; handled by two-step button
     const res = await fetch('/api/member_attributes', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: editingAttrId }),
+      body: JSON.stringify({ id: edit.id }),
     });
     const result = await res.json();
     if (result.error) {
       toast({ title: 'Error deleting attribute', description: result.error, status: 'error', duration: 3000 });
     } else {
-      setEditingAttrId(null);
-      setEditingAttrType("");
-      setEditingAttrValue("");
-      setAttributes(result.data || []);
+      setEditingAttr(editing => ({ ...editing, [member_id]: { id: null, type: '', value: '' } }));
+      // Immediately refresh the attributes list for this member
+      const res2 = await fetch(`/api/member_attributes?member_id=${member_id}`);
+      const result2 = await res2.json();
+      setMemberAttributes(attrs => ({ ...attrs, [member_id]: result2.data || [] }));
       toast({ title: 'Attribute deleted', status: 'success', duration: 2000 });
     }
+    setConfirmingDelete(prev => ({ ...prev, [member_id]: null }));
   };
+
+  // After each render, update the max height
+  useEffect(() => {
+    const heights = Object.values(attrNotesHeights);
+    if (heights.length > 0) {
+      setMaxAttrNotesHeight(Math.max(...heights));
+    }
+  }, [attrNotesHeights, members]);
 
   function formatPhone(phone?: string) {
     if (!phone) return '';
@@ -353,6 +398,195 @@ export default function MemberDetailAdmin() {
     }
     return phone;
   }
+
+  useEffect(() => {
+    if (!members.length) return;
+    const fetchAllNotes = async () => {
+      const newNotes: Record<string, Note[]> = {};
+      for (const member of members) {
+        const res = await fetch(`/api/member_notes?member_id=${member.member_id}`);
+        const result = await res.json();
+        newNotes[member.member_id] = result.data || [];
+      }
+      setMemberNotes(newNotes);
+    };
+    fetchAllNotes();
+  }, [members]);
+
+  const handleAddNote = async (member_id: string) => {
+    const note = noteInputs[member_id] || '';
+    if (!note.trim()) {
+      toast({ title: 'Note required', status: 'error', duration: 2000 });
+      return;
+    }
+    const res = await fetch('/api/member_notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id, note }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error adding note', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setNoteInputs(inputs => ({ ...inputs, [member_id]: '' }));
+      setMemberNotes(notes => ({ ...notes, [member_id]: result.data || [] }));
+      toast({ title: 'Note added', status: 'success', duration: 2000 });
+    }
+  };
+
+  const handleEditNoteClick = (member_id: string, note: Note) => {
+    setEditingNote(editing => ({ ...editing, [member_id]: { id: note.id, note: note.note } }));
+  };
+
+  const handleSaveEditNote = async (member_id: string) => {
+    const edit = editingNote[member_id];
+    if (!edit || !edit.note.trim()) {
+      toast({ title: 'Note required', status: 'error', duration: 2000 });
+      return;
+    }
+    const res = await fetch('/api/member_notes', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: edit.id, member_id, note: edit.note }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error updating note', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setEditingNote(editing => ({ ...editing, [member_id]: { id: null, note: '' } }));
+      setMemberNotes(notes => ({ ...notes, [member_id]: result.data || [] }));
+      toast({ title: 'Note updated', status: 'success', duration: 2000 });
+    }
+  };
+
+  const handleCancelEditNote = (member_id: string) => {
+    setEditingNote(editing => ({ ...editing, [member_id]: { id: null, note: '' } }));
+  };
+
+  const handleDeleteNote = async (member_id: string) => {
+    const edit = editingNote[member_id];
+    if (!edit || !edit.id) return;
+    if (pendingDeleteNote[member_id] !== edit.id) {
+      setPendingDeleteNote(pd => ({ ...pd, [member_id]: edit.id }));
+      return;
+    }
+    const res = await fetch('/api/member_notes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: edit.id, member_id }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error deleting note', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setEditingNote(editing => ({ ...editing, [member_id]: { id: null, note: '' } }));
+      setPendingDeleteNote(pd => ({ ...pd, [member_id]: null }));
+      setMemberNotes(notes => ({ ...notes, [member_id]: result.data || [] }));
+      toast({ title: 'Note deleted', status: 'success', duration: 2000 });
+    }
+  };
+
+  const handleCancelDeleteNote = (member_id: string) => {
+    setPendingDeleteNote(pd => ({ ...pd, [member_id]: null }));
+  };
+
+  // Edit handler
+  const handleEditMember = (member: Member) => {
+    setEditMember(member);
+    setIsEditModalOpen(true);
+  };
+
+  // Save handler for edit
+  const handleSaveEditMember = async (memberData: any) => {
+    try {
+      const response = await fetch('/api/members', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(memberData),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update member');
+      }
+      await fetchMembers();
+      setIsEditModalOpen(false);
+      setEditMember(null);
+      toast({ title: 'Member updated', status: 'success', duration: 3000 });
+    } catch (error: any) {
+      toast({ title: 'Error updating member', description: error.message, status: 'error', duration: 3000 });
+    }
+  };
+
+  const handleInlineEditClick = (member: Member) => {
+    setEditMemberData({ ...member });
+    setIsEditingMember(member.member_id);
+  };
+
+  const handleInlineSaveEdit = async (memberId: string) => {
+    if (!editMemberData) return;
+    
+    try {
+      const response = await fetch('/api/members', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editMemberData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update member');
+      }
+      
+      await fetchMembers();
+      setIsEditingMember(null);
+      setEditMemberData(null);
+      toast({ title: 'Member updated', status: 'success', duration: 3000 });
+    } catch (error: any) {
+      toast({ title: 'Error updating member', description: error.message, status: 'error', duration: 3000 });
+    }
+  };
+
+  const handleInlineCancelEdit = () => {
+    setIsEditingMember(null);
+    setEditMemberData(null);
+  };
+
+  const handleInlineEditChange = (field: string, value: string) => {
+    if (!editMemberData) return;
+    setEditMemberData(prev => prev ? { ...prev, [field]: value } : null);
+  };
+
+  const handleDeleteMember = async (member: Member) => {
+    if (!deleteConfirmMode) {
+      // First click - show confirmation
+      setDeleteConfirmMode(true);
+      return;
+    }
+
+    // Second click - actually deactivate
+    try {
+      const response = await fetch(`/api/members/${member.member_id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to deactivate member');
+      }
+      
+      await fetchMembers();
+      setDeleteConfirmMode(false);
+      toast({ title: 'Member deactivated', status: 'success', duration: 3000 });
+      
+      // If this was the last member, redirect to members list
+      if (members.length <= 1) {
+        router.push('/admin/members');
+      }
+    } catch (error: any) {
+      toast({ title: 'Error deactivating member', description: error.message, status: 'error', duration: 3000 });
+    }
+  };
 
   if (loading) {
     return <Box p={8} display="flex" justifyContent="center"><Spinner size="xl" /></Box>;
@@ -367,25 +601,41 @@ export default function MemberDetailAdmin() {
   return (
     <AdminLayout>
       <Box p={8}>
-        <Button mb={6} onClick={() => router.push('/admin/members')}
-          bg="#A59480"
-          color="white"
-          borderRadius="12px"
-          fontWeight="semibold"
-          fontSize="md"
-          _hover={{ bg: '#8B7B68' }}
-        >Back to Members</Button>
-        <Button mb={6} onClick={() => setAddMemberOpen(true)}
-          bg="#A59480"
-          color="white"
-          borderRadius="12px"
-          fontWeight="semibold"
-          fontSize="md"
-          _hover={{ bg: '#8B7B68' }}
-        >Add New Member</Button>
+        <HStack spacing={4} mb={6}>
+          <Button 
+            mb={6} 
+            onClick={() => router.push('/admin/members')}
+            bg="#A59480"
+            color="white"
+            borderRadius="12px"
+            fontWeight="semibold"
+            fontSize="md"
+            _hover={{ bg: '#8B7B68' }}
+          >
+            Back to Members
+          </Button>
+          <Button 
+            mb={6} 
+            onClick={() => setAddMemberOpen(true)}
+            bg="#A59480"
+            color="white"
+            borderRadius="12px"
+            fontWeight="semibold"
+            fontSize="md"
+            _hover={{ bg: '#8B7B68' }}
+          >
+            Add New Member
+          </Button>
+          
+        </HStack>
         <AddMemberModal isOpen={isAddMemberOpen} onClose={() => setAddMemberOpen(false)} onSave={async (memberData: any) => {
           setAddMemberOpen(false);
         }} />
+        <AddMemberModal
+          isOpen={isEditModalOpen}
+          onClose={() => { setIsEditModalOpen(false); setEditMember(null); }}
+          onSave={handleSaveEditMember}
+        />
         <SimpleGrid columns={2} spacing={8} mb={10} mt={120} minChildWidth="600px">
           {members.map(member => (
             <Box key={member.member_id} minH="540px" display="flex" flexDirection="column" alignItems="center" bg="transparent" borderRadius="16px" boxShadow="none" p={0} fontFamily="Montserrat, sans-serif" position="relative">
@@ -394,7 +644,7 @@ export default function MemberDetailAdmin() {
                 {/* Photo as background, floating above card */}
                 <Box
                   position="absolute"
-                  top="-84px"
+                  top="-100px"
                   left="50%"
                   transform="translateX(-50%)"
                   zIndex={2}
@@ -410,7 +660,7 @@ export default function MemberDetailAdmin() {
                     <img src={member.photo} alt={`${member.first_name} ${member.last_name}`} style={{ width: '200px', height: '200px', objectFit: 'cover' }} />
                   ) : (
                     <Box width="140px"  height="140px" display="flex" alignItems="center" justifyContent="center" bg="#F7FAFC" >
-                      <Text  fontSize="3xl" color="#353535" fontWeight="bold">{member.first_name?.[0]}{member.last_name?.[0]}</Text>
+                      <Text  fontSize="3xl" color="#ecede8" fontWeight="bold">{member.first_name?.[0]}{member.last_name?.[0]}</Text>
                     </Box>
                   )}
                 </Box>
@@ -418,153 +668,408 @@ export default function MemberDetailAdmin() {
                 <Box
                   position="relative"
                   zIndex={2}
-                  top="24px"
+                  top="10px"
                   mb={4}
                   textAlign="center"
                   width="100%"
                   mt={0}
                   
                 >
-                  <Text fontSize="40px" fontWeight="bold" color="#353535"  fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} p={0}>
+                  <Text fontSize="40px" fontWeight="bold" color="#ecede8"  fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} p={0}>
                     {member.first_name} {member.last_name}
                   </Text>
                 </Box>
                 {/* Info Box */}
-                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30}>
+                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30} position="relative">
                   <SimpleGrid columns={2} spacingX={10} spacingY={1} ml={0} w="100%" alignItems="start">
                     <VStack align="flex-start" spacing={1} ml={12}>
                       <HStack spacing={15} color="#353535" width="90%">
                         <PhoneIcon boxSize={18} />
-                        <Text fontSize="20px" margin={5}>{formatPhone(member.phone) || <span style={{ color: '#ccc' }}> </span>}</Text>
-                        
+                        {isEditingMember === member.member_id ? (
+                          <Input
+                            value={editMemberData?.phone || ''}
+                            onChange={(e) => handleInlineEditChange('phone', e.target.value)}
+                            size="sm"
+                            fontSize="16px"
+                            fontFamily="Montserrat, sans-serif"
+                            bg="white"
+                            border="1px solid #A59480"
+                            borderRadius="4px"
+                          />
+                        ) : (
+                          <Text fontSize="16px" margin={5}>{formatPhone(member.phone) || <span style={{ color: '#ccc' }}> </span>}</Text>
+                        )}
                       </HStack>
                       <HStack spacing={15} color="#353535">
                         <EmailIcon boxSize={18} />
-                        <Text fontSize="20px" margin={5}>{member.email || <span style={{ color: '#ccc' }}> </span>}</Text>
+                        {isEditingMember === member.member_id ? (
+                          <Input
+                            value={editMemberData?.email || ''}
+                            onChange={(e) => handleInlineEditChange('email', e.target.value)}
+                            size="sm"
+                            fontFamily="Montserrat, sans-serif"
+                            fontSize="16px"
+                            bg="white"
+                            border="1px solid #A59480"
+                            borderRadius="4px"
+                          />
+                        ) : (
+                          <Text fontSize="16px" margin={5}>{member.email || <span style={{ color: '#ccc' }}> </span>}</Text>
+                        )}
                       </HStack>
                       <HStack spacing={15} color="#353535">
                         <Box as={FaBriefcase} boxSize={16} />
-                        <Text fontSize="20px" fontFamily="Montserrat, sans-serif" margin={5}>
-                          Co.: {member.company || <span style={{ color: '#bbb' }}>—</span>}
-                        </Text>
+                        {isEditingMember === member.member_id ? (
+                          <Input
+                            value={editMemberData?.company || ''}
+                            onChange={(e) => handleInlineEditChange('company', e.target.value)}
+                            size="sm"
+                            fontSize="16px"
+                            fontFamily="Montserrat, sans-serif"
+                            bg="white"
+                            border="1px solid #A59480"
+                            borderRadius="4px"
+                            placeholder="Company"
+                          />
+                        ) : (
+                          <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>
+                            Co.: {member.company || <span style={{ color: '#bbb' }}>—</span>}
+                          </Text>
+                        )}
                       </HStack>
                     </VStack>
                     <VStack align="flex-start" spacing={1} mr={2} width="100%">
                       {member.dob && (
                         <HStack spacing={15} color="#353535">
                           <CalendarIcon boxSize={16} />
-                          <Text fontSize="20px" fontFamily="Montserrat, sans-serif" margin={5}>
-                            Birthdate: {new Date(member.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </Text>
+                          {isEditingMember === member.member_id ? (
+                            <Input
+                              type="date"
+                              value={editMemberData?.dob ? editMemberData.dob.slice(0, 10) : ''}
+                              onChange={(e) => handleInlineEditChange('dob', e.target.value)}
+                              size="sm"
+                              fontFamily="Montserrat, sans-serif"
+                              fontSize="16px"
+                              bg="white"
+                              border="1px solid #A59480"
+                              borderRadius="4px"
+                            />
+                          ) : (
+                            <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>
+                              Birthdate: {new Date(member.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </Text>
+                          )}
                         </HStack>
                       )}
                       {member.join_date && (
                         <HStack spacing={15} color="#353535">
                           <CalendarIcon boxSize={16} />
-                          <Text fontSize="20px" fontFamily="Montserrat, sans-serif" margin={5}>Member Since: {new Date(member.join_date).toLocaleDateString()}</Text>
+                          {isEditingMember === member.member_id ? (
+                            <Input
+                              type="date"
+                              value={editMemberData?.join_date ? editMemberData.join_date.slice(0, 10) : ''}
+                              onChange={(e) => handleInlineEditChange('join_date', e.target.value)}
+                              size="sm"
+                              fontFamily="Montserrat, sans-serif"
+                              fontSize="16px"
+                              bg="white"
+                              border="1px solid #A59480"
+                              borderRadius="4px"
+                            />
+                          ) : (
+                            <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>Member Since: {new Date(member.join_date).toLocaleDateString()}</Text>
+                          )}
                         </HStack>
                       )}
                       <HStack spacing={15} color="#353535">
                         <Box as={FaUser} boxSize={16} />
-                        <Text fontSize="20px" fontFamily="Montserrat, sans-serif" margin={5}>Referred by: {member.referred_by || <span style={{ color: '#bbb' }}>—</span>}</Text>
+                        {isEditingMember === member.member_id ? (
+                          <Input
+                            value={editMemberData?.referred_by || ''}
+                            onChange={(e) => handleInlineEditChange('referred_by', e.target.value)}
+                            size="sm"
+                            fontSize="16px"
+                            fontFamily="Montserrat, sans-serif"
+                            bg="white"
+                            border="1px solid #A59480"
+                            borderRadius="4px"
+                            placeholder="Referred by"
+                          />
+                        ) : (
+                          <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>Referred by: {member.referred_by || <span style={{ color: '#bbb' }}>—</span>}</Text>
+                        )}
                       </HStack>
                     </VStack>
                   </SimpleGrid>
+                  
+                  {/* Edit/Save/Cancel Buttons */}
+                  <Box position="absolute" bottom={4} right={4}>
+                    {isEditingMember === member.member_id ? (
+                      <HStack spacing={2}>
+                        <Button
+                          mb={6}
+                          mr={6}
+                          onClick={() => handleInlineSaveEdit(member.member_id)}
+                          bg="#A59480"
+                          color="white"
+                          borderRadius="12px"
+                          fontWeight="semibold"
+                          fontSize="md"
+                          _hover={{ bg: '#8B7B68' }}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          mb={6}
+                          mr={6}
+                          onClick={handleInlineCancelEdit}
+                          bg="#A59480"
+                          color="white"
+                          borderRadius="12px"
+                          fontWeight="semibold"
+                          fontSize="md"
+                          _hover={{ bg: '#8B7B68' }}
+                        >
+                          Cancel
+                        </Button>
+                      </HStack>
+                    ) : (
+                      <Button
+                        mb={6}
+                        mr={6}
+                        onClick={() => handleInlineEditClick(member)}
+                        bg="#A59480"
+                        color="white"
+                        borderRadius="12px"
+                        fontWeight="semibold"
+                        fontSize="md"
+                        _hover={{ bg: '#8B7B68' }}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
-                {/* Add 20px space between info card and attributes card */}
-                <Box h="20px" />
+                {/* Add 10px space between info card and attributes card */}
+                <Box h="10px" />
                 {/* Centered Attributes & Notes title above the card */}
                 <Box width="100%" textAlign="center" mb={2}>
-                  <Text fontSize="32px" fontWeight="bold" color="#353535" fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} mb={-12}>
+                  <Text fontSize="32px" fontWeight="bold" color="#ecede8" fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} mb={0}>
                     Attributes & Notes
                   </Text>
                 </Box>
-                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30} mb={10}>
+              
+                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30} mb={-10}>
                   {/* Attributes Section */}
-                  <Text fontWeight="bold" fontSize="lg" mb={2} color="#353535">Attributes</Text>
+                  <Text fontWeight="bold" fontFamily="Montserrat Bold, sans-serif" fontSize="lg" mb={2} color="#a59480">Attributes</Text>
                   {/* List attributes */}
-                  <VStack align="stretch" spacing={2} mb={4} w="100%">
-                    {attributes.map(attr => (
-                      <HStack key={attr.id} spacing={2}>
-                        {editingAttrId === attr.id ? (
-                          <>
-                            <Input
-                              value={editingAttrType}
-                              onChange={e => setEditingAttrType(e.target.value)}
-                              w="30%"
-                              bg="#ECEDE8"
-                              border="2px solid #A59480"
+                  <VStack align="stretch" margin={0} padding={0} ml={0} spacing={0} mb={0} w="100%">
+                    {(memberAttributes[member.member_id] || []).map(attr => (
+                      editingAttr[member.member_id]?.id === attr.id ? (
+                        <Flex key={attr.id} align="center" gap={2} mb={2} width="100%">
+                          <Input
+                            value={editingAttr[member.member_id]?.type || ''}
+                            onChange={e => setEditingAttr(editing => ({ ...editing, [member.member_id]: { ...editing[member.member_id], type: e.target.value } }))}
+                            minW="120px"
+                            w="30%"
+                            bg="#ECEDE8"
+                            border="2px solid #A59480"
+                            borderRadius="8px"
+                            fontSize="18px"
+                            fontFamily="Montserrat, sans-serif"
+                            
+                            py={2}
+                            px={3}
+                            _placeholder={{ color: "#999" }}
+                          />
+                          <Input
+                            value={editingAttr[member.member_id]?.value || ''}
+                            onChange={e => setEditingAttr(editing => ({ ...editing, [member.member_id]: { ...editing[member.member_id], value: e.target.value } }))}
+                            minW="140px"
+                            w="50%"
+                            bg="#ECEDE8"
+                            border="2px solid #A59480"
+                            borderRadius="8px"
+                            fontSize="18px"
+                            fontFamily="Montserrat, sans-serif"
+                            
+                            py={2}
+                            px={3}
+                            _placeholder={{ color: "#999" }}
+                          />
+                          <Button size="sm" colorScheme="green" fontSize="15px" minW="65px" borderRadius="8px" onClick={() => handleSaveEdit(member.member_id)}>Save</Button>
+                          <Button size="sm" variant="ghost" minW="65px" borderRadius="8px" onClick={() => handleCancelEdit(member.member_id)}>Cancel</Button>
+                          {confirmingDelete[member.member_id] === attr.id ? (
+                            <Button
+                              size="sm"
+                              minW="80px"
+                              backgroundColor="red"
+                              color="white"
                               borderRadius="8px"
-                              fontSize="18px"
-                              fontFamily="Montserrat, sans-serif"
-                              _placeholder={{ color: "#999" }}
-                            />
-                            <Input
-                              value={editingAttrValue}
-                              onChange={e => setEditingAttrValue(e.target.value)}
-                              w="50%"
-                              bg="#ECEDE8"
-                              border="2px solid #A59480"
+                              onClick={() => handleDeleteAttribute(member.member_id)}
+                              _hover={{ bg: 'red.600' }}
+                            >
+                              Confirm
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              minW="80px"
+                              backgroundColor=""
+                              color="red"
                               borderRadius="8px"
-                              fontSize="18px"
-                              fontFamily="Montserrat, sans-serif"
-                              _placeholder={{ color: "#999" }}
-                            />
-                            <Button size="sm" colorScheme="green" onClick={handleSaveEdit}>Save</Button>
-                            <Button size="sm" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
-                            <Button size="sm" colorScheme="red" onClick={handleDeleteAttribute}>Delete</Button>
-                          </>
-                        ) : (
-                          <>
-                            <Text w="30%" fontWeight="semibold">{attr.key}</Text>
-                            <Text w="50%">{attr.value}</Text>
-                            <Button size="sm" onClick={() => handleEditClick(attr)} colorScheme="yellow">Edit</Button>
-                          </>
-                        )}
-                      </HStack>
+                              onClick={() => setConfirmingDelete(prev => ({ ...prev, [member.member_id]: attr.id }))}
+                              _hover={{ bg: 'red.600' }}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </Flex>
+                      ) : (
+                        <Flex key={attr.id} align="center" justify="space-between" mb={2} width="100%">
+                          <Flex w="75%" gap={50}>
+                            <Box minW="150px">
+                              <Text fontWeight="semibold" color="#353535" fontSize="18px">{attr.key}</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize="18px" color="#353535">{attr.value}</Text>
+                            </Box>
+                          </Flex>
+                          <Button
+                            size="sm"
+                            backgroundColor="#A59480"
+                            color="#ECEDE8"
+                            fontFamily="Montserrat, sans-serif"
+                            fontSize="14px"
+                            borderRadius="6px"
+                            px={4}
+                            _hover={{ backgroundColor: '#8c7a68' }}
+                            onClick={() => handleEditClick(member.member_id, attr)}
+                          >
+                            Edit
+                          </Button>
+                        </Flex>
+                      )
                     ))}
                   </VStack>
-                  <HStack spacing={2} mb={4} w="100%">
+                  <Flex align="center" gap={2} mb={4} width="100%">
                     <Input
                       placeholder="Attribute Type"
-                      value={attrType}
-                      onChange={e => setAttrType(e.target.value)}
+                      value={attrInputs[member.member_id]?.type || ''}
+                      onChange={e => setAttrInputs(inputs => ({ ...inputs, [member.member_id]: { ...inputs[member.member_id], type: e.target.value } }))}
+                      minW="120px"
+                      w="30%"
                       bg="#ECEDE8"
                       border="2px solid #A59480"
                       borderRadius="8px"
                       fontSize="18px"
                       fontFamily="Montserrat, sans-serif"
+                      py={2}
+                      px={3}
                       _placeholder={{ color: "#999" }}
                     />
                     <Input
                       placeholder="Attribute Detail"
-                      value={attrValue}
-                      onChange={e => setAttrValue(e.target.value)}
+                      value={attrInputs[member.member_id]?.value || ''}
+                      onChange={e => setAttrInputs(inputs => ({ ...inputs, [member.member_id]: { ...inputs[member.member_id], value: e.target.value } }))}
+                      minW="140px"
+                      w="50%"
                       bg="#ECEDE8"
+                      ml={10}
                       border="2px solid #A59480"
                       borderRadius="8px"
                       fontSize="18px"
                       fontFamily="Montserrat, sans-serif"
+                      py={2}
+                      px={3}
                       _placeholder={{ color: "#999" }}
                     />
-                    <Button bg="#A59480" color="white" borderRadius="8px" fontWeight="semibold" fontSize="md" _hover={{ bg: '#8B7B68' }} onClick={handleAddAttribute}>Add</Button>
-                  </HStack>
+                    <Button bg="#A59480" color="white" borderRadius="8px" fontWeight="semibold" fontSize="md" ml={18} minW="80px" alignContent="right" _hover={{ bg: '#8B7B68' }} onClick={() => handleAddAttribute(member.member_id)}>Add</Button>
+                  </Flex>
                   {/* Notes Section */}
-                  <Text fontWeight="bold" fontSize="lg" mb={2} color="#353535">Notes History</Text>
+                  <Text fontWeight="bold" fontFamily="Montserrat Bold, sans-serif" fontSize="lg" mb={2} color="#a59480">Notes History</Text>
                   <VStack align="stretch" spacing={2} w="100%">
+                    {(memberNotes[member.member_id] || []).map(note => (
+                      <Flex key={note.id} align="center" gap={2} mb={1} width="100%">
+                        {editingNote[member.member_id]?.id === note.id ? (
+                          <>
+                            <Input
+                              value={editingNote[member.member_id]?.note || ''}
+                              onChange={e => setEditingNote(editing => ({ ...editing, [member.member_id]: { ...editing[member.member_id], note: e.target.value } }))}
+                              minW="160px"
+                              w="65%"
+                              bg="#ECEDE8"
+                              border="2px solid #A59480"
+                              borderRadius="8px"
+                              fontSize="18px"
+                              fontFamily="Montserrat, sans-serif"
+                              py={2}
+                              px={3}
+                              _placeholder={{ color: "#999" }}
+                            />
+                            <Button size="sm" colorScheme="green" minW="65px" fontSize="15px" borderRadius="8px" onClick={() => handleSaveEditNote(member.member_id)}>Save</Button>
+                            <Button size="sm" variant="ghost" minW="65px" borderRadius="8px" onClick={() => handleCancelEditNote(member.member_id)}>Cancel</Button>
+                            {pendingDeleteNote[member.member_id] === note.id ? (
+                              <Button size="sm" backgroundColor="red" color="white"  minW="110px" borderRadius="8px" onClick={() => handleDeleteNote(member.member_id)}>Delete</Button>
+                            ) : (
+                              <Button size="sm" color="red" backgroundColor="white" minW="65px" borderRadius="8px" onClick={() => handleDeleteNote(member.member_id)}>Delete</Button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Text minW="160px" w="65%" fontSize="18px">{note.note}</Text>
+                            <Text fontSize="12px" color="#888" minW="140px">{
+                              (() => {
+                                const d = new Date(note.created_at);
+                                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                const dd = String(d.getDate()).padStart(2, '0');
+                                const yy = String(d.getFullYear()).slice(-2);
+                                const hh = String(d.getHours()).padStart(2, '0');
+                                const min = String(d.getMinutes()).padStart(2, '0');
+                                return `${mm}/${dd}/${yy} ${hh}:${min}`;
+                              })()
+                            }</Text>
+                            <Button size="sm" minW="65px" borderRadius="8px" backgroundColor="#a59480" color="white" fontSize="15px" onClick={() => handleEditNoteClick(member.member_id, note)} colorScheme="yellow">Edit</Button>
+                          </>
+                        )}
+                      </Flex>
+                    ))}
+                  </VStack>
+                  <Flex align="center" gap={2} mb={4} width="100%">
                     <Input
                       placeholder="New note..."
+                      value={noteInputs[member.member_id] || ''}
+                      onChange={e => setNoteInputs(inputs => ({ ...inputs, [member.member_id]: e.target.value }))}
+                      minW="160px"
+                      w="100%"
+                      flexGrow={1}
                       bg="#ECEDE8"
                       border="2px solid #A59480"
                       borderRadius="8px"
                       fontSize="18px"
                       fontFamily="Montserrat, sans-serif"
+                      py={2}
+                      px={3}
                       _placeholder={{ color: "#999" }}
                     />
-                    <Button alignSelf="flex-start" bg="#A59480" color="white" borderRadius="8px" fontWeight="semibold" fontSize="md" _hover={{ bg: '#8B7B68' }}>Add Note</Button>
-                  </VStack>
+                    <Button
+                      alignSelf="flex-start"
+                      bg="#A59480"
+                      color="white"
+                      borderRadius="8px"
+                      fontWeight="semibold"
+                      fontSize="md"
+                      
+                      minW="80px"
+                      _hover={{ bg: '#8B7B68' }}
+                      onClick={() => handleAddNote(member.member_id)}
+                      ml="20"
+                    >
+                      Add Note
+                    </Button>
+                  </Flex>
                 </Box>
-                <Box h={2} />
+                <Box h={1} />
                 {/* Member ID in bottom-right corner */}
                 <Box position="absolute" bottom="12px" right="20px">
                   <Text fontSize="sm" fontStyle="italic" color="#ECEDE8" opacity={0.6}>
@@ -576,14 +1081,34 @@ export default function MemberDetailAdmin() {
             </Box>
           ))}
         </SimpleGrid>
-        <Box bg="white" border="3px solid #a59480" borderRadius="12px" boxShadow="lg" p={8} mb={8}>
-          <Heading size="md" mb={4}>Ledger</Heading>
+        <Box
+          bg="white"
+          borderRadius="24px"
+          boxShadow="0 4px 16px rgba(53,53,53,0.5)"
+          p={10}
+          mb={10}
+          ml={30}
+          fontFamily="Montserrat, sans-serif"
+          width="94%"
+        >
+          <Heading
+            fontSize="36px"
+            fontWeight="bold"
+            color="#353535"
+            fontFamily="IvyJournal-Thin, serif"
+            textTransform="uppercase"
+            letterSpacing="0.08em"
+            mb={0}
+            textAlign="center"
+          >
+            Ledger
+          </Heading>
           {ledgerLoading ? (
             <Spinner size="md" />
           ) : (
-            <Box overflowX="auto">
+            <Box margin={0} width="94%" marginLeft="2%" dropShadow="0 4px 16px rgba(53,53,53,0.5)" overflowX="auto">
               <MemberLedger
-                members={members}
+                members={members as any}
                 memberLedger={ledger}
                 selectedMember={members[0]}
                 ledgerLoading={ledgerLoading}
@@ -607,13 +1132,13 @@ export default function MemberDetailAdmin() {
           )}
         </Box>
         {/* Message + History Card */}
-        <Box bg="white" border="3px solid #a59480" borderRadius="12px" boxShadow="lg" p={8} mb={8}>
-          <Heading size="md" mb={4}>Messages</Heading>
-          <Box display={{ base: 'block', md: 'flex' }} gap={6}>
+        <Box bg="white" border="3px solid #a59480" borderRadius="16px" width="94%" marginLeft="2%" boxShadow="lg" p={8} mb={8} paddingTop={20}> 
+          
+          <Box display={{ base: 'block', md: 'flex' }} gap={16} paddingBottom={10}>
             {/* Send Message Form */}
-            <Box flex={1} minW={0} mr={{ md: 6 }}>
+            <Box flex={10} width="50%" mr={{ md: 6 }}>
               <SendMessageForm
-                members={members}
+                members={members as any}
                 accountId={accountId as string}
                 onSent={async () => {
                   // Refetch messages after sending
@@ -622,14 +1147,14 @@ export default function MemberDetailAdmin() {
             </Box>
             {/* Message History Table */}
             <Box flex={1} minW={0}>
-              <Heading size="sm" mb={2}>Message History</Heading>
+              <Heading size="sm" >Message History</Heading>
               {messagesLoading ? (
                 <Spinner size="md" />
               ) : messages.length === 0 ? (
                 <Text>No messages found for this account.</Text>
               ) : (
                 <Box overflowX="auto">
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table style={{ width: '90%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#f5f5f5' }}>
                         <th style={{ padding: '8px', borderBottom: '1px solid #eee', textAlign: 'left' }}>Message</th>
@@ -639,20 +1164,57 @@ export default function MemberDetailAdmin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {messages.map((msg: any) => (
-                        <tr key={msg.id}>
-                          <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{msg.content}</td>
-                          <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{new Date(msg.timestamp).toLocaleString()}</td>
-                          <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{msg.recipient || msg.to || 'N/A'}</td>
-                          <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{msg.sender || 'System'}</td>
-                        </tr>
-                      ))}
+                      {messages.map((msg: any) => {
+                        // Find the member name for this message
+                        const member = members.find(m => m.member_id === msg.member_id);
+                        const memberName = member ? `${member.first_name} ${member.last_name}` : 'Unknown';
+                        
+                        return (
+                          <tr key={msg.id}>
+                            <td style={{ padding: '8px', width: '60%', borderBottom: '1px solid #f0f0f0' }}>{msg.content}</td>
+                            <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{new Date(msg.timestamp).toLocaleString('en-US', {
+                              month: 'numeric',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: 'numeric'
+                            })}</td>
+                            <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{memberName}</td>
+                            <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{msg.sent_by || 'System'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </Box>
               )}
             </Box>
           </Box>
+        </Box>
+        {/* Delete Member Button - Two Stage */}
+        <Box 
+          display="flex" 
+          justifyContent="center" 
+          mt={8} 
+          pb={8}
+          borderTop="1px solid"
+          borderColor="gray.200"
+          pt={6}
+        >
+          <Button
+            onClick={() => handleDeleteMember(members[0])}
+            bg={deleteConfirmMode ? "red.600" : "red.500"}
+            color="#545454"
+            borderRadius="8px"
+            fontWeight="normal"
+            fontSize="sm"
+            size="sm"
+            opacity={0.7}
+            _hover={{ bg: deleteConfirmMode ? 'red.700' : 'red.600', opacity: 1 }}
+            _active={{ bg: 'red.700' }}
+          >
+            {deleteConfirmMode ? "CONFIRM DELETE MEMBER - THIS CANNOT BE UNDONE" : "Delete Member"}
+          </Button>
         </Box>
       </Box>
     </AdminLayout>

@@ -1,0 +1,947 @@
+import React, { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
+import { Box, Spinner, Text, Button, SimpleGrid, VStack, Heading, HStack, Input, useToast, Flex } from "@chakra-ui/react";
+import { supabase } from "../../api/supabaseClient";
+import MemberDetail from "../../../components/MemberDetail";
+import MemberLedger from "../../../components/pages/MemberLedger";
+import AddMemberModal from '../../../components/members/AddMemberModal';
+import SendMessageForm from '../../../components/messages/SendMessageForm';
+import AdminLayout from '../../../components/layouts/AdminLayout';
+import { EmailIcon, PhoneIcon, CalendarIcon } from "@chakra-ui/icons";
+import { FaBriefcase, FaUser } from 'react-icons/fa';
+
+interface Member {
+  member_id: string;
+  account_id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
+  photo?: string;
+  join_date?: string;
+  primary?: boolean;
+  dob?: string;
+  company?: string;
+  referred_by?: string;
+  next_renewal?: string;
+}
+
+interface Message {
+  id: string;
+  member_id: string;
+  account_id: string;
+  content: string;
+  direction: 'inbound' | 'outbound';
+  status: 'sent' | 'failed' | 'pending';
+  phone_number: string;
+  error_message?: string;
+  created_at: string;
+  members?: {
+    first_name: string;
+    last_name: string;
+    phone_number: string;
+  };
+}
+
+interface Attribute {
+  id: string;
+  key: string;
+  value: string;
+  created_at: string;
+}
+
+interface Note { id: string; note: string; created_at: string; }
+
+function sortMembers(members: any[]) {
+  return [...members].sort((a, b) => {
+    if (a.primary && !b.primary) return -1;
+    if (!a.primary && b.primary) return 1;
+    return 0;
+  });
+}
+
+export default function MemberDetailAdmin() {
+  const router = useRouter();
+  const { accountId } = router.query;
+  const [members, setMembers] = useState<Member[]>([]);
+  const [ledger, setLedger] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [ledgerLoading, setLedgerLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isAddMemberOpen, setAddMemberOpen] = useState(false);
+  const [newTransaction, setNewTransaction] = useState<any>({});
+  const [transactionStatus, setTransactionStatus] = useState<string>('');
+  const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  const [editTransactionForm, setEditTransactionForm] = useState<any>({});
+  const [selectedTransactionMemberId, setSelectedTransactionMemberId] = useState<string>('');
+  const toast = useToast();
+  const [memberAttributes, setMemberAttributes] = useState<Record<string, Attribute[]>>({});
+  const [attrInputs, setAttrInputs] = useState<Record<string, { type: string; value: string }>>({});
+  const [editingAttr, setEditingAttr] = useState<Record<string, { id: string | null; type: string; value: string }>>({});
+  const [attrNotesHeights, setAttrNotesHeights] = useState<Record<string, number>>({});
+  const [maxAttrNotesHeight, setMaxAttrNotesHeight] = useState<number>(0);
+  const attrNotesRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [pendingDelete, setPendingDelete] = useState<Record<string, string | null>>({});
+  const [confirmingDelete, setConfirmingDelete] = useState<Record<string, string | null>>({});
+  const [memberNotes, setMemberNotes] = useState<Record<string, Note[]>>({});
+  const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
+  const [editingNote, setEditingNote] = useState<Record<string, { id: string | null; note: string }>>({});
+  const [pendingDeleteNote, setPendingDeleteNote] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    if (!accountId) return;
+    async function fetchMembers() {
+      try {
+        const { data, error } = await supabase
+          .from('members')
+          .select('*')
+          .eq('account_id', accountId);
+        if (error) throw error;
+        setMembers(sortMembers(data || []));
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMembers();
+  }, [accountId]);
+
+  const fetchLedger = async (accountId: string) => {
+    setLedgerLoading(true);
+    try {
+      const res = await fetch(`/api/ledger?account_id=${accountId}`);
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      setLedger(result.data || []);
+    } catch (err) {
+      console.error('Ledger fetch error:', err);
+      toast({
+        title: 'Error fetching ledger',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!accountId) return;
+    fetchLedger(accountId as string);
+  }, [accountId]);
+
+  const handleAddTransaction = async (memberId: string, accountId: string) => {
+    if (!newTransaction.type || !newTransaction.amount) {
+      toast({
+        title: 'Missing required fields',
+        description: 'Please fill in all required fields',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    setTransactionStatus('loading');
+    try {
+      const response = await fetch('/api/ledger', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_id: memberId,
+          account_id: accountId,
+          type: newTransaction.type,
+          amount: newTransaction.amount,
+          note: newTransaction.note,
+          date: newTransaction.date || new Date().toISOString().split('T')[0],
+        }),
+      });
+
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+
+      // Clear the form
+      setNewTransaction({});
+      setSelectedTransactionMemberId('');
+      
+      // Refresh the ledger
+      await fetchLedger(accountId);
+
+      toast({
+        title: 'Transaction added',
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error adding transaction',
+        description: err.message,
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setTransactionStatus('');
+    }
+  };
+
+  const handleEditTransaction = (transaction: any) => {
+    setEditingTransaction(transaction);
+    setEditTransactionForm({
+      note: transaction.note,
+      amount: Math.abs(transaction.amount),
+      type: transaction.type,
+      date: transaction.date,
+    });
+  };
+
+  const handleUpdateTransaction = async (tx: { id: string; type: string; amount: number; note?: string; date?: string }) => {
+    const { id, type, amount, note, date } = tx;
+    let amt = amount;
+    if (type === 'purchase') amt = -Math.abs(amount);
+    try {
+      const response = await fetch('/api/ledger', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, type, amount: amt, note, date }),
+      });
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+      setEditingTransaction(null);
+      setEditTransactionForm({});
+      await fetchLedger(accountId as string);
+      toast({ title: 'Transaction updated', status: 'success', duration: 3000 });
+    } catch (err: any) {
+      toast({ title: 'Error updating transaction', description: err.message, status: 'error', duration: 3000 });
+    }
+  };
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      const response = await fetch('/api/ledger', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+      await fetchLedger(accountId as string);
+      toast({ title: 'Transaction deleted', status: 'success', duration: 3000 });
+    } catch (err: any) {
+      toast({ title: 'Error deleting transaction', description: err.message, status: 'error', duration: 3000 });
+    }
+  };
+
+  useEffect(() => {
+    if (!accountId) return;
+    async function fetchMessages() {
+      setMessagesLoading(true);
+      try {
+        const res = await fetch(`/api/messages?account_id=${accountId}`);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const result = await res.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        setMessages(result.messages || []);
+      } catch (err) {
+        console.error('Messages fetch error:', err);
+        toast({
+          title: 'Error fetching messages',
+          description: err instanceof Error ? err.message : 'Failed to fetch messages',
+          status: 'error',
+          duration: 5000,
+        });
+        setMessages([]);
+      } finally {
+        setMessagesLoading(false);
+      }
+    }
+    fetchMessages();
+  }, [accountId, toast]);
+
+  useEffect(() => {
+    if (!members.length) return;
+    const newHeights: Record<string, number> = {};
+    members.forEach(member => {
+      const el = attrNotesRefs.current[member.member_id];
+      if (el) newHeights[member.member_id] = el.offsetHeight;
+    });
+    setAttrNotesHeights(newHeights);
+  }, [memberAttributes, members]);
+
+  useEffect(() => {
+    if (!members.length) return;
+    const fetchAll = async () => {
+      const newAttrs: Record<string, Attribute[]> = {};
+      for (const member of members) {
+        const res = await fetch(`/api/member_attributes?member_id=${member.member_id}`);
+        const result = await res.json();
+        newAttrs[member.member_id] = result.data || [];
+      }
+      setMemberAttributes(newAttrs);
+    };
+    fetchAll();
+  }, [members]);
+
+  const handleAddAttribute = async (member_id: string) => {
+    const input = attrInputs[member_id] || { type: '', value: '' };
+    if (!input.type) {
+      toast({ title: 'Attribute type required', status: 'error', duration: 2000 });
+      return;
+    }
+    const res = await fetch('/api/member_attributes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id, key: input.type, value: input.value }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error adding attribute', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setAttrInputs(inputs => ({ ...inputs, [member_id]: { type: '', value: '' } }));
+      setMemberAttributes(attrs => ({ ...attrs, [member_id]: result.data || [] }));
+      toast({ title: 'Attribute added', status: 'success', duration: 2000 });
+    }
+  };
+
+  const handleEditClick = (member_id: string, attr: Attribute) => {
+    setEditingAttr(editing => ({ ...editing, [member_id]: { id: attr.id, type: attr.key, value: attr.value } }));
+  };
+
+  const handleSaveEdit = async (member_id: string) => {
+    const edit = editingAttr[member_id];
+    if (!edit || !edit.type) {
+      toast({ title: 'Attribute type required', status: 'error', duration: 2000 });
+      return;
+    }
+    try {
+      const res = await fetch('/api/member_attributes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: edit.id, member_id, key: edit.type, value: edit.value }),
+      });
+      const result = await res.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setEditingAttr(editing => ({ ...editing, [member_id]: { id: null, type: '', value: '' } }));
+      setConfirmingDelete(prev => ({ ...prev, [member_id]: null }));
+
+      // Refetch attributes
+      const refreshed = await fetch(`/api/member_attributes?member_id=${member_id}`);
+      const refreshedResult = await refreshed.json();
+      setMemberAttributes(attrs => ({ ...attrs, [member_id]: refreshedResult.data || [] }));
+
+      toast({ title: 'Attribute updated', status: 'success', duration: 2000 });
+    } catch (err: any) {
+      console.error("Error saving attribute:", err);
+      toast({ title: 'Error saving attribute', description: err.message, status: 'error', duration: 3000 });
+    }
+  };
+
+  const handleCancelEdit = (member_id: string) => {
+    setEditingAttr(editing => ({ ...editing, [member_id]: { id: null, type: '', value: '' } }));
+    setConfirmingDelete(prev => ({ ...prev, [member_id]: null }));
+  };
+
+  const handleDeleteAttribute = async (member_id: string) => {
+    const edit = editingAttr[member_id];
+    if (!edit || !edit.id) return;
+    // No confirm dialog here; handled by two-step button
+    const res = await fetch('/api/member_attributes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: edit.id }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error deleting attribute', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setEditingAttr(editing => ({ ...editing, [member_id]: { id: null, type: '', value: '' } }));
+      // Immediately refresh the attributes list for this member
+      const res2 = await fetch(`/api/member_attributes?member_id=${member_id}`);
+      const result2 = await res2.json();
+      setMemberAttributes(attrs => ({ ...attrs, [member_id]: result2.data || [] }));
+      toast({ title: 'Attribute deleted', status: 'success', duration: 2000 });
+    }
+    setConfirmingDelete(prev => ({ ...prev, [member_id]: null }));
+  };
+
+  // After each render, update the max height
+  useEffect(() => {
+    const heights = Object.values(attrNotesHeights);
+    if (heights.length > 0) {
+      setMaxAttrNotesHeight(Math.max(...heights));
+    }
+  }, [attrNotesHeights, members]);
+
+  function formatPhone(phone?: string) {
+    if (!phone) return '';
+    // Always use last 10 digits, and always return (123) 456-7890 format if possible
+    const cleaned = phone.replace(/\D/g, '').slice(-10);
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return phone;
+  }
+
+  useEffect(() => {
+    if (!members.length) return;
+    const fetchAllNotes = async () => {
+      const newNotes: Record<string, Note[]> = {};
+      for (const member of members) {
+        const res = await fetch(`/api/member_notes?member_id=${member.member_id}`);
+        const result = await res.json();
+        newNotes[member.member_id] = result.data || [];
+      }
+      setMemberNotes(newNotes);
+    };
+    fetchAllNotes();
+  }, [members]);
+
+  const handleAddNote = async (member_id: string) => {
+    const note = noteInputs[member_id] || '';
+    if (!note.trim()) {
+      toast({ title: 'Note required', status: 'error', duration: 2000 });
+      return;
+    }
+    const res = await fetch('/api/member_notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member_id, note }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error adding note', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setNoteInputs(inputs => ({ ...inputs, [member_id]: '' }));
+      setMemberNotes(notes => ({ ...notes, [member_id]: result.data || [] }));
+      toast({ title: 'Note added', status: 'success', duration: 2000 });
+    }
+  };
+
+  const handleEditNoteClick = (member_id: string, note: Note) => {
+    setEditingNote(editing => ({ ...editing, [member_id]: { id: note.id, note: note.note } }));
+  };
+
+  const handleSaveEditNote = async (member_id: string) => {
+    const edit = editingNote[member_id];
+    if (!edit || !edit.note.trim()) {
+      toast({ title: 'Note required', status: 'error', duration: 2000 });
+      return;
+    }
+    const res = await fetch('/api/member_notes', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: edit.id, member_id, note: edit.note }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error updating note', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setEditingNote(editing => ({ ...editing, [member_id]: { id: null, note: '' } }));
+      setMemberNotes(notes => ({ ...notes, [member_id]: result.data || [] }));
+      toast({ title: 'Note updated', status: 'success', duration: 2000 });
+    }
+  };
+
+  const handleCancelEditNote = (member_id: string) => {
+    setEditingNote(editing => ({ ...editing, [member_id]: { id: null, note: '' } }));
+  };
+
+  const handleDeleteNote = async (member_id: string) => {
+    const edit = editingNote[member_id];
+    if (!edit || !edit.id) return;
+    if (pendingDeleteNote[member_id] !== edit.id) {
+      setPendingDeleteNote(pd => ({ ...pd, [member_id]: edit.id }));
+      return;
+    }
+    const res = await fetch('/api/member_notes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: edit.id, member_id }),
+    });
+    const result = await res.json();
+    if (result.error) {
+      toast({ title: 'Error deleting note', description: result.error, status: 'error', duration: 3000 });
+    } else {
+      setEditingNote(editing => ({ ...editing, [member_id]: { id: null, note: '' } }));
+      setPendingDeleteNote(pd => ({ ...pd, [member_id]: null }));
+      setMemberNotes(notes => ({ ...notes, [member_id]: result.data || [] }));
+      toast({ title: 'Note deleted', status: 'success', duration: 2000 });
+    }
+  };
+
+  const handleCancelDeleteNote = (member_id: string) => {
+    setPendingDeleteNote(pd => ({ ...pd, [member_id]: null }));
+  };
+
+  if (loading) {
+    return <Box p={8} display="flex" justifyContent="center"><Spinner size="xl" /></Box>;
+  }
+  if (error) {
+    return <Box p={8}><Text color="red.500">Error: {error}</Text></Box>;
+  }
+  if (!members.length) {
+    return <Box p={8}><Text>No members found for this account.</Text></Box>;
+  }
+
+  return (
+    <AdminLayout>
+      <Box p={8}>
+        <Button mb={6} onClick={() => router.push('/admin/members')}
+          bg="#A59480"
+          color="white"
+          borderRadius="12px"
+          fontWeight="semibold"
+          fontSize="md"
+          _hover={{ bg: '#8B7B68' }}
+        >Back to Members</Button>
+        <Button mb={6} onClick={() => setAddMemberOpen(true)}
+          bg="#A59480"
+          color="white"
+          borderRadius="12px"
+          fontWeight="semibold"
+          fontSize="md"
+          _hover={{ bg: '#8B7B68' }}
+        >Add New Member</Button>
+        <AddMemberModal isOpen={isAddMemberOpen} onClose={() => setAddMemberOpen(false)} onSave={async (memberData: any) => {
+          setAddMemberOpen(false);
+        }} />
+        <SimpleGrid columns={2} spacing={8} mb={10} mt={120} minChildWidth="600px">
+          {members.map(member => (
+            <Box key={member.member_id} minH="540px" display="flex" flexDirection="column" alignItems="center" bg="transparent" borderRadius="16px" boxShadow="none" p={0} fontFamily="Montserrat, sans-serif" position="relative">
+              {/* Profile Card Box */}
+              <Box position="relative" bg="#a59480" borderRadius="24px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" p={15} pb="90px" pt="90px" w="100%" maxW="600px" display="flex" flexDirection="column" alignItems="center">
+                {/* Photo as background, floating above card */}
+                <Box
+                  position="absolute"
+                  top="-100px"
+                  left="50%"
+                  transform="translateX(-50%)"
+                  zIndex={2}
+                  borderRadius="100"
+                  border="2px solid white"
+                  overflow="hidden"
+                  width="200px"
+                  height="200px"
+                  boxShadow="0 2px 8px rgba(0,0,0,0.50)"
+                  bg="#fff"
+                >
+                  {member.photo ? (
+                    <img src={member.photo} alt={`${member.first_name} ${member.last_name}`} style={{ width: '200px', height: '200px', objectFit: 'cover' }} />
+                  ) : (
+                    <Box width="140px"  height="140px" display="flex" alignItems="center" justifyContent="center" bg="#F7FAFC" >
+                      <Text  fontSize="3xl" color="#ecede8" fontWeight="bold">{member.first_name?.[0]}{member.last_name?.[0]}</Text>
+                    </Box>
+                  )}
+                </Box>
+                {/* Name overlays photo */}
+                <Box
+                  position="relative"
+                  zIndex={2}
+                  top="10px"
+                  mb={4}
+                  textAlign="center"
+                  width="100%"
+                  mt={0}
+                  
+                >
+                  <Text fontSize="40px" fontWeight="bold" color="#ecede8"  fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} p={0}>
+                    {member.first_name} {member.last_name}
+                  </Text>
+                </Box>
+                {/* Info Box */}
+                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30}>
+                  <SimpleGrid columns={2} spacingX={10} spacingY={1} ml={0} w="100%" alignItems="start">
+                    <VStack align="flex-start" spacing={1} ml={12}>
+                      <HStack spacing={15} color="#353535" width="90%">
+                        <PhoneIcon boxSize={18} />
+                        <Text fontSize="16px" margin={5}>{formatPhone(member.phone) || <span style={{ color: '#ccc' }}> </span>}</Text>
+                        
+                      </HStack>
+                      <HStack spacing={15} color="#353535">
+                        <EmailIcon boxSize={18} />
+                        <Text fontSize="16px" margin={5}>{member.email || <span style={{ color: '#ccc' }}> </span>}</Text>
+                      </HStack>
+                      <HStack spacing={15} color="#353535">
+                        <Box as={FaBriefcase} boxSize={16} />
+                        <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>
+                          Co.: {member.company || <span style={{ color: '#bbb' }}>—</span>}
+                        </Text>
+                      </HStack>
+                    </VStack>
+                    <VStack align="flex-start" spacing={1} mr={2} width="100%">
+                      {member.dob && (
+                        <HStack spacing={15} color="#353535">
+                          <CalendarIcon boxSize={16} />
+                          <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>
+                            Birthdate: {new Date(member.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                        </HStack>
+                      )}
+                      {member.join_date && (
+                        <HStack spacing={15} color="#353535">
+                          <CalendarIcon boxSize={16} />
+                          <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>Member Since: {new Date(member.join_date).toLocaleDateString()}</Text>
+                        </HStack>
+                      )}
+                      <HStack spacing={15} color="#353535">
+                        <Box as={FaUser} boxSize={16} />
+                        <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>Referred by: {member.referred_by || <span style={{ color: '#bbb' }}>—</span>}</Text>
+                      </HStack>
+                    </VStack>
+                  </SimpleGrid>
+                </Box>
+                {/* Add 10px space between info card and attributes card */}
+                <Box h="10px" />
+                {/* Centered Attributes & Notes title above the card */}
+                <Box width="100%" textAlign="center" mb={2}>
+                  <Text fontSize="32px" fontWeight="bold" color="#ecede8" fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} mb={0}>
+                    Attributes & Notes
+                  </Text>
+                </Box>
+              
+                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30} mb={-10}>
+                  {/* Attributes Section */}
+                  <Text fontWeight="bold" fontFamily="Montserrat Bold, sans-serif" fontSize="lg" mb={2} color="#a59480">Attributes</Text>
+                  {/* List attributes */}
+                  <VStack align="stretch" margin={0} padding={0} ml={0} spacing={0} mb={0} w="100%">
+                    {(memberAttributes[member.member_id] || []).map(attr => (
+                      editingAttr[member.member_id]?.id === attr.id ? (
+                        <Flex key={attr.id} align="center" gap={2} mb={2} width="100%">
+                          <Input
+                            value={editingAttr[member.member_id]?.type || ''}
+                            onChange={e => setEditingAttr(editing => ({ ...editing, [member.member_id]: { ...editing[member.member_id], type: e.target.value } }))}
+                            minW="120px"
+                            w="30%"
+                            bg="#ECEDE8"
+                            border="2px solid #A59480"
+                            borderRadius="8px"
+                            fontSize="18px"
+                            fontFamily="Montserrat, sans-serif"
+                            
+                            py={2}
+                            px={3}
+                            _placeholder={{ color: "#999" }}
+                          />
+                          <Input
+                            value={editingAttr[member.member_id]?.value || ''}
+                            onChange={e => setEditingAttr(editing => ({ ...editing, [member.member_id]: { ...editing[member.member_id], value: e.target.value } }))}
+                            minW="140px"
+                            w="50%"
+                            bg="#ECEDE8"
+                            border="2px solid #A59480"
+                            borderRadius="8px"
+                            fontSize="18px"
+                            fontFamily="Montserrat, sans-serif"
+                            
+                            py={2}
+                            px={3}
+                            _placeholder={{ color: "#999" }}
+                          />
+                          <Button size="sm" colorScheme="green" fontSize="15px" minW="65px" borderRadius="8px" onClick={() => handleSaveEdit(member.member_id)}>Save</Button>
+                          <Button size="sm" variant="ghost" minW="65px" borderRadius="8px" onClick={() => handleCancelEdit(member.member_id)}>Cancel</Button>
+                          {confirmingDelete[member.member_id] === attr.id ? (
+                            <Button
+                              size="sm"
+                              minW="80px"
+                              backgroundColor="red"
+                              color="white"
+                              borderRadius="8px"
+                              onClick={() => handleDeleteAttribute(member.member_id)}
+                              _hover={{ bg: 'red.600' }}
+                            >
+                              Confirm
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              minW="80px"
+                              backgroundColor=""
+                              color="red"
+                              borderRadius="8px"
+                              onClick={() => setConfirmingDelete(prev => ({ ...prev, [member.member_id]: attr.id }))}
+                              _hover={{ bg: 'red.600' }}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </Flex>
+                      ) : (
+                        <Flex key={attr.id} align="center" justify="space-between" mb={2} width="100%">
+                          <Flex w="75%" gap={50}>
+                            <Box minW="150px">
+                              <Text fontWeight="semibold" color="#353535" fontSize="18px">{attr.key}</Text>
+                            </Box>
+                            <Box>
+                              <Text fontSize="18px" color="#353535">{attr.value}</Text>
+                            </Box>
+                          </Flex>
+                          <Button
+                            size="sm"
+                            backgroundColor="#A59480"
+                            color="#ECEDE8"
+                            fontFamily="Montserrat, sans-serif"
+                            fontSize="14px"
+                            borderRadius="6px"
+                            px={4}
+                            _hover={{ backgroundColor: '#8c7a68' }}
+                            onClick={() => handleEditClick(member.member_id, attr)}
+                          >
+                            Edit
+                          </Button>
+                        </Flex>
+                      )
+                    ))}
+                  </VStack>
+                  <Flex align="center" gap={2} mb={4} width="100%">
+                    <Input
+                      placeholder="Attribute Type"
+                      value={attrInputs[member.member_id]?.type || ''}
+                      onChange={e => setAttrInputs(inputs => ({ ...inputs, [member.member_id]: { ...inputs[member.member_id], type: e.target.value } }))}
+                      minW="120px"
+                      w="30%"
+                      bg="#ECEDE8"
+                      border="2px solid #A59480"
+                      borderRadius="8px"
+                      fontSize="18px"
+                      fontFamily="Montserrat, sans-serif"
+                      py={2}
+                      px={3}
+                      _placeholder={{ color: "#999" }}
+                    />
+                    <Input
+                      placeholder="Attribute Detail"
+                      value={attrInputs[member.member_id]?.value || ''}
+                      onChange={e => setAttrInputs(inputs => ({ ...inputs, [member.member_id]: { ...inputs[member.member_id], value: e.target.value } }))}
+                      minW="140px"
+                      w="50%"
+                      bg="#ECEDE8"
+                      ml={10}
+                      border="2px solid #A59480"
+                      borderRadius="8px"
+                      fontSize="18px"
+                      fontFamily="Montserrat, sans-serif"
+                      py={2}
+                      px={3}
+                      _placeholder={{ color: "#999" }}
+                    />
+                    <Button bg="#A59480" color="white" borderRadius="8px" fontWeight="semibold" fontSize="md" ml={18} minW="80px" alignContent="right" _hover={{ bg: '#8B7B68' }} onClick={() => handleAddAttribute(member.member_id)}>Add</Button>
+                  </Flex>
+                  {/* Notes Section */}
+                  <Text fontWeight="bold" fontFamily="Montserrat Bold, sans-serif" fontSize="lg" mb={2} color="#a59480">Notes History</Text>
+                  <VStack align="stretch" spacing={2} w="100%">
+                    {(memberNotes[member.member_id] || []).map(note => (
+                      <Flex key={note.id} align="center" gap={2} mb={1} width="100%">
+                        {editingNote[member.member_id]?.id === note.id ? (
+                          <>
+                            <Input
+                              value={editingNote[member.member_id]?.note || ''}
+                              onChange={e => setEditingNote(editing => ({ ...editing, [member.member_id]: { ...editing[member.member_id], note: e.target.value } }))}
+                              minW="160px"
+                              w="65%"
+                              bg="#ECEDE8"
+                              border="2px solid #A59480"
+                              borderRadius="8px"
+                              fontSize="18px"
+                              fontFamily="Montserrat, sans-serif"
+                              py={2}
+                              px={3}
+                              _placeholder={{ color: "#999" }}
+                            />
+                            <Button size="sm" colorScheme="green" minW="65px" fontSize="15px" borderRadius="8px" onClick={() => handleSaveEditNote(member.member_id)}>Save</Button>
+                            <Button size="sm" variant="ghost" minW="65px" borderRadius="8px" onClick={() => handleCancelEditNote(member.member_id)}>Cancel</Button>
+                            {pendingDeleteNote[member.member_id] === note.id ? (
+                              <Button size="sm" backgroundColor="red" color="white"  minW="110px" borderRadius="8px" onClick={() => handleDeleteNote(member.member_id)}>Delete</Button>
+                            ) : (
+                              <Button size="sm" color="red" backgroundColor="white" minW="65px" borderRadius="8px" onClick={() => handleDeleteNote(member.member_id)}>Delete</Button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <Text minW="160px" w="65%" fontSize="18px">{note.note}</Text>
+                            <Text fontSize="12px" color="#888" minW="140px">{
+                              (() => {
+                                const d = new Date(note.created_at);
+                                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                const dd = String(d.getDate()).padStart(2, '0');
+                                const yy = String(d.getFullYear()).slice(-2);
+                                const hh = String(d.getHours()).padStart(2, '0');
+                                const min = String(d.getMinutes()).padStart(2, '0');
+                                return `${mm}/${dd}/${yy} ${hh}:${min}`;
+                              })()
+                            }</Text>
+                            <Button size="sm" minW="65px" borderRadius="8px" backgroundColor="#a59480" color="white" fontSize="15px" onClick={() => handleEditNoteClick(member.member_id, note)} colorScheme="yellow">Edit</Button>
+                          </>
+                        )}
+                      </Flex>
+                    ))}
+                  </VStack>
+                  <Flex align="center" gap={2} mb={4} width="100%">
+                    <Input
+                      placeholder="New note..."
+                      value={noteInputs[member.member_id] || ''}
+                      onChange={e => setNoteInputs(inputs => ({ ...inputs, [member.member_id]: e.target.value }))}
+                      minW="160px"
+                      w="100%"
+                      flexGrow={1}
+                      bg="#ECEDE8"
+                      border="2px solid #A59480"
+                      borderRadius="8px"
+                      fontSize="18px"
+                      fontFamily="Montserrat, sans-serif"
+                      py={2}
+                      px={3}
+                      _placeholder={{ color: "#999" }}
+                    />
+                    <Button
+                      alignSelf="flex-start"
+                      bg="#A59480"
+                      color="white"
+                      borderRadius="8px"
+                      fontWeight="semibold"
+                      fontSize="md"
+                      
+                      minW="80px"
+                      _hover={{ bg: '#8B7B68' }}
+                      onClick={() => handleAddNote(member.member_id)}
+                      ml="20"
+                    >
+                      Add Note
+                    </Button>
+                  </Flex>
+                </Box>
+                <Box h={1} />
+                {/* Member ID in bottom-right corner */}
+                <Box position="absolute" bottom="12px" right="20px">
+                  <Text fontSize="sm" fontStyle="italic" color="#ECEDE8" opacity={0.6}>
+                    ID: {member.member_id}
+                  </Text>
+                </Box>
+              </Box>
+              {/* Other member info, attributes, etc. can go below here as needed */}
+            </Box>
+          ))}
+        </SimpleGrid>
+        <Box
+          bg="white"
+          borderRadius="24px"
+          boxShadow="0 4px 16px rgba(53,53,53,0.5)"
+          p={10}
+          mb={10}
+          ml={30}
+          fontFamily="Montserrat, sans-serif"
+          width="94%"
+        >
+          <Heading
+            fontSize="36px"
+            fontWeight="bold"
+            color="#353535"
+            fontFamily="IvyJournal-Thin, serif"
+            textTransform="uppercase"
+            letterSpacing="0.08em"
+            mb={0}
+            textAlign="center"
+          >
+            Ledger
+          </Heading>
+          {ledgerLoading ? (
+            <Spinner size="md" />
+          ) : (
+            <Box margin={0} align="center" width="94%" marginLeft="2%" dropShadow="0 4px 16px rgba(53,53,53,0.5)" overflowX="auto">
+              <MemberLedger
+                
+                members={members}
+                memberLedger={ledger}
+                selectedMember={members[0]}
+                ledgerLoading={ledgerLoading}
+                newTransaction={newTransaction}
+                setNewTransaction={setNewTransaction}
+                handleAddTransaction={handleAddTransaction}
+                transactionStatus={transactionStatus}
+                editingTransaction={editingTransaction}
+                setEditingTransaction={setEditingTransaction}
+                editTransactionForm={editTransactionForm}
+                setEditTransactionForm={setEditTransactionForm}
+                handleEditTransaction={handleEditTransaction}
+                handleUpdateTransaction={handleUpdateTransaction}
+                handleDeleteTransaction={handleDeleteTransaction}
+                fetchLedger={() => accountId && fetchLedger(accountId as string)}
+                setSelectedTransactionMemberId={setSelectedTransactionMemberId}
+                selectedTransactionMemberId={selectedTransactionMemberId}
+                session={null}
+              />
+            </Box>
+          )}
+        </Box>
+        {/* Message + History Card */}
+        <Box bg="white" border="3px solid #a59480" borderRadius="16px" width="94%" marginLeft="2%" boxShadow="lg" p={8} mb={8} paddingTop={20}> 
+          
+          <Box align="middle" display={{ base: 'block', md: 'flex' }} gap={16} paddingBottom={10}>
+            {/* Send Message Form */}
+            <Box flex={10} width="50%" align="center" mr={{ md: 6 }}>
+              <SendMessageForm
+                members={members}
+                accountId={accountId as string}
+                onSent={async () => {
+                  // Refetch messages after sending
+                }}
+              />
+            </Box>
+            {/* Message History Table */}
+            <Box flex={1} minW={0}>
+              <Heading size="sm" >Message History</Heading>
+              {messagesLoading ? (
+                <Spinner size="md" />
+              ) : messages.length === 0 ? (
+                <Text>No messages found for this account.</Text>
+              ) : (
+                <Box overflowX="auto">
+                  <table style={{ width: '90%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f5f5f5' }}>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #eee', textAlign: 'left' }}>Message</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #eee', textAlign: 'left' }}>Date</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #eee', textAlign: 'left' }}>To</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #eee', textAlign: 'left' }}>From</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {messages.map((msg: any) => {
+                        // Find the member name for this message
+                        const member = members.find(m => m.member_id === msg.member_id);
+                        const memberName = member ? `${member.first_name} ${member.last_name}` : 'Unknown';
+                        
+                        return (
+                          <tr key={msg.id}>
+                            <td style={{ padding: '8px', width: '60%', borderBottom: '1px solid #f0f0f0' }}>{msg.content}</td>
+                            <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{new Date(msg.timestamp).toLocaleString('en-US', {
+                              month: 'numeric',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: 'numeric'
+                            })}</td>
+                            <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{memberName}</td>
+                            <td style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>{msg.sent_by || 'System'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </AdminLayout>
+  );
+} 

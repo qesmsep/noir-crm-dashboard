@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/api/supabaseClient';
+import { supabase } from '../../../lib/supabase';
+import { formatDateTime } from '../../../utils/dateUtils';
 
 export async function POST(request: Request) {
   try {
@@ -86,10 +87,13 @@ export async function POST(request: Request) {
     const { data: tables, error: tablesError } = await supabase
       .from('tables')
       .select('*')
-      .gte('capacity', party_size);
+      .gte('seats', party_size);
+
     if (tablesError) {
-      return NextResponse.json({ error: 'Error fetching tables' }, { status: 500 });
+      console.error('Supabase tablesError:', tablesError.message);
+      return NextResponse.json({ error: 'Error fetching tables: ' + tablesError.message }, { status: 500 });
     }
+
     if (!tables || tables.length === 0) {
       return NextResponse.json({ error: 'No available table for this party size' }, { status: 400 });
     }
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
     const slotStart = new Date(start_time);
     const slotEnd = new Date(end_time);
     const availableTable = tables
-      .sort((a, b) => a.capacity - b.capacity)
+      .sort((a, b) => a.seats - b.seats)
       .find(table => {
         const tableReservations = reservations.filter(r => r.table_id === table.id);
         // Check for overlap
@@ -122,9 +126,48 @@ export async function POST(request: Request) {
           );
         });
       });
+    
     if (!availableTable) {
+      // No table available at requested time - find alternative times
+      console.log('No table available, attempting to find alternative times...');
+      try {
+        // Convert time to 12-hour format using UTC to avoid timezone issues
+        const startDate = new Date(start_time);
+        const dateString = startDate.toISOString().split('T')[0];
+        
+        // Use UTC methods to avoid timezone conversion issues
+        const hours = startDate.getUTCHours();
+        const minutes = startDate.getUTCMinutes();
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+        const timeString = `${displayHours}:${minutes.toString().padStart(2, '0')}${ampm}`;
+        
+        console.log('Calling alternative times function with:', { dateString, party_size, requested_time: timeString });
+        console.log('Original start_time:', start_time);
+        console.log('Parsed hours (UTC):', hours, 'minutes:', minutes, 'ampm:', ampm);
+        console.log('Converted time string:', timeString);
+        
+        // Call the alternative times function directly
+        const altData = await findAlternativeTimes(dateString, party_size, timeString);
+        
+        console.log('Alternative times result:', altData);
+        
+        if (altData) {
+          return NextResponse.json({
+            error: 'No available table for this time and party size',
+            alternative_times: altData.alternative_times,
+            message: altData.message,
+            requested_time: altData.requested_time
+          }, { status: 409 }); // 409 Conflict - indicates alternative times are available
+        }
+      } catch (altError) {
+        console.error('Error finding alternative times:', altError);
+      }
+      
+      // Fallback to original error if alternative times lookup fails
       return NextResponse.json({ error: 'No available table for this time and party size' }, { status: 400 });
     }
+    
     // Create reservation with assigned table_id
     const { data: reservation, error } = await supabase
       .from('reservations')
@@ -154,6 +197,9 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    // Send SMS confirmation
+    await sendSMSConfirmation(reservation);
 
     return NextResponse.json(reservation);
   } catch (error) {
@@ -194,5 +240,235 @@ export async function GET() {
       { error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+// Helper: generate all time slots (e.g., 6:00pm to midnight, every 15 min)
+function generateTimeSlots() {
+  const slots: string[] = [];
+  for (let h = 18; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hour = h % 12 === 0 ? 12 : h % 12;
+      const ampm = h < 12 ? 'am' : 'pm';
+      const min = m.toString().padStart(2, '0');
+      slots.push(`${hour}:${min}${ampm}`);
+    }
+  }
+  return slots;
+}
+
+// Helper: convert time string to Date object
+function timeStringToDate(timeString: string, date: string): Date {
+  const [time, ampm] = timeString.split(/(am|pm)/);
+  let [hour, minute] = time.split(':').map(Number);
+  if (ampm === 'pm' && hour !== 12) hour += 12;
+  if (ampm === 'am' && hour === 12) hour = 0;
+  const slotStart = new Date(date + 'T00:00:00.000Z'); // Create UTC date
+  slotStart.setUTCHours(hour, minute, 0, 0); // Use UTC methods
+  return slotStart;
+}
+
+// Helper function to find alternative times
+async function findAlternativeTimes(date: string, party_size: number, requested_time: string) {
+  try {
+    // 2. Get all reservations for that date
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Get all reservations and filter in JavaScript to avoid query issues
+    const { data: allReservations, error: resError } = await supabase
+      .from('reservations')
+      .select('table_id, start_time, end_time');
+    
+    if (resError) {
+      console.error('Error fetching reservations:', resError);
+      return null;
+    }
+
+    // Filter reservations for the specific date (compare only YYYY-MM-DD)
+    const targetDateStr = date;
+    const reservations = (allReservations || []).filter(res => {
+      const resDateStr = new Date(res.start_time).toISOString().slice(0, 10);
+      return resDateStr === targetDateStr;
+    });
+
+    // 1. Get all tables that fit the party size
+    const { data: tables, error: tablesError } = await supabase
+      .from('tables')
+      .select('id, table_number, seats')
+      .gte('seats', party_size);
+    
+    if (tablesError || !tables || tables.length === 0) {
+      return null;
+    }
+
+    // Map to id, number, seats for frontend
+    const mappedTables = (tables || []).map(t => ({
+      id: t.id,
+      number: t.table_number,
+      seats: parseInt(t.seats, 10)
+    }));
+
+    // 3. Generate all possible time slots
+    const allSlots = generateTimeSlots();
+    const slotDuration = party_size <= 2 ? 90 : 120; // minutes
+    
+    // 4. Check availability for each slot
+    const availableSlots: { time: string; available: boolean }[] = [];
+    
+    for (const slot of allSlots) {
+      const slotStart = timeStringToDate(slot, date);
+      const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
+      
+      // Check if any table is available for this slot
+      const availableTable = mappedTables.find(table => {
+        const tableReservations = reservations.filter(r => r.table_id === table.id);
+        
+        // Check for overlap
+        const hasOverlap = tableReservations.some(r => {
+          const resStart = new Date(r.start_time);
+          const resEnd = new Date(r.end_time);
+          const overlap = (slotStart < resEnd) && (slotEnd > resStart);
+          return overlap;
+        });
+        
+        return !hasOverlap;
+      });
+      
+      availableSlots.push({
+        time: slot,
+        available: !!availableTable
+      });
+    }
+
+    // 5. Find the requested time index
+    const requestedTimeIndex = availableSlots.findIndex(slot => slot.time === requested_time);
+    
+    if (requestedTimeIndex === -1) {
+      return null;
+    }
+
+    // 6. Find nearest available times before and after
+    let beforeTime: string | null = null;
+    let afterTime: string | null = null;
+    
+    // Look for available time before the requested time
+    for (let i = requestedTimeIndex - 1; i >= 0; i--) {
+      if (availableSlots[i].available) {
+        beforeTime = availableSlots[i].time;
+        break;
+      }
+    }
+    
+    // Look for available time after the requested time
+    for (let i = requestedTimeIndex + 1; i < availableSlots.length; i++) {
+      if (availableSlots[i].available) {
+        afterTime = availableSlots[i].time;
+        break;
+      }
+    }
+
+    return {
+      requested_time,
+      alternative_times: {
+        before: beforeTime,
+        after: afterTime
+      },
+      message: beforeTime || afterTime 
+        ? 'The requested time is not available. Here are the nearest available times:'
+        : 'No alternative times available for this date.'
+    };
+  } catch (error) {
+    console.error('Error in findAlternativeTimes:', error);
+    return null;
+  }
+}
+
+// Function to send SMS confirmation
+async function sendSMSConfirmation(reservation: any) {
+  try {
+    // Check if OpenPhone credentials are configured
+    if (!process.env.OPENPHONE_API_KEY) {
+      console.error('OpenPhone API key not configured');
+      return false;
+    }
+
+    if (!process.env.OPENPHONE_PHONE_NUMBER_ID) {
+      console.error('OpenPhone phone number ID not configured');
+      return false;
+    }
+
+    // Manually format the date and time using UTC components (since UTC = intended CST)
+    const startDate = new Date(reservation.start_time);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const weekday = days[startDate.getUTCDay()];
+    const month = months[startDate.getUTCMonth()];
+    const day = startDate.getUTCDate();
+    const year = startDate.getUTCFullYear();
+    let hour = startDate.getUTCHours();
+    const minute = startDate.getUTCMinutes();
+    const ampm = hour >= 12 ? 'pm' : 'am';
+    let displayHour = hour % 12;
+    if (displayHour === 0) displayHour = 12;
+    const minuteStr = minute.toString().padStart(2, '0');
+    const formattedDate = `${weekday}, ${month} ${day}, ${year}`;
+    const timeString = `${displayHour}:${minuteStr}${ampm}`;
+
+    // Create the confirmation message
+    const customerName = reservation.first_name || reservation.name || 'Guest';
+    const occasion = reservation.event_type || 'dining';
+    
+    const messageContent = `Thank you, ${customerName}. Your reservation has been confirmed for Noir on ${formattedDate} at ${timeString} for ${reservation.party_size} guests. ${occasion !== 'dining' ? `Occasion: ${occasion}. ` : ''}Please respond directly to this text message if you need to make any changes or if you have any questions.`;
+
+    // Format phone number
+    let formattedPhone = reservation.phone;
+    if (!formattedPhone.startsWith('+')) {
+      const digits = formattedPhone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        formattedPhone = '+1' + digits;
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        formattedPhone = '+' + digits;
+      } else {
+        formattedPhone = '+' + digits;
+      }
+    }
+
+    console.log('Sending SMS confirmation to:', formattedPhone);
+    console.log('Sending from phone ID:', process.env.OPENPHONE_PHONE_NUMBER_ID);
+    console.log('Reservation time (CST):', formattedDate, 'at', timeString);
+
+    // Send SMS using OpenPhone API
+    const response = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: [formattedPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: messageContent
+      })
+    });
+
+    // Debug logging for response
+    console.log('OpenPhone API Response Status:', response.status);
+    const responseText = await response.text();
+    console.log('OpenPhone API Response:', responseText);
+
+    if (!response.ok) {
+      console.error('Failed to send SMS confirmation:', responseText);
+      return false;
+    }
+
+    console.log('SMS confirmation sent successfully to:', formattedPhone);
+    return true;
+  } catch (error) {
+    console.error('Error sending SMS confirmation:', error);
+    return false;
   }
 } 

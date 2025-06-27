@@ -75,7 +75,18 @@ export default async function handler(req, res) {
       token:        form.token || null,
     };
     // Set monthly_dues based on membership
-    const duesMap = { 'Solo': 100, 'Duo': 125, 'Premier': 250, 'Reserve': 1000, 'Host': 1 };
+    const duesMap = { 
+      'Membership': 100, 
+      'Membership + Partner': 125, 
+      'Membership + Daytime': 350, 
+      'Membership + Partner + Daytime': 375,
+      // Keep legacy support for existing members
+      'Solo': 100, 
+      'Duo': 125, 
+      'Premier': 250, 
+      'Reserve': 1000, 
+      'Host': 1 
+    };
     member1.monthly_dues = duesMap[member1.membership] || 0;
 
     // Second member (if present)

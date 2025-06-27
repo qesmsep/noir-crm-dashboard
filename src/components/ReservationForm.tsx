@@ -136,9 +136,14 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const stripe = useStripe();
   const elements = useElements();
   const [exceptionalClosures, setExceptionalClosures] = useState<string[]>([]); // ISO date strings
-  const [exceptionalOpens, setExceptionalOpens] = useState<string[]>([]); // ISO date strings
-  const [privateEventDates, setPrivateEventDates] = useState<string[]>([]); // ISO date strings
+  const [exceptionalOpens, setExceptionalOpens] = useState<string[]>([]);
+  const [privateEventDates, setPrivateEventDates] = useState<string[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [alternativeTimes, setAlternativeTimes] = useState<{
+    before: string | null;
+    after: string | null;
+  } | null>(null);
+  const [showAlternativeTimesModal, setShowAlternativeTimesModal] = useState(false);
 
   useEffect(() => {
     if (!bookingStartDate) return;
@@ -183,8 +188,15 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, party_size: form.party_size })
       });
+
+      if (!res.ok) {
+        console.error('Error fetching available slots:', await res.text());
+        setAvailableTimes([]);
+        return;
+      }
+
       const { slots } = await res.json();
-      setAvailableTimes(slots);
+      setAvailableTimes(Array.isArray(slots) ? slots : []);
     }
     fetchAvailableTimes();
   }, [date, form.party_size, baseDays]);
@@ -371,7 +383,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     }
 
     // Build start time in CST
-    const start = createDateFromTimeString(time, date);
+    const start = createDateFromTimeString(time, 'America/Chicago', date);
     const durationMinutes = form.party_size <= 2 ? 90 : 120;
     const end = new Date(start.getTime() + durationMinutes * 60000);
 
@@ -450,6 +462,12 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
           console.log('API Response data:', data);
 
           if (!response.ok) {
+            // Check if this is a 409 status with alternative times
+            if (response.status === 409 && data.alternative_times) {
+              setAlternativeTimes(data.alternative_times);
+              setShowAlternativeTimesModal(true);
+              return;
+            }
             throw new Error(data.error || 'Failed to create reservation');
           }
           
@@ -526,6 +544,12 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         });
         const data = await response.json();
         if (!response.ok) {
+          // Check if this is a 409 status with alternative times
+          if (response.status === 409 && data.alternative_times) {
+            setAlternativeTimes(data.alternative_times);
+            setShowAlternativeTimesModal(true);
+            return;
+          }
           throw new Error(data.error || 'Failed to create reservation');
         }
         const confirmedReservation = data;
@@ -885,36 +909,33 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     <Box>
                       <Text fontWeight="bold" color="nightSky">Date & Time</Text>
                       <Text>
-                        {new Date(confirmationData?.start_time).toLocaleDateString(undefined, {
+                        {date.toLocaleDateString('en-US', {
                           weekday: 'long',
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric'
                         })}
                         {' at '}
-                        {new Date(confirmationData?.start_time).toLocaleTimeString([], { 
-                          hour: 'numeric', 
-                          minute: '2-digit' 
-                        })}
+                        {time}
                       </Text>
                     </Box>
                     
                     <Box>
                       <Text fontWeight="bold" color="nightSky">Party Size</Text>
-                      <Text>{confirmationData?.party_size} {confirmationData?.party_size === 1 ? 'person' : 'people'}</Text>
+                      <Text>{form.party_size} {form.party_size === 1 ? 'person' : 'people'}</Text>
                     </Box>
                     
-                    {confirmationData?.event_type && (
+                    {form.event_type && (
                       <Box>
                         <Text fontWeight="bold" color="nightSky">Occasion</Text>
-                        <Text>{confirmationData.event_type}</Text>
+                        <Text>{form.event_type}</Text>
                       </Box>
                     )}
                     
                     <Box>
                       <Text fontWeight="bold" color="nightSky">Contact Information</Text>
-                      <Text>Phone: {confirmationData?.phone}</Text>
-                      {confirmationData?.email && <Text>Email: {confirmationData.email}</Text>}
+                      <Text>Phone: {displayPhone}</Text>
+                      {form.email && <Text>Email: {form.email}</Text>}
                     </Box>
                   </VStack>
                 </Box>
@@ -935,6 +956,83 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                 w="full"
               >
                 Close
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        <Modal isOpen={showAlternativeTimesModal} onClose={() => setShowAlternativeTimesModal(false)}>
+          <ModalOverlay />
+          <ModalContent bg="white" borderRadius="xl" p={6}>
+            <ModalHeader textAlign="center" color="nightSky" fontSize="2xl" fontWeight="bold">
+              Time Not Available
+            </ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={6} align="stretch">
+                <Box textAlign="center" bg="gray.50" p={6} borderRadius="lg">
+                  <Text fontSize="lg" color="nightSky" mb={4}>
+                    Sorry, {time} is not available for your party size.
+                  </Text>
+                  <Text fontSize="md" color="gray.600">
+                    Here are the nearest available times:
+                  </Text>
+                </Box>
+                
+                <VStack spacing={4} align="stretch">
+                  {alternativeTimes?.before && (
+                    <Button
+                      onClick={() => {
+                        setTime(alternativeTimes.before!);
+                        setShowAlternativeTimesModal(false);
+                      }}
+                      colorScheme="black"
+                      bg="black"
+                      color="#A59480"
+                      _hover={{ bg: 'gray.800' }}
+                      size="lg"
+                      h="48px"
+                    >
+                      {alternativeTimes.before} (Earlier)
+                    </Button>
+                  )}
+                  
+                  {alternativeTimes?.after && (
+                    <Button
+                      onClick={() => {
+                        setTime(alternativeTimes.after!);
+                        setShowAlternativeTimesModal(false);
+                      }}
+                      colorScheme="black"
+                      bg="black"
+                      color="#A59480"
+                      _hover={{ bg: 'gray.800' }}
+                      size="lg"
+                      h="48px"
+                    >
+                      {alternativeTimes.after} (Later)
+                    </Button>
+                  )}
+                  
+                  {!alternativeTimes?.before && !alternativeTimes?.after && (
+                    <Text fontSize="md" color="gray.600" textAlign="center">
+                      No alternative times available for this date. Please try a different date.
+                    </Text>
+                  )}
+                </VStack>
+                
+                <Text fontSize="sm" color="gray.600" textAlign="center">
+                  Select one of the available times above to continue with your reservation.
+                </Text>
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button 
+                variant="outline"
+                onClick={() => setShowAlternativeTimesModal(false)}
+                w="full"
+              >
+                Cancel
               </Button>
             </ModalFooter>
           </ModalContent>

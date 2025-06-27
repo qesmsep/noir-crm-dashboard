@@ -7,15 +7,17 @@ import {
   VStack,
   HStack,
   SimpleGrid,
-  Image,
   Input,
   Button,
-  Divider
+  Divider,
+  useToast
 } from "@chakra-ui/react";
 import { PhoneIcon, EmailIcon, CalendarIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
+import Image from "next/image";
 import { supabase } from "../api/supabaseClient";
 import AdminLayout from '../../components/layouts/AdminLayout';
+import AddMemberModal from '../../components/members/AddMemberModal';
 
 interface Member {
   member_id: string;
@@ -35,7 +37,10 @@ export default function MembersAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lookupQuery, setLookupQuery] = useState("");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
+  const toast = useToast();
 
   useEffect(() => {
     fetchMembers();
@@ -46,6 +51,7 @@ export default function MembersAdmin() {
       const { data, error } = await supabase
         .from('members')
         .select('*')
+        .eq('deactivated', false)
         .order('join_date', { ascending: false });
       if (error) throw error;
       setMembers(data || []);
@@ -91,6 +97,50 @@ export default function MembersAdmin() {
     acc[member.account_id].push(member);
     return acc;
   }, {} as { [accountId: string]: Member[] });
+
+  const handleSaveMember = async (memberData: any) => {
+    setSaving(true);
+    try {
+      const response = await fetch('/api/members', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(memberData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create member');
+      }
+
+      const result = await response.json();
+      
+      // Refresh the members list
+      await fetchMembers();
+      
+      toast({
+        title: "Success",
+        description: "Member created successfully",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      
+      setIsAddModalOpen(false);
+    } catch (error: any) {
+      console.error('Error creating member:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create member",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -140,6 +190,9 @@ export default function MembersAdmin() {
               fontWeight="semibold"
               fontSize="md"
               transition="all 0.2s"
+              onClick={() => setIsAddModalOpen(true)}
+              isLoading={saving}
+              loadingText="Adding..."
             >
               Add Member
             </Button>
@@ -210,16 +263,23 @@ export default function MembersAdmin() {
                                     width: '100px',
                                     height: '100px',
                                     flexShrink: 0,
-                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                    border: '2px solid #F7FAFC'
+                                    boxShadow: '5px  5px 10px #353535',
+                                    border: '2px solid #F7FAFC',
+                                    position: 'relative'
                                   }}
                                 >
                                   <Image
                                     src={member.photo}
                                     alt={`${member.first_name} ${member.last_name}`}
-                                    boxSize="100px"
-                                  
-                                    objectFit="cover"
+                                    width={100}
+                                    height={100}
+                                    style={{
+                                      objectFit: 'cover',
+                                      borderRadius: '50%'
+                                    }}
+                                    loading="lazy"
+                                    placeholder="blur"
+                                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
                                   />
                                 </Box>
                               ) : (
@@ -280,6 +340,12 @@ export default function MembersAdmin() {
           )}
         </VStack>
       </Box>
+      
+      <AddMemberModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSave={handleSaveMember}
+      />
     </AdminLayout>
   );
 }

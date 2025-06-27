@@ -2,7 +2,13 @@ import { Box, Button, Container, Heading, Text, VStack, Collapse, useDisclosure 
 import ReservationForm from './ReservationForm';
 import '../styles/fonts.css';
 
-const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }) => {
+interface ReservationSectionProps {
+  baseDays: any;
+  bookingStartDate: any;
+  bookingEndDate: any;
+}
+
+const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: ReservationSectionProps) => {
   const { isOpen: isMemberOpen, onOpen: onMemberOpen, onClose: onMemberClose } = useDisclosure();
   const { isOpen: isNonMemberOpen, onOpen: onNonMemberOpen, onClose: onNonMemberClose } = useDisclosure();
 

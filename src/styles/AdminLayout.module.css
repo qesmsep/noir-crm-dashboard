@@ -84,24 +84,24 @@
 }
 
 .nav {
-  margin-top: 2rem;
+  margin-top: 25px;
 }
 
 .navItem {
   display: flex;
   width: 100%;
-  align-items: center;
-  padding: 0.75rem 1rem;
+  align-items: left;
+  padding: 10px;
   color: #ecede8;
   text-decoration: none;
   border-radius: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 4px;
   transition: background-color 0.2s;
   font-family: 'Montserrat', sans-serif;
-  font-size: 1.25rem;
+  font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.075em;
-  font-weight: 400;
+  font-weight: 600;
 }
 
 .navItem:hover {

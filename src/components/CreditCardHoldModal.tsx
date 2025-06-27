@@ -132,7 +132,7 @@ const CreditCardHoldDrawer: React.FC<CreditCardHoldModalProps> = ({
           redirect: 'if_required',
         });
         if (stripeError) {
-          setPayError(stripeError.message);
+          setPayError(stripeError.message || 'Payment failed');
           setPayProcessing(false);
           return;
         }

@@ -20,6 +20,8 @@
     "@supabase/auth-ui-shared": "*",
     "@supabase/supabase-js": "^2.49.4",
     "bootstrap": "^5.3.6",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.5.0",
     "framer-motion": "^7.6.16",
     "limiter": "^3.0.0",
     "micro": "^10.0.1",

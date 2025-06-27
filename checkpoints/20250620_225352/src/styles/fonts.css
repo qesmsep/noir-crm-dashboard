@@ -1,0 +1,13 @@
+@font-face {
+  font-family: 'IvyJournalThin';
+  src: url('/fonts/IvyJournal-Thin.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+h2 {
+  font-family: 'IvyJournalThin', Montserrat, sans-serif !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+} 

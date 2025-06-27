@@ -121,6 +121,9 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editMember, setEditMember] = useState({ ...member });
+
   useEffect(() => {
     if (member?.member_id) {
       fetchAttributes();
@@ -450,6 +453,26 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
     }
   };
 
+  const handleEditClick = () => {
+    setEditMember({ ...member });
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMember({ ...member });
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = () => {
+    onEditMember(editMember);
+    setIsEditing(false);
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditMember((prev) => ({ ...prev, [name]: value }));
+  };
+
   return (
     <Box p={6} maxW="1200px" mx="auto">
       <VStack spacing={6} align="stretch">
@@ -473,7 +496,7 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
         </Flex>
 
         {/* Member Info */}
-        <Box bg="white" p={6} borderRadius="12px" boxShadow="lg" border="3px solid #a59480">
+        <Box bg="white" p={6} borderRadius="12px" boxShadow="lg" border="3px solid #a59480" position="relative">
           <HStack spacing={6} align="flex-start">
             {member.photo ? (
               <Box
@@ -510,27 +533,135 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
               </Box>
             )}
             <VStack align="flex-start" spacing={1} flex={1}>
-              <Text
-                fontSize="2xl"
-                fontWeight="normal"
-                color="#A59480"
-                fontFamily="IvyJournalThin, serif"
-                textTransform="uppercase"
-                letterSpacing="0.05em"
-              >
-                {member.first_name} {member.last_name}
-              </Text>
-              <HStack spacing={2} color="gray.600">
-                <Text fontSize="sm">{member.email}</Text>
-              </HStack>
-              <HStack spacing={2} color="gray.600">
-                <Text fontSize="sm">{formatPhoneNumber(member.phone)}</Text>
-              </HStack>
-              <Text color="gray.600" fontSize="xs">
-                Member since {formatDateLong(member.join_date)}
-              </Text>
+              {isEditing ? (
+                <>
+                  <HStack spacing={2}>
+                    <Input
+                      name="first_name"
+                      value={editMember.first_name}
+                      onChange={handleEditChange}
+                      size="md"
+                      fontWeight="normal"
+                      color="#A59480"
+                      fontFamily="IvyJournalThin, serif"
+                      textTransform="uppercase"
+                      letterSpacing="0.05em"
+                      width="auto"
+                    />
+                    <Input
+                      name="last_name"
+                      value={editMember.last_name}
+                      onChange={handleEditChange}
+                      size="md"
+                      fontWeight="normal"
+                      color="#A59480"
+                      fontFamily="IvyJournalThin, serif"
+                      textTransform="uppercase"
+                      letterSpacing="0.05em"
+                      width="auto"
+                    />
+                  </HStack>
+                  <HStack spacing={2} color="gray.600">
+                    <Input
+                      name="email"
+                      value={editMember.email}
+                      onChange={handleEditChange}
+                      size="sm"
+                      fontSize="sm"
+                      width="auto"
+                    />
+                  </HStack>
+                  <HStack spacing={2} color="gray.600">
+                    <Input
+                      name="phone"
+                      value={editMember.phone}
+                      onChange={handleEditChange}
+                      size="sm"
+                      fontSize="sm"
+                      width="auto"
+                    />
+                  </HStack>
+                  <HStack spacing={2} color="gray.600">
+                    <Input
+                      name="join_date"
+                      type="date"
+                      value={editMember.join_date ? editMember.join_date.slice(0,10) : ''}
+                      onChange={handleEditChange}
+                      size="sm"
+                      fontSize="xs"
+                      width="auto"
+                    />
+                  </HStack>
+                </>
+              ) : (
+                <>
+                  <Text
+                    fontSize="2xl"
+                    fontWeight="normal"
+                    color="#A59480"
+                    fontFamily="IvyJournalThin, serif"
+                    textTransform="uppercase"
+                    letterSpacing="0.05em"
+                  >
+                    {member.first_name} {member.last_name}
+                  </Text>
+                  <HStack spacing={2} color="gray.600">
+                    <Text fontSize="sm">{member.email}</Text>
+                  </HStack>
+                  <HStack spacing={2} color="gray.600">
+                    <Text fontSize="sm">{formatPhoneNumber(member.phone)}</Text>
+                  </HStack>
+                  <Text color="gray.600" fontSize="xs">
+                    Member since {formatDateLong(member.join_date)}
+                  </Text>
+                </>
+              )}
             </VStack>
           </HStack>
+          {/* Edit/Save/Cancel Buttons */}
+          <Box position="absolute" bottom={4} right={4}>
+            {isEditing ? (
+              <HStack spacing={2}>
+                <Button
+                  mb={6}
+                  onClick={handleSaveEdit}
+                  bg="#A59480"
+                  color="white"
+                  borderRadius="12px"
+                  fontWeight="semibold"
+                  fontSize="md"
+                  _hover={{ bg: '#8B7B68' }}
+                >
+                  Save
+                </Button>
+                <Button
+                  mb={6}
+                  onClick={handleCancelEdit}
+                  bg="#A59480"
+                  color="white"
+                  borderRadius="12px"
+                  fontWeight="semibold"
+                  fontSize="md"
+                  _hover={{ bg: '#8B7B68' }}
+                >
+                  Cancel
+                </Button>
+              </HStack>
+            ) : (
+              <Button
+                mb={6}
+                onClick={handleEditClick}
+                bg="#A59480"
+                color="white"
+                borderRadius="12px"
+                fontWeight="semibold"
+                fontSize="md"
+                _hover={{ bg: '#8B7B68' }}
+              >
+                Edit
+              </Button>
+            )}
+          </Box>
         </Box>
 
         {/* Attributes */}

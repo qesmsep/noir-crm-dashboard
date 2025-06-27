@@ -203,9 +203,6 @@ export default function Home() {
           <Image src="/images/noir-wedding-day.png" alt="Noir Logo" width={120} height={80} className="object-contain" />
         </div>
         <div className="flex gap-6 items-center text-lg font-medium">
-          <a href="/" className="hover:underline">Home</a>
-          <a href="/members" className="hover:underline">Members</a>
-          <a href="/auth/admin" className="hover:underline">Admin</a>
           <a href="#reserve" className="ml-4 px-4 py-2 rounded" style={{ background: '#A59480', color: '#fff', fontWeight: 600, letterSpacing: '0.05em' }}>Reserve Now</a>
         </div>
       </nav>
@@ -312,79 +309,72 @@ export default function Home() {
           marginBottom: '2rem',
           textAlign: 'center',
         }}>THE MEMBERSHIP</h2>
-        <h3 style={{
-          fontFamily: 'Montserrat, sans-serif',
-          fontWeight: 700,
-          fontSize: '1.25rem',
-          letterSpacing: '0.04em',
-          color: '#23201C',
-          marginBottom: '1.2rem',
-          textAlign: 'center',
-        }}>INCLUDED WITH EVERY TIER</h3>
-        <ul className="mb-8 max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-left" style={{ color: '#23201C', fontSize: '1rem', lineHeight: 1.6, fontFamily: 'Montserrat, sans-serif', fontWeight: 400 }}>
-          <li>• No deposit for make reservations</li>
-          <li>• Curated events & member experiences</li>
-          <li>• Monthly beverage credit</li>
-          <li>• Concierge Reservations via Text</li>
-          <li>• House account for seamless billing</li>
-          <li>• Host Private Gatherings at Noir</li>
-        </ul>
-        <div className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* SOLO */}
-          <div className="bg-[#353535] rounded-2xl shadow-xl p-8 flex flex-col items-center border border-[#3A362F] min-h-[340px]">
-            <h4 className="font-serif text-xl text-[#ECEDE8] mb-2" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Solo</h4>
-            <div className="text-2xl text-[#BCA892] font-semibold mb-3">$100<span className="text-base font-normal">/mo</span></div>
-            <ul className="text-[#ECEDE8] text-sm mb-4 space-y-1 text-center">
-              <li>You + up to 10 guests per visit</li>
-              <li>$100/monthly beverage credit</li>
-              <li>Unused credit rolls over each month</li>
-              <li>Invitations to curated events</li>
-            </ul>
-            <div className="text-xs text-[#BCA892] italic mt-auto">Limited availability</div>
-          </div>
-          {/* DUO */}
-          <div className="bg-[#353535] rounded-2xl shadow-xl p-8 flex flex-col items-center border border-[#3A362F] min-h-[340px]">
-            <h4 className="font-serif text-xl text-[#ECEDE8] mb-2" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Duo</h4>
-            <div className="text-2xl text-[#BCA892] font-semibold mb-3">$125<span className="text-base font-normal">/mo</span></div>
-            <ul className="text-[#ECEDE8] text-sm mb-4 space-y-1 text-center">
-              <li>Everything in SOLO+</li>
-              <li>Partner account (can visit without you)</li>
-              <li>$125/monthly beverage credit</li>
-              <li>Shared beverage credit</li>
-              <li>Shared House Account</li>
-            </ul>
-            <div className="text-xs text-[#BCA892] italic mt-auto">Limited availability</div>
-          </div>
-          {/* PREMIER */}
+        <div className="w-full max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          {/* Main Membership Card */}
           <div className="bg-[#353535] rounded-2xl shadow-xl p-8 flex flex-col items-center border-4 border-[#BCA892] min-h-[340px]">
-            <h4 className="font-serif text-xl text-[#ECEDE8] mb-2" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Premier</h4>
-            <div className="text-2xl text-[#BCA892] font-semibold mb-3">$250<span className="text-base font-normal">/mo</span></div>
-            <ul className="text-[#ECEDE8] text-sm mb-4 space-y-1 text-center">
-              <li>Everything in SOLO+</li>
-              <li>$250/month beverage credit</li>
-              <li>Validated Parking</li>
-              <li>First access to Noir Private Events</li>
+            <h4 className="font-serif text-2xl text-[#ECEDE8] mb-2" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>MEMBERSHIP</h4>
+            <div className="text-3xl text-[#BCA892] font-semibold mb-3">$100<span className="text-lg font-normal">/mo</span></div>
+            <ul className="text-[#ECEDE8] text-base mb-4 space-y-1 text-left">
+              <li>• No deposit for reservations</li>
+              <li>• You + up to 10 guests per visit</li>
+              <li>• Unused credit rolls over each month</li>
+              <li>• Curated events & member experiences</li>
+              <li>• Monthly beverage credit</li>
+              <li>• Concierge Reservations via Text</li>
+              <li>• House account for seamless billing</li>
+              <li>• Host Private Gatherings at Noir</li>
             </ul>
             <div className="text-xs text-[#BCA892] italic mt-auto">Limited availability</div>
           </div>
-          {/* RESERVE */}
-          <div className="bg-[#353535] rounded-2xl shadow-xl p-8 flex flex-col items-center border border-[#3A362F] min-h-[340px]">
-            <h4 className="font-serif text-xl text-[#ECEDE8] mb-2" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Reserve</h4>
-            <div className="text-2xl text-[#BCA892] font-semibold mb-3">$1,000<span className="text-base font-normal">/mo</span></div>
-            <ul className="text-[#ECEDE8] text-sm mb-4 space-y-1 text-center">
-              <li>Must be Premier Member for 3+ Months</li>
-              <li>Everything in PREMIER+</li>
-              <li>$1,000/month beverage credit</li>
-              <li>Quarterly Happy Hour - Exclusive access to Noir for up to 50 guests.</li>
-              <li>Day-time Access Mon–Friday 10am–5pm</li>
-            </ul>
-            <div className="text-xs text-[#BCA892] italic mt-auto">Limited availability</div>
+          
+          {/* Add-ons Stacked Vertically */}
+          <div className="flex flex-col gap-6">
+            {/* Partner Add-on */}
+            <div className="bg-[#353535] rounded-2xl shadow-xl p-6 flex flex-col items-center border border-[#3A362F] min-h-[160px] relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-[#BCA892] text-[#23201C] px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                ADD-ON
+              </div>
+              <h4 className="font-serif text-xl text-[#ECEDE8] mb-2 mt-2" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>PARTNER</h4>
+              <div className="text-2xl text-[#BCA892] font-semibold mb-3">+$25<span className="text-base font-normal">/mo</span></div>
+              <ul className="text-[#ECEDE8] text-sm mb-4 space-y-1 text-center">
+                <li>Partner account (can visit without you)</li>
+                <li>Shared beverage credit</li>
+                <li>Shared House Account</li>
+                <li>Same guest privileges</li>
+              </ul>
+              <div className="text-xs text-[#BCA892] italic mt-auto">Add to existing membership</div>
+            </div>
+            
+            {/* Daytime Access Add-on */}
+            <div className="bg-[#353535] rounded-2xl shadow-xl p-6 flex flex-col items-center border border-[#3A362F] min-h-[160px] relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-[#BCA892] text-[#23201C] px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                ADD-ON
+              </div>
+              <h4 className="font-serif text-xl text-[#ECEDE8] mb-2 mt-2" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>DAYTIME ACCESS</h4>
+              <div className="text-2xl text-[#BCA892] font-semibold mb-3">+$500<span className="text-base font-normal">/mo</span></div>
+              <ul className="text-[#ECEDE8] text-sm mb-4 space-y-1 text-center">
+                <li>Day-time Access Mon–Friday 10am–5pm</li>
+                <li>Quiet workspace, meeting & entertainment environment</li>
+                <li>Priority booking for daytime hours</li>
+                <li>Based on approval</li>
+              </ul>
+              <div className="text-xs text-[#BCA892] italic mt-auto">Add to existing membership</div>
+            </div>
           </div>
         </div>
         <div className="w-full flex justify-center mt-10">
-          <a href="https://skylineandco.typeform.com/noir-waitlist" target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-4 rounded-full bg-[#BCA892] text-[#23201C] text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200" style={{ fontFamily: 'Montserrat, sans-serif', letterSpacing: '0.05em' }}>
-            Join the Waitlist
-          </a>
+          <button 
+            onClick={() => {
+              const message = "MEMBER";
+              const phoneNumber = "9137774488";
+              const url = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+              window.open(url, '_blank');
+            }}
+            className="inline-block px-8 py-4 rounded-full bg-[#BCA892] text-[#23201C] text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200" 
+            style={{ fontFamily: 'Montserrat, sans-serif', letterSpacing: '0.05em' }}
+          >
+            Text MEMBER to 913.777.4488 for more information
+          </button>
         </div>
       </section>
 
@@ -451,6 +441,28 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+        {/* Discreet Admin Access */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginTop: '1rem', 
+          paddingTop: '1rem', 
+          borderTop: '1px solid rgba(188, 168, 146, 0.2)',
+          fontSize: '0.75rem',
+          opacity: '0.6'
+        }}>
+          <a 
+            href="/auth/admin" 
+            style={{ 
+              color: '#BCA892', 
+              textDecoration: 'none',
+              fontFamily: 'Montserrat, sans-serif',
+              fontSize: '0.7rem',
+              letterSpacing: '0.05em'
+            }}
+          >
+            admin
+          </a>
         </div>
       </footer>
     </div>

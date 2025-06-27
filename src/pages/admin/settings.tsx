@@ -3,7 +3,9 @@ import AdminLayout from '@/components/layouts/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import styles from '@/styles/Settings.module.css';
 import CalendarAvailabilityControl from '@/components/CalendarAvailabilityControl';
-import { Box, Heading, VStack, useColorModeValue } from "@chakra-ui/react";
+import PrivateEventsManager from '@/components/PrivateEventsManager';
+import { Box, Heading, VStack, useColorModeValue, Text, Input, Button } from "@chakra-ui/react";
+import { useSettings } from '@/context/SettingsContext';
 
 interface Settings {
   business_name: string;
@@ -54,37 +56,15 @@ const defaultSettings: Settings = {
 };
 
 export default function Settings() {
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [loading, setLoading] = useState(true);
+  const { settings: contextSettings, refreshSettings } = useSettings();
+  const [settings, setSettings] = useState<Settings>(contextSettings);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  async function fetchSettings() {
-    try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        setSettings(data as Settings);
-      }
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-      setMessage({
-        type: 'error',
-        text: 'Failed to load settings. Using default values.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
+    setSettings(contextSettings);
+  }, [contextSettings]);
 
   async function handleSave() {
     setSaving(true);
@@ -97,6 +77,7 @@ export default function Settings() {
 
       if (error) throw error;
 
+      await refreshSettings();
       setMessage({
         type: 'success',
         text: 'Settings saved successfully.',
@@ -136,89 +117,123 @@ export default function Settings() {
 
   return (
     <AdminLayout>
-      <Box p={{ base: 4, md: 8 }}>
-        <Heading mb={8} fontSize="2xl" fontWeight="bold" color="gray.800">Settings</Heading>
-        <VStack spacing={8} align="stretch">
-          <Box bg={useColorModeValue('white', 'gray.800')} borderRadius="lg" boxShadow="md" p={6}>
-            <div className={styles.section}>
-              <div className={styles.formGroup}>
-                <label htmlFor="business_name">Business Name</label>
-                <input
-                  type="text"
-                  id="business_name"
-                  value={settings.business_name}
-                  onChange={(e) =>
-                    handleInputChange('business_name', '', e.target.value)
-                  }
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor="business_email">Business Email</label>
-                <input
-                  type="email"
-                  id="business_email"
-                  value={settings.business_email}
-                  onChange={(e) =>
-                    handleInputChange('business_email', '', e.target.value)
-                  }
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor="business_phone">Business Phone</label>
-                <input
-                  type="tel"
-                  id="business_phone"
-                  value={settings.business_phone}
-                  onChange={(e) =>
-                    handleInputChange('business_phone', '', e.target.value)
-                  }
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor="address">Address</label>
-                <textarea
-                  id="address"
-                  value={settings.address}
-                  onChange={(e) =>
-                    handleInputChange('address', '', e.target.value)
-                  }
-                />
-              </div>
-            </div>
+      <Box p={{ base: 4, md: 8 }} bg="weddingDay" minH="100vh">
+        <Heading mb={8} fontSize="2xl" fontWeight="bold" color="nightSky">Settings</Heading>
+        
+        {message && (
+          <Box
+            mb={6}
+            p={4}
+            borderRadius="lg"
+            bg={message.type === 'success' ? 'green.50' : 'red.50'}
+            color={message.type === 'success' ? 'green.700' : 'red.700'}
+            border="1px solid"
+            borderColor={message.type === 'success' ? 'green.200' : 'red.200'}
+          >
+            {message.text}
           </Box>
-          <Box bg={useColorModeValue('white', 'gray.800')} borderRadius="lg" boxShadow="md" p={6}>
-            <div className={styles.section}>
-              <div style={{ marginBottom: '2rem' }}>
-                <strong>Booking Window</strong>
-                <div style={{ marginTop: '1rem' }}>
-                  <CalendarAvailabilityControl section="booking_window" />
-                </div>
-              </div>
-              <div style={{ marginBottom: '2rem' }}>
-                <strong>Base Hours</strong>
-                <div style={{ marginTop: '1rem' }}>
-                  <CalendarAvailabilityControl section="base" />
-                </div>
-              </div>
-              <div style={{ marginBottom: '2rem' }}>
-                <strong>Custom Open Days</strong>
-                <div style={{ marginTop: '1rem' }}>
-                  <CalendarAvailabilityControl section="custom_open" />
-                </div>
-              </div>
-              <div style={{ marginBottom: '2rem' }}>
-                <strong>Custom Closed Days</strong>
-                <div style={{ marginTop: '1rem' }}>
-                  <CalendarAvailabilityControl section="custom_closed" />
-                </div>
-              </div>
-              <div style={{ marginBottom: '2rem' }}>
-                <strong>Private Events</strong>
-                <div style={{ marginTop: '1rem' }}>
-                  <CalendarAvailabilityControl section="private_events" />
-                </div>
-              </div>
-            </div>
+        )}
+
+        <VStack spacing={6} align="stretch">
+          {/* Save Button */}
+          <Box display="flex" justifyContent="flex-end">
+            <Button
+              onClick={handleSave}
+              isLoading={saving}
+              loadingText="Saving..."
+              colorScheme="blue"
+              size="lg"
+            >
+              Save Settings
+            </Button>
+          </Box>
+
+          {/* Booking Window Card */}
+          <Box 
+            bg="white" 
+            borderRadius="2xl" 
+            boxShadow="0 2px 8px rgba(0,0,0,0.07)" 
+            p={6}
+            border="1px solid"
+            borderColor="gray.100"
+          >
+            <Heading size="md" mb={4} color="nightSky" fontWeight="600">
+              Booking Window
+            </Heading>
+            <CalendarAvailabilityControl section="booking_window" />
+          </Box>
+
+          {/* Base Hours Card */}
+          <Box 
+            bg="white" 
+            borderRadius="2xl" 
+            boxShadow="0 2px 8px rgba(0,0,0,0.07)" 
+            p={6}
+            border="1px solid"
+            borderColor="gray.100"
+          >
+            <Heading size="md" mb={4} color="nightSky" fontWeight="600">
+              Base Hours
+            </Heading>
+            <CalendarAvailabilityControl section="base" />
+          </Box>
+
+          {/* Custom Open/Closed Days Card */}
+          <Box 
+            bg="white" 
+            borderRadius="2xl" 
+            boxShadow="0 2px 8px rgba(0,0,0,0.07)" 
+            p={6}
+            border="1px solid"
+            borderColor="gray.100"
+          >
+            <Heading size="md" mb={4} color="nightSky" fontWeight="600">
+              Custom Open/Closed Days
+            </Heading>
+            <VStack spacing={6} align="stretch">
+              <Box>
+                <Text fontWeight="500" mb={3} color="gray.700">Custom Open Days</Text>
+                <CalendarAvailabilityControl section="custom_open" />
+              </Box>
+              <Box>
+                <Text fontWeight="500" mb={3} color="gray.700">Custom Closed Days</Text>
+                <CalendarAvailabilityControl section="custom_closed" />
+              </Box>
+            </VStack>
+          </Box>
+
+          {/* Timezone Card */}
+          <Box 
+            bg="white"
+            borderRadius="2xl"
+            boxShadow="0 2px 8px rgba(0,0,0,0.07)"
+            p={6}
+            border="1px solid"
+            borderColor="gray.100"
+          >
+            <Heading size="md" mb={4} color="nightSky" fontWeight="600">
+              Timezone
+            </Heading>
+            <Input
+              value={settings.timezone}
+              onChange={(e) => handleInputChange('timezone', '', e.target.value)}
+              placeholder="e.g., America/Chicago"
+            />
+            <Text fontSize="sm" color="gray.500" mt={2}>
+              Enter IANA timezone, e.g., America/Chicago, America/New_York, Europe/London
+            </Text>
+          </Box>
+
+          {/* Private Events Card */}
+          <Box 
+            bg="white" 
+            borderRadius="2xl" 
+            boxShadow="0 2px 8px rgba(0,0,0,0.07)" 
+            p={6}
+            border="1px solid"
+            borderColor="gray.100"
+          >
+            <PrivateEventsManager />
           </Box>
         </VStack>
       </Box>

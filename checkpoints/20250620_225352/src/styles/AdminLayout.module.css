@@ -1,0 +1,248 @@
+@font-face {
+  font-family: 'Montserrat';
+  src: url('/fonts/Montserrat-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat Bold';
+  src: url('/fonts/Montserrat.Bold.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Montserrat Light';
+  src: url('/fonts/montserrat-light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+.memberCardText {
+  font-family: 'Montserrat Bold', sans-serif;
+}
+.container {
+  display: flex;
+  min-height: 100vh;
+  background-color: #353535;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 400;
+}
+
+.sidebar {
+  width: flex;
+  background-color: #aba8a1;
+  color: white;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  margin-top: 0rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
+  
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  cursor: pointer;
+}
+
+.logo a {
+  color: white;
+  text-decoration: none;
+}
+
+.main {
+  flex: 1;
+  padding: 0;
+  overflow-y: auto;
+  background: none;
+  box-shadow: none;
+  border: none;
+}
+
+.header {
+  display: flex;
+  background: #353535;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0rem;
+}
+.pageTitleContainer {
+  margin-top: 6rem;
+  padding: 0rem 1.5rem;
+  background-color: #353535;
+}
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.nav {
+  margin-top: 2rem;
+}
+
+.navItem {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  color: #ecede8;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  transition: background-color 0.2s;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  font-weight: 400;
+}
+
+.navItem:hover {
+  background-color: #333;
+}
+
+.navItem.active {
+  background-color: #353535;
+  color: white;
+}
+
+.navIcon {
+  margin-right: 1rem;
+  width: 32px;
+  height: 32px;
+  font-size: 2rem;
+  color: #a59480;
+}
+
+.userSection {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #333;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  color: #e0e0e0;
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 0.75rem;
+}
+
+.userName {
+  font-weight: 500;
+}
+
+.logoutButton {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.logoutButton:hover {
+  background-color: #b91c1c;
+}
+
+.menuButton {
+  display: none;
+  background: none;
+  border: none;
+  color: #1a1a1a;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.menuIcon {
+  font-size: 1.5rem;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ECEDE8;
+}
+
+.content {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.mobileMenu {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #1a1a1a;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.mobileNavItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: #a0a0a0;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.mobileNavItem:hover,
+.mobileNavItem.active {
+  background-color: #2a2a2a;
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    padding: 1rem;
+  }
+
+  .main {
+    padding: 1rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .menuButton {
+    display: block;
+  }
+
+  .mobileMenu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+} 

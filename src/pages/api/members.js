@@ -21,6 +21,11 @@ function cleanMemberObject(obj) {
 function getMonthlyDues(membership) {
   if (!membership) return 0;
   const map = {
+    'Membership': 100,
+    'Membership + Partner': 125,
+    'Membership + Daytime': 350,
+    'Membership + Partner + Daytime': 375,
+    // Keep legacy support for existing members
     'Solo': 100,
     'Duo': 125,
     'Premier': 250,
@@ -42,6 +47,64 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: error.message });
     }
   }
+  
+  if (req.method === 'PUT') {
+    try {
+      const { member_id, ...updateData } = req.body;
+      
+      if (!member_id) {
+        return res.status(400).json({ error: 'Missing required field: member_id' });
+      }
+
+      // Clean the update data to only include allowed fields
+      const cleanedData = cleanMemberObject(updateData);
+      
+      const { data, error } = await supabase
+        .from('members')
+        .update(cleanedData)
+        .eq('member_id', member_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating member:', error);
+        throw error;
+      }
+
+      return res.status(200).json({ success: true, data });
+    } catch (error) {
+      console.error('Error updating member:', error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      // Extract member_id from the URL path
+      const member_id = req.url.split('/').pop();
+      
+      if (!member_id) {
+        return res.status(400).json({ error: 'Missing required field: member_id' });
+      }
+
+      // Instead of deleting, set a deactivated flag
+      const { error } = await supabase
+        .from('members')
+        .update({ deactivated: true })
+        .eq('member_id', member_id);
+
+      if (error) {
+        console.error('Error deactivating member:', error);
+        throw error;
+      }
+
+      return res.status(200).json({ success: true, message: 'Member deactivated successfully' });
+    } catch (error) {
+      console.error('Error deactivating member:', error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -49,34 +112,33 @@ export default async function handler(req, res) {
   try {
     const { account_id, primary_member, secondary_member } = req.body;
 
-    const now = new Date().toISOString();
-    const primaryMemberClean = cleanMemberObject({
-      ...primary_member,
-      monthly_dues: primary_member.monthly_dues || getMonthlyDues(primary_member.membership),
-      created_at: now
-    });
-    const secondaryMemberClean = secondary_member ? cleanMemberObject({
-      ...secondary_member,
-      monthly_dues: secondary_member.monthly_dues || getMonthlyDues(secondary_member.membership),
-      created_at: now
-    }) : null;
+    if (!account_id || !primary_member) {
+      return res.status(400).json({ error: 'Missing required fields: account_id and primary_member' });
+    }
 
-    // Start a transaction
+    // The AddMemberModal already cleans and structures the data
+    // We just need to insert it into the database
     const { data: primaryMemberData, error: primaryError } = await supabase
       .from('members')
-      .insert([primaryMemberClean])
+      .insert([primary_member])
       .select()
       .single();
 
-    if (primaryError) throw primaryError;
+    if (primaryError) {
+      console.error('Error inserting primary member:', primaryError);
+      throw primaryError;
+    }
 
     // If there's a secondary member, add them too
-    if (secondaryMemberClean) {
+    if (secondary_member) {
       const { error: secondaryError } = await supabase
         .from('members')
-        .insert([secondaryMemberClean]);
+        .insert([secondary_member]);
 
-      if (secondaryError) throw secondaryError;
+      if (secondaryError) {
+        console.error('Error inserting secondary member:', secondaryError);
+        throw secondaryError;
+      }
     }
 
     return res.status(200).json({ success: true, data: primaryMemberData });
