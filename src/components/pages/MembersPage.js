@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../api/supabaseClient';
+import { getSupabaseClient } from '../../api/supabaseClient';
 import {
   Box,
   Button,
@@ -102,6 +102,7 @@ const MembersPage = ({
   const fetchMembers = async () => {
     try {
       setLoading(true);
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('members')
         .select('*')
@@ -127,6 +128,7 @@ const MembersPage = ({
   const handleCreateMember = async (e) => {
     e.preventDefault();
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('members')
         .insert([createForm])
@@ -166,6 +168,7 @@ const MembersPage = ({
   const handleDeleteMember = async (id) => {
     if (!window.confirm('Are you sure you want to delete this member? This cannot be undone.')) return;
     try {
+      const supabase = getSupabaseClient();
       const { error } = await supabase
         .from('members')
         .delete()
