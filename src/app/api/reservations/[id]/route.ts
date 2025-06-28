@@ -11,9 +11,9 @@ const supabase = createClient(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
   console.log('PATCH: Querying for reservation id:', reservationId);
   
@@ -71,9 +71,9 @@ export async function PATCH(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
   console.log('GET: Querying for reservation id:', reservationId);
   
@@ -116,10 +116,10 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
+  const { id } = context.params;
   try {
-    const { id } = params;
     const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
 
     const { error } = await supabase
