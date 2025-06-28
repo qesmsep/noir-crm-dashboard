@@ -49,6 +49,7 @@ import {
   SettingsIcon
 } from '@chakra-ui/icons';
 import { supabase } from '@/lib/supabase';
+import { useSettings } from '@/context/SettingsContext';
 
 interface PrivateEvent {
   id: string;
@@ -433,16 +434,18 @@ export default function PrivateEventsManager() {
     setEditingId('new');
   };
 
-  const formatDate = (dateTime: string) => {
-    return new Date(dateTime).toLocaleDateString('en-US', {
+  const formatDate = (dateTime: string, timezone?: string) => {
+    const date = timezone ? new Date(new Date(dateTime).toLocaleString('en-US', { timeZone: timezone })) : new Date(dateTime);
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
   };
 
-  const formatTime = (dateTime: string) => {
-    return new Date(dateTime).toLocaleTimeString('en-US', {
+  const formatTime = (dateTime: string, timezone?: string) => {
+    const date = timezone ? new Date(new Date(dateTime).toLocaleString('en-US', { timeZone: timezone })) : new Date(dateTime);
+    return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -453,6 +456,10 @@ export default function PrivateEventsManager() {
     const IconComponent = EVENT_TYPE_ICONS[eventType] || SettingsIcon;
     return <IconComponent />;
   };
+
+  // Get timezone from settings if available
+  const { settings } = useSettings ? useSettings() : { settings: { timezone: undefined } };
+  const timezone = settings?.timezone;
 
   if (loading) {
     return (
@@ -734,11 +741,7 @@ export default function PrivateEventsManager() {
                     <Td borderRight="1px solid" borderColor="gray.200" py={4} px={4}>
                       <HStack spacing={1} align="center">
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
-                          {new Date(event.start_time).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {formatDate(event.start_time, timezone)}
                         </Text>
                       </HStack>
                     </Td>
@@ -747,7 +750,11 @@ export default function PrivateEventsManager() {
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
                           {event.full_day
                             ? 'Full Day'
-                            : `${formatTime(event.start_time)} - ${formatTime(event.end_time)}`}
+                            : (
+                              formatDate(event.start_time, timezone) === formatDate(event.end_time, timezone)
+                                ? `${formatTime(event.start_time, timezone)} - ${formatTime(event.end_time, timezone)}`
+                                : `${formatDate(event.start_time, timezone)} ${formatTime(event.start_time, timezone)} - ${formatDate(event.end_time, timezone)} ${formatTime(event.end_time, timezone)}`
+                            )}
                         </Text>
                       </HStack>
                     </Td>

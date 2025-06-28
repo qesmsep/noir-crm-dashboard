@@ -524,61 +524,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   return (
     <Box
-      position="relative"
-      sx={{
-        '.fc-resource-area': {
-          backgroundColor: '#ecede8',
-          color: 'white',
-          verticalAlign: 'middle',
-          justifyContent: 'center',
-          fontFamily: 'Montserrat, sans-serif',
-          minWidth: '90px',
-          width: '10%',
-        },
-        '.fc-resource-area .fc-resource-title': {
-          color: 'white',
-          verticalAlign: 'middle',
-          justifyContent: 'center',
-          fontFamily: 'Montserrat, sans-serif',
-        },
-        '.fc-timeline .fc-timeline-body td': {
-          backgroundColor: '#ecede8',
-          verticalAlign: 'middle',
-          justifyContent: 'center',
-          paddingtop: '10px',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-        },
-        '.fc-timeline': {
-          maxWidth: 'fit-content',
-        },
-        '.fc-timeline-header': {
-          maxWidth: 'fit-content',
-        },
-        '.fc-timeline-body': {
-          maxWidth: 'fit-content',
-        },
-        '.fc-header-toolbar .fc-prev-button': {
-          marginRight: '0.5rem',
-        },
-        'a.fc-event': {
-          border: '0 !important',
-          outline: '0 !important',
-          padding: '0px !important',
-          borderRadius: '5px !important',
-          boxShadow: '5px 5px 15px .5px !important',
-          backgroundColor: 'transparent !important',
-          marginTop: '10px',
-        },
-        '.fc .fc-button-primary': {
-          backgroundColor: '#353535',
-          borderColor: '#353535',
-          '&:hover': {
-            backgroundColor: '#4f4f4f',
-          },
-        },
+      style={{
+        // Mobile-specific container styles
+        touchAction: 'manipulation',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
       }}
     >
-      {/* Day Reservations Button */}
       <Box mb={4} display="flex" justifyContent="flex-end">
         <Button
           onClick={() => {
@@ -598,78 +550,213 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         </Button>
       </Box>
 
-      <FullCalendar
-        ref={calendarRef}
-        plugins={[resourceTimelinePlugin, interactionPlugin]}
-        initialView="resourceTimelineDay"
-        initialDate={new Date()}
-        timeZone={settings.timezone}
-        schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
-        headerToolbar={{
-          left: 'prev,next',
-          center: 'title',
-          right: 'today',
+      {/* Debug Panel for Touch Testing */}
+      {process.env.NODE_ENV === 'development' && (
+        <Box 
+          mb={4} 
+          p={3} 
+          bg="blue.50" 
+          borderRadius="md" 
+          border="1px solid" 
+          borderColor="blue.200"
+          fontSize="sm"
+        >
+          <Text fontWeight="bold" mb={2}>Touch Debug Info:</Text>
+          <Text>Touch Device: {isTouchDeviceState ? '✅ Yes' : '❌ No'}</Text>
+          <Text>Mobile: {isMobile ? '✅ Yes' : '❌ No'}</Text>
+          <Text>View Only: {viewOnly ? '✅ Yes' : '❌ No'}</Text>
+          <Text>Editable: {!viewOnly ? '✅ Yes' : '❌ No'}</Text>
+          <Text>Droppable: {!viewOnly ? '✅ Yes' : '❌ No'}</Text>
+        </Box>
+      )}
+
+      <Box
+        style={{
+          // FullCalendar container optimizations
+          touchAction: 'manipulation',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          // Mobile-specific adjustments
+          ...(isMobile && {
+            fontSize: '14px',
+            lineHeight: '1.4',
+          }),
         }}
-        titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
-        resources={resources}
-        events={events}
-        editable={true}
-        droppable={true}
-        selectable={!viewOnly}
-        eventDrop={handleEventDrop}
-        eventResize={handleEventResize}
-        eventClick={handleEventClick}
-        dateClick={handleDayClick}
-        height="auto"
-        
-        // Touch and mobile optimizations
-        longPressDelay={isTouchDeviceState ? 300 : 1000}
-        eventLongPressDelay={isTouchDeviceState ? 300 : 1000}
-        selectLongPressDelay={isTouchDeviceState ? 300 : 1000}
-        
-        // Improved touch interaction settings
-        eventDragMinDistance={isTouchDeviceState ? 5 : 3}
-        eventDragStart={handleEventDragStart}
-        eventDragStop={handleEventDragStop}
-        
-        // Mobile-specific configurations
-        dayMaxEvents={isMobile ? 3 : false}
-        moreLinkClick="popover"
-        
-        slotMinTime={slotMinTime}
-        slotMaxTime={slotMaxTime}
-        slotDuration="00:30:00"
-        slotLabelInterval="00:30:00"
-        slotLabelFormat={[{ hour: 'numeric', minute: '2-digit', hour12: true }]}
-        nowIndicator
-        resourceAreaWidth={isMobile ? '15%' : '6%'}
-        resourceAreaHeaderContent={''}
-        eventContent={(arg) => (
-          <div
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              whiteSpace: 'normal',
-              margin: '0px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: isMobile ? '28px' : '24px',
-              fontSize: isMobile ? '12px' : '14px',
-              background: '#a59480',
-              color: 'white',
-              borderRadius: '4px',
-              padding: isMobile ? '0 4px' : '0 2px',
-              border: '1px solid #353535',
-              cursor: isTouchDeviceState ? 'grab' : 'pointer',
-              userSelect: 'none',
+        sx={{
+          // FullCalendar mobile optimizations
+          '.fc': {
+            touchAction: 'manipulation',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+          },
+          '.fc-resource-area': {
+            backgroundColor: '#ecede8',
+            color: 'white',
+            verticalAlign: 'middle',
+            justifyContent: 'center',
+            fontFamily: 'Montserrat, sans-serif',
+            minWidth: isMobile ? '120px' : '90px',
+            width: isMobile ? '15%' : '10%',
+          },
+          '.fc-resource-area .fc-resource-title': {
+            color: 'white',
+            verticalAlign: 'middle',
+            justifyContent: 'center',
+            fontFamily: 'Montserrat, sans-serif',
+            fontSize: isMobile ? '12px' : '14px',
+          },
+          '.fc-timeline .fc-timeline-body td': {
+            backgroundColor: '#ecede8',
+            verticalAlign: 'middle',
+            justifyContent: 'center',
+            paddingTop: '10px',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          },
+          '.fc-timeline': {
+            maxWidth: 'fit-content',
+          },
+          '.fc-timeline-header': {
+            maxWidth: 'fit-content',
+          },
+          '.fc-timeline-body': {
+            maxWidth: 'fit-content',
+          },
+          '.fc-header-toolbar .fc-prev-button': {
+            marginRight: '0.5rem',
+          },
+          'a.fc-event': {
+            border: '0 !important',
+            outline: '0 !important',
+            padding: '0px !important',
+            borderRadius: '5px !important',
+            boxShadow: '5px 5px 15px .5px !important',
+            backgroundColor: 'transparent !important',
+            marginTop: '10px',
+            // Touch optimizations
+            touchAction: 'manipulation',
+            WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            cursor: isTouchDeviceState ? 'grab' : 'pointer',
+            userSelect: 'none',
+            // Mobile-specific adjustments
+            ...(isMobile && {
+              minHeight: '28px',
+              fontSize: '12px',
+            }),
+          },
+          '.fc .fc-button-primary': {
+            backgroundColor: '#353535',
+            borderColor: '#353535',
+            '&:hover': {
+              backgroundColor: '#4f4f4f',
+            },
+            // Mobile button optimizations
+            ...(isMobile && {
+              padding: '8px 12px',
+              fontSize: '14px',
+            }),
+          },
+          // Touch-specific styles
+          ...(isTouchDeviceState && {
+            '.fc-event': {
+              transition: 'all 0.2s ease',
+              '&:active': {
+                transform: 'scale(0.95)',
+                opacity: 0.8,
+              },
+            },
+            '.fc-event-main': {
               touchAction: 'manipulation',
-            }}
-          >
-            {arg.event.title}
-          </div>
-        )}
-        datesSet={handleDatesSet}
-      />
+            },
+          }),
+        }}
+      >
+        <FullCalendar
+          ref={calendarRef}
+          plugins={[resourceTimelinePlugin, interactionPlugin]}
+          initialView="resourceTimelineDay"
+          initialDate={new Date()}
+          timeZone={settings.timezone}
+          schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
+          headerToolbar={{
+            left: 'prev,next',
+            center: 'title',
+            right: 'today',
+          }}
+          titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
+          resources={resources}
+          events={events}
+          editable={true}
+          droppable={true}
+          selectable={!viewOnly}
+          eventDrop={handleEventDrop}
+          eventResize={handleEventResize}
+          eventClick={handleEventClick}
+          dateClick={handleDayClick}
+          height="auto"
+          
+          // Touch and mobile optimizations
+          longPressDelay={isTouchDeviceState ? 300 : 1000}
+          eventLongPressDelay={isTouchDeviceState ? 300 : 1000}
+          selectLongPressDelay={isTouchDeviceState ? 300 : 1000}
+          
+          // Improved touch interaction settings
+          eventDragMinDistance={isTouchDeviceState ? 5 : 3}
+          eventDragStart={handleEventDragStart}
+          eventDragStop={handleEventDragStop}
+          
+          // Mobile-specific configurations
+          dayMaxEvents={isMobile ? 3 : false}
+          moreLinkClick="popover"
+          
+          slotMinTime={slotMinTime}
+          slotMaxTime={slotMaxTime}
+          slotDuration="00:30:00"
+          slotLabelInterval="00:30:00"
+          slotLabelFormat={[{ hour: 'numeric', minute: '2-digit', hour12: true }]}
+          nowIndicator
+          resourceAreaWidth={isMobile ? '15%' : '6%'}
+          resourceAreaHeaderContent={''}
+          eventContent={(arg) => (
+            <div
+              style={{
+                fontFamily: 'Montserrat, sans-serif',
+                whiteSpace: 'normal',
+                margin: '0px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: isMobile ? '28px' : '24px',
+                fontSize: isMobile ? '12px' : '14px',
+                background: '#a59480',
+                color: 'white',
+                borderRadius: '4px',
+                padding: isMobile ? '0 4px' : '0 2px',
+                border: '1px solid #353535',
+                cursor: isTouchDeviceState ? 'grab' : 'pointer',
+                userSelect: 'none',
+                touchAction: 'manipulation',
+                // Additional touch optimizations
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                // Hover effects for touch devices
+                ...(isTouchDeviceState && {
+                  transition: 'all 0.2s ease',
+                  '&:active': {
+                    transform: 'scale(0.95)',
+                    opacity: 0.8,
+                  },
+                }),
+              }}
+            >
+              {arg.event.title}
+            </div>
+          )}
+          datesSet={handleDatesSet}
+        />
+      </Box>
       
       <Box width="60%" ml={100} p={0} borderWidth="1px" borderRadius="lg">
         <Grid templateColumns="repeat(7, 1fr)" gap={0}>
