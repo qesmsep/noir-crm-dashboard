@@ -2,8 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
-import { Box, VStack, Text, Button, Input, Select, HStack, IconButton, Center, useToast, AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay, Drawer, DrawerOverlay, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter, DrawerCloseButton, FormControl, FormLabel, Heading } from '@chakra-ui/react';
-import { useDisclosure, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalCloseButton } from '@chakra-ui/react';
+import { useDisclosure, Box, VStack, Text, Button, Input, Select, HStack, IconButton, Center, useToast, AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay, Drawer, DrawerOverlay, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter, DrawerCloseButton, FormControl, FormLabel, Heading } from '@chakra-ui/react';
 import { AddIcon, MinusIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
