@@ -70,8 +70,26 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('Error fetching settings:', error);
-        // Use default settings if fetch fails
-        setSettings(defaultSettings);
+        
+        // If no settings record exists, create one with defaults
+        if (error.code === 'PGRST116') {
+          console.log('No settings record found, creating default...');
+          const { data: newSettings, error: insertError } = await supabase
+            .from('settings')
+            .insert([defaultSettings])
+            .select()
+            .single();
+          
+          if (insertError) {
+            console.error('Error creating default settings:', insertError);
+            setSettings(defaultSettings);
+          } else {
+            setSettings(newSettings as Settings);
+          }
+        } else {
+          // Use default settings if fetch fails for other reasons
+          setSettings(defaultSettings);
+        }
       } else if (data) {
         setSettings(data as Settings);
       }

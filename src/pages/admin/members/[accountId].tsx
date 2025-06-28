@@ -4,7 +4,7 @@ import { Box, Spinner, Text, Button, SimpleGrid, VStack, Heading, HStack, Input,
 import { getSupabaseClient } from "../../api/supabaseClient";
 import MemberDetail from "../../../components/MemberDetail";
 // @ts-ignore
-const MemberLedger = require("../../../components/pages/MemberLedger");
+const MemberLedger = require("../../../components/pages/MemberLedger").default;
 import AddMemberModal from '../../../components/members/AddMemberModal';
 import SendMessageForm from '../../../components/messages/SendMessageForm';
 import AdminLayout from '../../../components/layouts/AdminLayout';
