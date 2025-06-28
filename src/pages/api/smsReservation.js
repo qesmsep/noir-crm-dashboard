@@ -1,5 +1,4 @@
 const { createClient } = require('@supabase/supabase-js');
-const { sendCustomEmail } = require('./sendCustomEmail');
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -58,6 +57,22 @@ function parseNaturalDate(dateStr) {
     } else {
       result.setDate(result.getDate() + daysToAdd);
     }
+    return result;
+  }
+  
+  // Handle single day names (e.g., 'Sunday')
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const dayNameMatch = dateStr.toLowerCase().match(/^(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)$/i);
+  if (dayNameMatch) {
+    let targetDay = dayNames.findIndex(
+      d => d.startsWith(dayNameMatch[1].toLowerCase())
+    );
+    if (targetDay === -1) return null;
+    const result = new Date(today);
+    const currentDay = today.getDay();
+    let daysToAdd = (targetDay - currentDay + 7) % 7;
+    if (daysToAdd === 0) daysToAdd = 7; // always return next occurrence, not today
+    result.setDate(result.getDate() + daysToAdd);
     return result;
   }
   
@@ -152,11 +167,13 @@ function parseReservationMessage(message) {
   }
 
   // Flexible date and time extraction
-  // Try to find a date (MM/DD/YY, Month Day, this/next Friday, etc.)
+  // Try to find a date (MM/DD/YY, Month Day, this/next Friday, day names, etc.)
   let dateStr = '';
   let dateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
                   msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i) ||
-                  msg.match(/(this|next)\s+\w+/i);
+                  msg.match(/(this|next)\s+\w+/i) ||
+                  msg.match(/(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)/i) ||
+                  msg.match(/(tomorrow|today)/i);
   if (dateMatch) {
     dateStr = dateMatch[0];
   }
@@ -172,7 +189,9 @@ function parseReservationMessage(message) {
 
   // If date or time is missing, try to find them anywhere in the message
   if (!dateStr) {
-    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/) ||
+                   msg.match(/(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)/i) ||
+                   msg.match(/(tomorrow|today)/i);
     if (anyDate) dateStr = anyDate[0];
   }
   if (!timeStr) {
@@ -433,19 +452,65 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       return { available: false, message: 'Reservations are not available for this date' };
     }
 
-    // 2. Check for Private Events (private_events table)
+    // 2. Check for Private Events (private_events table) - Enhanced for specific messages
     const { data: privateEvents } = await supabase
       .from('private_events')
-      .select('start_time, end_time')
+      .select('start_time, end_time, full_day')
       .gte('start_time', `${dateStr}T00:00:00`)
       .lte('end_time', `${dateStr}T23:59:59`);
     
     if (privateEvents && privateEvents.length > 0) {
       console.log('Private event found for date:', dateStr);
-      return { available: false, message: 'This date is blocked for a private event' };
+      
+      // Check if it's a full day private event
+      const fullDayEvent = privateEvents.find(event => event.full_day);
+      if (fullDayEvent) {
+        // Scenario 3b: Full day private event
+        const eventDate = new Date(fullDayEvent.start_time);
+        const formattedDate = eventDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        return { 
+          available: false, 
+          message: `Thank you for your reservation request. Noir will be closed on ${formattedDate} for a private event.`
+        };
+      } else {
+        // Scenario 3a: Partial day private event - check if requested time conflicts
+        const requestedTime = date.getTime();
+        const conflictingEvent = privateEvents.find(event => {
+          const eventStart = new Date(event.start_time).getTime();
+          const eventEnd = new Date(event.end_time).getTime();
+          return requestedTime >= eventStart && requestedTime <= eventEnd;
+        });
+        
+        if (conflictingEvent) {
+          const eventStart = new Date(conflictingEvent.start_time);
+          const eventEnd = new Date(conflictingEvent.end_time);
+          
+          const startTimeStr = eventStart.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+          
+          const endTimeStr = eventEnd.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+          
+          return { 
+            available: false, 
+            message: `Thank you for your reservation request. Noir will be closed from ${startTimeStr} to ${endTimeStr} for a private event. If you'd like, please resubmit your reservation request for a time outside of this window. Thank you!`
+          };
+        }
+      }
     }
 
-    // 3. Check for Exceptional Closures (venue_hours table)
+    // 3. Check for Exceptional Closures (venue_hours table) - Scenario 1
     const { data: exceptionalClosure } = await supabase
       .from('venue_hours')
       .select('*')
@@ -455,6 +520,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     
     if (exceptionalClosure && (exceptionalClosure.full_day || !exceptionalClosure.time_ranges)) {
       console.log('Exceptional closure found for date:', dateStr);
+      // Use the custom SMS notification from venue_hours table
       const customMessage = exceptionalClosure.sms_notification || 'The venue is closed on this date';
       return { available: false, message: customMessage };
     }
@@ -471,7 +537,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       return { available: false, message: 'The venue is not open on this day of the week' };
     }
 
-    // 5. Check if the requested time falls within venue hours
+    // 5. Check if the requested time falls within venue hours - Scenario 2
     const requestedHour = date.getHours();
     const requestedMinute = date.getMinutes();
     const requestedTime = `${requestedHour.toString().padStart(2, '0')}:${requestedMinute.toString().padStart(2, '0')}`;
@@ -500,7 +566,37 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     
     if (!isWithinHours) {
       console.log('Requested time outside venue hours:', { requestedTime, timeRanges });
-      return { available: false, message: 'The requested time is outside venue hours' };
+      
+      // Scenario 2: Outside base hours - provide specific message with base hours
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayName = dayNames[dayOfWeek];
+      
+      // Format the time ranges for display
+      const formattedRanges = timeRanges.map(range => {
+        const startTime = new Date(`2000-01-01T${range.start}:00`);
+        const endTime = new Date(`2000-01-01T${range.end}:00`);
+        
+        const startStr = startTime.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        
+        const endStr = endTime.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        
+        return `${startStr} to ${endStr}`;
+      });
+      
+      const hoursText = formattedRanges.join(' and ');
+      
+      return { 
+        available: false, 
+        message: `Thank you for your reservation request. Noir is currently available for reservations on ${dayName}s (${hoursText}). Please resubmit your reservation within these windows. Thank you!`
+      };
     }
 
     // 6. Check Table Availability (tables and reservations tables)
@@ -579,7 +675,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
   }
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   console.log('SMS reservation handler received request:', {
     method: req.method,
     body: req.body
@@ -711,7 +807,7 @@ module.exports = async (req, res) => {
 
   console.log('Reservation created:', reservation);
 
-  // Send confirmation email
+  // Send confirmation SMS
   const startTime = new Date(reservation.start_time);
   const formattedDate = startTime.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -722,43 +818,26 @@ module.exports = async (req, res) => {
     minute: '2-digit'
   });
 
-  const emailContent = `
-    <h2>Reservation Confirmation</h2>
-    <p>Dear ${member.first_name} ${member.last_name},</p>
-    <p>Your reservation has been confirmed for:</p>
-    <p><strong>Date:</strong> ${formattedDate}</p>
-    <p><strong>Party Size:</strong> ${reservation.party_size} guests</p>
-    <p>We look forward to seeing you!</p>
-  `;
-
   try {
-    await sendCustomEmail({
-      to: member.email,
-      subject: 'Reservation Confirmation',
-      text: emailContent
+    await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`
+      },
+      body: JSON.stringify({
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        to: phone,
+        text: `Hi ${member.first_name}, your reservation at Noir has been confirmed for ${party_size} guests on ${formattedDate}`
+      })
     });
-    console.log('Confirmation email sent to:', member.email);
-  } catch (emailError) {
-    console.error('Error sending confirmation email:', emailError);
+  } catch (err) {
+    console.error('Failed to send confirmation SMS:', err);
   }
-
-  // Send confirmation SMS
-  const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`
-    },
-    body: JSON.stringify({
-      from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-      to: phone,
-      text: `Hi ${member.first_name}, your reservation at Noir has been confirmed for ${party_size} guests on ${new Date(start_time).toLocaleDateString()} at ${new Date(start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-    })
-  });
 
   return res.status(201).json({
     success: true,
     reservation,
-    message: `Reservation confirmed for ${member.first_name} on ${new Date(start_time).toLocaleDateString()} at ${new Date(start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} for ${party_size} guests${reservation.tables?.number ? ` at Table ${reservation.tables.number}` : ''}.`
+    message: `Reservation confirmed for ${member.first_name} on ${formattedDate} for ${party_size} guests${reservation.tables?.number ? ` at Table ${reservation.tables.number}` : ''}.`
   });
-}; 
+} 
