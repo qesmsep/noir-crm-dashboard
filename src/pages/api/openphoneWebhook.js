@@ -480,7 +480,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       return { available: false, message: 'Reservations are not available for this date' };
     }
 
-    // 2. Check for Private Events (private_events table) - Enhanced for specific messages
+    // 2. Check for Private Events (private_events table)
     const { data: privateEvents, error: privateEventsError } = await supabase
       .from('private_events')
       .select('start_time, end_time, full_day, title')
@@ -494,69 +494,52 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     
     console.log('Private events found for date:', dateStr, privateEvents);
     
+    // 2. Private events
     if (privateEvents && privateEvents.length > 0) {
       console.log('Private event found for date:', dateStr);
       
-      // Check if it's a full day private event
-      const fullDayEvent = privateEvents.find(event => event.full_day === true);
-      if (fullDayEvent) {
-        console.log('Full day private event detected:', fullDayEvent);
-        // Scenario 3b: Full day private event
-        const eventDate = new Date(fullDayEvent.start_time);
-        const formattedDate = eventDate.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-        return { 
-          available: false, 
-          message: `Thank you for your reservation request. Noir will be closed on ${formattedDate} for a private event.`
+      // 3b. Full-day closure
+      const fullDay = privateEvents.find(ev => ev.full_day);
+      if (fullDay) {
+        console.log('Full day private event detected:', fullDay);
+        const date = new Date(fullDay.start_time)
+          .toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+        return {
+          available: false,
+          message: `Thank you for your reservation request. Noir will be closed on ${date} for a private event.`
         };
-      } else {
-        console.log('Partial day private event(s) detected:', privateEvents);
-        // Scenario 3a: Partial day private event - check if requested time conflicts
-        const requestedTime = date.getTime();
-        const conflictingEvent = privateEvents.find(event => {
-          const eventStart = new Date(event.start_time).getTime();
-          const eventEnd = new Date(event.end_time).getTime();
-          const conflicts = requestedTime >= eventStart && requestedTime <= eventEnd;
-          console.log('Checking conflict:', {
-            eventTitle: event.title,
-            eventStart: new Date(eventStart).toISOString(),
-            eventEnd: new Date(eventEnd).toISOString(),
-            requestedTime: new Date(requestedTime).toISOString(),
-            conflicts
-          });
-          return conflicts;
+      }
+
+      // 3a. Partial-day conflict
+      const conflict = privateEvents.find(ev => {
+        const evStart = new Date(ev.start_time);
+        const evEnd = new Date(ev.end_time);
+        const conflicts = new Date(startTime) < evEnd && new Date(endTime) > evStart;
+        console.log('Checking conflict:', {
+          eventTitle: ev.title,
+          eventStart: evStart.toISOString(),
+          eventEnd: evEnd.toISOString(),
+          requestedStart: new Date(startTime).toISOString(),
+          requestedEnd: new Date(endTime).toISOString(),
+          conflicts
         });
-        
-        if (conflictingEvent) {
-          console.log('Conflicting private event found:', conflictingEvent);
-          const eventStart = new Date(conflictingEvent.start_time);
-          const eventEnd = new Date(conflictingEvent.end_time);
-          
-          const startTimeStr = eventStart.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          });
-          
-          const endTimeStr = eventEnd.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          });
-          
-          return { 
-            available: false, 
-            message: `Thank you for your reservation request. Noir will be closed from ${startTimeStr} to ${endTimeStr} for a private event. If you'd like, please resubmit your reservation request for a time outside of this window. Thank you!`
-          };
-        }
+        return conflicts;
+      });
+      
+      if (conflict) {
+        console.log('Conflicting private event found:', conflict);
+        const from = new Date(conflict.start_time)
+          .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        const to = new Date(conflict.end_time)
+          .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        return {
+          available: false,
+          message: `Thank you for your reservation request. Noir will be closed from ${from} to ${to} for a private event. If you'd like, please resubmit your reservation request for a time outside of this window. Thank you!`
+        };
       }
     }
 
-    // 3. Check for Exceptional Closures (venue_hours table) - Scenario 1
+    // 3. Check for Exceptional Closures (venue_hours table)
     const { data: exceptionalClosure } = await supabase
       .from('venue_hours')
       .select('*')
@@ -564,6 +547,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       .eq('date', dateStr)
       .maybeSingle();
     
+    // 1. Custom closures
     if (exceptionalClosure) {
       console.log('Exceptional closure found for date:', dateStr);
       
@@ -605,7 +589,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       return { available: false, message: 'The venue is not open on this day of the week' };
     }
 
-    // 5. Check if the requested time falls within venue hours - Scenario 2
+    // 5. Check if the requested time falls within venue hours
     const requestedHour = date.getHours();
     const requestedMinute = date.getMinutes();
     const requestedTime = `${requestedHour.toString().padStart(2, '0')}:${requestedMinute.toString().padStart(2, '0')}`;
@@ -635,7 +619,8 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     if (!isWithinHours) {
       console.log('Requested time outside venue hours:', { requestedTime, timeRanges });
       
-      // Scenario 2: Outside base hours - provide specific message with base hours
+      // 3. Outside base hours
+      // Build base hours descriptor
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayName = dayNames[dayOfWeek];
       
@@ -659,11 +644,11 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
         return `${startStr} to ${endStr}`;
       });
       
-      const hoursText = formattedRanges.join(' and ');
+      const baseHoursDescriptor = `${dayName}s (${formattedRanges.join(' and ')})`;
       
-      return { 
-        available: false, 
-        message: `Thank you for your reservation request. Noir is currently available for reservations on ${dayName}s (${hoursText}). Please resubmit your reservation within these windows. Thank you!`
+      return {
+        available: false,
+        message: `Thank you for your reservation request. Noir is currently available for reservations on ${baseHoursDescriptor}. Please resubmit your reservation within these windows. Thank you!`
       };
     }
 
