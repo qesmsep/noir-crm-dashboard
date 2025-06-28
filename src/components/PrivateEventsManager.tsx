@@ -67,6 +67,7 @@ interface PrivateEvent {
   status: 'active' | 'cancelled' | 'completed';
   created_at: string;
   created_by: string | null;
+  full_day: boolean;
 }
 
 const EVENT_TYPES = [
@@ -99,7 +100,6 @@ export default function PrivateEventsManager() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  
   const toast = useToast();
 
   const [formData, setFormData] = useState({
@@ -112,8 +112,29 @@ export default function PrivateEventsManager() {
     event_description: '',
     rsvp_enabled: false,
     require_time_selection: false,
-    total_attendees_maximum: 500
+    total_attendees_maximum: 500,
+    full_day: true
   });
+
+  // Move resetForm here so it can access the state setters
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      event_type: 'Birthday',
+      start_time: '',
+      end_time: '',
+      max_guests: 10,
+      deposit_required: 0,
+      event_description: '',
+      rsvp_enabled: false,
+      require_time_selection: false,
+      total_attendees_maximum: 500,
+      full_day: true
+    });
+    setEditingId(null);
+    setImageFile(null);
+    setImagePreview(null);
+  };
 
   useEffect(() => {
     fetchEvents();
@@ -206,12 +227,17 @@ export default function PrivateEventsManager() {
         throw new Error('User not authenticated');
       }
 
-      const eventData: any = {
+      let eventData: any = {
         ...formData,
-        start_time: new Date(formData.start_time).toISOString(),
-        end_time: new Date(formData.end_time).toISOString(),
         created_by: user.id
       };
+
+      if (formData.full_day) {
+        // Ensure start_time and end_time are set to 00:00 and 23:59 for the selected date
+        const date = formData.start_time ? formData.start_time.slice(0, 10) : '';
+        eventData.start_time = `${date}T00:00`;
+        eventData.end_time = `${date}T23:59`;
+      }
 
       let backgroundImageUrl = null;
       if (imageFile) {
@@ -343,7 +369,8 @@ export default function PrivateEventsManager() {
       event_description: event.event_description || '',
       rsvp_enabled: event.rsvp_enabled,
       require_time_selection: event.require_time_selection,
-      total_attendees_maximum: event.total_attendees_maximum
+      total_attendees_maximum: event.total_attendees_maximum,
+      full_day: event.full_day || false
     });
     setImagePreview(event.background_image_url);
   };
@@ -399,24 +426,6 @@ export default function PrivateEventsManager() {
         duration: 3000,
       });
     }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      event_type: 'Birthday',
-      start_time: '',
-      end_time: '',
-      max_guests: 10,
-      deposit_required: 0,
-      event_description: '',
-      rsvp_enabled: false,
-      require_time_selection: false,
-      total_attendees_maximum: 500
-    });
-    setEditingId(null);
-    setImageFile(null);
-    setImagePreview(null);
   };
 
   const openNewEvent = () => {
@@ -506,25 +515,65 @@ export default function PrivateEventsManager() {
                 </FormControl>
               </HStack>
 
-              <HStack spacing={4}>
-                <FormControl isRequired>
-                  <FormLabel>Start Date & Time</FormLabel>
-                  <Input
-                    type="datetime-local"
-                    value={formData.start_time}
-                    onChange={(e) => handleInputChange('start_time', e.target.value)}
-                  />
-                </FormControl>
+              <FormControl>
+                <FormLabel>Full Day</FormLabel>
+                <Checkbox
+                  isChecked={formData.full_day}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    handleInputChange('full_day', checked);
+                    if (checked) {
+                      // Set start/end times to full day defaults if checked
+                      const today = formData.start_time ? new Date(formData.start_time) : new Date();
+                      const yyyy = today.getFullYear();
+                      const mm = String(today.getMonth() + 1).padStart(2, '0');
+                      const dd = String(today.getDate()).padStart(2, '0');
+                      handleInputChange('start_time', `${yyyy}-${mm}-${dd}T00:00`);
+                      handleInputChange('end_time', `${yyyy}-${mm}-${dd}T23:59`);
+                    }
+                  }}
+                >
+                  Full Day
+                </Checkbox>
+              </FormControl>
 
-                <FormControl isRequired>
-                  <FormLabel>End Date & Time</FormLabel>
-                  <Input
-                    type="datetime-local"
-                    value={formData.end_time}
-                    onChange={(e) => handleInputChange('end_time', e.target.value)}
-                  />
-                </FormControl>
-              </HStack>
+              {!formData.full_day && (
+                <HStack spacing={4}>
+                  <FormControl isRequired>
+                    <FormLabel>Start Date & Time</FormLabel>
+                    <Input
+                      type="datetime-local"
+                      value={formData.start_time}
+                      onChange={(e) => handleInputChange('start_time', e.target.value)}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>End Date & Time</FormLabel>
+                    <Input
+                      type="datetime-local"
+                      value={formData.end_time}
+                      onChange={(e) => handleInputChange('end_time', e.target.value)}
+                    />
+                  </FormControl>
+                </HStack>
+              )}
+              {formData.full_day && (
+                <HStack spacing={4}>
+                  <FormControl isRequired>
+                    <FormLabel>Start Date</FormLabel>
+                    <Input
+                      type="date"
+                      value={formData.start_time ? formData.start_time.slice(0, 10) : ''}
+                      onChange={(e) => {
+                        const date = e.target.value;
+                        handleInputChange('start_time', `${date}T00:00`);
+                        handleInputChange('end_time', `${date}T23:59`);
+                      }}
+                    />
+                  </FormControl>
+                </HStack>
+              )}
 
               <HStack spacing={4}>
                 <FormControl isRequired>
@@ -795,25 +844,65 @@ export default function PrivateEventsManager() {
                               </FormControl>
                             </HStack>
 
-                            <HStack spacing={4}>
-                              <FormControl isRequired>
-                                <FormLabel>Start Date & Time</FormLabel>
-                                <Input
-                                  type="datetime-local"
-                                  value={formData.start_time}
-                                  onChange={(e) => handleInputChange('start_time', e.target.value)}
-                                />
-                              </FormControl>
+                            <FormControl>
+                              <FormLabel>Full Day</FormLabel>
+                              <Checkbox
+                                isChecked={formData.full_day}
+                                onChange={e => {
+                                  const checked = e.target.checked;
+                                  handleInputChange('full_day', checked);
+                                  if (checked) {
+                                    // Set start/end times to full day defaults if checked
+                                    const today = formData.start_time ? new Date(formData.start_time) : new Date();
+                                    const yyyy = today.getFullYear();
+                                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                                    const dd = String(today.getDate()).padStart(2, '0');
+                                    handleInputChange('start_time', `${yyyy}-${mm}-${dd}T00:00`);
+                                    handleInputChange('end_time', `${yyyy}-${mm}-${dd}T23:59`);
+                                  }
+                                }}
+                              >
+                                Full Day
+                              </Checkbox>
+                            </FormControl>
 
-                              <FormControl isRequired>
-                                <FormLabel>End Date & Time</FormLabel>
-                                <Input
-                                  type="datetime-local"
-                                  value={formData.end_time}
-                                  onChange={(e) => handleInputChange('end_time', e.target.value)}
-                                />
-                              </FormControl>
-                            </HStack>
+                            {!formData.full_day && (
+                              <HStack spacing={4}>
+                                <FormControl isRequired>
+                                  <FormLabel>Start Date & Time</FormLabel>
+                                  <Input
+                                    type="datetime-local"
+                                    value={formData.start_time}
+                                    onChange={(e) => handleInputChange('start_time', e.target.value)}
+                                  />
+                                </FormControl>
+
+                                <FormControl isRequired>
+                                  <FormLabel>End Date & Time</FormLabel>
+                                  <Input
+                                    type="datetime-local"
+                                    value={formData.end_time}
+                                    onChange={(e) => handleInputChange('end_time', e.target.value)}
+                                  />
+                                </FormControl>
+                              </HStack>
+                            )}
+                            {formData.full_day && (
+                              <HStack spacing={4}>
+                                <FormControl isRequired>
+                                  <FormLabel>Start Date</FormLabel>
+                                  <Input
+                                    type="date"
+                                    value={formData.start_time ? formData.start_time.slice(0, 10) : ''}
+                                    onChange={(e) => {
+                                      const date = e.target.value;
+                                      handleInputChange('start_time', `${date}T00:00`);
+                                      handleInputChange('end_time', `${date}T23:59`);
+                                    }}
+                                  />
+                                </FormControl>
+                              </HStack>
+                            )}
 
                             <HStack spacing={4}>
                               <FormControl isRequired>
