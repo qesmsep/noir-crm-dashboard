@@ -303,7 +303,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center justify-center gap-8 sm:gap-12">
           <div className="flex-shrink-0 w-full max-w-sm sm:max-w-md lg:max-w-lg">
             <Image 
-              src="/images/LPR66872.JPG" 
+              src="/images/LPR69138.JPG" 
               alt="Cocktails" 
               width={450} 
               height={350} 
@@ -369,7 +369,7 @@ export default function Home() {
           <div className="w-full max-w-4xl mx-auto px-4">
             <button onClick={() => setMenuModalOpen(true)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }} aria-label="Open Noir Menu">
               <Image 
-                src="/public/images/noir-menu.png" 
+                src="/images/noir-menu.png" 
                 alt="Noir Menu" 
                 width={1200} 
                 height={1200} 

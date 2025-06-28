@@ -84,6 +84,12 @@ function isSameDayLocal(a: Date, b: Date) {
   );
 }
 
+// Touch detection utility
+const isTouchDevice = () => {
+  if (typeof window === 'undefined') return false;
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+};
+
 const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false }) => {
   // Private Event Table expand/collapse state
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -107,6 +113,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const { settings } = useSettings();
+  
+  // Touch and mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  const [isTouchDeviceState, setIsTouchDeviceState] = useState(false);
+  
+  // Initialize touch detection and mobile detection
+  useEffect(() => {
+    setIsTouchDeviceState(isTouchDevice());
+    
+    // Mobile detection
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') {
+        setIsMobile(window.innerWidth < 768);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     async function loadTables() {
@@ -287,6 +314,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   async function handleEventDrop(info: any) {
     try {
       console.log('[Drop Triggered] Raw info:', info);
+      console.log('[Touch Device]', isTouchDeviceState);
+      console.log('[Mobile]', isMobile);
   
       if (!info.event || !info.event.id || !info.oldEvent) {
         console.warn('Missing event, event.id, or oldEvent in drop info:', info);
@@ -331,7 +360,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   
       toast({
         title: 'Reservation updated',
-        description: `Saved new table and time`,
+        description: isTouchDeviceState ? 'Touch drag successful!' : 'Saved new table and time',
         status: 'success',
         duration: 3000,
       });
@@ -343,7 +372,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   
       toast({
         title: 'Error',
-        description: 'Reservation update failed. Please try again.',
+        description: isTouchDeviceState ? 'Touch drag failed. Please try again.' : 'Reservation update failed. Please try again.',
         status: 'error',
         duration: 6000,
       });
@@ -464,6 +493,33 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     }
   };
 
+  // Touch drag event handlers
+  const handleEventDragStart = (info: any) => {
+    console.log('[Drag Start]', info);
+    if (isTouchDeviceState) {
+      // Add visual feedback for touch devices
+      const eventEl = info.el;
+      if (eventEl) {
+        eventEl.style.opacity = '0.8';
+        eventEl.style.transform = 'scale(1.05)';
+        eventEl.style.zIndex = '1000';
+      }
+    }
+  };
+
+  const handleEventDragStop = (info: any) => {
+    console.log('[Drag Stop]', info);
+    if (isTouchDeviceState) {
+      // Remove visual feedback for touch devices
+      const eventEl = info.el;
+      if (eventEl) {
+        eventEl.style.opacity = '';
+        eventEl.style.transform = '';
+        eventEl.style.zIndex = '';
+      }
+    }
+  };
+
   const currentDayPrivateEvents = getCurrentDayPrivateEvents();
 
   return (
@@ -543,6 +599,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       </Box>
 
       <FullCalendar
+        ref={calendarRef}
         plugins={[resourceTimelinePlugin, interactionPlugin]}
         initialView="resourceTimelineDay"
         initialDate={new Date()}
@@ -565,13 +622,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         dateClick={handleDayClick}
         height="auto"
         
+        // Touch and mobile optimizations
+        longPressDelay={isTouchDeviceState ? 300 : 1000}
+        eventLongPressDelay={isTouchDeviceState ? 300 : 1000}
+        selectLongPressDelay={isTouchDeviceState ? 300 : 1000}
+        
+        // Improved touch interaction settings
+        eventDragMinDistance={isTouchDeviceState ? 5 : 3}
+        eventDragStart={handleEventDragStart}
+        eventDragStop={handleEventDragStop}
+        
+        // Mobile-specific configurations
+        dayMaxEvents={isMobile ? 3 : false}
+        moreLinkClick="popover"
+        
         slotMinTime={slotMinTime}
         slotMaxTime={slotMaxTime}
         slotDuration="00:30:00"
         slotLabelInterval="00:30:00"
         slotLabelFormat={[{ hour: 'numeric', minute: '2-digit', hour12: true }]}
         nowIndicator
-        resourceAreaWidth={'6%'}
+        resourceAreaWidth={isMobile ? '15%' : '6%'}
         resourceAreaHeaderContent={''}
         eventContent={(arg) => (
           <div
@@ -582,13 +653,16 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              height: '24px',
-              fontSize: '14px',
+              height: isMobile ? '28px' : '24px',
+              fontSize: isMobile ? '12px' : '14px',
               background: '#a59480',
               color: 'white',
               borderRadius: '4px',
-              padding: '0 2px',
+              padding: isMobile ? '0 4px' : '0 2px',
               border: '1px solid #353535',
+              cursor: isTouchDeviceState ? 'grab' : 'pointer',
+              userSelect: 'none',
+              touchAction: 'manipulation',
             }}
           >
             {arg.event.title}
