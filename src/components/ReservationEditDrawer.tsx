@@ -382,232 +382,230 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
 
   return (
     <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="sm" >
-      <Box zIndex="2000" position="relative">
-        <DrawerOverlay bg="blackAlpha.600" />
-        <DrawerContent border="2px solid #353535" borderRadius="10px"  fontFamily="Montserrat, sans-serif" maxW="350px" maxH="flex" w="50vw" boxShadow="xl" mt="80px" mb="25px"paddingRight="40px" paddingLeft="40px" backgroundColor="#ecede8">
-          <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="0px" fontFamily="IvyJournal, sans-serif" color="#353535">
-            
-          </DrawerHeader>
-          <DrawerBody p={4} overflowY="auto">
-            {isLoading ? (
-              <VStack justify="center" align="center" h="100%">
-                <Spinner size="xl" />
-              </VStack>
-            ) : reservation ? (
-              <VStack spacing={1} align="stretch">
-                <Box>
-                  <Text mb="0px" fontSize="24px" fontWeight="bold" fontFamily="IvyJournal, sans-serif">
-                    {formData.first_name} {formData.last_name} <Badge margin="0px" colorScheme={reservation.membership_type === 'member' ? 'purple' : 'gray'} size="sm">
-                      {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
-                    </Badge>
+      <DrawerOverlay bg="blackAlpha.600" />
+      <DrawerContent border="2px solid #353535" borderRadius="10px"  fontFamily="Montserrat, sans-serif" maxW="350px" maxH="flex" w="50vw" boxShadow="xl" mt="80px" mb="25px" paddingRight="40px" paddingLeft="40px" backgroundColor="#ecede8">
+        <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="0px" fontFamily="IvyJournal, sans-serif" color="#353535">
+          
+        </DrawerHeader>
+        <DrawerBody p={4} overflowY="auto">
+          {isLoading ? (
+            <VStack justify="center" align="center" h="100%">
+              <Spinner size="xl" />
+            </VStack>
+          ) : reservation ? (
+            <VStack spacing={1} align="stretch">
+              <Box>
+                <Text mb="0px" fontSize="24px" fontWeight="bold" fontFamily="IvyJournal, sans-serif">
+                  {formData.first_name} {formData.last_name} <Badge margin="0px" colorScheme={reservation.membership_type === 'member' ? 'purple' : 'gray'} size="sm">
+                    {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
+                  </Badge>
+                </Text>
+                <HStack>
+                  <Text margin="0px" fontSize="sm" color="gray.600">
+                    Table {reservation.tables?.table_number || 'N/A'} | Party Size {formData.party_size} {eventIcon && `| ${eventIcon}`}
                   </Text>
-                  <HStack>
-                    <Text margin="0px" fontSize="sm" color="gray.600">
-                      Table {reservation.tables?.table_number || 'N/A'} | Party Size {formData.party_size} {eventIcon && `| ${eventIcon}`}
-                    </Text>
-                  </HStack>
-                </Box>
-              
-                <VStack spacing={1} as="section" align="stretch">
-                  <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                  <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel fontSize="sm" mb={1}>First Name</FormLabel>
-                        <Input fontFamily="Montserrat, sans-serif" value={formData.first_name} onChange={(e) => handleInputChange('first_name', e.target.value)} size="sm" />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel fontSize="sm" mb={1}>Last Name</FormLabel>
-                        <Input fontFamily="Montserrat, sans-serif" value={formData.last_name} onChange={(e) => handleInputChange('last_name', e.target.value)} size="sm" />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel fontSize="sm" mb={1}>Email</FormLabel>
-                        <Input fontFamily="Montserrat, sans-serif" type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} size="sm" />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel fontSize="sm" mb={1}>Phone</FormLabel>
-                        <Input fontFamily="Montserrat, sans-serif" value={formatPhoneDisplay(formData.phone)} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder="+1 (555) 123-4567" size="sm" />
-                      </FormControl>
-                    </GridItem>
-                  </Grid>
-                </VStack>
-              
-                <Grid as="section" templateColumns="repeat(2, 1fr)" gap={2} alignItems="center">
-                  <GridItem colSpan={2}>
-                    <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
+                </HStack>
+              </Box>
+            
+              <VStack spacing={1} as="section" align="stretch">
+                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
+                <Grid templateColumns="repeat(2, 1fr)" gap={2}>
+                  <GridItem>
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1}>First Name</FormLabel>
+                      <Input fontFamily="Montserrat, sans-serif" value={formData.first_name} onChange={(e) => handleInputChange('first_name', e.target.value)} size="sm" />
+                    </FormControl>
                   </GridItem>
                   <GridItem>
                     <FormControl>
-                      <FormLabel  fontSize="sm" mb={1}>Party Size</FormLabel>
-                      <Select icon={<></>} fontFamily="Montserrat, sans-serif" marginBottom="10px" value={formData.party_size} onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))} size="sm">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(size => (
-                          <option key={size} value={size}>{size} {size === 1 ? 'person' : 'people'}</option>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel  fontSize="sm" mb={1}>Event Type</FormLabel>
-                      <Select icon={<></>} fontFamily="Montserrat, sans-serif" marginBottom="10px"  value={formData.event_type} onChange={(e) => handleInputChange('event_type', e.target.value)} size="sm">
-                        <option value="">Select an occasion</option>
-                        {eventTypes.map(type => (<option key={type.value} value={type.value}>{type.label}</option>))}
-                      </Select>
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel fontSize="sm" mb={1}>Table</FormLabel>
-                      <Select icon={<></>}
-                        fontFamily="Montserrat, sans-serif" 
-                        marginBottom="10px" 
-                        value={formData.table_id} 
-                        onChange={(e) => handleInputChange('table_id', e.target.value)} 
-                        size="sm"
-                      >
-                        <option value="">Select a table</option>
-                        {tables && tables.length > 0 ? (
-                          tables.map(table => (
-                            <option key={table.id} value={table.id}>
-                              Table {table.table_number} ({table.seats} seats)
-                            </option>
-                          ))
-                        ) : (
-                          <option value="" disabled>Loading tables...</option>
-                        )}
-                      </Select>
+                      <FormLabel fontSize="sm" mb={1}>Last Name</FormLabel>
+                      <Input fontFamily="Montserrat, sans-serif" value={formData.last_name} onChange={(e) => handleInputChange('last_name', e.target.value)} size="sm" />
                     </FormControl>
                   </GridItem>
-          
-                  <GridItem colSpan={2}>
+                  <GridItem>
                     <FormControl>
-                      <FormLabel fontSize="sm" mb={1}>Start Time</FormLabel>
-                      <Input marginBottom="10px" fontFamily="Montserrat, sans-serif" type="datetime-local" value={formData.start_time} onChange={(e) => handleInputChange('start_time', e.target.value)} size="sm" />
+                      <FormLabel fontSize="sm" mb={1}>Email</FormLabel>
+                      <Input fontFamily="Montserrat, sans-serif" type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} size="sm" />
                     </FormControl>
+                  </GridItem>
+                  <GridItem>
                     <FormControl>
-                      <FormLabel fontSize="sm" mb={1}>End Time</FormLabel>
-                      <Input marginBottom="10px" fontFamily="Montserrat, sans-serif" type="datetime-local" value={formData.end_time} onChange={(e) => handleInputChange('end_time', e.target.value)} size="sm" />
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel fontSize="sm" mb={1}>Notes</FormLabel>
-                      <Textarea width="90%" fontFamily="Montserrat, sans-serif" value={formData.notes} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="Special requests..." size="sm" rows={3} />
+                      <FormLabel fontSize="sm" mb={1}>Phone</FormLabel>
+                      <Input fontFamily="Montserrat, sans-serif" value={formatPhoneDisplay(formData.phone)} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder="+1 (555) 123-4567" size="sm" />
                     </FormControl>
                   </GridItem>
                 </Grid>
-
-                {/* Text Message Section */}
-                
-                <VStack spacing={1} as="section" align="stretch">
-                  <Text marginBottom="00px" alignSelf="start" fontSize="md" fontWeight="bold" m="0"></Text>
-                  
-                  {messageError && (
-                    <Alert status="error" size="sm" borderRadius="md">
-                      <AlertIcon />
-                      {messageError}
-                    </Alert>
-                  )}
-                  
-                  {messageSuccess && (
-                    <Alert status="success" size="sm" borderRadius="md">
-                      <AlertIcon boxSize="25px" />
-                      {messageSuccess}
-                    </Alert>
-                  )}
-                  
-                  <FormControl>
-                    <FormLabel fontSize="sm" mb={1}>Message</FormLabel>
-                    <Textarea
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      placeholder="Type your message here..."
-                      size="sm"
-                      rows={3}
-                      width={"90%"}
-                      fontFamily="Montserrat, sans-serif"
-                      resize="vertical"
-                      bg="white"
-                      borderRadius="8px"
-                      border="1px solid"
-                      borderColor="gray.300"
-                      _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                    />
-                  </FormControl>
-                  
-                  <Button
-                    onClick={handleSendMessage}
-                    isLoading={isSendingMessage}
-                    loadingText="Sending..."
-                    isDisabled={!messageText.trim() || !reservation?.phone}
-                    size="sm"
-                    bg="#353535"
-                    color="#ecede8"
-                    width={"90%"}
-                    _hover={{ bg: '#2a2a2a' }}
-                    fontFamily="Montserrat, sans-serif"
-                    fontWeight="semibold"
-                  >
-                    Send Message
-                  </Button>
-                </VStack>
-
-               
-                <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
-                  
-                  <VStack spacing={1} fontSize="xs">
-                    <HStack justify="space-between">
-                      <Text fontSize="12px" color="gray.600" fontWeight="medium">Created:</Text>
-                      <Text fontSize="12px">{reservation.created_at ? formatDateTime(new Date(reservation.created_at), undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</Text>
-                    </HStack>
-                  
-                  
-                  </VStack>
-                </Box>
               </VStack>
-            ) : (
-              <Text>Reservation not found</Text>
-            )}
-          </DrawerBody>
-          <DrawerFooter borderTopWidth="1px" justifyContent="space-between">
-            {isConfirmingDelete ? (
-              <HStack w="100%" justifyContent="space-between">
-                <Text fontWeight="bold" >Are you sure?</Text>
-                <HStack>
-                  <Button variant="outline" size="sm" onClick={() => setIsConfirmingDelete(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    color="#ff0000"
+            
+              <Grid as="section" templateColumns="repeat(2, 1fr)" gap={2} alignItems="center">
+                <GridItem colSpan={2}>
+                  <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
+                </GridItem>
+                <GridItem>
+                  <FormControl>
+                    <FormLabel  fontSize="sm" mb={1}>Party Size</FormLabel>
+                    <Select icon={<></>} fontFamily="Montserrat, sans-serif" marginBottom="10px" value={formData.party_size} onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))} size="sm">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(size => (
+                        <option key={size} value={size}>{size} {size === 1 ? 'person' : 'people'}</option>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel  fontSize="sm" mb={1}>Event Type</FormLabel>
+                    <Select icon={<></>} fontFamily="Montserrat, sans-serif" marginBottom="10px"  value={formData.event_type} onChange={(e) => handleInputChange('event_type', e.target.value)} size="sm">
+                      <option value="">Select an occasion</option>
+                      {eventTypes.map(type => (<option key={type.value} value={type.value}>{type.label}</option>))}
+                    </Select>
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel fontSize="sm" mb={1}>Table</FormLabel>
+                    <Select icon={<></>}
+                      fontFamily="Montserrat, sans-serif" 
+                      marginBottom="10px" 
+                      value={formData.table_id} 
+                      onChange={(e) => handleInputChange('table_id', e.target.value)} 
+                      size="sm"
+                    >
+                      <option value="">Select a table</option>
+                      {tables && tables.length > 0 ? (
+                        tables.map(table => (
+                          <option key={table.id} value={table.id}>
+                            Table {table.table_number} ({table.seats} seats)
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>Loading tables...</option>
+                      )}
+                    </Select>
+                  </FormControl>
+                </GridItem>
+        
+                <GridItem colSpan={2}>
+                  <FormControl>
+                    <FormLabel fontSize="sm" mb={1}>Start Time</FormLabel>
+                    <Input marginBottom="10px" fontFamily="Montserrat, sans-serif" type="datetime-local" value={formData.start_time} onChange={(e) => handleInputChange('start_time', e.target.value)} size="sm" />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel fontSize="sm" mb={1}>End Time</FormLabel>
+                    <Input marginBottom="10px" fontFamily="Montserrat, sans-serif" type="datetime-local" value={formData.end_time} onChange={(e) => handleInputChange('end_time', e.target.value)} size="sm" />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel fontSize="sm" mb={1}>Notes</FormLabel>
+                    <Textarea width="90%" fontFamily="Montserrat, sans-serif" value={formData.notes} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="Special requests..." size="sm" rows={3} />
+                  </FormControl>
+                </GridItem>
+              </Grid>
+
+              {/* Text Message Section */}
+              
+              <VStack spacing={1} as="section" align="stretch">
+                <Text marginBottom="00px" alignSelf="start" fontSize="md" fontWeight="bold" m="0"></Text>
+                
+                {messageError && (
+                  <Alert status="error" size="sm" borderRadius="md">
+                    <AlertIcon />
+                    {messageError}
+                  </Alert>
+                )}
+                
+                {messageSuccess && (
+                  <Alert status="success" size="sm" borderRadius="md">
+                    <AlertIcon boxSize="25px" />
+                    {messageSuccess}
+                  </Alert>
+                )}
+                
+                <FormControl>
+                  <FormLabel fontSize="sm" mb={1}>Message</FormLabel>
+                  <Textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder="Type your message here..."
                     size="sm"
-                    borderColor="#ff0000"
-                    onClick={handleDelete}
-                    isLoading={isSaving}
-                  >
-                    Delete
-                  </Button>
-                </HStack>
-              </HStack>
-            ) : (
-              <>
-                <IconButton
-                  aria-label="Delete reservation"
-                  icon={<DeleteIcon />}
-                  variant="ghost"
+                    rows={3}
+                    width={"90%"}
+                    fontFamily="Montserrat, sans-serif"
+                    resize="vertical"
+                    bg="white"
+                    borderRadius="8px"
+                    border="1px solid"
+                    borderColor="gray.300"
+                    _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                  />
+                </FormControl>
+                
+                <Button
+                  onClick={handleSendMessage}
+                  isLoading={isSendingMessage}
+                  loadingText="Sending..."
+                  isDisabled={!messageText.trim() || !reservation?.phone}
+                  size="sm"
+                  bg="#353535"
+                  color="#ecede8"
+                  width={"90%"}
+                  _hover={{ bg: '#2a2a2a' }}
+                  fontFamily="Montserrat, sans-serif"
+                  fontWeight="semibold"
+                >
+                  Send Message
+                </Button>
+              </VStack>
+
+             
+              <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
+                
+                <VStack spacing={1} fontSize="xs">
+                  <HStack justify="space-between">
+                    <Text fontSize="12px" color="gray.600" fontWeight="medium">Created:</Text>
+                    <Text fontSize="12px">{reservation.created_at ? formatDateTime(new Date(reservation.created_at), undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</Text>
+                  </HStack>
+                
+                
+                </VStack>
+              </Box>
+            </VStack>
+          ) : (
+            <Text>Reservation not found</Text>
+          )}
+        </DrawerBody>
+        <DrawerFooter borderTopWidth="1px" justifyContent="space-between">
+          {isConfirmingDelete ? (
+            <HStack w="100%" justifyContent="space-between">
+              <Text fontWeight="bold" >Are you sure?</Text>
+              <HStack>
+                <Button variant="outline" size="sm" onClick={() => setIsConfirmingDelete(false)}>
+                  Cancel
+                </Button>
+                <Button
                   color="#ff0000"
-                  border="none"
-                  fontSize="18px"
-                  onClick={() => setIsConfirmingDelete(true)}
-                />
-                <HStack spacing={3} mb={"10px"}>
-                  <Button variant="outline" onClick={onClose}>Cancel</Button>
-                  <Button colorScheme="blue" onClick={handleSave} isLoading={isSaving} loadingText="Saving...">Save</Button>
-                </HStack>
-              </>
-            )}
-          </DrawerFooter>
-        </DrawerContent>
-      </Box>
+                  size="sm"
+                  borderColor="#ff0000"
+                  onClick={handleDelete}
+                  isLoading={isSaving}
+                >
+                  Delete
+                </Button>
+              </HStack>
+            </HStack>
+          ) : (
+            <>
+              <IconButton
+                aria-label="Delete reservation"
+                icon={<DeleteIcon />}
+                variant="ghost"
+                color="#ff0000"
+                border="none"
+                fontSize="18px"
+                onClick={() => setIsConfirmingDelete(true)}
+              />
+              <HStack spacing={3} mb={"10px"}>
+                <Button variant="outline" onClick={onClose}>Cancel</Button>
+                <Button colorScheme="blue" onClick={handleSave} isLoading={isSaving} loadingText="Saving...">Save</Button>
+              </HStack>
+            </>
+          )}
+        </DrawerFooter>
+      </DrawerContent>
     </Drawer>
   );
 };
