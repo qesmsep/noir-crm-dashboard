@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
 import { supabase } from '@/lib/supabase';
 import styles from '@/styles/Analytics.module.css';

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { RateLimiter } from 'limiter';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
