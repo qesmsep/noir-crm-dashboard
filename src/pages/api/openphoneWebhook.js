@@ -578,28 +578,40 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     }
 
     // 4. Check Base Hours (venue_hours table)
-    const { data: baseHoursData } = await supabase
+    const { data: baseHoursData, error: baseHoursError } = await supabase
       .from('venue_hours')
       .select('*')
       .eq('type', 'base')
       .eq('day_of_week', dayOfWeek);
     
+    if (baseHoursError) {
+      console.error('Error fetching base hours:', baseHoursError);
+    }
+    
+    console.log('Base hours data for day', dayOfWeek, ':', baseHoursData);
+    
     if (!baseHoursData || baseHoursData.length === 0) {
       console.log('No base hours found for day of week:', dayOfWeek);
       
       // 3. Outside base hours - Build base hours descriptor for all days
-      const allBaseHours = await supabase
+      const { data: allBaseHours, error: allBaseHoursError } = await supabase
         .from('venue_hours')
         .select('day_of_week, time_ranges')
         .eq('type', 'base');
       
-      if (allBaseHours.data && allBaseHours.data.length > 0) {
+      if (allBaseHoursError) {
+        console.error('Error fetching all base hours:', allBaseHoursError);
+      }
+      
+      console.log('All base hours data:', allBaseHours);
+      
+      if (allBaseHours && allBaseHours.length > 0) {
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const availableDays = [];
         
         // Group by day and format
         for (let i = 0; i < 7; i++) {
-          const dayHours = allBaseHours.data.filter(h => h.day_of_week === i);
+          const dayHours = allBaseHours.filter(h => h.day_of_week === i);
           if (dayHours.length > 0) {
             const timeRanges = dayHours.flatMap(h => h.time_ranges || []);
             if (timeRanges.length > 0) {
