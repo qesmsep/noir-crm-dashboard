@@ -26,7 +26,7 @@ export default function Calendar() {
             reloadKey={reloadKey}
             bookingStartDate={bookingStartDate}
             bookingEndDate={bookingEndDate}
-            viewOnly={false}
+            viewOnly={true}
           />
         </Box>
       </Box>

@@ -550,26 +550,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         </Button>
       </Box>
 
-      {/* Debug Panel for Touch Testing */}
-      {process.env.NODE_ENV === 'development' && (
-        <Box 
-          mb={4} 
-          p={3} 
-          bg="blue.50" 
-          borderRadius="md" 
-          border="1px solid" 
-          borderColor="blue.200"
-          fontSize="sm"
-        >
-          <Text fontWeight="bold" mb={2}>Touch Debug Info:</Text>
-          <Text>Touch Device: {isTouchDeviceState ? '✅ Yes' : '❌ No'}</Text>
-          <Text>Mobile: {isMobile ? '✅ Yes' : '❌ No'}</Text>
-          <Text>View Only: {viewOnly ? '✅ Yes' : '❌ No'}</Text>
-          <Text>Editable: {!viewOnly ? '✅ Yes' : '❌ No'}</Text>
-          <Text>Droppable: {!viewOnly ? '✅ Yes' : '❌ No'}</Text>
-        </Box>
-      )}
-
       <Box
         style={{
           // FullCalendar container optimizations
