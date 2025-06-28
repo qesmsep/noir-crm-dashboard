@@ -2,5 +2,9 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/api/smsReservation": "pages/api/smsReservation.js"
+  "/api/ledger": "pages/api/ledger.js",
+  "/admin/members/[accountId]": "pages/admin/members/[accountId].js",
+  "/api/messages": "pages/api/messages.js",
+  "/api/member_notes": "pages/api/member_notes.js",
+  "/api/member_attributes": "pages/api/member_attributes.js"
 }

@@ -546,11 +546,33 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       .eq('date', dateStr)
       .maybeSingle();
     
-    if (exceptionalClosure && (exceptionalClosure.full_day || !exceptionalClosure.time_ranges)) {
+    if (exceptionalClosure) {
       console.log('Exceptional closure found for date:', dateStr);
-      // Use the custom SMS notification from venue_hours table
-      const customMessage = exceptionalClosure.sms_notification || 'The venue is closed on this date';
-      return { available: false, message: customMessage };
+      
+      // Always send the custom SMS notification if it exists
+      if (exceptionalClosure.sms_notification) {
+        return { available: false, message: exceptionalClosure.sms_notification };
+      }
+      
+      // If no custom message, check if it's a full-day closure
+      if (exceptionalClosure.full_day || !exceptionalClosure.time_ranges) {
+        return { available: false, message: 'The venue is closed on this date' };
+      }
+      
+      // For partial-day closures without custom message, check if requested time conflicts
+      if (exceptionalClosure.time_ranges) {
+        const requestedHour = date.getHours();
+        const requestedMinute = date.getMinutes();
+        const requestedTime = `${requestedHour.toString().padStart(2, '0')}:${requestedMinute.toString().padStart(2, '0')}`;
+        
+        const isDuringClosure = exceptionalClosure.time_ranges.some(range => 
+          requestedTime >= range.start && requestedTime <= range.end
+        );
+        
+        if (isDuringClosure) {
+          return { available: false, message: 'The venue is closed during this time' };
+        }
+      }
     }
 
     // 4. Check Base Hours (venue_hours table)
