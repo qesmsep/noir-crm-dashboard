@@ -9,11 +9,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function PATCH(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
-  const { id } = context.params;
+export async function PATCH(request: Request, { params }: any) {
+  const { id } = params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
   console.log('PATCH: Querying for reservation id:', reservationId);
   
@@ -69,11 +66,8 @@ export async function PATCH(
   }
 }
 
-export async function GET(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
-  const { id } = context.params;
+export async function GET(request: Request, { params }: any) {
+  const { id } = params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
   console.log('GET: Querying for reservation id:', reservationId);
   
@@ -114,11 +108,8 @@ export async function GET(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
-  const { id } = context.params;
+export async function DELETE(request: Request, { params }: any) {
+  const { id } = params;
   try {
     const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
 
