@@ -63,18 +63,14 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   useEffect(() => {
     async function fetchBookingDates() {
       setBookingDatesLoading(true);
-      const { data: startData } = await supabase
+      const { data: settingsData } = await supabase
         .from('settings')
-        .select('value')
-        .eq('key', 'booking_start_date')
+        .select('booking_start_date, booking_end_date')
         .single();
-      const { data: endData } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'booking_end_date')
-        .single();
-      if (startData && startData.value) setBookingStartDate(new Date(startData.value));
-      if (endData && endData.value) setBookingEndDate(new Date(endData.value));
+      if (settingsData) {
+        if (settingsData.booking_start_date) setBookingStartDate(new Date(settingsData.booking_start_date));
+        if (settingsData.booking_end_date) setBookingEndDate(new Date(settingsData.booking_end_date));
+      }
       setBookingDatesLoading(false);
     }
     fetchBookingDates();

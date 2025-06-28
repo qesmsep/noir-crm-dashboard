@@ -12,7 +12,21 @@ export default async function handler(req, res) {
 
   try {
     console.log('Saving booking window:', { start, end });
-    await supabase.from('booking_window').upsert({ booking_start_date: start, booking_end_date: end });
+    
+    // Update the settings table with the new booking window dates
+    const { error } = await supabase
+      .from('settings')
+      .update({ 
+        booking_start_date: start, 
+        booking_end_date: end 
+      })
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all records
+    
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({ error: 'Failed to save booking window' });
+    }
+    
     console.log('Booking window saved successfully');
     res.status(200).json({ success: true });
   } catch (error) {
