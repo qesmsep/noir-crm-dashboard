@@ -48,13 +48,54 @@ function parseNaturalDate(dateStr) {
     const monthIndex = monthNames.indexOf(month.toLowerCase());
     if (monthIndex === -1) return null;
     
-    const result = new Date(today.getFullYear(), monthIndex, parseInt(day));
+    // Smart year handling: assume current year unless date is more than 2 months away
+    let year = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const monthsDiff = monthIndex - currentMonth;
+    
+    // If the requested month is more than 2 months away, assume next year
+    if (monthsDiff > 2 || (monthsDiff < -10)) {
+      year++;
+    }
+    
+    const result = new Date(year, monthIndex, parseInt(day));
+    
+    // Additional safety check: if the date is in the past, assume next year
     if (result < today) {
       result.setFullYear(result.getFullYear() + 1);
     }
+    
     return result;
   }
   
+  // Handle MM/DD format (without year)
+  const dateMatchNoYear = dateStr.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (dateMatchNoYear) {
+    const [_, month, day] = dateMatchNoYear;
+    const monthIndex = parseInt(month) - 1;
+    const dayNum = parseInt(day);
+    
+    // Smart year handling: assume current year unless date is more than 2 months away
+    let year = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const monthsDiff = monthIndex - currentMonth;
+    
+    // If the requested month is more than 2 months away, assume next year
+    if (monthsDiff > 2 || (monthsDiff < -10)) {
+      year++;
+    }
+    
+    const result = new Date(year, monthIndex, dayNum);
+    
+    // Additional safety check: if the date is in the past, assume next year
+    if (result < today) {
+      result.setFullYear(result.getFullYear() + 1);
+    }
+    
+    return result;
+  }
+  
+  // Handle MM/DD/YY or MM/DD/YYYY format
   const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if (dateMatch) {
     const [_, month, day, year] = dateMatch;
@@ -152,14 +193,21 @@ IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
       } else if (parsed.date.startsWith('this ') || parsed.date.startsWith('next ')) {
         date = parseNaturalDate(parsed.date);
       } else {
-        // Assume it's MM/DD/YYYY format
-        const [month, day, year] = parsed.date.split('/');
-        date = new Date(year, month - 1, day);
+        // Handle MM/DD/YYYY format or MM/DD format
+        const dateParts = parsed.date.split('/');
+        if (dateParts.length === 2) {
+          // MM/DD format - use smart year handling
+          date = parseNaturalDate(parsed.date);
+        } else if (dateParts.length === 3) {
+          // MM/DD/YYYY format
+          const [month, day, year] = dateParts;
+          date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
       }
     }
 
-    if (!date) {
-      console.log('Could not parse date from AI response');
+    if (!date || isNaN(date.getTime())) {
+      console.log('Could not parse date from AI response or date is invalid');
       return null;
     }
 
@@ -169,9 +217,26 @@ IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
       const [h, m] = parsed.time.split(':');
       hour = parseInt(h);
       minute = parseInt(m);
+      
+      // Validate time values
+      if (isNaN(hour) || hour < 0 || hour > 23) {
+        console.log('Invalid hour in AI response:', hour);
+        return null;
+      }
+      if (isNaN(minute) || minute < 0 || minute > 59) {
+        console.log('Invalid minute in AI response:', minute);
+        return null;
+      }
     }
 
     date.setHours(hour, minute, 0, 0);
+    
+    // Final validation to ensure we have a valid date
+    if (isNaN(date.getTime())) {
+      console.log('Invalid date after setting time:', date);
+      return null;
+    }
+    
     const start_time = date.toISOString();
     const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
 
@@ -221,9 +286,10 @@ function parseReservationMessage(message) {
   }
 
   // Flexible date and time extraction
-  // Try to find a date (MM/DD/YY, Month Day, this/next Friday, etc.)
+  // Try to find a date (MM/DD/YY, MM/DD, Month Day, this/next Friday, etc.)
   let dateStr = '';
   let dateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+                  msg.match(/(\d{1,2}\/\d{1,2})/i) ||  // MM/DD format
                   msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i) ||
                   msg.match(/(this|next)\s+\w+/i);
   if (dateMatch) {
@@ -241,7 +307,7 @@ function parseReservationMessage(message) {
 
   // If date or time is missing, try to find them anywhere in the message
   if (!dateStr) {
-    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/) || msg.match(/(\d{1,2}\/\d{1,2})/);
     if (anyDate) dateStr = anyDate[0];
   }
   if (!timeStr) {
@@ -254,7 +320,8 @@ function parseReservationMessage(message) {
   if (dateStr) {
     date = parseNaturalDate(dateStr);
   }
-  if (!date) {
+  if (!date || isNaN(date.getTime())) {
+    console.log('Could not parse date or date is invalid:', dateStr);
     return null;
   }
 
@@ -344,7 +411,7 @@ async function checkMemberStatus(phone) {
     // First, let's see what's actually in the members table for debugging
     const { data: allMembers, error: allMembersError } = await supabase
       .from('members')
-      .select('member_id, first_name, last_name, phone, membership_status')
+      .select('member_id, first_name, last_name, phone')
       .limit(10);
     
     if (allMembersError) {
@@ -374,7 +441,6 @@ async function checkMemberStatus(phone) {
       id: member.member_id, 
       name: `${member.first_name} ${member.last_name}`,
       phone: member.phone,
-      status: member.membership_status 
     });
     
     return { isMember: true, member };

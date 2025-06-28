@@ -69,11 +69,50 @@ function parseNaturalDate(dateStr) {
     const monthIndex = monthNames.indexOf(month.toLowerCase());
     if (monthIndex === -1) return null;
     
-    const result = new Date(today.getFullYear(), monthIndex, parseInt(day));
-    // If the date is in the past, assume next year
+    // Smart year handling: assume current year unless date is more than 2 months away
+    let year = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const monthsDiff = monthIndex - currentMonth;
+    
+    // If the requested month is more than 2 months away, assume next year
+    if (monthsDiff > 2 || (monthsDiff < -10)) {
+      year++;
+    }
+    
+    const result = new Date(year, monthIndex, parseInt(day));
+    
+    // Additional safety check: if the date is in the past, assume next year
     if (result < today) {
       result.setFullYear(result.getFullYear() + 1);
     }
+    
+    return result;
+  }
+  
+  // Handle MM/DD format (without year)
+  const dateMatchNoYear = dateStr.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (dateMatchNoYear) {
+    const [_, month, day] = dateMatchNoYear;
+    const monthIndex = parseInt(month) - 1;
+    const dayNum = parseInt(day);
+    
+    // Smart year handling: assume current year unless date is more than 2 months away
+    let year = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const monthsDiff = monthIndex - currentMonth;
+    
+    // If the requested month is more than 2 months away, assume next year
+    if (monthsDiff > 2 || (monthsDiff < -10)) {
+      year++;
+    }
+    
+    const result = new Date(year, monthIndex, dayNum);
+    
+    // Additional safety check: if the date is in the past, assume next year
+    if (result < today) {
+      result.setFullYear(result.getFullYear() + 1);
+    }
+    
     return result;
   }
   
@@ -277,14 +316,21 @@ IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
       } else if (parsed.date.startsWith('this ') || parsed.date.startsWith('next ')) {
         date = parseNaturalDate(parsed.date);
       } else {
-        // Assume it's MM/DD/YYYY format
-        const [month, day, year] = parsed.date.split('/');
-        date = new Date(year, month - 1, day);
+        // Handle MM/DD/YYYY format or MM/DD format
+        const dateParts = parsed.date.split('/');
+        if (dateParts.length === 2) {
+          // MM/DD format - use smart year handling
+          date = parseNaturalDate(parsed.date);
+        } else if (dateParts.length === 3) {
+          // MM/DD/YYYY format
+          const [month, day, year] = dateParts;
+          date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
       }
     }
 
-    if (!date) {
-      console.log('Could not parse date from AI response');
+    if (!date || isNaN(date.getTime())) {
+      console.log('Could not parse date from AI response or date is invalid');
       return null;
     }
 
@@ -294,9 +340,26 @@ IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
       const [h, m] = parsed.time.split(':');
       hour = parseInt(h);
       minute = parseInt(m);
+      
+      // Validate time values
+      if (isNaN(hour) || hour < 0 || hour > 23) {
+        console.log('Invalid hour in AI response:', hour);
+        return null;
+      }
+      if (isNaN(minute) || minute < 0 || minute > 59) {
+        console.log('Invalid minute in AI response:', minute);
+        return null;
+      }
     }
 
     date.setHours(hour, minute, 0, 0);
+    
+    // Final validation to ensure we have a valid date
+    if (isNaN(date.getTime())) {
+      console.log('Invalid date after setting time:', date);
+      return null;
+    }
+    
     const start_time = date.toISOString();
     const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
 
