@@ -450,18 +450,117 @@ async function checkMemberStatus(phone) {
   }
 }
 
-// Check availability
-async function checkAvailability(startTime, endTime, partySize) {
+// Comprehensive availability checking
+async function checkComprehensiveAvailability(startTime, endTime, partySize) {
   try {
+    const date = new Date(startTime);
+    const dateStr = date.toISOString().split('T')[0];
+    const dayOfWeek = date.getDay();
+
+    console.log('Checking comprehensive availability for:', { dateStr, dayOfWeek, partySize, startTime, endTime });
+
+    // 1. Check Booking Window (venue_hours table)
+    const { data: startSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'booking_start_date')
+      .single();
+    const { data: endSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'booking_end_date')
+      .single();
+    
+    const bookingStart = startSetting?.value ? new Date(startSetting.value) : null;
+    const bookingEnd = endSetting?.value ? new Date(endSetting.value) : null;
+    const reqDate = new Date(dateStr);
+    
+    if ((bookingStart && reqDate < bookingStart) || (bookingEnd && reqDate > bookingEnd)) {
+      console.log('Date outside booking window:', { reqDate, bookingStart, bookingEnd });
+      return { available: false, message: 'Reservations are not available for this date' };
+    }
+
+    // 2. Check for Private Events (private_events table)
+    const { data: privateEvents } = await supabase
+      .from('private_events')
+      .select('start_time, end_time')
+      .gte('start_time', `${dateStr}T00:00:00`)
+      .lte('end_time', `${dateStr}T23:59:59`);
+    
+    if (privateEvents && privateEvents.length > 0) {
+      console.log('Private event found for date:', dateStr);
+      return { available: false, message: 'This date is blocked for a private event' };
+    }
+
+    // 3. Check for Exceptional Closures (venue_hours table)
+    const { data: exceptionalClosure } = await supabase
+      .from('venue_hours')
+      .select('*')
+      .eq('type', 'exceptional_closure')
+      .eq('date', dateStr)
+      .maybeSingle();
+    
+    if (exceptionalClosure && (exceptionalClosure.full_day || !exceptionalClosure.time_ranges)) {
+      console.log('Exceptional closure found for date:', dateStr);
+      return { available: false, message: 'The venue is closed on this date' };
+    }
+
+    // 4. Check Base Hours (venue_hours table)
+    const { data: baseHoursData } = await supabase
+      .from('venue_hours')
+      .select('*')
+      .eq('type', 'base')
+      .eq('day_of_week', dayOfWeek);
+    
+    if (!baseHoursData || baseHoursData.length === 0) {
+      console.log('No base hours found for day of week:', dayOfWeek);
+      return { available: false, message: 'The venue is not open on this day of the week' };
+    }
+
+    // 5. Check if the requested time falls within venue hours
+    const requestedHour = date.getHours();
+    const requestedMinute = date.getMinutes();
+    const requestedTime = `${requestedHour.toString().padStart(2, '0')}:${requestedMinute.toString().padStart(2, '0')}`;
+    
+    let timeRanges = baseHoursData.flatMap(row => row.time_ranges || []);
+    
+    // Remove closed time ranges if partial closure
+    if (exceptionalClosure && exceptionalClosure.time_ranges) {
+      const closedRanges = exceptionalClosure.time_ranges;
+      timeRanges = timeRanges.flatMap(range => {
+        for (const closed of closedRanges) {
+          if (closed.start <= range.end && closed.end >= range.start) {
+            const before = closed.start > range.start ? [{ start: range.start, end: closed.start }] : [];
+            const after = closed.end < range.end ? [{ start: closed.end, end: range.end }] : [];
+            return [...before, ...after];
+          }
+        }
+        return [range];
+      });
+    }
+
+    // Check if requested time falls within any open time range
+    const isWithinHours = timeRanges.some(range => 
+      requestedTime >= range.start && requestedTime <= range.end
+    );
+    
+    if (!isWithinHours) {
+      console.log('Requested time outside venue hours:', { requestedTime, timeRanges });
+      return { available: false, message: 'The requested time is outside venue hours' };
+    }
+
+    // 6. Check Table Availability (tables and reservations tables)
     const { data: tables, error: tablesError } = await supabase
       .from('tables')
       .select('*')
       .gte('capacity', partySize);
     
     if (tablesError || !tables || tables.length === 0) {
+      console.log('No tables available for party size:', partySize);
       return { available: false, message: 'No tables available for this party size' };
     }
-    
+
+    // Get all reservations and events for the date to check conflicts
     const startOfDay = new Date(startTime);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(startTime);
@@ -474,29 +573,54 @@ async function checkAvailability(startTime, endTime, partySize) {
       .lte('end_time', endOfDay.toISOString());
     
     if (resError) {
+      console.error('Error fetching reservations:', resError);
       return { available: false, message: 'Error checking availability' };
     }
+
+    const { data: events, error: evError } = await supabase
+      .from('events')
+      .select('table_id, start_time, end_time')
+      .gte('start_time', startOfDay.toISOString())
+      .lte('end_time', endOfDay.toISOString());
     
-    const slotStart = new Date(startTime);
-    const slotEnd = new Date(endTime);
+    if (evError) {
+      console.error('Error fetching events:', evError);
+      return { available: false, message: 'Error checking availability' };
+    }
+
+    // Check for conflicting reservations and events
     const availableTable = tables
       .sort((a, b) => a.capacity - b.capacity)
       .find(table => {
-        const tableReservations = reservations.filter(r => r.table_id === table.id);
-        return !tableReservations.some(r => {
+        // Check for conflicting reservations
+        const hasReservationConflict = (reservations || []).some(r => {
+          if (r.table_id !== table.id) return false;
           const resStart = new Date(r.start_time);
           const resEnd = new Date(r.end_time);
-          return (slotStart < resEnd) && (slotEnd > resStart);
+          return (startTime < resEnd) && (endTime > resStart);
         });
+
+        // Check for conflicting events
+        const hasEventConflict = (events || []).some(e => {
+          if (e.table_id !== table.id) return false;
+          const evStart = new Date(e.start_time);
+          const evEnd = new Date(e.end_time);
+          return (startTime < evEnd) && (endTime > evStart);
+        });
+
+        return !hasReservationConflict && !hasEventConflict;
       });
-    
+
     if (!availableTable) {
-      return { available: false, message: 'No available tables for this time and party size' };
+      console.log('No available tables for the requested time');
+      return { available: false, message: 'No tables available for the requested time' };
     }
-    
+
+    console.log('Comprehensive availability check passed');
     return { available: true, table: availableTable };
+
   } catch (error) {
-    console.error('Error checking availability:', error);
+    console.error('Error in comprehensive availability check:', error);
     return { available: false, message: 'Error checking availability' };
   }
 }
@@ -626,7 +750,7 @@ export async function handler(req, res) {
     
     console.log('Successfully parsed reservation for member:', member.first_name, 'Parsed data:', parsed);
     
-    const availability = await checkAvailability(parsed.start_time, parsed.end_time, parsed.party_size);
+    const availability = await checkComprehensiveAvailability(parsed.start_time, parsed.end_time, parsed.party_size);
     
     if (!availability.available) {
       const errorMessage = `Sorry, ${availability.message}. Please try a different time or contact us directly.`;
