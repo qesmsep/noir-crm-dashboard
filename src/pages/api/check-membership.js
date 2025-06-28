@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {
@@ -17,13 +17,25 @@ export default async function handler(req, res) {
 
   try {
     // Format phone number to match database format
-    const formattedPhone = phone.replace(/\D/g, '');
+    const digits = phone.replace(/\D/g, '');
+    const possiblePhones = [
+      digits,                    // 6199713730
+      '+1' + digits,            // +16199713730
+      '1' + digits,             // 16199713730
+      '+1' + digits.slice(-10), // +16199713730 (if it's already 11 digits)
+      digits.slice(-10)         // 6199713730 (last 10 digits)
+    ];
+    
+    console.log('Checking membership for phone:', phone);
+    console.log('Possible phone formats:', possiblePhones);
 
-    // Query members table for the phone number (primary or secondary)
+    // Query members table for the phone number with multiple formats
     const { data: memberData, error: memberError } = await supabase
       .from('members')
       .select('member_id')
-      .or(`phone.eq.${formattedPhone},phone2.eq.${formattedPhone}`)
+      .or(
+        possiblePhones.map(p => `phone.eq.${p}`).join(',')
+      )
       .single();
 
     if (memberError && memberError.code !== 'PGRST116') {
@@ -40,7 +52,7 @@ export default async function handler(req, res) {
     const { data: potentialData, error: potentialError } = await supabase
       .from('potential_members')
       .select('member_id')
-      .eq('member_id', formattedPhone)
+      .eq('member_id', digits)
       .single();
 
     if (potentialError && potentialError.code !== 'PGRST116') {

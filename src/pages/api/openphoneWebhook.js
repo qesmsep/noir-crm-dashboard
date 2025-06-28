@@ -328,7 +328,7 @@ async function checkMemberStatus(phone) {
     // First, let's see what's actually in the members table for debugging
     const { data: allMembers, error: allMembersError } = await supabase
       .from('members')
-      .select('member_id, first_name, last_name, phone, phone2, membership_status')
+      .select('member_id, first_name, last_name, phone, membership_status')
       .limit(10);
     
     if (allMembersError) {
@@ -337,15 +337,13 @@ async function checkMemberStatus(phone) {
       console.log('Sample members in database:', allMembers);
     }
     
-    // Check both phone and phone2 fields with multiple formats
+    // Check phone field with multiple formats (removed phone2 since it no longer exists)
     const { data: member, error } = await supabase
       .from('members')
       .select('*')
       .or(
         // Check phone field with all possible formats
-        possiblePhones.map(p => `phone.eq.${p}`).join(','),
-        // Check phone2 field with all possible formats  
-        possiblePhones.map(p => `phone2.eq.${p}`).join(',')
+        possiblePhones.map(p => `phone.eq.${p}`).join(',')
       )
       .single();
     
@@ -360,7 +358,6 @@ async function checkMemberStatus(phone) {
       id: member.member_id, 
       name: `${member.first_name} ${member.last_name}`,
       phone: member.phone,
-      phone2: member.phone2,
       status: member.membership_status 
     });
     
@@ -537,7 +534,7 @@ export async function handler(req, res) {
     const { isMember, member } = await checkMemberStatus(from);
     
     if (!isMember) {
-      const errorMessage = `Thank you for your reservation request. However, I can only process reservations for active members. Please visit our website to make a reservation: https://noir-crm-dashboard.vercel.app`;
+      const errorMessage = `Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noir-crm-dashboard.vercel.app`;
       await sendSMS(from, errorMessage);
       return res.status(200).json({ message: 'Sent non-member error message with website redirect' });
     }

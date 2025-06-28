@@ -405,11 +405,23 @@ module.exports = async (req, res) => {
   const { party_size, start_time, end_time, event_type, notes } = parsedData;
 
   // Check if sender is a member
+  const digits = phone.replace(/\D/g, '');
+  const possiblePhones = [
+    digits,                    // 8584129797
+    '+1' + digits,            // +18584129797
+    '1' + digits,             // 18584129797
+    '+1' + digits.slice(-10), // +18584129797 (if it's already 11 digits)
+    digits.slice(-10)         // 8584129797 (last 10 digits)
+  ];
+  
   const { data: memberData, error: memberError } = await supabase
     .from('members')
     .select('*')
-    .limit(1)
-    .or(`phone.eq.${phone.replace(/\D/g, '')},phone.eq.${phone}`);
+    .or(
+      // Check phone field with all possible formats (removed phone2 since it no longer exists)
+      possiblePhones.map(p => `phone.eq.${p}`).join(',')
+    )
+    .single();
 
   if (memberError) {
     console.error('Error checking member status:', memberError);
@@ -423,7 +435,7 @@ module.exports = async (req, res) => {
     console.log('Non-member attempted SMS reservation:', phone);
     return res.status(403).json({ 
       error: 'Members only',
-      message: 'SMS reservations are only available for active members. Please contact us directly.'
+      message: 'Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noir-crm-dashboard.vercel.app'
     });
   }
 
