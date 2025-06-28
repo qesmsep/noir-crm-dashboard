@@ -586,6 +586,55 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     
     if (!baseHoursData || baseHoursData.length === 0) {
       console.log('No base hours found for day of week:', dayOfWeek);
+      
+      // 3. Outside base hours - Build base hours descriptor for all days
+      const allBaseHours = await supabase
+        .from('venue_hours')
+        .select('day_of_week, time_ranges')
+        .eq('type', 'base');
+      
+      if (allBaseHours.data && allBaseHours.data.length > 0) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const availableDays = [];
+        
+        // Group by day and format
+        for (let i = 0; i < 7; i++) {
+          const dayHours = allBaseHours.data.filter(h => h.day_of_week === i);
+          if (dayHours.length > 0) {
+            const timeRanges = dayHours.flatMap(h => h.time_ranges || []);
+            if (timeRanges.length > 0) {
+              const formattedRanges = timeRanges.map(range => {
+                const startTime = new Date(`2000-01-01T${range.start}:00`);
+                const endTime = new Date(`2000-01-01T${range.end}:00`);
+                
+                const startStr = startTime.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                });
+                
+                const endStr = endTime.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                });
+                
+                return `${startStr} to ${endStr}`;
+              });
+              
+              availableDays.push(`${dayNames[i]}s (${formattedRanges.join(' and ')})`);
+            }
+          }
+        }
+        
+        const baseHoursDescriptor = availableDays.join(', ');
+        
+        return {
+          available: false,
+          message: `Thank you for your reservation request. Noir is currently available for reservations on ${baseHoursDescriptor}. Please resubmit your reservation within these windows. Thank you!`
+        };
+      }
+      
       return { available: false, message: 'The venue is not open on this day of the week' };
     }
 
