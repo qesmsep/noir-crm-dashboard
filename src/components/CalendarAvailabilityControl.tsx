@@ -126,13 +126,13 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const [editingClosure, setEditingClosure] = useState<any>(null);
 
   // Private Events State
-  const [privateEvent, setPrivateEvent] = useState<any>({ name: '', event_type: '', date: null, start: '18:00', end: '20:00' });
+  const [privateEvent, setPrivateEvent] = useState<any>({ name: '', event_type: '', date: null, start: '18:00', end: '20:00', full_day: true });
   const [privateEventStatus, setPrivateEventStatus] = useState<string>('');
   const [createdPrivateEvent, setCreatedPrivateEvent] = useState<any>(null);
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const [editingEvent, setEditingEvent] = useState<any>(null);
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
-  const [editEventForm, setEditEventForm] = useState<any>({ name: '', event_type: '', date: null, start: '', end: '' });
+  const [editEventForm, setEditEventForm] = useState<any>({ name: '', event_type: '', date: null, start: '', end: '', full_day: true });
 
   // Load base/exceptional hours from Supabase
   useEffect(() => {
@@ -367,27 +367,45 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     e.preventDefault();
     setPrivateEventStatus('');
     try {
-      if (!privateEvent.name || !privateEvent.event_type || !privateEvent.date || !privateEvent.start || !privateEvent.end) {
-        setPrivateEventStatus('Please fill all fields.');
+      if (!privateEvent.name || !privateEvent.event_type || !privateEvent.date) {
+        setPrivateEventStatus('Please fill all required fields.');
         return;
       }
-      const start_time = new Date(privateEvent.date);
-      const [startHour, startMinute] = privateEvent.start.split(':');
-      start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
-      const end_time = new Date(privateEvent.date);
-      const [endHour, endMinute] = privateEvent.end.split(':');
-      end_time.setHours(Number(endHour), Number(endMinute), 0, 0);
+      
+      let start_time, end_time;
+      
+      if (privateEvent.full_day) {
+        // For full day events, set start to 00:00 and end to 23:59
+        start_time = new Date(privateEvent.date);
+        start_time.setHours(0, 0, 0, 0);
+        end_time = new Date(privateEvent.date);
+        end_time.setHours(23, 59, 59, 999);
+      } else {
+        // For time-specific events, validate time fields
+        if (!privateEvent.start || !privateEvent.end) {
+          setPrivateEventStatus('Please fill all fields.');
+          return;
+        }
+        start_time = new Date(privateEvent.date);
+        const [startHour, startMinute] = privateEvent.start.split(':');
+        start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
+        end_time = new Date(privateEvent.date);
+        const [endHour, endMinute] = privateEvent.end.split(':');
+        end_time.setHours(Number(endHour), Number(endMinute), 0, 0);
+      }
+      
       const { data, error } = await supabase.from('private_events').insert([
         {
           title: privateEvent.name,
           event_type: privateEvent.event_type,
           start_time: start_time.toISOString(),
           end_time: end_time.toISOString(),
+          full_day: privateEvent.full_day,
         }
       ]).select().single();
       if (error) throw error;
       setPrivateEvents([...privateEvents, data]);
-      setPrivateEvent({ name: '', event_type: '', date: null, start: '18:00', end: '20:00' });
+      setPrivateEvent({ name: '', event_type: '', date: null, start: '18:00', end: '20:00', full_day: true });
       setPrivateEventStatus('Private event created!');
     } catch (err: any) {
       setPrivateEventStatus(err.message || 'Failed to create private event.');
@@ -406,6 +424,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       date: event.start_time ? new Date(event.start_time) : null,
       start: event.start_time ? new Date(event.start_time).toISOString().slice(11, 16) : '18:00',
       end: event.end_time ? new Date(event.end_time).toISOString().slice(11, 16) : '20:00',
+      full_day: event.full_day || false,
     });
     setEditingEvent(event);
     setEditModalOpen(true);
@@ -415,12 +434,28 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleSaveEditEvent = async () => {
     if (!editingEvent) return;
     try {
-      const start_time = new Date(editEventForm.date);
-      const [startHour, startMinute] = editEventForm.start.split(':');
-      start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
-      const end_time = new Date(editEventForm.date);
-      const [endHour, endMinute] = editEventForm.end.split(':');
-      end_time.setHours(Number(endHour), Number(endMinute), 0, 0);
+      let start_time, end_time;
+      
+      if (editEventForm.full_day) {
+        // For full day events, set start to 00:00 and end to 23:59
+        start_time = new Date(editEventForm.date);
+        start_time.setHours(0, 0, 0, 0);
+        end_time = new Date(editEventForm.date);
+        end_time.setHours(23, 59, 59, 999);
+      } else {
+        // For time-specific events, validate time fields
+        if (!editEventForm.start || !editEventForm.end) {
+          setPrivateEventStatus('Please fill all fields.');
+          return;
+        }
+        start_time = new Date(editEventForm.date);
+        const [startHour, startMinute] = editEventForm.start.split(':');
+        start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
+        end_time = new Date(editEventForm.date);
+        const [endHour, endMinute] = editEventForm.end.split(':');
+        end_time.setHours(Number(endHour), Number(endMinute), 0, 0);
+      }
+      
       const { data, error } = await supabase
         .from('private_events')
         .update({
@@ -428,6 +463,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           event_type: editEventForm.event_type,
           start_time: start_time.toISOString(),
           end_time: end_time.toISOString(),
+          full_day: editEventForm.full_day,
         })
         .eq('id', editingEvent.id)
         .select()
@@ -722,8 +758,13 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                     placeholderText="Select date"
                     className="chakra-input"
                   />
-                  <Input type="time" value={privateEvent.start} onChange={e => setPrivateEvent((ev: any) => ({ ...ev, start: e.target.value }))} w="110px" required />
-                  <Input type="time" value={privateEvent.end} onChange={e => setPrivateEvent((ev: any) => ({ ...ev, end: e.target.value }))} w="110px" required />
+                  <Checkbox isChecked={privateEvent.full_day} onChange={e => setPrivateEvent((ev: any) => ({ ...ev, full_day: e.target.checked }))}>Full Day</Checkbox>
+                  {!privateEvent.full_day && (
+                    <>
+                      <Input type="time" value={privateEvent.start} onChange={e => setPrivateEvent((ev: any) => ({ ...ev, start: e.target.value }))} w="110px" required />
+                      <Input type="time" value={privateEvent.end} onChange={e => setPrivateEvent((ev: any) => ({ ...ev, end: e.target.value }))} w="110px" required />
+                    </>
+                  )}
                   <Button colorScheme="green" type="submit">Create Private Event</Button>
                 </HStack>
                 {privateEventStatus && <Text color={privateEventStatus.includes('created') ? 'green.500' : 'red.500'}>{privateEventStatus}</Text>}
@@ -734,7 +775,12 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                   <Box key={event.id} p={2} borderWidth={1} borderRadius={6} display="flex" alignItems="center" gap={2}>
                     <Text fontWeight={600}>{event.title}</Text>
                     <Text>{event.event_type}</Text>
-                    <Text>{event.start_time && new Date(event.start_time).toLocaleString()} - {event.end_time && new Date(event.end_time).toLocaleString()}</Text>
+                    <Text>
+                      {event.full_day ? 'Full Day' : `${event.start_time && new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${event.end_time && new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                      {' '}
+                      {event.start_time && new Date(event.start_time).toLocaleDateString()}
+                    </Text>
+                    {event.full_day && <Badge colorScheme="purple">Full Day</Badge>}
                     <Button size="xs" colorScheme="blue" onClick={() => handleOpenEditModal(event)}>Edit</Button>
                     <Button size="xs" colorScheme="red" onClick={() => handleDeletePrivateEvent(event.id)}>Delete</Button>
                   </Box>
@@ -756,8 +802,13 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                       placeholderText="Select date"
                       className="chakra-input"
                     />
-                    <Input type="time" value={editEventForm.start} onChange={e => setEditEventForm((f: any) => ({ ...f, start: e.target.value }))} w="110px" required />
-                    <Input type="time" value={editEventForm.end} onChange={e => setEditEventForm((f: any) => ({ ...f, end: e.target.value }))} w="110px" required />
+                    <Checkbox isChecked={editEventForm.full_day} onChange={e => setEditEventForm((f: any) => ({ ...f, full_day: e.target.checked }))}>Full Day</Checkbox>
+                    {!editEventForm.full_day && (
+                      <HStack>
+                        <Input type="time" value={editEventForm.start} onChange={e => setEditEventForm((f: any) => ({ ...f, start: e.target.value }))} w="110px" required />
+                        <Input type="time" value={editEventForm.end} onChange={e => setEditEventForm((f: any) => ({ ...f, end: e.target.value }))} w="110px" required />
+                      </HStack>
+                    )}
                   </VStack>
                 </ModalBody>
                 <ModalFooter>
