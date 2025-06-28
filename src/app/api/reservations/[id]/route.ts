@@ -11,10 +11,11 @@ const supabase = createClient(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  console.log('PATCH: Querying for reservation id:', id);
+  const { id } = params;
+  const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
+  console.log('PATCH: Querying for reservation id:', reservationId);
   
   try {
     const body = await request.json();
@@ -49,7 +50,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('reservations')
       .update(updateFields)
-      .eq('id', id)
+      .eq('id', reservationId)
       .select()
       .single();
 
@@ -70,13 +71,14 @@ export async function PATCH(
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  console.log('GET: Querying for reservation id:', id);
+  const { id } = params;
+  const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
+  console.log('GET: Querying for reservation id:', reservationId);
   
   try {
-    console.log('API: Fetching reservation with ID:', id);
+    console.log('API: Fetching reservation with ID:', reservationId);
     
     const { data, error } = await supabase
       .from('reservations')
@@ -88,7 +90,7 @@ export async function GET(
           seats
         )
       `)
-      .eq('id', id)
+      .eq('id', reservationId)
       .single();
 
     console.log('API: Supabase query result:', { data, error });
@@ -114,15 +116,16 @@ export async function GET(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const { id } = params;
+    const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
 
     const { error } = await supabase
       .from('reservations')
       .delete()
-      .eq('id', id);
+      .eq('id', reservationId);
 
     if (error) {
       console.error('Error deleting reservation:', error);
