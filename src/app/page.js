@@ -13,6 +13,7 @@ import { CardNumberElement, CardExpiryElement, CardCvcElement } from '@stripe/re
 import { getSupabaseClient } from '../pages/api/supabaseClient';
 import ReservationForm from '@/components/ReservationForm';
 import ReservationSection from '@/components/ReservationSection';
+import Modal from 'react-modal';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -377,19 +378,6 @@ export default function Home() {
                 style={{ borderRadius: '1.5rem', boxShadow: '0 8px 32px rgba(53,53,53,0.15)' }} 
               />
             </button>
-            <Modal
-              isOpen={menuModalOpen}
-              onRequestClose={() => setMenuModalOpen(false)}
-              contentLabel="Noir Menu Modal"
-              style={{
-                overlay: { backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000 },
-                content: { maxWidth: '90vw', maxHeight: '90vh', margin: 'auto', background: '#23201C', border: 'none', borderRadius: '1.5rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }
-              }}
-              ariaHideApp={false}
-            >
-              <button onClick={() => setMenuModalOpen(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(53,53,53,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: 36, height: 36, fontSize: 24, cursor: 'pointer', zIndex: 10 }} aria-label="Close Menu">&times;</button>
-              <img src="/images/noir-menu.png" alt="Noir Menu" style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '1.5rem', boxShadow: '0 8px 32px rgba(53,53,53,0.15)' }} />
-            </Modal>
           </div>
         </div>
       </section>
@@ -643,6 +631,61 @@ export default function Home() {
           </a>
         </div>
       </footer>
+
+      {/* Noir Menu Modal using react-modal */}
+      <Modal
+        isOpen={menuModalOpen}
+        onRequestClose={() => setMenuModalOpen(false)}
+        contentLabel="Noir Menu Modal"
+        style={{
+          overlay: { backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 2000 },
+          content: {
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            margin: 'auto',
+            background: '#23201C',
+            border: 'none',
+            borderRadius: '1.5rem',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2001
+          }
+        }}
+        ariaHideApp={false}
+      >
+        <button
+          onClick={() => setMenuModalOpen(false)}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: 'rgba(53,53,53,0.7)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: 36,
+            height: 36,
+            fontSize: 24,
+            cursor: 'pointer',
+            zIndex: 10
+          }}
+          aria-label="Close Menu"
+        >
+          &times;
+        </button>
+        <img
+          src="/images/noir-menu.png"
+          alt="Noir Menu"
+          style={{
+            maxWidth: '90vw',
+            maxHeight: '80vh',
+            borderRadius: '1.5rem',
+            boxShadow: '0 8px 32px rgba(53,53,53,0.15)'
+          }}
+        />
+      </Modal>
     </div>
   );
 }
