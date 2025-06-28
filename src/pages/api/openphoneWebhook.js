@@ -480,7 +480,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       return { available: false, message: 'Reservations are not available for this date' };
     }
 
-    // 2. Check for Private Events (private_events table)
+    // 2. Check for Private Events FIRST (private_events table)
     const { data: privateEvents, error: privateEventsError } = await supabase
       .from('private_events')
       .select('start_time, end_time, full_day, title')
@@ -494,7 +494,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     
     console.log('Private events found for date:', dateStr, privateEvents);
     
-    // 2. Private events
+    // Check for Private Events FIRST
     if (privateEvents && privateEvents.length > 0) {
       console.log('Private event found for date:', dateStr);
       
@@ -539,7 +539,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       }
     }
 
-    // 3. Check for Exceptional Closures (venue_hours table)
+    // 3. Check for Exceptional Closures SECOND (venue_hours table)
     const { data: exceptionalClosure } = await supabase
       .from('venue_hours')
       .select('*')
@@ -547,7 +547,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       .eq('date', dateStr)
       .maybeSingle();
     
-    // 1. Custom closures
+    // Check for Special Closed Days SECOND
     if (exceptionalClosure) {
       console.log('Exceptional closure found for date:', dateStr);
       
@@ -577,7 +577,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       }
     }
 
-    // 4. Check Base Hours (venue_hours table)
+    // 4. Check Base Hours THIRD (venue_hours table)
     const { data: baseHoursData, error: baseHoursError } = await supabase
       .from('venue_hours')
       .select('*')
@@ -593,7 +593,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     if (!baseHoursData || baseHoursData.length === 0) {
       console.log('No base hours found for day of week:', dayOfWeek);
       
-      // 3. Outside base hours - Build base hours descriptor for all days
+      // Outside base hours - Build base hours descriptor for all days
       const { data: allBaseHours, error: allBaseHoursError } = await supabase
         .from('venue_hours')
         .select('day_of_week, time_ranges')
@@ -680,7 +680,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     if (!isWithinHours) {
       console.log('Requested time outside venue hours:', { requestedTime, timeRanges });
       
-      // 3. Outside base hours
+      // Outside base hours
       // Build base hours descriptor
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayName = dayNames[dayOfWeek];
