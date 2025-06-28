@@ -540,13 +540,14 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     }
 
     // 3. Check for Exceptional Closures SECOND (venue_hours table)
+    console.log('Checking for exceptional closure with dateStr:', dateStr);
     const { data: exceptionalClosure } = await supabase
       .from('venue_hours')
       .select('*')
       .eq('type', 'exceptional_closure')
       .eq('date', dateStr)
       .maybeSingle();
-    
+    console.log('Exceptional closure query result:', exceptionalClosure);
     // Check for Special Closed Days SECOND
     if (exceptionalClosure) {
       console.log('Exceptional closure found for date:', dateStr);

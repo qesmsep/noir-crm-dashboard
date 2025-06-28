@@ -167,9 +167,10 @@ function parseReservationMessage(message) {
   }
 
   // Flexible date and time extraction
-  // Try to find a date (MM/DD/YY, Month Day, this/next Friday, day names, etc.)
+  // Try to find a date (MM/DD/YY, MM-DD-YYYY, Month Day, this/next Friday, day names, etc.)
   let dateStr = '';
-  let dateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+  let dateMatch = msg.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i) ||
+                  msg.match(/(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i) ||
                   msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i) ||
                   msg.match(/(this|next)\s+\w+/i) ||
                   msg.match(/(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)/i) ||
@@ -189,7 +190,8 @@ function parseReservationMessage(message) {
 
   // If date or time is missing, try to find them anywhere in the message
   if (!dateStr) {
-    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/) ||
+    const anyDate = msg.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/) ||
+                   msg.match(/(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/) ||
                    msg.match(/(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)/i) ||
                    msg.match(/(tomorrow|today)/i);
     if (anyDate) dateStr = anyDate[0];
@@ -512,13 +514,14 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     }
 
     // 3. Check for Exceptional Closures SECOND (venue_hours table)
+    console.log('Checking for exceptional closure with dateStr:', dateStr);
     const { data: exceptionalClosure } = await supabase
       .from('venue_hours')
       .select('*')
       .eq('type', 'exceptional_closure')
       .eq('date', dateStr)
       .maybeSingle();
-    
+    console.log('Exceptional closure query result:', exceptionalClosure);
     // Check for Special Closed Days SECOND
     if (exceptionalClosure) {
       console.log('Exceptional closure found for date:', dateStr);
@@ -926,4 +929,4 @@ export default async function handler(req, res) {
     reservation,
     message: `Reservation confirmed for ${member.first_name} on ${formattedDate} for ${party_size} guests${reservation.tables?.number ? ` at Table ${reservation.tables.number}` : ''}.`
   });
-} 
+}
