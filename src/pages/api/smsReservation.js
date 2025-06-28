@@ -511,7 +511,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
           .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
         return {
           available: false,
-          message: `Thank you for your reservation request. Noir will be closed from ${from} to ${to} for a private event. If you'd like, please resubmit your reservation request for a time outside of this window. Thank you!`
+          message: `Thank you for your reservation request. Noir will be closed from ${from} to ${to} for a private event. If you'd like, please resubmit your reservation request for a time outside of this window. Thank you.`
         };
       }
     }
@@ -621,7 +621,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
         
         return {
           available: false,
-          message: `Thank you for your reservation request. Noir is currently available for reservations on ${baseHoursDescriptor}. Please resubmit your reservation within these windows. Thank you!`
+          message: `Thank you for your reservation request. Noir is currently available for reservations on ${baseHoursDescriptor}. Please resubmit your reservation within these windows. Thank you.`
         };
       }
       
@@ -687,7 +687,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       
       return {
         available: false,
-        message: `Thank you for your reservation request. Noir is currently available for reservations on ${baseHoursDescriptor}. Please resubmit your reservation within these windows. Thank you!`
+        message: `Thank you for your reservation request. Noir is currently available for reservations on ${baseHoursDescriptor}. Please resubmit your reservation within these windows. Thank you.`
       };
     }
 
