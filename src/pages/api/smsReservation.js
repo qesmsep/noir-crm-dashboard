@@ -94,13 +94,6 @@ function parseReservationMessage(message) {
   // Normalize message (remove extra spaces, make case-insensitive for keywords)
   const msg = message.replace(/\s+/g, ' ').trim();
 
-  // Regex for reservation keyword (case-insensitive)
-  const reservationKeyword = /\b(reservation|reserve)\b/i;
-  if (!reservationKeyword.test(msg)) {
-    console.log('No reservation keyword found');
-    return null;
-  }
-
   // Flexible party size extraction
   let party_size = 2; // default
   const partySizeRegexes = [
@@ -305,13 +298,6 @@ async function parseReservationMessageHybrid(message) {
   // Normalize message
   const msg = message.replace(/\s+/g, ' ').trim();
 
-  // Check for reservation keyword
-  const reservationKeyword = /\b(reservation|reserve|book|table)\b/i;
-  if (!reservationKeyword.test(msg)) {
-    console.log('No reservation keyword found');
-    return null;
-  }
-
   // Try regex parsing first (fast and free)
   const regexResult = parseReservationMessage(msg);
   if (regexResult) {
@@ -391,6 +377,38 @@ module.exports = async (req, res) => {
     });
   }
 
+  // Only process messages that start with "Reservation"
+  if (!text.toLowerCase().startsWith('reservation')) {
+    console.log('Message does not start with "Reservation", ignoring');
+    return res.status(200).json({ message: 'Message ignored - does not start with Reservation' });
+  }
+
+  // Check if sender is a member FIRST
+  const digits = phone.replace(/\D/g, '');
+  const possiblePhones = [
+    digits,                    // 8584129797
+    '+1' + digits,            // +18584129797
+    '1' + digits,             // 18584129797
+    '+1' + digits.slice(-10), // +18584129797 (if it's already 11 digits)
+    digits.slice(-10)         // 8584129797 (last 10 digits)
+  ];
+  const { data: memberData, error: memberError } = await supabase
+    .from('members')
+    .select('*')
+    .or(
+      possiblePhones.map(p => `phone.eq.${p}`).join(',')
+    )
+    .single();
+  const member = memberData;
+  const isMember = !!member;
+  if (!isMember) {
+    console.log('Non-member attempted SMS reservation:', phone);
+    return res.status(403).json({ 
+      error: 'Members only',
+      message: 'Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noir-crm-dashboard.vercel.app'
+    });
+  }
+
   // Parse the SMS text using our hybrid approach
   const parsedData = await parseReservationMessageHybrid(text);
   
@@ -403,41 +421,6 @@ module.exports = async (req, res) => {
   }
 
   const { party_size, start_time, end_time, event_type, notes } = parsedData;
-
-  // Check if sender is a member
-  const digits = phone.replace(/\D/g, '');
-  const possiblePhones = [
-    digits,                    // 8584129797
-    '+1' + digits,            // +18584129797
-    '1' + digits,             // 18584129797
-    '+1' + digits.slice(-10), // +18584129797 (if it's already 11 digits)
-    digits.slice(-10)         // 8584129797 (last 10 digits)
-  ];
-  
-  const { data: memberData, error: memberError } = await supabase
-    .from('members')
-    .select('*')
-    .or(
-      // Check phone field with all possible formats (removed phone2 since it no longer exists)
-      possiblePhones.map(p => `phone.eq.${p}`).join(',')
-    )
-    .single();
-
-  if (memberError) {
-    console.error('Error checking member status:', memberError);
-    return res.status(500).json({ error: 'Error checking member status' });
-  }
-
-  const member = memberData?.[0];
-  const isMember = !!member;
-
-  if (!isMember) {
-    console.log('Non-member attempted SMS reservation:', phone);
-    return res.status(403).json({ 
-      error: 'Members only',
-      message: 'Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noir-crm-dashboard.vercel.app'
-    });
-  }
 
   // Check availability and assign table
   const table_id = await assignTable(start_time, end_time, party_size);

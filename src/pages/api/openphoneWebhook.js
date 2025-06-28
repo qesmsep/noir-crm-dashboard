@@ -282,13 +282,6 @@ async function parseReservationMessageHybrid(message) {
   // Normalize message
   const msg = message.replace(/\s+/g, ' ').trim();
 
-  // Check for reservation keyword
-  const reservationKeyword = /\b(reservation|reserve|book|table)\b/i;
-  if (!reservationKeyword.test(msg)) {
-    console.log('No reservation keyword found');
-    return null;
-  }
-
   // Try regex parsing first (fast and free)
   const regexResult = parseReservationMessage(msg);
   if (regexResult) {
@@ -515,29 +508,32 @@ export async function handler(req, res) {
   console.log('Raw webhook data:', JSON.stringify(data, null, 2));
   console.log('Phone number received from OpenPhone:', from);
 
-  // More flexible message filtering - check for reservation keywords
-  const reservationKeywords = /\b(reservation|reserve|book|table)\b/i;
-  if (!reservationKeywords.test(text)) {
-    console.log('Message does not contain reservation keywords, ignoring');
-    return res.status(200).json({ message: 'Message ignored - no reservation keywords' });
+  // Only process messages that start with "Reservation"
+  if (!text.toLowerCase().startsWith('reservation')) {
+    console.log('Message does not start with "Reservation", ignoring');
+    return res.status(200).json({ message: 'Message ignored - does not start with Reservation' });
+  }
+
+  // Check membership FIRST
+  const { isMember, member } = await checkMemberStatus(from);
+  if (!isMember) {
+    const errorMessage = `Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noir-crm-dashboard.vercel.app`;
+    await sendSMS(from, errorMessage);
+    return res.status(200).json({ message: 'Sent non-member error message with website redirect' });
   }
 
   try {
+    console.log('Attempting to parse reservation message for member:', member.first_name);
     const parsed = await parseReservationMessageHybrid(text);
     
     if (!parsed) {
+      console.log('Both regex and AI parsing failed for member:', member.first_name, 'Message:', text);
       const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please visit our website to make a reservation: https://noir-crm-dashboard.vercel.app`;
       await sendSMS(from, errorMessage);
       return res.status(200).json({ message: 'Sent error message to user with website redirect' });
     }
     
-    const { isMember, member } = await checkMemberStatus(from);
-    
-    if (!isMember) {
-      const errorMessage = `Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noir-crm-dashboard.vercel.app`;
-      await sendSMS(from, errorMessage);
-      return res.status(200).json({ message: 'Sent non-member error message with website redirect' });
-    }
+    console.log('Successfully parsed reservation for member:', member.first_name, 'Parsed data:', parsed);
     
     const availability = await checkAvailability(parsed.start_time, parsed.end_time, parsed.party_size);
     
