@@ -313,15 +313,22 @@ async function checkMemberStatus(phone) {
   try {
     console.log('Checking member status for phone:', phone);
     
+    // Normalize the incoming phone number
     const digits = phone.replace(/\D/g, '');
-    const possiblePhones = [digits, '+1' + digits, '1' + digits];
+    const possiblePhones = [
+      digits,                    // 8584129797
+      '+1' + digits,            // +18584129797
+      '1' + digits,             // 18584129797
+      '+1' + digits.slice(-10), // +18584129797 (if it's already 11 digits)
+      digits.slice(-10)         // 8584129797 (last 10 digits)
+    ];
     
     console.log('Phone number formats to check:', possiblePhones);
     
     // First, let's see what's actually in the members table for debugging
     const { data: allMembers, error: allMembersError } = await supabase
       .from('members')
-      .select('member_id, first_name, last_name, phone, membership_status')
+      .select('member_id, first_name, last_name, phone, phone2, membership_status')
       .limit(10);
     
     if (allMembersError) {
@@ -330,10 +337,16 @@ async function checkMemberStatus(phone) {
       console.log('Sample members in database:', allMembers);
     }
     
+    // Check both phone and phone2 fields with multiple formats
     const { data: member, error } = await supabase
       .from('members')
       .select('*')
-      .in('phone', possiblePhones)
+      .or(
+        // Check phone field with all possible formats
+        possiblePhones.map(p => `phone.eq.${p}`).join(','),
+        // Check phone2 field with all possible formats  
+        possiblePhones.map(p => `phone2.eq.${p}`).join(',')
+      )
       .single();
     
     console.log('Member lookup result:', { member, error });
@@ -347,6 +360,7 @@ async function checkMemberStatus(phone) {
       id: member.member_id, 
       name: `${member.first_name} ${member.last_name}`,
       phone: member.phone,
+      phone2: member.phone2,
       status: member.membership_status 
     });
     
