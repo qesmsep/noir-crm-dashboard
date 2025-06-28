@@ -166,6 +166,7 @@ export default function Home() {
   const [bookingEndDate, setBookingEndDate] = useState(null);
   const [baseDays, setBaseDays] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [menuModalOpen, setMenuModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchConfig() {
@@ -205,6 +206,9 @@ export default function Home() {
       </div>
     );
   }
+
+  // Apple Maps link helper
+  const appleMapsUrl = 'https://maps.apple.com/?address=106%20W%2011th%20St,Kansas%20City,MO%2064105';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#ECEDE8]">
@@ -303,7 +307,8 @@ export default function Home() {
               alt="Cocktails" 
               width={450} 
               height={350} 
-              className="rounded-2xl object-cover w-full h-64 sm:h-80 lg:h-96 shadow-xl" 
+              className="rounded-2xl object-cover w-full h-64 sm:h-80 lg:h-96 shadow-xl"
+              style={{ objectPosition: 'bottom center' }}
             />
           </div>
           <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
@@ -320,13 +325,13 @@ export default function Home() {
               Hours & Location
             </h2>
             <a 
-              href="https://maps.google.com/?q=106 W. 11th St, Kansas City, Mo 68104" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+              href={appleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="underline mb-4 sm:mb-6 text-base sm:text-lg text-[#353535] hover:text-[#A59480] transition-colors"
-              aria-label="Open location in Google Maps"
+              aria-label="Open location in Apple Maps"
             >
-              106 W. 11th St, Kansas City, Mo 68104
+              106 W. 11th St, Kansas City, MO 64105
             </a>
             <div className="mb-4 sm:mb-6 text-[#353535] text-base sm:text-lg space-y-1">
               <div>Thursday – 6pm-11pm</div>
@@ -362,17 +367,29 @@ export default function Home() {
             Explore our curated selection of cocktails, spirits, and small plates. Enjoy the Noir experience.
           </p>
           <div className="w-full max-w-4xl mx-auto px-4">
-            <Image 
-              src="/images/noir-menu.png" 
-              alt="Noir Menu" 
-              width={1200} 
-              height={1200} 
-              className="w-full h-auto rounded-2xl shadow-2xl" 
-              style={{ 
-                borderRadius: '1.5rem', 
-                boxShadow: '0 8px 32px rgba(53,53,53,0.15)' 
-              }} 
-            />
+            <button onClick={() => setMenuModalOpen(true)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }} aria-label="Open Noir Menu">
+              <Image 
+                src="/images/noir-menu.png" 
+                alt="Noir Menu" 
+                width={1200} 
+                height={1200} 
+                className="w-full h-auto rounded-2xl shadow-2xl" 
+                style={{ borderRadius: '1.5rem', boxShadow: '0 8px 32px rgba(53,53,53,0.15)' }} 
+              />
+            </button>
+            <Modal
+              isOpen={menuModalOpen}
+              onRequestClose={() => setMenuModalOpen(false)}
+              contentLabel="Noir Menu Modal"
+              style={{
+                overlay: { backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000 },
+                content: { maxWidth: '90vw', maxHeight: '90vh', margin: 'auto', background: '#23201C', border: 'none', borderRadius: '1.5rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }
+              }}
+              ariaHideApp={false}
+            >
+              <button onClick={() => setMenuModalOpen(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(53,53,53,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: 36, height: 36, fontSize: 24, cursor: 'pointer', zIndex: 10 }} aria-label="Close Menu">&times;</button>
+              <img src="/images/noir-menu.png" alt="Noir Menu" style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '1.5rem', boxShadow: '0 8px 32px rgba(53,53,53,0.15)' }} />
+            </Modal>
           </div>
         </div>
       </section>
@@ -576,11 +593,11 @@ export default function Home() {
               <div className="font-semibold text-lg sm:text-xl mb-2 sm:mb-3">Location</div>
               <div className="text-sm sm:text-base leading-relaxed">
                 <a 
-                  href="https://maps.google.com/?q=106 W. 11th St, Kansas City, MO 64105" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
+                  href={appleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-[#BCA892] underline hover:text-[#ECEDE8] transition-colors"
-                  aria-label="Open location in Google Maps"
+                  aria-label="Open location in Apple Maps"
                 >
                   106 W. 11th St,<br />
                   Kansas City, MO 64105

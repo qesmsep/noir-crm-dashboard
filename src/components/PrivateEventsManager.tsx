@@ -733,9 +733,12 @@ export default function PrivateEventsManager() {
                     </Td>
                     <Td borderRight="1px solid" borderColor="gray.200" py={4} px={4}>
                       <HStack spacing={1} align="center">
-                        
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
-                          {formatDate(event.start_time)}
+                          {new Date(event.start_time).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
                         </Text>
                       </HStack>
                     </Td>
@@ -743,7 +746,7 @@ export default function PrivateEventsManager() {
                       <HStack spacing={1} align="center">
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
                           {event.full_day
-                            ? 'All Day'
+                            ? 'Full Day'
                             : `${formatTime(event.start_time)} - ${formatTime(event.end_time)}`}
                         </Text>
                       </HStack>
