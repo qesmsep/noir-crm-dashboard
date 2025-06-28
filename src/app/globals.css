@@ -49,52 +49,374 @@ body {
     rgb(var(--background-start-rgb));
 }
 
-@layer components {
-  .btn-primary {
-    @apply px-4 py-2 rounded-md transition-colors;
-    background-color: #353535;
-    color: #FFFFFF;
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  /* Improve touch targets */
+  button, a, input, select, textarea {
+    min-height: 44px;
+    min-width: 44px;
   }
-  .btn-primary:hover {
-    background-color: #2E2E2E;
+  
+  /* Better scrolling */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
   }
+  
+  /* Prevent horizontal scroll */
+  body {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  
+  /* Improve text readability */
+  p, h1, h2, h3, h4, h5, h6 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Better form elements */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+    border-radius: 8px;
+  }
+  
+  /* Improve button interactions */
+  button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  /* Better image handling */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  /* Improve modal and overlay interactions */
+  .chakra-modal__overlay {
+    backdrop-filter: blur(4px);
+  }
+  
+  /* Better date picker on mobile */
+  .react-datepicker-wrapper {
+    width: 100%;
+  }
+  
+  .react-datepicker__input-container {
+    width: 100%;
+  }
+  
+  .react-datepicker__input-container input {
+    width: 100%;
+    height: 48px;
+    font-size: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+  }
+  
+  /* Improve select dropdowns */
+  select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 8px center;
+    background-repeat: no-repeat;
+    background-size: 16px 12px;
+    padding-right: 40px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+  
+  /* Better date picker calendar on mobile */
+  .react-datepicker-popper {
+    z-index: 9999 !important;
+  }
+  
+  .react-datepicker {
+    font-size: 14px !important;
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+  }
+  
+  .react-datepicker__header {
+    border-radius: 12px 12px 0 0 !important;
+    background-color: #f7fafc !important;
+  }
+  
+  .react-datepicker__day {
+    width: 36px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    margin: 2px !important;
+    border-radius: 50% !important;
+  }
+  
+  .react-datepicker__day:hover {
+    background-color: #A59480 !important;
+    color: white !important;
+  }
+  
+  .react-datepicker__day--selected {
+    background-color: #353535 !important;
+    color: white !important;
+  }
+  
+  .react-datepicker__day--keyboard-selected {
+    background-color: #A59480 !important;
+    color: white !important;
+  }
+  
+  /* Better form spacing on mobile */
+  .chakra-form-control {
+    margin-bottom: 16px;
+  }
+  
+  .chakra-form-label {
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  
+  /* Improve button states */
+  button:active {
+    transform: scale(0.98);
+  }
+  
+  /* Better focus states for mobile */
+  input:focus, select:focus, textarea:focus {
+    outline: 2px solid #A59480;
+    outline-offset: 2px;
+  }
+  
+  /* Improve navigation on mobile */
+  nav {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  /* Better hero section on mobile */
+  .hero-section {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Improve section spacing on mobile */
+  section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Better card layouts on mobile */
+  .card-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  /* Improve footer on mobile */
+  footer {
+    text-align: center;
+  }
+  
+  /* Better image responsiveness */
+  .responsive-image {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+  }
+  
+  /* Improve text sizing on mobile */
+  .mobile-text {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  
+  /* Better button sizing on mobile */
+  .mobile-button {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    min-height: 44px;
+  }
+  
+  /* Improve form container on mobile */
+  .form-container {
+    padding: 1rem;
+    margin: 0.5rem;
+  }
+  
+  /* Better spacing for mobile */
+  .mobile-spacing {
+    margin-bottom: 1rem;
+  }
+  
+  /* Improve accessibility on mobile */
+  .mobile-accessible {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
 
-  .btn-secondary {
-    @apply px-4 py-2 rounded-md transition-colors;
-    background-color: #ECEDE8;
-    color: #353535;
-  }
-  .btn-secondary:hover {
-    background-color: #CAC2B9;
-  }
+/* Smooth scrolling for all devices */
+html {
+  scroll-behavior: smooth;
+}
 
-  .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
-  }
+/* Better focus states for accessibility */
+button:focus, a:focus, input:focus, select:focus, textarea:focus {
+  outline: 2px solid #A59480;
+  outline-offset: 2px;
+}
 
-  .card {
-    @apply bg-white rounded-lg shadow-md p-6;
-  }
+/* Loading animation */
+.loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255,255,255,.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
 
-  .table-container {
-    @apply overflow-x-auto;
-  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 
-  .table {
-    @apply min-w-full divide-y divide-gray-200;
-  }
+/* Date picker improvements */
+.react-datepicker-wrapper {
+  width: 100%;
+}
 
-  .table th {
-    @apply px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
-  }
+.react-datepicker__input-container {
+  width: 100%;
+}
 
-  .table td {
-    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
-  }
+.react-datepicker__input-container input {
+  width: 100%;
+  height: 48px;
+  font-size: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background-color: white;
+}
 
-  .table tr {
-    @apply hover:bg-gray-50;
-  }
+.react-datepicker__input-container input:focus {
+  outline: 2px solid #A59480;
+  outline-offset: 2px;
+  border-color: #A59480;
+}
+
+/* Select improvements */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px 12px;
+  padding-right: 40px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Form improvements */
+input, select, textarea {
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+input:hover, select:hover, textarea:hover {
+  border-color: #A59480;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Button styles */
+.btn-primary {
+  background-color: #A59480;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #8B7A6A;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: #A59480;
+  border: 2px solid #A59480;
+  padding: 10px 22px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #A59480;
+  color: white;
+}
+
+/* Input field styles */
+.input-field {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 16px;
+}
+
+/* Card styles */
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+}
+
+/* Table styles */
+.table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.table th {
+  background-color: #f7fafc;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.table tr {
+  transition: background-color 0.2s;
+}
+
+.table tr:hover {
+  background-color: #f7fafc;
 }
 
 @media (prefers-color-scheme: dark) {

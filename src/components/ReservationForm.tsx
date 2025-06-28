@@ -640,24 +640,36 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   };
 
   return (
-    <Box fontFamily="Montserrat, sans-serif" color="nightSky">
-      <Box bg="#fff" borderRadius="2xl" boxShadow="2xl" p={8} width="400px" maxW="95vw">
+    <Box fontFamily="Montserrat, sans-serif" color="nightSky" w="full">
+      <Box 
+        bg="#fff" 
+        borderRadius="2xl" 
+        boxShadow="2xl" 
+        p={{ base: 4, sm: 6, md: 8 }} 
+        w="full" 
+        maxW={{ base: "full", sm: "400px" }}
+        mx="auto"
+      >
         <form onSubmit={handleReservationSubmit}>
-          <VStack spacing={4} align="center" maxW="400px" mx="auto" w="100%">
+          <VStack spacing={{ base: 4, sm: 5 }} align="stretch" w="100%">
             {/* Party Size */}
             <FormControl isRequired>
-              <FormLabel>Party Size</FormLabel>
+              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                Party Size
+              </FormLabel>
               <Select
                 value={form.party_size}
                 onChange={handlePartySizeChange}
-                size="md"
+                size={{ base: "md", sm: "lg" }}
                 bg="white"
                 borderColor="gray.200"
                 _hover={{ borderColor: 'gray.300' }}
                 _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                h="40px"
+                h={{ base: "44px", sm: "48px" }}
                 display="flex"
                 alignItems="center"
+                borderRadius="lg"
+                fontSize={{ base: "sm", sm: "md" }}
               >
                 <option value="">Select party size</option>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((size) => (
@@ -670,7 +682,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Date */}
             <FormControl isRequired>
-              <FormLabel>Date</FormLabel>
+              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                Date
+              </FormLabel>
               <Box position="relative" w="full">
                 <DatePicker
                   selected={date}
@@ -694,12 +708,12 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   customInput={
                     <Input
                       w="full"
-                      h="40px"
+                      h={{ base: "44px", sm: "48px" }}
                       borderColor="gray.200"
                       _hover={{ borderColor: 'gray.300' }}
                       _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                      fontSize="md"
-                      borderRadius="md"
+                      fontSize={{ base: "sm", sm: "md" }}
+                      borderRadius="lg"
                       bg="white"
                       placeholder="Select date"
                       readOnly
@@ -714,17 +728,20 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Time */}
             <FormControl>
-              <FormLabel fontSize="sm" fontWeight="medium" color="gray.600">Time</FormLabel>
+              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                Time
+              </FormLabel>
               <Select
                 name="time"
                 value={time}
                 onChange={handleTimeChange}
-                size="md"
-                h="40px"
-                borderRadius="md"
+                size={{ base: "md", sm: "lg" }}
+                h={{ base: "44px", sm: "48px" }}
+                borderRadius="lg"
                 borderColor="gray.200"
                 _hover={{ borderColor: 'gray.300' }}
                 _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                fontSize={{ base: "sm", sm: "md" }}
               >
                 {(availableTimes || []).map(t => (
                   <option key={t} value={t}>{t}</option>
@@ -734,18 +751,21 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Phone */}
             <FormControl>
-              <FormLabel fontSize="sm" fontWeight="medium" color="gray.600">Phone Number</FormLabel>
+              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                Phone Number
+              </FormLabel>
               <Input
                 name="phone"
                 value={displayPhone}
                 onChange={handlePhoneChange}
                 placeholder="(555) 555-5555"
-                size="md"
-                h="40px"
-                borderRadius="md"
+                size={{ base: "md", sm: "lg" }}
+                h={{ base: "44px", sm: "48px" }}
+                borderRadius="lg"
                 borderColor="gray.200"
                 _hover={{ borderColor: 'gray.300' }}
                 _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                fontSize={{ base: "sm", sm: "md" }}
               />
             </FormControl>
 
@@ -753,46 +773,55 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
             {!isMember && (
               <>
                 <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="medium" color="gray.600">First Name</FormLabel>
+                  <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                    First Name
+                  </FormLabel>
                   <Input
                     name="first_name"
                     value={form.first_name}
                     onChange={handleInlineChange}
-                    size="md"
-                    h="40px"
-                    borderRadius="md"
+                    size={{ base: "md", sm: "lg" }}
+                    h={{ base: "44px", sm: "48px" }}
+                    borderRadius="lg"
                     borderColor="gray.200"
                     _hover={{ borderColor: 'gray.300' }}
                     _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                    fontSize={{ base: "sm", sm: "md" }}
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="medium" color="gray.600">Last Name</FormLabel>
+                  <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                    Last Name
+                  </FormLabel>
                   <Input
                     name="last_name"
                     value={form.last_name}
                     onChange={handleInlineChange}
-                    size="md"
-                    h="40px"
-                    borderRadius="md"
+                    size={{ base: "md", sm: "lg" }}
+                    h={{ base: "44px", sm: "48px" }}
+                    borderRadius="lg"
                     borderColor="gray.200"
                     _hover={{ borderColor: 'gray.300' }}
                     _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                    fontSize={{ base: "sm", sm: "md" }}
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel fontSize="sm" fontWeight="medium" color="gray.600">Email</FormLabel>
+                  <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                    Email
+                  </FormLabel>
                   <Input
                     name="email"
                     type="email"
                     value={form.email}
                     onChange={handleInlineChange}
-                    size="md"
-                    h="40px"
-                    borderRadius="md"
+                    size={{ base: "md", sm: "lg" }}
+                    h={{ base: "44px", sm: "48px" }}
+                    borderRadius="lg"
                     borderColor="gray.200"
                     _hover={{ borderColor: 'gray.300' }}
                     _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                    fontSize={{ base: "sm", sm: "md" }}
                   />
                 </FormControl>
               </>
@@ -800,17 +829,20 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Event Type */}
             <FormControl>
-              <FormLabel fontSize="sm" fontWeight="medium" color="gray.600">Occasion (Optional)</FormLabel>
+              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                Occasion (Optional)
+              </FormLabel>
               <Select
                 name="event_type"
                 value={form.event_type}
                 onChange={handleInlineChange}
-                size="md"
-                h="40px"
-                borderRadius="md"
+                size={{ base: "md", sm: "lg" }}
+                h={{ base: "44px", sm: "48px" }}
+                borderRadius="lg"
                 borderColor="gray.200"
                 _hover={{ borderColor: 'gray.300' }}
                 _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                fontSize={{ base: "sm", sm: "md" }}
               >
                 <option value="">Select an occasion</option>
                 {(eventTypes || []).map(type => (
@@ -821,41 +853,48 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Notes */}
             <FormControl>
-              <FormLabel fontSize="sm" fontWeight="medium" color="gray.600">Special Requests (Optional)</FormLabel>
+              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                Special Requests (Optional)
+              </FormLabel>
               <Input
                 name="notes"
                 value={form.notes}
                 onChange={handleInlineChange}
                 placeholder="Any special requests or notes?"
-                size="md"
-                h="40px"
-                borderRadius="md"
+                size={{ base: "md", sm: "lg" }}
+                h={{ base: "44px", sm: "48px" }}
+                borderRadius="lg"
                 borderColor="gray.200"
                 _hover={{ borderColor: 'gray.300' }}
                 _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                fontSize={{ base: "sm", sm: "md" }}
               />
             </FormControl>
 
             {!isMember && isClient && stripe && (
-              <FormControl isRequired mt={4}>
-                <FormLabel>Credit Card</FormLabel>
-                <Text fontSize="sm" color="gray.600" mb={2}>
+              <FormControl isRequired mt={{ base: 4, sm: 6 }}>
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Credit Card
+                </FormLabel>
+                <Text fontSize={{ base: "xs", sm: "sm" }} color="gray.600" mb={3}>
                   Non-members are required to place a credit card hold of ${getHoldAmount(Number(form.party_size))} for your reservation. These funds will be released upon your arrival.
                 </Text>
-                <Box p={2} borderWidth={1} borderRadius="md" bg="gray.50">
-                  <div ref={cardElementRef} style={{ height: '40px' }} />
+                <Box p={3} borderWidth={1} borderRadius="lg" bg="gray.50" borderColor="gray.200">
+                  <div ref={cardElementRef} style={{ height: '44px' }} />
                 </Box>
               </FormControl>
             )}
 
             {!isMember && !isClient && (
-              <FormControl isRequired mt={4}>
-                <FormLabel>Credit Card</FormLabel>
-                <Text fontSize="sm" color="gray.600" mb={2}>
+              <FormControl isRequired mt={{ base: 4, sm: 6 }}>
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Credit Card
+                </FormLabel>
+                <Text fontSize={{ base: "xs", sm: "sm" }} color="gray.600" mb={3}>
                   Non-members are required to place a credit card hold of ${getHoldAmount(Number(form.party_size))} for your reservation. These funds will be released upon your arrival.
                 </Text>
-                <Box p={2} borderWidth={1} borderRadius="md" bg="gray.50" h="40px" display="flex" alignItems="center" justifyContent="center">
-                  <Text fontSize="sm" color="gray.500">Loading payment form...</Text>
+                <Box p={3} borderWidth={1} borderRadius="lg" bg="gray.50" borderColor="gray.200" h="44px" display="flex" alignItems="center" justifyContent="center">
+                  <Text fontSize={{ base: "xs", sm: "sm" }} color="gray.500">Loading payment form...</Text>
                 </Box>
               </FormControl>
             )}
@@ -863,21 +902,27 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
             <Button
               type="submit"
               colorScheme="black"
-              size="lg"
-              h="48px"
-              mt={6}
+              size={{ base: "md", sm: "lg" }}
+              h={{ base: "52px", sm: "56px" }}
+              mt={{ base: 6, sm: 8 }}
               bg="black"
               color="#A59480"
               _hover={{ bg: 'gray.800' }}
               _active={{ transform: 'scale(0.98)' }}
               transition="all 0.2s"
               boxShadow="md"
+              borderRadius="xl"
+              fontSize={{ base: "md", sm: "lg" }}
+              fontWeight="bold"
+              fontFamily="Montserrat, sans-serif"
+              letterSpacing="0.05em"
+              textTransform="uppercase"
             >
               {isEdit ? 'Update Reservation' : 'Make Reservation'}
             </Button>
 
             {error && (
-              <Text color="red.500" fontSize="sm" textAlign="center" mt={2}>
+              <Text color="red.500" fontSize={{ base: "sm", sm: "md" }} textAlign="center" mt={3}>
                 {error}
               </Text>
             )}
