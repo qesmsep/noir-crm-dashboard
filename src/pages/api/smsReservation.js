@@ -1,12 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendCustomEmail } = require('./sendCustomEmail');
-const { getSupabaseClient } = require('./supabaseClient');
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-
-// Simple in-memory cache for AI responses
-const aiCache = new Map();
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Utility functions for handling dates and times in CST
 function toCST(date) {
@@ -202,133 +197,131 @@ function parseReservationMessage(message) {
   };
 }
 
-// AI-powered parsing using local Ollama
+// AI-powered parsing using OpenAI GPT-4
 async function parseReservationMessageWithAI(message) {
   try {
-    // Check cache first
-    const cacheKey = message.toLowerCase().trim();
-    const cached = aiCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      console.log('Using cached AI response for:', message);
-      return cached.result;
-    }
+    const prompt = `
+Parse this SMS reservation request and return JSON:
+"${message}"
 
-    const prompt = `Parse this SMS reservation request and return ONLY valid JSON:
-
-Message: "${message}"
-
-Instructions:
-- Extract party size (number of people)
-- Extract date (convert to MM/DD/YYYY format)
-- Extract time (convert to 24-hour HH:MM format)
-- If date is relative (like "tomorrow", "next Friday"), calculate the actual date
-- If time is missing, use 20:00 (8pm) as default
-- If party size is missing, use 2 as default
-
-Return ONLY this JSON format:
+Return ONLY valid JSON with these fields:
 {
   "party_size": number,
-  "date": "MM/DD/YYYY",
+  "date": "MM/DD/YYYY", 
   "time": "HH:MM",
-  "event_type": "Fun Night Out",
-  "notes": "SMS Reservation"
+  "event_type": "string (optional)",
+  "notes": "string (optional)"
 }
 
-If you cannot parse the message, return:
-{"error": "Could not understand the reservation request"}`;
+If you can't parse it, return: {"error": "reason"}
 
-    const response = await fetch('http://localhost:11434/api/generate', {
+Examples:
+"RESERVATION 2 guests on 6/27/25 at 6:30pm" → {"party_size": 2, "date": "06/27/2025", "time": "18:30"}
+"book me for 4 people tomorrow at 8pm" → {"party_size": 4, "date": "tomorrow", "time": "20:00"}
+"reserve table for 6 on Friday 7pm" → {"party_size": 6, "date": "this Friday", "time": "19:00"}
+`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama3.1:8b', // or 'mistral:7b' for faster processing
-        prompt: prompt,
-        stream: false,
-        options: {
-          temperature: 0.1,
-          top_p: 0.9,
-          max_tokens: 200
-        }
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 200
       })
     });
 
     if (!response.ok) {
-      console.error('Ollama API error:', response.status);
+      console.error('OpenAI API error:', response.status, response.statusText);
       return null;
     }
 
     const result = await response.json();
-    const aiResponse = result.response.trim();
+    const aiResponse = result.choices[0].message.content.trim();
     
-    // Try to parse JSON from AI response
-    let parsed;
-    try {
-      // Extract JSON from response (in case AI adds extra text)
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        parsed = JSON.parse(aiResponse);
-      }
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', aiResponse);
-      return null;
-    }
-
-    // Validate and convert AI response to our format
+    // Try to parse the JSON response
+    const parsed = JSON.parse(aiResponse);
+    
     if (parsed.error) {
+      console.log('AI parsing error:', parsed.error);
       return null;
     }
 
-    // Convert date and time to our expected format
-    const date = new Date(parsed.date);
-    if (isNaN(date.getTime())) {
-      console.error('Invalid date from AI:', parsed.date);
+    // Convert AI response to our expected format
+    let date = null;
+    if (parsed.date) {
+      // Handle relative dates like "tomorrow", "this Friday"
+      if (parsed.date === 'tomorrow') {
+        date = new Date();
+        date.setDate(date.getDate() + 1);
+      } else if (parsed.date.startsWith('this ') || parsed.date.startsWith('next ')) {
+        date = parseNaturalDate(parsed.date);
+      } else {
+        // Assume it's MM/DD/YYYY format
+        const [month, day, year] = parsed.date.split('/');
+        date = new Date(year, month - 1, day);
+      }
+    }
+
+    if (!date) {
+      console.log('Could not parse date from AI response');
       return null;
     }
 
-    const [hours, minutes] = parsed.time.split(':').map(Number);
-    date.setHours(hours, minutes, 0, 0);
+    // Parse time
+    let hour = 20, minute = 0; // default 8pm
+    if (parsed.time) {
+      const [h, m] = parsed.time.split(':');
+      hour = parseInt(h);
+      minute = parseInt(m);
+    }
 
-    const parsedResult = {
+    date.setHours(hour, minute, 0, 0);
+    const start_time = date.toISOString();
+    const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
+
+    return {
       party_size: parsed.party_size || 2,
-      start_time: date.toISOString(),
-      end_time: new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      start_time,
+      end_time,
       event_type: parsed.event_type || 'Fun Night Out',
-      notes: parsed.notes || 'SMS Reservation'
+      notes: parsed.notes || 'AI-parsed reservation'
     };
 
-    // Cache the result
-    aiCache.set(cacheKey, {
-      result: parsedResult,
-      timestamp: Date.now()
-    });
-
-    console.log('AI parsed successfully:', parsedResult);
-    return parsedResult;
-
   } catch (error) {
-    console.error('AI parsing error:', error);
+    console.error('Error in AI parsing:', error);
     return null;
   }
 }
 
 // Hybrid parsing function
 async function parseReservationMessageHybrid(message) {
-  console.log('Parsing message with hybrid approach:', message);
+  console.log('Parsing message:', message);
   
-  // Try regex first (fast, free)
-  const regexResult = parseReservationMessage(message);
+  // Normalize message
+  const msg = message.replace(/\s+/g, ' ').trim();
+
+  // Check for reservation keyword
+  const reservationKeyword = /\b(reservation|reserve|book|table)\b/i;
+  if (!reservationKeyword.test(msg)) {
+    console.log('No reservation keyword found');
+    return null;
+  }
+
+  // Try regex parsing first (fast and free)
+  const regexResult = parseReservationMessage(msg);
   if (regexResult) {
     console.log('Regex parsing successful');
     return regexResult;
   }
 
-  // Fall back to AI (slower, but more flexible)
-  console.log('Regex failed, trying AI parsing...');
-  const aiResult = await parseReservationMessageWithAI(message);
+  // Fall back to AI parsing
+  console.log('Regex parsing failed, trying AI...');
+  const aiResult = await parseReservationMessageWithAI(msg);
   if (aiResult) {
     console.log('AI parsing successful');
     return aiResult;
@@ -388,26 +381,28 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { 
-    phone, // Required: customer's phone number
-    name, // Required: customer's name
-    email, // Optional: customer's email
-    party_size, // Required: number of guests
-    start_time, // Required: ISO string of reservation start time
-    end_time, // Required: ISO string of reservation end time
-    event_type = 'Fun Night Out', // Optional: type of event
-    notes = '', // Optional: additional notes
-    source = 'sms' // Optional: source of reservation
-  } = req.body;
+  const { phone, text } = req.body;
 
-  // Validate required fields
-  if (!phone || !name || !party_size || !start_time || !end_time) {
-    console.log('Missing required fields:', { phone, name, party_size, start_time, end_time });
+  if (!phone || !text) {
+    console.log('Missing phone or text:', { phone, text });
     return res.status(400).json({ 
-      error: 'Missing required fields',
-      message: 'Please provide phone, name, party_size, start_time, and end_time'
+      error: 'Missing phone or text',
+      message: 'Please provide phone number and SMS text'
     });
   }
+
+  // Parse the SMS text using our hybrid approach
+  const parsedData = await parseReservationMessageHybrid(text);
+  
+  if (!parsedData) {
+    console.log('Failed to parse SMS text:', text);
+    return res.status(400).json({ 
+      error: 'Could not parse reservation request',
+      message: 'Please use format: RESERVATION for X guests on date at time'
+    });
+  }
+
+  const { party_size, start_time, end_time, event_type, notes } = parsedData;
 
   // Check if sender is a member
   const { data: memberData, error: memberError } = await supabase
@@ -423,6 +418,14 @@ module.exports = async (req, res) => {
 
   const member = memberData?.[0];
   const isMember = !!member;
+
+  if (!isMember) {
+    console.log('Non-member attempted SMS reservation:', phone);
+    return res.status(403).json({ 
+      error: 'Members only',
+      message: 'SMS reservations are only available for active members. Please contact us directly.'
+    });
+  }
 
   // Check availability and assign table
   const table_id = await assignTable(start_time, end_time, party_size);
@@ -441,17 +444,17 @@ module.exports = async (req, res) => {
   const { data: reservation, error: reservationError } = await supabase
     .from('reservations')
     .insert({
-      member_id: member?.member_id,
+      member_id: member.member_id,
       start_time,
       end_time,
       party_size,
       table_id,
-      name,
+      name: `${member.first_name} ${member.last_name}`,
       phone,
-      email,
-      source,
+      email: member.email,
+      source: 'sms',
       event_type,
-      notes: isMember ? '♥' : notes || event_type
+      notes: notes || 'SMS reservation'
     })
     .select(`
       *,
@@ -519,6 +522,6 @@ module.exports = async (req, res) => {
   return res.status(201).json({
     success: true,
     reservation,
-    message: `Reservation confirmed for ${name} on ${new Date(start_time).toLocaleDateString()} at ${new Date(start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} for ${party_size} guests${reservation.tables?.number ? ` at Table ${reservation.tables.number}` : ''}.`
+    message: `Reservation confirmed for ${member.first_name} on ${new Date(start_time).toLocaleDateString()} at ${new Date(start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} for ${party_size} guests${reservation.tables?.number ? ` at Table ${reservation.tables.number}` : ''}.`
   });
 }; 
