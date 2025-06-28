@@ -502,7 +502,8 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     
     if (exceptionalClosure && (exceptionalClosure.full_day || !exceptionalClosure.time_ranges)) {
       console.log('Exceptional closure found for date:', dateStr);
-      return { available: false, message: 'The venue is closed on this date' };
+      const customMessage = exceptionalClosure.sms_notification || 'The venue is closed on this date';
+      return { available: false, message: customMessage };
     }
 
     // 4. Check Base Hours (venue_hours table)

@@ -35,7 +35,7 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 type TimeRange = { start: string; end: string };
 type BaseHour = { enabled: boolean; timeRanges: TimeRange[] };
 type ExceptionalOpen = { id: number; date: string; time_ranges: TimeRange[]; label?: string };
-type ExceptionalClosure = { id: number; date: string; reason?: string; full_day?: boolean; time_ranges?: TimeRange[] };
+type ExceptionalClosure = { id: number; date: string; reason?: string; full_day?: boolean; time_ranges?: TimeRange[]; sms_notification?: string };
 
 type CalendarAvailabilityControlProps = { section: 'booking_window' | 'base' | 'custom_open' | 'custom_closed' | 'private_events' };
 
@@ -111,6 +111,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const [exceptionalClosures, setExceptionalClosures] = useState<ExceptionalClosure[]>([]);
   const [newClosureDate, setNewClosureDate] = useState<Date | null>(null);
   const [newClosureReason, setNewClosureReason] = useState<string>('');
+  const [newClosureSmsNotification, setNewClosureSmsNotification] = useState<string>('');
   const [newClosureTimeRanges, setNewClosureTimeRanges] = useState<TimeRange[]>([{ start: '18:00', end: '23:00' }]);
   const [newClosureFullDay, setNewClosureFullDay] = useState<boolean>(true);
 
@@ -268,7 +269,8 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         reason: newClosureReason,
         type: 'exceptional_closure',
         full_day: newClosureFullDay,
-        time_ranges: newClosureFullDay ? null : newClosureTimeRanges
+        time_ranges: newClosureFullDay ? null : newClosureTimeRanges,
+        sms_notification: newClosureSmsNotification
       };
       const { data, error } = await supabase.from('venue_hours').insert([newClosure]).select();
       if (error) throw error;
@@ -278,6 +280,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         setNewClosureReason('');
         setNewClosureTimeRanges([{ start: '18:00', end: '23:00' }]);
         setNewClosureFullDay(true);
+        setNewClosureSmsNotification('');
       }
     } catch (error: any) {
       setError('Failed to add exceptional closure. Please try again.');
@@ -340,6 +343,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           reason: editingClosure.reason,
           full_day: editingClosure.full_day,
           time_ranges: editingClosure.full_day ? null : editingClosure.time_ranges,
+          sms_notification: editingClosure.sms_notification
         })
         .eq('id', editingClosure.id)
         .select()
@@ -633,6 +637,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                   className="chakra-input"
                 />
                 <Input value={newClosureReason} onChange={e => setNewClosureReason(e.target.value)} placeholder="Reason for closure (optional)" w="200px" />
+                <Input value={newClosureSmsNotification} onChange={e => setNewClosureSmsNotification(e.target.value)} placeholder="SMS message for reservations (optional)" w="250px" />
                 <Checkbox isChecked={newClosureFullDay} onChange={e => setNewClosureFullDay(e.target.checked)}>Full Day</Checkbox>
                 {!newClosureFullDay && (
                   <HStack>
@@ -668,6 +673,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                           className="chakra-input"
                         />
                         <Input value={editingClosure?.reason} onChange={e => setEditingClosure((ed: any) => ({ ...ed, reason: e.target.value }))} placeholder="Reason for closure (optional)" w="200px" />
+                        <Input value={editingClosure?.sms_notification} onChange={e => setEditingClosure((ed: any) => ({ ...ed, sms_notification: e.target.value }))} placeholder="SMS message for reservations (optional)" w="250px" />
                         <Checkbox isChecked={editingClosure?.full_day} onChange={e => setEditingClosure((ed: any) => ({ ...ed, full_day: e.target.checked }))}>Full Day</Checkbox>
                         {!editingClosure?.full_day && (
                           <HStack>
@@ -689,6 +695,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                         <Text>{closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date) ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })() : new Date(closure.date).toLocaleDateString()}</Text>
                         <Text>{closure.full_day ? 'Full Day' : closure.time_ranges?.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</Text>
                         {closure.reason && <Badge colorScheme="red">{closure.reason}</Badge>}
+                        {closure.sms_notification && <Badge colorScheme="blue">SMS: {closure.sms_notification}</Badge>}
                         <Button size="xs" colorScheme="blue" onClick={() => handleEditClosure(closure)}>Edit</Button>
                         <Button size="xs" colorScheme="red" onClick={() => deleteExceptionalClosure(closure.id)}>Delete</Button>
                       </>
