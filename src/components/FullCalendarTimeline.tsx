@@ -195,7 +195,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       ? eventData.resRes
       : eventData.resRes.data || [];
     
+    console.log('Raw reservations data:', rawReservations);
+    
     const mapped = rawReservations.map((r: Record<string, any>) => {
+      console.log('Processing reservation:', r);
+      console.log('Reservation ID:', r.id, 'Type:', typeof r.id);
+      
       const heart = r.membership_type === 'member' ? '🖤 ' : '';
       let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
       
@@ -227,7 +232,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         endTime = new Date(r.end_time);
       }
       
-      return {
+      const event = {
         id: String(r.id),
         title: `${heart}${r.first_name || ''} ${r.last_name || ''} | Party Size: ${r.party_size}${emoji ? ' ' + emoji : ''}`,
         extendedProps: {
@@ -244,8 +249,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         resourceId: resourceId,
         type: 'reservation',
       };
+      
+      console.log('Created event:', event);
+      return event;
     });
     
+    console.log('Final mapped events:', mapped);
     setEvents(mapped);
     setSlotMinTime('18:00:00');
     setSlotMaxTime('26:00:00');
@@ -392,6 +401,11 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   }
 
   function handleEventClick(info: any) {
+    console.log('Event clicked:', info);
+    console.log('Event ID:', info.event.id);
+    console.log('Event title:', info.event.title);
+    console.log('Event extendedProps:', info.event.extendedProps);
+    
     setSelectedReservationId(info.event.id);
     setIsDrawerOpen(true);
   }

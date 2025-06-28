@@ -529,17 +529,17 @@ export async function handler(req, res) {
     const parsed = await parseReservationMessageHybrid(text);
     
     if (!parsed) {
-      const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please confirm by texting me back:\n\nRESERVATION for [# of] guests on [date] at [time] and I can assist further.`;
+      const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please visit our website to make a reservation: https://noir-crm-dashboard.vercel.app`;
       await sendSMS(from, errorMessage);
-      return res.status(200).json({ message: 'Sent error message to user' });
+      return res.status(200).json({ message: 'Sent error message to user with website redirect' });
     }
     
     const { isMember, member } = await checkMemberStatus(from);
     
     if (!isMember) {
-      const errorMessage = `Thank you for your reservation request. However, I can only process reservations for active members. Please contact us directly to make a reservation.`;
+      const errorMessage = `Thank you for your reservation request. However, I can only process reservations for active members. Please visit our website to make a reservation: https://noir-crm-dashboard.vercel.app`;
       await sendSMS(from, errorMessage);
-      return res.status(200).json({ message: 'Sent non-member error message' });
+      return res.status(200).json({ message: 'Sent non-member error message with website redirect' });
     }
     
     const availability = await checkAvailability(parsed.start_time, parsed.end_time, parsed.party_size);
@@ -579,7 +579,7 @@ export async function handler(req, res) {
       hour12: true
     });
     
-    const confirmationMessage = `Your reservation for ${parsed.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
+    const confirmationMessage = `Hi ${member.first_name}! Your reservation for ${parsed.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
     
     await sendSMS(from, confirmationMessage);
     

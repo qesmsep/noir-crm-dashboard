@@ -70,6 +70,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    console.log('API: Fetching reservation with ID:', id);
     
     const { data, error } = await supabase
       .from('reservations')
@@ -84,17 +85,20 @@ export async function GET(
       .eq('id', id)
       .single();
 
+    console.log('API: Supabase query result:', { data, error });
+
     if (error) {
-      console.error('Error fetching reservation:', error);
+      console.error('API: Error fetching reservation:', error);
       return NextResponse.json(
         { error: 'Reservation not found' },
         { status: 404 }
       );
     }
 
+    console.log('API: Successfully found reservation:', data);
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error in reservation GET:', error);
+    console.error('API: Error in reservation GET:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

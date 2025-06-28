@@ -114,7 +114,9 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
   const toast = useToast();
 
   useEffect(() => {
+    console.log('useEffect triggered - isOpen:', isOpen, 'reservationId:', reservationId);
     if (isOpen && reservationId) {
+      console.log('Calling fetchReservation and fetchTables');
       fetchReservation();
       fetchTables();
     }
@@ -146,9 +148,22 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
   const fetchReservation = async () => {
     setIsLoading(true);
     try {
+      console.log('Fetching reservation with ID:', reservationId);
+      console.log('API URL:', `/api/reservations/${reservationId}`);
+      
       const response = await fetch(`/api/reservations/${reservationId}`);
-      if (!response.ok) throw new Error('Failed to fetch reservation');
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error response:', errorText);
+        throw new Error('Failed to fetch reservation');
+      }
+      
       const data = await response.json();
+      console.log('Reservation data received:', data);
+      
       setReservation(data);
       setFormData({
         first_name: data.first_name || '',
@@ -163,6 +178,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
         end_time: data.end_time ? utcToCSTDateTimeLocal(data.end_time) : '',
       });
     } catch (error) {
+      console.error('Error in fetchReservation:', error);
       toast({ title: 'Error', description: 'Failed to load reservation details', status: 'error', duration: 5000 });
     } finally {
       setIsLoading(false);
