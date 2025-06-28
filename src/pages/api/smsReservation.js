@@ -453,18 +453,26 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     }
 
     // 2. Check for Private Events (private_events table) - Enhanced for specific messages
-    const { data: privateEvents } = await supabase
+    const { data: privateEvents, error: privateEventsError } = await supabase
       .from('private_events')
-      .select('start_time, end_time, full_day')
+      .select('start_time, end_time, full_day, title')
       .gte('start_time', `${dateStr}T00:00:00`)
-      .lte('end_time', `${dateStr}T23:59:59`);
+      .lte('end_time', `${dateStr}T23:59:59`)
+      .eq('status', 'active');
+    
+    if (privateEventsError) {
+      console.error('Error fetching private events:', privateEventsError);
+    }
+    
+    console.log('Private events found for date:', dateStr, privateEvents);
     
     if (privateEvents && privateEvents.length > 0) {
       console.log('Private event found for date:', dateStr);
       
       // Check if it's a full day private event
-      const fullDayEvent = privateEvents.find(event => event.full_day);
+      const fullDayEvent = privateEvents.find(event => event.full_day === true);
       if (fullDayEvent) {
+        console.log('Full day private event detected:', fullDayEvent);
         // Scenario 3b: Full day private event
         const eventDate = new Date(fullDayEvent.start_time);
         const formattedDate = eventDate.toLocaleDateString('en-US', {
@@ -478,15 +486,25 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
           message: `Thank you for your reservation request. Noir will be closed on ${formattedDate} for a private event.`
         };
       } else {
+        console.log('Partial day private event(s) detected:', privateEvents);
         // Scenario 3a: Partial day private event - check if requested time conflicts
         const requestedTime = date.getTime();
         const conflictingEvent = privateEvents.find(event => {
           const eventStart = new Date(event.start_time).getTime();
           const eventEnd = new Date(event.end_time).getTime();
-          return requestedTime >= eventStart && requestedTime <= eventEnd;
+          const conflicts = requestedTime >= eventStart && requestedTime <= eventEnd;
+          console.log('Checking conflict:', {
+            eventTitle: event.title,
+            eventStart: new Date(eventStart).toISOString(),
+            eventEnd: new Date(eventEnd).toISOString(),
+            requestedTime: new Date(requestedTime).toISOString(),
+            conflicts
+          });
+          return conflicts;
         });
         
         if (conflictingEvent) {
+          console.log('Conflicting private event found:', conflictingEvent);
           const eventStart = new Date(conflictingEvent.start_time);
           const eventEnd = new Date(conflictingEvent.end_time);
           
