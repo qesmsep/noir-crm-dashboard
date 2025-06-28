@@ -741,9 +741,10 @@ export default function PrivateEventsManager() {
                     </Td>
                     <Td borderRight="1px solid" borderColor="gray.200" py={4} px={4}>
                       <HStack spacing={1} align="center">
-                        
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
-                          {formatTime(event.start_time)} - {formatTime(event.end_time)}
+                          {event.full_day
+                            ? 'All Day'
+                            : `${formatTime(event.start_time)} - ${formatTime(event.end_time)}`}
                         </Text>
                       </HStack>
                     </Td>
