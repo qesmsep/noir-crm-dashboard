@@ -750,11 +750,7 @@ export default function PrivateEventsManager() {
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
                           {event.full_day
                             ? 'Full Day'
-                            : (
-                              formatDate(event.start_time, timezone) === formatDate(event.end_time, timezone)
-                                ? `${formatTime(event.start_time, timezone)} - ${formatTime(event.end_time, timezone)}`
-                                : `${formatDate(event.start_time, timezone)} ${formatTime(event.start_time, timezone)} - ${formatDate(event.end_time, timezone)} ${formatTime(event.end_time, timezone)}`
-                            )}
+                            : `${formatTime(event.start_time, timezone)} - ${formatTime(event.end_time, timezone)}`}
                         </Text>
                       </HStack>
                     </Td>
