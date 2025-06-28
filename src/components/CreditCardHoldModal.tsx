@@ -37,10 +37,7 @@ interface CustomerInfo {
 interface FormData extends CustomerInfo {}
 
 function getHoldAmount(partySize: number): number {
-  if (partySize <= 2) return 25;
-  if (partySize <= 4) return 50;
-  if (partySize <= 8) return 100;
-  return 150;
+  return 25;
 }
 
 const CreditCardHoldDrawer: React.FC<CreditCardHoldModalProps> = ({
@@ -75,7 +72,7 @@ const CreditCardHoldDrawer: React.FC<CreditCardHoldModalProps> = ({
       const response = await fetch('/api/create-hold', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ party_size: partySize }),
+        body: JSON.stringify({ amount: holdAmount }),
       });
 
       if (!response.ok) {

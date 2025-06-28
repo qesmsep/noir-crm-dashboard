@@ -18,6 +18,10 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
   
+function getHoldAmount(partySize) {
+  return 25;
+}
+
 function InlineStripeForm({ partySize, onSuccess }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -40,7 +44,7 @@ function InlineStripeForm({ partySize, onSuccess }) {
     const resp = await fetch('/api/create-hold', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_method_id: paymentMethod.id, party_size: partySize }),
+      body: JSON.stringify({ payment_method_id: paymentMethod.id, amount: getHoldAmount(partySize) }),
     });
     const data = await resp.json();
     if (resp.ok) onSuccess(data.holdId, { /* you can pass back customer info if needed */ });

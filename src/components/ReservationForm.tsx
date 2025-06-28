@@ -85,7 +85,7 @@ function findFirstAvailableDate(startDate: Date, baseDays: number[], exceptional
 
 // Add this helper function near the top of the component
 function getHoldAmount(partySize: number): number {
-  return 1;
+  return 25;
 }
 
 const ReservationForm: React.FC<ReservationFormProps> = ({
