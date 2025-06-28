@@ -530,6 +530,8 @@ export async function handler(req, res) {
   console.log('Processing message:', { from, text });
   console.log('Raw webhook data:', JSON.stringify(data, null, 2));
   console.log('Phone number received from OpenPhone:', from);
+  console.log('Message text received:', `"${text}"`);
+  console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
 
   // Only process messages that start with "Reservation"
   if (!text.toLowerCase().startsWith('reservation')) {
