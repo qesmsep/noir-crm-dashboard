@@ -381,9 +381,29 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
   const eventIcon = eventTypes.find(e => e.value === formData.event_type)?.label.split(' ')[0];
 
   return (
-    <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="sm" >
-      <DrawerOverlay bg="blackAlpha.600" />
-      <DrawerContent border="2px solid #353535" borderRadius="10px"  fontFamily="Montserrat, sans-serif" maxW="350px" maxH="flex" w="50vw" boxShadow="xl" mt="80px" mb="25px" paddingRight="40px" paddingLeft="40px" backgroundColor="#ecede8">
+    <Drawer 
+      isOpen={isOpen} 
+      placement="right" 
+      onClose={onClose} 
+      size="sm"
+      portalProps={{ containerRef: undefined }}
+    >
+      <DrawerOverlay bg="blackAlpha.600" zIndex={2000} />
+      <DrawerContent 
+        border="2px solid #353535" 
+        borderRadius="10px"  
+        fontFamily="Montserrat, sans-serif" 
+        maxW="350px" 
+        maxH="flex" 
+        w="50vw" 
+        boxShadow="xl" 
+        mt="80px" 
+        mb="25px" 
+        paddingRight="40px" 
+        paddingLeft="40px" 
+        backgroundColor="#ecede8"
+        zIndex={2001}
+      >
         <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="0px" fontFamily="IvyJournal, sans-serif" color="#353535">
           
         </DrawerHeader>

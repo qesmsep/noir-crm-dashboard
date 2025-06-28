@@ -366,14 +366,14 @@ export default function Home() {
              }}>
             Explore our curated selection of cocktails, spirits, and small plates. Enjoy the Noir experience.
           </p>
-          <div className="w-full max-w-4xl mx-auto px-4">
+          <div className="w-full max-w-4xl mx-auto px-4 flex justify-center">
             <button onClick={() => setMenuModalOpen(true)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }} aria-label="Open Noir Menu">
               <Image 
                 src="/images/noir-menu.png" 
                 alt="Noir Menu" 
                 width={1200} 
                 height={1200} 
-                className="w-full h-auto rounded-2xl shadow-2xl" 
+                className="w-full h-auto rounded-2xl shadow-2xl mx-auto" 
                 style={{ borderRadius: '1.5rem', boxShadow: '0 8px 32px rgba(53,53,53,0.15)' }} 
               />
             </button>
