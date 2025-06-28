@@ -369,7 +369,7 @@ export default function Home() {
           <div className="w-full max-w-4xl mx-auto px-4">
             <button onClick={() => setMenuModalOpen(true)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }} aria-label="Open Noir Menu">
               <Image 
-                src="/images/noir-menu.png" 
+                src="/public/images/noir-menu.png" 
                 alt="Noir Menu" 
                 width={1200} 
                 height={1200} 
@@ -422,11 +422,13 @@ export default function Home() {
               $100<span className="text-base sm:text-lg font-normal">/mo</span>
             </div>
             <ul className="text-[#ECEDE8] text-sm sm:text-base mb-4 sm:mb-6 space-y-1 text-left">
+              <li>• $100 Monthly beverage credit</li>
+              <li>• Unused credit rolls over each month</li>
               <li>• No deposit for reservations</li>
               <li>• You + up to 10 guests per visit</li>
-              <li>• Unused credit rolls over each month</li>
+              
               <li>• Curated events & member experiences</li>
-              <li>• Monthly beverage credit</li>
+             
               <li>• Concierge Reservations via Text</li>
               <li>• House account for seamless billing</li>
               <li>• Host Private Gatherings at Noir</li>

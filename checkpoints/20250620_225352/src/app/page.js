@@ -250,7 +250,7 @@ export default function Home() {
       {/* Hours & Location Section */}
       <section className="bg-[#ECEDE8] py-20 flex flex-col md:flex-row items-center justify-center gap-12">
         <div className="flex-shrink-0">
-          <Image src="/images/LPR66872.JPG" alt="Cocktails" width={450} height={350} className="rounded-2xl object-cover" />
+          <Image src="/images/LPR69138.JPG" alt="Cocktails" width={450} height={350} className="rounded-2xl object-cover" />
         </div>
         <div className="flex flex-col items-center md:items-start">
           <h2 
@@ -322,9 +322,10 @@ export default function Home() {
           textAlign: 'center',
         }}>INCLUDED WITH EVERY TIER</h3>
         <ul className="mb-8 max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-left" style={{ color: '#23201C', fontSize: '1rem', lineHeight: 1.6, fontFamily: 'Montserrat, sans-serif', fontWeight: 400 }}>
+          <li>• $100 Monthly beverage credit</li>
           <li>• No deposit for make reservations</li>
           <li>• Curated events & member experiences</li>
-          <li>• Monthly beverage credit</li>
+          
           <li>• Concierge Reservations via Text</li>
           <li>• House account for seamless billing</li>
           <li>• Host Private Gatherings at Noir</li>
