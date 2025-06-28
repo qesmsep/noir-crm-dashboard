@@ -311,8 +311,24 @@ async function parseReservationMessageHybrid(message) {
 // Check member status
 async function checkMemberStatus(phone) {
   try {
+    console.log('Checking member status for phone:', phone);
+    
     const digits = phone.replace(/\D/g, '');
     const possiblePhones = [digits, '+1' + digits, '1' + digits];
+    
+    console.log('Phone number formats to check:', possiblePhones);
+    
+    // First, let's see what's actually in the members table for debugging
+    const { data: allMembers, error: allMembersError } = await supabase
+      .from('members')
+      .select('member_id, first_name, last_name, phone, membership_status')
+      .limit(10);
+    
+    if (allMembersError) {
+      console.error('Error fetching all members:', allMembersError);
+    } else {
+      console.log('Sample members in database:', allMembers);
+    }
     
     const { data: member, error } = await supabase
       .from('members')
@@ -320,9 +336,19 @@ async function checkMemberStatus(phone) {
       .in('phone', possiblePhones)
       .single();
     
+    console.log('Member lookup result:', { member, error });
+    
     if (error || !member) {
+      console.log('No member found for phone:', phone);
       return { isMember: false, member: null };
     }
+    
+    console.log('Member found:', { 
+      id: member.member_id, 
+      name: `${member.first_name} ${member.last_name}`,
+      phone: member.phone,
+      status: member.membership_status 
+    });
     
     return { isMember: true, member };
   } catch (error) {
@@ -475,6 +501,8 @@ export async function handler(req, res) {
     text: data?.object?.text || data?.object?.body || ''
   };
   console.log('Processing message:', { from, text });
+  console.log('Raw webhook data:', JSON.stringify(data, null, 2));
+  console.log('Phone number received from OpenPhone:', from);
 
   // More flexible message filtering - check for reservation keywords
   const reservationKeywords = /\b(reservation|reserve|book|table)\b/i;
