@@ -7,7 +7,7 @@
 }
 @font-face {
   font-family: 'Montserrat Bold';
-  src: url('/fonts/Montserrat.Bold.otf') format('opentype');
+  src: url('/fonts/Montserrat-Bold.otf') format('opentype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -15,7 +15,7 @@
 
 @font-face {
   font-family: 'Montserrat Light';
-  src: url('/fonts/montserrat-light.ttf') format('truetype');
+  src: url('/fonts/Montserrat-Light.ttf') format('truetype');
   font-weight: 300;
   font-style: normal;
   font-display: swap;
