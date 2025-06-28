@@ -65,62 +65,247 @@ function parseNaturalDate(dateStr) {
   return null;
 }
 
-// Parse SMS reservation message
-function parseSMSReservation(message) {
-  console.log('Parsing SMS reservation message:', message);
-  
-  if (!message.trim().toUpperCase().startsWith('RESERVATION')) {
+// AI-powered parsing using OpenAI GPT-4
+async function parseReservationMessageWithAI(message) {
+  try {
+    const prompt = `
+Parse this SMS reservation request and return JSON:
+"${message}"
+
+Return ONLY valid JSON with these fields:
+{
+  "party_size": number,
+  "date": "MM/DD/YYYY", 
+  "time": "HH:MM",
+  "event_type": "string (optional)",
+  "notes": "string (optional)"
+}
+
+If you can't parse it, return: {"error": "reason"}
+
+Examples:
+"RESERVATION 2 guests on 6/27/25 at 6:30pm" → {"party_size": 2, "date": "06/27/2025", "time": "18:30"}
+"book me for 4 people tomorrow at 8pm" → {"party_size": 4, "date": "tomorrow", "time": "20:00"}
+"reserve table for 6 on Friday 7pm" → {"party_size": 6, "date": "this Friday", "time": "19:00"}
+`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 200
+      })
+    });
+
+    if (!response.ok) {
+      console.error('OpenAI API error:', response.status, response.statusText);
+      return null;
+    }
+
+    const result = await response.json();
+    const aiResponse = result.choices[0].message.content.trim();
+    
+    // Try to parse the JSON response
+    const parsed = JSON.parse(aiResponse);
+    
+    if (parsed.error) {
+      console.log('AI parsing error:', parsed.error);
+      return null;
+    }
+
+    // Convert AI response to our expected format
+    let date = null;
+    if (parsed.date) {
+      // Handle relative dates like "tomorrow", "this Friday"
+      if (parsed.date === 'tomorrow') {
+        date = new Date();
+        date.setDate(date.getDate() + 1);
+      } else if (parsed.date.startsWith('this ') || parsed.date.startsWith('next ')) {
+        date = parseNaturalDate(parsed.date);
+      } else {
+        // Assume it's MM/DD/YYYY format
+        const [month, day, year] = parsed.date.split('/');
+        date = new Date(year, month - 1, day);
+      }
+    }
+
+    if (!date) {
+      console.log('Could not parse date from AI response');
+      return null;
+    }
+
+    // Parse time
+    let hour = 20, minute = 0; // default 8pm
+    if (parsed.time) {
+      const [h, m] = parsed.time.split(':');
+      hour = parseInt(h);
+      minute = parseInt(m);
+    }
+
+    date.setHours(hour, minute, 0, 0);
+    const start_time = date.toISOString();
+    const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
+
+    return {
+      party_size: parsed.party_size || 2,
+      start_time,
+      end_time,
+      event_type: parsed.event_type || 'Fun Night Out',
+      notes: parsed.notes || 'AI-parsed reservation'
+    };
+
+  } catch (error) {
+    console.error('Error in AI parsing:', error);
     return null;
   }
-  
-  const partySizeMatch = message.match(/for\s+(\d+)\s+guests?/i);
-  if (!partySizeMatch) {
-    return { error: 'Could not parse party size. Please use format: RESERVATION for X guests on date at time' };
+}
+
+// Enhanced parsing for flexible SMS formats (regex only)
+function parseReservationMessage(message) {
+  console.log('Parsing message:', message);
+  // Normalize message (remove extra spaces, make case-insensitive for keywords)
+  const msg = message.replace(/\s+/g, ' ').trim();
+
+  // Regex for reservation keyword (case-insensitive)
+  const reservationKeyword = /\b(reservation|reserve|book|table)\b/i;
+  if (!reservationKeyword.test(msg)) {
+    console.log('No reservation keyword found');
+    return null;
   }
-  const partySize = parseInt(partySizeMatch[1]);
-  
-  const dateTimeMatch = message.match(/on\s+([^@\n]+?)(?:\s+at|\s+@|\s*$)/i) || 
-                       message.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
-                       message.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i);
-  const timeMatch = message.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-  
-  if (!dateTimeMatch || !timeMatch) {
-    return { error: 'Could not parse date or time. Please use format: RESERVATION for X guests on date at time' };
+
+  // Flexible party size extraction
+  let party_size = 2; // default
+  const partySizeRegexes = [
+    /for\s+(\d+)\b/i, // for 2
+    /(\d+)\s*guests?/i, // 2 guests
+    /(\d+)\s*people/i, // 2 people
+    /party of (\d+)/i, // party of 2
+    /for a party of (\d+)/i, // for a party of 2
+    /for (\d+)/i, // for 2
+  ];
+  for (const re of partySizeRegexes) {
+    const match = msg.match(re);
+    if (match) {
+      party_size = parseInt(match[1]);
+      break;
+    }
   }
-  
-  let dateStr = dateTimeMatch[1].trim();
-  const date = parseNaturalDate(dateStr);
-  if (!date) {
-    return { error: 'Could not parse date. Please use format: RESERVATION for X guests on date at time' };
+
+  // Flexible date and time extraction
+  // Try to find a date (MM/DD/YY, Month Day, this/next Friday, etc.)
+  let dateStr = '';
+  let dateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+                  msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i) ||
+                  msg.match(/(this|next)\s+\w+/i);
+  if (dateMatch) {
+    dateStr = dateMatch[0];
   }
-  
-  let timeStr = timeMatch[1].trim().toLowerCase();
-  let hour = 20, minute = 0;
+
+  // Try to find a time (at 6:30pm, 18:30, 6pm, 6:30 pm, etc.)
+  let timeStr = '';
+  let timeMatch = msg.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i) ||
+                  msg.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i) ||
+                  msg.match(/(\d{1,2})\s*(am|pm)/i);
   if (timeMatch) {
-    let timeParts = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    timeStr = timeMatch[0].replace(/^(at|@)\s*/i, '');
+  }
+
+  // If date or time is missing, try to find them anywhere in the message
+  if (!dateStr) {
+    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (anyDate) dateStr = anyDate[0];
+  }
+  if (!timeStr) {
+    const anyTime = msg.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i) || msg.match(/(\d{1,2})\s*(am|pm)/i);
+    if (anyTime) timeStr = anyTime[0];
+  }
+
+  // Parse date
+  let date = null;
+  if (dateStr) {
+    date = parseNaturalDate(dateStr);
+  }
+  if (!date) {
+    return null;
+  }
+
+  // Parse time
+  let hour = 20, minute = 0; // default 8pm
+  if (timeStr) {
+    let timeParts = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
     if (timeParts) {
       hour = parseInt(timeParts[1]);
       minute = timeParts[2] ? parseInt(timeParts[2]) : 0;
       const meridiem = timeParts[3];
       if (meridiem === 'pm' && hour < 12) hour += 12;
       if (meridiem === 'am' && hour === 12) hour = 0;
-    } else if (/\d{2}:\d{2}/.test(timeStr)) {
-      const [h, m] = timeStr.split(':');
-      hour = parseInt(h);
-      minute = parseInt(m);
     }
   }
-  
   date.setHours(hour, minute, 0, 0);
-  const startTime = date.toISOString();
-  const endTime = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
-  
+  const start_time = date.toISOString();
+  const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
+
+  // Extract TYPE (event_type)
+  let eventTypeMatch = msg.match(/type\s+(\w+)/i);
+  let event_type = eventTypeMatch ? eventTypeMatch[1] : 'Fun Night Out';
+
+  // Extract NOTES
+  let notesMatch = msg.match(/notes?\s+"([^"]+)"/i) || msg.match(/notes?\s+([\w\s]+)/i);
+  let notes = notesMatch ? notesMatch[1].trim() : event_type;
+  if (!notes) notes = 'Fun Night Out';
+
+  // Fallbacks
+  if (!party_size) {
+    console.log('Could not parse party size');
+    return null;
+  }
+
   return {
-    partySize,
-    startTime,
-    endTime,
-    parsedDate: date
+    party_size,
+    start_time,
+    end_time,
+    event_type,
+    notes
   };
+}
+
+// Hybrid parsing function
+async function parseReservationMessageHybrid(message) {
+  console.log('Parsing message:', message);
+  
+  // Normalize message
+  const msg = message.replace(/\s+/g, ' ').trim();
+
+  // Check for reservation keyword
+  const reservationKeyword = /\b(reservation|reserve|book|table)\b/i;
+  if (!reservationKeyword.test(msg)) {
+    console.log('No reservation keyword found');
+    return null;
+  }
+
+  // Try regex parsing first (fast and free)
+  const regexResult = parseReservationMessage(msg);
+  if (regexResult) {
+    console.log('Regex parsing successful');
+    return regexResult;
+  }
+
+  // Fall back to AI parsing
+  console.log('Regex parsing failed, trying AI...');
+  const aiResult = await parseReservationMessageWithAI(msg);
+  if (aiResult) {
+    console.log('AI parsing successful');
+    return aiResult;
+  }
+
+  console.log('Both regex and AI parsing failed');
+  return null;
 }
 
 // Check member status
@@ -291,15 +476,17 @@ export async function handler(req, res) {
   };
   console.log('Processing message:', { from, text });
 
-  if (!text.trim().toUpperCase().startsWith('RESERVATION')) {
-    console.log('Message does not start with RESERVATION, ignoring');
-    return res.status(200).json({ message: 'Message ignored - does not start with RESERVATION' });
+  // More flexible message filtering - check for reservation keywords
+  const reservationKeywords = /\b(reservation|reserve|book|table)\b/i;
+  if (!reservationKeywords.test(text)) {
+    console.log('Message does not contain reservation keywords, ignoring');
+    return res.status(200).json({ message: 'Message ignored - no reservation keywords' });
   }
 
   try {
-    const parsed = parseSMSReservation(text);
+    const parsed = await parseReservationMessageHybrid(text);
     
-    if (parsed.error) {
+    if (!parsed) {
       const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please confirm by texting me back:\n\nRESERVATION for [# of] guests on [date] at [time] and I can assist further.`;
       await sendSMS(from, errorMessage);
       return res.status(200).json({ message: 'Sent error message to user' });
@@ -313,7 +500,7 @@ export async function handler(req, res) {
       return res.status(200).json({ message: 'Sent non-member error message' });
     }
     
-    const availability = await checkAvailability(parsed.startTime, parsed.endTime, parsed.partySize);
+    const availability = await checkAvailability(parsed.start_time, parsed.end_time, parsed.party_size);
     
     if (!availability.available) {
       const errorMessage = `Sorry, ${availability.message}. Please try a different time or contact us directly.`;
@@ -323,9 +510,9 @@ export async function handler(req, res) {
     
     const reservationResult = await createReservation(
       member, 
-      parsed.startTime, 
-      parsed.endTime, 
-      parsed.partySize, 
+      parsed.start_time, 
+      parsed.end_time, 
+      parsed.party_size, 
       availability.table.id
     );
     
@@ -335,20 +522,22 @@ export async function handler(req, res) {
       return res.status(200).json({ message: 'Sent reservation creation error message' });
     }
     
-    const formattedDate = parsed.parsedDate.toLocaleDateString('en-US', {
+    // Format date and time from the parsed start_time
+    const reservationDate = new Date(parsed.start_time);
+    const formattedDate = reservationDate.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
     
-    const formattedTime = parsed.parsedDate.toLocaleTimeString('en-US', {
+    const formattedTime = reservationDate.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
     });
     
-    const confirmationMessage = `Your reservation for ${parsed.partySize} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
+    const confirmationMessage = `Your reservation for ${parsed.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
     
     await sendSMS(from, confirmationMessage);
     
