@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
-import { getSupabaseClient } from "../pages/api/supabaseClient";
+import { supabase } from '../lib/supabase';
 
 const AppContext = createContext(null);
 
@@ -8,7 +8,6 @@ export function AppContextProvider({ children }) {
   const [reservations, setReservations] = useState([]);
 
   useEffect(() => {
-    const supabase = getSupabaseClient();
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) setUser(session.user);
     });

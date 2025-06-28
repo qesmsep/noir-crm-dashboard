@@ -3,7 +3,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import React, { useState, useEffect } from 'react';
 import { createDateFromTimeString, toCSTISOString } from '../utils/dateUtils';
-import { getSupabaseClient } from '../pages/api/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import "./ReservationForm.css";
@@ -146,7 +146,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   } | null>(null);
   const [showAlternativeTimesModal, setShowAlternativeTimesModal] = useState(false);
 
-  const supabase = getSupabaseClient();
   const cardElementRef = React.useRef<HTMLDivElement>(null);
 
   // Initialize Stripe on client side only

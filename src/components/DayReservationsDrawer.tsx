@@ -20,7 +20,7 @@ import {
 } from '@chakra-ui/react';
 import { ChevronRightIcon, CalendarIcon } from '@chakra-ui/icons';
 import { formatDateTime } from '../utils/dateUtils';
-import { getSupabaseClient } from '../pages/api/supabaseClient';
+import { supabase } from '../lib/supabase';
 
 interface DayReservationsDrawerProps {
   isOpen: boolean;
@@ -55,7 +55,6 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
   const [reservations, setReservations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
-  const supabase = getSupabaseClient();
 
   useEffect(() => {
     if (isOpen && selectedDate) {
