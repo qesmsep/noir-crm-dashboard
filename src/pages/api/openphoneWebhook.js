@@ -124,10 +124,13 @@ Return ONLY valid JSON with these fields:
 
 If you can't parse it, return: {"error": "reason"}
 
+IMPORTANT: Use year 2025 for all dates unless explicitly specified otherwise.
+
 Examples:
 "RESERVATION 2 guests on 6/27/25 at 6:30pm" → {"party_size": 2, "date": "06/27/2025", "time": "18:30"}
 "book me for 4 people tomorrow at 8pm" → {"party_size": 4, "date": "tomorrow", "time": "20:00"}
 "reserve table for 6 on Friday 7pm" → {"party_size": 6, "date": "this Friday", "time": "19:00"}
+"Reservation 8 people on July 4 at 6pm" → {"party_size": 8, "date": "07/04/2025", "time": "18:00"}
 
 IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
 `;
