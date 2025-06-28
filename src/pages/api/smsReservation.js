@@ -650,6 +650,25 @@ module.exports = async (req, res) => {
 
   if (!availabilityResult.available) {
     console.log('Availability check failed:', availabilityResult.message);
+    // Send SMS to user with the closure message if this is a closure
+    if (availabilityResult.message && availabilityResult.message !== 'No available tables' && phone) {
+      try {
+        await fetch('https://api.openphone.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`
+          },
+          body: JSON.stringify({
+            from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+            to: phone,
+            text: availabilityResult.message
+          })
+        });
+      } catch (err) {
+        console.error('Failed to send closure SMS:', err);
+      }
+    }
     return res.status(409).json({ 
       error: 'No available tables',
       message: availabilityResult.message
