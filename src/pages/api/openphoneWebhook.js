@@ -69,7 +69,7 @@ function parseNaturalDate(dateStr) {
 async function parseReservationMessageWithAI(message) {
   try {
     const prompt = `
-Parse this SMS reservation request and return JSON:
+Parse this SMS reservation request and return ONLY valid JSON:
 "${message}"
 
 Return ONLY valid JSON with these fields:
@@ -87,6 +87,8 @@ Examples:
 "RESERVATION 2 guests on 6/27/25 at 6:30pm" → {"party_size": 2, "date": "06/27/2025", "time": "18:30"}
 "book me for 4 people tomorrow at 8pm" → {"party_size": 4, "date": "tomorrow", "time": "20:00"}
 "reserve table for 6 on Friday 7pm" → {"party_size": 6, "date": "this Friday", "time": "19:00"}
+
+IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
 `;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -111,8 +113,29 @@ Examples:
     const result = await response.json();
     const aiResponse = result.choices[0].message.content.trim();
     
+    console.log('Raw AI response:', aiResponse);
+    
+    // Try to extract JSON from the response (in case AI added extra text)
+    let jsonStart = aiResponse.indexOf('{');
+    let jsonEnd = aiResponse.lastIndexOf('}');
+    
+    if (jsonStart === -1 || jsonEnd === -1) {
+      console.error('No JSON found in AI response');
+      return null;
+    }
+    
+    const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
+    console.log('Extracted JSON string:', jsonString);
+    
     // Try to parse the JSON response
-    const parsed = JSON.parse(aiResponse);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Failed to parse:', jsonString);
+      return null;
+    }
     
     if (parsed.error) {
       console.log('AI parsing error:', parsed.error);
