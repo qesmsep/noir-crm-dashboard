@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import AdminLayout from '@/components/layouts/AdminLayout';
-import { supabase } from '@/lib/supabase';
-import styles from '@/styles/Settings.module.css';
-import CalendarAvailabilityControl from '@/components/CalendarAvailabilityControl';
-import PrivateEventsManager from '@/components/PrivateEventsManager';
+import AdminLayout from '../../components/layouts/AdminLayout';
+import { supabase } from '../../lib/supabase';
+import styles from '../../styles/Settings.module.css';
+import CalendarAvailabilityControl from '../../components/CalendarAvailabilityControl';
+import PrivateEventsManager from '../../components/PrivateEventsManager';
 import { Box, Heading, VStack, useColorModeValue, Text, Input, Button } from "@chakra-ui/react";
-import { useSettings } from '@/context/SettingsContext';
+import { useSettings } from '../../context/SettingsContext';
 
 interface Settings {
   business_name: string;

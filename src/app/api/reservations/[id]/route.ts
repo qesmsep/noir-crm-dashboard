@@ -10,7 +10,7 @@ const supabase = createClient(
 );
 
 export async function PATCH(request: Request, { params }: any) {
-  const { id } = params;
+  const { id } = await params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
   console.log('PATCH: Querying for reservation id:', reservationId);
   
@@ -67,7 +67,7 @@ export async function PATCH(request: Request, { params }: any) {
 }
 
 export async function GET(request: Request, { params }: any) {
-  const { id } = params;
+  const { id } = await params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
   console.log('GET: Querying for reservation id:', reservationId);
   
@@ -109,7 +109,7 @@ export async function GET(request: Request, { params }: any) {
 }
 
 export async function DELETE(request: Request, { params }: any) {
-  const { id } = params;
+  const { id } = await params;
   try {
     const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
 

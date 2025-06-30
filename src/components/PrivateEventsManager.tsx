@@ -48,8 +48,8 @@ import {
   TriangleDownIcon,
   SettingsIcon
 } from '@chakra-ui/icons';
-import { supabase } from '@/lib/supabase';
-import { useSettings } from '@/context/SettingsContext';
+import { supabase } from '../lib/supabase';
+import { useSettings } from '../context/SettingsContext';
 
 interface PrivateEvent {
   id: string;

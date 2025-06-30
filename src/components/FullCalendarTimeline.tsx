@@ -4,7 +4,6 @@ import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
-import ReservationEditDrawer from './ReservationEditDrawer';
 import DayReservationsDrawer from './DayReservationsDrawer';
 import { toZone, toCSTISOString, formatDateTime } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
@@ -54,6 +53,7 @@ interface FullCalendarTimelineProps {
   bookingEndDate?: Date;
   baseDays?: number[];
   viewOnly?: boolean;
+  onReservationClick?: (reservationId: string) => void;
 }
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_12345');
@@ -90,7 +90,7 @@ const isTouchDevice = () => {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 };
 
-const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false }) => {
+const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick }) => {
   // Private Event Table expand/collapse state
   const [expandedId, setExpandedId] = useState<string | null>(null);
   function toggleExpand(id: string) {
@@ -103,7 +103,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const [newReservation, setNewReservation] = useState<any>(null);
   const [eventData, setEventData] = useState<EventData>({ evRes: null, resRes: null });
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [isDayReservationsDrawerOpen, setIsDayReservationsDrawerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -433,17 +432,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     console.log('Event title:', info.event.title);
     console.log('Event extendedProps:', info.event.extendedProps);
     
-    setSelectedReservationId(info.event.id);
-    setIsDrawerOpen(true);
-  }
-
-  function handleCloseDrawer() {
-    setIsDrawerOpen(false);
-    setSelectedReservationId(null);
-  }
-
-  function handleReservationUpdated() {
-    setLocalReloadKey(k => k + 1);
+    if (onReservationClick) {
+      onReservationClick(info.event.id);
+    } else {
+      // Fallback to internal state management
+      setSelectedReservationId(info.event.id);
+    }
   }
 
   const handleDayClick = (info: any) => {
@@ -458,8 +452,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const handleReservationFromListClick = (reservationId: string) => {
-    setSelectedReservationId(reservationId);
-    setIsDrawerOpen(true);
+    if (onReservationClick) {
+      onReservationClick(reservationId);
+    } else {
+      // Fallback to internal state management
+      setSelectedReservationId(reservationId);
+    }
     setIsDayReservationsDrawerOpen(false);
   };
 
@@ -853,18 +851,11 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         </Elements>
       )}
 
-      <ReservationEditDrawer
-        isOpen={isDrawerOpen}
-        onClose={handleCloseDrawer}
-        reservationId={selectedReservationId}
-        onReservationUpdated={handleReservationUpdated}
-      />
-
       <DayReservationsDrawer
         isOpen={isDayReservationsDrawerOpen}
         onClose={handleDayReservationsClose}
         selectedDate={selectedDate}
-        onReservationClick={handleReservationFromListClick}
+        onReservationClick={onReservationClick || handleReservationFromListClick}
       />
     </Box>
   );

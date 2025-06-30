@@ -2,8 +2,8 @@
 import { ReactNode, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth';
-import styles from '@/styles/AdminLayout.module.css';
+import { useAuth } from '../../lib/auth';
+import styles from '../../styles/AdminLayout.module.css';
 import Image from 'next/image';
 
 interface AdminLayoutProps {

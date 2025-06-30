@@ -1,6 +1,6 @@
 import { Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber, Spinner, VStack, Text, Flex } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import AdminLayout from '@/components/layouts/AdminLayout';
+import AdminLayout from '../../components/layouts/AdminLayout';
 
 interface Member {
   member_id: string;

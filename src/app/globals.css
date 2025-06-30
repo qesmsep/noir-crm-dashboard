@@ -425,4 +425,45 @@ button:hover {
     --background-start-rgb: 0, 0, 0;
     --background-end-rgb: 0, 0, 0;
   }
+}
+
+/* Always keep FullCalendar below the drawer */
+.calendar-container,
+.fc,
+.fc * {
+  z-index: 1 !important;
+  position: relative;
+}
+
+/* Reservation Edit Drawer - Ensure it appears above all content */
+.reservation-edit-drawer {
+  position: fixed !important;
+  z-index: 999999 !important;
+  top: 0 !important;
+  right: 0 !important;
+  height: 100vh !important;
+  transition: transform 0.3s ease-in-out !important;
+}
+
+/* Ensure the overlay also has high z-index */
+.reservation-edit-drawer + [data-overlay] {
+  z-index: 999998 !important;
+}
+
+/* Override any FullCalendar z-index issues */
+.chakra-drawer__overlay {
+  z-index: 999998 !important;
+}
+
+.chakra-drawer__content {
+  z-index: 999999 !important;
+}
+
+/* Force the drawer to be above everything */
+[data-overlay] {
+  z-index: 999998 !important;
+}
+
+[role="dialog"] {
+  z-index: 999999 !important;
 } 
