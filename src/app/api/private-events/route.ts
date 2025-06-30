@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     // Get user from authorization header
     const authHeader = request.headers.get('authorization');
-    let userId = null;
+    let userId: string | null = null;
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
