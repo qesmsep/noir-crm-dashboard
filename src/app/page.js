@@ -10,8 +10,8 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, useStripe, useElements } from '@stripe/react-stripe-js';
 import { CardNumberElement, CardExpiryElement, CardCvcElement } from '@stripe/react-stripe-js';
 import { getSupabaseClient } from '../pages/api/supabaseClient';
-import ReservationForm from '@/components/ReservationForm';
-import ReservationSection from '@/components/ReservationSection';
+import ReservationForm from '../components/ReservationForm';
+import ReservationSection from '../components/ReservationSection';
 import Modal from 'react-modal';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
