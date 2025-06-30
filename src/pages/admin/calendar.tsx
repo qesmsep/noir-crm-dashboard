@@ -39,7 +39,6 @@ export default function Calendar() {
         onClose={handleCloseDrawer}
         reservationId={selectedReservationId}
         onReservationUpdated={handleReservationUpdated}
-        zIndex={999999}
       />
       <Box p={{ base: 4, md: 8 }} zIndex={100}>
         <Box 
