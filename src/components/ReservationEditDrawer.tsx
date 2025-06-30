@@ -388,7 +388,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
       size="sm"
       portalProps={{ containerRef: undefined }}
     >
-      <DrawerOverlay bg="blackAlpha.600" zIndex={2000} />
+      <DrawerOverlay bg="blackAlpha.600" zIndex={3000} />
       <DrawerContent 
         border="2px solid #353535" 
         borderRadius="10px"  
@@ -402,7 +402,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
         paddingRight="40px" 
         paddingLeft="40px" 
         backgroundColor="#ecede8"
-        zIndex={2001}
+        zIndex={3001}
       >
         <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="0px" fontFamily="IvyJournal, sans-serif" color="#353535">
           
