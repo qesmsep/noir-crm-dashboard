@@ -113,9 +113,9 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
   const generateTimeOptions = () => {
     if (!event) return [];
 
-    const startTime = new Date(event.start_time);
-    const endTime = new Date(event.end_time);
-    const options = [];
+    const startTime = new Date(event!.start_time);
+    const endTime = new Date(event!.end_time);
+    const options: { value: string; label: string }[] = [];
 
     let currentTime = new Date(startTime);
     while (currentTime <= endTime) {
