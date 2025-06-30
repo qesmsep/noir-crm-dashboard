@@ -240,7 +240,7 @@ export default function PrivateEventsManager() {
         eventData.end_time = `${date}T23:59`;
       }
 
-      let backgroundImageUrl = null;
+      let backgroundImageUrl: string | null = null;
       if (imageFile) {
         if (editingId === 'new' || !editingId) {
           // Create event via API route (which handles RSVP URL generation)
