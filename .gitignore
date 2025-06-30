@@ -60,3 +60,7 @@ Thumbs.db
 
 # Supabase
 **/supabase/.temp
+
+# Checkpoint directories (backup/archive files)
+/checkpoints/
+/Ω_historic/
