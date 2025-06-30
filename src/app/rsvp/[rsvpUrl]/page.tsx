@@ -110,7 +110,7 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
     }
   };
 
-  const generateTimeOptions = () => {
+  const generateTimeOptions = (): { value: string; label: string }[] => {
     if (!event) return [];
 
     const startTime = new Date(event!.start_time);
