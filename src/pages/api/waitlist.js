@@ -118,7 +118,7 @@ export default async function handler(req, res) {
       if (status === 'approved') {
         smsMessage = "We've reviewed your request and would like to formally invite you to take the next steps to becoming a Member of Noir.\n\nPlease complete the following form within 24 hours:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nFinally, respond to this text with any questions.\n\nThank you.";
       } else if (status === 'denied') {
-        smsMessage = "Thank you for your membership invitation request. At this time, our membership is full, and we will keep your information on file should any spots become available. Thank you again.";
+        smsMessage = "We appreciate your request.\n\nNoir is intentionally intimate—each additional member carefully considered to preserve the experience we value most at Noir.\n\nAt this time, we aren't able to extend an invitation. However, you've been added to our waitlist, and as space allows, your request will be revisited and you'll be notified.\n\nThank you for your patience. We hope to welcome you, when the time is right.";
       }
 
       if (smsMessage) {
