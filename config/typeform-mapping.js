@@ -3,18 +3,18 @@
 // Add new fields here when you update your Typeform
 
 const FIELD_MAPPING = {
-  // Core required fields
-  'first_name': ['Q1', 'first_name_field', 'First name'],
-  'last_name': ['Q2', 'last_name_field', 'Last name'],
-  'email': ['Q3', 'email_field', 'Email'],
-  'phone': ['Q4', 'phone_field', 'Phone number'],
+  // Core required fields - Updated with actual Typeform field refs
+  'first_name': ['awkpAkWItTkD', 'a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d'],
+  'last_name': ['vtsJcH4QqrKD', '9c123e7b-2643-4819-9b4d-4a9f236302c9'],
+  'phone': ['KXH2CEFMTFdn', '6ed12e4b-95a2-4b30-96b2-a7095f673db6'],
+  'email': ['Nv9dEUvj5A1d', 'ee4bcd7b-768d-49fb-b7cc-80cdd25c750a'],
   
-  // Optional fields
-  'company': ['Q5', 'company_field', 'Company'],
-  'city_state': ['Q6', 'city_state_field', 'We\'re exploring where to bring the Noir experience next. What city and state do you call home?'],
-  'referral': ['Q7', 'referral_field', 'Who referred you to Noir\'s Membership?'],
-  'visit_frequency': ['Q8', 'visit_frequency_field', 'How often do you see yourself visiting Noir?'],
-  'go_to_drink': ['Q9', 'go_to_drink_field', 'What\'s your go-to drink order?'],
+  // Optional fields - Updated with actual Typeform field refs
+  'company': ['et3s7EMSamUX', 'd32131fd-318b-4e39-8fcd-41eed4096d36'],
+  'city_state': ['938oHZ5xsU7y', 'f09c98b9-233e-46d9-870f-8220df2bd4f4'],
+  'referral': ['o8Qtfm9EbAzQ', 'dff5344e-93e0-4ae5-967c-b92e0ad51f65'],
+  'visit_frequency': ['GUrKHIc9jUkD', 'e63865bb-bfd2-4546-8bbe-d66946f66aa1'],
+  'go_to_drink': ['Je2OHV7ZoxrV', '2761aaee-1aa7-4ce8-b640-af2e0ebd18c7'],
   
   // Future fields - uncomment and update when you add them to Typeform
   // 'occupation': ['Q10', 'occupation_field', 'What is your occupation?'],

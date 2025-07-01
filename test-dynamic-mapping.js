@@ -40,88 +40,88 @@ function extractFormData(answers) {
   return data;
 }
 
-// Test with sample data
+// Test with actual Typeform data structure
 const testAnswers = [
   {
-    field: {
-      ref: 'Q1',
-      id: 'first_name_field',
-      title: 'First name'
-    },
-    type: 'text',
-    text: 'John'
+    "type": "text",
+    "text": "Testy",
+    "field": {
+      "id": "awkpAkWItTkD",
+      "type": "short_text",
+      "ref": "a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d"
+    }
   },
   {
-    field: {
-      ref: 'Q2',
-      id: 'last_name_field',
-      title: 'Last name'
-    },
-    type: 'text',
-    text: 'Doe'
+    "type": "text",
+    "text": "Timmerson",
+    "field": {
+      "id": "vtsJcH4QqrKD",
+      "type": "short_text",
+      "ref": "9c123e7b-2643-4819-9b4d-4a9f236302c9"
+    }
   },
   {
-    field: {
-      ref: 'Q3',
-      id: 'email_field',
-      title: 'Email'
-    },
-    type: 'email',
-    email: 'john.doe@example.com'
+    "type": "phone_number",
+    "phone_number": "+18584129797",
+    "field": {
+      "id": "KXH2CEFMTFdn",
+      "type": "phone_number",
+      "ref": "6ed12e4b-95a2-4b30-96b2-a7095f673db6"
+    }
   },
   {
-    field: {
-      ref: 'Q4',
-      id: 'phone_field',
-      title: 'Phone number'
-    },
-    type: 'phone_number',
-    phone_number: '+15551234567'
+    "type": "email",
+    "email": "tim@skylinerooftops.com",
+    "field": {
+      "id": "Nv9dEUvj5A1d",
+      "type": "email",
+      "ref": "ee4bcd7b-768d-49fb-b7cc-80cdd25c750a"
+    }
   },
   {
-    field: {
-      ref: 'Q5',
-      id: 'company_field',
-      title: 'Company'
-    },
-    type: 'text',
-    text: 'Test Company'
+    "type": "text",
+    "text": "The New Forward",
+    "field": {
+      "id": "et3s7EMSamUX",
+      "type": "short_text",
+      "ref": "d32131fd-318b-4e39-8fcd-41eed4096d36"
+    }
   },
   {
-    field: {
-      ref: 'Q6',
-      id: 'city_state_field',
-      title: 'We\'re exploring where to bring the Noir experience next. What city and state do you call home?'
-    },
-    type: 'text',
-    text: 'Overland Park, KS'
+    "type": "text",
+    "text": "KS",
+    "field": {
+      "id": "938oHZ5xsU7y",
+      "type": "short_text",
+      "ref": "f09c98b9-233e-46d9-870f-8220df2bd4f4"
+    }
   },
   {
-    field: {
-      ref: 'Q7',
-      id: 'referral_field',
-      title: 'Who referred you to Noir\'s Membership?'
-    },
-    type: 'text',
-    text: 'Friend'
+    "type": "text",
+    "text": "The first time",
+    "field": {
+      "id": "o8Qtfm9EbAzQ",
+      "type": "short_text",
+      "ref": "dff5344e-93e0-4ae5-967c-b92e0ad51f65"
+    }
   },
   {
-    field: {
-      ref: 'Q8',
-      id: 'visit_frequency_field',
-      title: 'How often do you see yourself visiting Noir?'
-    },
-    type: 'choice',
-    choice: { label: '2x month' }
+    "type": "text",
+    "text": "The only way",
+    "field": {
+      "id": "GUrKHIc9jUkD",
+      "type": "short_text",
+      "ref": "e63865bb-bfd2-4546-8bbe-d66946f66aa1"
+    }
   },
   {
-    field: {
-      ref: 'Q9',
-      id: 'go_to_drink_field',
-      title: 'What\'s your go-to drink order?'
-    },
-    type: 'text',
-    text: 'Cask & Blossom'
+    "type": "text",
+    "text": "The only reason",
+    "field": {
+      "id": "Je2OHV7ZoxrV",
+      "type": "short_text",
+      "ref": "2761aaee-1aa7-4ce8-b640-af2e0ebd18c7"
+    }
   }
 ];
 
