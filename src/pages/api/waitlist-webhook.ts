@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -55,9 +55,13 @@ function findAnswer(answers: any[], fieldRefs: string[], type?: string) {
   return null;
 }
 
-export async function POST(request: Request) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    const body = await request.json();
+    const body = req.body;
     console.log('Waitlist webhook received:', body);
 
     // Extract form response
@@ -65,7 +69,7 @@ export async function POST(request: Request) {
     
     if (!formResponse || !formResponse.answers) {
       console.error('Invalid form response structure');
-      return NextResponse.json({ error: 'Invalid form response' }, { status: 400 });
+      return res.status(400).json({ error: 'Invalid form response' });
     }
 
     const answers = formResponse.answers;
@@ -88,7 +92,7 @@ export async function POST(request: Request) {
     // Validate required fields
     if (!waitlistData.first_name || !waitlistData.last_name || !waitlistData.email || !waitlistData.phone) {
       console.error('Missing required fields:', waitlistData);
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Format phone number
@@ -114,10 +118,10 @@ export async function POST(request: Request) {
 
     if (existingEntry) {
       console.log('Duplicate waitlist entry found:', existingEntry);
-      return NextResponse.json({ 
+      return res.status(409).json({ 
         error: 'Already submitted', 
         message: 'You have already submitted a waitlist application' 
-      }, { status: 409 });
+      });
     }
 
     // Insert into waitlist table
@@ -129,7 +133,7 @@ export async function POST(request: Request) {
 
     if (insertError) {
       console.error('Error inserting waitlist entry:', insertError);
-      return NextResponse.json({ error: 'Failed to save application' }, { status: 500 });
+      return res.status(500).json({ error: 'Failed to save application' });
     }
 
     // Send confirmation SMS
@@ -138,7 +142,7 @@ export async function POST(request: Request) {
 
     console.log('Waitlist entry created successfully:', waitlistEntry.id);
 
-    return NextResponse.json({ 
+    return res.status(200).json({ 
       success: true, 
       message: 'Application submitted successfully',
       id: waitlistEntry.id 
@@ -146,6 +150,6 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Error processing waitlist webhook:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 } 
