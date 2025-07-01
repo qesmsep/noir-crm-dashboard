@@ -2,237 +2,271 @@
 
 ## Overview
 
-The Noir CRM Dashboard now includes a comprehensive waitlist system for managing membership applications. This system allows potential members to request membership information via SMS and submit applications through a Typeform, which are then reviewed by administrators.
+The waitlist system allows potential members to submit applications via SMS and Typeform. The system uses **dynamic field mapping** to handle Typeform changes without code modifications.
 
-## Features
+## How It Works
 
-- **SMS Integration**: Users can text "MEMBER" to receive a link to the waitlist form
-- **Typeform Integration**: Automated form submission processing
-- **Admin Dashboard**: Review and manage applications with approve/deny functionality
-- **Automated SMS Responses**: Automatic notifications for application status changes
-- **Comprehensive Tracking**: Full audit trail of all applications and decisions
+1. **User texts "MEMBER"** to 913.777.4488
+2. **OpenPhone webhook** sends Typeform link via SMS
+3. **User completes Typeform** application
+4. **Typeform webhook** processes submission and stores in database
+5. **Admin dashboard** shows applications for review
+6. **Admin approves/denies** applications with automated SMS responses
 
-## System Flow
+## Dynamic Field Mapping
 
-1. **User requests information**: User texts "MEMBER" to 913.777.4488
-2. **Automated response**: System sends Typeform link via SMS
-3. **Form submission**: User completes Typeform, data is stored in waitlist table
-4. **Confirmation SMS**: User receives confirmation of submission
-5. **Admin review**: Administrators review applications in the dashboard
-6. **Decision**: Admin approves or denies application
-7. **Notification**: User receives SMS with decision and next steps
+The system uses a configuration-based approach for maximum flexibility:
 
-## Database Setup
+### Configuration File: `config/typeform-mapping.js`
 
-### Step 1: Run the Migration
-
-1. Go to your Supabase Dashboard
-2. Navigate to the SQL Editor
-3. Copy and paste the contents of `supabase/migrations/20250122_add_waitlist.sql`
-4. Click "Run" to execute the migration
-
-This creates:
-- `waitlist` table with all necessary fields
-- Status enum (`review`, `approved`, `denied`)
-- Indexes for performance
-- Row Level Security policies
-- Helper functions for status counting
-
-### Step 2: Verify Setup
-
-After running the migration, verify that:
-- The `waitlist` table exists with all columns
-- The `waitlist_status` enum is created
-- RLS policies are in place
-- Indexes are created
-
-## Typeform Setup
-
-### Step 1: Create the Waitlist Form
-
-1. Go to [Typeform](https://www.typeform.com) and create a new form
-2. Add the following fields (adjust field references as needed):
-
-| Field Type | Field Name | Field Reference | Required |
-|------------|------------|-----------------|----------|
-| Short Text | First Name | `first_name_field_ref` | Yes |
-| Short Text | Last Name | `last_name_field_ref` | Yes |
-| Email | Email Address | `email_field_ref` | Yes |
-| Phone Number | Phone Number | `phone_field_ref` | Yes |
-| Short Text | Company | `company_field_ref` | No |
-| Short Text | How did you hear about us? | `how_did_you_hear_field_ref` | No |
-| Long Text | Why do you want to join Noir? | `why_noir_field_ref` | No |
-| Short Text | Occupation | `occupation_field_ref` | No |
-| Short Text | Industry | `industry_field_ref` | No |
-| Short Text | Referral | `referral_field_ref` | No |
-
-### Step 2: Configure Webhook
-
-1. In your Typeform, go to Settings > Integrations
-2. Add a webhook with the URL: `https://your-domain.com/api/waitlist-webhook`
-3. Set the webhook to trigger on form submission
-4. Test the webhook to ensure it's working
-
-### Step 3: Update Field References
-
-In `src/pages/api/waitlist-webhook.ts`, update the field references to match your actual Typeform field IDs:
-
-```typescript
-const waitlistData = {
-  first_name: findAnswer(answers, ['your_actual_first_name_field_id']),
-  last_name: findAnswer(answers, ['your_actual_last_name_field_id']),
-  email: findAnswer(answers, ['your_actual_email_field_id'], 'email'),
-  phone: findAnswer(answers, ['your_actual_phone_field_id'], 'phone_number'),
-  // ... other fields
+```javascript
+const FIELD_MAPPING = {
+  'first_name': ['Q1', 'first_name_field', 'First name'],
+  'last_name': ['Q2', 'last_name_field', 'Last name'],
+  'email': ['Q3', 'email_field', 'Email'],
+  'phone': ['Q4', 'phone_field', 'Phone number'],
+  // Add new fields here
 };
 ```
 
-## SMS Configuration
+### Adding New Questions
 
-### Step 1: Update OpenPhone Webhook
+1. **Add to Typeform**: Create the new question in your Typeform
+2. **Update config**: Add the field mapping to `config/typeform-mapping.js`
+3. **Add database column** (if needed): `ALTER TABLE waitlist ADD COLUMN new_field TEXT;`
 
-The OpenPhone webhook (`src/pages/api/openphoneWebhook.js`) has been updated to handle "MEMBER" messages. Ensure your OpenPhone configuration is set up correctly:
+### Field Types Supported
 
-- `OPENPHONE_API_KEY`: Your OpenPhone API key
-- `OPENPHONE_PHONE_NUMBER_ID`: Your phone number ID
+- `text` - Short text answers
+- `long_text` - Long text answers  
+- `email` - Email addresses
+- `phone_number` - Phone numbers
+- `choice` - Multiple choice answers
+- `date` - Date selections
+- `file_url` - File uploads
 
-### Step 2: Test SMS Flow
+## Setup Instructions
 
-1. Send "MEMBER" to your configured phone number
-2. Verify you receive the Typeform link
-3. Complete the form and verify the confirmation SMS
+### 1. Environment Variables
 
-## Admin Interface
+```bash
+# OpenPhone Configuration
+OPENPHONE_API_KEY=sk-proj-...
+OPENPHONE_PHONE_NUMBER_ID=...
 
-### Dashboard Integration
+# Supabase Configuration  
+NEXT_PUBLIC_SUPABASE_URL=https://...
+SUPABASE_SERVICE_ROLE_KEY=...
 
-The waitlist queue is now integrated into the main dashboard:
+# Typeform Configuration
+TYPEFORM_WEBHOOK_URL=https://your-domain.com/api/waitlist-webhook
+```
 
-- **Members Queue Card**: Shows count of applications in "Review" status
-- **Waitlist Queue Section**: Lists the next 5 applications to be reviewed
-- **Click to Review**: Click any application to open the review modal
+### 2. OpenPhone Webhook Setup
 
-### Dedicated Waitlist Page
+1. Go to OpenPhone dashboard
+2. Navigate to Integrations/Webhooks
+3. Add webhook with URL: `https://your-domain.com/api/openphoneWebhook`
+4. Set trigger to "Message received"
 
-Access the full waitlist management at `/admin/waitlist`:
+### 3. Typeform Webhook Setup
 
-- **Status Summary**: Overview of applications by status
-- **Filtering**: Filter by status and search by name/email/company
-- **Pagination**: Navigate through large numbers of applications
-- **Bulk Actions**: Review applications with approve/deny functionality
+1. Go to Typeform dashboard
+2. Open your waitlist form
+3. Go to Connect > Webhooks
+4. Add webhook with URL: `https://your-domain.com/api/waitlist-webhook`
+5. Set trigger to "Form response"
 
-### Review Process
+### 4. Database Setup
 
-1. **View Application**: Click "Review" on any application
-2. **Review Details**: See all submitted information
-3. **Add Notes**: Optional internal notes for the decision
-4. **Make Decision**: Approve or deny the application
-5. **Automatic Notification**: User receives SMS with decision
+The waitlist table is created automatically via Supabase migration:
+
+```sql
+CREATE TABLE waitlist (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  email TEXT NOT NULL,
+  company TEXT,
+  city_state TEXT,
+  referral TEXT,
+  visit_frequency TEXT,
+  go_to_drink TEXT,
+  status waitlist_status DEFAULT 'review',
+  submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  reviewed_by TEXT,
+  review_notes TEXT,
+  typeform_response_id TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
 ## API Endpoints
 
-### GET /api/waitlist
+### GET `/api/waitlist`
+Fetch waitlist entries with filtering and pagination.
 
-Fetch waitlist entries with filtering and pagination:
+**Query Parameters:**
+- `status` - Filter by status (review, approved, denied)
+- `limit` - Number of entries to return (default: 10)
+- `offset` - Pagination offset (default: 0)
 
-```javascript
-// Get all entries
-GET /api/waitlist
-
-// Filter by status
-GET /api/waitlist?status=review
-
-// Pagination
-GET /api/waitlist?limit=20&offset=0
+**Response:**
+```json
+{
+  "data": [...],
+  "count": 5,
+  "statusCounts": [
+    {"status": "review", "count": 3},
+    {"status": "approved", "count": 1},
+    {"status": "denied", "count": 1}
+  ]
+}
 ```
 
-### PATCH /api/waitlist
+### PATCH `/api/waitlist`
+Update waitlist entry status and send SMS notification.
 
-Update application status:
-
-```javascript
-PATCH /api/waitlist
+**Request Body:**
+```json
 {
-  "id": "entry-id",
+  "id": "entry-uuid",
   "status": "approved|denied",
   "review_notes": "Optional notes"
 }
 ```
 
-### POST /api/waitlist-webhook
-
-Typeform webhook endpoint (handles form submissions automatically).
-
-## Environment Variables
-
-Ensure these environment variables are set:
-
-```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# OpenPhone (for SMS)
-OPENPHONE_API_KEY=your_openphone_api_key
-OPENPHONE_PHONE_NUMBER_ID=your_phone_number_id
+**Response:**
+```json
+{
+  "success": true,
+  "data": {...},
+  "message": "Waitlist entry approved successfully"
+}
 ```
 
-## Testing
+## Admin Interface
 
-### Manual Testing
+### Dashboard Integration
 
-1. **SMS Flow**: Text "MEMBER" to your phone number
-2. **Form Submission**: Complete the Typeform
-3. **Admin Review**: Check the dashboard for new applications
-4. **Decision Process**: Approve or deny an application
-5. **Notification**: Verify the user receives the appropriate SMS
+The dashboard automatically shows:
+- **Members Queue count** - Number of applications in "review" status
+- **Waitlist Queue** - Next 5 applications with click-to-review functionality
 
-### Automated Testing
+### Waitlist Management Page
 
-Run the test script to verify API functionality:
+Access via `/admin/waitlist` for full management:
+- Filter by status
+- Search by name/email
+- Bulk operations
+- Review modal with approve/deny actions
 
-```bash
-node test-waitlist-webhook.js
-```
+## SMS Messages
+
+### Automatic Messages
+
+1. **MEMBER Text Response:**
+   ```
+   Thank you for your interest in becoming a member! Please complete our application form: [Typeform URL]
+   ```
+
+2. **Application Confirmation:**
+   ```
+   Thank you for submitting an invitation request. We typically respond to all requests within 72 hours.
+   ```
+
+3. **Approval Message:**
+   ```
+   This is your invitation to become a Noir Member. To complete your membership you must complete the following form within 24 hours. https://skylineandco.typeform.com/noirkc-signup#auth_code=tw Please respond to this text with any questions. Thank you.
+   ```
+
+4. **Denial Message:**
+   ```
+   Thank you for your membership invitation request. At this time, our membership is full, and we will keep your information on file should any spots become available. Thank you again.
+   ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Webhook not receiving data**: Check Typeform webhook URL and field references
-2. **SMS not sending**: Verify OpenPhone API credentials
-3. **Database errors**: Ensure migration was run successfully
-4. **Permission errors**: Check RLS policies in Supabase
+1. **"Unauthorized" SMS Errors**
+   - Check OpenPhone API key and phone number ID
+   - Verify API key is active in OpenPhone dashboard
 
-### Debug Logs
+2. **Webhook Not Receiving Data**
+   - Verify webhook URLs are correct
+   - Check Typeform webhook is active
+   - Ensure domain is accessible from Typeform
 
-Check the browser console and server logs for detailed error information. All API endpoints include comprehensive logging.
+3. **Field Mapping Issues**
+   - Check `config/typeform-mapping.js` for correct field refs
+   - Use debug logging to see actual Typeform payload
+   - Update field refs based on actual Typeform structure
 
-## Security Considerations
+### Debug Tools
 
-- All database operations use Row Level Security (RLS)
-- API endpoints validate input data
-- SMS notifications are rate-limited
-- Admin access is restricted to authenticated users
+1. **Test Dynamic Mapping:**
+   ```bash
+   node test-dynamic-mapping.js
+   ```
+
+2. **Test Webhook:**
+   ```bash
+   node test-waitlist-webhook.js
+   ```
+
+3. **Check API Endpoints:**
+   ```bash
+   curl http://localhost:3000/api/waitlist?status=review
+   ```
 
 ## Maintenance
 
-### Regular Tasks
+### Adding New Fields
 
-1. **Review Applications**: Check the waitlist queue regularly
-2. **Clean Old Data**: Archive or delete old denied applications
-3. **Monitor SMS Usage**: Track OpenPhone usage and costs
-4. **Update Field References**: If Typeform fields change, update the webhook
+1. **Update Typeform** with new question
+2. **Add to config** in `config/typeform-mapping.js`:
+   ```javascript
+   'new_field': ['Q10', 'new_field_ref', 'Question Title'],
+   ```
+3. **Add field type** in `FIELD_TYPES`:
+   ```javascript
+   'new_field': 'text', // or appropriate type
+   ```
+4. **Add database column** (if needed):
+   ```sql
+   ALTER TABLE waitlist ADD COLUMN new_field TEXT;
+   ```
 
-### Backup
+### Updating Field References
 
-The waitlist data is stored in Supabase and automatically backed up. Consider exporting data periodically for additional backup.
+If Typeform field refs change:
+1. **Get new refs** from Typeform webhook payload
+2. **Update config** with new refs
+3. **Test** with sample submission
+
+### Monitoring
+
+- Check webhook logs for errors
+- Monitor SMS delivery rates
+- Review waitlist application quality
+- Track approval/denial rates
+
+## Security Considerations
+
+- All webhooks validate required fields
+- Duplicate submissions are prevented
+- SMS messages are rate-limited
+- Admin actions are logged
+- Sensitive data is encrypted in transit
 
 ## Support
 
-For issues or questions about the waitlist system:
-
-1. Check the troubleshooting section above
-2. Review the server logs for error details
-3. Verify all environment variables are set correctly
-4. Test the individual components (SMS, webhook, database) separately 
+For issues or questions:
+1. Check this documentation
+2. Review server logs
+3. Test with provided debug tools
+4. Contact development team 

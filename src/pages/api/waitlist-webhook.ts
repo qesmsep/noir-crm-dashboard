@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { FIELD_MAPPING, FIELD_TYPES, REQUIRED_FIELDS } from '../../../config/typeform-mapping';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,23 +37,43 @@ async function sendSMS(to: string, message: string) {
   }
 }
 
-// Function to find answer in Typeform response
+// Enhanced function to find answer in Typeform response
 function findAnswer(answers: any[], fieldRefs: string[], type?: string) {
-  const answer = answers.find(
-    a => (fieldRefs.includes(a.field.ref) || fieldRefs.includes(a.field.id)) &&
-         (!type || a.type === type)
-  );
-  
-  if (!answer) return null;
-  
-  if (type === 'choice' && answer.choice) return answer.choice.label;
-  if (type === 'file_url' && answer.file_url) return answer.file_url;
-  if (type === 'phone_number' && answer.phone_number) return answer.phone_number;
-  if (type === 'email' && answer.email) return answer.email;
-  if (type === 'date' && answer.date) return answer.date;
-  if (answer.text) return answer.text;
-  
+  for (const ref of fieldRefs) {
+    const answer = answers.find(
+      a => (a.field.ref === ref || a.field.id === ref || a.field.title === ref) &&
+           (!type || a.type === type)
+    );
+    
+    if (answer) {
+      // Extract value based on type
+      if (type === 'choice' && answer.choice) return answer.choice.label;
+      if (type === 'file_url' && answer.file_url) return answer.file_url;
+      if (type === 'phone_number' && answer.phone_number) return answer.phone_number;
+      if (type === 'email' && answer.email) return answer.email;
+      if (type === 'date' && answer.date) return answer.date;
+      if (type === 'long_text' && answer.text) return answer.text;
+      if (answer.text) return answer.text;
+      
+      return null;
+    }
+  }
   return null;
+}
+
+// Function to extract all form data using dynamic mapping
+function extractFormData(answers: any[]) {
+  const data: any = {};
+  
+  Object.entries(FIELD_MAPPING).forEach(([dbField, fieldRefs]) => {
+    const fieldType = FIELD_TYPES[dbField as keyof typeof FIELD_TYPES];
+    const value = findAnswer(answers, fieldRefs, fieldType);
+    if (value !== null) {
+      data[dbField] = value;
+    }
+  });
+  
+  return data;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -74,25 +95,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const answers = formResponse.answers;
 
-    // Extract form data - adjust field references based on your actual Typeform
-    const waitlistData = {
-      first_name: findAnswer(answers, ['first_name_field_ref']), // Replace with actual field ref
-      last_name: findAnswer(answers, ['last_name_field_ref']), // Replace with actual field ref
-      email: findAnswer(answers, ['email_field_ref'], 'email'),
-      phone: findAnswer(answers, ['phone_field_ref'], 'phone_number'),
-      company: findAnswer(answers, ['company_field_ref']),
-      referral: findAnswer(answers, ['referral_field_ref']),
-      how_did_you_hear: findAnswer(answers, ['how_did_you_hear_field_ref']),
-      why_noir: findAnswer(answers, ['why_noir_field_ref']),
-      occupation: findAnswer(answers, ['occupation_field_ref']),
-      industry: findAnswer(answers, ['industry_field_ref']),
-      typeform_response_id: formResponse.response_id || formResponse.token
-    };
+    // Debug: Log the actual field structure to help identify correct refs
+    console.log('Typeform answers structure:', JSON.stringify(answers, null, 2));
 
-    // Validate required fields
-    if (!waitlistData.first_name || !waitlistData.last_name || !waitlistData.email || !waitlistData.phone) {
-      console.error('Missing required fields:', waitlistData);
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Extract form data using dynamic mapping
+    const waitlistData = extractFormData(answers);
+    
+    // Add Typeform response ID
+    waitlistData.typeform_response_id = formResponse.response_id || formResponse.token;
+
+    // Validate required fields using dynamic configuration
+    const missingFields = REQUIRED_FIELDS.filter(field => !waitlistData[field]);
+    if (missingFields.length > 0) {
+      console.error('Missing required fields:', missingFields, 'Received data:', waitlistData);
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        missing: missingFields,
+        received: Object.keys(waitlistData)
+      });
     }
 
     // Format phone number
