@@ -25,6 +25,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/admin/members', label: 'Members', icon: '👥' },
+    { href: '/admin/waitlist', label: 'Waitlist', icon: '⏳' },
     { href: '/admin/calendar', label: 'Calendar', icon: '📅' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
   ];

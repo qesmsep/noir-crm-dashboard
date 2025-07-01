@@ -889,6 +889,15 @@ export async function handler(req, res) {
   console.log('Raw webhook data:', JSON.stringify(data, null, 2));
   console.log('Phone number received from OpenPhone:', from);
   console.log('Message text received:', `"${text}"`);
+  
+  // Handle "MEMBER" messages for waitlist
+  if (text.toLowerCase().trim() === 'member') {
+    console.log('Processing MEMBER message for waitlist');
+    const waitlistMessage = "Thank you for requesting information. Please submit your invitation request by clicking on the following URL: https://skylineandco.typeform.com/noir-waitlist";
+    await sendSMS(from, waitlistMessage);
+    return res.status(200).json({ message: 'Sent waitlist invitation message' });
+  }
+  
   console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
 
   // Only process messages that start with "Reservation"

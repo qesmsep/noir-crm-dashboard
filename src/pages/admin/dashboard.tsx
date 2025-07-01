@@ -1,6 +1,7 @@
-import { Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber, Spinner, VStack, Text, Flex } from "@chakra-ui/react";
+import { Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber, Spinner, VStack, Text, Flex, Button, useDisclosure } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import AdminLayout from '../../components/layouts/AdminLayout';
+import WaitlistReviewModal from '../../components/WaitlistReviewModal';
 
 interface Member {
   member_id: string;
@@ -23,6 +24,8 @@ interface Stats {
   reservations: number;
   outstanding: number;
   loading: boolean;
+  waitlistCount: number;
+  waitlistEntries: any[];
 }
 
 function getNextBirthday(dob?: string) {
@@ -53,39 +56,50 @@ export default function Dashboard() {
     reservations: 0,
     outstanding: 0,
     loading: true,
+    waitlistCount: 0,
+    waitlistEntries: [],
   });
   const [reservationDetails, setReservationDetails] = useState<any[]>([]);
+  const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<any>(null);
+  const { isOpen: isWaitlistModalOpen, onOpen: onWaitlistModalOpen, onClose: onWaitlistModalClose } = useDisclosure();
+
+  const fetchStats = async () => {
+    setStats(s => ({ ...s, loading: true }));
+    try {
+      // Fetch all members
+      const membersRes = await fetch("/api/members");
+      const membersData = await membersRes.json();
+      // Fetch ledger
+      const ledgerRes = await fetch("/api/ledger");
+      const ledgerData = await ledgerRes.json();
+      // Fetch all upcoming reservations (not just count)
+      const reservationsRes = await fetch("/api/reservations?upcoming=1");
+      const reservationsData = await reservationsRes.json();
+      // Fetch outstanding balances
+      const outstandingRes = await fetch("/api/ledger?outstanding=1");
+      const outstandingData = await outstandingRes.json();
+
+      // Fetch waitlist data
+      const waitlistRes = await fetch("/api/waitlist?status=review&limit=5");
+      const waitlistData = await waitlistRes.json();
+      
+      setStats({
+        members: membersData.data || [],
+        ledger: ledgerData.data || [],
+        reservations: reservationsData.count || 0,
+        outstanding: outstandingData.total || 0,
+        loading: false,
+        waitlistCount: waitlistData.count || 0,
+        waitlistEntries: waitlistData.data || [],
+      });
+      setReservationDetails(reservationsData.data || []);
+    } catch (err) {
+      setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [] });
+      setReservationDetails([]);
+    }
+  };
 
   useEffect(() => {
-    async function fetchStats() {
-      setStats(s => ({ ...s, loading: true }));
-      try {
-        // Fetch all members
-        const membersRes = await fetch("/api/members");
-        const membersData = await membersRes.json();
-        // Fetch ledger
-        const ledgerRes = await fetch("/api/ledger");
-        const ledgerData = await ledgerRes.json();
-        // Fetch all upcoming reservations (not just count)
-        const reservationsRes = await fetch("/api/reservations?upcoming=1");
-        const reservationsData = await reservationsRes.json();
-        // Fetch outstanding balances
-        const outstandingRes = await fetch("/api/ledger?outstanding=1");
-        const outstandingData = await outstandingRes.json();
-
-        setStats({
-          members: membersData.data || [],
-          ledger: ledgerData.data || [],
-          reservations: reservationsData.count || 0,
-          outstanding: outstandingData.total || 0,
-          loading: false,
-        });
-        setReservationDetails(reservationsData.data || []);
-      } catch (err) {
-        setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false });
-        setReservationDetails([]);
-      }
-    }
     fetchStats();
   }, []);
 
@@ -211,6 +225,13 @@ export default function Dashboard() {
               <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">{now.toLocaleString('default', { month: 'long' })} A/R (Owed to Us)</StatLabel>
               <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">${ar.toFixed(2)}</StatNumber>
             </Stat>
+            
+            {/* Members Queue */}
+            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
+            >
+              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Members Queue</StatLabel>
+              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">{stats.waitlistCount}</StatNumber>
+            </Stat>
           </SimpleGrid>
           {/* Multi-stat cards, each in their own row */}
           <Flex justifyContent="left" mt={20} gap={22} shadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={20} borderRadius="10px">
@@ -299,9 +320,64 @@ export default function Dashboard() {
                 </VStack>
               )}
             </Box>
+            
+            {/* Waitlist Queue */}
+            <Box width="33%" bg="#a59480" borderRadius="10px" boxShadow="0 8px 32px rgba(53,53,53,0.25)" p={7} minH="300px"
+              fontFamily="'Montserrat', sans-serif"
+              display="flex"
+              flexDirection="column"
+              shadow="0 8px 32px rgba(0, 0, 0, 0.5)"
+              alignItems="center"
+              border="1px solid#ecede8"
+            >
+              <Heading fontSize="24px" textAlign="center" mb={4} fontFamily="'Montserrat', sans-serif">Waitlist Queue</Heading>
+              {stats.waitlistEntries.length === 0 ? (
+                <Text fontFamily="'Montserrat', sans-serif" textAlign="center">No pending applications.</Text>
+              ) : (
+                <VStack align="stretch" spacing={2} mt={2} w="100%">
+                  {stats.waitlistEntries.slice(0, 5).map((entry: any) => (
+                    <Box 
+                      key={entry.id} 
+                      p={3} 
+                      bg="#2a2a2a" 
+                      borderRadius="8px" 
+                      cursor="pointer"
+                      onClick={() => {
+                        setSelectedWaitlistEntry(entry);
+                        onWaitlistModalOpen();
+                      }}
+                      _hover={{ bg: "#3a3a3a" }}
+                    >
+                      <Text fontSize="16px" fontWeight="bold" fontFamily="'Montserrat', sans-serif" textAlign="left">
+                        {entry.first_name} {entry.last_name}
+                      </Text>
+                      <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" textAlign="left" color="#a59480">
+                        {new Date(entry.submitted_at).toLocaleDateString()}
+                      </Text>
+                    </Box>
+                  ))}
+                  {stats.waitlistEntries.length > 5 && (
+                    <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" textAlign="center" color="#a59480">
+                      +{stats.waitlistEntries.length - 5} more applications
+                    </Text>
+                  )}
+                </VStack>
+              )}
+            </Box>
           </Flex>
         </Box>
       </Box>
+      
+      {/* Waitlist Review Modal */}
+      <WaitlistReviewModal
+        isOpen={isWaitlistModalOpen}
+        onClose={onWaitlistModalClose}
+        entry={selectedWaitlistEntry}
+        onStatusUpdate={() => {
+          // Refresh the stats when a waitlist entry is updated
+          fetchStats();
+        }}
+      />
     </AdminLayout>
   );
 } 
