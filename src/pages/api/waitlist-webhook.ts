@@ -96,7 +96,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const answers = formResponse.answers;
 
     // Debug: Log the actual field structure to help identify correct refs
+    console.log('=== TYPEFORM WEBHOOK DEBUG ===');
+    console.log('Form response ID:', formResponse.response_id || formResponse.token);
+    console.log('Number of answers:', answers.length);
     console.log('Typeform answers structure:', JSON.stringify(answers, null, 2));
+    console.log('=== END DEBUG ===');
 
     // Extract form data using dynamic mapping
     const waitlistData = extractFormData(answers);
