@@ -116,7 +116,7 @@ export default async function handler(req, res) {
       // Send appropriate SMS based on status
       let smsMessage = '';
       if (status === 'approved') {
-        smsMessage = "This is your invitation to become a Noir Member. To complete your membership you must complete the following form within 24 hours. https://skylineandco.typeform.com/noirkc-signup#auth_code=tw Please respond to this text with any questions. Thank you.";
+        smsMessage = "We've reviewed your request and would like to formally invite you to take the next steps to becoming a Member of Noir.\n\nPlease complete the following form within 24 hours:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nFinally, respond to this text with any questions.\n\nThank you.";
       } else if (status === 'denied') {
         smsMessage = "Thank you for your membership invitation request. At this time, our membership is full, and we will keep your information on file should any spots become available. Thank you again.";
       }
