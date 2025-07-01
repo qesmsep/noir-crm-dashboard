@@ -512,7 +512,7 @@ export default function TemplatesPage() {
                         placeholder="Hi {{first_name}}! Welcome to Noir..."
                       />
                       <FormHelperText fontFamily="'Montserrat', sans-serif">
-                        Use {{first_name}} to include the member's first name
+                        Use {'{{first_name}}'} to include the member's first name
                       </FormHelperText>
                     </FormControl>
 
