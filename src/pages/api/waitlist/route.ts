@@ -119,8 +119,10 @@ export async function PATCH(request: Request) {
     let smsMessage = '';
     if (status === 'approved') {
       smsMessage = "This is your invitation to become a Noir Member. To complete your membership you must complete the following form within 24 hours. https://skylineandco.typeform.com/noirkc-signup#auth_code=tw Please respond to this text with any questions. Thank you.";
-    } else if (status === 'denied') {
+    } else if (status === 'waitlisted') {
       smsMessage = "Thank you for your membership invitation request. At this time, our membership is full, and we will keep your information on file should any spots become available. Thank you again.";
+    } else if (status === 'denied') {
+      smsMessage = "Thank you for your interest in Noir. After careful consideration, we are unable to extend an invitation at this time. We wish you the best in your future endeavors.";
     }
 
     if (smsMessage) {

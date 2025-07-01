@@ -3,7 +3,7 @@
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'waitlist_status') THEN
-        CREATE TYPE waitlist_status AS ENUM ('review', 'approved', 'denied');
+        CREATE TYPE waitlist_status AS ENUM ('review', 'approved', 'denied', 'waitlisted');
     END IF;
 END $$;
 

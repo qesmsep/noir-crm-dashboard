@@ -36,7 +36,7 @@ interface WaitlistEntry {
   why_noir?: string;
   occupation?: string;
   industry?: string;
-  status: 'review' | 'approved' | 'denied';
+  status: 'review' | 'approved' | 'denied' | 'waitlisted';
   submitted_at: string;
   reviewed_at?: string;
   review_notes?: string;
@@ -78,7 +78,7 @@ const WaitlistReviewModal: React.FC<WaitlistReviewModalProps> = ({
     return phone;
   };
 
-  const handleStatusUpdate = async (status: 'approved' | 'denied') => {
+  const handleStatusUpdate = async (status: 'approved' | 'waitlisted') => {
     if (!entry) return;
 
     setIsLoading(true);
@@ -100,7 +100,7 @@ const WaitlistReviewModal: React.FC<WaitlistReviewModalProps> = ({
       if (response.ok) {
         toast({
           title: 'Success',
-          description: `Application ${status} successfully`,
+          description: `Application ${status === 'waitlisted' ? 'denied and waitlisted' : status} successfully`,
           status: 'success',
           duration: 3000,
         });
@@ -132,7 +132,7 @@ const WaitlistReviewModal: React.FC<WaitlistReviewModalProps> = ({
           <Flex align="center" justify="space-between">
             <Text>Review Application</Text>
             <Badge 
-              colorScheme={entry.status === 'review' ? 'yellow' : entry.status === 'approved' ? 'green' : 'red'}
+              colorScheme={entry.status === 'review' ? 'yellow' : entry.status === 'approved' ? 'green' : entry.status === 'denied' ? 'red' : 'purple'}
               variant="subtle"
             >
               {entry.status.toUpperCase()}
@@ -268,14 +268,14 @@ const WaitlistReviewModal: React.FC<WaitlistReviewModalProps> = ({
               Cancel
             </Button>
             <Button
-              onClick={() => handleStatusUpdate('denied')}
+              onClick={() => handleStatusUpdate('waitlisted')}
               leftIcon={<CloseIcon />}
               colorScheme="red"
               variant="outline"
               isLoading={isLoading}
               fontFamily="'Montserrat', sans-serif"
             >
-              Deny
+              Deny & Waitlist
             </Button>
             <Button
               onClick={() => handleStatusUpdate('approved')}

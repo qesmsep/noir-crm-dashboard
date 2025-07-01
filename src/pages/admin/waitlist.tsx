@@ -42,7 +42,7 @@ interface WaitlistEntry {
   why_noir?: string;
   occupation?: string;
   industry?: string;
-  status: 'review' | 'approved' | 'denied';
+  status: 'review' | 'approved' | 'denied' | 'waitlisted';
   submitted_at: string;
   reviewed_at?: string;
   review_notes?: string;
@@ -139,6 +139,7 @@ export default function WaitlistPage() {
     switch (status) {
       case 'review': return 'yellow';
       case 'approved': return 'green';
+      case 'waitlisted': return 'purple';
       case 'denied': return 'red';
       default: return 'gray';
     }
@@ -196,6 +197,7 @@ export default function WaitlistPage() {
               <option value="">All Statuses</option>
               <option value="review">Review</option>
               <option value="approved">Approved</option>
+              <option value="waitlisted">Waitlisted</option>
               <option value="denied">Denied</option>
             </Select>
 

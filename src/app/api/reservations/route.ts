@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
 import { formatDateTime } from '../../../utils/dateUtils';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+// Helper function to calculate hold amount based on party size
+function getHoldAmount(partySize: number): number {
+  return 25; // Fixed $25 hold for all party sizes
+}
 
 export async function POST(request: Request) {
   try {
@@ -168,30 +176,79 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No available table for this time and party size' }, { status: 400 });
     }
     
+    // For non-members, create Stripe hold before creating reservation
+    let paymentIntentId: string | null = null;
+    let holdAmount: number | null = null;
+    
+    if (!is_member && payment_method_id) {
+      try {
+        holdAmount = getHoldAmount(party_size);
+        
+        // Create PaymentIntent for the hold
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: holdAmount * 100, // Convert to cents
+          currency: 'usd',
+          capture_method: 'manual', // This creates a hold, not a charge
+          payment_method: payment_method_id,
+          confirm: true, // Confirm the payment method immediately
+          metadata: {
+            reservation_type: 'non_member_reservation',
+            party_size: party_size.toString(),
+            hold_amount: holdAmount.toString()
+          },
+          description: `Reservation hold - $${holdAmount}`
+        });
+        
+        paymentIntentId = paymentIntent.id;
+        console.log('Created Stripe hold:', paymentIntentId);
+      } catch (stripeError) {
+        console.error('Error creating Stripe hold:', stripeError);
+        return NextResponse.json(
+          { error: 'Failed to create payment hold. Please try again.' },
+          { status: 500 }
+        );
+      }
+    }
+
     // Create reservation with assigned table_id
+    const reservationData = {
+      start_time,
+      end_time,
+      party_size,
+      event_type,
+      notes,
+      phone: body.phone,
+      email: body.email,
+      first_name: body.first_name,
+      last_name: body.last_name,
+      membership_type: body.is_member ? 'member' : 'non-member',
+      payment_method_id,
+      table_id: availableTable.id,
+      payment_intent_id: paymentIntentId,
+      hold_amount: holdAmount,
+      hold_status: paymentIntentId ? 'confirmed' : null,
+      hold_created_at: paymentIntentId ? new Date().toISOString() : null
+    };
+
     const { data: reservation, error } = await supabase
       .from('reservations')
-      .insert([
-        {
-          start_time,
-          end_time,
-          party_size,
-          event_type,
-          notes,
-          phone: body.phone,
-          email: body.email,
-          first_name: body.first_name,
-          last_name: body.last_name,
-          membership_type: body.is_member ? 'member' : 'non-member',
-          payment_method_id,
-          table_id: availableTable.id
-        }
-      ])
+      .insert([reservationData])
       .select()
       .single();
 
     if (error) {
       console.error('Error creating reservation:', error);
+      
+      // If we created a hold but failed to create the reservation, we should release the hold
+      if (paymentIntentId) {
+        try {
+          await stripe.paymentIntents.cancel(paymentIntentId);
+          console.log('Cancelled hold due to reservation creation failure:', paymentIntentId);
+        } catch (cancelError) {
+          console.error('Error cancelling hold:', cancelError);
+        }
+      }
+      
       return NextResponse.json(
         { error: 'Failed to create reservation' },
         { status: 500 }

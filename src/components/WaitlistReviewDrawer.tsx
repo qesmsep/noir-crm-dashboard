@@ -38,7 +38,7 @@ interface WaitlistEntry {
   referral?: string;
   visit_frequency?: string;
   go_to_drink?: string;
-  status: 'review' | 'approved' | 'denied';
+  status: 'review' | 'approved' | 'denied' | 'waitlisted';
   submitted_at: string;
   reviewed_at?: string;
   review_notes?: string;
@@ -80,7 +80,7 @@ const WaitlistReviewDrawer: React.FC<WaitlistReviewDrawerProps> = ({
     return phone;
   };
 
-  const handleStatusUpdate = async (status: 'approved' | 'denied') => {
+  const handleStatusUpdate = async (status: 'approved' | 'waitlisted') => {
     if (!entry) return;
 
     setIsLoading(true);
@@ -102,7 +102,7 @@ const WaitlistReviewDrawer: React.FC<WaitlistReviewDrawerProps> = ({
       if (response.ok) {
         toast({
           title: 'Success',
-          description: `Application ${status} successfully`,
+          description: `Application ${status === 'waitlisted' ? 'denied and waitlisted' : status} successfully`,
           status: 'success',
           duration: 3000,
         });
@@ -161,7 +161,7 @@ const WaitlistReviewDrawer: React.FC<WaitlistReviewDrawerProps> = ({
             <Flex align="center" justify="space-between">
               <Text>Review Application</Text>
               <Badge 
-                colorScheme={entry.status === 'review' ? 'yellow' : entry.status === 'approved' ? 'green' : 'red'}
+                colorScheme={entry.status === 'review' ? 'yellow' : entry.status === 'approved' ? 'green' : entry.status === 'denied' ? 'red' : 'purple'}
                 variant="subtle"
                 size="sm"
               >
@@ -301,7 +301,7 @@ const WaitlistReviewDrawer: React.FC<WaitlistReviewDrawerProps> = ({
                 Cancel
               </Button>
               <Button
-                onClick={() => handleStatusUpdate('denied')}
+                onClick={() => handleStatusUpdate('waitlisted')}
                 leftIcon={<CloseIcon />}
                 colorScheme="red"
                 variant="outline"
@@ -309,7 +309,7 @@ const WaitlistReviewDrawer: React.FC<WaitlistReviewDrawerProps> = ({
                 fontFamily="Montserrat, sans-serif"
                 size="sm"
               >
-                Deny
+                Deny & Waitlist
               </Button>
               <Button
                 onClick={() => handleStatusUpdate('approved')}

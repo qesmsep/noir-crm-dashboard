@@ -26,6 +26,8 @@ interface Stats {
   loading: boolean;
   waitlistCount: number;
   waitlistEntries: any[];
+  invitationRequestsCount: number;
+  invitationRequests: any[];
 }
 
 function getNextBirthday(dob?: string) {
@@ -58,6 +60,8 @@ export default function Dashboard() {
     loading: true,
     waitlistCount: 0,
     waitlistEntries: [],
+    invitationRequestsCount: 0,
+    invitationRequests: [],
   });
   const [reservationDetails, setReservationDetails] = useState<any[]>([]);
   const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<any>(null);
@@ -83,18 +87,24 @@ export default function Dashboard() {
       const waitlistRes = await fetch("/api/waitlist?status=review&limit=5");
       const waitlistData = await waitlistRes.json();
       
+      // Fetch waitlisted data (denied but kept on file)
+      const waitlistedRes = await fetch("/api/waitlist?status=waitlisted&limit=5");
+      const waitlistedData = await waitlistedRes.json();
+      
       setStats({
         members: membersData.data || [],
         ledger: ledgerData.data || [],
         reservations: reservationsData.count || 0,
         outstanding: outstandingData.total || 0,
         loading: false,
-        waitlistCount: waitlistData.count || 0,
-        waitlistEntries: waitlistData.data || [],
+        waitlistCount: waitlistedData.count || 0,
+        waitlistEntries: waitlistedData.data || [],
+        invitationRequestsCount: waitlistData.count || 0,
+        invitationRequests: waitlistData.data || [],
       });
       setReservationDetails(reservationsData.data || []);
     } catch (err) {
-      setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [] });
+      setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [], invitationRequestsCount: 0, invitationRequests: [] });
       setReservationDetails([]);
     }
   };
@@ -226,10 +236,17 @@ export default function Dashboard() {
               <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">${ar.toFixed(2)}</StatNumber>
             </Stat>
             
-            {/* Members Queue */}
+            {/* Invitation Requests */}
             <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
             >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Members Queue</StatLabel>
+              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Invitation Requests</StatLabel>
+              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">{stats.invitationRequestsCount}</StatNumber>
+            </Stat>
+            
+            {/* Waitlist */}
+            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
+            >
+              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Waitlist</StatLabel>
               <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">{stats.waitlistCount}</StatNumber>
             </Stat>
           </SimpleGrid>
@@ -321,7 +338,7 @@ export default function Dashboard() {
               )}
             </Box>
             
-            {/* Waitlist Queue */}
+            {/* Invitation Requests Queue */}
             <Box width="33%" bg="#a59480" borderRadius="10px" boxShadow="0 8px 32px rgba(53,53,53,0.25)" p={7} minH="300px"
               fontFamily="'Montserrat', sans-serif"
               display="flex"
@@ -330,12 +347,12 @@ export default function Dashboard() {
               alignItems="center"
               border="1px solid#ecede8"
             >
-              <Heading fontSize="24px" textAlign="center" mb={4} fontFamily="'Montserrat', sans-serif">Waitlist Queue</Heading>
-              {stats.waitlistEntries.length === 0 ? (
-                <Text fontFamily="'Montserrat', sans-serif" textAlign="center">No pending applications.</Text>
+              <Heading fontSize="24px" textAlign="center" mb={4} fontFamily="'Montserrat', sans-serif">Invitation Requests</Heading>
+              {stats.invitationRequests.length === 0 ? (
+                <Text fontFamily="'Montserrat', sans-serif" textAlign="center">No pending requests.</Text>
               ) : (
                 <VStack align="stretch" spacing={2} mt={2} w="100%">
-                  {stats.waitlistEntries.slice(0, 5).map((entry: any) => (
+                  {stats.invitationRequests.slice(0, 5).map((entry: any) => (
                     <Box 
                       key={entry.id} 
                       p={3} 
@@ -356,9 +373,9 @@ export default function Dashboard() {
                       </Text>
                     </Box>
                   ))}
-                  {stats.waitlistEntries.length > 5 && (
+                  {stats.invitationRequests.length > 5 && (
                     <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" textAlign="center" color="#a59480">
-                      +{stats.waitlistEntries.length - 5} more applications
+                      +{stats.invitationRequests.length - 5} more requests
                     </Text>
                   )}
                 </VStack>
