@@ -135,6 +135,32 @@ export default async function handler(req, res) {
       res.status(500).json({ error: error.message, details: error.details, hint: error.hint, code: error.code });
       return;
     }
+
+    // Trigger followup campaign for the primary member
+    try {
+      const primaryMember = member1;
+      console.log('Triggering followup campaign for member:', primaryMember.member_id);
+      
+      const campaignResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/trigger-member-campaign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: primaryMember.member_id,
+          activation_date: form.submitted_at
+        })
+      });
+
+      if (campaignResponse.ok) {
+        const campaignData = await campaignResponse.json();
+        console.log('Followup campaign triggered successfully:', campaignData);
+      } else {
+        console.error('Failed to trigger followup campaign:', await campaignResponse.text());
+      }
+    } catch (campaignError) {
+      console.error('Error triggering followup campaign:', campaignError);
+      // Don't fail the entire request if campaign trigger fails
+    }
+
     res.status(200).json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
