@@ -28,7 +28,7 @@ import {
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
-import WaitlistReviewModal from '../../components/WaitlistReviewModal';
+import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 
 interface WaitlistEntry {
   id: string;
@@ -323,8 +323,8 @@ export default function WaitlistPage() {
         </Box>
       </Box>
 
-      {/* Waitlist Review Modal */}
-      <WaitlistReviewModal
+      {/* Waitlist Review Drawer */}
+      <WaitlistReviewDrawer
         isOpen={isModalOpen}
         onClose={onModalClose}
         entry={selectedEntry}

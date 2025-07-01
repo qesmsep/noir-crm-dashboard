@@ -1,7 +1,7 @@
 import { Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber, Spinner, VStack, Text, Flex, Button, useDisclosure } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import AdminLayout from '../../components/layouts/AdminLayout';
-import WaitlistReviewModal from '../../components/WaitlistReviewModal';
+import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 
 interface Member {
   member_id: string;
@@ -368,8 +368,8 @@ export default function Dashboard() {
         </Box>
       </Box>
       
-      {/* Waitlist Review Modal */}
-      <WaitlistReviewModal
+      {/* Waitlist Review Drawer */}
+      <WaitlistReviewDrawer
         isOpen={isWaitlistModalOpen}
         onClose={onWaitlistModalClose}
         entry={selectedWaitlistEntry}
