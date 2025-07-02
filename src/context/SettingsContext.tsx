@@ -1,7 +1,9 @@
+'use client';
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
 
 interface Settings {
+  id: string;
   business_name: string;
   business_email: string;
   business_phone: string;
@@ -20,9 +22,12 @@ interface Settings {
     sms_notifications: boolean;
     notification_email: string;
   };
+  hold_fee_enabled: boolean;
+  hold_fee_amount: number;
 }
 
 const defaultSettings: Settings = {
+  id: '',
   business_name: '',
   business_email: '',
   business_phone: '',
@@ -47,6 +52,8 @@ const defaultSettings: Settings = {
     sms_notifications: false,
     notification_email: '',
   },
+  hold_fee_enabled: true,
+  hold_fee_amount: 25.00,
 };
 
 interface SettingsContextType {
@@ -63,38 +70,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .single();
-
-      if (error) {
-        console.error('Error fetching settings:', error);
-        
-        // If no settings record exists, create one with defaults
-        if (error.code === 'PGRST116') {
-          console.log('No settings record found, creating default...');
-          const { data: newSettings, error: insertError } = await supabase
-            .from('settings')
-            .insert([defaultSettings])
-            .select()
-            .single();
-          
-          if (insertError) {
-            console.error('Error creating default settings:', insertError);
-            setSettings(defaultSettings);
-          } else {
-            setSettings(newSettings as Settings);
-          }
-        } else {
-          // Use default settings if fetch fails for other reasons
-          setSettings(defaultSettings);
-        }
-      } else if (data) {
-        setSettings(data as Settings);
-      }
+      const res = await fetch('/api/settings');
+      if (!res.ok) throw new Error('Failed to fetch settings');
+      const data = await res.json();
+      setSettings(data as Settings);
     } catch (error) {
-      console.error('Error in fetchSettings:', error);
+      console.error('Error fetching settings:', error);
       setSettings(defaultSettings);
     } finally {
       setLoading(false);

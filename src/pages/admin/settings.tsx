@@ -4,10 +4,11 @@ import { supabase } from '../../lib/supabase';
 import styles from '../../styles/Settings.module.css';
 import CalendarAvailabilityControl from '../../components/CalendarAvailabilityControl';
 import PrivateEventsManager from '../../components/PrivateEventsManager';
-import { Box, Heading, VStack, useColorModeValue, Text, Input, Button } from "@chakra-ui/react";
+import { Box, Heading, VStack, useColorModeValue, Text, Input, Button, Switch, FormControl, FormLabel, NumberInput, NumberInputField, NumberInputStepper, NumberIncrementStepper, NumberDecrementStepper, HStack } from "@chakra-ui/react";
 import { useSettings } from '../../context/SettingsContext';
 
 interface Settings {
+  id: string;
   business_name: string;
   business_email: string;
   business_phone: string;
@@ -26,9 +27,12 @@ interface Settings {
     sms_notifications: boolean;
     notification_email: string;
   };
+  hold_fee_enabled: boolean;
+  hold_fee_amount: number;
 }
 
 const defaultSettings: Settings = {
+  id: '',
   business_name: '',
   business_email: '',
   business_phone: '',
@@ -53,6 +57,8 @@ const defaultSettings: Settings = {
     sms_notifications: false,
     notification_email: '',
   },
+  hold_fee_enabled: true,
+  hold_fee_amount: 25.00,
 };
 
 export default function Settings() {
@@ -234,6 +240,56 @@ export default function Settings() {
             borderColor="gray.100"
           >
             <PrivateEventsManager />
+          </Box>
+
+          {/* Hold Fee Settings Card */}
+          <Box 
+            bg="white" 
+            borderRadius="2xl" 
+            boxShadow="0 2px 8px rgba(0,0,0,0.07)" 
+            p={6}
+            border="1px solid"
+            borderColor="gray.100"
+          >
+            <Heading size="md" mb={4} color="nightSky" fontWeight="600">
+              Reservation Hold Fee
+            </Heading>
+            <VStack spacing={4} align="stretch">
+              <FormControl display="flex" alignItems="center">
+                <FormLabel mb="0" fontWeight="500" color="gray.700">
+                  Enable Hold Fee
+                </FormLabel>
+                <Switch
+                  isChecked={settings.hold_fee_enabled}
+                  onChange={(e) => handleInputChange('hold_fee_enabled', '', e.target.checked)}
+                  colorScheme="green"
+                />
+              </FormControl>
+              
+              {settings.hold_fee_enabled && (
+                <FormControl>
+                  <FormLabel fontWeight="500" color="gray.700">
+                    Hold Fee Amount ($)
+                  </FormLabel>
+                  <NumberInput
+                    value={settings.hold_fee_amount}
+                    onChange={(valueString) => handleInputChange('hold_fee_amount', '', parseFloat(valueString) || 0)}
+                    min={0}
+                    max={1000}
+                    precision={2}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                  <Text fontSize="sm" color="gray.500" mt={2}>
+                    Amount to hold on credit cards for non-member reservations
+                  </Text>
+                </FormControl>
+              )}
+            </VStack>
           </Box>
         </VStack>
       </Box>
