@@ -4,21 +4,20 @@ import { supabase } from '../../lib/supabase';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      // Get pending reminders with reservation and template details
-      const { data: pendingReminders, error } = await supabase
+      // Get pending reservation reminders with related data (latest reservation info)
+      const { data: pendingReminders, error: fetchError } = await supabase
         .from('scheduled_reservation_reminders')
         .select(`
           *,
-          reservation:reservations(
+          reservations (
             id,
             first_name,
             last_name,
             phone,
             start_time,
-            party_size,
-            status
+            party_size
           ),
-          template:reservation_reminder_templates(
+          reservation_reminder_templates (
             id,
             name,
             reminder_type,
@@ -28,15 +27,64 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('status', 'pending')
         .order('scheduled_for', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching pending reminders:', error);
+      if (fetchError) {
+        console.error('Error fetching pending reservation reminders:', fetchError);
         return res.status(500).json({ error: 'Failed to fetch pending reminders' });
       }
 
       res.status(200).json({ pendingReminders: pendingReminders || [] });
     } catch (error) {
-      console.error('Error in pending-reservation-reminders API:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      console.error('Error in pending reservation reminders API:', error);
+      res.status(500).json({ error: 'Failed to fetch pending reminders' });
+    }
+  } else if (req.method === 'PATCH') {
+    try {
+      const { id, scheduled_for, message_content } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ error: 'Reminder ID is required' });
+      }
+
+      // Validate that at least one field is provided to update
+      if (!scheduled_for && !message_content) {
+        return res.status(400).json({ error: 'At least one field (scheduled_for or message_content) is required' });
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+      if (scheduled_for) {
+        updateData.scheduled_for = scheduled_for;
+      }
+      if (message_content) {
+        updateData.message_content = message_content;
+      }
+
+      // Update the reminder
+      const { data: updatedReminder, error: updateError } = await supabase
+        .from('scheduled_reservation_reminders')
+        .update(updateData)
+        .eq('id', id)
+        .eq('status', 'pending')
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating reminder:', updateError);
+        return res.status(500).json({ error: 'Failed to update reminder' });
+      }
+
+      if (!updatedReminder) {
+        return res.status(404).json({ error: 'Reminder not found or not in pending status' });
+      }
+
+      res.status(200).json({ 
+        message: 'Reminder updated successfully',
+        reminder: updatedReminder
+      });
+
+    } catch (error) {
+      console.error('Error updating reservation reminder:', error);
+      res.status(500).json({ error: 'Failed to update reminder' });
     }
   } else if (req.method === 'POST') {
     try {
@@ -46,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Reminder ID is required' });
       }
 
-      // Get the reminder details
+      // Get the specific reminder
       const { data: reminder, error: fetchError } = await supabase
         .from('scheduled_reservation_reminders')
         .select('*')
@@ -87,8 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       if (!smsResponse.ok) {
-        const errorData = await smsResponse.json();
-        throw new Error(`SMS API returned ${smsResponse.status}: ${JSON.stringify(errorData)}`);
+        throw new Error(`SMS API returned ${smsResponse.status}`);
       }
 
       const smsResult = await smsResponse.json();
@@ -108,34 +155,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to update reminder status' });
       }
 
-      res.status(200).json({
+      res.status(200).json({ 
         message: 'Reminder sent successfully',
-        reminder_id,
-        openphone_message_id: smsResult.id
+        openphone_message_id: smsResult.id 
       });
 
     } catch (error) {
-      console.error('Error sending individual reminder:', error);
-
-      // Update reminder status to failed
-      const { reminder_id } = req.body;
-      if (reminder_id) {
-        await supabase
-          .from('scheduled_reservation_reminders')
-          .update({
-            status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown error'
-          })
-          .eq('id', reminder_id);
-      }
-
-      res.status(500).json({ 
-        error: 'Failed to send reminder',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
+      console.error('Error sending individual reservation reminder:', error);
+      res.status(500).json({ error: 'Failed to send reminder' });
     }
   } else {
-    res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    res.setHeader('Allow', ['GET', 'PATCH', 'POST']);
+    res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 } 
