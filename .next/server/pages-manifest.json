@@ -2,6 +2,5 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/admin/settings": "pages/admin/settings.js",
-  "/api/schedule-reservation-reminders": "pages/api/schedule-reservation-reminders.js"
+  "/admin/settings": "pages/admin/settings.js"
 }
