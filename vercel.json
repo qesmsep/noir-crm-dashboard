@@ -16,5 +16,11 @@
     "src/pages/api/cron-process-reminders.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/cron-process-reminders",
+      "destination": "/api/cron-process-reminders"
+    }
+  ]
 } 
