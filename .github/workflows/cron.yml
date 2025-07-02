@@ -1,0 +1,15 @@
+name: Process Reservation Reminders
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  process-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call webhook
+        run: |
+          curl -X GET "https://noir-crm-dashboard-hw7jln68k-qesmseps-projects.vercel.app/api/webhook-process-reminders" \
+            -H "x-webhook-secret: ${{ secrets.WEBHOOK_SECRET }}" 
