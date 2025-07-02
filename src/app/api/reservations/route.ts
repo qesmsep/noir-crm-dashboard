@@ -266,6 +266,18 @@ export async function POST(request: Request) {
     // Send SMS confirmation
     await sendSMSConfirmation(reservation);
 
+    // Schedule reservation reminders
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/schedule-reservation-reminders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservation_id: reservation.id })
+      });
+    } catch (error) {
+      console.error('Error scheduling reservation reminders:', error);
+      // Don't fail the reservation creation if reminder scheduling fails
+    }
+
     return NextResponse.json(reservation);
   } catch (error) {
     console.error('Error in reservations POST:', error);

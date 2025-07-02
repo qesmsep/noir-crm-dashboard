@@ -71,11 +71,16 @@ function formatDateMDY(date: Date) {
 function findFirstAvailableDate(startDate: Date, baseDays: number[], exceptionalClosures: string[], exceptionalOpens: string[], privateEventDates: string[]): Date {
   let currentDate = new Date(startDate);
   while (true) {
-    const iso = currentDate.toISOString().slice(0, 10);
-    const isExceptionalOpen = exceptionalOpens.includes(iso);
+    // Format date as YYYY-MM-DD using local timezone (consistent with other date handling)
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const isExceptionalOpen = exceptionalOpens.includes(dateStr);
     const isBaseDay = baseDays.includes(currentDate.getDay());
-    const isClosed = exceptionalClosures.includes(iso);
-    const isPrivateEvent = privateEventDates.includes(iso);
+    const isClosed = exceptionalClosures.includes(dateStr);
+    const isPrivateEvent = privateEventDates.includes(dateStr);
     
     if ((isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent) {
       return currentDate;
@@ -140,6 +145,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const [exceptionalOpens, setExceptionalOpens] = useState<string[]>([]);
   const [privateEventDates, setPrivateEventDates] = useState<string[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [internalBaseDays, setInternalBaseDays] = useState<number[]>([]);
   const [alternativeTimes, setAlternativeTimes] = useState<{
     before: string | null;
     after: string | null;
@@ -201,7 +207,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         .gte('time_ranges', '[]');
       if (data) {
         console.log('Loaded baseDays from Supabase:', data);
-        // setBaseDays(data.map(r => typeof r.day_of_week === 'string' ? Number(r.day_of_week) : r.day_of_week));
+        const days = data.map(r => typeof r.day_of_week === 'string' ? Number(r.day_of_week) : r.day_of_week);
+        console.log('Setting internalBaseDays to:', days);
+        setInternalBaseDays(days);
       }
     }
     loadBaseDays();
@@ -209,17 +217,64 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
   // Fetch available times when date or party_size changes
   useEffect(() => {
-    // Only fetch if the selected date is allowed
-    if (!date || !Array.isArray(baseDays) || !baseDays.includes(date.getDay())) {
+    // Check if the selected date is allowed (either base day or exceptional open)
+    // Format date as YYYY-MM-DD using local timezone (consistent with fetchAvailableTimes)
+    const dateStr = date ? (() => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const result = `${year}-${month}-${day}`;
+      console.log('=== DATE STRING CONVERSION DEBUG ===');
+      console.log('Original date:', date);
+      console.log('date.getFullYear():', year);
+      console.log('date.getMonth():', date.getMonth());
+      console.log('date.getDate():', date.getDate());
+      console.log('Calculated dateStr:', result);
+      console.log('date.toISOString().slice(0, 10):', date.toISOString().slice(0, 10));
+      console.log('=== END DATE STRING CONVERSION DEBUG ===');
+      return result;
+    })() : '';
+    const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
+    const isBaseDay = Array.isArray(effectiveBaseDays) && effectiveBaseDays.includes(date?.getDay());
+    const isExceptionalOpen = exceptionalOpens.includes(dateStr);
+    const isClosed = exceptionalClosures.includes(dateStr);
+    const isPrivateEvent = privateEventDates.includes(dateStr);
+    
+    console.log('=== AVAILABILITY CHECK DEBUG ===');
+    console.log('dateStr:', dateStr);
+    console.log('isBaseDay:', isBaseDay);
+    console.log('isExceptionalOpen:', isExceptionalOpen);
+    console.log('isClosed:', isClosed);
+    console.log('isPrivateEvent:', isPrivateEvent);
+    console.log('baseDays:', baseDays);
+    console.log('internalBaseDays:', internalBaseDays);
+    console.log('exceptionalOpens:', exceptionalOpens);
+    console.log('exceptionalClosures:', exceptionalClosures);
+    console.log('privateEventDates:', privateEventDates);
+    console.log('day of week:', date.getDay());
+    console.log('=== END AVAILABILITY CHECK DEBUG ===');
+    
+    // Only fetch if the date is available (base day OR exceptional open) AND not closed/private event
+    if (!date || (!isBaseDay && !isExceptionalOpen) || isClosed || isPrivateEvent) {
+      console.log('Setting availableTimes to empty array due to availability check failure');
+      console.log('Reason: !date =', !date, ', (!isBaseDay && !isExceptionalOpen) =', (!isBaseDay && !isExceptionalOpen), ', isClosed =', isClosed, ', isPrivateEvent =', isPrivateEvent);
       setAvailableTimes([]);
       return;
     }
+    
     async function fetchAvailableTimes() {
       if (!date || !form.party_size) return;
+      
+      // Format date as YYYY-MM-DD using local timezone
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
       const res = await fetch('/api/available-slots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, party_size: form.party_size })
+        body: JSON.stringify({ date: dateStr, party_size: form.party_size })
       });
 
       if (!res.ok) {
@@ -232,7 +287,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       setAvailableTimes(Array.isArray(slots) ? slots : []);
     }
     fetchAvailableTimes();
-  }, [date, form.party_size, baseDays]);
+  }, [date, form.party_size, baseDays, internalBaseDays, exceptionalOpens, exceptionalClosures, privateEventDates]);
 
   // Set default time only when availableTimes changes and current time is not in slots
   useEffect(() => {
@@ -267,16 +322,33 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       // Private Events (any event that blocks the whole day)
       const { data: events } = await supabase
         .from('private_events')
-        .select('start_time, end_time')
+        .select('start_time, end_time, full_day')
         .gte('start_time', start.toISOString())
-        .lte('end_time', end.toISOString());
+        .lte('end_time', end.toISOString())
+        .eq('status', 'active');
       // Collect all dates covered by private events
       const eventDates = new Set<string>();
       (events || []).forEach((ev: any) => {
-        const d0 = new Date(ev.start_time);
-        const d1 = new Date(ev.end_time);
-        for (let d = new Date(d0); d <= d1; d.setDate(d.getDate() + 1)) {
-          eventDates.add(d.toISOString().slice(0, 10));
+        if (ev.full_day) {
+          // For full-day events, just add the date
+          // Use UTC methods to avoid timezone shifts
+          const date = new Date(ev.start_time);
+          const year = date.getUTCFullYear();
+          const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(date.getUTCDate()).padStart(2, '0');
+          const eventDate = `${year}-${month}-${day}`;
+          eventDates.add(eventDate);
+        } else {
+          // For partial day events, add all dates in the range
+          const d0 = new Date(ev.start_time);
+          const d1 = new Date(ev.end_time);
+          for (let d = new Date(d0); d <= d1; d.setUTCDate(d.getUTCDate() + 1)) {
+            const year = d.getUTCFullYear();
+            const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(d.getUTCDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+            eventDates.add(dateStr);
+          }
         }
       });
       setPrivateEventDates(Array.from(eventDates));
@@ -286,16 +358,17 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
   // Update date when all required data is loaded
   useEffect(() => {
+    const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
     if (
       isInitialLoad &&
-      baseDays.length > 0 &&
+      effectiveBaseDays.length > 0 &&
       exceptionalClosures.length >= 0 &&
       exceptionalOpens.length >= 0 &&
       privateEventDates.length >= 0
     ) {
       const firstAvailable = findFirstAvailableDate(
         effectiveStartDate,
-        baseDays,
+        effectiveBaseDays,
         exceptionalClosures,
         exceptionalOpens,
         privateEventDates
@@ -304,7 +377,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       setIsInitialLoad(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
+  }, [baseDays, internalBaseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
 
   // Step 1: Inline fields
   const handleInlineChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => 
@@ -431,8 +504,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       email: form.email,
       first_name: form.first_name,
       last_name: form.last_name,
-      is_member: isMember,
-      status: 'confirmed'
+      is_member: isMember
     };
 
     setCurrentReservationData(reservationData);
@@ -700,11 +772,31 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     // - on a base open day or exceptional open
                     // - not in exceptional closures (full day)
                     // - not in private event dates
-                    const iso = d.toISOString().slice(0, 10);
-                    const isExceptionalOpen = exceptionalOpens.includes(iso);
-                    const isBaseDay = baseDays.includes(d.getDay());
-                    const isClosed = exceptionalClosures.includes(iso);
-                    const isPrivateEvent = privateEventDates.includes(iso);
+                    // Use local date formatting to match the rest of the component
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
+                    const isExceptionalOpen = exceptionalOpens.includes(dateStr);
+                    const isBaseDay = effectiveBaseDays.includes(d.getDay());
+                    const isClosed = exceptionalClosures.includes(dateStr);
+                    const isPrivateEvent = privateEventDates.includes(dateStr);
+                    
+                    console.log(`=== FILTER DATE DEBUG for ${dateStr} ===`);
+                    console.log('dateStr:', dateStr);
+                    console.log('day of week:', d.getDay());
+                    console.log('effectiveBaseDays:', effectiveBaseDays);
+                    console.log('isBaseDay:', isBaseDay);
+                    console.log('isExceptionalOpen:', isExceptionalOpen);
+                    console.log('isClosed:', isClosed);
+                    console.log('isPrivateEvent:', isPrivateEvent);
+                    console.log('exceptionalOpens:', exceptionalOpens);
+                    console.log('exceptionalClosures:', exceptionalClosures);
+                    console.log('privateEventDates:', privateEventDates);
+                    console.log('result:', (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent);
+                    console.log('=== END FILTER DATE DEBUG ===');
+                    
                     return (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent;
                   }}
                   customInput={

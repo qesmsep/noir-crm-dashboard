@@ -3,5 +3,5 @@
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
   "/admin/settings": "pages/admin/settings.js",
-  "/admin/dashboard": "pages/admin/dashboard.js"
+  "/api/schedule-reservation-reminders": "pages/api/schedule-reservation-reminders.js"
 }

@@ -21,12 +21,14 @@ export async function PATCH(
       start_time,
       end_time,
       max_guests,
+      total_attendees_maximum,
       deposit_required,
       event_description,
       rsvp_enabled,
       background_image_url,
       require_time_selection,
-      status
+      status,
+      full_day
     } = body;
 
     // Build update object with only provided fields
@@ -36,12 +38,14 @@ export async function PATCH(
     if (start_time !== undefined) updateFields.start_time = start_time;
     if (end_time !== undefined) updateFields.end_time = end_time;
     if (max_guests !== undefined) updateFields.max_guests = max_guests;
+    if (total_attendees_maximum !== undefined) updateFields.total_attendees_maximum = total_attendees_maximum;
     if (deposit_required !== undefined) updateFields.deposit_required = deposit_required;
     if (event_description !== undefined) updateFields.event_description = event_description;
     if (rsvp_enabled !== undefined) updateFields.rsvp_enabled = rsvp_enabled;
     if (background_image_url !== undefined) updateFields.background_image_url = background_image_url;
     if (require_time_selection !== undefined) updateFields.require_time_selection = require_time_selection;
     if (status !== undefined) updateFields.status = status;
+    if (full_day !== undefined) updateFields.full_day = full_day;
 
     // Add updated_at timestamp
     updateFields.updated_at = new Date().toISOString();

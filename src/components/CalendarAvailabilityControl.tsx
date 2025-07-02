@@ -220,7 +220,9 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     if (!newOpenDate) return;
     try {
       setError('');
-      const isOverlapping = exceptionalClosures.some(closure => new Date(closure.date).toDateString() === newOpenDate.toDateString());
+      // Format the new open date as YYYY-MM-DD for consistent comparison
+      const newOpenDateStr = newOpenDate.toISOString().split('T')[0];
+      const isOverlapping = exceptionalClosures.some(closure => closure.date === newOpenDateStr);
       if (isOverlapping) {
         setError('Cannot add exceptional open on a closure date.');
         return;
@@ -259,7 +261,9 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     if (!newClosureDate) return;
     try {
       setError('');
-      const isOverlapping = exceptionalOpens.some(open => new Date(open.date).toDateString() === newClosureDate.toDateString());
+      // Format the new closure date as YYYY-MM-DD for consistent comparison
+      const newClosureDateStr = newClosureDate.toISOString().split('T')[0];
+      const isOverlapping = exceptionalOpens.some(open => open.date === newClosureDateStr);
       if (isOverlapping) {
         setError('Cannot add closure on an exceptional open date.');
         return;

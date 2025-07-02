@@ -50,6 +50,7 @@ import {
 } from '@chakra-ui/icons';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
+// Removed date-fns-tz import
 
 interface PrivateEvent {
   id: string;
@@ -92,6 +93,8 @@ const EVENT_TYPE_ICONS: { [key: string]: any } = {
   'Party': SettingsIcon,
   'Other': SettingsIcon
 };
+
+const VENUE_TIMEZONE = 'America/Chicago';
 
 export default function PrivateEventsManager() {
   const [events, setEvents] = useState<PrivateEvent[]>([]);
@@ -236,8 +239,25 @@ export default function PrivateEventsManager() {
       if (formData.full_day) {
         // Ensure start_time and end_time are set to 00:00 and 23:59 for the selected date
         const date = formData.start_time ? formData.start_time.slice(0, 10) : '';
-        eventData.start_time = `${date}T00:00`;
-        eventData.end_time = `${date}T23:59`;
+        eventData.start_time = `${date}T00:00:00`;
+        eventData.end_time = `${date}T23:59:59`;
+      } else {
+        // Ensure proper datetime format for non-full-day events
+        if (formData.start_time && !formData.start_time.includes(':')) {
+          // If only date is provided, add default time
+          eventData.start_time = `${formData.start_time}T00:00:00`;
+        } else if (formData.start_time) {
+          // Ensure seconds are included
+          eventData.start_time = formData.start_time.includes(':00') ? formData.start_time : `${formData.start_time}:00`;
+        }
+        
+        if (formData.end_time && !formData.end_time.includes(':')) {
+          // If only date is provided, add default time
+          eventData.end_time = `${formData.end_time}T23:59:59`;
+        } else if (formData.end_time) {
+          // Ensure seconds are included
+          eventData.end_time = formData.end_time.includes(':00') ? formData.end_time : `${formData.end_time}:00`;
+        }
       }
 
       let backgroundImageUrl: string | null = null;
@@ -360,11 +380,23 @@ export default function PrivateEventsManager() {
 
   const handleEdit = (event: PrivateEvent) => {
     setEditingId(event.id);
+    
+    // Format datetime for datetime-local input (YYYY-MM-DDTHH:MM)
+    const formatDateTimeForInput = (dateTimeString: string) => {
+      const date = new Date(dateTimeString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+    
     setFormData({
       title: event.title,
       event_type: event.event_type,
-      start_time: new Date(event.start_time).toISOString().slice(0, 16),
-      end_time: new Date(event.end_time).toISOString().slice(0, 16),
+      start_time: formatDateTimeForInput(event.start_time),
+      end_time: formatDateTimeForInput(event.end_time),
       max_guests: event.max_guests,
       deposit_required: event.deposit_required,
       event_description: event.event_description || '',
@@ -434,17 +466,26 @@ export default function PrivateEventsManager() {
     setEditingId('new');
   };
 
-  const formatDate = (dateTime: string, timezone?: string) => {
-    const date = timezone ? new Date(new Date(dateTime).toLocaleString('en-US', { timeZone: timezone })) : new Date(dateTime);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateTime: string) => {
+    if (!dateTime) return '';
+    const date = new Date(dateTime);
+    // Extract just the date part (YYYY-MM-DD) to avoid timezone issues
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+    
+    // Create a new date object with the local timezone
+    const localDate = new Date(year, month, day);
+    return localDate.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
   };
 
-  const formatTime = (dateTime: string, timezone?: string) => {
-    const date = timezone ? new Date(new Date(dateTime).toLocaleString('en-US', { timeZone: timezone })) : new Date(dateTime);
+  const formatTime = (dateTime: string) => {
+    if (!dateTime) return '';
+    const date = new Date(dateTime);
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -741,7 +782,7 @@ export default function PrivateEventsManager() {
                     <Td borderRight="1px solid" borderColor="gray.200" py={4} px={4}>
                       <HStack spacing={1} align="center">
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
-                          {formatDate(event.start_time, timezone)}
+                          {formatDate(event.start_time)}
                         </Text>
                       </HStack>
                     </Td>
@@ -750,7 +791,7 @@ export default function PrivateEventsManager() {
                         <Text fontSize="sm" fontWeight="500" color="gray.800">
                           {event.full_day
                             ? 'Full Day'
-                            : `${formatTime(event.start_time, timezone)} - ${formatTime(event.end_time, timezone)}`}
+                            : `${formatTime(event.start_time)} - ${formatTime(event.end_time)}`}
                         </Text>
                       </HStack>
                     </Td>
