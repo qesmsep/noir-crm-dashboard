@@ -5,8 +5,16 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/process-reservation-reminders",
-      "schedule": "*/1 * * * *"
+      "path": "/api/cron-process-reminders",
+      "schedule": "*/1 * * * *",
+      "headers": {
+        "Authorization": "Bearer cron-secret-token-2024"
+      }
     }
-  ]
+  ],
+  "functions": {
+    "src/pages/api/cron-process-reminders.ts": {
+      "maxDuration": 30
+    }
+  }
 } 

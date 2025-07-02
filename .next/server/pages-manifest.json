@@ -2,12 +2,12 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/admin/dashboard": "pages/admin/dashboard.js",
   "/admin/templates": "pages/admin/templates.js",
   "/api/pending-reservation-reminders": "pages/api/pending-reservation-reminders.js",
   "/api/campaign-templates": "pages/api/campaign-templates.js",
-  "/api/process-scheduled-messages": "pages/api/process-scheduled-messages.js",
+  "/admin/dashboard": "pages/admin/dashboard.js",
   "/api/pending-campaign-messages": "pages/api/pending-campaign-messages.js",
+  "/api/process-scheduled-messages": "pages/api/process-scheduled-messages.js",
   "/api/process-reservation-reminders": "pages/api/process-reservation-reminders.js",
   "/api/reservation-reminder-templates": "pages/api/reservation-reminder-templates.js"
 }
