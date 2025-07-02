@@ -67,6 +67,8 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [holdFeeSaving, setHoldFeeSaving] = useState(false);
+  const [holdFeeMessage, setHoldFeeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     setSettings(contextSettings);
@@ -96,6 +98,23 @@ export default function Settings() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleHoldFeeSave() {
+    setHoldFeeSaving(true);
+    setHoldFeeMessage(null);
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ id: settings.id, hold_fee_enabled: settings.hold_fee_enabled, hold_fee_amount: settings.hold_fee_amount }, { onConflict: 'id' });
+      if (error) throw error;
+      await refreshSettings();
+      setHoldFeeMessage({ type: 'success', text: 'Hold fee settings saved successfully.' });
+    } catch (error) {
+      setHoldFeeMessage({ type: 'error', text: 'Failed to save hold fee settings.' });
+    } finally {
+      setHoldFeeSaving(false);
     }
   }
 
@@ -255,9 +274,22 @@ export default function Settings() {
               Reservation Hold Fee
             </Heading>
             <VStack spacing={4} align="stretch">
+              {holdFeeMessage && (
+                <Box
+                  mb={2}
+                  p={3}
+                  borderRadius="lg"
+                  bg={holdFeeMessage.type === 'success' ? 'green.50' : 'red.50'}
+                  color={holdFeeMessage.type === 'success' ? 'green.700' : 'red.700'}
+                  border="1px solid"
+                  borderColor={holdFeeMessage.type === 'success' ? 'green.200' : 'red.200'}
+                >
+                  {holdFeeMessage.text}
+                </Box>
+              )}
               <FormControl display="flex" alignItems="center">
                 <FormLabel mb="0" fontWeight="500" color="gray.700">
-                  Enable Hold Fee
+                  {settings.hold_fee_enabled ? 'Disable Hold Fee' : 'Enable Hold Fee'}
                 </FormLabel>
                 <Switch
                   isChecked={settings.hold_fee_enabled}
@@ -265,7 +297,6 @@ export default function Settings() {
                   colorScheme="green"
                 />
               </FormControl>
-              
               {settings.hold_fee_enabled && (
                 <FormControl>
                   <FormLabel fontWeight="500" color="gray.700">
@@ -289,6 +320,17 @@ export default function Settings() {
                   </Text>
                 </FormControl>
               )}
+              <Box display="flex" justifyContent="flex-end">
+                <Button
+                  onClick={handleHoldFeeSave}
+                  isLoading={holdFeeSaving}
+                  loadingText="Saving..."
+                  colorScheme="blue"
+                  size="md"
+                >
+                  Save Hold Fee Settings
+                </Button>
+              </Box>
             </VStack>
           </Box>
         </VStack>

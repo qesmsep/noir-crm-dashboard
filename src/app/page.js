@@ -13,22 +13,28 @@ import { getSupabaseClient } from '../pages/api/supabaseClient';
 import ReservationForm from '../components/ReservationForm';
 import ReservationSection from '../components/ReservationSection';
 import Modal from 'react-modal';
+import { useSettings } from '../context/SettingsContext';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
-  
-function getHoldAmount(partySize) {
-  return 25;
-}
 
 function InlineStripeForm({ partySize, onSuccess }) {
   const stripe = useStripe();
   const elements = useElements();
   const toast = useToast();
+  const { settings } = useSettings();
+
   const handleCardSubmit = async (e) => {
     e.preventDefault && e.preventDefault();
     if (!stripe || !elements) return;
+    
+    // If hold fee is disabled, skip payment processing
+    if (!settings.hold_fee_enabled) {
+      onSuccess('no-hold', { /* you can pass back customer info if needed */ });
+      return;
+    }
+
     // Get individual elements
     const cardNumber = elements.getElement(CardNumberElement);
     // Use CardNumberElement for payment method
@@ -44,7 +50,7 @@ function InlineStripeForm({ partySize, onSuccess }) {
     const resp = await fetch('/api/create-hold', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_method_id: paymentMethod.id, amount: getHoldAmount(partySize) }),
+      body: JSON.stringify({ payment_method_id: paymentMethod.id, amount: settings.hold_fee_amount }),
     });
     const data = await resp.json();
     if (resp.ok) onSuccess(data.holdId, { /* you can pass back customer info if needed */ });

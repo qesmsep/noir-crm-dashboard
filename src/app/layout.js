@@ -1,5 +1,6 @@
 import ChakraClientProvider from '../components/ChakraClientProvider';
 import { AuthProvider } from '../lib/auth-context';
+import { SettingsProvider } from '../context/SettingsContext';
 import './globals.css';
 
 export const metadata = {
@@ -16,7 +17,9 @@ export default function RootLayout({ children }) {
       <body className="font-sans">
         <ChakraClientProvider>
           <AuthProvider>
-            {children}
+            <SettingsProvider>
+              {children}
+            </SettingsProvider>
           </AuthProvider>
         </ChakraClientProvider>
       </body>

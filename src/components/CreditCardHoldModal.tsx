@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PaymentElement, useStripe, useElements, Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -18,6 +18,7 @@ import {
   useToast,
   Box,
 } from '@chakra-ui/react';
+import { useSettings } from '../context/SettingsContext';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -36,10 +37,6 @@ interface CustomerInfo {
 
 interface FormData extends CustomerInfo {}
 
-function getHoldAmount(partySize: number): number {
-  return 25;
-}
-
 const CreditCardHoldDrawer: React.FC<CreditCardHoldModalProps> = ({
   partySize,
   onSuccess,
@@ -50,14 +47,16 @@ const CreditCardHoldDrawer: React.FC<CreditCardHoldModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CustomerInfo>({
     firstName: '',
     lastName: '',
     email: ''
   });
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const { settings } = useSettings();
 
-  const holdAmount = getHoldAmount(partySize);
+  // Calculate hold amount based on configuration
+  const holdAmount = settings.hold_fee_enabled ? settings.hold_fee_amount : 0;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -228,9 +227,15 @@ const CreditCardHoldDrawer: React.FC<CreditCardHoldModalProps> = ({
                     Thank you for your reservation. To hold your reservation we request a hold on the credit card. 
                     This will be released upon your arrival.
                   </Text>
-                  <Text fontSize="xl" color="blue.700" fontWeight="bold" mb={4}>
-                    Hold Amount: ${holdAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' }).replace('$','')}
-                  </Text>
+                  {settings.hold_fee_enabled ? (
+                    <Text fontSize="xl" color="blue.700" fontWeight="bold" mb={4}>
+                      Hold Amount: ${holdAmount.toFixed(2)}
+                    </Text>
+                  ) : (
+                    <Text fontSize="xl" color="green.700" fontWeight="bold" mb={4}>
+                      No hold fee required
+                    </Text>
+                  )}
                 </Box>
                 {error && (
                   <Text color="red.500">{error}</Text>

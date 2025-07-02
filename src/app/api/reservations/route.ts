@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
 import { formatDateTime } from '../../../utils/dateUtils';
 import Stripe from 'stripe';
+import { getHoldFeeConfig, getHoldAmount } from '../../../utils/holdFeeUtils';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// Helper function to calculate hold amount based on party size
-function getHoldAmount(partySize: number): number {
-  return 25; // Fixed $25 hold for all party sizes
+// Helper function to calculate hold amount based on party size and settings
+async function getHoldAmountFromSettings(partySize: number): Promise<number> {
+  const holdFeeConfig = await getHoldFeeConfig();
+  return getHoldAmount(partySize, holdFeeConfig);
 }
 
 export async function POST(request: Request) {
@@ -182,28 +184,31 @@ export async function POST(request: Request) {
     
     if (!is_member && payment_method_id) {
       try {
-        holdAmount = getHoldAmount(party_size);
+        holdAmount = await getHoldAmountFromSettings(party_size);
         
-        // Create PaymentIntent for the hold
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: holdAmount * 100, // Convert to cents
-          currency: 'usd',
-          capture_method: 'manual', // This creates a hold, not a charge
-          payment_method: payment_method_id,
-          confirm: true, // Confirm the payment method immediately
-          metadata: {
-            reservation_type: 'non_member_reservation',
-            party_size: party_size.toString(),
-            hold_amount: holdAmount.toString()
-          },
-          description: `Reservation hold - $${holdAmount}`,
-          return_url: process.env.NEXT_PUBLIC_BASE_URL
-            ? `${process.env.NEXT_PUBLIC_BASE_URL}/reservation/confirmation`
-            : 'https://noir-crm-dashboard.vercel.app/reservation/confirmation',
-        });
-        
-        paymentIntentId = paymentIntent.id;
-        console.log('Created Stripe hold:', paymentIntentId);
+        // Only create hold if amount is greater than 0
+        if (holdAmount > 0) {
+          // Create PaymentIntent for the hold
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: holdAmount * 100, // Convert to cents
+            currency: 'usd',
+            capture_method: 'manual', // This creates a hold, not a charge
+            payment_method: payment_method_id,
+            confirm: true, // Confirm the payment method immediately
+            metadata: {
+              reservation_type: 'non_member_reservation',
+              party_size: party_size.toString(),
+              hold_amount: holdAmount.toString()
+            },
+            description: `Reservation hold - $${holdAmount}`,
+            return_url: process.env.NEXT_PUBLIC_BASE_URL
+              ? `${process.env.NEXT_PUBLIC_BASE_URL}/reservation/confirmation`
+              : 'https://noir-crm-dashboard.vercel.app/reservation/confirmation',
+          });
+          
+          paymentIntentId = paymentIntent.id;
+          console.log('Created Stripe hold:', paymentIntentId);
+        }
       } catch (stripeError) {
         console.error('Error creating Stripe hold:', stripeError);
         return NextResponse.json(

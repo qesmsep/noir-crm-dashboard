@@ -8,6 +8,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { loadStripe } from '@stripe/stripe-js';
 import "./ReservationForm.css";
 import { CalendarIcon } from '@chakra-ui/icons';
+import { useSettings } from '../context/SettingsContext';
 
 interface ReservationFormProps {
   initialStart?: string;
@@ -83,10 +84,7 @@ function findFirstAvailableDate(startDate: Date, baseDays: number[], exceptional
   }
 }
 
-// Add this helper function near the top of the component
-function getHoldAmount(partySize: number): number {
-  return 25;
-}
+
 
 const ReservationForm: React.FC<ReservationFormProps> = ({
   initialStart,
@@ -103,6 +101,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 }) => {
   const toast = useToast();
   const { colors } = useTheme();
+  const { settings } = useSettings();
+  
   // Booking window logic: today or bookingStartDate (if in future)
   const today = new Date();
   const effectiveStartDate = bookingStartDate && bookingStartDate > today ? bookingStartDate : today;
@@ -136,7 +136,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const [isClient, setIsClient] = useState(false);
   const [stripe, setStripe] = useState<any>(null);
   const [elements, setElements] = useState<any>(null);
-  const [exceptionalClosures, setExceptionalClosures] = useState<string[]>([]); // ISO date strings
+  const [exceptionalClosures, setExceptionalClosures] = useState<string[]>([]);
   const [exceptionalOpens, setExceptionalOpens] = useState<string[]>([]);
   const [privateEventDates, setPrivateEventDates] = useState<string[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -161,6 +161,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     };
     initStripe();
   }, []);
+
+
 
   // Mount card element when elements is available
   useEffect(() => {
@@ -871,13 +873,13 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               />
             </FormControl>
 
-            {!isMember && isClient && stripe && (
+            {!isMember && isClient && stripe && settings.hold_fee_enabled && (
               <FormControl isRequired mt={{ base: 4, sm: 6 }}>
                 <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
                   Credit Card
                 </FormLabel>
                 <Text fontSize={{ base: "xs", sm: "sm" }} color="gray.600" mb={3}>
-                  Non-members are required to place a credit card hold of ${getHoldAmount(Number(form.party_size))} for your reservation. These funds will be released upon your arrival.
+                  Non-members are required to place a credit card hold of ${settings.hold_fee_amount.toFixed(2)} for your reservation. These funds will be released upon your arrival.
                 </Text>
                 <Box p={3} borderWidth={1} borderRadius="lg" bg="gray.50" borderColor="gray.200">
                   <div ref={cardElementRef} style={{ height: '44px' }} />
@@ -885,13 +887,13 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               </FormControl>
             )}
 
-            {!isMember && !isClient && (
+            {!isMember && !isClient && settings.hold_fee_enabled && (
               <FormControl isRequired mt={{ base: 4, sm: 6 }}>
                 <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
                   Credit Card
                 </FormLabel>
                 <Text fontSize={{ base: "xs", sm: "sm" }} color="gray.600" mb={3}>
-                  Non-members are required to place a credit card hold of ${getHoldAmount(Number(form.party_size))} for your reservation. These funds will be released upon your arrival.
+                  Non-members are required to place a credit card hold of ${settings.hold_fee_amount.toFixed(2)} for your reservation. These funds will be released upon your arrival.
                 </Text>
                 <Box p={3} borderWidth={1} borderRadius="lg" bg="gray.50" borderColor="gray.200" h="44px" display="flex" alignItems="center" justifyContent="center">
                   <Text fontSize={{ base: "xs", sm: "sm" }} color="gray.500">Loading payment form...</Text>
