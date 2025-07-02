@@ -24,7 +24,10 @@ export default async function handler(req, res) {
         hold_type: 'reservation_hold',
         hold_amount: amount.toString()
       },
-      description: `Reservation hold - $${amount}`
+      description: `Reservation hold - $${amount}`,
+      return_url: process.env.NEXT_PUBLIC_BASE_URL
+        ? `${process.env.NEXT_PUBLIC_BASE_URL}/reservation/confirmation`
+        : 'https://noir-crm-dashboard.vercel.app/reservation/confirmation',
     });
 
     res.status(200).json({ 

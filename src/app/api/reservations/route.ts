@@ -196,7 +196,10 @@ export async function POST(request: Request) {
             party_size: party_size.toString(),
             hold_amount: holdAmount.toString()
           },
-          description: `Reservation hold - $${holdAmount}`
+          description: `Reservation hold - $${holdAmount}`,
+          return_url: process.env.NEXT_PUBLIC_BASE_URL
+            ? `${process.env.NEXT_PUBLIC_BASE_URL}/reservation/confirmation`
+            : 'https://noir-crm-dashboard.vercel.app/reservation/confirmation',
         });
         
         paymentIntentId = paymentIntent.id;
