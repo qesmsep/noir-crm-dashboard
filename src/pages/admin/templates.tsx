@@ -82,9 +82,34 @@ interface TemplateStats {
   cancelled: number;
 }
 
+interface PendingReminder {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  message_content: string;
+  scheduled_for: string;
+  created_at: string;
+  reservation: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+    start_time: string;
+    party_size: number;
+    status: string;
+  };
+  template: {
+    id: string;
+    name: string;
+    reminder_type: string;
+    send_time: string;
+  };
+}
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
   const [reminderTemplates, setReminderTemplates] = useState<ReservationReminderTemplate[]>([]);
+  const [pendingReminders, setPendingReminders] = useState<PendingReminder[]>([]);
   const [stats, setStats] = useState<TemplateStats>({ total: 0, pending: 0, sent: 0, failed: 0, cancelled: 0 });
   const [reminderStats, setReminderStats] = useState<TemplateStats>({ total: 0, pending: 0, sent: 0, failed: 0, cancelled: 0 });
   const [loading, setLoading] = useState(true);
@@ -94,6 +119,7 @@ export default function TemplatesPage() {
   const [testFirstName, setTestFirstName] = useState('Test');
   const [processingMessages, setProcessingMessages] = useState(false);
   const [processingReminders, setProcessingReminders] = useState(false);
+  const [sendingIndividualReminder, setSendingIndividualReminder] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'campaigns' | 'reminders'>('campaigns');
   
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -127,6 +153,7 @@ export default function TemplatesPage() {
     fetchReminderTemplates();
     fetchStats();
     fetchReminderStats();
+    fetchPendingReminders();
   }, []);
 
   const fetchTemplates = async () => {
@@ -204,6 +231,72 @@ export default function TemplatesPage() {
       }
     } catch (error) {
       console.error('Failed to fetch reminder stats:', error);
+    }
+  };
+
+  const fetchPendingReminders = async () => {
+    try {
+      const response = await fetch('/api/pending-reservation-reminders');
+      const data = await response.json();
+      
+      if (response.ok) {
+        setPendingReminders(data.pendingReminders || []);
+      } else {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to fetch pending reminders',
+          status: 'error',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch pending reminders',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const sendIndividualReminder = async (reminderId: string) => {
+    setSendingIndividualReminder(reminderId);
+    try {
+      const response = await fetch('/api/pending-reservation-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminder_id: reminderId })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Reminder sent successfully',
+          status: 'success',
+          duration: 3000,
+        });
+        // Refresh the pending reminders list
+        fetchPendingReminders();
+        fetchReminderStats();
+      } else {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to send reminder',
+          status: 'error',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send reminder',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setSendingIndividualReminder(null);
     }
   };
 
@@ -1060,6 +1153,114 @@ export default function TemplatesPage() {
                   ))}
                 </Tbody>
               </Table>
+            </Box>
+
+            {/* Pending Messages Table */}
+            <Box mt={8} bg="#a59480" borderRadius="lg" border="1px solid #ecede8" overflow="hidden">
+              <Box p={4} bg="#8B7A6A" borderBottom="1px solid #ecede8">
+                <Heading size="md" fontFamily="'Montserrat', sans-serif" color="#23201C">
+                  Pending Reminder Messages
+                </Heading>
+                <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" color="#23201C" mt={1}>
+                  {pendingReminders.length} pending message{pendingReminders.length !== 1 ? 's' : ''}
+                </Text>
+              </Box>
+              {pendingReminders.length === 0 ? (
+                <Box p={8} textAlign="center">
+                  <Text fontFamily="'Montserrat', sans-serif" color="#23201C">
+                    No pending reminder messages
+                  </Text>
+                </Box>
+              ) : (
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Customer</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Reservation</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Template</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Message</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Scheduled For</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Actions</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {pendingReminders.map((reminder) => (
+                      <Tr key={reminder.id}>
+                        <Td>
+                          <VStack align="start" spacing={1}>
+                            <Text fontFamily="'Montserrat', sans-serif" fontWeight="bold">
+                              {reminder.customer_name}
+                            </Text>
+                            <Text fontFamily="'Montserrat', sans-serif" fontSize="sm" color="#666">
+                              {reminder.customer_phone}
+                            </Text>
+                          </VStack>
+                        </Td>
+                        <Td>
+                          <VStack align="start" spacing={1}>
+                            <Text fontFamily="'Montserrat', sans-serif">
+                              {new Date(reminder.reservation.start_time).toLocaleDateString()} at{' '}
+                              {new Date(reminder.reservation.start_time).toLocaleTimeString([], { 
+                                hour: 'numeric', 
+                                minute: '2-digit',
+                                hour12: true 
+                              })}
+                            </Text>
+                            <Text fontFamily="'Montserrat', sans-serif" fontSize="sm" color="#666">
+                              {reminder.reservation.party_size} guest{reminder.reservation.party_size !== 1 ? 's' : ''}
+                            </Text>
+                          </VStack>
+                        </Td>
+                        <Td>
+                          <VStack align="start" spacing={1}>
+                            <Text fontFamily="'Montserrat', sans-serif" fontWeight="bold">
+                              {reminder.template.name}
+                            </Text>
+                            <Badge
+                              colorScheme={reminder.template.reminder_type === 'day_of' ? 'blue' : 'purple'}
+                              fontFamily="'Montserrat', sans-serif"
+                              fontSize="xs"
+                            >
+                              {reminder.template.reminder_type === 'day_of' ? 'Day Of' : 'Hour Before'}
+                            </Badge>
+                          </VStack>
+                        </Td>
+                        <Td>
+                          <Text fontFamily="'Montserrat', sans-serif" fontSize="sm" maxW="300px" noOfLines={3}>
+                            {reminder.message_content}
+                          </Text>
+                        </Td>
+                        <Td>
+                          <VStack align="start" spacing={1}>
+                            <Text fontFamily="'Montserrat', sans-serif">
+                              {new Date(reminder.scheduled_for).toLocaleDateString()}
+                            </Text>
+                            <Text fontFamily="'Montserrat', sans-serif" fontSize="sm" color="#666">
+                              {new Date(reminder.scheduled_for).toLocaleTimeString([], { 
+                                hour: 'numeric', 
+                                minute: '2-digit',
+                                hour12: true 
+                              })}
+                            </Text>
+                          </VStack>
+                        </Td>
+                        <Td>
+                          <Button
+                            size="sm"
+                            colorScheme="green"
+                            onClick={() => sendIndividualReminder(reminder.id)}
+                            isLoading={sendingIndividualReminder === reminder.id}
+                            loadingText="Sending"
+                            fontFamily="'Montserrat', sans-serif"
+                          >
+                            Send Now
+                          </Button>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              )}
             </Box>
           )}
 

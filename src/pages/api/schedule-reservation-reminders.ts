@@ -52,12 +52,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (template.reminder_type === 'day_of') {
         // Schedule for the day of the reservation at the specified time
         const reservationDate = new Date(reservation.start_time);
-        const [hours, minutes] = template.send_time.split(':');
+        const hours = template.send_time; // send_time is now an integer representing the hour
         scheduledTime = new Date(reservationDate);
-        scheduledTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        scheduledTime.setHours(hours, 0, 0, 0); // Set to the specified hour, 0 minutes
       } else if (template.reminder_type === 'hour_before') {
         // Schedule for X hours before the reservation
-        const hoursBefore = parseInt(template.send_time);
+        const hoursBefore = template.send_time; // send_time is the number of hours before
         scheduledTime = new Date(reservation.start_time);
         scheduledTime.setHours(scheduledTime.getHours() - hoursBefore);
       } else {
