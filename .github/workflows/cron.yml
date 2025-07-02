@@ -2,7 +2,7 @@ name: Process Reservation Reminders
 
 on:
   schedule:
-    - cron: '*/1 * * * *'  # Every 5 minutes
+    - cron: '*/1 * * * *'  # Every 1 minutes
   workflow_dispatch:
 
 jobs:
