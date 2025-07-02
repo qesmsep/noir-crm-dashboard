@@ -2,15 +2,19 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
+  // Allow both GET and POST requests for compatibility
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    res.setHeader('Allow', ['GET', 'POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   // Verify webhook secret for security
   const webhookSecret = req.headers['x-webhook-secret'];
   if (webhookSecret !== process.env.WEBHOOK_SECRET) {
+    console.log('Webhook secret mismatch:', { 
+      received: webhookSecret, 
+      expected: process.env.WEBHOOK_SECRET?.substring(0, 8) + '...' 
+    });
     return res.status(401).json({ error: 'Invalid webhook secret' });
   }
 
