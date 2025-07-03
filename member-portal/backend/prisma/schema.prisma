@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id            String          @id @default(uuid())
+  name          String?
+  createdAt     DateTime        @default(now())
+
+  members        Member[]
+  ledgerEntries  LedgerEntry[]
+  billingMethods BillingMethod[]
+}
+
+model Member {
+  id            String          @id @default(uuid())
+  account       Account         @relation(fields: [accountId], references: [id])
+  accountId     String
+  phone         String          @unique
+  email         String?
+  firstName     String?
+  lastName      String?
+  photoUrl      String?
+  preferences   Json?
+  role          Role            @default(MEMBER)
+  passwordHash  String
+  status        Status          @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+
+  profileChanges ProfileChange[]
+}
+
+model ProfileChange {
+  id           String        @id @default(uuid())
+  member       Member        @relation(fields: [memberId], references: [id])
+  memberId     String
+  changeJson   Json
+  status       ChangeStatus  @default(PENDING)
+  reviewedBy   Member?       @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  reviewedById String?
+  createdAt    DateTime      @default(now())
+  reviewedAt   DateTime?
+}
+
+model LedgerEntry {
+  id           String        @id @default(uuid())
+  account      Account       @relation(fields: [accountId], references: [id])
+  accountId    String
+  type         LedgerType
+  amountCents  Int
+  currency     String        @default("USD")
+  description  String?
+  externalRef  String?
+  createdAt    DateTime      @default(now())
+}
+
+model BillingMethod {
+  id                  String           @id @default(uuid())
+  account             Account          @relation(fields: [accountId], references: [id])
+  accountId           String
+  provider            BillingProvider
+  providerCustomerId  String
+  last4               String?
+  brand               String?
+  expMonth            Int?
+  expYear             Int?
+  createdAt           DateTime         @default(now())
+}
+
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+enum Status {
+  ACTIVE
+  DISABLED
+}
+
+enum ChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LedgerType {
+  CHARGE
+  PAYMENT
+  REFUND
+}
+
+enum BillingProvider {
+  STRIPE
+  BRAINTREE
+}

@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: member_portal_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: member_portal
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: member_portal_backend
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/member_portal
+      NODE_ENV: development
+    ports:
+      - "3001:3001"
+    command: yarn start:dev
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: member_portal_frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    command: yarn dev
+    volumes:
+      - ./frontend:/usr/src/app
+      - /usr/src/app/node_modules
+
+volumes:
+  db-data:
