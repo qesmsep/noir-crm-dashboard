@@ -28,6 +28,7 @@ const defaultSettings = {
   },
   hold_fee_enabled: true,
   hold_fee_amount: 25.00,
+  admin_notification_phone: '',
 };
 
 export async function GET() {

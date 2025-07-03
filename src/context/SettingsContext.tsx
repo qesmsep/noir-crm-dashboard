@@ -24,6 +24,7 @@ interface Settings {
   };
   hold_fee_enabled: boolean;
   hold_fee_amount: number;
+  admin_notification_phone: string;
 }
 
 const defaultSettings: Settings = {
@@ -54,6 +55,7 @@ const defaultSettings: Settings = {
   },
   hold_fee_enabled: true,
   hold_fee_amount: 25.00,
+  admin_notification_phone: '',
 };
 
 interface SettingsContextType {

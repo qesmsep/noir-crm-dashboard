@@ -55,6 +55,21 @@ export async function PATCH(request: Request, { params }: any) {
       throw error;
     }
 
+    // Send admin notification for reservation modification
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin-notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          reservation_id: reservationId,
+          action: 'modified'
+        })
+      });
+    } catch (error) {
+      console.error('Error sending admin notification:', error);
+      // Don't fail the reservation update if admin notification fails
+    }
+
     return NextResponse.json(data);
 
   } catch (error) {

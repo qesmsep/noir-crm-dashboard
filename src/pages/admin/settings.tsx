@@ -29,6 +29,7 @@ interface Settings {
   };
   hold_fee_enabled: boolean;
   hold_fee_amount: number;
+  admin_notification_phone: string;
 }
 
 const defaultSettings: Settings = {
@@ -59,6 +60,7 @@ const defaultSettings: Settings = {
   },
   hold_fee_enabled: true,
   hold_fee_amount: 25.00,
+  admin_notification_phone: '',
 };
 
 export default function Settings() {
@@ -259,6 +261,39 @@ export default function Settings() {
             borderColor="gray.100"
           >
             <PrivateEventsManager />
+          </Box>
+
+          {/* Admin Notification Settings Card */}
+          <Box 
+            bg="white" 
+            borderRadius="2xl" 
+            boxShadow="0 2px 8px rgba(0,0,0,0.07)" 
+            p={6}
+            border="1px solid"
+            borderColor="gray.100"
+          >
+            <Heading size="md" mb={4} color="nightSky" fontWeight="600">
+              Admin Notifications
+            </Heading>
+            <VStack spacing={4} align="stretch">
+              <FormControl>
+                <FormLabel fontWeight="500" color="gray.700">
+                  Admin Notification Phone Number
+                </FormLabel>
+                <Input
+                  value={settings.admin_notification_phone}
+                  onChange={(e) => handleInputChange('admin_notification_phone', '', e.target.value)}
+                  placeholder="9137774488"
+                  bg="white"
+                  color="#23201C"
+                  fontFamily="'Montserrat', sans-serif"
+                />
+                <Text fontSize="sm" color="gray.500" mt={2}>
+                  Phone number for SMS notifications when reservations are created or modified. 
+                  The system will automatically add +1 prefix.
+                </Text>
+              </FormControl>
+            </VStack>
           </Box>
 
           {/* Hold Fee Settings Card */}

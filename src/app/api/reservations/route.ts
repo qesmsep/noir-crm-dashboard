@@ -267,6 +267,21 @@ export async function POST(request: Request) {
     // Send SMS confirmation
     await sendSMSConfirmation(reservation);
 
+    // Send admin notification
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin-notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          reservation_id: reservation.id,
+          action: 'created'
+        })
+      });
+    } catch (error) {
+      console.error('Error sending admin notification:', error);
+      // Don't fail the reservation creation if admin notification fails
+    }
+
     // Schedule reservation reminders
     try {
       await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/schedule-reservation-reminders`, {
