@@ -318,10 +318,13 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
   // Set default time only when availableTimes changes and current time is not in slots
   useEffect(() => {
-    if (availableTimes.length > 0 && !availableTimes.includes(time)) {
-      setTime(availableTimes[0] || '');
+    if (availableTimes.length > 0) {
+      if (!availableTimes.includes(time)) {
+        setTime(availableTimes[0] || '');
+      }
+    } else {
+      setTime(''); // Clear time if no available times
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableTimes]);
 
   // Fetch exceptional closures, opens, and private events for the booking window
@@ -935,28 +938,39 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
             </FormControl>
 
             {/* Time */}
-            <FormControl isRequired>
+            <FormControl isRequired isDisabled={availableTimes.length === 0}>
               <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
-                Time *
+                Time
               </FormLabel>
               <Select
-                name="time"
                 value={time}
                 onChange={handleTimeChange}
                 size={{ base: "md", sm: "lg" }}
-                h={{ base: "44px", sm: "48px" }}
-                borderRadius="lg"
+                bg="white"
                 borderColor="gray.200"
                 _hover={{ borderColor: 'gray.300' }}
                 _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                h={{ base: "44px", sm: "48px" }}
+                display="flex"
+                alignItems="center"
+                borderRadius="lg"
                 fontSize={{ base: "sm", sm: "md" }}
                 isInvalid={!time && isSubmitting}
+                disabled={availableTimes.length === 0}
               >
-                <option value="">Select a time</option>
-                {(availableTimes || []).map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
+                {availableTimes.length === 0 ? (
+                  <option value="">No available times</option>
+                ) : (
+                  availableTimes.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))
+                )}
               </Select>
+              {availableTimes.length === 0 && (
+                <Text color="red.500" fontSize="xs" mt={1}>
+                  No available times for this party size on the selected date.
+                </Text>
+              )}
               {!time && isSubmitting && (
                 <Text color="red.500" fontSize="xs" mt={1}>
                   Time is required
