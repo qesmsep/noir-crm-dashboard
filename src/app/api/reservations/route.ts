@@ -10,6 +10,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 // Function to send admin notification
 async function sendAdminNotification(reservationId: string, action: 'created' | 'modified') {
   try {
+    console.log('=== ADMIN NOTIFICATION DEBUG ===');
+    console.log('Reservation ID:', reservationId);
+    console.log('Action:', action);
+    
     // Get reservation details
     const { data: reservation, error: reservationError } = await supabase
       .from('reservations')
@@ -27,16 +31,25 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       return;
     }
 
+    console.log('Reservation found:', reservation);
+
     // Get admin notification phone from settings
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
       .select('admin_notification_phone')
       .single();
 
+    console.log('Settings found:', settings);
+    console.log('Settings error:', settingsError);
+
     if (settingsError || !settings?.admin_notification_phone) {
-      console.log('Admin notification phone not configured');
+      console.log('❌ Admin notification phone not configured');
+      console.log('Settings data:', settings);
+      console.log('Settings error:', settingsError);
       return;
     }
+
+    console.log('✅ Admin notification phone configured:', settings.admin_notification_phone);
 
     // Format admin phone number (add +1 if not present)
     let adminPhone = settings.admin_notification_phone;
@@ -69,6 +82,11 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
     // Create message content
     const messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
 
+    console.log('Message content:', messageContent);
+    console.log('Admin phone:', adminPhone);
+    console.log('OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
+    console.log('OpenPhone Phone Number ID exists:', !!process.env.OPENPHONE_PHONE_NUMBER_ID);
+
     // Send SMS using OpenPhone API (same as existing sendText.js)
     const response = await fetch('https://api.openphone.com/v1/messages', {
       method: 'POST',
@@ -84,13 +102,18 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       })
     });
 
+    console.log('OpenPhone response status:', response.status);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Failed to send admin notification SMS:', errorText);
+      console.error('❌ Failed to send admin notification SMS:', errorText);
       return;
     }
 
-    console.log('Admin notification sent successfully');
+    const responseData = await response.json();
+    console.log('✅ Admin notification sent successfully');
+    console.log('OpenPhone response:', responseData);
+    console.log('=== END ADMIN NOTIFICATION DEBUG ===');
   } catch (error) {
     console.error('Error in sendAdminNotification:', error);
   }
@@ -368,7 +391,11 @@ export async function POST(request: Request) {
 
     // Schedule reservation reminders
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/schedule-reservation-reminders`, {
+      const reminderUrl = process.env.NEXT_PUBLIC_SITE_URL 
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/schedule-reservation-reminders`
+        : 'http://localhost:3000/api/schedule-reservation-reminders';
+        
+      await fetch(reminderUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reservation_id: reservation.id })
