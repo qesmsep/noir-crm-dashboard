@@ -69,18 +69,12 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
     // Create message content
     const messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
 
-    // Check if OpenPhone credentials are configured
-    if (!process.env.OPENPHONE_API_KEY || !process.env.OPENPHONE_PHONE_NUMBER_ID) {
-      console.error('OpenPhone API credentials not configured');
-      return;
-    }
-
-    // Send SMS using OpenPhone API
+    // Send SMS using OpenPhone API (same as existing sendText.js)
     const response = await fetch('https://api.openphone.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': process.env.OPENPHONE_API_KEY,
+        'Authorization': process.env.OPENPHONE_API_KEY!,
         'Accept': 'application/json'
       },
       body: JSON.stringify({
@@ -96,126 +90,13 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       return;
     }
 
-    const responseData = await response.json();
-
-    // Log the notification in guest_messages table
-    const { error: logError } = await supabase
-      .from('guest_messages')
-      .insert({
-        phone: adminPhone,
-        content: messageContent,
-        reservation_id: reservationId,
-        sent_by: 'system',
-        status: 'sent',
-        openphone_message_id: responseData.id,
-        timestamp: new Date().toISOString()
-      });
-
-    if (logError) {
-      console.error('Error logging admin notification:', logError);
-      // Don't fail the request if logging fails
-    }
-
     console.log('Admin notification sent successfully');
   } catch (error) {
     console.error('Error in sendAdminNotification:', error);
   }
 }
 
-// Function to schedule reservation reminders
-async function scheduleReservationReminders(reservationId: string) {
-  try {
-    // Get the reservation details
-    const { data: reservation, error: reservationError } = await supabase
-      .from('reservations')
-      .select('*')
-      .eq('id', reservationId)
-      .single();
 
-    if (reservationError || !reservation) {
-      console.error('Error fetching reservation for reminders:', reservationError);
-      return;
-    }
-
-    // Get all active reminder templates
-    const { data: templates, error: templatesError } = await supabase
-      .from('reservation_reminder_templates')
-      .select('*')
-      .eq('is_active', true)
-      .order('reminder_type', { ascending: true })
-      .order('send_time', { ascending: true });
-
-    if (templatesError) {
-      console.error('Error fetching reminder templates:', templatesError);
-      return;
-    }
-
-    if (!templates || templates.length === 0) {
-      console.log('No active reminder templates found');
-      return;
-    }
-
-    const scheduledReminders: any[] = [];
-
-    // Schedule reminders for each template
-    for (const template of templates) {
-      let scheduledTime: Date;
-
-      if (template.reminder_type === 'day_of') {
-        // Schedule for the day of the reservation at the specified time
-        const reservationDate = new Date(reservation.start_time);
-        const [hours, minutes] = template.send_time.split(':');
-        scheduledTime = new Date(reservationDate);
-        scheduledTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-      } else if (template.reminder_type === 'hour_before') {
-        // Schedule for X hours before the reservation
-        const hoursBefore = parseInt(template.send_time);
-        scheduledTime = new Date(reservation.start_time);
-        scheduledTime.setHours(scheduledTime.getHours() - hoursBefore);
-      } else {
-        continue; // Skip unknown reminder types
-      }
-
-      // Only schedule if the time hasn't passed
-      if (scheduledTime > new Date()) {
-        // Create message content with placeholders
-        let messageContent = template.message_template;
-        messageContent = messageContent.replace(/\{\{first_name\}\}/g, reservation.first_name || 'Guest');
-        messageContent = messageContent.replace(/\{\{reservation_time\}\}/g, 
-          new Date(reservation.start_time).toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }));
-        messageContent = messageContent.replace(/\{\{party_size\}\}/g, reservation.party_size.toString());
-
-        // Insert scheduled reminder
-        const { data: scheduledReminder, error: insertError } = await supabase
-          .from('scheduled_reservation_reminders')
-          .insert({
-            reservation_id: reservation.id,
-            template_id: template.id,
-            customer_name: `${reservation.first_name || ''} ${reservation.last_name || ''}`.trim() || 'Guest',
-            customer_phone: reservation.phone,
-            message_content: messageContent,
-            scheduled_for: scheduledTime.toISOString()
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error('Error scheduling reminder:', insertError);
-        } else {
-          scheduledReminders.push(scheduledReminder);
-        }
-      }
-    }
-
-    console.log(`Scheduled ${scheduledReminders.length} reminders for reservation ${reservationId}`);
-  } catch (error) {
-    console.error('Error in scheduleReservationReminders:', error);
-  }
-}
 
 // Helper function to calculate hold amount based on party size and settings
 async function getHoldAmountFromSettings(partySize: number): Promise<number> {
@@ -487,7 +368,11 @@ export async function POST(request: Request) {
 
     // Schedule reservation reminders
     try {
-      await scheduleReservationReminders(reservation.id);
+      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/schedule-reservation-reminders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservation_id: reservation.id })
+      });
     } catch (error) {
       console.error('Error scheduling reservation reminders:', error);
       // Don't fail the reservation creation if reminder scheduling fails
