@@ -723,10 +723,10 @@ export default function TemplatesPage() {
                                   {reminder.reservations && (
                                     <VStack align="start" spacing={1}>
                                       <Text fontWeight="bold" color="#23201C">
-                                        {reminder.reservations.start_time ? new Date(reminder.reservations.start_time).toLocaleDateString() : ''}
+                                        {reminder.reservations.start_time ? new Date(reminder.reservations.start_time).toLocaleDateString('en-US', { timeZone: 'America/Chicago' }) : ''}
                                       </Text>
                                       <Text fontWeight="bold" color="#23201C">
-                                        {reminder.reservations.start_time ? new Date(reminder.reservations.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                        {reminder.reservations.start_time ? new Date(reminder.reservations.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chicago' }) : ''}
                                       </Text>
                                       <Text fontSize="sm" color="#666">
                                         Party Size: {reminder.reservations.party_size}
@@ -742,10 +742,10 @@ export default function TemplatesPage() {
                                 <Td fontFamily="'Montserrat', sans-serif">
                                   <VStack align="start" spacing={1}>
                                     <Text fontWeight="bold" color="#23201C">
-                                      {new Date(reminder.scheduled_for).toLocaleDateString()}
+                                      {new Date(reminder.scheduled_for).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })}
                                     </Text>
                                     <Text fontWeight="bold" color="#23201C">
-                                      {new Date(reminder.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {new Date(reminder.scheduled_for).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chicago' })}
                                     </Text>
                                   </VStack>
                                 </Td>
