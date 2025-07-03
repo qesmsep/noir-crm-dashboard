@@ -620,20 +620,43 @@ export default function Home() {
             </div>
           </div>
         </div>
-        {/* Discreet Admin Access */}
+        {/* Discreet Admin & Member Access */}
         <div className="text-center mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-[#BCA892]/20">
-          <a 
-            href="/auth/admin" 
-            className="text-[#BCA892] no-underline hover:text-[#ECEDE8] transition-colors"
-            style={{ 
-              fontFamily: 'Montserrat, sans-serif',
-              fontSize: '0.7rem',
-              letterSpacing: '0.05em'
-            }}
-            aria-label="Admin access"
-          >
-            admin
-          </a>
+          <div className="flex justify-center gap-4 sm:gap-6">
+            <a 
+              href="/auth/member-login" 
+              className="text-[#BCA892] no-underline hover:text-[#ECEDE8] transition-colors"
+              style={{ 
+                fontFamily: 'Montserrat, sans-serif',
+                fontSize: '0.7rem',
+                letterSpacing: '0.05em'
+              }}
+              aria-label="Member portal access"
+            >
+              member portal
+            </a>
+            <span 
+              className="text-[#BCA892]/40"
+              style={{ 
+                fontFamily: 'Montserrat, sans-serif',
+                fontSize: '0.7rem'
+              }}
+            >
+              |
+            </span>
+            <a 
+              href="/auth/admin" 
+              className="text-[#BCA892] no-underline hover:text-[#ECEDE8] transition-colors"
+              style={{ 
+                fontFamily: 'Montserrat, sans-serif',
+                fontSize: '0.7rem',
+                letterSpacing: '0.05em'
+              }}
+              aria-label="Admin access"
+            >
+              admin
+            </a>
+          </div>
         </div>
       </footer>
 

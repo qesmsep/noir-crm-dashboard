@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.members (
     email TEXT UNIQUE NOT NULL,
     phone TEXT UNIQUE NOT NULL,
     photo_url TEXT,
+    has_password BOOLEAN DEFAULT false,
     join_date TIMESTAMPTZ DEFAULT NOW(),
     membership_type TEXT DEFAULT 'standard',
     membership_status TEXT DEFAULT 'active',
@@ -31,6 +32,14 @@ CREATE TABLE IF NOT EXISTS public.members (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add has_password column if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'members' AND column_name = 'has_password') THEN
+        ALTER TABLE public.members ADD COLUMN has_password BOOLEAN DEFAULT false;
+    END IF;
+END $$;
 
 -- Create member_profile_changes table for approval workflow
 CREATE TABLE IF NOT EXISTS public.member_profile_changes (
@@ -90,6 +99,16 @@ CREATE TABLE IF NOT EXISTS public.password_reset_tokens (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Create otp_codes table for member phone verification
+CREATE TABLE IF NOT EXISTS public.otp_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone TEXT NOT NULL,
+    code TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Add indexes for performance
 CREATE INDEX IF NOT EXISTS idx_members_user_id ON members(user_id);
 CREATE INDEX IF NOT EXISTS idx_members_email ON members(email);
@@ -101,6 +120,8 @@ CREATE INDEX IF NOT EXISTS idx_member_ledger_member_id ON member_ledger(member_i
 CREATE INDEX IF NOT EXISTS idx_member_ledger_date ON member_ledger(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_member_billing_info_member_id ON member_billing_info(member_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_otp_codes_phone ON otp_codes(phone);
+CREATE INDEX IF NOT EXISTS idx_otp_codes_expires ON otp_codes(expires_at);
 
 -- Enable RLS
 ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
@@ -108,6 +129,7 @@ ALTER TABLE public.member_profile_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.member_ledger ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.member_billing_info ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.password_reset_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.otp_codes ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for members
 CREATE POLICY "Members can view own profile"
