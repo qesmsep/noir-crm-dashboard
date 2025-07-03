@@ -65,3 +65,4 @@ Thumbs.db
 /checkpoints/
 /Ω_historic/
 .next/
+test-*.js
