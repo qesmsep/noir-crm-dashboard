@@ -71,7 +71,10 @@ function formatDateMDY(date: Date) {
 // Helper to find first available date
 function findFirstAvailableDate(startDate: Date, baseDays: number[], exceptionalClosures: string[], exceptionalOpens: string[], privateEventDates: string[]): Date {
   let currentDate = DateTime.fromJSDate(startDate);
-  while (true) {
+  let daysChecked = 0;
+  const maxDaysToCheck = 365; // Prevent infinite loop
+  
+  while (daysChecked < maxDaysToCheck) {
     // Format date as YYYY-MM-DD using Luxon
     const dateStr = currentDate.toFormat('yyyy-MM-dd');
     
@@ -84,7 +87,33 @@ function findFirstAvailableDate(startDate: Date, baseDays: number[], exceptional
       return currentDate.toJSDate();
     }
     currentDate = currentDate.plus({ days: 1 });
+    daysChecked++;
   }
+  
+  // If no available date found within a year, return the original start date
+  console.warn('No available date found within 365 days, returning start date');
+  return startDate;
+}
+
+// Helper to find first available date using only base days (fallback)
+function findFirstAvailableDateBasic(startDate: Date, baseDays: number[]): Date {
+  let currentDate = DateTime.fromJSDate(startDate);
+  let daysChecked = 0;
+  const maxDaysToCheck = 30; // Check up to 30 days ahead
+  
+  while (daysChecked < maxDaysToCheck) {
+    const isBaseDay = baseDays.includes(currentDate.weekday % 7);
+    
+    if (isBaseDay) {
+      return currentDate.toJSDate();
+    }
+    currentDate = currentDate.plus({ days: 1 });
+    daysChecked++;
+  }
+  
+  // If no base day found within 30 days, return the original start date
+  console.warn('No base day found within 30 days, returning start date');
+  return startDate;
 }
 
 
@@ -121,7 +150,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     last_name: ''
   });
   const [date, setDate] = useState<DateTime>(() => {
-    // Ensure we have a valid date from the start using Luxon
+    // Start with today or booking start date, will be updated to first available date
     const today = DateTime.now();
     const effectiveStartDate = bookingStartDate && DateTime.fromJSDate(bookingStartDate) > today 
       ? DateTime.fromJSDate(bookingStartDate) 
@@ -349,25 +378,33 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     fetchBlockedDates();
   }, [bookingStartDate, bookingEndDate]);
 
-  // Update date when all required data is loaded
+  // Update date to first available date when data is loaded
   useEffect(() => {
     const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
-    if (
-      isInitialLoad &&
-      effectiveBaseDays.length > 0 &&
-      exceptionalClosures.length >= 0 &&
-      exceptionalOpens.length >= 0 &&
-      privateEventDates.length >= 0
-    ) {
-      const firstAvailable = findFirstAvailableDate(
-        effectiveStartDate,
-        effectiveBaseDays,
-        exceptionalClosures,
-        exceptionalOpens,
-        privateEventDates
-      );
+    
+    // If we have base days loaded, try to find the first available date
+    if (effectiveBaseDays.length > 0) {
+      let firstAvailable: Date;
+      
+      // If we have exceptional data, use the full function
+      if (exceptionalClosures.length >= 0 && exceptionalOpens.length >= 0 && privateEventDates.length >= 0) {
+        firstAvailable = findFirstAvailableDate(
+          effectiveStartDate,
+          effectiveBaseDays,
+          exceptionalClosures,
+          exceptionalOpens,
+          privateEventDates
+        );
+        setIsInitialLoad(false);
+      } else {
+        // Otherwise, use the basic function that only checks base days
+        firstAvailable = findFirstAvailableDateBasic(
+          effectiveStartDate,
+          effectiveBaseDays
+        );
+      }
+      
       setDate(DateTime.fromJSDate(firstAvailable));
-      setIsInitialLoad(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseDays, internalBaseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
