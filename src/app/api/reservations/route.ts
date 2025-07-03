@@ -382,6 +382,8 @@ export async function POST(request: Request) {
     await sendSMSConfirmation(reservation);
 
     // Send admin notification
+    console.log('=== ABOUT TO SEND ADMIN NOTIFICATION ===');
+    console.log('Reservation ID:', reservation.id);
     try {
       await sendAdminNotification(reservation.id, 'created');
     } catch (error) {
@@ -391,15 +393,22 @@ export async function POST(request: Request) {
 
     // Schedule reservation reminders
     try {
+      console.log('=== SCHEDULING RESERVATION REMINDERS ===');
+      console.log('NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
+      
       const reminderUrl = process.env.NEXT_PUBLIC_SITE_URL 
         ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/schedule-reservation-reminders`
         : 'http://localhost:3000/api/schedule-reservation-reminders';
+      
+      console.log('Reminder URL:', reminderUrl);
         
       await fetch(reminderUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reservation_id: reservation.id })
       });
+      
+      console.log('✅ Reservation reminders scheduled successfully');
     } catch (error) {
       console.error('Error scheduling reservation reminders:', error);
       // Don't fail the reservation creation if reminder scheduling fails
