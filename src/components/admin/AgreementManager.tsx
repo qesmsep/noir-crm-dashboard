@@ -13,13 +13,13 @@ import {
   Th,
   Td,
   Badge,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
+  Drawer,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
   useDisclosure,
   useToast,
   FormControl,
@@ -27,7 +27,8 @@ import {
   Input,
   Textarea,
   Select,
-  Checkbox
+  Checkbox,
+  IconButton
 } from '@chakra-ui/react';
 import { FiPlus, FiEdit } from 'react-icons/fi';
 
@@ -176,39 +177,49 @@ export default function AgreementManager() {
                 )}
               </Td>
               <Td>
-                <Button size="sm" onClick={() => handleEdit(agreement)}>
-                  Edit
-                </Button>
+                <IconButton
+                  size="sm"
+                  icon={<FiEdit />}
+                  onClick={() => handleEdit(agreement)}
+                  aria-label="Edit agreement"
+                  colorScheme="blue"
+                />
               </Td>
             </Tr>
           ))}
         </Tbody>
       </Table>
 
-      {/* Edit Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
+      {/* Edit Drawer */}
+      <Drawer isOpen={isOpen} onClose={onClose} size="xl">
+        <DrawerOverlay />
+        <DrawerContent bg="#ECEDE8" color="#353535">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" color="#353535">
             {editingAgreement?.id ? 'Edit Agreement' : 'Create Agreement'}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
+          </DrawerHeader>
+          <DrawerBody>
+            <VStack spacing={4} align="stretch" pt={4}>
               <FormControl>
-                <FormLabel>Title</FormLabel>
+                <FormLabel color="#353535">Title</FormLabel>
                 <Input
                   value={editingAgreement?.title || ''}
                   onChange={(e) => setEditingAgreement(prev => ({ ...prev!, title: e.target.value }))}
                   placeholder="Enter agreement title"
+                  bg="white"
+                  borderColor="gray.300"
+                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                 />
               </FormControl>
 
               <FormControl>
-                <FormLabel>Status</FormLabel>
+                <FormLabel color="#353535">Status</FormLabel>
                 <Select
                   value={editingAgreement?.status || 'draft'}
                   onChange={(e) => setEditingAgreement(prev => ({ ...prev!, status: e.target.value as any }))}
+                  bg="white"
+                  borderColor="gray.300"
+                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                 >
                   <option value="draft">Draft</option>
                   <option value="active">Active</option>
@@ -220,32 +231,38 @@ export default function AgreementManager() {
                 <Checkbox
                   isChecked={editingAgreement?.is_current || false}
                   onChange={(e) => setEditingAgreement(prev => ({ ...prev!, is_current: e.target.checked }))}
+                  color="#353535"
                 >
                   Set as current agreement
                 </Checkbox>
               </FormControl>
 
               <FormControl>
-                <FormLabel>Content (HTML)</FormLabel>
+                <FormLabel color="#353535">Content (HTML)</FormLabel>
                 <Textarea
                   value={editingAgreement?.content || ''}
                   onChange={(e) => setEditingAgreement(prev => ({ ...prev!, content: e.target.value }))}
                   placeholder="Enter agreement content (HTML supported)"
                   rows={15}
+                  bg="white"
+                  borderColor="gray.300"
+                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                 />
               </FormControl>
             </VStack>
-          </ModalBody>
-          <ModalFooter>
+          </DrawerBody>
+          <DrawerFooter borderTopWidth="1px">
             <HStack spacing={3}>
-              <Button onClick={onClose}>Cancel</Button>
+              <Button onClick={onClose} variant="outline">
+                Cancel
+              </Button>
               <Button colorScheme="blue" onClick={handleSave}>
                 Save Agreement
               </Button>
             </HStack>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </VStack>
   );
 } 

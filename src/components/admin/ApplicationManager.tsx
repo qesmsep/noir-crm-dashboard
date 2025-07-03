@@ -18,9 +18,19 @@ import {
   InputGroup,
   InputLeftElement,
   Icon,
-  useToast
+  useToast,
+  Drawer,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  useDisclosure,
+  Divider,
+  IconButton
 } from '@chakra-ui/react';
-import { FiSearch } from 'react-icons/fi';
+import { FiSearch, FiEye, FiCheck, FiX } from 'react-icons/fi';
 
 interface Application {
   id: string;
@@ -35,6 +45,8 @@ interface Application {
   payment_completed_at?: string;
   payment_amount?: number;
   waitlist_id?: string;
+  questionnaire_responses?: any;
+  agreement_signed?: boolean;
 }
 
 export default function ApplicationManager() {
@@ -42,6 +54,9 @@ export default function ApplicationManager() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
   useEffect(() => {
@@ -69,6 +84,80 @@ export default function ApplicationManager() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewApplication = async (application: Application) => {
+    try {
+      const response = await fetch(`/api/membership/applications/${application.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedApplication(data);
+        onOpen();
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load application details',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleApproveApplication = async (applicationId: string) => {
+    try {
+      const response = await fetch(`/api/membership/applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' })
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Application approved successfully',
+          status: 'success',
+          duration: 3000,
+        });
+        onClose();
+        loadApplications();
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to approve application',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleRejectApplication = async (applicationId: string) => {
+    try {
+      const response = await fetch(`/api/membership/applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected' })
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Application rejected successfully',
+          status: 'success',
+          duration: 3000,
+        });
+        onClose();
+        loadApplications();
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to reject application',
+        status: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -227,13 +316,21 @@ export default function ApplicationManager() {
               
               <Td>
                 <HStack spacing={2}>
-                  <Button size="sm" variant="outline">
-                    View
-                  </Button>
+                  <IconButton
+                    size="sm"
+                    icon={<FiEye />}
+                    onClick={() => handleViewApplication(application)}
+                    aria-label="View application"
+                    colorScheme="blue"
+                  />
                   {application.status === 'payment_completed' && (
-                    <Button size="sm" colorScheme="green">
-                      Approve
-                    </Button>
+                    <IconButton
+                      size="sm"
+                      icon={<FiCheck />}
+                      onClick={() => handleApproveApplication(application.id)}
+                      aria-label="Approve application"
+                      colorScheme="green"
+                    />
                   )}
                 </HStack>
               </Td>
@@ -247,6 +344,99 @@ export default function ApplicationManager() {
           <Text color="gray.500">No applications found</Text>
         </Box>
       )}
+
+      {/* Application Details Drawer */}
+      <Drawer isOpen={isOpen} onClose={onClose} size="xl">
+        <DrawerOverlay />
+        <DrawerContent bg="#ECEDE8" color="#353535">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" color="#353535">
+            Application Details: {selectedApplication?.first_name} {selectedApplication?.last_name}
+          </DrawerHeader>
+          <DrawerBody>
+            {selectedApplication && (
+              <VStack spacing={6} align="stretch" pt={4}>
+                {/* Basic Information */}
+                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
+                  <Text fontWeight="bold" mb={3} color="#353535">Basic Information</Text>
+                  <VStack align="start" spacing={2}>
+                    <Text><strong>Name:</strong> {selectedApplication.first_name} {selectedApplication.last_name}</Text>
+                    <Text><strong>Email:</strong> {selectedApplication.email}</Text>
+                    {selectedApplication.phone && (
+                      <Text><strong>Phone:</strong> {selectedApplication.phone}</Text>
+                    )}
+                    <Text><strong>Status:</strong> 
+                      <Badge ml={2} colorScheme={getStatusColor(selectedApplication.status)}>
+                        {selectedApplication.status.replace('_', ' ')}
+                      </Badge>
+                    </Text>
+                    <Text><strong>Submitted:</strong> {formatDate(selectedApplication.created_at)}</Text>
+                  </VStack>
+                </Box>
+
+                {/* Progress */}
+                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
+                  <Text fontWeight="bold" mb={3} color="#353535">Application Progress</Text>
+                  <VStack align="start" spacing={2}>
+                    {selectedApplication.questionnaire_completed_at && (
+                      <Text color="green.600">✓ Questionnaire completed on {formatDate(selectedApplication.questionnaire_completed_at)}</Text>
+                    )}
+                    {selectedApplication.agreement_completed_at && (
+                      <Text color="green.600">✓ Agreement signed on {formatDate(selectedApplication.agreement_completed_at)}</Text>
+                    )}
+                    {selectedApplication.payment_completed_at && (
+                      <Text color="green.600">✓ Payment completed on {formatDate(selectedApplication.payment_completed_at)}</Text>
+                    )}
+                    {selectedApplication.payment_amount && (
+                      <Text><strong>Payment Amount:</strong> {formatAmount(selectedApplication.payment_amount)}</Text>
+                    )}
+                  </VStack>
+                </Box>
+
+                {/* Questionnaire Responses */}
+                {selectedApplication.questionnaire_responses && (
+                  <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
+                    <Text fontWeight="bold" mb={3} color="#353535">Questionnaire Responses</Text>
+                    <VStack align="start" spacing={3}>
+                      {Object.entries(selectedApplication.questionnaire_responses).map(([question, answer]) => (
+                        <Box key={question} w="100%">
+                          <Text fontWeight="semibold" color="#353535">{question}</Text>
+                          <Text fontSize="sm" color="gray.600">{String(answer)}</Text>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </Box>
+                )}
+              </VStack>
+            )}
+          </DrawerBody>
+          <DrawerFooter borderTopWidth="1px">
+            <HStack spacing={3}>
+              {selectedApplication?.status === 'payment_completed' && (
+                <>
+                  <Button
+                    leftIcon={<FiX />}
+                    colorScheme="red"
+                    onClick={() => handleRejectApplication(selectedApplication.id)}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    leftIcon={<FiCheck />}
+                    colorScheme="green"
+                    onClick={() => handleApproveApplication(selectedApplication.id)}
+                  >
+                    Approve
+                  </Button>
+                </>
+              )}
+              <Button onClick={onClose} variant="outline">
+                Close
+              </Button>
+            </HStack>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </VStack>
   );
 } 

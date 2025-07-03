@@ -16,13 +16,13 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
+  Drawer,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
   useDisclosure,
   useToast,
   Textarea,
@@ -32,9 +32,10 @@ import {
   AlertIcon,
   Spinner,
   Icon,
-  Tooltip
+  Tooltip,
+  IconButton
 } from '@chakra-ui/react';
-import { FiSearch, FiSend, FiExternalLink, FiClock, FiCheck, FiX } from 'react-icons/fi';
+import { FiSearch, FiSend, FiExternalLink, FiClock, FiCheck, FiX, FiEye } from 'react-icons/fi';
 
 interface WaitlistEntry {
   id: string;
@@ -69,6 +70,7 @@ export default function WaitlistManager() {
   
   const { isOpen: isReviewOpen, onOpen: onReviewOpen, onClose: onReviewClose } = useDisclosure();
   const { isOpen: isLinkOpen, onOpen: onLinkOpen, onClose: onLinkClose } = useDisclosure();
+  const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
   const toast = useToast();
 
   useEffect(() => {
@@ -117,6 +119,11 @@ export default function WaitlistManager() {
     onLinkOpen();
   };
 
+  const handleViewEntry = (entry: WaitlistEntry) => {
+    setSelectedEntry(entry);
+    onViewOpen();
+  };
+
   const submitReview = async (status: 'approved' | 'denied' | 'waitlisted') => {
     if (!selectedEntry) return;
 
@@ -162,32 +169,29 @@ export default function WaitlistManager() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          waitlist_id: selectedEntry.id,
-          send_sms: true,
-          expires_in_hours: 168 // 7 days
+          id: selectedEntry.id,
+          action: 'generate_link'
         })
       });
 
       if (response.ok) {
-        const data = await response.json();
         toast({
           title: 'Success',
-          description: `Application link sent to ${selectedEntry.first_name}!`,
+          description: 'Application link generated and sent successfully',
           status: 'success',
-          duration: 5000,
+          duration: 3000,
         });
         onLinkClose();
         loadWaitlistEntries();
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send application link');
+        throw new Error('Failed to generate link');
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to send application link',
+        description: 'Failed to generate and send link',
         status: 'error',
-        duration: 5000,
+        duration: 3000,
       });
     } finally {
       setSendingSMS(false);
@@ -222,13 +226,14 @@ export default function WaitlistManager() {
       entry.first_name.toLowerCase().includes(searchLower) ||
       entry.last_name.toLowerCase().includes(searchLower) ||
       entry.email.toLowerCase().includes(searchLower) ||
-      entry.phone.includes(searchTerm)
+      entry.phone.includes(searchTerm) ||
+      (entry.company && entry.company.toLowerCase().includes(searchLower))
     );
   });
 
   if (loading) {
     return (
-      <VStack spacing={4} py={8}>
+      <VStack spacing={4} align="center" py={8}>
         <Spinner size="lg" />
         <Text>Loading waitlist entries...</Text>
       </VStack>
@@ -237,45 +242,33 @@ export default function WaitlistManager() {
 
   return (
     <VStack spacing={6} align="stretch">
-      {/* Header and Filters */}
-      <HStack justify="space-between" wrap="wrap">
-        <VStack align="start" spacing={1}>
-          <Text fontSize="lg" fontWeight="bold">
-            Waitlist Management
-          </Text>
-          <Text fontSize="sm" color="gray.600">
-            Review and approve waitlist entries to send application links
-          </Text>
-        </VStack>
+      {/* Filters */}
+      <HStack spacing={4} wrap="wrap">
+        <InputGroup maxW="300px">
+          <InputLeftElement>
+            <Icon as={FiSearch} color="gray.400" />
+          </InputLeftElement>
+          <Input
+            placeholder="Search entries..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </InputGroup>
 
-        <HStack spacing={4}>
-          <InputGroup maxW="300px">
-            <InputLeftElement>
-              <Icon as={FiSearch} color="gray.400" />
-            </InputLeftElement>
-            <Input
-              placeholder="Search entries..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </InputGroup>
-
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            maxW="200px"
-          >
-            <option value="all">All Statuses</option>
-            <option value="review">Pending Review</option>
-            <option value="approved">Approved</option>
-            <option value="link_sent">Link Sent</option>
-            <option value="waitlisted">Waitlisted</option>
-            <option value="denied">Denied</option>
-          </Select>
-        </HStack>
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          maxW="200px"
+        >
+          <option value="all">All Statuses</option>
+          <option value="review">Review</option>
+          <option value="approved">Approved</option>
+          <option value="denied">Denied</option>
+          <option value="waitlisted">Waitlisted</option>
+          <option value="link_sent">Link Sent</option>
+        </Select>
       </HStack>
 
-      {/* Waitlist Table */}
       <Box overflowX="auto">
         <Table variant="simple">
           <Thead>
@@ -334,55 +327,53 @@ export default function WaitlistManager() {
                 <Td>
                   <VStack align="start" spacing={1}>
                     {entry.application_link_sent_at && (
-                      <HStack spacing={1}>
-                        <Icon as={FiSend} size="xs" color="green.500" />
-                        <Text fontSize="xs" color="green.600">
-                          Sent {formatDate(entry.application_link_sent_at)}
-                        </Text>
-                      </HStack>
+                      <Text fontSize="xs" color="green.600">
+                        Sent {formatDate(entry.application_link_sent_at)}
+                      </Text>
                     )}
                     {entry.application_link_opened_at && (
-                      <HStack spacing={1}>
-                        <Icon as={FiExternalLink} size="xs" color="blue.500" />
-                        <Text fontSize="xs" color="blue.600">
-                          Opened {formatDate(entry.application_link_opened_at)}
-                        </Text>
-                      </HStack>
+                      <Text fontSize="xs" color="blue.600">
+                        Opened {formatDate(entry.application_link_opened_at)}
+                      </Text>
                     )}
                     {entry.application_expires_at && (
-                      <HStack spacing={1}>
-                        <Icon as={FiClock} size="xs" color="orange.500" />
-                        <Text fontSize="xs" color="orange.600">
-                          Expires {formatDate(entry.application_expires_at)}
-                        </Text>
-                      </HStack>
+                      <Text fontSize="xs" color="orange.600">
+                        Expires {formatDate(entry.application_expires_at)}
+                      </Text>
                     )}
                   </VStack>
                 </Td>
                 
                 <Td>
                   <HStack spacing={2}>
+                    <IconButton
+                      size="xs"
+                      icon={<FiEye />}
+                      onClick={() => handleViewEntry(entry)}
+                      aria-label="View entry details"
+                      colorScheme="blue"
+                    />
+                    
                     {entry.status === 'review' && (
-                      <Button
+                      <IconButton
                         size="xs"
-                        colorScheme="blue"
+                        icon={<FiCheck />}
                         onClick={() => handleReview(entry)}
-                      >
-                        Review
-                      </Button>
+                        aria-label="Review entry"
+                        colorScheme="yellow"
+                      />
                     )}
                     
                     {(entry.status === 'approved' || entry.status === 'link_sent') && (
                       <Tooltip label="Generate and send application link">
-                        <Button
+                        <IconButton
                           size="xs"
+                          icon={<FiSend />}
+                          onClick={() => handleGenerateLink(entry)}
+                          aria-label="Generate and send application link"
                           colorScheme="green"
                           variant={entry.status === 'link_sent' ? 'outline' : 'solid'}
-                          onClick={() => handleGenerateLink(entry)}
-                          leftIcon={<Icon as={FiSend} />}
-                        >
-                          {entry.status === 'link_sent' ? 'Resend' : 'Send Link'}
-                        </Button>
+                        />
                       </Tooltip>
                     )}
                   </HStack>
@@ -399,18 +390,18 @@ export default function WaitlistManager() {
         )}
       </Box>
 
-      {/* Review Modal */}
-      <Modal isOpen={isReviewOpen} onClose={onReviewClose} size="md">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
+      {/* Review Drawer */}
+      <Drawer isOpen={isReviewOpen} onClose={onReviewClose} size="md">
+        <DrawerOverlay />
+        <DrawerContent bg="#ECEDE8" color="#353535">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" color="#353535">
             Review Waitlist Entry: {selectedEntry?.first_name} {selectedEntry?.last_name}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
+          </DrawerHeader>
+          <DrawerBody>
+            <VStack spacing={4} align="stretch" pt={4}>
               {selectedEntry && (
-                <Box bg="gray.50" p={4} borderRadius="md">
+                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
                   <VStack align="start" spacing={2}>
                     <Text><strong>Email:</strong> {selectedEntry.email}</Text>
                     <Text><strong>Phone:</strong> {selectedEntry.phone}</Text>
@@ -428,22 +419,25 @@ export default function WaitlistManager() {
               )}
 
               <FormControl>
-                <FormLabel>Review Notes</FormLabel>
+                <FormLabel color="#353535">Review Notes</FormLabel>
                 <Textarea
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
                   placeholder="Add notes about this review..."
                   rows={3}
+                  bg="white"
+                  borderColor="gray.300"
+                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                 />
               </FormControl>
             </VStack>
-          </ModalBody>
-          <ModalFooter>
+          </DrawerBody>
+          <DrawerFooter borderTopWidth="1px">
             <HStack spacing={3}>
               <Button
                 colorScheme="red"
                 onClick={() => submitReview('denied')}
-                leftIcon={<Icon as={FiX} />}
+                leftIcon={<FiX />}
               >
                 Deny
               </Button>
@@ -456,64 +450,155 @@ export default function WaitlistManager() {
               <Button
                 colorScheme="green"
                 onClick={() => submitReview('approved')}
-                leftIcon={<Icon as={FiCheck} />}
+                leftIcon={<FiCheck />}
               >
                 Approve
               </Button>
             </HStack>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
-      {/* Application Link Modal */}
-      <Modal isOpen={isLinkOpen} onClose={onLinkClose} size="md">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
+      {/* Application Link Drawer */}
+      <Drawer isOpen={isLinkOpen} onClose={onLinkClose} size="md">
+        <DrawerOverlay />
+        <DrawerContent bg="#ECEDE8" color="#353535">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" color="#353535">
             Send Application Link: {selectedEntry?.first_name} {selectedEntry?.last_name}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
-              <Alert status="info">
+          </DrawerHeader>
+          <DrawerBody>
+            <VStack spacing={4} align="stretch" pt={4}>
+              <Alert status="info" bg="blue.50" border="1px" borderColor="blue.200">
                 <AlertIcon />
                 <VStack align="start" spacing={1}>
-                  <Text fontWeight="bold">
+                  <Text fontWeight="bold" color="#353535">
                     Generate and send application link via SMS
                   </Text>
-                  <Text fontSize="sm">
+                  <Text fontSize="sm" color="#353535">
                     This will create a unique application link that expires in 7 days and send it to {selectedEntry?.phone}
                   </Text>
                 </VStack>
               </Alert>
 
               {selectedEntry?.application_link_sent_at && (
-                <Alert status="warning">
+                <Alert status="warning" bg="orange.50" border="1px" borderColor="orange.200">
                   <AlertIcon />
-                  <Text fontSize="sm">
+                  <Text fontSize="sm" color="#353535">
                     A link was previously sent on {formatDate(selectedEntry.application_link_sent_at)}. 
                     Sending a new link will invalidate the previous one.
                   </Text>
                 </Alert>
               )}
             </VStack>
-          </ModalBody>
-          <ModalFooter>
+          </DrawerBody>
+          <DrawerFooter borderTopWidth="1px">
             <HStack spacing={3}>
-              <Button onClick={onLinkClose}>Cancel</Button>
+              <Button onClick={onLinkClose} variant="outline">
+                Cancel
+              </Button>
               <Button
                 colorScheme="green"
                 onClick={generateAndSendLink}
                 isLoading={sendingSMS}
                 loadingText="Sending..."
-                leftIcon={<Icon as={FiSend} />}
+                leftIcon={<FiSend />}
               >
                 Generate & Send Link
               </Button>
             </HStack>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      {/* View Entry Drawer */}
+      <Drawer isOpen={isViewOpen} onClose={onViewClose} size="md">
+        <DrawerOverlay />
+        <DrawerContent bg="#ECEDE8" color="#353535">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" color="#353535">
+            Entry Details: {selectedEntry?.first_name} {selectedEntry?.last_name}
+          </DrawerHeader>
+          <DrawerBody>
+            {selectedEntry && (
+              <VStack spacing={4} align="stretch" pt={4}>
+                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
+                  <Text fontWeight="bold" mb={3} color="#353535">Contact Information</Text>
+                  <VStack align="start" spacing={2}>
+                    <Text><strong>Name:</strong> {selectedEntry.first_name} {selectedEntry.last_name}</Text>
+                    <Text><strong>Email:</strong> {selectedEntry.email}</Text>
+                    <Text><strong>Phone:</strong> {selectedEntry.phone}</Text>
+                    {selectedEntry.company && (
+                      <Text><strong>Company:</strong> {selectedEntry.company}</Text>
+                    )}
+                    {selectedEntry.occupation && (
+                      <Text><strong>Occupation:</strong> {selectedEntry.occupation}</Text>
+                    )}
+                    {selectedEntry.industry && (
+                      <Text><strong>Industry:</strong> {selectedEntry.industry}</Text>
+                    )}
+                  </VStack>
+                </Box>
+
+                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
+                  <Text fontWeight="bold" mb={3} color="#353535">Application Details</Text>
+                  <VStack align="start" spacing={2}>
+                    {selectedEntry.referral && (
+                      <Text><strong>Referral:</strong> {selectedEntry.referral}</Text>
+                    )}
+                    {selectedEntry.how_did_you_hear && (
+                      <Text><strong>How did you hear:</strong> {selectedEntry.how_did_you_hear}</Text>
+                    )}
+                    {selectedEntry.why_noir && (
+                      <Text><strong>Why Noir:</strong> {selectedEntry.why_noir}</Text>
+                    )}
+                    <Text><strong>Status:</strong> 
+                      <Badge ml={2} colorScheme={getStatusColor(selectedEntry.status)}>
+                        {selectedEntry.status.replace('_', ' ')}
+                      </Badge>
+                    </Text>
+                    <Text><strong>Submitted:</strong> {formatDate(selectedEntry.submitted_at)}</Text>
+                    {selectedEntry.reviewed_at && (
+                      <Text><strong>Reviewed:</strong> {formatDate(selectedEntry.reviewed_at)}</Text>
+                    )}
+                  </VStack>
+                </Box>
+
+                {selectedEntry.review_notes && (
+                  <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
+                    <Text fontWeight="bold" mb={3} color="#353535">Review Notes</Text>
+                    <Text>{selectedEntry.review_notes}</Text>
+                  </Box>
+                )}
+
+                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
+                  <Text fontWeight="bold" mb={3} color="#353535">Application Link Status</Text>
+                  <VStack align="start" spacing={2}>
+                    {selectedEntry.application_link_sent_at ? (
+                      <>
+                        <Text color="green.600">✓ Link sent on {formatDate(selectedEntry.application_link_sent_at)}</Text>
+                        {selectedEntry.application_link_opened_at && (
+                          <Text color="blue.600">✓ Link opened on {formatDate(selectedEntry.application_link_opened_at)}</Text>
+                        )}
+                        {selectedEntry.application_expires_at && (
+                          <Text color="orange.600">⚠ Expires on {formatDate(selectedEntry.application_expires_at)}</Text>
+                        )}
+                      </>
+                    ) : (
+                      <Text color="gray.500">No application link sent yet</Text>
+                    )}
+                  </VStack>
+                </Box>
+              </VStack>
+            )}
+          </DrawerBody>
+          <DrawerFooter borderTopWidth="1px">
+            <Button onClick={onViewClose} variant="outline">
+              Close
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </VStack>
   );
 } 

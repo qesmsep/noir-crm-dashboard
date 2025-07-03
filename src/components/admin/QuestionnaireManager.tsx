@@ -13,13 +13,13 @@ import {
   Th,
   Td,
   Badge,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
+  Drawer,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
   useDisclosure,
   useToast,
   FormControl,
@@ -204,42 +204,50 @@ export default function QuestionnaireManager() {
                 </Badge>
               </Td>
               <Td>
-                <HStack spacing={2}>
-                  <Button size="sm" onClick={() => handleEdit(questionnaire)}>
-                    Edit
-                  </Button>
-                </HStack>
+                <IconButton
+                  size="sm"
+                  icon={<FiEdit />}
+                  onClick={() => handleEdit(questionnaire)}
+                  aria-label="Edit questionnaire"
+                  colorScheme="blue"
+                />
               </Td>
             </Tr>
           ))}
         </Tbody>
       </Table>
 
-      {/* Edit Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
+      {/* Edit Drawer */}
+      <Drawer isOpen={isOpen} onClose={onClose} size="xl">
+        <DrawerOverlay />
+        <DrawerContent bg="#ECEDE8" color="#353535">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px" color="#353535">
             {editingQuestionnaire ? 'Edit Questionnaire' : 'Create Questionnaire'}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
+          </DrawerHeader>
+          <DrawerBody>
+            <VStack spacing={4} align="stretch" pt={4}>
               <FormControl>
-                <FormLabel>Title</FormLabel>
+                <FormLabel color="#353535">Title</FormLabel>
                 <Input
                   value={editingQuestionnaire?.title || ''}
                   onChange={(e) => setEditingQuestionnaire(prev => ({ ...prev!, title: e.target.value }))}
                   placeholder="Enter questionnaire title"
+                  bg="white"
+                  borderColor="gray.300"
+                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                 />
               </FormControl>
 
               <FormControl>
-                <FormLabel>Description</FormLabel>
+                <FormLabel color="#353535">Description</FormLabel>
                 <Textarea
                   value={editingQuestionnaire?.description || ''}
                   onChange={(e) => setEditingQuestionnaire(prev => ({ ...prev!, description: e.target.value }))}
                   placeholder="Enter questionnaire description"
+                  bg="white"
+                  borderColor="gray.300"
+                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                 />
               </FormControl>
 
@@ -247,6 +255,7 @@ export default function QuestionnaireManager() {
                 <Checkbox
                   isChecked={editingQuestionnaire?.is_active ?? true}
                   onChange={(e) => setEditingQuestionnaire(prev => ({ ...prev!, is_active: e.target.checked }))}
+                  color="#353535"
                 >
                   Active
                 </Checkbox>
@@ -254,7 +263,7 @@ export default function QuestionnaireManager() {
 
               <Box>
                 <HStack justify="space-between" mb={4}>
-                  <Text fontWeight="bold">Questions</Text>
+                  <Text fontWeight="bold" color="#353535">Questions</Text>
                   <Button size="sm" onClick={addQuestion}>
                     Add Question
                   </Button>
@@ -262,33 +271,41 @@ export default function QuestionnaireManager() {
 
                 <VStack spacing={4} align="stretch">
                   {questions.map((question, index) => (
-                    <Box key={index} p={4} border="1px" borderColor="gray.200" borderRadius="md">
+                    <Box key={index} p={4} border="1px" borderColor="gray.300" borderRadius="md" bg="white">
                       <VStack spacing={3} align="stretch">
                         <HStack justify="space-between">
-                          <Text fontWeight="bold">Question {index + 1}</Text>
+                          <Text fontWeight="bold" color="#353535">Question {index + 1}</Text>
                           <IconButton
                             size="sm"
                             icon={<Icon as={FiTrash2} />}
                             onClick={() => removeQuestion(index)}
                             aria-label="Remove question"
+                            colorScheme="red"
+                            variant="ghost"
                           />
                         </HStack>
 
                         <FormControl>
-                          <FormLabel>Question Text</FormLabel>
+                          <FormLabel color="#353535">Question Text</FormLabel>
                           <Input
                             value={question.question_text}
                             onChange={(e) => updateQuestion(index, 'question_text', e.target.value)}
                             placeholder="Enter question text"
+                            bg="white"
+                            borderColor="gray.300"
+                            _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                           />
                         </FormControl>
 
                         <HStack spacing={4}>
                           <FormControl>
-                            <FormLabel>Type</FormLabel>
+                            <FormLabel color="#353535">Type</FormLabel>
                             <Select
                               value={question.question_type}
                               onChange={(e) => updateQuestion(index, 'question_type', e.target.value)}
+                              bg="white"
+                              borderColor="gray.300"
+                              _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                             >
                               <option value="text">Text</option>
                               <option value="textarea">Text Area</option>
@@ -306,6 +323,7 @@ export default function QuestionnaireManager() {
                             <Checkbox
                               isChecked={question.is_required}
                               onChange={(e) => updateQuestion(index, 'is_required', e.target.checked)}
+                              color="#353535"
                             >
                               Required
                             </Checkbox>
@@ -317,17 +335,19 @@ export default function QuestionnaireManager() {
                 </VStack>
               </Box>
             </VStack>
-          </ModalBody>
-          <ModalFooter>
+          </DrawerBody>
+          <DrawerFooter borderTopWidth="1px">
             <HStack spacing={3}>
-              <Button onClick={onClose}>Cancel</Button>
+              <Button onClick={onClose} variant="outline">
+                Cancel
+              </Button>
               <Button colorScheme="blue" onClick={handleSave}>
                 Save Questionnaire
               </Button>
             </HStack>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </VStack>
   );
 } 

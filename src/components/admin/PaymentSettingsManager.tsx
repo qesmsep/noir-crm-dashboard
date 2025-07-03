@@ -38,14 +38,10 @@ export default function PaymentSettingsManager() {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/membership/payment-settings');
+      const response = await fetch('/api/membership/payment');
       if (response.ok) {
         const data = await response.json();
-        setSettings(data[0] || {
-          membership_fee: 10000,
-          currency: 'usd',
-          is_active: true
-        });
+        setSettings(data);
       }
     } catch (error) {
       toast({
@@ -64,7 +60,7 @@ export default function PaymentSettingsManager() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/membership/payment-settings', {
+      const response = await fetch('/api/membership/payment', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -73,15 +69,17 @@ export default function PaymentSettingsManager() {
       if (response.ok) {
         toast({
           title: 'Success',
-          description: 'Payment settings updated successfully',
+          description: 'Payment settings saved successfully',
           status: 'success',
           duration: 3000,
         });
+      } else {
+        throw new Error('Failed to save settings');
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update payment settings',
+        description: 'Failed to save payment settings',
         status: 'error',
         duration: 3000,
       });
@@ -110,23 +108,26 @@ export default function PaymentSettingsManager() {
         </Text>
       </VStack>
 
-      <Card>
+      <Card bg="white" border="1px" borderColor="gray.300">
         <CardBody>
           <VStack spacing={6} align="stretch">
-            <Alert status="info">
+            <Alert status="info" bg="blue.50" border="1px" borderColor="blue.200">
               <AlertIcon />
-              <Text fontSize="sm">
+              <Text fontSize="sm" color="#353535">
                 These settings control the membership application fee and payment processing configuration.
               </Text>
             </Alert>
 
             <FormControl>
-              <FormLabel>Membership Fee (in cents)</FormLabel>
+              <FormLabel color="#353535">Membership Fee (in cents)</FormLabel>
               <Input
                 type="number"
                 value={settings?.membership_fee || 0}
                 onChange={(e) => setSettings(prev => ({ ...prev!, membership_fee: parseInt(e.target.value) || 0 }))}
                 placeholder="10000 for $100.00"
+                bg="white"
+                borderColor="gray.300"
+                _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
               />
               <Text fontSize="sm" color="gray.500">
                 Current fee: {formatAmount(settings?.membership_fee || 0)}
@@ -134,10 +135,13 @@ export default function PaymentSettingsManager() {
             </FormControl>
 
             <FormControl>
-              <FormLabel>Currency</FormLabel>
+              <FormLabel color="#353535">Currency</FormLabel>
               <Select
                 value={settings?.currency || 'usd'}
                 onChange={(e) => setSettings(prev => ({ ...prev!, currency: e.target.value }))}
+                bg="white"
+                borderColor="gray.300"
+                _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
               >
                 <option value="usd">USD - US Dollar</option>
                 <option value="eur">EUR - Euro</option>
@@ -147,11 +151,14 @@ export default function PaymentSettingsManager() {
             </FormControl>
 
             <FormControl>
-              <FormLabel>Stripe Price ID (Optional)</FormLabel>
+              <FormLabel color="#353535">Stripe Price ID (Optional)</FormLabel>
               <Input
                 value={settings?.stripe_price_id || ''}
                 onChange={(e) => setSettings(prev => ({ ...prev!, stripe_price_id: e.target.value }))}
                 placeholder="price_1234567890"
+                bg="white"
+                borderColor="gray.300"
+                _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
               />
               <Text fontSize="sm" color="gray.500">
                 If you have a specific Stripe price ID, enter it here. Otherwise, a new price will be created.
@@ -162,6 +169,7 @@ export default function PaymentSettingsManager() {
               <Checkbox
                 isChecked={settings?.is_active ?? true}
                 onChange={(e) => setSettings(prev => ({ ...prev!, is_active: e.target.checked }))}
+                color="#353535"
               >
                 Active
               </Checkbox>
