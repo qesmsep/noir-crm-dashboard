@@ -281,7 +281,7 @@ export default function Settings() {
                   Admin Notification Phone Number
                 </FormLabel>
                 <Input
-                  value={settings.admin_notification_phone}
+                  value={typeof settings.admin_notification_phone === 'string' ? settings.admin_notification_phone : ''}
                   onChange={(e) => handleInputChange('admin_notification_phone', '', e.target.value)}
                   placeholder="9137774488"
                   bg="white"
@@ -293,10 +293,44 @@ export default function Settings() {
                   The system will automatically add +1 prefix.
                 </Text>
                 <Text fontSize="sm" color="gray.700" mt={2}>
-                  <b>Current notification phone on file:</b> {contextSettings.admin_notification_phone
+                  <b>Current notification phone on file:</b> {typeof contextSettings.admin_notification_phone === 'string' && contextSettings.admin_notification_phone
                     ? `+1${contextSettings.admin_notification_phone.replace(/^\+?1?/, '')}`
                     : <span style={{color: '#b91c1c'}}>Not set</span>}
                 </Text>
+                {/* Save button for just the phone number */}
+                <Box display="flex" justifyContent="flex-end" mt={2}>
+                  <Button
+                    colorScheme="blue"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const { error } = await supabase
+                          .from('settings')
+                          .upsert({ id: settings.id, admin_notification_phone: settings.admin_notification_phone }, { onConflict: 'id' });
+                        if (error) throw error;
+                        await refreshSettings();
+                        setMessage({ type: 'success', text: 'Admin notification phone saved.' });
+                      } catch (err) {
+                        setMessage({ type: 'error', text: 'Failed to save admin notification phone.' });
+                      }
+                    }}
+                  >
+                    Save Phone
+                  </Button>
+                </Box>
+                {message && (
+                  <Box
+                    mt={2}
+                    p={2}
+                    borderRadius="md"
+                    bg={message.type === 'success' ? 'green.50' : 'red.50'}
+                    color={message.type === 'success' ? 'green.700' : 'red.700'}
+                    border="1px solid"
+                    borderColor={message.type === 'success' ? 'green.200' : 'red.200'}
+                  >
+                    {message.text}
+                  </Box>
+                )}
               </FormControl>
             </VStack>
           </Box>
