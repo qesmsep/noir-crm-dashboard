@@ -241,19 +241,19 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         
         if (privateEvent && !privateEvent.require_time_selection) {
           // For private events that don't require time selection, use the event start time
-          startTime = privateEvent.start_time;
-          endTime = privateEvent.end_time;
+          startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+          endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
         } else {
           // For private events that do require time selection, use the reservation's own time
-          startTime = r.start_time;
-          endTime = r.end_time;
+          startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+          endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
         }
       } else {
         const tableResource = resources.find(res => res.id === String(r.table_id));
         resourceId = String(r.table_id);
         tableLabel = tableResource ? tableResource.title : '';
-        startTime = r.start_time;
-        endTime = r.end_time;
+        startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+        endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
       }
       
       const event = {
