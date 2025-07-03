@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { DateTime } from 'luxon';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     // Get admin notification phone from settings
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
-      .select('admin_notification_phone')
+      .select('admin_notification_phone, timezone')
       .single();
 
     if (settingsError || !settings?.admin_notification_phone) {
@@ -56,14 +57,16 @@ export async function POST(request: Request) {
       adminPhone = '+1' + adminPhone;
     }
 
-    // Format date and time
-    const startDate = new Date(reservation.start_time);
-    const formattedDate = startDate.toLocaleDateString('en-US', {
+    // Use timezone from settings or default to America/Chicago
+    const timezone = settings.timezone || 'America/Chicago';
+    // Format date and time in local timezone
+    const startDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(timezone);
+    const formattedDate = startDate.toLocaleString({
       month: '2-digit',
       day: '2-digit',
       year: 'numeric'
     });
-    const formattedTime = startDate.toLocaleTimeString('en-US', {
+    const formattedTime = startDate.toLocaleString({
       hour: 'numeric',
       minute: '2-digit',
       hour12: true

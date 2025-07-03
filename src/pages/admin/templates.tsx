@@ -523,6 +523,20 @@ export default function TemplatesPage() {
     setIsTemplateDrawerOpen(true);
   };
 
+  // Helper to format send time
+  function formatSendTime(template) {
+    if (template.reminder_type === 'hour_before') {
+      return `${template.send_time} Hour${template.send_time === 1 ? '' : 's'} Before`;
+    } else {
+      // template.send_time is integer hour (e.g., 10 for 10:00 AM)
+      const hour = Number(template.send_time);
+      const minutes = 0; // If you add minute support, parse it here
+      let hour12 = hour % 12 || 12;
+      const ampm = hour < 12 ? 'AM' : 'PM';
+      return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    }
+  }
+
   return (
     <AdminLayout>
       <ReminderEditDrawer
@@ -721,63 +735,35 @@ export default function TemplatesPage() {
                     Process Reservation Reminders
                   </Button>
                 </HStack>
-                <Box bg="#a59480" borderRadius="lg" border="1px solid #ecede8" overflow="hidden">
-                  <Table variant="simple">
-                    <Thead>
+                <Box bg="#ecede8" borderRadius="lg" border="2px solid #a59480" overflow="hidden" mt={4}>
+                  <Table variant="simple" style={{ background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
+                    <Thead style={{ background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
                       <Tr>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Name</Th>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Description</Th>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Type</Th>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Send Time</Th>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Status</Th>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Actions</Th>
+                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Name</Th>
+                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Type</Th>
+                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Send Time</Th>
+                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Message</Th>
+                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Status</Th>
+                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Actions</Th>
                       </Tr>
                     </Thead>
-                    <Tbody>
+                    <Tbody style={{ background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
                       {reminderTemplates.map((template) => (
-                        <Tr key={template.id}>
-                          <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold">
-                            {template.name}
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif">
-                            {template.description || '-'}
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif">
-                            <Badge colorScheme={template.reminder_type === 'day_of' ? 'blue' : 'purple'} fontFamily="'Montserrat', sans-serif">
-                              {template.reminder_type === 'day_of' ? 'Day Of' : 'Hour Before'}
-                            </Badge>
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif">
-                            {template.reminder_type === 'day_of' ? template.send_time : `${template.send_time} hours before`}
-                          </Td>
-                          <Td>
+                        <Tr key={template.id} style={{ verticalAlign: 'top', background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
+                          <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="#353535" borderColor="#a59480">{template.name}</Td>
+                          <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">{template.reminder_type === 'day_of' ? 'Day Of' : 'Hour Before'}</Td>
+                          <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">{formatSendTime(template)}</Td>
+                          <Td fontFamily="'Montserrat', sans-serif" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: 'sm', maxWidth: 400, background: '#f7f5f2', borderRadius: 8, padding: 8, color: '#353535', borderColor: '#a59480' }}>{template.message_template}</Td>
+                          <Td borderColor="#a59480">
                             <Badge colorScheme={template.is_active ? 'green' : 'red'} fontFamily="'Montserrat', sans-serif">
                               {template.is_active ? 'Active' : 'Inactive'}
                             </Badge>
                           </Td>
-                          <Td>
-                            <HStack spacing={2}>
-                              <IconButton 
-                                aria-label="Test reminder template" 
-                                icon={<ViewIcon />} 
-                                size="sm" 
-                                colorScheme="blue" 
-                                onClick={() => handleTestReminderTemplate(template)}
-                              />
-                              <IconButton 
-                                aria-label="Edit reminder template" 
-                                icon={<EditIcon />} 
-                                size="sm" 
-                                colorScheme="yellow" 
-                                onClick={() => handleEditReminderTemplate(template)}
-                              />
-                              <IconButton 
-                                aria-label="Delete reminder template" 
-                                icon={<DeleteIcon />} 
-                                size="sm" 
-                                colorScheme="red" 
-                                onClick={() => handleDeleteReminderTemplate(template.id)}
-                              />
+                          <Td borderColor="#a59480">
+                            <HStack spacing={2} align="flex-start">
+                              <IconButton aria-label="Test template" icon={<ViewIcon />} size="sm" colorScheme="blue" onClick={() => handleTestReminderTemplate(template)} />
+                              <IconButton aria-label="Edit reminder template" icon={<EditIcon />} size="sm" colorScheme="yellow" onClick={() => handleEditReminderTemplate(template)} />
+                              <IconButton aria-label="Delete reminder template" icon={<DeleteIcon />} size="sm" colorScheme="red" onClick={() => handleDeleteReminderTemplate(template.id)} />
                             </HStack>
                           </Td>
                         </Tr>
@@ -832,7 +818,15 @@ export default function TemplatesPage() {
                                   </Text>
                                 </Td>
                                 <Td fontFamily="'Montserrat', sans-serif" maxW="300px">
-                                  <Text noOfLines={3}>{message.message_content}</Text>
+                                  <Text 
+                                    noOfLines={3} 
+                                    color="#23201C"
+                                    whiteSpace="pre-wrap"
+                                    fontFamily="monospace"
+                                    fontSize="sm"
+                                  >
+                                    {message.message_content}
+                                  </Text>
                                 </Td>
                                 <Td fontFamily="'Montserrat', sans-serif">
                                   {new Date(message.scheduled_for).toLocaleString()}
@@ -907,7 +901,13 @@ export default function TemplatesPage() {
                                   )}
                                 </Td>
                                 <Td fontFamily="'Montserrat', sans-serif" maxW="300px">
-                                  <Text noOfLines={3} color="#23201C">
+                                  <Text 
+                                    noOfLines={3} 
+                                    color="#23201C"
+                                    whiteSpace="pre-wrap"
+                                    fontFamily="monospace"
+                                    fontSize="sm"
+                                  >
                                     {reminder.message_content}
                                   </Text>
                                 </Td>

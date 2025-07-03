@@ -141,11 +141,39 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
   if (!reminderId) return null;
 
   return (
-    <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="sm">
+    <Drawer 
+      isOpen={isOpen} 
+      placement="right" 
+      onClose={onClose} 
+      size="sm"
+      closeOnOverlayClick={true}
+      closeOnEsc={true}
+    >
       <Box zIndex="2000" position="relative">
-        <DrawerOverlay bg="blackAlpha.600" />
-        <DrawerContent border="2px solid #353535" borderRadius="10px" fontFamily="Montserrat, sans-serif" maxW="350px" w="50vw" boxShadow="xl" mt="80px" mb="25px" backgroundColor="#ecede8" position="fixed" top="0" right="0" height="100vh">
-          <DrawerHeader borderBottomWidth="1px" fontWeight="bold" fontFamily="IvyJournal, sans-serif" color="#353535">
+        <DrawerOverlay bg="blackAlpha.600" onClick={onClose} />
+        <DrawerContent 
+          border="2px solid #353535" 
+          borderRadius="10px"  
+          fontFamily="Montserrat, sans-serif" 
+          maxW="400px" 
+          maxH="flex" 
+          w="40vw" 
+          boxShadow="xl" 
+          mt="80px" 
+          mb="25px" 
+          paddingRight="40px" 
+          paddingLeft="40px" 
+          backgroundColor="#ecede8"
+          position="fixed"
+          top="0"
+          right="0"
+          height="100vh"
+          style={{
+            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease-in-out'
+          }}
+        >
+          <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
             Edit Reservation Reminder
           </DrawerHeader>
           <DrawerBody p={4} overflowY="auto">

@@ -24,8 +24,14 @@ import {
   Switch,
   Alert,
   AlertIcon,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper,
 } from '@chakra-ui/react';
 import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
+import { useSettings } from '../context/SettingsContext';
 
 interface ReservationReminderTemplate {
   id: string;
@@ -33,7 +39,8 @@ interface ReservationReminderTemplate {
   description: string;
   message_template: string;
   reminder_type: 'day_of' | 'hour_before';
-  send_time: string;
+  send_time: number;
+  send_time_minutes: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -60,13 +67,15 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
     description: '',
     message_template: '',
     reminder_type: 'day_of' as 'day_of' | 'hour_before',
-    send_time: '10:00:00',
+    send_time_hours: 10,
+    send_time_minutes: 0,
     is_active: true,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const toast = useToast();
+  const { settings } = useSettings();
 
   useEffect(() => {
     if (isOpen) {
@@ -77,7 +86,8 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
           description: '',
           message_template: '',
           reminder_type: 'day_of',
-          send_time: '10:00:00',
+          send_time_hours: 10,
+          send_time_minutes: 0,
           is_active: true,
         });
         setTemplate(null);
@@ -101,12 +111,13 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
       if (foundTemplate) {
         setTemplate(foundTemplate);
         setFormData({
-          name: foundTemplate.name || '',
+          name: foundTemplate.name,
           description: foundTemplate.description || '',
-          message_template: foundTemplate.message_template || '',
-          reminder_type: foundTemplate.reminder_type || 'day_of',
-          send_time: foundTemplate.send_time || '10:00:00',
-          is_active: foundTemplate.is_active ?? true,
+          message_template: foundTemplate.message_template,
+          reminder_type: foundTemplate.reminder_type,
+          send_time_hours: foundTemplate.send_time,
+          send_time_minutes: foundTemplate.send_time_minutes || 0,
+          is_active: foundTemplate.is_active,
         });
       } else {
         throw new Error('Template not found');
@@ -129,16 +140,47 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
   };
 
   const handleSave = async () => {
+    if (!formData.name.trim() || !formData.message_template.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Name and message template are required',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const url = '/api/reservation-reminder-templates';
+      // Format send_time based on reminder type
+      let sendTime: string;
+      if (formData.reminder_type === 'day_of') {
+        // Format as "HH:MM"
+        sendTime = `${formData.send_time_hours.toString().padStart(2, '0')}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
+      } else {
+        // Format as hours only for hour_before
+        sendTime = formData.send_time_hours.toString();
+      }
+
+      const payload = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        message_template: formData.message_template.trim(),
+        reminder_type: formData.reminder_type,
+        send_time: sendTime,
+        is_active: formData.is_active,
+      };
+
+      const url = isCreateMode ? '/api/reservation-reminder-templates' : `/api/reservation-reminder-templates?id=${templateId}`;
       const method = isCreateMode ? 'POST' : 'PUT';
-      const body = isCreateMode ? formData : { ...formData, id: templateId };
 
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -148,9 +190,7 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
 
       toast({
         title: 'Success',
-        description: isCreateMode 
-          ? 'Reminder template created successfully' 
-          : 'Reminder template updated successfully',
+        description: isCreateMode ? 'Reminder template created successfully' : 'Reminder template updated successfully',
         status: 'success',
         duration: 3000,
       });
@@ -212,34 +252,69 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
       .replace(/\{\{party_size\}\}/g, '2');
   };
 
-  const title = isCreateMode ? 'Create Reminder Template' : 'Edit Reminder Template';
+  const formatSendTimeDisplay = () => {
+    if (formData.reminder_type === 'hour_before') {
+      const h = formData.send_time_hours;
+      const m = formData.send_time_minutes;
+      let str = '';
+      if (h > 0) str += `${h} Hour${h === 1 ? '' : 's'}`;
+      if (h > 0 && m > 0) str += ' ';
+      if (m > 0) str += `${m} Minute${m === 1 ? '' : 's'}`;
+      if (!str) str = '0 Minutes';
+      return str + ' Before';
+    } else {
+      const hour12 = formData.send_time_hours === 0 ? 12 : 
+                    formData.send_time_hours > 12 ? formData.send_time_hours - 12 : 
+                    formData.send_time_hours;
+      const ampm = formData.send_time_hours < 12 ? 'AM' : 'PM';
+      return `${hour12.toString().padStart(2, '0')}:${formData.send_time_minutes.toString().padStart(2, '0')} ${ampm}`;
+    }
+  };
 
   return (
-    <Box>
-      <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="md">
-        <DrawerOverlay bg="rgba(0, 0, 0, 0.4)" backdropFilter="blur(10px)" />
+    <Drawer 
+      isOpen={isOpen} 
+      placement="right" 
+      onClose={onClose} 
+      size="sm"
+      closeOnOverlayClick={true}
+      closeOnEsc={true}
+    >
+      <Box zIndex="2000" position="relative">
+        <DrawerOverlay bg="blackAlpha.600" onClick={onClose} />
         <DrawerContent 
-          bg="#353535" 
-          color="#ECEDE8" 
-          fontFamily="Montserrat, sans-serif"
-          maxW="400px"
-          w="25vw"
-          minW="350px"
+          border="2px solid #353535" 
+          borderRadius="10px"  
+          fontFamily="Montserrat, sans-serif" 
+          maxW="400px" 
+          maxH="flex" 
+          w="40vw" 
+          boxShadow="xl" 
+          mt="80px" 
+          mb="25px" 
+          paddingRight="40px" 
+          paddingLeft="40px" 
+          backgroundColor="#ecede8"
+          position="fixed"
+          top="0"
+          right="0"
+          height="100vh"
+          style={{
+            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease-in-out'
+          }}
         >
-          <DrawerHeader 
-            borderBottomWidth="1px" 
-            borderBottomColor="#a59480"
-            fontSize="xl"
-            fontWeight="bold"
-            fontFamily="IvyJournal, sans-serif"
-          >
+          <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
             <HStack justify="space-between" align="center">
-              <Text>{title}</Text>
+              <Text>
+                {isCreateMode ? 'Create Reminder Template' : 'Edit Reminder Template'}
+              </Text>
               <IconButton
-                aria-label="Close"
+                aria-label="Close drawer"
                 icon={<CloseIcon />}
-                variant="ghost"
                 size="sm"
+                variant="ghost"
+                bg="#353535"
                 onClick={onClose}
                 color="#ECEDE8"
                 _hover={{ bg: '#2a2a2a' }}
@@ -261,9 +336,9 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     placeholder="Enter template name"
                     size="sm"
-                    bg="#2a2a2a"
-                    borderColor="#a59480"
-                    _focus={{ borderColor: "#ecede8" }}
+                    bg="#ecede8"
+                    borderColor="#23201C"
+                    _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                   />
                 </FormControl>
 
@@ -274,9 +349,9 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     placeholder="Enter description (optional)"
                     size="sm"
-                    bg="#2a2a2a"
-                    borderColor="#a59480"
-                    _focus={{ borderColor: "#ecede8" }}
+                    bg="#ecede8"
+                    borderColor="#23201C"
+                    _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                   />
                 </FormControl>
 
@@ -286,47 +361,101 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                     value={formData.reminder_type}
                     onChange={(e) => handleInputChange('reminder_type', e.target.value)}
                     size="sm"
-                    bg="#2a2a2a"
-                    borderColor="#a59480"
-                    _focus={{ borderColor: "#ecede8" }}
+                    bg="#ecede8"
+                    borderColor="#23201C"
+                    _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                   >
                     <option value="day_of">Day Of Reservation</option>
                     <option value="hour_before">Hours Before Reservation</option>
                   </Select>
                 </FormControl>
 
-                <FormControl>
+                <FormControl isRequired>
                   <FormLabel fontSize="sm" mb={1}>
-                    {formData.reminder_type === 'day_of' ? 'Send Time' : 'Hours Before'}
+                    {formData.reminder_type === 'day_of' ? 'Send Time' : 'Hours/Minutes Before'}
                   </FormLabel>
-                  {formData.reminder_type === 'day_of' ? (
-                    <Input
-                      type="time"
-                      value={formData.send_time}
-                      onChange={(e) => handleInputChange('send_time', e.target.value)}
-                      size="sm"
-                      bg="#2a2a2a"
-                      borderColor="#a59480"
-                      _focus={{ borderColor: "#ecede8" }}
-                    />
-                  ) : (
-                    <Select
-                      value={formData.send_time}
-                      onChange={(e) => handleInputChange('send_time', e.target.value)}
-                      size="sm"
-                      bg="#2a2a2a"
-                      borderColor="#a59480"
-                      _focus={{ borderColor: "#ecede8" }}
-                    >
-                      <option value="1">1 Hour Before</option>
-                      <option value="2">2 Hours Before</option>
-                      <option value="3">3 Hours Before</option>
-                      <option value="4">4 Hours Before</option>
-                      <option value="6">6 Hours Before</option>
-                      <option value="12">12 Hours Before</option>
-                      <option value="24">24 Hours Before</option>
-                    </Select>
-                  )}
+                  <HStack spacing={2}>
+                    {formData.reminder_type === 'day_of' ? (
+                      <>
+                        <NumberInput
+                          value={formData.send_time_hours}
+                          onChange={(_, value) => handleInputChange('send_time_hours', value)}
+                          min={0}
+                          max={23}
+                          size="sm"
+                          bg="#ecede8"
+                          borderColor="#23201C"
+                          _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        >
+                          <NumberInputField />
+                          <NumberInputStepper>
+                            <NumberIncrementStepper />
+                            <NumberDecrementStepper />
+                          </NumberInputStepper>
+                        </NumberInput>
+                        <Text color="#353535">:</Text>
+                        <NumberInput
+                          value={formData.send_time_minutes}
+                          onChange={(_, value) => handleInputChange('send_time_minutes', value)}
+                          min={0}
+                          max={59}
+                          size="sm"
+                          bg="#ecede8"
+                          borderColor="#23201C"
+                          _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        >
+                          <NumberInputField />
+                          <NumberInputStepper>
+                            <NumberIncrementStepper />
+                            <NumberDecrementStepper />
+                          </NumberInputStepper>
+                        </NumberInput>
+                        <Text color="#353535" fontSize="sm">
+                          {formatSendTimeDisplay()}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <NumberInput
+                          value={formData.send_time_hours}
+                          onChange={(_, value) => handleInputChange('send_time_hours', value)}
+                          min={0}
+                          max={24}
+                          size="sm"
+                          bg="#ecede8"
+                          borderColor="#23201C"
+                          _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        >
+                          <NumberInputField />
+                          <NumberInputStepper>
+                            <NumberIncrementStepper />
+                            <NumberDecrementStepper />
+                          </NumberInputStepper>
+                        </NumberInput>
+                        <Text color="#353535">Hour(s)</Text>
+                        <NumberInput
+                          value={formData.send_time_minutes}
+                          onChange={(_, value) => handleInputChange('send_time_minutes', value)}
+                          min={0}
+                          max={59}
+                          size="sm"
+                          bg="#ecede8"
+                          borderColor="#23201C"
+                          _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        >
+                          <NumberInputField />
+                          <NumberInputStepper>
+                            <NumberIncrementStepper />
+                            <NumberDecrementStepper />
+                          </NumberInputStepper>
+                        </NumberInput>
+                        <Text color="#353535">Minute(s) Before</Text>
+                        <Text color="#353535" fontSize="sm">
+                          {formatSendTimeDisplay()}
+                        </Text>
+                      </>
+                    )}
+                  </HStack>
                 </FormControl>
 
                 <FormControl>
@@ -334,22 +463,30 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                   <Textarea
                     value={formData.message_template}
                     onChange={(e) => handleInputChange('message_template', e.target.value)}
-                    placeholder="Enter message template. Use {{first_name}}, {{reservation_time}}, and {{party_size}} as placeholders."
+                    placeholder="Enter message template. Use {{first_name}}, {{reservation_time}}, and {{party_size}} as placeholders. You can add line breaks for better formatting."
                     size="sm"
                     rows={4}
-                    bg="#2a2a2a"
-                    borderColor="#a59480"
-                    _focus={{ borderColor: "#ecede8" }}
+                    bg="#ecede8"
+                    borderColor="#23201C"
+                    _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                   />
-                  <Text fontSize="xs" color="gray.400" mt={1}>
-                    Available placeholders: {'{'}{'{'} first_name {'}'}{'}'},  {'{'}{'{'} reservation_time {'}'}{'}'},  {'{'}{'{'} party_size {'}'}{'}'} 
+                  <Text fontSize="xs" color="gray.600" mt={1}>
+                    Available placeholders: {'{'}{'{'}first_name{'}'}{'}'}, {'{'}{'{'}reservation_time{'}'}{'}'}, {'{'}{'{'}party_size{'}'}{'}'}
+                  </Text>
+                  <Text fontSize="xs" color="gray.600" mt={1}>
+                    💡 Tip: You can press Enter to add line breaks for better message formatting
                   </Text>
                 </FormControl>
 
                 {formData.message_template && (
-                  <Box bg="#2a2a2a" p={3} borderRadius="md" borderWidth="1px" borderColor="#a59480">
+                  <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
                     <Text fontSize="sm" fontWeight="bold" mb={2}>Preview:</Text>
-                    <Text fontSize="sm" fontStyle="italic">
+                    <Text 
+                      fontSize="sm" 
+                      fontStyle="italic"
+                      whiteSpace="pre-wrap"
+                      fontFamily="monospace"
+                    >
                       {getPreviewMessage()}
                     </Text>
                   </Box>
@@ -366,17 +503,23 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                   </HStack>
                 </FormControl>
 
+                {settings?.timezone && (
+                  <Text fontSize="xs" color="#666" textAlign="center">
+                    Times will be sent in {settings.timezone} timezone
+                  </Text>
+                )}
+
                 {!isCreateMode && template && (
-                  <Box bg="#2a2a2a" p={3} borderRadius="md" borderWidth="1px" borderColor="#a59480">
+                  <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
                     <VStack spacing={1} fontSize="xs">
                       <HStack justify="space-between" w="100%">
-                        <Text fontSize="12px" color="gray.400" fontWeight="medium">Created:</Text>
+                        <Text fontSize="12px" color="gray.600" fontWeight="medium">Created:</Text>
                         <Text fontSize="12px">
                           {template.created_at ? new Date(template.created_at).toLocaleDateString() : 'N/A'}
                         </Text>
                       </HStack>
                       <HStack justify="space-between" w="100%">
-                        <Text fontSize="12px" color="gray.400" fontWeight="medium">Last Updated:</Text>
+                        <Text fontSize="12px" color="gray.600" fontWeight="medium">Last Updated:</Text>
                         <Text fontSize="12px">
                           {template.updated_at ? new Date(template.updated_at).toLocaleDateString() : 'N/A'}
                         </Text>
@@ -388,7 +531,7 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
             )}
           </DrawerBody>
           
-          <DrawerFooter borderTopWidth="1px" borderTopColor="#a59480" justifyContent="space-between">
+          <DrawerFooter borderTopWidth="1px" justifyContent="space-between">
             {isConfirmingDelete ? (
               <HStack w="100%" justifyContent="space-between">
                 <Text fontWeight="bold">Are you sure?</Text>
@@ -434,8 +577,8 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
             )}
           </DrawerFooter>
         </DrawerContent>
-      </Drawer>
-    </Box>
+      </Box>
+    </Drawer>
   );
 };
 

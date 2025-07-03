@@ -1263,9 +1263,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     <Box>
                       <Text fontWeight="bold" color="nightSky">Date & Time</Text>
                       <Text>
-                        {date.toLocaleString(DateTime.DATETIME_FULL)}
-                        {' at '}
-                        {time}
+                        {confirmationData?.start_time
+                          ? DateTime.fromISO(confirmationData.start_time).setZone(settings?.timezone || 'America/Chicago').toLocaleString(DateTime.DATETIME_FULL)
+                          : ''}
                       </Text>
                     </Box>
                     
