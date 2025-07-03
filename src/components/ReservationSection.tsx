@@ -39,9 +39,11 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
       display="flex"
       alignItems="center"
       minH={{ base: 'auto', md: '100vh' }}
-      overflow="hidden"
+      overflow={{ base: "visible", md: "hidden" }}
+      position="relative"
+      className="reservation-section"
     >
-      <Container maxW="container.xl" px={{ base: 0, sm: 4 }}>
+      <Container maxW="container.xl" px={{ base: 0, sm: 4 }} minH="auto">
         <Box textAlign="center" mb={{ base: 6, sm: 8, md: 10 }}>
           <Heading 
             as="h2" 
@@ -70,7 +72,7 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
           </Text>
         </Box>
 
-        <VStack spacing={{ base: 4, sm: 6 }} align="stretch" maxW={{ base: "full", sm: "400px" }} mx="auto">
+        <VStack spacing={{ base: 4, sm: 6 }} align="stretch" maxW={{ base: "full", sm: "400px" }} mx="auto" minH="auto">
           <VStack spacing={{ base: 3, sm: 4 }} w="full">
             <Collapse in={!isNonMemberOpen} animateOpacity>
               <Button
@@ -144,8 +146,12 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
               boxShadow="2xl"
               mx={{ base: 2, sm: 0 }}
               my={{ base: 2, sm: 0 }}
-              maxH={{ base: "80vh", sm: "none" }}
-              overflowY={{ base: "auto", sm: "visible" }}
+              minH={{ base: "auto", sm: "none" }}
+              maxH={{ base: "none", sm: "none" }}
+              overflowY={{ base: "visible", sm: "visible" }}
+              position={{ base: "relative", sm: "static" }}
+              zIndex={{ base: 10, sm: "auto" }}
+              className="reservation-form-container"
             >
               <ReservationForm 
                 isMember={true} 
@@ -166,8 +172,12 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
               boxShadow="2xl"
               mx={{ base: 2, sm: 0 }}
               my={{ base: 2, sm: 0 }}
-              maxH={{ base: "80vh", sm: "none" }}
-              overflowY={{ base: "auto", sm: "visible" }}
+              minH={{ base: "auto", sm: "none" }}
+              maxH={{ base: "none", sm: "none" }}
+              overflowY={{ base: "visible", sm: "visible" }}
+              position={{ base: "relative", sm: "static" }}
+              zIndex={{ base: 10, sm: "auto" }}
+              className="reservation-form-container"
             >
               <ReservationForm 
                 isMember={false} 

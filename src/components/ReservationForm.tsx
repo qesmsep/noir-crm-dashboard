@@ -779,7 +779,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   };
 
   return (
-    <Box fontFamily="Montserrat, sans-serif" color="nightSky" w="full">
+    <Box fontFamily="Montserrat, sans-serif" color="nightSky" w="full" minH="auto">
       <Box 
         bg="#fff" 
         borderRadius="2xl" 
@@ -788,9 +788,12 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         w="full" 
         maxW={{ base: "full", sm: "400px" }}
         mx="auto"
+        minH="auto"
+        overflow="visible"
+        className="reservation-form-content"
       >
         <form onSubmit={handleReservationSubmit}>
-          <VStack spacing={{ base: 4, sm: 5 }} align="stretch" w="100%">
+          <VStack spacing={{ base: 4, sm: 5 }} align="stretch" w="100%" minH="auto">
             {/* Party Size */}
             <FormControl isRequired>
               <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>

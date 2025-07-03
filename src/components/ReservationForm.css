@@ -2,4 +2,30 @@
   background-color: #A59480 !important;
   color: #fff !important;
   border-radius: 0.3rem;
+}
+
+/* Mobile-specific styles for reservation form expansion */
+@media (max-width: 768px) {
+  .reservation-form-container {
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  
+  .reservation-form-content {
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  
+  /* Ensure form inputs are properly spaced on mobile */
+  .reservation-form-input {
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Ensure the form container can expand beyond viewport if needed */
+  .reservation-section {
+    overflow: visible !important;
+    min-height: auto !important;
+  }
 } 
