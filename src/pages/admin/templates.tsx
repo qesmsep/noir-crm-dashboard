@@ -40,6 +40,7 @@ import {
 import { EditIcon, DeleteIcon, ViewIcon, ArrowForwardIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import ReminderEditDrawer from '../../components/ReminderEditDrawer';
+import ReminderTemplateEditDrawer from '../../components/ReminderTemplateEditDrawer';
 
 interface CampaignTemplate {
   id: string;
@@ -144,6 +145,9 @@ export default function TemplatesPage() {
   const [deletingReminder, setDeletingReminder] = useState<string | null>(null);
   const [isReminderDrawerOpen, setIsReminderDrawerOpen] = useState(false);
   const [selectedReminderId, setSelectedReminderId] = useState<string | null>(null);
+  const [isTemplateDrawerOpen, setIsTemplateDrawerOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [isCreateMode, setIsCreateMode] = useState(false);
   const toast = useToast();
 
   const fetchReminderTemplates = async () => {
@@ -399,6 +403,10 @@ export default function TemplatesPage() {
     fetchPendingReservationReminders();
   };
 
+  const handleTemplateUpdated = () => {
+    fetchReminderTemplates();
+  };
+
   // Template management functions
   const handleEditTemplate = (template: CampaignTemplate) => {
     // TODO: Implement edit template functionality
@@ -458,13 +466,9 @@ export default function TemplatesPage() {
 
   // Reminder template management functions
   const handleEditReminderTemplate = (template: ReservationReminderTemplate) => {
-    // TODO: Implement edit reminder template functionality
-    toast({
-      title: 'Edit Reminder Template',
-      description: 'Edit reminder template functionality coming soon',
-      status: 'info',
-      duration: 3000,
-    });
+    setSelectedTemplateId(template.id);
+    setIsCreateMode(false);
+    setIsTemplateDrawerOpen(true);
   };
 
   const handleDeleteReminderTemplate = async (id: string) => {
@@ -514,13 +518,9 @@ export default function TemplatesPage() {
   };
 
   const handleCreateReminderTemplate = () => {
-    // TODO: Implement create reminder template functionality
-    toast({
-      title: 'Create Reminder Template',
-      description: 'Create reminder template functionality coming soon',
-      status: 'info',
-      duration: 3000,
-    });
+    setSelectedTemplateId(null);
+    setIsCreateMode(true);
+    setIsTemplateDrawerOpen(true);
   };
 
   return (
@@ -530,6 +530,13 @@ export default function TemplatesPage() {
         onClose={() => setIsReminderDrawerOpen(false)}
         reminderId={selectedReminderId}
         onReminderUpdated={handleReminderUpdated}
+      />
+      <ReminderTemplateEditDrawer
+        isOpen={isTemplateDrawerOpen}
+        onClose={() => setIsTemplateDrawerOpen(false)}
+        templateId={selectedTemplateId}
+        isCreateMode={isCreateMode}
+        onTemplateUpdated={handleTemplateUpdated}
       />
       <Box p={4} minH="100vh" bg="#353535" color="#ECEDE8">
         <Box position="relative" ml={10} mr={10} zIndex={1} pt={28}>
