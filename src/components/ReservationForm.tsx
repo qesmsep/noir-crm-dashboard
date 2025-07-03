@@ -495,8 +495,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
     // Prepare reservation data
     const reservationData = {
-      start_time: toCSTISOString(start),
-      end_time: toCSTISOString(end),
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
       party_size: form.party_size,
       event_type: form.event_type,
       notes: form.notes,
