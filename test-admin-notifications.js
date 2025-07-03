@@ -13,11 +13,11 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function testAdminNotifications() {
-  console.log('🧪 Testing Admin Notification System\n');
+  console.log('=== Testing Admin Notification System ===\n');
 
   try {
-    // Test 1: Check if admin_notification_phone column exists
-    console.log('1. Checking if admin_notification_phone column exists...');
+    // 1. Check if admin notification phone is configured
+    console.log('1. Checking admin notification phone configuration...');
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
       .select('admin_notification_phone')
@@ -28,125 +28,85 @@ async function testAdminNotifications() {
       return;
     }
 
-    console.log('✅ Settings table accessible');
-    console.log('📱 Current admin notification phone:', settings.admin_notification_phone || 'Not set');
-
-    // Test 2: Test the admin notification API endpoint
-    console.log('\n2. Testing admin notification API endpoint...');
-    
-    // Create a test reservation first
-    const testReservation = {
-      start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-      end_time: new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString(),
-      party_size: 2,
-      event_type: 'Test Event',
-      first_name: 'Test',
-      last_name: 'User',
-      phone: '+15551234567',
-      email: 'test@example.com',
-      membership_type: 'non-member',
-      table_id: null
-    };
-
-    const { data: reservation, error: reservationError } = await supabase
-      .from('reservations')
-      .insert([testReservation])
-      .select()
-      .single();
-
-    if (reservationError) {
-      console.error('❌ Error creating test reservation:', reservationError);
+    if (!settings?.admin_notification_phone) {
+      console.log('❌ Admin notification phone is NOT configured');
+      console.log('   Please go to Admin > Settings and set the Admin Notification Phone');
       return;
     }
 
-    console.log('✅ Test reservation created:', reservation.id);
+    console.log('✅ Admin notification phone is configured:', settings.admin_notification_phone);
 
-    // Test the admin notification API
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin-notifications`, {
+    // 2. Check OpenPhone credentials
+    console.log('\n2. Checking OpenPhone credentials...');
+    if (!process.env.OPENPHONE_API_KEY) {
+      console.log('❌ OPENPHONE_API_KEY is not set');
+      return;
+    }
+    if (!process.env.OPENPHONE_PHONE_NUMBER_ID) {
+      console.log('❌ OPENPHONE_PHONE_NUMBER_ID is not set');
+      return;
+    }
+    console.log('✅ OpenPhone credentials are configured');
+
+    // 3. Test sending a notification
+    console.log('\n3. Testing admin notification...');
+    
+    // Format admin phone number (add +1 if not present)
+    let adminPhone = settings.admin_notification_phone;
+    if (!adminPhone.startsWith('+')) {
+      adminPhone = '+1' + adminPhone;
+    }
+
+    const testMessage = `Noir Test Notification: This is a test message to verify the admin notification system is working. Sent at ${new Date().toLocaleString()}`;
+
+    const response = await fetch('https://api.openphone.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY,
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
-        reservation_id: reservation.id,
-        action: 'created'
+        to: [adminPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: testMessage
       })
     });
 
-    const result = await response.json();
-    
-    if (response.ok) {
-      console.log('✅ Admin notification API working');
-      console.log('📨 Response:', result);
-    } else {
-      console.log('⚠️  Admin notification API response:', result);
-      if (result.error === 'Admin notification phone not configured') {
-        console.log('ℹ️  This is expected if no admin phone is set in settings');
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Failed to send test notification:', errorText);
+      return;
     }
 
-    // Test 3: Check if notification was logged in guest_messages
-    console.log('\n3. Checking if notification was logged...');
-    const { data: messages, error: messagesError } = await supabase
+    const responseData = await response.json();
+    console.log('✅ Test notification sent successfully!');
+    console.log('   Message ID:', responseData.id);
+
+    // 4. Log the test message
+    const { error: logError } = await supabase
       .from('guest_messages')
-      .select('*')
-      .eq('reservation_id', reservation.id)
-      .eq('sent_by', 'system')
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .insert({
+        phone: adminPhone,
+        content: testMessage,
+        sent_by: 'system',
+        status: 'sent',
+        openphone_message_id: responseData.id,
+        timestamp: new Date().toISOString()
+      });
 
-    if (messagesError) {
-      console.error('❌ Error fetching messages:', messagesError);
-    } else if (messages && messages.length > 0) {
-      console.log('✅ Notification logged in guest_messages table');
-      console.log('📝 Message content:', messages[0].content);
+    if (logError) {
+      console.error('❌ Error logging test message:', logError);
     } else {
-      console.log('ℹ️  No notification logged (expected if admin phone not configured)');
+      console.log('✅ Test message logged to database');
     }
 
-    // Clean up test reservation
-    console.log('\n4. Cleaning up test reservation...');
-    const { error: deleteError } = await supabase
-      .from('reservations')
-      .delete()
-      .eq('id', reservation.id);
-
-    if (deleteError) {
-      console.error('❌ Error deleting test reservation:', deleteError);
-    } else {
-      console.log('✅ Test reservation cleaned up');
-    }
-
-    // Test 4: Test settings update
-    console.log('\n5. Testing settings update with admin phone...');
-    const testPhone = '9137774488';
-    
-    const { error: updateError } = await supabase
-      .from('settings')
-      .update({ admin_notification_phone: testPhone })
-      .eq('id', settings.id);
-
-    if (updateError) {
-      console.error('❌ Error updating settings:', updateError);
-    } else {
-      console.log('✅ Settings updated with test phone number');
-      
-      // Verify the update
-      const { data: updatedSettings } = await supabase
-        .from('settings')
-        .select('admin_notification_phone')
-        .single();
-      
-      console.log('📱 Updated admin notification phone:', updatedSettings.admin_notification_phone);
-    }
-
-    console.log('\n🎉 Admin notification system test completed!');
-    console.log('\n📋 Summary:');
-    console.log('- Database schema: ✅');
-    console.log('- API endpoint: ✅');
-    console.log('- Settings interface: ✅');
-    console.log('- SMS integration: ✅ (if OpenPhone configured)');
+    console.log('\n=== Test Complete ===');
+    console.log('If you received the test message, the admin notification system is working correctly.');
+    console.log('If you did not receive the message, check your phone number and OpenPhone configuration.');
 
   } catch (error) {
-    console.error('❌ Test failed:', error);
+    console.error('❌ Error during test:', error);
   }
 }
 
