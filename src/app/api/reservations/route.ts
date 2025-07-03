@@ -7,6 +7,121 @@ import { DateTime } from 'luxon';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+// Function to send admin notification
+async function sendAdminNotification(reservationId: string, action: 'created' | 'modified') {
+  try {
+    // Get reservation details
+    const { data: reservation, error: reservationError } = await supabase
+      .from('reservations')
+      .select(`
+        *,
+        tables (
+          table_number
+        )
+      `)
+      .eq('id', reservationId)
+      .single();
+
+    if (reservationError || !reservation) {
+      console.error('Error fetching reservation for admin notification:', reservationError);
+      return;
+    }
+
+    // Get admin notification phone from settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('settings')
+      .select('admin_notification_phone')
+      .single();
+
+    if (settingsError || !settings?.admin_notification_phone) {
+      console.log('Admin notification phone not configured');
+      return;
+    }
+
+    // Format admin phone number (add +1 if not present)
+    let adminPhone = settings.admin_notification_phone;
+    if (!adminPhone.startsWith('+')) {
+      adminPhone = '+1' + adminPhone;
+    }
+
+    // Format date and time
+    const startDate = new Date(reservation.start_time);
+    const formattedDate = startDate.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    });
+    const formattedTime = startDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    // Get table number or 'TBD'
+    const tableNumber = reservation.tables?.table_number || 'TBD';
+
+    // Get event type or 'Dining'
+    const eventType = reservation.event_type || 'Dining';
+
+    // Determine member status
+    const memberStatus = reservation.membership_type === 'member' ? 'Yes' : 'No';
+
+    // Create message content
+    const messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
+
+    // Check if OpenPhone credentials are configured
+    if (!process.env.OPENPHONE_API_KEY || !process.env.OPENPHONE_PHONE_NUMBER_ID) {
+      console.error('OpenPhone API credentials not configured');
+      return;
+    }
+
+    // Send SMS using OpenPhone API
+    const response = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: [adminPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: messageContent
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to send admin notification SMS:', errorText);
+      return;
+    }
+
+    const responseData = await response.json();
+
+    // Log the notification in guest_messages table
+    const { error: logError } = await supabase
+      .from('guest_messages')
+      .insert({
+        phone: adminPhone,
+        content: messageContent,
+        reservation_id: reservationId,
+        sent_by: 'system',
+        status: 'sent',
+        openphone_message_id: responseData.id,
+        timestamp: new Date().toISOString()
+      });
+
+    if (logError) {
+      console.error('Error logging admin notification:', logError);
+      // Don't fail the request if logging fails
+    }
+
+    console.log('Admin notification sent successfully');
+  } catch (error) {
+    console.error('Error in sendAdminNotification:', error);
+  }
+}
+
 // Helper function to calculate hold amount based on party size and settings
 async function getHoldAmountFromSettings(partySize: number): Promise<number> {
   const holdFeeConfig = await getHoldFeeConfig();
@@ -269,14 +384,7 @@ export async function POST(request: Request) {
 
     // Send admin notification
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin-notifications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          reservation_id: reservation.id,
-          action: 'created'
-        })
-      });
+      await sendAdminNotification(reservation.id, 'created');
     } catch (error) {
       console.error('Error sending admin notification:', error);
       // Don't fail the reservation creation if admin notification fails
