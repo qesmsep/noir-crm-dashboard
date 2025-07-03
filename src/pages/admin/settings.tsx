@@ -292,6 +292,11 @@ export default function Settings() {
                   Phone number for SMS notifications when reservations are created or modified. 
                   The system will automatically add +1 prefix.
                 </Text>
+                <Text fontSize="sm" color="gray.700" mt={2}>
+                  <b>Current notification phone on file:</b> {contextSettings.admin_notification_phone
+                    ? `+1${contextSettings.admin_notification_phone.replace(/^\+?1?/, '')}`
+                    : <span style={{color: '#b91c1c'}}>Not set</span>}
+                </Text>
               </FormControl>
             </VStack>
           </Box>
