@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../lib/supabase';
+import { DateTime } from 'luxon';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -45,36 +46,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const scheduledReminders: any[] = [];
 
+    // Get business timezone from settings
+    let businessTimezone = 'America/Chicago';
+    const { data: settings, error: settingsError } = await supabase
+      .from('settings')
+      .select('timezone')
+      .single();
+    if (!settingsError && settings?.timezone) {
+      businessTimezone = settings.timezone;
+    }
+
     // Schedule reminders for each template
     for (const template of templates) {
-      let scheduledTime: Date;
+      let scheduledTimeUTC: string | null = null;
 
       if (template.reminder_type === 'day_of') {
-        // Schedule for the day of the reservation at the specified time
-        const reservationDate = new Date(reservation.start_time);
+        // Schedule for the day of the reservation at the specified time in business timezone
+        const reservationDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
         const [hours, minutes] = template.send_time.split(':');
-        scheduledTime = new Date(reservationDate);
-        scheduledTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        const scheduledLocal = reservationDate.set({ hour: parseInt(hours), minute: parseInt(minutes), second: 0, millisecond: 0 });
+        scheduledTimeUTC = scheduledLocal.toUTC().toISO();
       } else if (template.reminder_type === 'hour_before') {
-        // Schedule for X hours before the reservation
+        // Schedule for X hours before the reservation in business timezone
         const hoursBefore = parseInt(template.send_time);
-        scheduledTime = new Date(reservation.start_time);
-        scheduledTime.setHours(scheduledTime.getHours() - hoursBefore);
+        const reservationDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
+        const scheduledLocal = reservationDate.minus({ hours: hoursBefore });
+        scheduledTimeUTC = scheduledLocal.toUTC().toISO();
       } else {
         continue; // Skip unknown reminder types
       }
 
       // Only schedule if the time hasn't passed
-      if (scheduledTime > new Date()) {
+      if (scheduledTimeUTC && DateTime.fromISO(scheduledTimeUTC) > DateTime.utc()) {
         // Create message content with placeholders
         let messageContent = template.message_template;
         messageContent = messageContent.replace(/\{\{first_name\}\}/g, reservation.first_name || 'Guest');
-        messageContent = messageContent.replace(/\{\{reservation_time\}\}/g, 
-          new Date(reservation.start_time).toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }));
+        messageContent = messageContent.replace(/\{\{reservation_time\}\}/g,
+          DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone).toFormat('hh:mm a'));
         messageContent = messageContent.replace(/\{\{party_size\}\}/g, reservation.party_size.toString());
 
         // Insert scheduled reminder
@@ -86,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             customer_name: `${reservation.first_name || ''} ${reservation.last_name || ''}`.trim() || 'Guest',
             customer_phone: reservation.phone,
             message_content: messageContent,
-            scheduled_for: scheduledTime.toISOString()
+            scheduled_for: scheduledTimeUTC
           })
           .select()
           .single();

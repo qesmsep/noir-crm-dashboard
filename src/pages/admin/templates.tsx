@@ -41,6 +41,8 @@ import { EditIcon, DeleteIcon, ViewIcon, ArrowForwardIcon } from '@chakra-ui/ico
 import AdminLayout from '../../components/layouts/AdminLayout';
 import ReminderEditDrawer from '../../components/ReminderEditDrawer';
 import ReminderTemplateEditDrawer from '../../components/ReminderTemplateEditDrawer';
+import { DateTime } from 'luxon';
+import { useSettings } from '../../context/SettingsContext';
 
 interface CampaignTemplate {
   id: string;
@@ -149,6 +151,8 @@ export default function TemplatesPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isCreateMode, setIsCreateMode] = useState(false);
   const toast = useToast();
+  const { settings } = useSettings();
+  const businessTimezone = settings?.timezone || 'America/Chicago';
 
   const fetchReminderTemplates = async () => {
     try {
@@ -828,8 +832,8 @@ export default function TemplatesPage() {
                                     {message.message_content}
                                   </Text>
                                 </Td>
-                                <Td fontFamily="'Montserrat', sans-serif">
-                                  {new Date(message.scheduled_for).toLocaleString()}
+                                <Td fontFamily="'Montserrat', sans-serif" style={{ minWidth: 180 }}>
+                                  {DateTime.fromISO(message.scheduled_for, { zone: 'utc' }).setZone(businessTimezone).toFormat('MMM d, yyyy h:mm a')}
                                 </Td>
                                 <Td>
                                   <IconButton
@@ -860,92 +864,39 @@ export default function TemplatesPage() {
                         </Text>
                       </Box>
                     ) : (
-                      <Box bg="#a59480" borderRadius="lg" border="1px solid #ecede8" overflow="hidden">
-                        <Table variant="simple">
-                          <Thead>
+                      <Box bg="#ecede8" borderRadius="lg" border="2px solid #a59480" overflow="hidden" mt={4} style={{ width: '90%', margin: '0 auto' }}>
+                        <Table variant="simple" style={{ background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
+                          <Thead style={{ background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
                             <Tr>
-                              <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Phone Number</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Customer Name</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Reservation Date & Time</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Message</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Scheduled to Send</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" color="#23201C">Actions</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Phone Number</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Customer Name</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Reservation Date & Time</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Message</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Scheduled to Send</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Actions</Th>
                             </Tr>
                           </Thead>
-                          <Tbody>
+                          <Tbody style={{ background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
                             {pendingReservationReminders.map((reminder) => (
-                              <Tr key={reminder.id}>
-                                <Td fontFamily="'Montserrat', sans-serif">
-                                  <Text fontWeight="bold" color="#23201C">
-                                    {reminder.customer_phone}
-                                  </Text>
+                              <Tr key={reminder.id} style={{ verticalAlign: 'top', background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
+                                <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">{reminder.customer_phone}</Td>
+                                <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">{reminder.customer_name}</Td>
+                                <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">
+                                  {reminder.reservations && reminder.reservations.start_time
+                                    ? DateTime.fromISO(reminder.reservations.start_time, { zone: 'utc' }).setZone(businessTimezone).toFormat('M/d/yyyy hh:mm a')
+                                    : ''}
                                 </Td>
-                                <Td fontFamily="'Montserrat', sans-serif">
-                                  <Text fontWeight="bold" color="#23201C">
-                                    {reminder.customer_name}
-                                  </Text>
+                                <Td fontFamily="'Montserrat', sans-serif" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: 'sm', maxWidth: 400, background: '#f7f5f2', borderRadius: 8, padding: 8, color: '#353535', borderColor: '#a59480' }}>{reminder.message_content}</Td>
+                                <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">
+                                  {reminder.scheduled_for
+                                    ? DateTime.fromISO(reminder.scheduled_for, { zone: 'utc' }).setZone(businessTimezone).toFormat('M/d/yyyy hh:mm a')
+                                    : ''}
                                 </Td>
-                                <Td fontFamily="'Montserrat', sans-serif">
-                                  {reminder.reservations && (
-                                    <VStack align="start" spacing={1}>
-                                      <Text fontWeight="bold" color="#23201C">
-                                        {reminder.reservations.start_time ? new Date(reminder.reservations.start_time).toLocaleDateString() : ''}
-                                      </Text>
-                                      <Text fontWeight="bold" color="#23201C">
-                                        {reminder.reservations.start_time ? new Date(reminder.reservations.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                                      </Text>
-                                      <Text fontSize="sm" color="#666">
-                                        Party Size: {reminder.reservations.party_size}
-                                      </Text>
-                                    </VStack>
-                                  )}
-                                </Td>
-                                <Td fontFamily="'Montserrat', sans-serif" maxW="300px">
-                                  <Text 
-                                    noOfLines={3} 
-                                    color="#23201C"
-                                    whiteSpace="pre-wrap"
-                                    fontFamily="monospace"
-                                    fontSize="sm"
-                                  >
-                                    {reminder.message_content}
-                                  </Text>
-                                </Td>
-                                <Td fontFamily="'Montserrat', sans-serif">
-                                  <VStack align="start" spacing={1}>
-                                    <Text fontWeight="bold" color="#23201C">
-                                      {new Date(reminder.scheduled_for).toLocaleDateString()}
-                                    </Text>
-                                    <Text fontWeight="bold" color="#23201C">
-                                      {new Date(reminder.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </Text>
-                                  </VStack>
-                                </Td>
-                                <Td>
-                                  <HStack spacing={2}>
-                                    <IconButton
-                                      aria-label="Send reminder now"
-                                      icon={<ArrowForwardIcon />}
-                                      size="sm"
-                                      colorScheme="green"
-                                      onClick={() => sendIndividualReservationReminder(reminder.id)}
-                                      isLoading={sendingIndividualReminder === reminder.id}
-                                    />
-                                    <IconButton
-                                      aria-label="Edit reminder"
-                                      icon={<EditIcon />}
-                                      size="sm"
-                                      colorScheme="yellow"
-                                      onClick={() => handleEditReminder(reminder)}
-                                    />
-                                    <IconButton
-                                      aria-label="Delete reminder"
-                                      icon={<DeleteIcon />}
-                                      size="sm"
-                                      colorScheme="red"
-                                      onClick={() => deleteReservationReminder(reminder.id)}
-                                      isLoading={deletingReminder === reminder.id}
-                                    />
+                                <Td borderColor="#a59480">
+                                  <HStack spacing={2} align="flex-start">
+                                    <IconButton aria-label="Send reminder now" icon={<ArrowForwardIcon />} size="sm" colorScheme="green" onClick={() => sendIndividualReservationReminder(reminder.id)} isLoading={sendingIndividualReminder === reminder.id} />
+                                    <IconButton aria-label="Edit reminder" icon={<EditIcon />} size="sm" colorScheme="yellow" onClick={() => handleEditReminder(reminder)} />
+                                    <IconButton aria-label="Delete reminder" icon={<DeleteIcon />} size="sm" colorScheme="red" onClick={() => deleteReservationReminder(reminder.id)} isLoading={deletingReminder === reminder.id} />
                                   </HStack>
                                 </Td>
                               </Tr>
