@@ -7,6 +7,22 @@ import { DateTime } from 'luxon';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+// Map event type value to label
+const eventTypeLabels: Record<string, string> = {
+  birthday: 'Birthday',
+  engagement: 'Engagement',
+  anniversary: 'Anniversary',
+  party: 'Party / Celebration',
+  graduation: 'Graduation',
+  corporate: 'Corporate Event',
+  holiday: 'Holiday Gathering',
+  networking: 'Networking',
+  fundraiser: 'Fundraiser / Charity',
+  bachelor: 'Bachelor / Bachelorette Party',
+  fun: 'Fun Night Out',
+  date: 'Date Night',
+};
+
 // Function to send admin notification
 async function sendAdminNotification(reservationId: string, action: 'created' | 'modified') {
   try {
@@ -73,14 +89,17 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
     // Get table number or 'TBD'
     const tableNumber = reservation.tables?.table_number || 'TBD';
 
-    // Get event type or 'Dining'
-    const eventType = reservation.event_type || 'Dining';
+    // Get event type label or fallback
+    const eventType = eventTypeLabels[reservation.event_type] || reservation.event_type || 'Dining';
 
     // Determine member status
     const memberStatus = reservation.membership_type === 'member' ? 'Yes' : 'No';
 
     // Create message content
-    const messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
+    let messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
+    if (reservation.notes && reservation.notes.trim()) {
+      messageContent += `\nSpecial Requests: ${reservation.notes.trim()}`;
+    }
 
     console.log('Message content:', messageContent);
     console.log('Admin phone:', adminPhone);
