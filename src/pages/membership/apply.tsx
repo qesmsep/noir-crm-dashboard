@@ -48,14 +48,23 @@ export default function MembershipApplication() {
   const [application, setApplication] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [waitlistData, setWaitlistData] = useState<any>(null);
+  const [applicationToken, setApplicationToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for existing application in URL params or local storage
-    const { email, applicationId } = router.query;
-    if (email || applicationId) {
+    const { email, applicationId, token } = router.query;
+    
+    if (token) {
+      // Handle token-based access
+      setApplicationToken(token as string);
+      loadApplicationByToken(token as string);
+    } else if (email || applicationId) {
+      // Handle direct access
       loadApplication(email as string, applicationId as string);
     } else {
-      setLoading(false);
+      // No token or existing application - redirect to waitlist
+      router.push('/waitlist');
+      return;
     }
   }, [router.query]);
 
@@ -83,6 +92,59 @@ export default function MembershipApplication() {
       }
     } catch (err) {
       console.error('Error loading application:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadApplicationByToken = async (token: string) => {
+    try {
+      // First validate the token and get waitlist data
+      const tokenResponse = await fetch(`/api/membership/validate-token?token=${token}`);
+      
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        if (errorData.expired) {
+          setError('This application link has expired. Please contact us for a new link.');
+        } else {
+          setError('Invalid application link. Please check your link or contact us.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      const tokenData = await tokenResponse.json();
+      setWaitlistData(tokenData.waitlist_data);
+
+      // Check if there's already an application for this email
+      try {
+        const appResponse = await fetch(`/api/membership/apply?email=${tokenData.waitlist_data.email}`);
+        if (appResponse.ok) {
+          const existingApp = await appResponse.json();
+          setApplication(existingApp);
+          
+          // Determine current step based on application status
+          if (existingApp.payment_completed_at) {
+            setCurrentStep(3);
+          } else if (existingApp.agreement_completed_at) {
+            setCurrentStep(2);
+          } else if (existingApp.questionnaire_completed_at) {
+            setCurrentStep(1);
+          } else {
+            setCurrentStep(0);
+          }
+        } else {
+          // No existing application, start fresh
+          setCurrentStep(0);
+        }
+      } catch (err) {
+        // No existing application, start fresh
+        setCurrentStep(0);
+      }
+
+    } catch (err) {
+      console.error('Error loading application by token:', err);
+      setError('Error loading application. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -206,6 +268,8 @@ export default function MembershipApplication() {
             {currentStep === 0 && (
               <QuestionnaireForm
                 application={application}
+                waitlistData={waitlistData}
+                applicationToken={applicationToken}
                 onComplete={(data) => handleStepComplete(0, data)}
                 onError={handleError}
               />

@@ -74,11 +74,26 @@ async function submitApplication(req: NextApiRequest, res: NextApiResponse) {
     last_name, 
     questionnaire_id, 
     responses = [],
-    step = 'questionnaire' 
+    step = 'questionnaire',
+    waitlist_id = null,
+    token = null
   } = req.body;
 
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });
+  }
+
+  // If token provided, validate it and get waitlist_id
+  let validatedWaitlistId = waitlist_id;
+  if (token && !waitlist_id) {
+    const { data: tokenData } = await supabase
+      .rpc('get_waitlist_by_token', { token_param: token });
+    
+    if (tokenData && tokenData.length > 0 && tokenData[0].is_valid) {
+      validatedWaitlistId = tokenData[0].id;
+    } else {
+      return res.status(400).json({ error: 'Invalid or expired application token' });
+    }
   }
 
   // Check if application already exists
@@ -92,15 +107,22 @@ async function submitApplication(req: NextApiRequest, res: NextApiResponse) {
 
   if (existingApp) {
     // Update existing application
+    const updateData: any = {
+      phone,
+      first_name,
+      last_name,
+      questionnaire_id,
+      updated_at: new Date().toISOString()
+    };
+
+    // Only update waitlist_id if we have a valid one and it's not already set
+    if (validatedWaitlistId && !existingApp.waitlist_id) {
+      updateData.waitlist_id = validatedWaitlistId;
+    }
+
     const { data: updatedApp, error: updateError } = await supabase
       .from('member_applications')
-      .update({
-        phone,
-        first_name,
-        last_name,
-        questionnaire_id,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', existingApp.id)
       .select()
       .single();
@@ -120,6 +142,7 @@ async function submitApplication(req: NextApiRequest, res: NextApiResponse) {
         first_name,
         last_name,
         questionnaire_id,
+        waitlist_id: validatedWaitlistId,
         status: 'questionnaire_pending'
       })
       .select()

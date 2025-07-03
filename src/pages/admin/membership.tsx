@@ -16,6 +16,7 @@ import QuestionnaireManager from '../../components/admin/QuestionnaireManager';
 import AgreementManager from '../../components/admin/AgreementManager';
 import ApplicationManager from '../../components/admin/ApplicationManager';
 import PaymentSettingsManager from '../../components/admin/PaymentSettingsManager';
+import WaitlistManager from '../../components/admin/WaitlistManager';
 
 export default function MembershipAdmin() {
   return (
@@ -30,6 +31,7 @@ export default function MembershipAdmin() {
 
         <Tabs size="lg" colorScheme="blue">
           <TabList>
+            <Tab>Waitlist</Tab>
             <Tab>Applications</Tab>
             <Tab>Questionnaires</Tab>
             <Tab>Agreements</Tab>
@@ -37,6 +39,10 @@ export default function MembershipAdmin() {
           </TabList>
 
           <TabPanels>
+            <TabPanel>
+              <WaitlistManager />
+            </TabPanel>
+            
             <TabPanel>
               <ApplicationManager />
             </TabPanel>

@@ -53,14 +53,15 @@ export default function MembershipLanding() {
   ];
 
   const steps = [
-    'Complete the membership questionnaire',
+    'Submit your initial information to join our waitlist',
+    'Receive approval and invitation link via SMS',
+    'Complete the detailed membership questionnaire',
     'Review and sign the membership agreement',
-    'Submit your membership payment',
-    'Await approval from our membership committee'
+    'Submit your membership payment and await final approval'
   ];
 
   const handleApplyClick = () => {
-    router.push('/membership/apply');
+    router.push('/waitlist');
   };
 
   return (
@@ -87,11 +88,11 @@ export default function MembershipLanding() {
             py={6}
             fontSize="lg"
           >
-            Apply for Membership
+            Request Membership Invitation
           </Button>
 
           <Text fontSize="sm" color="gray.500">
-            Application takes approximately 10-15 minutes to complete
+            Join our waitlist - approved members will receive an invitation to apply
           </Text>
         </VStack>
 
@@ -236,7 +237,7 @@ export default function MembershipLanding() {
               onClick={handleApplyClick}
               px={8}
             >
-              Start Your Application
+              Join Our Waitlist
             </Button>
 
             <Text fontSize="xs" color="gray.500">

@@ -47,17 +47,19 @@ interface Application {
 
 interface Props {
   application: Application | null;
+  waitlistData?: any;
+  applicationToken?: string | null;
   onComplete: (data: any) => void;
   onError: (message: string) => void;
 }
 
-export default function QuestionnaireForm({ application, onComplete, onError }: Props) {
+export default function QuestionnaireForm({ application, waitlistData, applicationToken, onComplete, onError }: Props) {
   const [questionnaire, setQuestionnaire] = useState<Questionnaire | null>(null);
   const [formData, setFormData] = useState({
-    email: application?.email || '',
-    first_name: application?.first_name || '',
-    last_name: application?.last_name || '',
-    phone: application?.phone || ''
+    email: application?.email || waitlistData?.email || '',
+    first_name: application?.first_name || waitlistData?.first_name || '',
+    last_name: application?.last_name || waitlistData?.last_name || '',
+    phone: application?.phone || waitlistData?.phone || ''
   });
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -143,7 +145,9 @@ export default function QuestionnaireForm({ application, onComplete, onError }: 
           response_text: typeof value === 'string' ? value : null,
           response_data: typeof value !== 'string' ? value : null
         })),
-        step: 'questionnaire'
+        step: 'questionnaire',
+        waitlist_id: waitlistData?.id || null,
+        token: applicationToken || null
       };
 
       const response = await fetch('/api/membership/apply', {
@@ -287,7 +291,14 @@ export default function QuestionnaireForm({ application, onComplete, onError }: 
 
       {/* Basic Information */}
       <Box>
-        <Heading size="sm" mb={4}>Basic Information</Heading>
+        <Heading size="sm" mb={4}>
+          Basic Information
+          {waitlistData && (
+            <Text fontSize="xs" color="green.600" fontWeight="normal" mt={1}>
+              ✓ Pre-filled from your waitlist application
+            </Text>
+          )}
+        </Heading>
         <VStack spacing={4}>
           <HStack spacing={4} w="full">
             <FormControl isInvalid={!!errors.first_name} isRequired>
@@ -332,6 +343,47 @@ export default function QuestionnaireForm({ application, onComplete, onError }: 
             />
             <FormErrorMessage>{errors.phone}</FormErrorMessage>
           </FormControl>
+
+          {/* Additional waitlist fields if available */}
+          {waitlistData && (
+            <>
+              {waitlistData.company && (
+                <FormControl>
+                  <FormLabel>Company</FormLabel>
+                  <Input
+                    value={waitlistData.company}
+                    isReadOnly
+                    bg="gray.50"
+                  />
+                  <Text fontSize="xs" color="gray.500">From your waitlist application</Text>
+                </FormControl>
+              )}
+
+              {waitlistData.occupation && (
+                <FormControl>
+                  <FormLabel>Occupation</FormLabel>
+                  <Input
+                    value={waitlistData.occupation}
+                    isReadOnly
+                    bg="gray.50"
+                  />
+                  <Text fontSize="xs" color="gray.500">From your waitlist application</Text>
+                </FormControl>
+              )}
+
+              {waitlistData.industry && (
+                <FormControl>
+                  <FormLabel>Industry</FormLabel>
+                  <Input
+                    value={waitlistData.industry}
+                    isReadOnly
+                    bg="gray.50"
+                  />
+                  <Text fontSize="xs" color="gray.500">From your waitlist application</Text>
+                </FormControl>
+              )}
+            </>
+          )}
         </VStack>
       </Box>
 
