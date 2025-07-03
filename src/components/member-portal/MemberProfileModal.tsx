@@ -61,9 +61,9 @@ interface FormData {
   preferences: {
     dietary_restrictions?: string[];
     communication_preferences?: {
-      email_notifications: boolean;
-      sms_notifications: boolean;
-      marketing_emails: boolean;
+      email_notifications?: boolean;
+      sms_notifications?: boolean;
+      marketing_emails?: boolean;
     };
     seating_preferences?: string;
     special_occasions?: string;
@@ -243,7 +243,7 @@ const MemberProfileModal: React.FC<MemberProfileModalProps> = ({
 
     setLoading(true);
     try {
-      let photoUrl = null;
+      let photoUrl: string | null = null;
       
       // Upload photo if selected
       if (photoFile) {
