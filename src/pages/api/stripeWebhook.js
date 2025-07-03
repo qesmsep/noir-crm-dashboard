@@ -170,7 +170,7 @@ export default async function handler(req, res) {
             member_id: primaryMember.member_id,
             amount: invoice.amount_paid / 100, // Convert from cents to dollars
             type: 'payment',
-            note: `Subscription renewal payment for ${new Date(invoice.period_start * 1000).toLocaleDateString()} - ${new Date(invoice.period_end * 1000).toLocaleDateString()}`,
+            note: 'Noir Member dues',
             date: new Date().toISOString(),
             stripe_invoice_id: invoice.id
           });
