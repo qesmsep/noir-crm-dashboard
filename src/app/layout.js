@@ -4,8 +4,8 @@ import { SettingsProvider } from '../context/SettingsContext';
 import './globals.css';
 
 export const metadata = {
-  title: 'Noir CRM Dashboard',
-  description: 'Membership CRM and Lounge Reservation Portal',
+  title: 'Noir KC',
+  description: "Kansas City's Speakeasy Cocktail Lounge",
 };
 
 export default function RootLayout({ children }) {
