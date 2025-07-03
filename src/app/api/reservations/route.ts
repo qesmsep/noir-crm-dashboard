@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { formatDateTime } from '../../../utils/dateUtils';
 import Stripe from 'stripe';
 import { getHoldFeeConfig, getHoldAmount } from '../../../utils/holdFeeUtils';
+import { DateTime } from 'luxon';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -477,22 +478,19 @@ async function sendSMSConfirmation(reservation: any) {
       return false;
     }
 
-    // Manually format the date and time using UTC components (since UTC = intended CST)
-    const startDate = new Date(reservation.start_time);
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const weekday = days[startDate.getUTCDay()];
-    const month = months[startDate.getUTCMonth()];
-    const day = startDate.getUTCDate();
-    const year = startDate.getUTCFullYear();
-    let hour = startDate.getUTCHours();
-    const minute = startDate.getUTCMinutes();
-    const ampm = hour >= 12 ? 'pm' : 'am';
-    let displayHour = hour % 12;
-    if (displayHour === 0) displayHour = 12;
-    const minuteStr = minute.toString().padStart(2, '0');
-    const formattedDate = `${weekday}, ${month} ${day}, ${year}`;
-    const timeString = `${displayHour}:${minuteStr}${ampm}`;
+    // Format the date and time using Luxon with timezone awareness
+    const startDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone('America/Chicago');
+    const formattedDate = startDate.toLocaleString({
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const timeString = startDate.toLocaleString({
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
 
     // Create the confirmation message
     const customerName = reservation.first_name || reservation.name || 'Guest';

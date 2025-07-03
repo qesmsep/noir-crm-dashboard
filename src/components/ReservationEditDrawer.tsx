@@ -27,8 +27,9 @@ import {
   AlertIcon,
 } from '@chakra-ui/react';
 import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
-import { formatDateTime } from '../utils/dateUtils';
+import { formatDateTime, utcToLocalInput, localInputToUTC } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
+import { useSettings } from '../context/SettingsContext';
 
 // Helper: Format a local datetime string with timezone offset
 function toOffsetISOString(dateString: string) {
@@ -47,28 +48,7 @@ function toOffsetISOString(dateString: string) {
   return `${year}-${month}-${day}T${hours}:${minutes}:00${sign}${offsetHours}:${offsetMinutes}`;
 }
 
-// Helper: Convert UTC time to CST for datetime-local input
-function utcToCSTDateTimeLocal(utcTimeString: string) {
-  const utcDate = new Date(utcTimeString);
-  // Convert to CST by adding 6 hours (CST is UTC-6)
-  const cstDate = new Date(utcDate.getTime() + (5 * 60 * 60 * 1000));
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const year = cstDate.getFullYear();
-  const month = pad(cstDate.getMonth() + 1);
-  const day = pad(cstDate.getDate());
-  const hours = pad(cstDate.getHours());
-  const minutes = pad(cstDate.getMinutes());
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
 
-// Helper: Convert CST datetime-local format to UTC ISO string for storage
-function cstDateTimeLocalToUTC(cstDateTimeString: string) {
-  const cstDate = new Date(cstDateTimeString);
-  // Convert CST to UTC by subtracting 5 hours (CST is UTC-5)
-  // Use the same offset as the start time conversion
-  const utcDate = new Date(cstDate.getTime() - (5 * 60 * 60 * 1000));
-  return utcDate.toISOString();
-}
 
 interface ReservationEditDrawerProps {
   isOpen: boolean;
@@ -110,6 +90,8 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
   const [messageSuccess, setMessageSuccess] = useState('');
   const cancelRef = useRef<HTMLButtonElement>(null);
   const toast = useToast();
+  const { settings } = useSettings();
+  const timezone = settings?.timezone || 'America/Chicago';
 
   useEffect(() => {
     console.log('useEffect triggered - isOpen:', isOpen, 'reservationId:', reservationId);
@@ -172,8 +154,8 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
         event_type: data.event_type || '',
         notes: data.notes || '',
         table_id: data.table_id || '',
-        start_time: data.start_time ? utcToCSTDateTimeLocal(data.start_time) : '',
-        end_time: data.end_time ? utcToCSTDateTimeLocal(data.end_time) : '',
+        start_time: data.start_time ? utcToLocalInput(data.start_time, timezone) : '',
+        end_time: data.end_time ? utcToLocalInput(data.end_time, timezone) : '',
       });
     } catch (error) {
       console.error('Error in fetchReservation:', error);
@@ -192,9 +174,9 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
     try {
       console.log('Original form data:', formData);
       
-      // Convert both times using the same function
-      const startTimeUTC = formData.start_time ? cstDateTimeLocalToUTC(formData.start_time) : undefined;
-      const endTimeUTC = formData.end_time ? cstDateTimeLocalToUTC(formData.end_time) : undefined;
+      // Convert both times using the new timezone-aware functions
+      const startTimeUTC = formData.start_time ? localInputToUTC(formData.start_time, timezone) : undefined;
+      const endTimeUTC = formData.end_time ? localInputToUTC(formData.end_time, timezone) : undefined;
       
       console.log('Converted times:', { startTimeUTC, endTimeUTC });
       
@@ -584,7 +566,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                   <VStack spacing={1} fontSize="xs">
                     <HStack justify="space-between">
                       <Text fontSize="12px" color="gray.600" fontWeight="medium">Created:</Text>
-                      <Text fontSize="12px">{reservation.created_at ? formatDateTime(new Date(reservation.created_at), undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</Text>
+                      <Text fontSize="12px">{reservation.created_at ? formatDateTime(new Date(reservation.created_at), timezone, { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</Text>
                     </HStack>
                   
                   

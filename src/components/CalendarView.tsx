@@ -2,7 +2,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import React, { useEffect, useState } from 'react';
 import { Calendar, momentLocalizer, Event as RBCEvent, SlotInfo } from 'react-big-calendar';
 import moment from 'moment';
-import { toCST } from '../utils/dateUtils';
+import { fromUTC } from '../utils/dateUtils';
 
 const localizer = momentLocalizer(moment);
 
@@ -48,15 +48,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent
       const mapped: CalendarEvent[] = (evRes.data || []).map((e: any) => ({
         id: e.id,
         title: e.title,
-        start: toCST(new Date(e.start_time)),
-        end: toCST(new Date(e.end_time)),
+        start: fromUTC(e.start_time, 'America/Chicago').toJSDate(),
+        end: fromUTC(e.end_time, 'America/Chicago').toJSDate(),
         allDay: false,
         resourceId: e.table_id
       })).concat((resRes.data || []).map((r: any) => ({
         id: r.id,
         title: `Res: ${r.name}`,
-        start: toCST(new Date(r.start_time)),
-        end: toCST(new Date(r.end_time)),
+        start: fromUTC(r.start_time, 'America/Chicago').toJSDate(),
+        end: fromUTC(r.end_time, 'America/Chicago').toJSDate(),
         allDay: false,
         resourceId: r.table_id
       })));

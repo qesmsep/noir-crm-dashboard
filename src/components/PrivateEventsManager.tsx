@@ -50,6 +50,7 @@ import {
 } from '@chakra-ui/icons';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
+import { utcToLocalInput, localInputToUTC, formatDateTime } from '../utils/dateUtils';
 // Removed date-fns-tz import
 
 interface PrivateEvent {
@@ -237,26 +238,19 @@ export default function PrivateEventsManager() {
       };
 
       if (formData.full_day) {
-        // Ensure start_time and end_time are set to 00:00 and 23:59 for the selected date
+        // For full-day events, convert date to UTC start/end of day
         const date = formData.start_time ? formData.start_time.slice(0, 10) : '';
-        eventData.start_time = `${date}T00:00:00`;
-        eventData.end_time = `${date}T23:59:59`;
-      } else {
-        // Ensure proper datetime format for non-full-day events
-        if (formData.start_time && !formData.start_time.includes(':')) {
-          // If only date is provided, add default time
-          eventData.start_time = `${formData.start_time}T00:00:00`;
-        } else if (formData.start_time) {
-          // Ensure seconds are included
-          eventData.start_time = formData.start_time.includes(':00') ? formData.start_time : `${formData.start_time}:00`;
+        if (date) {
+          eventData.start_time = localInputToUTC(`${date}T00:00`, timezone);
+          eventData.end_time = localInputToUTC(`${date}T23:59`, timezone);
         }
-        
-        if (formData.end_time && !formData.end_time.includes(':')) {
-          // If only date is provided, add default time
-          eventData.end_time = `${formData.end_time}T23:59:59`;
-        } else if (formData.end_time) {
-          // Ensure seconds are included
-          eventData.end_time = formData.end_time.includes(':00') ? formData.end_time : `${formData.end_time}:00`;
+      } else {
+        // Convert local datetime inputs to UTC
+        if (formData.start_time) {
+          eventData.start_time = localInputToUTC(formData.start_time, timezone);
+        }
+        if (formData.end_time) {
+          eventData.end_time = localInputToUTC(formData.end_time, timezone);
         }
       }
 
@@ -381,22 +375,11 @@ export default function PrivateEventsManager() {
   const handleEdit = (event: PrivateEvent) => {
     setEditingId(event.id);
     
-    // Format datetime for datetime-local input (YYYY-MM-DDTHH:MM)
-    const formatDateTimeForInput = (dateTimeString: string) => {
-      const date = new Date(dateTimeString);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
-    };
-    
     setFormData({
       title: event.title,
       event_type: event.event_type,
-      start_time: formatDateTimeForInput(event.start_time),
-      end_time: formatDateTimeForInput(event.end_time),
+      start_time: utcToLocalInput(event.start_time, timezone),
+      end_time: utcToLocalInput(event.end_time, timezone),
       max_guests: event.max_guests,
       deposit_required: event.deposit_required,
       event_description: event.event_description || '',
@@ -468,15 +451,7 @@ export default function PrivateEventsManager() {
 
   const formatDate = (dateTime: string) => {
     if (!dateTime) return '';
-    const date = new Date(dateTime);
-    // Extract just the date part (YYYY-MM-DD) to avoid timezone issues
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
-    
-    // Create a new date object with the local timezone
-    const localDate = new Date(year, month, day);
-    return localDate.toLocaleDateString('en-US', {
+    return formatDateTime(new Date(dateTime), timezone, {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -485,8 +460,7 @@ export default function PrivateEventsManager() {
 
   const formatTime = (dateTime: string) => {
     if (!dateTime) return '';
-    const date = new Date(dateTime);
-    return date.toLocaleTimeString('en-US', {
+    return formatDateTime(new Date(dateTime), timezone, {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -499,8 +473,8 @@ export default function PrivateEventsManager() {
   };
 
   // Get timezone from settings if available
-  const { settings } = useSettings ? useSettings() : { settings: { timezone: undefined } };
-  const timezone = settings?.timezone;
+  const { settings } = useSettings ? useSettings() : { settings: { timezone: 'America/Chicago' } };
+  const timezone = settings?.timezone || 'America/Chicago';
 
   if (loading) {
     return (

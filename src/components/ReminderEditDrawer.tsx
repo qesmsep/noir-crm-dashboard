@@ -19,7 +19,7 @@ import {
   Box,
 } from '@chakra-ui/react';
 import { useSettings } from '../context/SettingsContext';
-import { DateTime } from 'luxon';
+import { utcToLocalInput, localInputToUTC } from '../utils/dateUtils';
 
 interface ReminderEditDrawerProps {
   isOpen: boolean;
@@ -59,19 +59,15 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
   }, [reminderId]);
 
   // Convert UTC to local time string for input using luxon
-  function utcToLocalInput(utcString: string) {
+  function utcToLocalInputHelper(utcString: string) {
     if (!utcString) return '';
-    return DateTime.fromISO(utcString, { zone: 'utc' })
-      .setZone(timezone)
-      .toFormat("yyyy-LL-dd'T'HH:mm");
+    return utcToLocalInput(utcString, timezone);
   }
 
   // Convert local input string to UTC ISO string using luxon
-  function localInputToUTC(localString: string) {
+  function localInputToUTCHelper(localString: string) {
     if (!localString) return '';
-    return DateTime.fromFormat(localString, "yyyy-LL-dd'T'HH:mm", { zone: timezone })
-      .toUTC()
-      .toISO({ suppressMilliseconds: true });
+    return localInputToUTC(localString, timezone);
   }
 
   const fetchReminder = async () => {
@@ -83,7 +79,7 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
       const r = Array.isArray(data.pendingReminders) ? data.pendingReminders[0] : data;
       setReminder(r);
       setFormData({
-        scheduled_for: r.scheduled_for ? utcToLocalInput(r.scheduled_for) : '',
+        scheduled_for: r.scheduled_for ? utcToLocalInputHelper(r.scheduled_for) : '',
         message_content: r.message_content || '',
       });
     } catch (error) {
@@ -105,7 +101,7 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: reminderId,
-          scheduled_for: localInputToUTC(formData.scheduled_for),
+          scheduled_for: localInputToUTCHelper(formData.scheduled_for),
           message_content: formData.message_content,
         }),
       });

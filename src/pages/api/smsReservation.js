@@ -1,92 +1,108 @@
 const { createClient } = require('@supabase/supabase-js');
+const { DateTime } = require('luxon');
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-// Utility functions for handling dates and times in CST
+// Default timezone - will be overridden by settings
+const DEFAULT_TIMEZONE = 'America/Chicago';
+
+// Utility functions for handling dates and times with Luxon
 function toCST(date) {
-  // Convert UTC to CST (UTC-5 or UTC-6 depending on DST)
-  const cstDate = new Date(date);
-  const utcHours = cstDate.getUTCHours();
-  const cstHours = utcHours - 5; // Default to UTC-5
-  cstDate.setUTCHours(cstHours);
-  return cstDate;
+  const dt = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
+  return dt.toJSDate();
 }
 
 function toUTC(date) {
-  // Convert CST to UTC (UTC+5 or UTC+6 depending on DST)
-  const utcDate = new Date(date);
-  const cstHours = utcDate.getHours();
-  const utcHours = cstHours + 5; // Default to UTC+5
-  
-  // Create a new date to handle date changes
-  const newDate = new Date(utcDate);
-  newDate.setHours(utcHours);
-  
-  // If the hours wrapped around to the next day, adjust the date
-  if (utcHours >= 24) {
-    newDate.setDate(newDate.getDate() + 1);
-    newDate.setHours(utcHours - 24);
-  }
-  
-  return newDate;
+  const dt = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
+  return dt.toUTC().toJSDate();
 }
 
-// Parse natural language date
+// Parse natural language date using Luxon
 function parseNaturalDate(dateStr) {
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const today = DateTime.now().setZone(DEFAULT_TIMEZONE);
+  const tomorrow = today.plus({ days: 1 });
   
-  // Handle "today" and "tomorrow"
-  if (dateStr.toLowerCase() === 'today') return today;
-  if (dateStr.toLowerCase() === 'tomorrow') return tomorrow;
+  const lowerDateStr = dateStr.toLowerCase().trim();
   
-  // Handle "this" and "next" with days of the week
-  const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const thisNextMatch = dateStr.toLowerCase().match(/(this|next)\s+(\w+)/);
-  if (thisNextMatch) {
-    const [_, modifier, day] = thisNextMatch;
-    const targetDay = daysOfWeek.indexOf(day.toLowerCase());
-    if (targetDay === -1) return null;
-    
-    const result = new Date(today);
-    const currentDay = today.getDay();
-    const daysToAdd = (targetDay - currentDay + 7) % 7;
-    if (modifier === 'next') {
-      result.setDate(result.getDate() + daysToAdd + 7);
-    } else {
-      result.setDate(result.getDate() + daysToAdd);
+  // Handle "today"
+  if (lowerDateStr === 'today') {
+    return today.toJSDate();
+  }
+  
+  // Handle "tomorrow"
+  if (lowerDateStr === 'tomorrow') {
+    return tomorrow.toJSDate();
+  }
+  
+  // Handle "next [day]"
+  const nextDayMatch = lowerDateStr.match(/^next\s+(\w+)$/);
+  if (nextDayMatch) {
+    const dayName = nextDayMatch[1];
+    const dayMap = {
+      'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
+      'friday': 5, 'saturday': 6, 'sunday': 0
+    };
+    const targetDay = dayMap[dayName];
+    if (targetDay !== undefined) {
+      let nextDate = today;
+      while (nextDate.weekday !== targetDay) {
+        nextDate = nextDate.plus({ days: 1 });
+      }
+      return nextDate.toJSDate();
     }
-    return result;
+  }
+  
+  // Handle "this [day]"
+  const thisDayMatch = lowerDateStr.match(/^this\s+(\w+)$/);
+  if (thisDayMatch) {
+    const dayName = thisDayMatch[1];
+    const dayMap = {
+      'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
+      'friday': 5, 'saturday': 6, 'sunday': 0
+    };
+    const targetDay = dayMap[dayName];
+    if (targetDay !== undefined) {
+      let thisDate = today;
+      while (thisDate.weekday !== targetDay) {
+        thisDate = thisDate.plus({ days: 1 });
+      }
+      return thisDate.toJSDate();
+    }
   }
   
   // Handle single day names (e.g., 'Sunday')
   const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const dayNameMatch = dateStr.toLowerCase().match(/^(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)$/i);
+  const dayNameMatch = lowerDateStr.match(/^(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)$/i);
   if (dayNameMatch) {
-    let targetDay = dayNames.findIndex(
-      d => d.startsWith(dayNameMatch[1].toLowerCase())
-    );
-    if (targetDay === -1) return null;
-    const result = new Date(today);
-    const currentDay = today.getDay();
-    let daysToAdd = (targetDay - currentDay + 7) % 7;
-    if (daysToAdd === 0) daysToAdd = 7; // always return next occurrence, not today
-    result.setDate(result.getDate() + daysToAdd);
-    return result;
+    const dayMap = {
+      'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
+      'friday': 5, 'saturday': 6, 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6
+    };
+    const targetDay = dayMap[dayNameMatch[1].toLowerCase()];
+    if (targetDay !== undefined) {
+      let nextDate = today;
+      while (nextDate.weekday !== targetDay) {
+        nextDate = nextDate.plus({ days: 1 });
+      }
+      // If it's today, return next week
+      if (nextDate.hasSame(today, 'day')) {
+        nextDate = nextDate.plus({ weeks: 1 });
+      }
+      return nextDate.toJSDate();
+    }
   }
   
   // Handle month names and ordinal dates (e.g., "June 7th")
   const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-  const monthDayMatch = dateStr.toLowerCase().match(/(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?/);
+  const monthDayMatch = lowerDateStr.match(/(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?/);
   if (monthDayMatch) {
     const [_, month, day] = monthDayMatch;
     const monthIndex = monthNames.indexOf(month.toLowerCase());
     if (monthIndex === -1) return null;
     
     // Smart year handling: assume current year unless date is more than 2 months away
-    let year = today.getFullYear();
-    const currentMonth = today.getMonth();
+    let year = today.year;
+    const currentMonth = today.month - 1;
     const monthsDiff = monthIndex - currentMonth;
     
     // If the requested month is more than 2 months away, assume next year
@@ -94,14 +110,14 @@ function parseNaturalDate(dateStr) {
       year++;
     }
     
-    const result = new Date(year, monthIndex, parseInt(day));
+    let result = DateTime.fromObject({ year, month: monthIndex + 1, day: parseInt(day) }, { zone: DEFAULT_TIMEZONE });
     
     // Additional safety check: if the date is in the past, assume next year
     if (result < today) {
-      result.setFullYear(result.getFullYear() + 1);
+      result = result.set({ year: result.year + 1 });
     }
     
-    return result;
+    return result.toJSDate();
   }
   
   // Handle MM/DD format (without year)
@@ -112,8 +128,8 @@ function parseNaturalDate(dateStr) {
     const dayNum = parseInt(day);
     
     // Smart year handling: assume current year unless date is more than 2 months away
-    let year = today.getFullYear();
-    const currentMonth = today.getMonth();
+    let year = today.year;
+    const currentMonth = today.month - 1;
     const monthsDiff = monthIndex - currentMonth;
     
     // If the requested month is more than 2 months away, assume next year
@@ -121,22 +137,26 @@ function parseNaturalDate(dateStr) {
       year++;
     }
     
-    const result = new Date(year, monthIndex, dayNum);
+    let result = DateTime.fromObject({ year, month: monthIndex + 1, day: dayNum }, { zone: DEFAULT_TIMEZONE });
     
     // Additional safety check: if the date is in the past, assume next year
     if (result < today) {
-      result.setFullYear(result.getFullYear() + 1);
+      result = result.set({ year: result.year + 1 });
     }
     
-    return result;
+    return result.toJSDate();
   }
   
-  // Handle MM/DD/YY format
+  // Handle MM/DD/YY or MM/DD/YYYY format
   const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if (dateMatch) {
     const [_, month, day, year] = dateMatch;
     const fullYear = year.length === 2 ? '20' + year : year;
-    return new Date(fullYear, month - 1, day);
+    return DateTime.fromObject({ 
+      year: parseInt(fullYear), 
+      month: parseInt(month), 
+      day: parseInt(day) 
+    }, { zone: DEFAULT_TIMEZONE }).toJSDate();
   }
   
   return null;
@@ -900,8 +920,8 @@ export default async function handler(req, res) {
   console.log('Reservation created:', reservation);
 
   // Send confirmation SMS
-  const startTime = new Date(reservation.start_time);
-  const formattedDate = startTime.toLocaleDateString('en-US', {
+  const startTime = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE);
+  const formattedDate = startTime.toLocaleString({
     weekday: 'long',
     year: 'numeric',
     month: 'long',

@@ -5,7 +5,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
 import DayReservationsDrawer from './DayReservationsDrawer';
-import { toZone, toCSTISOString, formatDateTime } from '../utils/dateUtils';
+import { fromUTC, toUTC, formatDateTime, isSameDay } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import {
@@ -288,10 +288,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const getCurrentDayPrivateEvents = () => {
     return privateEvents.filter((pe: any) => {
       // Convert both event start and calendar date to configured timezone
-      const eventDateLocal = toZone(new Date(pe.start_time), settings.timezone);
-      const calendarDateLocal = toZone(currentCalendarDate, settings.timezone);
+      const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
+      const calendarDateLocal = fromUTC(currentCalendarDate.toISOString(), settings.timezone);
       // Compare by year, month, and day
-      return isSameDayLocal(eventDateLocal, calendarDateLocal);
+      return isSameDay(eventDateLocal, calendarDateLocal, settings.timezone);
     });
   };
 

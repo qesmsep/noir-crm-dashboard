@@ -1,77 +1,127 @@
-// Utility functions for handling dates and times in any timezone
+import { DateTime } from 'luxon';
 
-// Convert a Date object to any IANA timezone
-export function toZone(date, timezone = 'America/Chicago') {
-  // Get the date components in the target timezone
-  const year = date.toLocaleDateString('en-US', { timeZone: timezone, year: 'numeric' });
-  const month = date.toLocaleDateString('en-US', { timeZone: timezone, month: '2-digit' });
-  const day = date.toLocaleDateString('en-US', { timeZone: timezone, day: '2-digit' });
-  const hours = date.toLocaleTimeString('en-US', { timeZone: timezone, hour: '2-digit', hour12: false });
-  const minutes = date.toLocaleTimeString('en-US', { timeZone: timezone, minute: '2-digit' });
-  const seconds = date.toLocaleTimeString('en-US', { timeZone: timezone, second: '2-digit' });
-  
-  // Create a new Date object with these components
-  return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes), parseInt(seconds));
+// Default timezone - will be overridden by settings
+const DEFAULT_TIMEZONE = 'America/Chicago';
+
+/**
+ * Convert a UTC ISO string to a DateTime object in the specified timezone
+ */
+export function fromUTC(utcString, timezone = DEFAULT_TIMEZONE) {
+  if (!utcString) return null;
+  return DateTime.fromISO(utcString, { zone: 'utc' }).setZone(timezone);
 }
 
-// Convert a Date object to CST (backward compatibility)
-export function toCST(date) {
-  return toZone(date, 'America/Chicago');
+/**
+ * Convert a DateTime object to UTC ISO string
+ */
+export function toUTC(dateTime, timezone = DEFAULT_TIMEZONE) {
+  if (!dateTime) return null;
+  const dt = DateTime.isDateTime(dateTime) ? dateTime : DateTime.fromJSDate(dateTime);
+  return dt.setZone(timezone).toUTC().toISO({ suppressMilliseconds: true });
 }
 
-// Convert a Date object to ISO string in the specified timezone
-export function toZoneISOString(date, timezone = 'America/Chicago') {
-  const d = new Date(date);
-  if (isNaN(d.getTime())) {
-    throw new Error('Invalid date passed to toZoneISOString');
-  }
-  
-  // Convert to the specified timezone first
-  const zoneDate = toZone(d, timezone);
-  
-  // Create UTC date with the same components
-  const year = zoneDate.getFullYear();
-  const month = zoneDate.getMonth();
-  const day = zoneDate.getDate();
-  const hours = zoneDate.getHours();
-  const minutes = zoneDate.getMinutes();
-  const seconds = zoneDate.getSeconds();
-  
-  const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
-  return utcDate.toISOString();
-}
-
-// Convert a Date object to ISO string in CST (backward compatibility)
-export function toCSTISOString(date) {
-  return toZoneISOString(date, 'America/Chicago');
-}
-
-// Format a date in the specified timezone for display
-export function formatDate(date, timezone = 'America/Chicago', options = {}) {
-  return toZone(date, timezone).toLocaleDateString('en-US', {
-    timeZone: timezone,
+/**
+ * Format a date for display in the specified timezone
+ */
+export function formatDate(date, timezone = DEFAULT_TIMEZONE, options = {}) {
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
+  return dt.setZone(timezone).toLocaleString({
+    ...DateTime.DATE_SHORT,
     ...options
   });
 }
 
-// Format a time in the specified timezone for display
-export function formatTime(date, timezone = 'America/Chicago', options = {}) {
-  return toZone(date, timezone).toLocaleTimeString('en-US', {
-    timeZone: timezone,
+/**
+ * Format a time for display in the specified timezone
+ */
+export function formatTime(date, timezone = DEFAULT_TIMEZONE, options = {}) {
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
+  return dt.setZone(timezone).toLocaleString({
+    ...DateTime.TIME_SIMPLE,
     ...options
   });
 }
 
-// Format a date and time in the specified timezone for display
-export function formatDateTime(date, timezone = 'America/Chicago', options = {}) {
-  return toZone(date, timezone).toLocaleString('en-US', {
-    timeZone: timezone,
+/**
+ * Format a date and time for display in the specified timezone
+ */
+export function formatDateTime(date, timezone = DEFAULT_TIMEZONE, options = {}) {
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
+  return dt.setZone(timezone).toLocaleString({
+    ...DateTime.DATETIME_SHORT,
     ...options
   });
 }
 
-// Create a Date object from a time string (HH:mm or h:mmam/pm) in the specified timezone
-export function createDateFromTimeString(timeString, timezone = 'America/Chicago', date = new Date()) {
+/**
+ * Convert a UTC ISO string to a datetime-local input value in the specified timezone
+ */
+export function utcToLocalInput(utcString, timezone = DEFAULT_TIMEZONE) {
+  if (!utcString) return '';
+  return DateTime.fromISO(utcString, { zone: 'utc' })
+    .setZone(timezone)
+    .toFormat("yyyy-LL-dd'T'HH:mm");
+}
+
+/**
+ * Convert a datetime-local input value to UTC ISO string
+ */
+export function localInputToUTC(localString, timezone = DEFAULT_TIMEZONE) {
+  if (!localString) return '';
+  return DateTime.fromFormat(localString, "yyyy-LL-dd'T'HH:mm", { zone: timezone })
+    .toUTC()
+    .toISO({ suppressMilliseconds: true });
+}
+
+/**
+ * Convert a UTC ISO string to a date input value (YYYY-MM-DD) in the specified timezone
+ */
+export function utcToDateInput(utcString, timezone = DEFAULT_TIMEZONE) {
+  if (!utcString) return '';
+  return DateTime.fromISO(utcString, { zone: 'utc' })
+    .setZone(timezone)
+    .toFormat("yyyy-LL-dd");
+}
+
+/**
+ * Convert a date input value to UTC ISO string (start of day)
+ */
+export function dateInputToUTC(dateString, timezone = DEFAULT_TIMEZONE) {
+  if (!dateString) return '';
+  return DateTime.fromFormat(dateString, "yyyy-LL-dd", { zone: timezone })
+    .startOf('day')
+    .toUTC()
+    .toISO({ suppressMilliseconds: true });
+}
+
+/**
+ * Convert a UTC ISO string to a time input value (HH:mm) in the specified timezone
+ */
+export function utcToTimeInput(utcString, timezone = DEFAULT_TIMEZONE) {
+  if (!utcString) return '';
+  return DateTime.fromISO(utcString, { zone: 'utc' })
+    .setZone(timezone)
+    .toFormat("HH:mm");
+}
+
+/**
+ * Convert a time input value to UTC ISO string (for today's date)
+ */
+export function timeInputToUTC(timeString, timezone = DEFAULT_TIMEZONE, date = new Date()) {
+  if (!timeString) return '';
+  const baseDate = DateTime.fromJSDate(date).setZone(timezone);
+  const [hours, minutes] = timeString.split(':').map(Number);
+  return baseDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 })
+    .toUTC()
+    .toISO({ suppressMilliseconds: true });
+}
+
+/**
+ * Create a DateTime object from a time string (HH:mm or h:mmam/pm) in the specified timezone
+ */
+export function createDateTimeFromTimeString(timeString, timezone = DEFAULT_TIMEZONE, date = new Date()) {
+  if (!timeString) return null;
+  
   let hours, minutes;
   if (/am|pm/i.test(timeString)) {
     // Handle 12-hour format like '6:00pm'
@@ -86,17 +136,165 @@ export function createDateFromTimeString(timeString, timezone = 'America/Chicago
     // Handle 24-hour format 'HH:mm'
     [hours, minutes] = timeString.split(':').map(Number);
   }
-  const zoneDate = toZone(date, timezone);
-  zoneDate.setHours(hours, minutes, 0, 0);
-  return zoneDate;
+  
+  const baseDate = DateTime.fromJSDate(date).setZone(timezone);
+  return baseDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
 }
 
-// Get the current time in the specified timezone
-export function getCurrentTime(timezone = 'America/Chicago') {
-  return toZone(new Date(), timezone);
+/**
+ * Get the current time in the specified timezone
+ */
+export function getCurrentTime(timezone = DEFAULT_TIMEZONE) {
+  return DateTime.now().setZone(timezone);
 }
 
-// Get the current time in CST (backward compatibility)
+/**
+ * Get the current time as UTC ISO string
+ */
+export function getCurrentTimeUTC() {
+  return DateTime.now().toUTC().toISO({ suppressMilliseconds: true });
+}
+
+/**
+ * Check if two dates are the same day in the specified timezone
+ */
+export function isSameDay(date1, date2, timezone = DEFAULT_TIMEZONE) {
+  const dt1 = DateTime.isDateTime(date1) ? date1 : DateTime.fromJSDate(date1);
+  const dt2 = DateTime.isDateTime(date2) ? date2 : DateTime.fromJSDate(date2);
+  return dt1.setZone(timezone).hasSame(dt2.setZone(timezone), 'day');
+}
+
+/**
+ * Get start of day in the specified timezone
+ */
+export function startOfDay(date, timezone = DEFAULT_TIMEZONE) {
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
+  return dt.setZone(timezone).startOf('day');
+}
+
+/**
+ * Get end of day in the specified timezone
+ */
+export function endOfDay(date, timezone = DEFAULT_TIMEZONE) {
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
+  return dt.setZone(timezone).endOf('day');
+}
+
+/**
+ * Add days to a date in the specified timezone
+ */
+export function addDays(date, days, timezone = DEFAULT_TIMEZONE) {
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
+  return dt.setZone(timezone).plus({ days });
+}
+
+/**
+ * Subtract days from a date in the specified timezone
+ */
+export function subtractDays(date, days, timezone = DEFAULT_TIMEZONE) {
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
+  return dt.setZone(timezone).minus({ days });
+}
+
+/**
+ * Parse a natural date string (like "tomorrow", "next friday", etc.) in the specified timezone
+ */
+export function parseNaturalDate(dateStr, timezone = DEFAULT_TIMEZONE) {
+  if (!dateStr) return null;
+  
+  const today = DateTime.now().setZone(timezone);
+  const tomorrow = today.plus({ days: 1 });
+  
+  const lowerDateStr = dateStr.toLowerCase().trim();
+  
+  // Handle "today"
+  if (lowerDateStr === 'today') {
+    return today;
+  }
+  
+  // Handle "tomorrow"
+  if (lowerDateStr === 'tomorrow') {
+    return tomorrow;
+  }
+  
+  // Handle "next [day]"
+  const nextDayMatch = lowerDateStr.match(/^next\s+(\w+)$/);
+  if (nextDayMatch) {
+    const dayName = nextDayMatch[1];
+    const dayMap = {
+      'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
+      'friday': 5, 'saturday': 6, 'sunday': 0
+    };
+    const targetDay = dayMap[dayName];
+    if (targetDay !== undefined) {
+      let nextDate = today;
+      while (nextDate.weekday !== targetDay) {
+        nextDate = nextDate.plus({ days: 1 });
+      }
+      return nextDate;
+    }
+  }
+  
+  // Handle MM/DD format (without year)
+  const dateMatchNoYear = dateStr.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (dateMatchNoYear) {
+    const [_, month, day] = dateMatchNoYear;
+    const monthIndex = parseInt(month) - 1;
+    const dayNum = parseInt(day);
+    
+    // Smart year handling: assume current year unless date is more than 2 months away
+    let year = today.year;
+    const currentMonth = today.month - 1;
+    const monthsDiff = monthIndex - currentMonth;
+    
+    // If the requested month is more than 2 months away, assume next year
+    if (monthsDiff > 2 || (monthsDiff < -10)) {
+      year++;
+    }
+    
+    let result = DateTime.fromObject({ year, month: monthIndex + 1, day: dayNum }, { zone: timezone });
+    
+    // Additional safety check: if the date is in the past, assume next year
+    if (result < today) {
+      result = result.set({ year: result.year + 1 });
+    }
+    
+    return result;
+  }
+  
+  // Handle MM/DD/YY or MM/DD/YYYY format
+  const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (dateMatch) {
+    const [_, month, day, year] = dateMatch;
+    const fullYear = year.length === 2 ? '20' + year : year;
+    return DateTime.fromObject({ 
+      year: parseInt(fullYear), 
+      month: parseInt(month), 
+      day: parseInt(day) 
+    }, { zone: timezone });
+  }
+  
+  return null;
+}
+
+// Backward compatibility functions
+export function toZone(date, timezone = DEFAULT_TIMEZONE) {
+  const dt = DateTime.fromJSDate(date).setZone(timezone);
+  return dt.toJSDate();
+}
+
+export function toCST(date) {
+  return toZone(date, 'America/Chicago');
+}
+
+export function toZoneISOString(date, timezone = DEFAULT_TIMEZONE) {
+  return toUTC(date, timezone);
+}
+
+export function toCSTISOString(date) {
+  return toZoneISOString(date, 'America/Chicago');
+}
+
 export function getCurrentCST() {
   return getCurrentTime('America/Chicago');
 } 

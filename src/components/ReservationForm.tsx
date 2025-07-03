@@ -2,7 +2,7 @@ import { useDisclosure, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBod
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import React, { useState, useEffect } from 'react';
-import { createDateFromTimeString, toCSTISOString } from '../utils/dateUtils';
+import { createDateTimeFromTimeString, toUTC } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -489,7 +489,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     }
 
     // Build start time in CST
-    const start = createDateFromTimeString(time, 'America/Chicago', date);
+    const start = createDateTimeFromTimeString(time, settings?.timezone || 'America/Chicago', date);
     const durationMinutes = form.party_size <= 2 ? 90 : 120;
     const end = new Date(start.getTime() + durationMinutes * 60000);
 

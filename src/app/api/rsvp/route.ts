@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { DateTime } from 'luxon';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -125,14 +126,15 @@ export async function POST(request: Request) {
 
     // Send SMS confirmation
     try {
-      const formattedDate = event.start_time.toLocaleDateString('en-US', {
+      const eventDateTime = DateTime.fromISO(event.start_time, { zone: 'utc' }).setZone('America/Chicago');
+      const formattedDate = eventDateTime.toLocaleString({
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
 
-      const timeString = event.start_time.toLocaleTimeString('en-US', {
+      const timeString = eventDateTime.toLocaleString({
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
