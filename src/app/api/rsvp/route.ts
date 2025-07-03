@@ -155,6 +155,12 @@ export async function POST(request: Request) {
         }
       }
 
+      console.log('Attempting to send SMS confirmation:', {
+        to: formattedPhone,
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        messageLength: messageContent.length
+      });
+
       // Send SMS using OpenPhone API
       const openPhoneApiKey = process.env.OPENPHONE_API_KEY;
       if (openPhoneApiKey) {
@@ -162,7 +168,7 @@ export async function POST(request: Request) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': openPhoneApiKey,
+            'Authorization': `Bearer ${openPhoneApiKey}`,
             'Accept': 'application/json'
           },
           body: JSON.stringify({
@@ -172,9 +178,17 @@ export async function POST(request: Request) {
           })
         });
 
+        const responseData = await response.text();
+        console.log('OpenPhone API response status:', response.status);
+        console.log('OpenPhone API response:', responseData);
+
         if (!response.ok) {
-          console.error('Failed to send SMS confirmation');
+          console.error('Failed to send SMS confirmation. Status:', response.status, 'Response:', responseData);
+        } else {
+          console.log('SMS confirmation sent successfully');
         }
+      } else {
+        console.error('OpenPhone API key not configured');
       }
     } catch (smsError) {
       console.error('Error sending SMS confirmation:', smsError);

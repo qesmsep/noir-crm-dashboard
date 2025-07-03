@@ -395,7 +395,132 @@ export default function TemplatesPage() {
   };
 
   const handleReminderUpdated = () => {
+    fetchReminderTemplates();
     fetchPendingReservationReminders();
+  };
+
+  // Template management functions
+  const handleEditTemplate = (template: CampaignTemplate) => {
+    // TODO: Implement edit template functionality
+    toast({
+      title: 'Edit Template',
+      description: 'Edit template functionality coming soon',
+      status: 'info',
+      duration: 3000,
+    });
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this template?')) return;
+
+    try {
+      const response = await fetch(`/api/campaign-templates?id=${id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Template deleted successfully',
+          status: 'success',
+          duration: 3000,
+        });
+        fetchTemplates();
+      } else {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to delete template',
+          status: 'error',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete template',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleTestTemplate = (template: CampaignTemplate) => {
+    // TODO: Implement test template functionality
+    toast({
+      title: 'Test Template',
+      description: 'Test template functionality coming soon',
+      status: 'info',
+      duration: 3000,
+    });
+  };
+
+  // Reminder template management functions
+  const handleEditReminderTemplate = (template: ReservationReminderTemplate) => {
+    // TODO: Implement edit reminder template functionality
+    toast({
+      title: 'Edit Reminder Template',
+      description: 'Edit reminder template functionality coming soon',
+      status: 'info',
+      duration: 3000,
+    });
+  };
+
+  const handleDeleteReminderTemplate = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this reminder template?')) return;
+
+    try {
+      const response = await fetch(`/api/reservation-reminder-templates?id=${id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Reminder template deleted successfully',
+          status: 'success',
+          duration: 3000,
+        });
+        fetchReminderTemplates();
+      } else {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to delete reminder template',
+          status: 'error',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete reminder template',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleTestReminderTemplate = (template: ReservationReminderTemplate) => {
+    // TODO: Implement test reminder template functionality
+    toast({
+      title: 'Test Reminder Template',
+      description: 'Test reminder template functionality coming soon',
+      status: 'info',
+      duration: 3000,
+    });
+  };
+
+  const handleCreateReminderTemplate = () => {
+    // TODO: Implement create reminder template functionality
+    toast({
+      title: 'Create Reminder Template',
+      description: 'Create reminder template functionality coming soon',
+      status: 'info',
+      duration: 3000,
+    });
   };
 
   return (
@@ -504,9 +629,27 @@ export default function TemplatesPage() {
                           </Td>
                           <Td>
                             <HStack spacing={2}>
-                              <IconButton aria-label="Test template" icon={<ViewIcon />} size="sm" colorScheme="blue" />
-                              <IconButton aria-label="Edit template" icon={<EditIcon />} size="sm" colorScheme="yellow" />
-                              <IconButton aria-label="Delete template" icon={<DeleteIcon />} size="sm" colorScheme="red" />
+                              <IconButton 
+                                aria-label="Test template" 
+                                icon={<ViewIcon />} 
+                                size="sm" 
+                                colorScheme="blue" 
+                                onClick={() => handleTestTemplate(template)}
+                              />
+                              <IconButton 
+                                aria-label="Edit template" 
+                                icon={<EditIcon />} 
+                                size="sm" 
+                                colorScheme="yellow" 
+                                onClick={() => handleEditTemplate(template)}
+                              />
+                              <IconButton 
+                                aria-label="Delete template" 
+                                icon={<DeleteIcon />} 
+                                size="sm" 
+                                colorScheme="red" 
+                                onClick={() => handleDeleteTemplate(template.id)}
+                              />
                             </HStack>
                           </Td>
                         </Tr>
@@ -560,7 +703,11 @@ export default function TemplatesPage() {
                   </Stat>
                 </SimpleGrid>
                 <HStack spacing={4} mb={6}>
-                  <Button colorScheme="blue" fontFamily="'Montserrat', sans-serif">
+                  <Button 
+                    colorScheme="blue" 
+                    fontFamily="'Montserrat', sans-serif"
+                    onClick={handleCreateReminderTemplate}
+                  >
                     Create Reminder Template
                   </Button>
                   <Button colorScheme="green" fontFamily="'Montserrat', sans-serif" isLoading={processingReminders}>
@@ -603,9 +750,27 @@ export default function TemplatesPage() {
                           </Td>
                           <Td>
                             <HStack spacing={2}>
-                              <IconButton aria-label="Test reminder template" icon={<ViewIcon />} size="sm" colorScheme="blue" />
-                              <IconButton aria-label="Edit reminder template" icon={<EditIcon />} size="sm" colorScheme="yellow" />
-                              <IconButton aria-label="Delete reminder template" icon={<DeleteIcon />} size="sm" colorScheme="red" />
+                              <IconButton 
+                                aria-label="Test reminder template" 
+                                icon={<ViewIcon />} 
+                                size="sm" 
+                                colorScheme="blue" 
+                                onClick={() => handleTestReminderTemplate(template)}
+                              />
+                              <IconButton 
+                                aria-label="Edit reminder template" 
+                                icon={<EditIcon />} 
+                                size="sm" 
+                                colorScheme="yellow" 
+                                onClick={() => handleEditReminderTemplate(template)}
+                              />
+                              <IconButton 
+                                aria-label="Delete reminder template" 
+                                icon={<DeleteIcon />} 
+                                size="sm" 
+                                colorScheme="red" 
+                                onClick={() => handleDeleteReminderTemplate(template.id)}
+                              />
                             </HStack>
                           </Td>
                         </Tr>

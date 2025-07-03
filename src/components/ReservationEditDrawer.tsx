@@ -368,9 +368,11 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
       placement="right" 
       onClose={onClose} 
       size="sm"
+      closeOnOverlayClick={true}
+      closeOnEsc={true}
     >
       <Box zIndex="2000" position="relative">
-        <DrawerOverlay bg="blackAlpha.600" />
+        <DrawerOverlay bg="blackAlpha.600" onClick={onClose} />
         <DrawerContent 
           border="2px solid #353535" 
           borderRadius="10px"  

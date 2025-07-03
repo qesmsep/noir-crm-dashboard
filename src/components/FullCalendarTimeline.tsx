@@ -107,6 +107,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const [isDayReservationsDrawerOpen, setIsDayReservationsDrawerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
+  const [isNewReservationDrawerOpen, setIsNewReservationDrawerOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{date: Date, resourceId: string} | null>(null);
   const toast = useToast();
   const [slotMinTime, setSlotMinTime] = useState<string>('18:00:00');
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
@@ -446,6 +448,32 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     setIsDayReservationsDrawerOpen(true);
   };
 
+  const handleSlotClick = (info: any) => {
+    if (viewOnly) return;
+    
+    // Extract date and resource information
+    const clickedDate = info.date;
+    const resourceId = info.resource?.id;
+    
+    if (clickedDate && resourceId) {
+      setSelectedSlot({
+        date: clickedDate,
+        resourceId: resourceId
+      });
+      setIsNewReservationDrawerOpen(true);
+    }
+  };
+
+  const handleNewReservationClose = () => {
+    setIsNewReservationDrawerOpen(false);
+    setSelectedSlot(null);
+  };
+
+  const handleNewReservationCreated = () => {
+    setLocalReloadKey(prev => prev + 1);
+    handleNewReservationClose();
+  };
+
   const handleDayReservationsClose = () => {
     setIsDayReservationsDrawerOpen(false);
     setSelectedDate(null);
@@ -672,6 +700,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           eventResize={handleEventResize}
           eventClick={handleEventClick}
           dateClick={handleDayClick}
+          select={handleSlotClick}
           height="auto"
           
           // Touch and mobile optimizations
@@ -857,6 +886,23 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         selectedDate={selectedDate}
         onReservationClick={onReservationClick || handleReservationFromListClick}
       />
+
+      {/* New Reservation Drawer */}
+      {!viewOnly && selectedSlot && (
+        <Elements stripe={stripePromise}>
+          <ReservationForm
+            initialStart={selectedSlot.date.toISOString()}
+            initialEnd={new Date(selectedSlot.date.getTime() + 2 * 60 * 60 * 1000).toISOString()}
+            table_id={selectedSlot.resourceId}
+            bookingStartDate={bookingStartDate}
+            bookingEndDate={bookingEndDate}
+            baseDays={baseDays}
+            onSave={handleNewReservationCreated}
+            onClose={handleNewReservationClose}
+            isEdit={false}
+          />
+        </Elements>
+      )}
     </Box>
   );
 };
