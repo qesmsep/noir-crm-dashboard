@@ -200,9 +200,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     initStripe();
   }, []);
 
-  // Mount card element when elements is available
+  // Mount card element when elements is available and hold fees are enabled
   useEffect(() => {
-    if (isClient && elements && cardElementRef.current) {
+    if (isClient && elements && cardElementRef.current && !isMember && settings?.hold_fee_enabled) {
       const cardElement = elements.create('card', {
         style: { base: { fontSize: '16px' } }
       });
@@ -212,7 +212,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         cardElement.unmount();
       };
     }
-  }, [isClient, elements]);
+  }, [isClient, elements, isMember, settings?.hold_fee_enabled]);
 
   useEffect(() => {
     if (!bookingStartDate || !isClient) return;
@@ -691,53 +691,59 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         return;
       }
 
-      // For non-members, use Stripe.js to create a PaymentMethod with the card details, then send only the paymentMethod.id and reservation data to the backend
+      // For non-members, handle based on hold fee settings
       if (!isMember) {
-        if (!stripe || !elements) {
-          toast({
-            title: 'Stripe not loaded',
-            description: 'Please try again in a moment.',
-            status: 'error',
-            duration: 3000,
+        let requestBody: any = { ...reservationData };
+        
+        // Only create payment method if hold fees are enabled
+        if (settings?.hold_fee_enabled) {
+          if (!stripe || !elements) {
+            toast({
+              title: 'Stripe not loaded',
+              description: 'Please try again in a moment.',
+              status: 'error',
+              duration: 3000,
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          
+          // Create payment method
+          const cardElement = elements.getElement('card');
+          if (!cardElement) {
+            toast({
+              title: 'Card error',
+              description: 'Card input not found. Please try again.',
+              status: 'error',
+              duration: 3000,
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          
+          const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
+            type: 'card',
+            card: cardElement,
+            billing_details: {
+              name: `${form.first_name} ${form.last_name}`.trim(),
+              email: form.email,
+            },
           });
-          setIsSubmitting(false);
-          return;
+          
+          if (pmError || !paymentMethod) {
+            toast({
+              title: 'Card error',
+              description: pmError?.message || 'Failed to create payment method',
+              status: 'error',
+              duration: 3000,
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          
+          // Add payment method ID to request body
+          requestBody.payment_method_id = paymentMethod.id;
         }
-        // Create payment method
-        const cardElement = elements.getElement('card');
-        if (!cardElement) {
-          toast({
-            title: 'Card error',
-            description: 'Card input not found. Please try again.',
-            status: 'error',
-            duration: 3000,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-          type: 'card',
-          card: cardElement,
-          billing_details: {
-            name: `${form.first_name} ${form.last_name}`.trim(),
-            email: form.email,
-          },
-        });
-        if (pmError || !paymentMethod) {
-          toast({
-            title: 'Card error',
-            description: pmError?.message || 'Failed to create payment method',
-            status: 'error',
-            duration: 3000,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        // Send reservation data and paymentMethod.id to backend
-        const requestBody = {
-          ...reservationData,
-          payment_method_id: paymentMethod.id,
-        };
         
         console.log('Sending non-member reservation request to API...');
         console.log('Request body:', requestBody);
