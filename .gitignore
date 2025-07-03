@@ -64,3 +64,4 @@ Thumbs.db
 # Checkpoint directories (backup/archive files)
 /checkpoints/
 /Ω_historic/
+.next/
