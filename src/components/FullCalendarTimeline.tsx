@@ -5,7 +5,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 import ReservationForm from './ReservationForm';
 import DayReservationsDrawer from './DayReservationsDrawer';
-import { fromUTC, toUTC, formatDateTime, isSameDay } from '../utils/dateUtils';
+import { fromUTC, toUTC, formatDateTime, formatTime, formatDate, isSameDay } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import {
@@ -241,19 +241,19 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         
         if (privateEvent && !privateEvent.require_time_selection) {
           // For private events that don't require time selection, use the event start time
-          startTime = new Date(privateEvent.start_time);
-          endTime = new Date(privateEvent.end_time);
+          startTime = fromUTC(privateEvent.start_time, settings.timezone).toJSDate();
+          endTime = fromUTC(privateEvent.end_time, settings.timezone).toJSDate();
         } else {
           // For private events that do require time selection, use the reservation's own time
-          startTime = new Date(r.start_time);
-          endTime = new Date(r.end_time);
+          startTime = fromUTC(r.start_time, settings.timezone).toJSDate();
+          endTime = fromUTC(r.end_time, settings.timezone).toJSDate();
         }
       } else {
         const tableResource = resources.find(res => res.id === String(r.table_id));
         resourceId = String(r.table_id);
         tableLabel = tableResource ? tableResource.title : '';
-        startTime = new Date(r.start_time);
-        endTime = new Date(r.end_time);
+        startTime = fromUTC(r.start_time, settings.timezone).toJSDate();
+        endTime = fromUTC(r.end_time, settings.timezone).toJSDate();
       }
       
       const event = {
@@ -763,7 +763,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           mt={8}
         >
           <Heading size="md" mb={4} color="nightSky" fontWeight="600">
-            🔒 Private Events for {currentCalendarDate.toLocaleDateString('en-US', { 
+            🔒 Private Events for {formatDate(currentCalendarDate, settings.timezone, { 
               weekday: 'long', 
               month: 'long', 
               day: 'numeric' 
@@ -790,7 +790,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
                       <Td>{pe.title}</Td>
                       <Td>{pe.event_type}</Td>
                       <Td>
-                        {new Date(pe.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - {new Date(pe.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                        {formatTime(new Date(pe.start_time), settings.timezone)} - {formatTime(new Date(pe.end_time), settings.timezone)}
                       </Td>
                       <Td>
                         {reservations.reduce((sum: number, r: any) => sum + (r.party_size || 0), 0)}/{pe.total_attendees_maximum}

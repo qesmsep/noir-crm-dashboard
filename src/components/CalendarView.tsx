@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, momentLocalizer, Event as RBCEvent, SlotInfo } from 'react-big-calendar';
 import moment from 'moment';
 import { fromUTC } from '../utils/dateUtils';
+import { useSettings } from '../context/SettingsContext';
 
 const localizer = momentLocalizer(moment);
 
@@ -29,6 +30,7 @@ interface CalendarEvent {
 const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent, reloadKey }) => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [tables, setTables] = useState<TableResource[]>([]);
+  const { settings } = useSettings();
 
   useEffect(() => {
     async function fetchData() {
@@ -48,15 +50,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent
       const mapped: CalendarEvent[] = (evRes.data || []).map((e: any) => ({
         id: e.id,
         title: e.title,
-        start: fromUTC(e.start_time, 'America/Chicago').toJSDate(),
-        end: fromUTC(e.end_time, 'America/Chicago').toJSDate(),
+        start: fromUTC(e.start_time, settings.timezone).toJSDate(),
+        end: fromUTC(e.end_time, settings.timezone).toJSDate(),
         allDay: false,
         resourceId: e.table_id
       })).concat((resRes.data || []).map((r: any) => ({
         id: r.id,
         title: `Res: ${r.name}`,
-        start: fromUTC(r.start_time, 'America/Chicago').toJSDate(),
-        end: fromUTC(r.end_time, 'America/Chicago').toJSDate(),
+        start: fromUTC(r.start_time, settings.timezone).toJSDate(),
+        end: fromUTC(r.end_time, settings.timezone).toJSDate(),
         allDay: false,
         resourceId: r.table_id
       })));
