@@ -601,8 +601,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             verticalAlign: 'middle',
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
-            minWidth: isMobile ? '120px' : '90px',
-            width: isMobile ? '15%' : '10%',
+            minWidth: '120px',
+            width: '120px',
+            flexShrink: 0,
           },
           '.fc-resource-area .fc-resource-title': {
             color: 'white',
@@ -610,6 +611,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
             fontSize: isMobile ? '12px' : '14px',
+            padding: '8px 4px',
+            textAlign: 'center',
           },
           '.fc-timeline .fc-timeline-body td': {
             backgroundColor: '#ecede8',
@@ -617,15 +620,53 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             justifyContent: 'center',
             paddingTop: '10px',
             borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
           },
           '.fc-timeline': {
-            maxWidth: 'fit-content',
+            width: '100%',
+            tableLayout: 'fixed',
           },
           '.fc-timeline-header': {
-            maxWidth: 'fit-content',
+            width: '100%',
+            tableLayout: 'fixed',
+            backgroundColor: '#f8f9fa',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
           },
           '.fc-timeline-body': {
-            maxWidth: 'fit-content',
+            width: '100%',
+            tableLayout: 'fixed',
+          },
+          '.fc-timeline-body .fc-timeline-slot': {
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+          },
+
+          '.fc-timeline-header .fc-timeline-slot': {
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+          },
+
+          '.fc-timeline-slot': {
+            minWidth: '60px',
+          },
+          '.fc-timeline-slot-lane': {
+            minWidth: '60px',
+          },
+          '.fc-timeline-body .fc-timeline-slot-lane': {
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          },
+          '.fc-timeline-header .fc-timeline-slot-lane': {
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          },
+          '.fc-resource-timeline-divider': {
+            borderRight: '2px solid #353535',
+          },
+          '.fc-resource-area, .fc-timeline-area': {
+            verticalAlign: 'top',
+          },
+          '.fc-resource-area-header': {
+            backgroundColor: '#ecede8',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
           },
           '.fc-header-toolbar .fc-prev-button': {
             marginRight: '0.5rem',
@@ -723,7 +764,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           slotLabelInterval="00:30:00"
           slotLabelFormat={[{ hour: 'numeric', minute: '2-digit', hour12: true }]}
           nowIndicator
-          resourceAreaWidth={isMobile ? '15%' : '6%'}
+          resourceAreaWidth="120px"
           resourceAreaHeaderContent={''}
           eventContent={(arg) => (
             <div

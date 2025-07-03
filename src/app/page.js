@@ -643,19 +643,31 @@ export default function Home() {
         onRequestClose={() => setMenuModalOpen(false)}
         contentLabel="Noir Menu Modal"
         style={{
-          overlay: { backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 2000 },
+          overlay: { 
+            backgroundColor: 'rgba(0,0,0,0.9)', 
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          },
           content: {
-            maxWidth: '90vw',
-            maxHeight: '90vh',
+            maxWidth: '95vw',
+            maxHeight: '95vh',
+            width: 'auto',
+            height: 'auto',
             margin: 'auto',
             background: '#23201C',
             border: 'none',
             borderRadius: '1.5rem',
-            padding: 0,
+            padding: '20px',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 2001
+            zIndex: 2001,
+            overflow: 'auto',
+            position: 'relative'
           }
         }}
         ariaHideApp={false}
@@ -664,32 +676,48 @@ export default function Home() {
           onClick={() => setMenuModalOpen(false)}
           style={{
             position: 'absolute',
-            top: 16,
-            right: 16,
-            background: 'rgba(53,53,53,0.7)',
+            top: 10,
+            right: 10,
+            background: 'rgba(53,53,53,0.8)',
             color: '#fff',
             border: 'none',
             borderRadius: '50%',
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             fontSize: 24,
             cursor: 'pointer',
-            zIndex: 10
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 'bold'
           }}
           aria-label="Close Menu"
         >
-          &times;
+          ×
         </button>
-        <img
-          src="/images/noir-menu.png"
-          alt="Noir Menu"
-          style={{
-            maxWidth: '90vw',
-            maxHeight: '80vh',
-            borderRadius: '1.5rem',
-            boxShadow: '0 8px 32px rgba(53,53,53,0.15)'
-          }}
-        />
+        <div style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'auto'
+        }}>
+          <img
+            src="/images/noir-menu.png"
+            alt="Noir Menu"
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              width: 'auto',
+              height: 'auto',
+              borderRadius: '1rem',
+              boxShadow: '0 8px 32px rgba(53,53,53,0.15)',
+              objectFit: 'contain'
+            }}
+          />
+        </div>
       </Modal>
     </div>
   );

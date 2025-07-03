@@ -39,6 +39,7 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
       display="flex"
       alignItems="center"
       minH={{ base: 'auto', md: '100vh' }}
+      overflow="hidden"
     >
       <Container maxW="container.xl" px={{ base: 0, sm: 4 }}>
         <Box textAlign="center" mb={{ base: 6, sm: 8, md: 10 }}>
@@ -91,8 +92,12 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
                   transform: 'scale(0.98)',
                   boxShadow: 'lg'
                 }}
-                minH={{ base: "52px", sm: "56px", md: "64px" }}
+                minH={{ base: "56px", sm: "60px", md: "64px" }}
                 borderRadius="xl"
+                _focus={{
+                  boxShadow: "0 0 0 3px rgba(165, 148, 128, 0.3)",
+                  outline: "none"
+                }}
               >
                 Noir Members
               </Button>
@@ -118,8 +123,12 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
                   transform: 'scale(0.98)',
                   boxShadow: 'lg'
                 }}
-                minH={{ base: "52px", sm: "56px", md: "64px" }}
+                minH={{ base: "56px", sm: "60px", md: "64px" }}
                 borderRadius="xl"
+                _focus={{
+                  boxShadow: "0 0 0 3px rgba(165, 148, 128, 0.3)",
+                  outline: "none"
+                }}
               >
                 Non-Members
               </Button>
@@ -135,6 +144,8 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
               boxShadow="2xl"
               mx={{ base: 2, sm: 0 }}
               my={{ base: 2, sm: 0 }}
+              maxH={{ base: "80vh", sm: "none" }}
+              overflowY={{ base: "auto", sm: "visible" }}
             >
               <ReservationForm 
                 isMember={true} 
@@ -155,6 +166,8 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
               boxShadow="2xl"
               mx={{ base: 2, sm: 0 }}
               my={{ base: 2, sm: 0 }}
+              maxH={{ base: "80vh", sm: "none" }}
+              overflowY={{ base: "auto", sm: "visible" }}
             >
               <ReservationForm 
                 isMember={false} 
