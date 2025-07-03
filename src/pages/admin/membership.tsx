@@ -12,6 +12,7 @@ import {
   Heading,
   Container
 } from '@chakra-ui/react';
+import AdminLayout from '../../components/layouts/AdminLayout';
 import QuestionnaireManager from '../../components/admin/QuestionnaireManager';
 import AgreementManager from '../../components/admin/AgreementManager';
 import ApplicationManager from '../../components/admin/ApplicationManager';
@@ -20,7 +21,8 @@ import WaitlistManager from '../../components/admin/WaitlistManager';
 
 export default function MembershipAdmin() {
   return (
-    <Container maxW="8xl" py={8}>
+    <AdminLayout>
+      <Container maxW="8xl" py={8}>
       <VStack spacing={8} align="stretch">
         <Box>
           <Heading size="lg" mb={2}>Membership Intake Management</Heading>
@@ -62,5 +64,6 @@ export default function MembershipAdmin() {
         </Tabs>
       </VStack>
     </Container>
+    </AdminLayout>
   );
 }

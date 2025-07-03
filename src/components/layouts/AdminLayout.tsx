@@ -26,6 +26,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { href: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/admin/members', label: 'Members', icon: '👥' },
     { href: '/admin/waitlist', label: 'Waitlist', icon: '⏳' },
+    { href: '/admin/membership', label: 'Membership', icon: '🎫' },
     { href: '/admin/calendar', label: 'Calendar', icon: '📅' },
     { href: '/admin/templates', label: 'Templates', icon: '📝' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
