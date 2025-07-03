@@ -25,10 +25,10 @@ export function toUTC(dateTime, timezone = DEFAULT_TIMEZONE) {
  */
 export function formatDate(date, timezone = DEFAULT_TIMEZONE, options = {}) {
   const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
-  return dt.setZone(timezone).toLocaleString({
-    ...DateTime.DATE_SHORT,
-    ...options
-  });
+  if (options.formatString) {
+    return dt.setZone(timezone).toFormat(options.formatString);
+  }
+  return dt.setZone(timezone).toLocaleString(DateTime.DATE_SHORT);
 }
 
 /**
@@ -36,10 +36,10 @@ export function formatDate(date, timezone = DEFAULT_TIMEZONE, options = {}) {
  */
 export function formatTime(date, timezone = DEFAULT_TIMEZONE, options = {}) {
   const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
-  return dt.setZone(timezone).toLocaleString({
-    ...DateTime.TIME_SIMPLE,
-    ...options
-  });
+  if (options.formatString) {
+    return dt.setZone(timezone).toFormat(options.formatString);
+  }
+  return dt.setZone(timezone).toLocaleString(DateTime.TIME_SIMPLE);
 }
 
 /**
@@ -47,10 +47,10 @@ export function formatTime(date, timezone = DEFAULT_TIMEZONE, options = {}) {
  */
 export function formatDateTime(date, timezone = DEFAULT_TIMEZONE, options = {}) {
   const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date);
-  return dt.setZone(timezone).toLocaleString({
-    ...DateTime.DATETIME_SHORT,
-    ...options
-  });
+  if (options.formatString) {
+    return dt.setZone(timezone).toFormat(options.formatString);
+  }
+  return dt.setZone(timezone).toLocaleString(DateTime.DATETIME_SHORT);
 }
 
 /**
