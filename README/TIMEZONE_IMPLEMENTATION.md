@@ -84,6 +84,13 @@ This document describes the comprehensive timezone handling implementation using
 - All SMS messages now display times in the correct timezone (America/Chicago)
 - Natural language date parsing now handles timezone-aware date calculations
 
+#### 8. **CalendarAvailabilityControl**
+- Updated to use Luxon for all date/time operations
+- Private event creation and editing now uses timezone-aware date handling
+- Date display functions updated to use timezone-aware formatting
+- Booking window date handling updated to use Luxon
+- Exceptional opens/closures date display updated for timezone consistency
+
 ### Settings Integration
 
 The implementation leverages the existing Settings context to provide timezone configuration:

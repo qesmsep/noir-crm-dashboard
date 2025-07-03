@@ -3,6 +3,8 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { supabase } from '../lib/supabase';
 import PrivateEventBooking from './PrivateEventBooking';
+import { DateTime } from 'luxon';
+import { formatTime, formatDate, fromUTC } from '../utils/dateUtils';
 import {
   Box,
   Button,
@@ -42,20 +44,17 @@ type CalendarAvailabilityControlProps = { section: 'booking_window' | 'base' | '
 function formatTime12h(timeStr: string) {
   if (!timeStr) return '';
   const [h, m] = timeStr.split(':');
-  const date = new Date(2000, 0, 1, Number(h), Number(m));
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const dt = DateTime.fromObject({ hour: Number(h), minute: Number(m) }, { zone: 'America/Chicago' });
+  return dt.toLocaleString({ hour: 'numeric', minute: '2-digit' });
 }
 
 const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = ({ section }) => {
   // Booking window state
   const [bookingStartDate, setBookingStartDate] = useState<Date>(() => {
-    const d = new Date();
-    return d;
+    return DateTime.now().setZone('America/Chicago').toJSDate();
   });
   const [bookingEndDate, setBookingEndDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 60);
-    return d;
+    return DateTime.now().setZone('America/Chicago').plus({ days: 60 }).toJSDate();
   });
   const [bookingDatesLoading, setBookingDatesLoading] = useState<boolean>(true);
   const [bookingDatesSaving, setBookingDatesSaving] = useState<boolean>(false);
@@ -68,8 +67,8 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         .select('booking_start_date, booking_end_date')
         .single();
       if (settingsData) {
-        if (settingsData.booking_start_date) setBookingStartDate(new Date(settingsData.booking_start_date));
-        if (settingsData.booking_end_date) setBookingEndDate(new Date(settingsData.booking_end_date));
+        if (settingsData.booking_start_date) setBookingStartDate(DateTime.fromISO(settingsData.booking_start_date, { zone: 'America/Chicago' }).toJSDate());
+        if (settingsData.booking_end_date) setBookingEndDate(DateTime.fromISO(settingsData.booking_end_date, { zone: 'America/Chicago' }).toJSDate());
       }
       setBookingDatesLoading(false);
     }
@@ -380,22 +379,20 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       
       if (privateEvent.full_day) {
         // For full day events, set start to 00:00 and end to 23:59
-        start_time = new Date(privateEvent.date);
-        start_time.setHours(0, 0, 0, 0);
-        end_time = new Date(privateEvent.date);
-        end_time.setHours(23, 59, 59, 999);
+        const eventDate = DateTime.fromJSDate(privateEvent.date).setZone('America/Chicago');
+        start_time = eventDate.startOf('day').toUTC().toISO({ suppressMilliseconds: true });
+        end_time = eventDate.endOf('day').toUTC().toISO({ suppressMilliseconds: true });
       } else {
         // For time-specific events, validate time fields
         if (!privateEvent.start || !privateEvent.end) {
           setPrivateEventStatus('Please fill all fields.');
           return;
         }
-        start_time = new Date(privateEvent.date);
+        const eventDate = DateTime.fromJSDate(privateEvent.date).setZone('America/Chicago');
         const [startHour, startMinute] = privateEvent.start.split(':');
-        start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
-        end_time = new Date(privateEvent.date);
+        start_time = eventDate.set({ hour: Number(startHour), minute: Number(startMinute) }).toUTC().toISO({ suppressMilliseconds: true });
         const [endHour, endMinute] = privateEvent.end.split(':');
-        end_time.setHours(Number(endHour), Number(endMinute), 0, 0);
+        end_time = eventDate.set({ hour: Number(endHour), minute: Number(endMinute) }).toUTC().toISO({ suppressMilliseconds: true });
       }
       
       const { data, error } = await supabase.from('private_events').insert([
@@ -422,12 +419,15 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
 
   // Handler to open the edit modal and set the event to edit
   const handleOpenEditModal = (event: any) => {
+    const startTime = event.start_time ? fromUTC(event.start_time, 'America/Chicago') : null;
+    const endTime = event.end_time ? fromUTC(event.end_time, 'America/Chicago') : null;
+    
     setEditEventForm({
       name: event.title,
       event_type: event.event_type,
-      date: event.start_time ? new Date(event.start_time) : null,
-      start: event.start_time ? new Date(event.start_time).toISOString().slice(11, 16) : '18:00',
-      end: event.end_time ? new Date(event.end_time).toISOString().slice(11, 16) : '20:00',
+      date: startTime ? startTime.toJSDate() : null,
+      start: startTime ? startTime.toFormat('HH:mm') : '18:00',
+      end: endTime ? endTime.toFormat('HH:mm') : '20:00',
       full_day: event.full_day || false,
     });
     setEditingEvent(event);
@@ -442,22 +442,20 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       
       if (editEventForm.full_day) {
         // For full day events, set start to 00:00 and end to 23:59
-        start_time = new Date(editEventForm.date);
-        start_time.setHours(0, 0, 0, 0);
-        end_time = new Date(editEventForm.date);
-        end_time.setHours(23, 59, 59, 999);
+        const eventDate = DateTime.fromJSDate(editEventForm.date).setZone('America/Chicago');
+        start_time = eventDate.startOf('day').toUTC().toISO({ suppressMilliseconds: true });
+        end_time = eventDate.endOf('day').toUTC().toISO({ suppressMilliseconds: true });
       } else {
         // For time-specific events, validate time fields
         if (!editEventForm.start || !editEventForm.end) {
           setPrivateEventStatus('Please fill all fields.');
           return;
         }
-        start_time = new Date(editEventForm.date);
+        const eventDate = DateTime.fromJSDate(editEventForm.date).setZone('America/Chicago');
         const [startHour, startMinute] = editEventForm.start.split(':');
-        start_time.setHours(Number(startHour), Number(startMinute), 0, 0);
-        end_time = new Date(editEventForm.date);
+        start_time = eventDate.set({ hour: Number(startHour), minute: Number(startMinute) }).toUTC().toISO({ suppressMilliseconds: true });
         const [endHour, endMinute] = editEventForm.end.split(':');
-        end_time.setHours(Number(endHour), Number(endMinute), 0, 0);
+        end_time = eventDate.set({ hour: Number(endHour), minute: Number(endMinute) }).toUTC().toISO({ suppressMilliseconds: true });
       }
       
       const { data, error } = await supabase
@@ -649,7 +647,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                       </>
                     ) : (
                       <>
-                        <Text>{open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date) ? (() => { const [y, m, d] = open.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })() : new Date(open.date).toLocaleDateString()}</Text>
+                        <Text>{open.date && /^\d{4}-\d{2}-\d{2}$/.test(open.date) ? (() => { const [y, m, d] = open.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })() : formatDate(new Date(open.date), 'America/Chicago')}</Text>
                         <Text>{open.time_ranges.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</Text>
                         {open.label && <Badge colorScheme="purple">{open.label}</Badge>}
                         <Button size="xs" colorScheme="blue" onClick={() => handleEditOpen(open)}>Edit</Button>
@@ -732,7 +730,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                       </>
                     ) : (
                       <>
-                        <Text>{closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date) ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })() : new Date(closure.date).toLocaleDateString()}</Text>
+                        <Text>{closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date) ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })() : formatDate(new Date(closure.date), 'America/Chicago')}</Text>
                         <Text>{closure.full_day ? 'Full Day' : closure.time_ranges?.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</Text>
                         {closure.reason && <Badge colorScheme="red">{closure.reason}</Badge>}
                         {closure.sms_notification && <Badge colorScheme="blue">SMS: {closure.sms_notification}</Badge>}
@@ -780,9 +778,9 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                     <Text fontWeight={600}>{event.title}</Text>
                     <Text>{event.event_type}</Text>
                     <Text>
-                      {event.full_day ? 'Full Day' : `${event.start_time && new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${event.end_time && new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                      {event.full_day ? 'Full Day' : `${event.start_time && formatTime(new Date(event.start_time), 'America/Chicago')} - ${event.end_time && formatTime(new Date(event.end_time), 'America/Chicago')}`}
                       {' '}
-                      {event.start_time && new Date(event.start_time).toLocaleDateString()}
+                      {event.start_time && formatDate(new Date(event.start_time), 'America/Chicago')}
                     </Text>
                     {event.full_day && <Badge colorScheme="purple">Full Day</Badge>}
                     <Button size="xs" colorScheme="blue" onClick={() => handleOpenEditModal(event)}>Edit</Button>
