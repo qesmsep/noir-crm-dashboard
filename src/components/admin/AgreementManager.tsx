@@ -191,9 +191,9 @@ export default function AgreementManager() {
       </Table>
 
       {/* Edit Drawer */}
-      <Drawer isOpen={isOpen} onClose={onClose} size="xl">
+      <Drawer isOpen={isOpen} onClose={onClose} size="md" placement="right">
         <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535">
+        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
           <DrawerCloseButton />
           <DrawerHeader borderBottomWidth="1px" color="#353535">
             {editingAgreement?.id ? 'Edit Agreement' : 'Create Agreement'}
@@ -209,6 +209,7 @@ export default function AgreementManager() {
                   bg="white"
                   borderColor="gray.300"
                   _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                  w="100%"
                 />
               </FormControl>
 
@@ -220,6 +221,7 @@ export default function AgreementManager() {
                   bg="white"
                   borderColor="gray.300"
                   _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                  w="100%"
                 >
                   <option value="draft">Draft</option>
                   <option value="active">Active</option>
@@ -247,6 +249,7 @@ export default function AgreementManager() {
                   bg="white"
                   borderColor="gray.300"
                   _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                  w="100%"
                 />
               </FormControl>
             </VStack>

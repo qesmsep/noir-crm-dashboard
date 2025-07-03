@@ -391,9 +391,9 @@ export default function WaitlistManager() {
       </Box>
 
       {/* Review Drawer */}
-      <Drawer isOpen={isReviewOpen} onClose={onReviewClose} size="md">
+      <Drawer isOpen={isReviewOpen} onClose={onReviewClose} size="md" placement="right">
         <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535">
+        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
           <DrawerCloseButton />
           <DrawerHeader borderBottomWidth="1px" color="#353535">
             Review Waitlist Entry: {selectedEntry?.first_name} {selectedEntry?.last_name}
@@ -428,6 +428,7 @@ export default function WaitlistManager() {
                   bg="white"
                   borderColor="gray.300"
                   _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                  w="100%"
                 />
               </FormControl>
             </VStack>
@@ -460,9 +461,9 @@ export default function WaitlistManager() {
       </Drawer>
 
       {/* Application Link Drawer */}
-      <Drawer isOpen={isLinkOpen} onClose={onLinkClose} size="md">
+      <Drawer isOpen={isLinkOpen} onClose={onLinkClose} size="md" placement="right">
         <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535">
+        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
           <DrawerCloseButton />
           <DrawerHeader borderBottomWidth="1px" color="#353535">
             Send Application Link: {selectedEntry?.first_name} {selectedEntry?.last_name}
@@ -512,9 +513,9 @@ export default function WaitlistManager() {
       </Drawer>
 
       {/* View Entry Drawer */}
-      <Drawer isOpen={isViewOpen} onClose={onViewClose} size="md">
+      <Drawer isOpen={isViewOpen} onClose={onViewClose} size="md" placement="right">
         <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535">
+        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
           <DrawerCloseButton />
           <DrawerHeader borderBottomWidth="1px" color="#353535">
             Entry Details: {selectedEntry?.first_name} {selectedEntry?.last_name}

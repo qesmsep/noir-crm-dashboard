@@ -83,13 +83,19 @@ export default function QuestionnaireManager() {
   };
 
   const handleCreate = () => {
-    setEditingQuestionnaire(null);
+    setEditingQuestionnaire({
+      id: '',
+      title: '',
+      description: '',
+      is_active: true,
+      questionnaire_questions: []
+    });
     setQuestions([]);
     onOpen();
   };
 
   const handleEdit = (questionnaire: Questionnaire) => {
-    setEditingQuestionnaire(questionnaire);
+    setEditingQuestionnaire({ ...questionnaire });
     setQuestions([...questionnaire.questionnaire_questions]);
     onOpen();
   };
@@ -126,15 +132,15 @@ export default function QuestionnaireManager() {
     }
 
     try {
-      const method = editingQuestionnaire ? 'PUT' : 'POST';
+      const method = editingQuestionnaire.id ? 'PUT' : 'POST';
       const response = await fetch('/api/membership/questionnaires', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: editingQuestionnaire?.id,
-          title: editingQuestionnaire?.title || 'New Questionnaire',
-          description: editingQuestionnaire?.description || '',
-          is_active: editingQuestionnaire?.is_active ?? true,
+          id: editingQuestionnaire.id || undefined,
+          title: editingQuestionnaire.title,
+          description: editingQuestionnaire.description || '',
+          is_active: editingQuestionnaire.is_active ?? true,
           questions: questions.map((q, index) => ({ ...q, order_index: index }))
         })
       });
@@ -148,11 +154,14 @@ export default function QuestionnaireManager() {
         });
         onClose();
         loadQuestionnaires();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save questionnaire');
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to save questionnaire',
+        description: error instanceof Error ? error.message : 'Failed to save questionnaire',
         status: 'error',
         duration: 3000,
       });
@@ -218,9 +227,9 @@ export default function QuestionnaireManager() {
       </Table>
 
       {/* Edit Drawer */}
-      <Drawer isOpen={isOpen} onClose={onClose} size="xl">
+      <Drawer isOpen={isOpen} onClose={onClose} size="md" placement="right">
         <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535">
+        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
           <DrawerCloseButton />
           <DrawerHeader borderBottomWidth="1px" color="#353535">
             {editingQuestionnaire ? 'Edit Questionnaire' : 'Create Questionnaire'}
@@ -236,6 +245,7 @@ export default function QuestionnaireManager() {
                   bg="white"
                   borderColor="gray.300"
                   _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                  w="100%"
                 />
               </FormControl>
 
@@ -248,6 +258,7 @@ export default function QuestionnaireManager() {
                   bg="white"
                   borderColor="gray.300"
                   _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                  w="100%"
                 />
               </FormControl>
 
@@ -294,6 +305,7 @@ export default function QuestionnaireManager() {
                             bg="white"
                             borderColor="gray.300"
                             _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                            w="100%"
                           />
                         </FormControl>
 
@@ -306,6 +318,7 @@ export default function QuestionnaireManager() {
                               bg="white"
                               borderColor="gray.300"
                               _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
+                              w="100%"
                             >
                               <option value="text">Text</option>
                               <option value="textarea">Text Area</option>

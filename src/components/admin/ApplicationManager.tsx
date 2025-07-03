@@ -346,9 +346,9 @@ export default function ApplicationManager() {
       )}
 
       {/* Application Details Drawer */}
-      <Drawer isOpen={isOpen} onClose={onClose} size="xl">
+      <Drawer isOpen={isOpen} onClose={onClose} size="md" placement="right">
         <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535">
+        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
           <DrawerCloseButton />
           <DrawerHeader borderBottomWidth="1px" color="#353535">
             Application Details: {selectedApplication?.first_name} {selectedApplication?.last_name}
