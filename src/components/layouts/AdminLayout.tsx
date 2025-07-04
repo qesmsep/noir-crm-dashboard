@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { href: '/admin/calendar', label: 'Calendar', icon: '📅' },
     { href: '/admin/templates', label: 'Templates', icon: '📝' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
+    { href: '/admin/admins', label: 'Admins', icon: '👑' },
   ];
 
   return (
