@@ -291,7 +291,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     return privateEvents.filter((pe: any) => {
       // Convert both event start and calendar date to configured timezone
       const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
-      const calendarDateLocal = fromUTC(currentCalendarDate.toISOString(), settings.timezone);
+      const calendarDateLocal = fromUTC(currentCalendarDate, settings.timezone);
       // Compare by year, month, and day
       return isSameDay(eventDateLocal, calendarDateLocal, settings.timezone);
     });
@@ -340,13 +340,25 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         return;
       }
   
+      // Convert the times from the configured timezone to UTC for storage
+      // FullCalendar provides times in the configured timezone, so we need to convert to UTC
+      const startTimeUTC = toUTC(newStart, settings.timezone);
+      const endTimeUTC = toUTC(newEnd, settings.timezone);
+  
       const body = {
-        start_time: newStart.toISOString(),
-        end_time: newEnd.toISOString(),
+        start_time: startTimeUTC,
+        end_time: endTimeUTC,
         table_id: newTableId,
       };
   
       console.log('[Sending PATCH]', eventId, body);
+      console.log('[Timezone conversion]', {
+        originalStart: newStart,
+        originalEnd: newEnd,
+        convertedStart: startTimeUTC,
+        convertedEnd: endTimeUTC,
+        timezone: settings.timezone
+      });
   
       const response = await fetch(`/api/reservations/${eventId}`, {
         method: 'PATCH',
@@ -389,12 +401,17 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     const { event } = info;
 
     try {
+      // Convert the times from the configured timezone to UTC for storage
+      // FullCalendar provides times in the configured timezone, so we need to convert to UTC
+      const startTimeUTC = toUTC(event.start, settings.timezone);
+      const endTimeUTC = toUTC(event.end, settings.timezone);
+
       const response = await fetch(`/api/reservations/${event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          start_time: event.start.toISOString(),
-          end_time: event.end.toISOString(),
+          start_time: startTimeUTC,
+          end_time: endTimeUTC,
         }),
       });
 
@@ -931,8 +948,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       {!viewOnly && selectedSlot && (
         <Elements stripe={stripePromise}>
           <ReservationForm
-            initialStart={selectedSlot.date.toISOString()}
-            initialEnd={new Date(selectedSlot.date.getTime() + 2 * 60 * 60 * 1000).toISOString()}
+            initialStart={toUTC(selectedSlot.date, settings.timezone)}
+            initialEnd={toUTC(new Date(selectedSlot.date.getTime() + 2 * 60 * 60 * 1000), settings.timezone)}
             table_id={selectedSlot.resourceId}
             bookingStartDate={bookingStartDate}
             bookingEndDate={bookingEndDate}
