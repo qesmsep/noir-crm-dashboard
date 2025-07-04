@@ -42,10 +42,11 @@ export default function Calendar() {
       />
       <Box p={{ base: 4, md: 8 }} zIndex={100}>
         <Box 
-          bg={useColorModeValue('white', 'gray.800')} 
-          borderRadius="24px" 
+          bg={useColorModeValue('white', '#cac2b9')} 
+          borderRadius="10px" 
           boxShadow="0 4px 16px rgba(53,53,53,0.5)" 
           p={8}
+          margin="10px"
           border="3px solid #a59480"
           className="calendar-container"
         >
