@@ -582,6 +582,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           touchAction: 'manipulation',
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
+          width: '100%',
           // Mobile-specific adjustments
           ...(isMobile && {
             fontSize: '14px',
@@ -601,8 +602,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             verticalAlign: 'middle',
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
-            minWidth: '120px',
-            width: '120px',
+            minWidth: '100px',
+            width: '100px',
             flexShrink: 0,
           },
           '.fc-resource-area .fc-resource-title': {
@@ -611,58 +612,51 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
             fontSize: isMobile ? '12px' : '14px',
-            padding: '8px 4px',
+            padding: '8px 2px',
             textAlign: 'center',
           },
-          '.fc-timeline .fc-timeline-body td': {
+          // --- Unified grid lines ---
+          '.fc-timeline, .fc-timeline-header, .fc-timeline-body': {
+            width: '100%',
+            tableLayout: 'fixed',
+          },
+          '.fc-timeline-header, .fc-timeline-body': {
+            borderRight: '1px solid rgba(0,0,0,0.12)',
+            borderBottom: '1px solid rgba(2, 1, 1, 0.08)',
             backgroundColor: '#ecede8',
             verticalAlign: 'middle',
             justifyContent: 'center',
-            paddingTop: '10px',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
-          },
-          '.fc-timeline': {
+            paddingTop: '0px',
             width: '100%',
-            tableLayout: 'fixed',
           },
-          '.fc-timeline-header': {
-            width: '100%',
-            tableLayout: 'fixed',
-            backgroundColor: '#f8f9fa',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          
+          '.fc-timeline-body td': {
+            borderBottom: '1px solid rgba(0,0,0,0.08)',
+            
           },
-          '.fc-timeline-body': {
-            width: '100%',
-            tableLayout: 'fixed',
+          '.fc-timeline-body tr': {
+            borderBottom: '1px solid rgba(0,0,0,0.08)',
+            
+            
           },
-          '.fc-timeline-body .fc-timeline-slot': {
-            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
-          },
-
-          '.fc-timeline-header .fc-timeline-slot': {
-            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
-          },
-
           '.fc-timeline-slot': {
-            minWidth: '60px',
+            borderBottom: '1px solid rgba(0,0,0,0.08)',
+            minwidth: '10px',
+            
           },
           '.fc-timeline-slot-lane': {
-            minWidth: '60px',
-          },
-          '.fc-timeline-body .fc-timeline-slot-lane': {
-            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-          },
-          '.fc-timeline-header .fc-timeline-slot-lane': {
-            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+         
+            margin: '0px',
+            minwidth: '10px',
           },
           '.fc-resource-timeline-divider': {
-            borderRight: '2px solid #353535',
+            borderRight: '1px solidrgb(136, 136, 136)',
+           
+            
           },
           '.fc-resource-area, .fc-timeline-area': {
             verticalAlign: 'top',
+            
           },
           '.fc-resource-area-header': {
             backgroundColor: '#ecede8',
@@ -671,6 +665,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           '.fc-header-toolbar .fc-prev-button': {
             marginRight: '0.5rem',
           },
+          
+          // Adjust the details of the reservations on the calendar
           'a.fc-event': {
             border: '0 !important',
             outline: '0 !important',
@@ -678,7 +674,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             borderRadius: '5px !important',
             boxShadow: '5px 5px 15px .5px !important',
             backgroundColor: 'transparent !important',
-            marginTop: '10px',
+            
+            margin: '0px',
             // Touch optimizations
             touchAction: 'manipulation',
             WebkitUserSelect: 'none',
@@ -764,20 +761,22 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           slotLabelInterval="00:30:00"
           slotLabelFormat={[{ hour: 'numeric', minute: '2-digit', hour12: true }]}
           nowIndicator
-          resourceAreaWidth="120px"
-          resourceAreaHeaderContent={''}
+          resourceAreaWidth="80px"
+          resourceAreaHeaderContent={' '}
+         // Adjust the details of the reservations on the calendar
           eventContent={(arg) => (
             <div
               style={{
                 fontFamily: 'Montserrat, sans-serif',
                 whiteSpace: 'normal',
                 margin: '0px',
-                display: 'flex',
+                display: 'center',
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: isMobile ? '28px' : '24px',
                 fontSize: isMobile ? '12px' : '14px',
                 background: '#a59480',
+               
                 color: 'white',
                 borderRadius: '4px',
                 padding: isMobile ? '0 4px' : '0 2px',
