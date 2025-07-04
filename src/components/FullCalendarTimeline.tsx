@@ -340,8 +340,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         return;
       }
   
-      // Convert the times from the configured timezone to UTC for storage
-      // FullCalendar provides times in the configured timezone, so we need to convert to UTC
+      // FullCalendar provides Date objects in the browser's local timezone
+      // We need to convert from local timezone to the configured timezone, then to UTC
       const startTimeUTC = toUTC(newStart, settings.timezone);
       const endTimeUTC = toUTC(newEnd, settings.timezone);
   
@@ -354,10 +354,15 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       console.log('[Sending PATCH]', eventId, body);
       console.log('[Timezone conversion]', {
         originalStart: newStart,
+        originalStartISO: newStart.toISOString(),
+        originalStartLocal: newStart.toString(),
         originalEnd: newEnd,
+        originalEndISO: newEnd.toISOString(),
+        originalEndLocal: newEnd.toString(),
         convertedStart: startTimeUTC,
         convertedEnd: endTimeUTC,
-        timezone: settings.timezone
+        timezone: settings.timezone,
+        browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
       });
   
       const response = await fetch(`/api/reservations/${eventId}`, {
@@ -401,8 +406,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     const { event } = info;
 
     try {
-      // Convert the times from the configured timezone to UTC for storage
-      // FullCalendar provides times in the configured timezone, so we need to convert to UTC
+      // FullCalendar provides Date objects in the browser's local timezone
+      // We need to convert from local timezone to the configured timezone, then to UTC
       const startTimeUTC = toUTC(event.start, settings.timezone);
       const endTimeUTC = toUTC(event.end, settings.timezone);
 
