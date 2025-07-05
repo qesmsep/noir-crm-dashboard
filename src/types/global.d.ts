@@ -1,4 +1,4 @@
-declare const Buffer: typeof import('buffer').Buffer;
+declare const Buffer: typeof Buffer;
 
 declare module 'pdfkit' {
   const PDFDocument: any;
