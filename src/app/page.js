@@ -14,6 +14,7 @@ import ReservationForm from '../components/ReservationForm';
 import ReservationSection from '../components/ReservationSection';
 import Modal from 'react-modal';
 import { useSettings } from '../context/SettingsContext';
+import MenuViewer from '../components/MenuViewer';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -349,14 +350,15 @@ export default function Home() {
       </section>
 
       {/* Mobile-Optimized Noir Menu Section */}
-      <section className="bg-[#ABA8A1] py-12 sm:py-16 px-4 sm:px-8">
+      <section className="bg-[#ABA8A1] py-36 sm:py-32 px-4 sm:px-8;">
         <div className="max-w-6xl mx-auto flex flex-col items-center justify-center">
           <h3 
             className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-center"
             style={{ 
-              fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', 
+              fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif',
+              marginTop: '100px',
               textTransform: 'uppercase',
-              fontWeight: 600,
+              fontWeight: 900,
               letterSpacing: '0.08em',
               color: '#353535'
             }}
@@ -373,15 +375,13 @@ export default function Home() {
             Explore our curated selection of cocktails, spirits, and small plates. Enjoy the Noir experience.
           </p>
           <div className="w-full max-w-4xl mx-auto px-4 flex justify-center">
-            <button onClick={() => setMenuModalOpen(true)} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }} aria-label="Open Noir Menu">
-              <Image 
-                src="/images/noir-menu.png" 
-                alt="Noir Menu" 
-                width={1200} 
-                height={1200} 
-                className="w-full h-auto rounded-2xl shadow-2xl mx-auto" 
-                style={{ borderRadius: '1.5rem', boxShadow: '0 8px 32px rgba(53,53,53,0.15)' }} 
-              />
+            <button
+              onClick={() => setMenuModalOpen(true)}
+              className="mobile-button mobile-accessible px-6 py-3 rounded-full bg-[#BCA892] text-[#23201C] text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
+              style={{ fontFamily: 'Montserrat, sans-serif', letterSpacing: '0.05em', touchAction: 'manipulation', minWidth: 180, marginBottom: '100px' }}
+              aria-label="View Noir Menu"
+            >
+              View Menu
             </button>
           </div>
         </div>
@@ -652,9 +652,9 @@ export default function Home() {
             padding: '20px'
           },
           content: {
-            maxWidth: '95vw',
-            maxHeight: '95vh',
-            width: 'auto',
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            width: '90vw',
             height: 'auto',
             margin: 'auto',
             background: '#23201C',
@@ -696,28 +696,8 @@ export default function Home() {
         >
           ×
         </button>
-        <div style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'auto'
-        }}>
-          <img
-            src="/images/noir-menu.png"
-            alt="Noir Menu"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              width: 'auto',
-              height: 'auto',
-              borderRadius: '1rem',
-              boxShadow: '0 8px 32px rgba(53,53,53,0.15)',
-              objectFit: 'contain'
-            }}
-          />
-        </div>
+        <h2 className="text-2xl font-bold text-[#ECEDE8] mb-4" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Noir Menu</h2>
+        <MenuViewer />
       </Modal>
     </div>
   );
