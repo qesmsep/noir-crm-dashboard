@@ -11,3 +11,9 @@ declare module '@sendgrid/mail' {
   export const setApiKey: (key: string) => void;
   export const send: (...args: any[]) => Promise<any>;
 }
+
+declare namespace NodeJS {
+  interface ProcessEnv {
+    [key: string]: string | undefined;
+  }
+}
