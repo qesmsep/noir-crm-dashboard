@@ -1,4 +1,4 @@
-declare const Buffer: typeof import('buffer').Buffer;
+/// <reference types="node" />
 
 declare module 'pdfkit' {
   const PDFDocument: any;
@@ -11,5 +11,3 @@ declare module '@sendgrid/mail' {
   export const setApiKey: (key: string) => void;
   export const send: (...args: any[]) => Promise<any>;
 }
-
-declare const process: any;
