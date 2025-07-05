@@ -7,17 +7,28 @@
     {
       "path": "/api/cron-process-reminders",
       "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron-monthly-statements",
+      "schedule": "0 0 * * *"
     }
   ],
   "functions": {
     "src/pages/api/cron-process-reminders.ts": {
       "maxDuration": 30
+    },
+    "src/pages/api/cron-monthly-statements.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
     {
       "source": "/api/cron-process-reminders",
       "destination": "/api/cron-process-reminders"
+    },
+    {
+      "source": "/api/cron-monthly-statements",
+      "destination": "/api/cron-monthly-statements"
     }
   ]
 } 
