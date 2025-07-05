@@ -28,7 +28,8 @@
       "./node_modules/@types"
     ],
     "types": [
-      "node"
+      "node",
+      "next"
     ],
     "baseUrl": "./",
     "paths": {
