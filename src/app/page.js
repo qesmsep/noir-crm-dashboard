@@ -643,32 +643,31 @@ export default function Home() {
         onRequestClose={() => setMenuModalOpen(false)}
         contentLabel="Noir Menu Modal"
         style={{
-          overlay: { 
-            backgroundColor: 'rgba(0,0,0,0.9)', 
+          overlay: {
+            backgroundColor: 'rgba(0,0,0,0.9)',
             zIndex: 2000,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '20px'
+            padding: 0,
           },
           content: {
-            maxWidth: '90vw',
-            maxHeight: '90vh',
-            width: '90vw',
-            height: 'auto',
-            margin: 'auto',
+            inset: 0,
             background: '#23201C',
             border: 'none',
-            borderRadius: '1.5rem',
-            padding: '20px',
+            borderRadius: '0',
+            padding: 0,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 2001,
-            overflow: 'auto',
-            position: 'relative'
-          }
+            overflowY: 'auto',
+            width: '100%',
+            height: '100vh',
+            maxWidth: '100%',
+            maxHeight: '100vh',
+            margin: '0 auto',
+          },
         }}
         ariaHideApp={false}
       >
