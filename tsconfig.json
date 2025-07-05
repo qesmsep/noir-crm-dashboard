@@ -26,10 +26,6 @@
     "typeRoots": [
       "./src/types",
       "./node_modules/@types"
-    ],
-    "types": [
-      "@types/node",
-      "@supabase/supabase-js"
     ]
   },
   "include": [
