@@ -3,7 +3,6 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import sgMail from '@sendgrid/mail';
 import PDFDocument from 'pdfkit';
-import { Buffer } from 'buffer';
 
 // Initialise SendGrid
 if (!process.env.SENDGRID_API_KEY) {

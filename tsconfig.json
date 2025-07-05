@@ -22,8 +22,7 @@
         "name": "next"
       }
     ],
-    "strictNullChecks": true,
-    "types": ["node"]
+    "strictNullChecks": true
   },
   "include": [
     "next-env.d.ts",
