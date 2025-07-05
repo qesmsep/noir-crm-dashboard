@@ -1,7 +1,9 @@
+/// <reference types="node" />
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import sgMail from '@sendgrid/mail';
 import PDFDocument from 'pdfkit';
+import { Buffer } from 'buffer';
 
 // Initialise SendGrid
 if (!process.env.SENDGRID_API_KEY) {
@@ -101,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Unauthorized – Only Vercel cron jobs or authorized tokens allowed' });
     }
     const token = authHeader.substring(7);
-    if (token !== 'cron-secret-token-2024') {
+    if (token !== process.env.CRON_SECRET_TOKEN) {
       return res.status(401).json({ error: 'Invalid token' });
     }
   }

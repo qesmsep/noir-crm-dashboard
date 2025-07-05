@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const token = authHeader.substring(7);
-    if (token !== 'cron-secret-token-2024') {
+    if (token !== process.env.CRON_SECRET_TOKEN) {
       return res.status(401).json({ error: 'Invalid token' });
     }
   }
