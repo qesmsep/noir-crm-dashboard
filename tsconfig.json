@@ -29,8 +29,7 @@
     ],
     "types": [
       "node",
-      "next",
-      "@supabase/supabase-js"
+      "next"
     ],
     "baseUrl": "./",
     "paths": {
