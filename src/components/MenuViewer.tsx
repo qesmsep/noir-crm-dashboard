@@ -1,6 +1,7 @@
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import type { RefObject } from 'react';
 import Slider from 'react-slick';
 
 const menuImages = [
@@ -12,8 +13,28 @@ const menuImages = [
   '/menu/Noir Menu - 06.png',
 ];
 
+function Arrow({ direction, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`z-50 absolute top-1/2 ${direction === 'left' ? 'left-[15px]' : 'right-[15px]'}  border-2  text-[#ECEDE8] w-14 h-14 rounded-full flex items-center justify-center focus:outline-none`}
+      style={{ border: '0px solid #ECEDE8', boxShadow: 'none', transform: 'translateY(-50%)', transition: 'none' }}
+      aria-label={direction === 'left' ? 'Previous menu page' : 'Next menu page'}
+    >
+      {direction === 'left' ? (
+        <svg width="36" height="36" fill="none" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke="#ECEDE8" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      ) : (
+        <svg width="36" height="36" fill="none" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke="#ECEDE8" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      )}
+    </button>
+  );
+}
+
 const MenuViewer: React.FC = () => {
   const [loaded, setLoaded] = useState(Array(menuImages.length).fill(false));
+  const sliderRef = useRef<Slider>(null);
+  const [current, setCurrent] = useState(0);
 
   const settings = {
     dots: true,
@@ -21,9 +42,11 @@ const MenuViewer: React.FC = () => {
     speed: 500,
     slidesToShow: 1,
     slidesToScroll: 1,
-    arrows: true,
+    arrows: false,
     swipe: true,
     adaptiveHeight: true,
+    beforeChange: (oldIndex, newIndex) => setCurrent(newIndex),
+    customPaging: i => <button className="w-2 h-2 rounded-full bg-[#ECEDE8] opacity-60 mx-1" />,
     responsive: [
       {
         breakpoint: 768,
@@ -35,10 +58,10 @@ const MenuViewer: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex flex-col items-center justify-center">
-      <Slider {...settings} className="w-full max-w-2xl mx-auto">
+    <div className="w-full flex flex-col items-center justify-center relative">
+      <Slider ref={sliderRef} {...settings} className="w-full max-w-2xl mx-auto">
         {menuImages.map((src, idx) => (
-          <div key={src} className="flex items-center justify-center w-full">
+          <div key={src} className="flex items-center justify-center w-full relative">
             <img
               src={src}
               alt={`Noir Menu Page ${idx + 1}`}
@@ -49,6 +72,12 @@ const MenuViewer: React.FC = () => {
           </div>
         ))}
       </Slider>
+      {current > 0 && (
+        <Arrow direction="left" onClick={() => sliderRef.current?.slickPrev()} />
+      )}
+      {current < menuImages.length - 1 && (
+        <Arrow direction="right" onClick={() => sliderRef.current?.slickNext()} />
+      )}
     </div>
   );
 };
