@@ -641,7 +641,7 @@ export default function MemberDetailAdmin() {
           {members.map(member => (
             <Box key={member.member_id} minH="540px" display="flex" flexDirection="column" alignItems="center" bg="transparent" borderRadius="16px" boxShadow="none" p={0} fontFamily="Montserrat, sans-serif" position="relative">
               {/* Profile Card Box */}
-              <Box position="relative" bg="#a59480" borderRadius="24px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" p={15} pb="90px" pt="90px" w="100%" maxW="600px" display="flex" flexDirection="column" alignItems="center">
+              <Box position="relative" bg="#a59480" borderRadius="16px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" p={15} pb="10%" pt="10%" w="100%" maxW="500px" display="flex" flexDirection="column" alignItems="center">
                 {/* Photo as background, floating above card */}
                 <Box
                   position="absolute"
@@ -649,27 +649,27 @@ export default function MemberDetailAdmin() {
                   left="50%"
                   transform="translateX(-50%)"
                   zIndex={2}
-                  borderRadius="100"
+                  borderRadius="100%"
                   border="2px solid white"
                   overflow="hidden"
-                  width="200px"
-                  height="200px"
+                  width="35%"
+                  height="35%"
                   boxShadow="0 2px 8px rgba(0,0,0,0.50)"
                   bg="#fff"
                 >
                   {member.photo ? (
-                    <img src={member.photo} alt={`${member.first_name} ${member.last_name}`} style={{ width: '200px', height: '200px', objectFit: 'cover' }} />
+                    <img src={member.photo} alt={`${member.first_name} ${member.last_name}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <Box width="140px"  height="140px" display="flex" alignItems="center" justifyContent="center" bg="#F7FAFC" >
-                      <Text  fontSize="3xl" color="#ecede8" fontWeight="bold">{member.first_name?.[0]}{member.last_name?.[0]}</Text>
+                    <Box width="100%"  height="100%" display="flex" alignItems="center" justifyContent="center" bg="#F7FAFC" >
+                      
                     </Box>
                   )}
                 </Box>
-                {/* Name overlays photo */}
+                {/* Member Name */}
                 <Box
                   position="relative"
                   zIndex={2}
-                  top="10px"
+                  top="2%"
                   mb={4}
                   textAlign="center"
                   width="100%"
@@ -681,51 +681,51 @@ export default function MemberDetailAdmin() {
                   </Text>
                 </Box>
                 {/* Info Box */}
-                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30} position="relative">
+                <Box bg="#ecede8" p={1} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="95%" mt={2} padding={10} position="relative">
                   <SimpleGrid columns={2} spacingX={10} spacingY={1} ml={0} w="100%" alignItems="start">
-                    <VStack align="flex-start" spacing={1} ml={12}>
-                      <HStack spacing={15} color="#353535" width="90%">
-                        <PhoneIcon boxSize={18} />
+                    <VStack align="flex-start" spacing={1} ml={1}>
+                      <HStack spacing={1} color="#353535" width="90%">
+                        <PhoneIcon boxSize={10} />
                         {isEditingMember === member.member_id ? (
                           <Input
                             value={editMemberData?.phone || ''}
                             onChange={(e) => handleInlineEditChange('phone', e.target.value)}
                             size="sm"
-                            fontSize="16px"
+                            fontSize="12px"
                             fontFamily="Montserrat, sans-serif"
                             bg="white"
                             border="1px solid #A59480"
                             borderRadius="4px"
                           />
                         ) : (
-                          <Text fontSize="16px" margin={5}>{formatPhone(member.phone) || <span style={{ color: '#ccc' }}> </span>}</Text>
+                          <Text fontSize="14px" margin={5}>{formatPhone(member.phone) || <span style={{ color: '#ccc' }}> </span>}</Text>
                         )}
                       </HStack>
-                      <HStack spacing={15} color="#353535">
-                        <EmailIcon boxSize={18} />
+                      <HStack spacing={1} color="#353535">
+                        <EmailIcon boxSize={10} />
                         {isEditingMember === member.member_id ? (
                           <Input
                             value={editMemberData?.email || ''}
                             onChange={(e) => handleInlineEditChange('email', e.target.value)}
                             size="sm"
                             fontFamily="Montserrat, sans-serif"
-                            fontSize="16px"
+                            fontSize="12px"
                             bg="white"
                             border="1px solid #A59480"
                             borderRadius="4px"
                           />
                         ) : (
-                          <Text fontSize="16px" margin={5}>{member.email || <span style={{ color: '#ccc' }}> </span>}</Text>
+                          <Text fontSize="14px" margin={5}>{member.email || <span style={{ color: '#ccc' }}> </span>}</Text>
                         )}
                       </HStack>
-                      <HStack spacing={15} color="#353535">
-                        <Box as={FaBriefcase} boxSize={16} />
+                      <HStack spacing={1} color="#353535">
+                        <Box as={FaBriefcase} boxSize={10} />
                         {isEditingMember === member.member_id ? (
                           <Input
                             value={editMemberData?.company || ''}
                             onChange={(e) => handleInlineEditChange('company', e.target.value)}
                             size="sm"
-                            fontSize="16px"
+                            fontSize="12px"
                             fontFamily="Montserrat, sans-serif"
                             bg="white"
                             border="1px solid #A59480"
@@ -733,7 +733,7 @@ export default function MemberDetailAdmin() {
                             placeholder="Company"
                           />
                         ) : (
-                          <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>
+                          <Text fontSize="14px" fontFamily="Montserrat, sans-serif" margin={5}>
                             Co.: {member.company || <span style={{ color: '#bbb' }}>—</span>}
                           </Text>
                         )}
@@ -741,8 +741,8 @@ export default function MemberDetailAdmin() {
                     </VStack>
                     <VStack align="flex-start" spacing={1} mr={2} width="100%">
                       {member.dob && (
-                        <HStack spacing={15} color="#353535">
-                          <CalendarIcon boxSize={16} />
+                        <HStack spacing={1} color="#353535">
+                          <CalendarIcon boxSize={10} />
                           {isEditingMember === member.member_id ? (
                             <Input
                               type="date"
@@ -750,21 +750,21 @@ export default function MemberDetailAdmin() {
                               onChange={(e) => handleInlineEditChange('dob', e.target.value)}
                               size="sm"
                               fontFamily="Montserrat, sans-serif"
-                              fontSize="16px"
+                              fontSize="12px"
                               bg="white"
                               border="1px solid #A59480"
                               borderRadius="4px"
                             />
                           ) : (
-                            <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>
+                            <Text fontSize="14px" fontFamily="Montserrat, sans-serif" margin={5}>
                               Birthdate: {new Date(member.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </Text>
                           )}
                         </HStack>
                       )}
                       {member.join_date && (
-                        <HStack spacing={15} color="#353535">
-                          <CalendarIcon boxSize={16} />
+                        <HStack spacing={1} color="#353535">
+                          <CalendarIcon boxSize={10} />
                           {isEditingMember === member.member_id ? (
                             <Input
                               type="date"
@@ -772,24 +772,24 @@ export default function MemberDetailAdmin() {
                               onChange={(e) => handleInlineEditChange('join_date', e.target.value)}
                               size="sm"
                               fontFamily="Montserrat, sans-serif"
-                              fontSize="16px"
+                              fontSize="12px"
                               bg="white"
                               border="1px solid #A59480"
                               borderRadius="4px"
                             />
                           ) : (
-                            <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>Member Since: {new Date(member.join_date).toLocaleDateString()}</Text>
+                            <Text fontSize="14px" fontFamily="Montserrat, sans-serif" margin={5}>Member Since: {new Date(member.join_date).toLocaleDateString()}</Text>
                           )}
                         </HStack>
                       )}
-                      <HStack spacing={15} color="#353535">
-                        <Box as={FaUser} boxSize={16} />
+                      <HStack spacing={1} color="#353535">
+                        <Box as={FaUser} boxSize={10} />
                         {isEditingMember === member.member_id ? (
                           <Input
                             value={editMemberData?.referred_by || ''}
                             onChange={(e) => handleInlineEditChange('referred_by', e.target.value)}
                             size="sm"
-                            fontSize="16px"
+                            fontSize="12px"
                             fontFamily="Montserrat, sans-serif"
                             bg="white"
                             border="1px solid #A59480"
@@ -797,7 +797,7 @@ export default function MemberDetailAdmin() {
                             placeholder="Referred by"
                           />
                         ) : (
-                          <Text fontSize="16px" fontFamily="Montserrat, sans-serif" margin={5}>Referred by: {member.referred_by || <span style={{ color: '#bbb' }}>—</span>}</Text>
+                          <Text fontSize="14px" fontFamily="Montserrat, sans-serif" margin={5}>Referred by: {member.referred_by || <span style={{ color: '#bbb' }}>—</span>}</Text>
                         )}
                       </HStack>
                     </VStack>
@@ -813,6 +813,7 @@ export default function MemberDetailAdmin() {
                           onClick={() => handleInlineSaveEdit(member.member_id)}
                           bg="#A59480"
                           color="white"
+                          
                           borderRadius="12px"
                           fontWeight="semibold"
                           fontSize="md"
@@ -854,15 +855,15 @@ export default function MemberDetailAdmin() {
                 {/* Add 10px space between info card and attributes card */}
                 <Box h="10px" />
                 {/* Centered Attributes & Notes title above the card */}
-                <Box width="100%" textAlign="center" mb={2}>
-                  <Text fontSize="32px" fontWeight="bold" color="#ecede8" fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} mb={0}>
+                <Box width="95%" textAlign="center" mb={2}>
+                  <Text fontSize="24px" fontWeight="bold" color="#ecede8" fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} mb={0}>
                     Attributes & Notes
                   </Text>
                 </Box>
               
-                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="100%" mt={2} padding={30} mb={-10}>
+                <Box bg="#ecede8" p={4} borderRadius="12px" boxShadow="0 4px 16px rgba(53,53,53,0.5)" w="95%" mt={2} padding={10} mb={0}>
                   {/* Attributes Section */}
-                  <Text fontWeight="bold" fontFamily="Montserrat Bold, sans-serif" fontSize="lg" mb={2} color="#a59480">Attributes</Text>
+                  <Text fontFamily="Montserrat Bold, sans-serif" fontSize="14px" mb={2} color="#a59480">Attributes</Text>
                   {/* List attributes */}
                   <VStack align="stretch" margin={0} padding={0} ml={0} spacing={0} mb={0} w="100%">
                     {(memberAttributes[member.member_id] || []).map(attr => (
@@ -876,7 +877,7 @@ export default function MemberDetailAdmin() {
                             bg="#ECEDE8"
                             border="2px solid #A59480"
                             borderRadius="8px"
-                            fontSize="18px"
+                            fontSize="14px"
                             fontFamily="Montserrat, sans-serif"
                             
                             py={2}
@@ -891,14 +892,14 @@ export default function MemberDetailAdmin() {
                             bg="#ECEDE8"
                             border="2px solid #A59480"
                             borderRadius="8px"
-                            fontSize="18px"
+                            fontSize="14px"
                             fontFamily="Montserrat, sans-serif"
                             
                             py={2}
                             px={3}
                             _placeholder={{ color: "#999" }}
                           />
-                          <Button size="sm" colorScheme="green" fontSize="15px" minW="65px" borderRadius="8px" onClick={() => handleSaveEdit(member.member_id)}>Save</Button>
+                          <Button size="sm" colorScheme="green" fontSize="14px" minW="65px" borderRadius="8px" onClick={() => handleSaveEdit(member.member_id)}>Save</Button>
                           <Button size="sm" variant="ghost" minW="65px" borderRadius="8px" onClick={() => handleCancelEdit(member.member_id)}>Cancel</Button>
                           {confirmingDelete[member.member_id] === attr.id ? (
                             <Button
@@ -930,10 +931,10 @@ export default function MemberDetailAdmin() {
                         <Flex key={attr.id} align="center" justify="space-between" mb={2} width="100%">
                           <Flex w="75%" gap={50}>
                             <Box minW="150px">
-                              <Text fontWeight="semibold" color="#353535" fontSize="18px">{attr.key}</Text>
+                              <Text fontWeight="semibold" color="#353535" fontSize="14px">{attr.key}</Text>
                             </Box>
                             <Box>
-                              <Text fontSize="18px" color="#353535">{attr.value}</Text>
+                              <Text fontSize="14px" color="#353535">{attr.value}</Text>
                             </Box>
                           </Flex>
                           <Button
@@ -963,7 +964,7 @@ export default function MemberDetailAdmin() {
                       bg="#ECEDE8"
                       border="2px solid #A59480"
                       borderRadius="8px"
-                      fontSize="18px"
+                      fontSize="14px"
                       fontFamily="Montserrat, sans-serif"
                       py={2}
                       px={3}
@@ -979,7 +980,7 @@ export default function MemberDetailAdmin() {
                       ml={10}
                       border="2px solid #A59480"
                       borderRadius="8px"
-                      fontSize="18px"
+                      fontSize="14px"
                       fontFamily="Montserrat, sans-serif"
                       py={2}
                       px={3}
@@ -988,7 +989,7 @@ export default function MemberDetailAdmin() {
                     <Button bg="#A59480" color="white" borderRadius="8px" fontWeight="semibold" fontSize="md" ml={18} minW="80px" alignContent="right" _hover={{ bg: '#8B7B68' }} onClick={() => handleAddAttribute(member.member_id)}>Add</Button>
                   </Flex>
                   {/* Notes Section */}
-                  <Text fontWeight="bold" fontFamily="Montserrat Bold, sans-serif" fontSize="lg" mb={2} color="#a59480">Notes History</Text>
+                  <Text fontWeight="bold" fontFamily="Montserrat Bold, sans-serif" fontSize="14px" mb={2} color="#a59480">Notes History</Text>
                   <VStack align="stretch" spacing={2} w="100%">
                     {(memberNotes[member.member_id] || []).map(note => (
                       <Flex key={note.id} align="center" gap={2} mb={1} width="100%">
@@ -1002,13 +1003,13 @@ export default function MemberDetailAdmin() {
                               bg="#ECEDE8"
                               border="2px solid #A59480"
                               borderRadius="8px"
-                              fontSize="18px"
+                              fontSize="14px"
                               fontFamily="Montserrat, sans-serif"
                               py={2}
                               px={3}
                               _placeholder={{ color: "#999" }}
                             />
-                            <Button size="sm" colorScheme="green" minW="65px" fontSize="15px" borderRadius="8px" onClick={() => handleSaveEditNote(member.member_id)}>Save</Button>
+                            <Button size="sm" colorScheme="green" minW="65px" fontSize="14px" borderRadius="8px" onClick={() => handleSaveEditNote(member.member_id)}>Save</Button>
                             <Button size="sm" variant="ghost" minW="65px" borderRadius="8px" onClick={() => handleCancelEditNote(member.member_id)}>Cancel</Button>
                             {pendingDeleteNote[member.member_id] === note.id ? (
                               <Button size="sm" backgroundColor="red" color="white"  minW="110px" borderRadius="8px" onClick={() => handleDeleteNote(member.member_id)}>Delete</Button>
@@ -1018,7 +1019,7 @@ export default function MemberDetailAdmin() {
                           </>
                         ) : (
                           <>
-                            <Text minW="160px" w="65%" fontSize="18px">{note.note}</Text>
+                            <Text minW="160px" w="65%" fontSize="14px">{note.note}</Text>
                             <Text fontSize="12px" color="#888" minW="140px">{
                               (() => {
                                 const d = new Date(note.created_at);
@@ -1030,7 +1031,7 @@ export default function MemberDetailAdmin() {
                                 return `${mm}/${dd}/${yy} ${hh}:${min}`;
                               })()
                             }</Text>
-                            <Button size="sm" minW="65px" borderRadius="8px" backgroundColor="#a59480" color="white" fontSize="15px" onClick={() => handleEditNoteClick(member.member_id, note)} colorScheme="yellow">Edit</Button>
+                            <Button size="sm" minW="65px" borderRadius="8px" backgroundColor="#a59480" color="white" fontSize="14px" onClick={() => handleEditNoteClick(member.member_id, note)} colorScheme="yellow">Edit</Button>
                           </>
                         )}
                       </Flex>
@@ -1047,7 +1048,7 @@ export default function MemberDetailAdmin() {
                       bg="#ECEDE8"
                       border="2px solid #A59480"
                       borderRadius="8px"
-                      fontSize="18px"
+                      fontSize="14px"
                       fontFamily="Montserrat, sans-serif"
                       py={2}
                       px={3}
@@ -1059,7 +1060,7 @@ export default function MemberDetailAdmin() {
                       color="white"
                       borderRadius="8px"
                       fontWeight="semibold"
-                      fontSize="md"
+                      fontSize="12"
                       
                       minW="80px"
                       _hover={{ bg: '#8B7B68' }}
@@ -1073,7 +1074,7 @@ export default function MemberDetailAdmin() {
                 <Box h={1} />
                 {/* Member ID in bottom-right corner */}
                 <Box position="absolute" bottom="12px" right="20px">
-                  <Text fontSize="sm" fontStyle="italic" color="#ECEDE8" opacity={0.6}>
+                  <Text fontSize="10px" fontStyle="italic" color="#ECEDE8" opacity={0.6}>
                     ID: {member.member_id}
                   </Text>
                 </Box>
@@ -1132,12 +1133,13 @@ export default function MemberDetailAdmin() {
             </Box>
           )}
         </Box>
+        
         {/* Message + History Card */}
         <Box bg="white" border="3px solid #a59480" borderRadius="16px" width="94%" marginLeft="2%" boxShadow="lg" p={8} mb={8} paddingTop={20}> 
           
           <Box display={{ base: 'block', md: 'flex' }} gap={16} paddingBottom={10}>
             {/* Send Message Form */}
-            <Box flex={10} width="50%" mr={{ md: 6 }}>
+            <Box flex={10} width="50%" marginLeft="25%" mr={{ md: 6 }}>
               <SendMessageForm
                 members={members as any}
                 accountId={accountId as string}
