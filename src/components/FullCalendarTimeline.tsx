@@ -167,7 +167,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   useEffect(() => {
     const fetchPrivateEvents = async () => {
       try {
-        const res = await fetch('/api/private-events');
+        // Get date range for the next 6 months to ensure we have all relevant events
+        const now = new Date();
+        const startDate = now.toISOString();
+        const endDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString();
+        
+        const res = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
         if (!res.ok) throw new Error('Failed to fetch private events');
         const privateEventsData = await res.json();
         setPrivateEvents(privateEventsData.data || []);
@@ -286,15 +291,43 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     setSlotMaxTime('26:00:00');
   }, [resources, eventData, currentCalendarDate, privateEvents]);
 
-  // Get private events for the current day
+  // Get private events for the current calendar date
   const getCurrentDayPrivateEvents = () => {
-    return privateEvents.filter((pe: any) => {
-      // Convert both event start and calendar date to configured timezone
+    console.log('=== DEBUG: getCurrentDayPrivateEvents ===');
+    console.log('Total private events:', privateEvents.length);
+    console.log('Current calendar date:', currentCalendarDate);
+    console.log('Settings timezone:', settings.timezone);
+    
+    const filtered = privateEvents.filter((pe: any) => {
+      // Only show active events
+      if (pe.status !== 'active') {
+        console.log(`Skipping ${pe.title} - not active`);
+        return false;
+      }
+      
+      // Convert event start to configured timezone
       const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
-      const calendarDateLocal = fromUTC(currentCalendarDate, settings.timezone);
+      
+      // For calendar date, since it's already a Date object, we need to convert it properly
+      // Create a date string in the format that fromUTC expects (YYYY-MM-DDTHH:mm:ss.sssZ)
+      const calendarDateUTC = currentCalendarDate.toISOString();
+      const calendarDateLocal = fromUTC(calendarDateUTC, settings.timezone);
+      
+      console.log(`Event: ${pe.title}`);
+      console.log(`  Event start_time: ${pe.start_time}`);
+      console.log(`  Event date local: ${eventDateLocal}`);
+      console.log(`  Calendar date UTC: ${calendarDateUTC}`);
+      console.log(`  Calendar date local: ${calendarDateLocal}`);
+      
       // Compare by year, month, and day
-      return isSameDay(eventDateLocal, calendarDateLocal, settings.timezone);
+      const isSame = isSameDay(eventDateLocal, calendarDateLocal, settings.timezone);
+      console.log(`  Is same day: ${isSame}`);
+      
+      return isSame;
     });
+    
+    console.log('Filtered events:', filtered.length);
+    return filtered;
   };
 
   // Get reservations for a specific private event
@@ -557,6 +590,29 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const currentDayPrivateEvents = getCurrentDayPrivateEvents();
+  
+  // Debug logging for date changes
+  console.log('Current calendar date:', currentCalendarDate);
+  console.log('Private events for this date:', currentDayPrivateEvents.length);
+  if (currentDayPrivateEvents.length > 0) {
+    console.log('Events found:', currentDayPrivateEvents.map(pe => pe.title));
+  }
+  
+  // Manual test for July 12, 2025
+  const testDate = new Date('2025-07-12T00:00:00.000Z');
+  const testEvents = privateEvents.filter(pe => {
+    if (pe.status !== 'active') return false;
+    const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
+    const testDateLocal = fromUTC(testDate, settings.timezone);
+    return isSameDay(eventDateLocal, testDateLocal, settings.timezone);
+  });
+  console.log('Manual test - Events for July 12, 2025:', testEvents.map(pe => pe.title));
+  
+  // Test all private events
+  console.log('All private events:');
+  privateEvents.forEach(pe => {
+    console.log(`- ${pe.title}: ${pe.start_time} (status: ${pe.status})`);
+  });
 
   return (
     <Box
@@ -812,6 +868,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             </div>
           )}
           datesSet={handleDatesSet}
+          eventDidMount={(info) => {
+            console.log('Event mounted:', info.event.title);
+          }}
         />
       </Box>
       
@@ -829,25 +888,26 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       </Box>
 
       {/* Private Events Section */}
-      {currentDayPrivateEvents.length > 0 && eventData.resRes && (
-        <Box
-          bg="white"
-          p={6}
-          borderRadius="2xl"
-          boxShadow="0 2px 8px rgba(0,0,0,0.07)"
-          border="1px solid"
-          borderColor="gray.100"
-          mx="auto"
-          maxW="80%"
-          mt={8}
-        >
-          <Heading size="md" mb={4} color="nightSky" fontWeight="600">
-            🔒 Private Events for {formatDate(currentCalendarDate, settings.timezone, { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </Heading>
+      <Box
+        bg="white"
+        p={6}
+        borderRadius="2xl"
+        boxShadow="0 2px 8px rgba(0,0,0,0.07)"
+        border="1px solid"
+        borderColor="gray.100"
+        mx="auto"
+        maxW="80%"
+        mt={8}
+      >
+        <Heading size="md" mb={4} color="nightSky" fontWeight="600">
+          🔒 Private Events for {formatDate(currentCalendarDate, settings.timezone, { 
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+        </Heading>
+        
+        {currentDayPrivateEvents.length > 0 ? (
           <Table variant="simple" size="sm">
             <Thead>
               <Tr>
@@ -917,8 +977,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
               })}
             </Tbody>
           </Table>
-        </Box>
-      )}
+        ) : (
+          <Text color="gray.500" textAlign="center" py={4}>
+            No private events scheduled for this date.
+          </Text>
+        )}
+      </Box>
 
       {!viewOnly && (
         <Elements stripe={stripePromise}>

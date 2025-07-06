@@ -204,14 +204,14 @@ const MemberLedger = ({
       <TableContainer 
         bg="#ecede8" 
         borderRadius="16px" 
-        p={16} 
+        p={10} 
         mx={4}
         boxShadow="0 4px 16px rgba(53,53,53,0.5)"
       >
-        <Table variant="simple" size="12px" width="90%">
+        <Table variant="simple" size="12px" width="100%">
           <Thead bg="#353535">
             <Tr>
-              <Th px={10} py={5} borderRadius="16px"  margin={10} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
+              <Th px={10} py={5} borderRadius="16px"  margin={0} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
                 Date
               </Th>
               <Th px={10} py={5} borderRadius="16px" margin={10} borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
@@ -249,7 +249,7 @@ const MemberLedger = ({
                   _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
                 />
               </Td>
-              <Td px={6} py={10} padding={5} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
+              <Td px={6} py={1} padding={5} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
                 <Select
                   variant="filled"
                   bg="white"
@@ -355,7 +355,7 @@ const MemberLedger = ({
 
                 return (
                   <Tr sx={{ height: '32px' }} key={tx.id || idx}>
-                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8">
+                    <Td px={1} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8">
                       {isEditing ? (
                         <Input
                           type="date"

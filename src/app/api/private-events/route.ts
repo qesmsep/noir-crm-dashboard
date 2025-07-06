@@ -102,12 +102,27 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    
+    let query = supabase
       .from('private_events')
       .select('*')
-      .order('created_at', { ascending: false });
+      .eq('status', 'active')
+      .order('start_time', { ascending: true });
+    
+    // Add date filtering if provided
+    if (startDate) {
+      query = query.gte('start_time', startDate);
+    }
+    if (endDate) {
+      query = query.lte('end_time', endDate);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching private events:', error);
