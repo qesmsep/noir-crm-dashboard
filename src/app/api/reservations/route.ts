@@ -49,10 +49,10 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
 
     console.log('Reservation found:', reservation);
 
-    // Get admin notification phone from settings
+    // Get admin notification phone and timezone from settings
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
-      .select('admin_notification_phone')
+      .select('admin_notification_phone, timezone')
       .single();
 
     console.log('Settings found:', settings);
@@ -73,14 +73,17 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       adminPhone = '+1' + adminPhone;
     }
 
-    // Format date and time
-    const startDate = new Date(reservation.start_time);
-    const formattedDate = startDate.toLocaleDateString('en-US', {
+    // Get timezone from settings or default to America/Chicago
+    const timezone = settings.timezone || 'America/Chicago';
+    
+    // Format date and time using Luxon with timezone awareness
+    const startDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(timezone);
+    const formattedDate = startDate.toLocaleString({
       month: '2-digit',
       day: '2-digit',
       year: 'numeric'
     });
-    const formattedTime = startDate.toLocaleTimeString('en-US', {
+    const formattedTime = startDate.toLocaleString({
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -95,8 +98,8 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
     // Determine member status
     const memberStatus = reservation.membership_type === 'member' ? 'Yes' : 'No';
 
-    // Create message content
-    let messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
+    // Create message content with party size
+    let messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, ${reservation.party_size} guests, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
     if (reservation.notes && reservation.notes.trim()) {
       messageContent += `\nSpecial Requests: ${reservation.notes.trim()}`;
     }

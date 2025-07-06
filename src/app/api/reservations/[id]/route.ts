@@ -71,8 +71,8 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
     // Determine member status
     const memberStatus = reservation.membership_type === 'member' ? 'Yes' : 'No';
 
-    // Create message content
-    const messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
+    // Create message content with party size
+    const messageContent = `Noir Reservation ${action}: ${reservation.first_name || 'Guest'} ${reservation.last_name || ''}, ${formattedDate} at ${formattedTime}, ${reservation.party_size} guests, Table ${tableNumber}, ${eventType}, Member: ${memberStatus}`;
 
     // Check if OpenPhone credentials are configured
     if (!process.env.OPENPHONE_API_KEY || !process.env.OPENPHONE_PHONE_NUMBER_ID) {
