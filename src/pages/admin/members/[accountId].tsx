@@ -660,7 +660,7 @@ export default function MemberDetailAdmin() {
                   {member.photo ? (
                     <img src={member.photo} alt={`${member.first_name} ${member.last_name}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <Box width="100%"  height="100%" display="flex" alignItems="center" justifyContent="center" bg="#F7FAFC" >
+                    <Box width="100%"  height="100%" display="flex" alignItems="bottom" justifyContent="bottom" bg="#F7FAFC" >
                       
                     </Box>
                   )}
@@ -676,7 +676,7 @@ export default function MemberDetailAdmin() {
                   mt={0}
                   
                 >
-                  <Text fontSize="40px" fontWeight="bold" color="#ecede8"  fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} p={0}>
+                  <Text fontSize="200%" fontWeight="bold" color="#ecede8"  fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} p={0}>
                     {member.first_name} {member.last_name}
                   </Text>
                 </Box>
@@ -856,7 +856,7 @@ export default function MemberDetailAdmin() {
                 <Box h="10px" />
                 {/* Centered Attributes & Notes title above the card */}
                 <Box width="95%" textAlign="center" mb={2}>
-                  <Text fontSize="24px" fontWeight="bold" color="#ecede8" fontFamily="IvyJournal-Thin, serif" textTransform="uppercase" letterSpacing="0.08em" m={0} mb={0}>
+                  <Text fontSize="24px" fontWeight="bold" color="#ecede8" fontFamily="IvyJournal-Thin, serif"  letterSpacing="0.08em" m={0} mb={0}>
                     Attributes & Notes
                   </Text>
                 </Box>
