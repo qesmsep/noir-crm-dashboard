@@ -33,6 +33,11 @@ export default async function handler(req, res) {
       if (!account_id || !type || !amount) {
         return res.status(400).json({ error: "Missing required fields" });
       }
+      
+      // Convert purchase amounts to negative for storage
+      let amt = Number(amount);
+      if (type === 'purchase') amt = -Math.abs(amt);
+      
       // Insert the transaction and return the inserted row
       const { data, error } = await supabaseAdmin
         .from("ledger")
@@ -41,7 +46,7 @@ export default async function handler(req, res) {
             member_id: member_id || null,
             account_id,
             type,
-            amount,
+            amount: amt,
             note,
             date: date || new Date().toISOString().split('T')[0]
           }
