@@ -70,10 +70,7 @@ const MemberLedger = ({
   };
 
   const calculateBalance = () => {
-    return (memberLedger || []).reduce((acc, t) => {
-      // Payments increase credit, purchases decrease credit
-      return acc + (t.type === 'payment' ? Number(t.amount) : -Number(t.amount));
-    }, 0);
+    return (memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0);
   };
 
   const handleStartEdit = (transaction) => {
