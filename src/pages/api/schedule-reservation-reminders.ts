@@ -56,33 +56,83 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       businessTimezone = settings.timezone;
     }
 
+    // Convert reservation time to business timezone for calculations
+    const reservationDateTime = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
+    const now = DateTime.now().setZone(businessTimezone);
+
     // Schedule reminders for each template
     for (const template of templates) {
       let scheduledTimeUTC: string | null = null;
+      let shouldSendImmediately = false;
 
       if (template.reminder_type === 'day_of') {
         // Schedule for the day of the reservation at the specified time in business timezone
-        const reservationDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
-        const [hours, minutes] = template.send_time.split(':');
-        const scheduledLocal = reservationDate.set({ hour: parseInt(hours), minute: parseInt(minutes), second: 0, millisecond: 0 });
+        // send_time format: "HH:MM" (e.g., "10:05", "14:30")
+        const [hours, minutes] = template.send_time.split(':').map(Number);
+        const scheduledLocal = reservationDateTime.set({ 
+          hour: hours, 
+          minute: minutes || 0, 
+          second: 0, 
+          millisecond: 0 
+        });
         scheduledTimeUTC = scheduledLocal.toUTC().toISO();
+
+        // Check if this is a same-day reservation and the scheduled time has already passed
+        const isSameDay = reservationDateTime.hasSame(now, 'day');
+        console.log(`Day-of reminder check:`, {
+          template: template.name,
+          reservationDate: reservationDateTime.toFormat('yyyy-MM-dd'),
+          currentDate: now.toFormat('yyyy-MM-dd'),
+          isSameDay,
+          scheduledLocal: scheduledLocal.toFormat('HH:mm'),
+          currentTime: now.toFormat('HH:mm'),
+          scheduledLocalPassed: scheduledLocal < now
+        });
+        
+        if (isSameDay && scheduledLocal < now) {
+          shouldSendImmediately = true;
+          scheduledTimeUTC = now.toUTC().toISO();
+          console.log(`✅ Scheduling immediate send for day-of reminder: ${template.name}`);
+        }
       } else if (template.reminder_type === 'hour_before') {
-        // Schedule for X hours before the reservation in business timezone
-        const hoursBefore = parseInt(template.send_time);
-        const reservationDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
-        const scheduledLocal = reservationDate.minus({ hours: hoursBefore });
+        // Schedule for X hours and Y minutes before the reservation in business timezone
+        // send_time format: "H:M" or "H" (e.g., "1:30", "2:00", "1")
+        const timeParts = template.send_time.split(':');
+        const hoursBefore = parseInt(timeParts[0]);
+        const minutesBefore = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+        
+        const scheduledLocal = reservationDateTime.minus({ 
+          hours: hoursBefore, 
+          minutes: minutesBefore 
+        });
         scheduledTimeUTC = scheduledLocal.toUTC().toISO();
+
+        // Check if the scheduled time has already passed
+        if (scheduledLocal < now) {
+          shouldSendImmediately = true;
+          scheduledTimeUTC = now.toUTC().toISO();
+        }
       } else {
         continue; // Skip unknown reminder types
       }
 
-      // Only schedule if the time hasn't passed
-      if (scheduledTimeUTC && DateTime.fromISO(scheduledTimeUTC) > DateTime.utc()) {
+      // Only schedule if the time hasn't passed or if we should send immediately
+      const shouldSchedule = scheduledTimeUTC && (shouldSendImmediately || DateTime.fromISO(scheduledTimeUTC) > DateTime.utc());
+      console.log(`Scheduling decision for ${template.name}:`, {
+        shouldSendImmediately,
+        scheduledTimeUTC,
+        scheduledTimeUTC_parsed: DateTime.fromISO(scheduledTimeUTC).toISO(),
+        currentUTC: DateTime.utc().toISO(),
+        timeNotPassed: DateTime.fromISO(scheduledTimeUTC) > DateTime.utc(),
+        shouldSchedule
+      });
+      
+      if (shouldSchedule) {
         // Create message content with placeholders
         let messageContent = template.message_template;
         messageContent = messageContent.replace(/\{\{first_name\}\}/g, reservation.first_name || 'Guest');
         messageContent = messageContent.replace(/\{\{reservation_time\}\}/g,
-          DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone).toFormat('hh:mm a'));
+          reservationDateTime.toFormat('hh:mm a'));
         messageContent = messageContent.replace(/\{\{party_size\}\}/g, reservation.party_size.toString());
 
         // Insert scheduled reminder
@@ -103,6 +153,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.error('Error scheduling reminder:', insertError);
         } else {
           scheduledReminders.push(scheduledReminder);
+          
+          // If this should be sent immediately, trigger the processing
+          if (shouldSendImmediately) {
+            console.log(`Scheduling immediate send for template: ${template.name}`);
+            // The reminder will be picked up by the next processing cycle
+          }
         }
       }
     }
