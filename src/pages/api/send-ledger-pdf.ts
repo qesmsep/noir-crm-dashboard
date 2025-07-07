@@ -61,7 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Try to upload to Supabase Storage
     try {
-      const fileName = `ledger_${member_id}_${start_date}_${end_date}.pdf`;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `ledger_${member_id}_${start_date}_${end_date}_${timestamp}.pdf`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('ledger-pdfs')
         .upload(fileName, pdfBuffer, {
@@ -71,7 +72,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (uploadError) {
         console.error('Error uploading PDF:', uploadError);
-        throw new Error('Storage upload failed');
+        if (uploadError.message === 'The resource already exists') {
+          console.log('⚠️  File already exists, using fallback method');
+        } else {
+          throw new Error('Storage upload failed');
+        }
       }
 
       // Get public URL
