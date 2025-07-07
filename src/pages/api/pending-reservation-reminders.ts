@@ -4,35 +4,74 @@ import { supabase } from '../../lib/supabase';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      // Get pending reservation reminders with related data (latest reservation info)
-      const { data: pendingReminders, error: fetchError } = await supabase
-        .from('scheduled_reservation_reminders')
-        .select(`
-          *,
-          reservations (
-            id,
-            first_name,
-            last_name,
-            phone,
-            start_time,
-            party_size
-          ),
-          reservation_reminder_templates (
-            id,
-            name,
-            reminder_type,
-            send_time
-          )
-        `)
-        .eq('status', 'pending')
-        .order('scheduled_for', { ascending: true });
+      const { id } = req.query;
 
-      if (fetchError) {
-        console.error('Error fetching pending reservation reminders:', fetchError);
-        return res.status(500).json({ error: 'Failed to fetch pending reminders' });
+      if (id) {
+        // Fetch a single reminder by ID
+        const { data: reminder, error: fetchError } = await supabase
+          .from('scheduled_reservation_reminders')
+          .select(`
+            *,
+            reservations (
+              id,
+              first_name,
+              last_name,
+              phone,
+              start_time,
+              party_size
+            ),
+            reservation_reminder_templates (
+              id,
+              name,
+              reminder_type,
+              send_time
+            )
+          `)
+          .eq('id', id)
+          .eq('status', 'pending')
+          .single();
+
+        if (fetchError) {
+          console.error('Error fetching reminder:', fetchError);
+          return res.status(500).json({ error: 'Failed to fetch reminder' });
+        }
+
+        if (!reminder) {
+          return res.status(404).json({ error: 'Reminder not found' });
+        }
+
+        res.status(200).json(reminder);
+      } else {
+        // Get all pending reservation reminders with related data
+        const { data: pendingReminders, error: fetchError } = await supabase
+          .from('scheduled_reservation_reminders')
+          .select(`
+            *,
+            reservations (
+              id,
+              first_name,
+              last_name,
+              phone,
+              start_time,
+              party_size
+            ),
+            reservation_reminder_templates (
+              id,
+              name,
+              reminder_type,
+              send_time
+            )
+          `)
+          .eq('status', 'pending')
+          .order('scheduled_for', { ascending: true });
+
+        if (fetchError) {
+          console.error('Error fetching pending reservation reminders:', fetchError);
+          return res.status(500).json({ error: 'Failed to fetch pending reminders' });
+        }
+
+        res.status(200).json({ pendingReminders: pendingReminders || [] });
       }
-
-      res.status(200).json({ pendingReminders: pendingReminders || [] });
     } catch (error) {
       console.error('Error in pending reservation reminders API:', error);
       res.status(500).json({ error: 'Failed to fetch pending reminders' });

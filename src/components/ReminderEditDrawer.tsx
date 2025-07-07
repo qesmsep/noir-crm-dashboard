@@ -76,11 +76,10 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
       const response = await fetch(`/api/pending-reservation-reminders?id=${reminderId}`);
       if (!response.ok) throw new Error('Failed to fetch reminder');
       const data = await response.json();
-      const r = Array.isArray(data.pendingReminders) ? data.pendingReminders[0] : data;
-      setReminder(r);
+      setReminder(data);
       setFormData({
-        scheduled_for: r.scheduled_for ? utcToLocalInputHelper(r.scheduled_for) : '',
-        message_content: r.message_content || '',
+        scheduled_for: data.scheduled_for ? utcToLocalInputHelper(data.scheduled_for) : '',
+        message_content: data.message_content || '',
       });
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to load reminder details', status: 'error', duration: 5000 });
