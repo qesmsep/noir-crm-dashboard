@@ -2,9 +2,9 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
+  // Allow POST and GET requests (GET for testing)
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    res.setHeader('Allow', ['POST', 'GET']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
@@ -16,12 +16,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!isVercelCron) {
     // For manual testing, allow with a secret token
+    let token: string | undefined;
+    
+    // Check Authorization header (for POST requests)
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+    
+    // Check query parameter (for GET requests)
+    if (!token && req.method === 'GET') {
+      token = req.query.token as string;
+    }
+    
+    if (!token) {
       return res.status(401).json({ error: 'Unauthorized - Only Vercel cron jobs or authorized tokens allowed' });
     }
-
-    const token = authHeader.substring(7);
+    
     if (token !== 'cron-secret-token-2024') {
       return res.status(401).json({ error: 'Invalid token' });
     }
