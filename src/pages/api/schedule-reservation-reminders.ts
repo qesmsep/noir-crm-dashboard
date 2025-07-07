@@ -151,12 +151,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (insertError) {
           console.error('Error scheduling reminder:', insertError);
+          console.error('Insert data:', {
+            reservation_id: reservation.id,
+            template_id: template.id,
+            customer_name: `${reservation.first_name || ''} ${reservation.last_name || ''}`.trim() || 'Guest',
+            customer_phone: reservation.phone,
+            message_content: messageContent,
+            scheduled_for: scheduledTimeUTC
+          });
         } else {
           scheduledReminders.push(scheduledReminder);
+          console.log(`✅ Successfully scheduled reminder: ${template.name} (${template.reminder_type}) for ${scheduledTimeUTC}`);
           
           // If this should be sent immediately, trigger the processing
           if (shouldSendImmediately) {
-            console.log(`Scheduling immediate send for template: ${template.name}`);
+            console.log(`⚡ Scheduling immediate send for template: ${template.name}`);
             // The reminder will be picked up by the next processing cycle
           }
         }
