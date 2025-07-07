@@ -2,21 +2,18 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Allow both GET and POST requests for compatibility
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    res.setHeader('Allow', ['GET', 'POST']);
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // Verify webhook secret for security
+  // Verify webhook secret if needed
   const webhookSecret = req.headers['x-webhook-secret'];
-  if (webhookSecret !== process.env.WEBHOOK_SECRET) {
-    console.log('Webhook secret mismatch:', { 
-      received: webhookSecret, 
-      expected: process.env.WEBHOOK_SECRET?.substring(0, 8) + '...' 
-    });
-    return res.status(401).json({ error: 'Invalid webhook secret' });
+  if (process.env.WEBHOOK_SECRET && webhookSecret !== process.env.WEBHOOK_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  console.log('🔄 Processing reservation reminders automatically...');
 
   try {
     // Get pending reminders that are due to be sent
@@ -34,8 +31,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!pendingReminders || pendingReminders.length === 0) {
+      console.log('✅ No pending reminders to process');
       return res.status(200).json({ message: 'No pending reminders to process' });
     }
+
+    console.log(`📱 Found ${pendingReminders.length} pending reminders to process`);
 
     const results = {
       processed: 0,
@@ -47,6 +47,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Process each pending reminder
     for (const reminder of pendingReminders) {
       try {
+        console.log(`📤 Processing reminder ${reminder.id} for ${reminder.customer_phone}`);
+        
         // Format phone number
         let formattedPhone = reminder.customer_phone;
         if (!formattedPhone.startsWith('+')) {
@@ -122,6 +124,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         results.errors.push(`Failed to send reminder ${reminder.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
+
+    console.log(`🎉 Processing complete: ${results.processed} processed, ${results.successful} successful, ${results.failed} failed`);
 
     res.status(200).json({
       message: `Processed ${results.processed} reminders`,

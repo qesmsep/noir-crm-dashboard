@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
-import { Box, Spinner, Text, Button, SimpleGrid, VStack, Heading, HStack, Input, useToast, Flex, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter } from "@chakra-ui/react";
+import { Box, Spinner, Text, Button, SimpleGrid, VStack, Heading, HStack, Input, useToast, Flex, Switch, Select, FormControl, FormLabel, Drawer, DrawerBody, DrawerFooter, DrawerHeader, DrawerOverlay, DrawerContent, IconButton } from "@chakra-ui/react";
+import { CloseIcon } from "@chakra-ui/icons";
 import { getSupabaseClient } from "../../api/supabaseClient";
 import MemberDetail from "../../../components/MemberDetail";
 // @ts-ignore
@@ -25,6 +26,7 @@ interface Member {
   company?: string;
   referred_by?: string;
   next_renewal?: string;
+  ledger_notifications_enabled?: boolean;
 }
 
 interface Message {
@@ -95,6 +97,12 @@ export default function MemberDetailAdmin() {
   const [isEditingMember, setIsEditingMember] = useState<string | null>(null);
   const [editMemberData, setEditMemberData] = useState<Member | null>(null);
   const [deleteConfirmMode, setDeleteConfirmMode] = useState(false);
+  const [isTextPdfModalOpen, setIsTextPdfModalOpen] = useState(false);
+  const [selectedMemberForPdf, setSelectedMemberForPdf] = useState<Member | null>(null);
+  const [pdfDateRange, setPdfDateRange] = useState('current_month');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [sendingPdf, setSendingPdf] = useState(false);
 
   async function fetchMembers() {
     try {
@@ -589,6 +597,102 @@ export default function MemberDetailAdmin() {
     }
   };
 
+  const handleTextPdf = async () => {
+    if (!selectedMemberForPdf || !selectedMemberForPdf.phone) {
+      toast({
+        title: 'Error',
+        description: 'Please select a member with a valid phone number.',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      setSendingPdf(true);
+
+      // Calculate date range
+      let startDate, endDate;
+      const today = new Date();
+
+      switch (pdfDateRange) {
+        case 'current_month':
+          startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          break;
+        case 'last_month':
+          startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+          break;
+        case 'last_3_months':
+          startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+          endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          break;
+        case 'custom':
+          if (!customStartDate || !customEndDate) {
+            toast({
+              title: 'Error',
+              description: 'Please select both start and end dates.',
+              status: 'error',
+              duration: 3000,
+            });
+            return;
+          }
+          startDate = new Date(customStartDate);
+          endDate = new Date(customEndDate);
+          break;
+        default:
+          startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      }
+
+      const response = await fetch('/api/send-ledger-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_id: selectedMemberForPdf.member_id,
+          account_id: selectedMemberForPdf.account_id,
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          phone: selectedMemberForPdf.phone,
+          member_name: `${selectedMemberForPdf.first_name} ${selectedMemberForPdf.last_name}`
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send PDF');
+      }
+
+      toast({
+        title: 'PDF Sent!',
+        description: `Ledger PDF has been sent to ${selectedMemberForPdf.first_name} ${selectedMemberForPdf.last_name}`,
+        status: 'success',
+        duration: 5000,
+      });
+
+      setIsTextPdfModalOpen(false);
+      setSelectedMemberForPdf(null);
+      setPdfDateRange('current_month');
+      setCustomStartDate('');
+      setCustomEndDate('');
+
+    } catch (error: any) {
+      console.error('Error sending PDF:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send PDF',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setSendingPdf(false);
+    }
+  };
+
   if (loading) {
     return <Box p={8} display="flex" justifyContent="center"><Spinner size="xl" /></Box>;
   }
@@ -799,6 +903,51 @@ export default function MemberDetailAdmin() {
                         ) : (
                           <Text fontSize="14px" fontFamily="Montserrat, sans-serif" margin={5}>Referred by: {member.referred_by || <span style={{ color: '#bbb' }}>—</span>}</Text>
                         )}
+                      </HStack>
+                      <HStack spacing={1} color="#353535">
+                        <Box as={FaUser} boxSize={10} />
+                        <HStack spacing={2} alignItems="center">
+                          <Text fontSize="14px" fontFamily="Montserrat, sans-serif" margin={5}>
+                            Ledger Notifications: 
+                          </Text>
+                          <Switch
+                            isChecked={member.ledger_notifications_enabled !== false}
+                            onChange={async (e) => {
+                              try {
+                                const { error } = await getSupabaseClient()
+                                  .from('members')
+                                  .update({ ledger_notifications_enabled: e.target.checked })
+                                  .eq('member_id', member.member_id);
+                                
+                                if (error) throw error;
+                                
+                                // Update local state
+                                setMembers(prev => prev.map(m => 
+                                  m.member_id === member.member_id 
+                                    ? { ...m, ledger_notifications_enabled: e.target.checked }
+                                    : m
+                                ));
+                                
+                                toast({
+                                  title: 'Updated',
+                                  description: `Ledger notifications ${e.target.checked ? 'enabled' : 'disabled'} for ${member.first_name}`,
+                                  status: 'success',
+                                  duration: 2000,
+                                });
+                              } catch (error) {
+                                console.error('Error updating ledger notifications:', error);
+                                toast({
+                                  title: 'Error',
+                                  description: 'Failed to update ledger notifications',
+                                  status: 'error',
+                                  duration: 3000,
+                                });
+                              }
+                            }}
+                            colorScheme="green"
+                            size="sm"
+                          />
+                        </HStack>
                       </HStack>
                     </VStack>
                   </SimpleGrid>
@@ -1093,18 +1242,33 @@ export default function MemberDetailAdmin() {
           fontFamily="Montserrat, sans-serif"
           width="94%"
         >
-          <Heading
-            fontSize="36px"
-            fontWeight="bold"
-            color="#353535"
-            fontFamily="IvyJournal-Thin, serif"
-            textTransform="uppercase"
-            letterSpacing="0.08em"
-            mb={0}
-            textAlign="center"
-          >
-            Ledger
-          </Heading>
+          <HStack justify="space-between" align="center" mb={4}>
+            <Heading
+              fontSize="36px"
+              fontWeight="bold"
+              color="#353535"
+              fontFamily="IvyJournal-Thin, serif"
+              textTransform="uppercase"
+              letterSpacing="0.08em"
+              mb={0}
+            >
+              Ledger
+            </Heading>
+            <Button
+              bg="#A59480"
+              color="white"
+              borderRadius="12px"
+              fontWeight="semibold"
+              fontSize="md"
+              _hover={{ bg: '#8B7B68' }}
+              onClick={() => {
+                setSelectedMemberForPdf(members[0]);
+                setIsTextPdfModalOpen(true);
+              }}
+            >
+              📄 Text PDF
+            </Button>
+          </HStack>
           {ledgerLoading ? (
             <Spinner size="md" />
           ) : (
@@ -1219,6 +1383,125 @@ export default function MemberDetailAdmin() {
             {deleteConfirmMode ? "CONFIRM DELETE MEMBER - THIS CANNOT BE UNDONE" : "Delete Member"}
           </Button>
         </Box>
+
+        {/* Text PDF Drawer */}
+        <Drawer 
+          isOpen={isTextPdfModalOpen} 
+          placement="right" 
+          onClose={() => setIsTextPdfModalOpen(false)} 
+          size="sm"
+          closeOnOverlayClick={true}
+          closeOnEsc={true}
+        >
+          <Box zIndex="2000" position="relative">
+            <DrawerOverlay bg="blackAlpha.600" onClick={() => setIsTextPdfModalOpen(false)} />
+            <DrawerContent 
+              border="2px solid #353535" 
+              borderRadius="10px"  
+              fontFamily="Montserrat, sans-serif" 
+              maxW="400px" 
+              maxH="flex" 
+              w="40vw" 
+              boxShadow="xl" 
+              mt="80px" 
+              mb="25px" 
+              paddingRight="40px" 
+              paddingLeft="40px" 
+              backgroundColor="#ecede8"
+              position="fixed"
+              top="0"
+              right="0"
+              height="100vh"
+              style={{
+                transform: isTextPdfModalOpen ? 'translateX(0)' : 'translateX(100%)',
+                transition: 'transform 0.3s ease-in-out'
+              }}
+            >
+              <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
+                Send Ledger PDF via SMS
+              </DrawerHeader>
+              <DrawerBody p={4} overflowY="auto">
+                <VStack spacing={4}>
+                  <Box>
+                    <Text fontSize="lg" fontWeight="bold" fontFamily="IvyJournal, sans-serif" color="#353535">
+                      {selectedMemberForPdf?.first_name} {selectedMemberForPdf?.last_name}
+                    </Text>
+                    <Text fontSize="sm" color="gray.600" fontFamily="Montserrat, sans-serif">
+                      Phone: {selectedMemberForPdf?.phone}
+                    </Text>
+                  </Box>
+                  
+                  <FormControl>
+                    <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">Date Range</FormLabel>
+                    <Select
+                      value={pdfDateRange}
+                      onChange={(e) => setPdfDateRange(e.target.value)}
+                      fontFamily="Montserrat, sans-serif"
+                      size="sm"
+                    >
+                      <option value="current_month">Current Month</option>
+                      <option value="last_month">Last Month</option>
+                      <option value="last_3_months">Last 3 Months</option>
+                      <option value="custom">Custom Range</option>
+                    </Select>
+                  </FormControl>
+
+                  {pdfDateRange === 'custom' && (
+                    <VStack spacing={3} w="100%">
+                      <FormControl>
+                        <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">Start Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          fontFamily="Montserrat, sans-serif"
+                          size="sm"
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">End Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          fontFamily="Montserrat, sans-serif"
+                          size="sm"
+                        />
+                      </FormControl>
+                    </VStack>
+                  )}
+
+                  <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
+                    <Text fontSize="sm" color="gray.600" fontFamily="Montserrat, sans-serif">
+                      The PDF will include all ledger transactions for the selected period.
+                    </Text>
+                  </Box>
+                </VStack>
+              </DrawerBody>
+              <DrawerFooter borderTopWidth="1px" justifyContent="space-between">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsTextPdfModalOpen(false)}
+                  fontFamily="Montserrat, sans-serif"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  bg="#353535"
+                  color="#ecede8"
+                  onClick={handleTextPdf}
+                  isLoading={sendingPdf}
+                  loadingText="Sending..."
+                  fontFamily="Montserrat, sans-serif"
+                  fontWeight="semibold"
+                  _hover={{ bg: '#2a2a2a' }}
+                >
+                  Send PDF
+                </Button>
+              </DrawerFooter>
+            </DrawerContent>
+          </Box>
+        </Drawer>
       </Box>
     </AdminLayout>
   );

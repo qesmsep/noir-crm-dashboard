@@ -7,6 +7,14 @@
     {
       "path": "/api/cron-process-reminders",
       "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/schedule-ledger-notifications",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/process-ledger-notifications",
+      "schedule": "0 10 * * *"
     }
   ],
   "functions": {

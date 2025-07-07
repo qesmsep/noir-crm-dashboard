@@ -6,7 +6,7 @@ import { useRouter } from 'next/router';
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const hideNav = router.pathname.startsWith('/admin') || router.pathname === '/auth/admin';
+  const hideNav = router.pathname.startsWith('/admin') || router.pathname === '/auth/admin' || router.pathname.startsWith('/questionnaire');
 
   return (
     <SettingsProvider>

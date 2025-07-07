@@ -13,6 +13,9 @@ export default function MainNav() {
         {user && (
           <Button as={Link} href="/admin/logout" size="sm" colorScheme="red" color="white">Logout</Button>
         )}
+        <Link href="/admin/questionnaires" style={{ display: 'block', padding: '10px 0', color: '#ECEDE8', fontWeight: 'bold' }}>
+          Questionnaires
+        </Link>
       </HStack>
     </Box>
   );

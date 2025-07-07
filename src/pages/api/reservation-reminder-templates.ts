@@ -8,8 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .from('reservation_reminder_templates')
         .select('*')
         .order('reminder_type', { ascending: true })
-        .order('send_time', { ascending: true })
-        .order('send_time_minutes', { ascending: true });
+        .order('send_time', { ascending: true });
 
       if (error) throw error;
       res.status(200).json({ templates: data });
@@ -21,19 +20,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const { name, description, message_template, reminder_type, send_time, is_active } = req.body;
 
-      // Parse send_time to extract hours and minutes
-      let sendTimeHours: number;
-      let sendTimeMinutes: number = 0;
+      // Validate send_time format based on reminder type
+      let validatedSendTime: string;
 
       if (reminder_type === 'day_of') {
-        // send_time format: "10:05" or "14:30"
-        const [hours, minutes] = send_time.split(':').map(Number);
-        sendTimeHours = hours;
-        sendTimeMinutes = minutes || 0;
+        // send_time format: "HH:MM" (e.g., "10:05", "14:30")
+        const timeRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$/;
+        if (!timeRegex.test(send_time)) {
+          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05")' });
+        }
+        validatedSendTime = send_time;
+      } else if (reminder_type === 'hour_before') {
+        // send_time format: "H:M" or "H" (e.g., "1:30", "2:00", "1")
+        const timeRegex = /^([0-9]|[1-9][0-9]):([0-5][0-9])$|^([0-9]|[1-9][0-9])$/;
+        if (!timeRegex.test(send_time)) {
+          return res.status(400).json({ error: 'Invalid time format for hour_before reminder. Use H:M or H format (e.g., "1:30" or "2")' });
+        }
+        validatedSendTime = send_time;
       } else {
-        // send_time format: "1" or "2" (hours before)
-        sendTimeHours = parseInt(send_time);
-        sendTimeMinutes = 0; // Default to 0 minutes for hour_before
+        return res.status(400).json({ error: 'Invalid reminder_type' });
       }
 
       const { data, error } = await supabase
@@ -43,8 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           description,
           message_template,
           reminder_type,
-          send_time: sendTimeHours,
-          send_time_minutes: sendTimeMinutes,
+          send_time: validatedSendTime,
           is_active: is_active ?? true
         }])
         .select()
@@ -65,19 +69,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Template ID is required' });
       }
 
-      // Parse send_time to extract hours and minutes
-      let sendTimeHours: number;
-      let sendTimeMinutes: number = 0;
+      // Validate send_time format based on reminder type
+      let validatedSendTime: string;
 
       if (reminder_type === 'day_of') {
-        // send_time format: "10:05" or "14:30"
-        const [hours, minutes] = send_time.split(':').map(Number);
-        sendTimeHours = hours;
-        sendTimeMinutes = minutes || 0;
+        // send_time format: "HH:MM" (e.g., "10:05", "14:30")
+        const timeRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$/;
+        if (!timeRegex.test(send_time)) {
+          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05")' });
+        }
+        validatedSendTime = send_time;
+      } else if (reminder_type === 'hour_before') {
+        // send_time format: "H:M" or "H" (e.g., "1:30", "2:00", "1")
+        const timeRegex = /^([0-9]|[1-9][0-9]):([0-5][0-9])$|^([0-9]|[1-9][0-9])$/;
+        if (!timeRegex.test(send_time)) {
+          return res.status(400).json({ error: 'Invalid time format for hour_before reminder. Use H:M or H format (e.g., "1:30" or "2")' });
+        }
+        validatedSendTime = send_time;
       } else {
-        // send_time format: "1" or "2" (hours before)
-        sendTimeHours = parseInt(send_time);
-        sendTimeMinutes = 0; // Default to 0 minutes for hour_before
+        return res.status(400).json({ error: 'Invalid reminder_type' });
       }
 
       const { data, error } = await supabase
@@ -87,8 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           description,
           message_template,
           reminder_type,
-          send_time: sendTimeHours,
-          send_time_minutes: sendTimeMinutes,
+          send_time: validatedSendTime,
           is_active: is_active ?? true
         })
         .eq('id', id)

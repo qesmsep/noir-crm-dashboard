@@ -26,6 +26,7 @@ import {
   Badge,
   useColorModeValue,
 } from '@chakra-ui/react';
+import Link from 'next/link';
 
 const AdminPage = ({
   users,

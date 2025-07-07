@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+
+console.log('🔄 Data Update Migration Helper\n');
+
+const dataUpdateSQL = `
 -- Trigger function to update scheduled reminder times when reservation time changes
 CREATE OR REPLACE FUNCTION update_reminder_times_on_reservation_update()
 RETURNS TRIGGER AS $$
@@ -9,8 +15,8 @@ BEGIN
     SET scheduled_for =
       CASE
         WHEN t.reminder_type = 'day_of' THEN
-          -- Set to 10:00am on the day of the reservation (or use template send_time)
-          (date_trunc('day', NEW.start_time) + (t.send_time || ' hours')::interval)
+          -- Set to the specified time on the day of the reservation
+          (date_trunc('day', NEW.start_time) + (t.send_time || ':00')::time)
         WHEN t.reminder_type = 'hour_before' THEN
           -- Set to X hours before the reservation start_time
           (NEW.start_time - (t.send_time || ' hours')::interval)
@@ -35,7 +41,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_reminder_times_on_reservation_update();
 
 -- Migration to update existing reservation reminder templates to support minute-level precision
--- This script updates the send_time format from the old format to the new string-based format
+-- This script safely converts the send_time format from the old format to the new string-based format
 
 -- First, let's see what we have currently
 SELECT 
@@ -47,15 +53,19 @@ SELECT
 FROM reservation_reminder_templates
 ORDER BY reminder_type, send_time;
 
--- Update existing day_of templates to use "HH:MM" format
+-- Step 1: Convert the send_time column to text if it's not already
+ALTER TABLE reservation_reminder_templates 
+ALTER COLUMN send_time TYPE text USING 
+    CASE 
+        WHEN pg_typeof(send_time) = 'integer'::regtype THEN send_time::text
+        WHEN pg_typeof(send_time) = 'time without time zone'::regtype THEN 
+            LPAD(EXTRACT(HOUR FROM send_time::time)::text, 2, '0') || ':' || LPAD(EXTRACT(MINUTE FROM send_time::time)::text, 2, '0')
+        ELSE send_time::text
+    END;
+
+-- Step 2: Update existing day_of templates to use "HH:MM" format
 UPDATE reservation_reminder_templates 
 SET send_time = CASE 
-    WHEN reminder_type = 'day_of' AND pg_typeof(send_time) = 'integer'::regtype THEN 
-        -- Convert integer hour to "HH:00" format
-        LPAD(send_time::text, 2, '0') || ':00'
-    WHEN reminder_type = 'day_of' AND pg_typeof(send_time) = 'time without time zone'::regtype THEN 
-        -- Convert TIME to "HH:MM" format
-        LPAD(EXTRACT(HOUR FROM send_time::time)::text, 2, '0') || ':' || LPAD(EXTRACT(MINUTE FROM send_time::time)::text, 2, '0')
     WHEN reminder_type = 'day_of' AND send_time ~ '^[0-9]+$' THEN 
         -- Convert string integer to "HH:00" format
         LPAD(send_time, 2, '0') || ':00'
@@ -66,15 +76,9 @@ SET send_time = CASE
 END
 WHERE reminder_type = 'day_of';
 
--- Update existing hour_before templates to use "H:M" or "H" format
+-- Step 3: Update existing hour_before templates to use "H:M" or "H" format
 UPDATE reservation_reminder_templates 
 SET send_time = CASE 
-    WHEN reminder_type = 'hour_before' AND pg_typeof(send_time) = 'integer' THEN 
-        -- Convert integer hours to "H" format (no minutes)
-        send_time::text
-    WHEN reminder_type = 'hour_before' AND pg_typeof(send_time) = 'time without time zone'::regtype THEN 
-        -- Convert TIME to "H:M" format
-        EXTRACT(HOUR FROM send_time::time)::text || ':' || LPAD(EXTRACT(MINUTE FROM send_time::time)::text, 2, '0')
     WHEN reminder_type = 'hour_before' AND send_time ~ '^[0-9]+$' THEN 
         -- Convert string integer to "H" format
         send_time
@@ -85,17 +89,17 @@ SET send_time = CASE
 END
 WHERE reminder_type = 'hour_before';
 
--- Update the default templates to use the new format
+-- Step 4: Update the default templates to use the new format
 UPDATE reservation_reminder_templates 
 SET send_time = '10:00'
 WHERE name = 'Day of Reminder' AND reminder_type = 'day_of';
 
 UPDATE reservation_reminder_templates 
-SET send_time = '1:00'
+SET send_time = '1'
 WHERE name = '1 Hour Before Reminder' AND reminder_type = 'hour_before';
 
--- Add a new template for 10:05 AM day-of reminder as requested
-INSERT INTO reservation_reminder_templates (name, description, message_template, reminder_type, send_time, is_active) 
+-- Step 5: Add a new template for 10:05 AM day-of reminder as requested
+INSERT INTO reservation_reminder_templates (name, description, message_template, reminder_type, send_time, is_active)
 VALUES (
     'Day of Reminder - 10:05 AM',
     'Reminder sent at 10:05 AM on the day of the reservation',
@@ -104,7 +108,7 @@ VALUES (
     '10:05'
 ) ON CONFLICT DO NOTHING;
 
--- Verify the updates
+-- Step 6: Verify the updates
 SELECT 
     id,
     name,
@@ -116,4 +120,30 @@ SELECT
         ELSE '❌ Invalid format'
     END as format_status
 FROM reservation_reminder_templates
-ORDER BY reminder_type, send_time; 
+ORDER BY reminder_type, send_time;
+`;
+
+console.log('📋 Data Update SQL Content:');
+console.log('==================================================');
+console.log(dataUpdateSQL);
+console.log('==================================================\n');
+
+console.log('📝 Instructions to run this data update:');
+console.log('1. Go to your Supabase dashboard');
+console.log('2. Navigate to the SQL Editor');
+console.log('3. Copy and paste the SQL content above');
+console.log('4. Click "Run" to execute the data update');
+console.log('5. Verify the templates were updated successfully\n');
+
+console.log('🔍 After running the update, you can verify it worked by:');
+console.log('- Checking if the send_time format is now "HH:MM" for day_of templates');
+console.log('- Checking if the send_time format is now "H:M" or "H" for hour_before templates');
+console.log('- Running the test script: node test-reservation-reminders.js\n');
+
+console.log('⚠️  Important Notes:');
+console.log('- This will update existing reminder templates to support minute-level precision');
+console.log('- The update is safe and will preserve existing template data');
+console.log('- A new template for 10:05 AM day-of reminder will be added');
+console.log('- All templates will be validated after the update\n');
+
+console.log('✅ Once the data update is complete, the minute-level precision will be fully functional!'); 

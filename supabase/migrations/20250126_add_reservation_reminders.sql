@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.reservation_reminder_templates (
     description TEXT,
     message_template TEXT NOT NULL,
     reminder_type reminder_type NOT NULL,
-    send_time TIME NOT NULL DEFAULT '10:00:00', -- Time of day to send (for day_of) or hours before (for hour_before)
+    send_time TEXT NOT NULL DEFAULT '10:00', -- Time format: "HH:MM" for day_of, "H" or "H:M" for hour_before
     is_active BOOLEAN DEFAULT true,
     created_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -100,14 +100,14 @@ INSERT INTO public.reservation_reminder_templates (name, description, message_te
     'Reminder sent on the day of the reservation',
     'Hi {{first_name}}! This is a friendly reminder that you have a reservation at Noir today at {{reservation_time}} for {{party_size}} guests. We look forward to seeing you!',
     'day_of',
-    '10:00:00'
+    '10:00'
 ),
 (
     '1 Hour Before Reminder',
     'Reminder sent 1 hour before the reservation',
     'Hi {{first_name}}! Your reservation at Noir is in 1 hour at {{reservation_time}} for {{party_size}} guests. See you soon!',
     'hour_before',
-    '01:00:00'
+    '1:00'
 );
 
 -- Create function to schedule reservation reminders
@@ -120,6 +120,10 @@ DECLARE
     template_record RECORD;
     scheduled_time TIMESTAMPTZ;
     message_content TEXT;
+    send_time_parts TEXT[];
+    hours_before INTEGER;
+    minutes_before INTEGER;
+    business_timezone TEXT := 'America/Chicago';
 BEGIN
     -- Get reservation details
     SELECT * INTO reservation_record 
@@ -128,6 +132,12 @@ BEGIN
     
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Reservation not found';
+    END IF;
+    
+    -- Get business timezone from settings
+    SELECT timezone INTO business_timezone FROM settings LIMIT 1;
+    IF business_timezone IS NULL THEN
+        business_timezone := 'America/Chicago';
     END IF;
     
     -- Get all active reminder templates
@@ -139,10 +149,19 @@ BEGIN
         -- Calculate scheduled time based on reminder type
         IF template_record.reminder_type = 'day_of' THEN
             -- Schedule for the day of the reservation at the specified time
-            scheduled_time := date_trunc('day', reservation_record.start_time) + template_record.send_time;
+            -- send_time format: "HH:MM" (e.g., "10:05", "14:30")
+            send_time_parts := string_to_array(template_record.send_time, ':');
+            scheduled_time := date_trunc('day', reservation_record.start_time AT TIME ZONE 'UTC' AT TIME ZONE business_timezone) 
+                             + (send_time_parts[1] || ' hours')::INTERVAL 
+                             + (send_time_parts[2] || ' minutes')::INTERVAL;
+            scheduled_time := scheduled_time AT TIME ZONE business_timezone AT TIME ZONE 'UTC';
         ELSIF template_record.reminder_type = 'hour_before' THEN
-            -- Schedule for X hours before the reservation
-            scheduled_time := reservation_record.start_time - (template_record.send_time || ' hours')::INTERVAL;
+            -- Schedule for X hours and Y minutes before the reservation
+            -- send_time format: "H:M" or "H" (e.g., "1:30", "2:00", "1")
+            send_time_parts := string_to_array(template_record.send_time, ':');
+            hours_before := send_time_parts[1]::INTEGER;
+            minutes_before := CASE WHEN array_length(send_time_parts, 1) > 1 THEN send_time_parts[2]::INTEGER ELSE 0 END;
+            scheduled_time := reservation_record.start_time - (hours_before || ' hours')::INTERVAL - (minutes_before || ' minutes')::INTERVAL;
         END IF;
         
         -- Only schedule if the time hasn't passed
@@ -151,7 +170,7 @@ BEGIN
             message_content := template_record.message_template;
             message_content := replace(message_content, '{{first_name}}', COALESCE(reservation_record.first_name, 'Guest'));
             message_content := replace(message_content, '{{reservation_time}}', 
-                to_char(reservation_record.start_time, 'HH:MI AM'));
+                to_char(reservation_record.start_time AT TIME ZONE 'UTC' AT TIME ZONE business_timezone, 'HH:MI AM'));
             message_content := replace(message_content, '{{party_size}}', reservation_record.party_size::TEXT);
             
             -- Insert scheduled reminder

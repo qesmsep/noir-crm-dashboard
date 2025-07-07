@@ -62,7 +62,8 @@ interface ReservationReminderTemplate {
   description: string;
   message_template: string;
   reminder_type: 'day_of' | 'hour_before';
-  send_time: string;
+  send_time: string | number;
+  send_time_minutes?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -530,13 +531,61 @@ export default function TemplatesPage() {
   // Helper to format send time
   function formatSendTime(template) {
     if (template.reminder_type === 'hour_before') {
-      return `${template.send_time} Hour${template.send_time === 1 ? '' : 's'} Before`;
+      // Handle both old integer format and new minute-level precision
+      let hours, minutes;
+      
+      if (typeof template.send_time === 'number') {
+        // Old format: integer hours
+        hours = template.send_time;
+        minutes = 0;
+      } else if (typeof template.send_time === 'string') {
+        // New format: "H:M" or "H"
+        const timeParts = template.send_time.split(':');
+        hours = parseInt(timeParts[0]);
+        minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+      } else {
+        // Fallback
+        hours = 0;
+        minutes = 0;
+      }
+      
+      // Add minutes from send_time_minutes if available
+      if (template.send_time_minutes !== undefined) {
+        minutes = template.send_time_minutes;
+      }
+      
+      let result = '';
+      if (hours > 0) result += `${hours} Hour${hours === 1 ? '' : 's'}`;
+      if (hours > 0 && minutes > 0) result += ' ';
+      if (minutes > 0) result += `${minutes} Minute${minutes === 1 ? '' : 's'}`;
+      if (!result) result = '0 Minutes';
+      return result + ' Before';
     } else {
-      // template.send_time is integer hour (e.g., 10 for 10:00 AM)
-      const hour = Number(template.send_time);
-      const minutes = 0; // If you add minute support, parse it here
-      let hour12 = hour % 12 || 12;
-      const ampm = hour < 12 ? 'AM' : 'PM';
+      // Handle both old integer format and new minute-level precision
+      let hours, minutes;
+      
+      if (typeof template.send_time === 'number') {
+        // Old format: integer hours
+        hours = template.send_time;
+        minutes = 0;
+      } else if (typeof template.send_time === 'string') {
+        // New format: "HH:MM"
+        const timeParts = template.send_time.split(':');
+        hours = parseInt(timeParts[0]);
+        minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+      } else {
+        // Fallback
+        hours = 0;
+        minutes = 0;
+      }
+      
+      // Add minutes from send_time_minutes if available
+      if (template.send_time_minutes !== undefined) {
+        minutes = template.send_time_minutes;
+      }
+      
+      const hour12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+      const ampm = hours < 12 ? 'AM' : 'PM';
       return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
     }
   }

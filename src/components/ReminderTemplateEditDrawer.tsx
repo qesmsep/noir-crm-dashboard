@@ -39,8 +39,8 @@ interface ReservationReminderTemplate {
   description: string;
   message_template: string;
   reminder_type: 'day_of' | 'hour_before';
-  send_time: number;
-  send_time_minutes: number;
+  send_time: string | number;
+  send_time_minutes?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -110,13 +110,54 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
       
       if (foundTemplate) {
         setTemplate(foundTemplate);
+        
+        // Parse send_time to extract hours and minutes
+        let hours = 10;
+        let minutes = 0;
+        
+        if (foundTemplate.reminder_type === 'day_of') {
+          // Handle both old integer format and new minute-level precision
+          if (typeof foundTemplate.send_time === 'number') {
+            // Old format: integer hours
+            hours = foundTemplate.send_time;
+            minutes = 0;
+          } else if (typeof foundTemplate.send_time === 'string') {
+            // New format: "HH:MM"
+            const timeParts = foundTemplate.send_time.split(':');
+            hours = parseInt(timeParts[0]);
+            minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+          }
+          
+          // Add minutes from send_time_minutes if available
+          if (foundTemplate.send_time_minutes !== undefined) {
+            minutes = foundTemplate.send_time_minutes;
+          }
+        } else {
+          // Handle both old integer format and new minute-level precision
+          if (typeof foundTemplate.send_time === 'number') {
+            // Old format: integer hours
+            hours = foundTemplate.send_time;
+            minutes = 0;
+          } else if (typeof foundTemplate.send_time === 'string') {
+            // New format: "H:M" or "H"
+            const timeParts = foundTemplate.send_time.split(':');
+            hours = parseInt(timeParts[0]);
+            minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+          }
+          
+          // Add minutes from send_time_minutes if available
+          if (foundTemplate.send_time_minutes !== undefined) {
+            minutes = foundTemplate.send_time_minutes;
+          }
+        }
+        
         setFormData({
           name: foundTemplate.name,
           description: foundTemplate.description || '',
           message_template: foundTemplate.message_template,
           reminder_type: foundTemplate.reminder_type,
-          send_time_hours: foundTemplate.send_time,
-          send_time_minutes: foundTemplate.send_time_minutes || 0,
+          send_time_hours: hours,
+          send_time_minutes: minutes,
           is_active: foundTemplate.is_active,
         });
       } else {
@@ -159,8 +200,12 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
         // Format as "HH:MM"
         sendTime = `${formData.send_time_hours.toString().padStart(2, '0')}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
       } else {
-        // Format as hours only for hour_before
-        sendTime = formData.send_time_hours.toString();
+        // Format as "H:M" or "H" for hour_before
+        if (formData.send_time_minutes > 0) {
+          sendTime = `${formData.send_time_hours}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
+        } else {
+          sendTime = formData.send_time_hours.toString();
+        }
       }
 
       const payload = {
@@ -169,6 +214,7 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
         message_template: formData.message_template.trim(),
         reminder_type: formData.reminder_type,
         send_time: sendTime,
+        send_time_minutes: formData.send_time_minutes,
         is_active: formData.is_active,
       };
 
