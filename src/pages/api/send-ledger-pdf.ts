@@ -12,11 +12,11 @@ async function sendSMS(to: string, message: string) {
   try {
     const response = await fetch('https://api.openphone.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`,
-        'Accept': 'application/json'
-      },
+              headers: {
+          'Content-Type': 'application/json',
+          'Authorization': process.env.OPENPHONE_API_KEY || '',
+          'Accept': 'application/json'
+        },
       body: JSON.stringify({
         to: [to],
         from: process.env.OPENPHONE_PHONE_NUMBER_ID,
