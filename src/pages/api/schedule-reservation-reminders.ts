@@ -60,11 +60,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const reservationDateTime = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
     const now = DateTime.now().setZone(businessTimezone);
 
+    // Check for existing reminders for this reservation
+    const { data: existingReminders, error: existingError } = await supabase
+      .from('scheduled_reservation_reminders')
+      .select('template_id')
+      .eq('reservation_id', reservation.id);
+
+    if (existingError) {
+      console.error('Error checking existing reminders:', existingError);
+    }
+
+    const scheduledTemplateIds = existingReminders?.map(r => r.template_id) || [];
+    console.log('Existing reminder template IDs:', scheduledTemplateIds);
+
     // Schedule reminders for each template
     console.log(`Processing ${templates.length} templates:`, templates.map(t => `${t.name} (${t.reminder_type})`));
     
     for (const template of templates) {
       console.log(`\n--- Processing template: ${template.name} (${template.reminder_type}) ---`);
+      
+      // Skip if already scheduled
+      if (scheduledTemplateIds.includes(template.id)) {
+        console.log(`⏭️ Skipping ${template.name} - already scheduled`);
+        continue;
+      }
+      
       let scheduledTimeUTC: string | null = null;
       let shouldSendImmediately = false;
 
