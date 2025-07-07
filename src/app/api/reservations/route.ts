@@ -417,10 +417,17 @@ export async function POST(request: Request) {
     try {
       console.log('=== SCHEDULING RESERVATION REMINDERS ===');
       console.log('NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
+      console.log('VERCEL_URL:', process.env.VERCEL_URL);
+      console.log('NODE_ENV:', process.env.NODE_ENV);
       
-      const reminderUrl = process.env.NEXT_PUBLIC_SITE_URL 
-        ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/schedule-reservation-reminders`
-        : 'http://localhost:3000/api/schedule-reservation-reminders';
+      // Use VERCEL_URL in production, or NEXT_PUBLIC_SITE_URL, or construct from request
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.NEXT_PUBLIC_SITE_URL 
+        ? process.env.NEXT_PUBLIC_SITE_URL
+        : 'http://localhost:3000';
+        
+      const reminderUrl = `${baseUrl}/api/schedule-reservation-reminders`;
       
       console.log('Reminder URL:', reminderUrl);
         
