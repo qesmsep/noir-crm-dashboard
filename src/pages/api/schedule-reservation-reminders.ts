@@ -61,7 +61,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const now = DateTime.now().setZone(businessTimezone);
 
     // Schedule reminders for each template
+    console.log(`Processing ${templates.length} templates:`, templates.map(t => `${t.name} (${t.reminder_type})`));
+    
     for (const template of templates) {
+      console.log(`\n--- Processing template: ${template.name} (${template.reminder_type}) ---`);
       let scheduledTimeUTC: string | null = null;
       let shouldSendImmediately = false;
 
