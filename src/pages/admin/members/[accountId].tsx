@@ -1458,9 +1458,7 @@ export default function MemberDetailAdmin() {
                       <option value="current_month">Current Month</option>
                       <option value="last_month">Last Month</option>
                       <option value="last_3_months">Last 3 Months</option>
-                      {hasPreviousMembershipPeriod && (
-                        <option value="previous_membership_period">Previous Membership Period</option>
-                      )}
+                      <option value="previous_membership_period">Previous Membership Period</option>
                       <option value="custom">Custom Range</option>
                     </Select>
                   </FormControl>
