@@ -36,9 +36,16 @@ BEGIN
     LOOP
         -- Calculate scheduled time based on reminder type
         IF template_record.reminder_type = 'day_of' THEN
-            -- Extract hour and minute from send_time (TIME type)
-            send_hour := EXTRACT(HOUR FROM template_record.send_time);
-            send_minute := EXTRACT(MINUTE FROM template_record.send_time);
+            -- Handle send_time which might be TIME or TEXT type
+            IF pg_typeof(template_record.send_time) = 'time without time zone'::regtype THEN
+                -- send_time is TIME type
+                send_hour := EXTRACT(HOUR FROM template_record.send_time::time);
+                send_minute := EXTRACT(MINUTE FROM template_record.send_time::time);
+            ELSE
+                -- send_time is TEXT type, parse it
+                send_hour := SPLIT_PART(template_record.send_time::text, ':', 1)::integer;
+                send_minute := SPLIT_PART(template_record.send_time::text, ':', 2)::integer;
+            END IF;
             
             -- Schedule for the day of the reservation at the specified hour:minute
             scheduled_time := date_trunc('day', reservation_record.start_time) + 
@@ -100,13 +107,22 @@ BEGIN
         SET scheduled_for =
           CASE
             WHEN t.reminder_type = 'day_of' THEN
-              -- Extract hour and minute from send_time (TIME type)
+              -- Handle send_time which might be TIME or TEXT type
               (date_trunc('day', NEW.start_time) + 
-               make_time(
-                 EXTRACT(HOUR FROM t.send_time), 
-                 EXTRACT(MINUTE FROM t.send_time) + t.send_time_minutes, 
-                 0
-               ))
+               CASE 
+                 WHEN pg_typeof(t.send_time) = 'time without time zone'::regtype THEN
+                   make_time(
+                     EXTRACT(HOUR FROM t.send_time::time), 
+                     EXTRACT(MINUTE FROM t.send_time::time) + t.send_time_minutes, 
+                     0
+                   )
+                 ELSE
+                   make_time(
+                     SPLIT_PART(t.send_time::text, ':', 1)::integer,
+                     SPLIT_PART(t.send_time::text, ':', 2)::integer + t.send_time_minutes,
+                     0
+                   )
+               END)
             WHEN t.reminder_type = 'hour_before' THEN
               -- Set to X hours and Y minutes before the reservation start_time
               (NEW.start_time - 
