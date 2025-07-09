@@ -68,9 +68,27 @@ export function utcToLocalInput(utcString, timezone = DEFAULT_TIMEZONE) {
  */
 export function localInputToUTC(localString, timezone = DEFAULT_TIMEZONE) {
   if (!localString) return '';
-  return DateTime.fromFormat(localString, "yyyy-LL-dd'T'HH:mm", { zone: timezone })
-    .toUTC()
-    .toISO({ suppressMilliseconds: true });
+  
+  // Parse the datetime string and extract components
+  const match = localString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) {
+    throw new Error(`Invalid datetime format: ${localString}`);
+  }
+  
+  const [, year, month, day, hour, minute, second = '00'] = match;
+  
+  // Create DateTime object with explicit components, setting seconds to 00
+  const dt = DateTime.fromObject({
+    year: parseInt(year),
+    month: parseInt(month),
+    day: parseInt(day),
+    hour: parseInt(hour),
+    minute: parseInt(minute),
+    second: 0,
+    millisecond: 0
+  }, { zone: timezone });
+  
+  return dt.toUTC().toISO({ suppressMilliseconds: true });
 }
 
 /**

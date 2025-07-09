@@ -175,6 +175,12 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
       console.log('Original form data:', formData);
       
       // Convert both times using the new timezone-aware functions
+      console.log('Original time values:', { 
+        start_time: formData.start_time, 
+        end_time: formData.end_time,
+        timezone 
+      });
+      
       const startTimeUTC = formData.start_time ? localInputToUTC(formData.start_time, timezone) : undefined;
       const endTimeUTC = formData.end_time ? localInputToUTC(formData.end_time, timezone) : undefined;
       
@@ -186,13 +192,20 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
       // Handle empty table_id (convert empty string to null)
       const tableId = formData.table_id === '' ? null : formData.table_id;
       
+      // Only include time fields if they have valid values
       const updateData = {
         ...formData,
         phone: cleanedPhone,
         table_id: tableId,
-        start_time: startTimeUTC,
-        end_time: endTimeUTC,
       };
+      
+      // Only add time fields if they have valid values
+      if (startTimeUTC) {
+        updateData.start_time = startTimeUTC;
+      }
+      if (endTimeUTC) {
+        updateData.end_time = endTimeUTC;
+      }
       
       console.log('Update data being sent:', updateData);
       
