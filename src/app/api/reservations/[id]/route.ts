@@ -170,8 +170,11 @@ export async function PATCH(request: Request, { params }: any) {
       .single();
 
     if (error) {
+      console.error('Supabase update error:', error);
       throw error;
     }
+
+    console.log('Reservation updated successfully:', data);
 
     // Send admin notification for reservation modification
     try {
@@ -186,7 +189,7 @@ export async function PATCH(request: Request, { params }: any) {
   } catch (error) {
     console.error(`Error updating reservation ${id}:`, error);
     return NextResponse.json(
-      { error: 'Failed to update reservation' },
+      { error: `Failed to update reservation: ${error.message}` },
       { status: 500 }
     );
   }

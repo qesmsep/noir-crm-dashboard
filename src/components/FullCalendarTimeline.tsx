@@ -185,11 +185,14 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   }, [reloadKey, localReloadKey]);
 
   useEffect(() => {
+    console.log('FullCalendarTimeline: reloadKey changed to', reloadKey);
     const fetchReservations = async () => {
       try {
+        console.log('Fetching reservations due to reloadKey change');
         const res = await fetch('/api/reservations');
         if (!res.ok) throw new Error('Failed to fetch reservations');
         const reservationsData = await res.json();
+        console.log('Reservations fetched:', reservationsData);
         setEventData({ evRes: null, resRes: reservationsData });
       } catch (error) {
         console.error('Error fetching reservations:', error);

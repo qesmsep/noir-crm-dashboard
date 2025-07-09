@@ -28,6 +28,7 @@ export default function Calendar() {
   };
 
   const handleReservationUpdated = () => {
+    console.log('handleReservationUpdated called, incrementing reloadKey');
     setReloadKey(prev => prev + 1);
   };
 

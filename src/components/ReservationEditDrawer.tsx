@@ -180,8 +180,16 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
       
       console.log('Converted times:', { startTimeUTC, endTimeUTC });
       
+      // Clean phone number if it exists
+      const cleanedPhone = formData.phone ? formData.phone.replace(/\D/g, '') : formData.phone;
+      
+      // Handle empty table_id (convert empty string to null)
+      const tableId = formData.table_id === '' ? null : formData.table_id;
+      
       const updateData = {
         ...formData,
+        phone: cleanedPhone,
+        table_id: tableId,
         start_time: startTimeUTC,
         end_time: endTimeUTC,
       };
@@ -193,12 +201,24 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData),
       });
-      if (!response.ok) throw new Error('Failed to update reservation');
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error response:', errorText);
+        throw new Error(`Failed to update reservation: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('Update successful:', result);
+      
       toast({ title: 'Success', description: 'Reservation updated successfully', status: 'success', duration: 3000 });
+      console.log('Calling onReservationUpdated callback');
       onReservationUpdated();
+      console.log('Closing drawer');
       onClose();
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to update reservation', status: 'error', duration: 5000 });
+      console.error('Error in handleSave:', error);
+      toast({ title: 'Error', description: `Failed to update reservation: ${error.message}`, status: 'error', duration: 5000 });
     } finally {
       setIsSaving(false);
     }
@@ -442,7 +462,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                     <GridItem>
                       <FormControl>
                         <FormLabel fontSize="sm" mb={1}>Phone</FormLabel>
-                        <Input fontFamily="Montserrat, sans-serif" value={formatPhoneDisplay(formData.phone)} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder="+1 (555) 123-4567" size="sm" />
+                        <Input fontFamily="Montserrat, sans-serif" value={formData.phone} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder="+1 (555) 123-4567" size="sm" />
                       </FormControl>
                     </GridItem>
                   </Grid>
