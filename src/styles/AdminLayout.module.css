@@ -242,6 +242,45 @@
     background: rgba(255,255,255,0.08);
     color: #BCA892;
   }
+  .sidebar {
+    display: none !important;
+  }
+  .mobileHeader {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 60px;
+    background: rgba(53, 53, 53, 0.6);
+    z-index: 2100;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    backdrop-filter: blur(6px);
+  }
+  .menuButton {
+    display: block;
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 0.5rem;
+    z-index: 2200;
+    font-size: 2rem;
+    position: absolute;
+    right: 1.2rem;
+    top: 0.7rem;
+  }
+  .mobileLogo {
+    display: flex;
+    align-items: center;
+    height: 40px;
+  }
+  .main {
+    padding-top: 60px;
+  }
 }
 
 @media (max-width: 768px) {
