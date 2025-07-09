@@ -103,6 +103,9 @@ export default function MemberDetailAdmin() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [sendingPdf, setSendingPdf] = useState(false);
+  const [hasPreviousMembershipPeriod, setHasPreviousMembershipPeriod] = useState(false);
+  const [previousPeriodStart, setPreviousPeriodStart] = useState<string | null>(null);
+  const [previousPeriodEnd, setPreviousPeriodEnd] = useState<string | null>(null);
 
   async function fetchMembers() {
     try {
@@ -597,6 +600,31 @@ export default function MemberDetailAdmin() {
     }
   };
 
+  // Fetch renewal dates when member is selected for PDF
+  useEffect(() => {
+    const fetchRenewalDates = async () => {
+      if (!selectedMemberForPdf) return;
+      const supabase = getSupabaseClient();
+      const { data: renewalEntries } = await supabase
+        .from('ledger')
+        .select('date')
+        .eq('account_id', selectedMemberForPdf.account_id)
+        .ilike('description', '%renewal%')
+        .order('date', { ascending: false });
+      if (renewalEntries && renewalEntries.length > 1) {
+        setHasPreviousMembershipPeriod(true);
+        setPreviousPeriodEnd(renewalEntries[0].date);
+        setPreviousPeriodStart(renewalEntries[1].date);
+      } else {
+        setHasPreviousMembershipPeriod(false);
+        setPreviousPeriodStart(null);
+        setPreviousPeriodEnd(null);
+      }
+    };
+    if (isTextPdfModalOpen) fetchRenewalDates();
+  }, [selectedMemberForPdf, isTextPdfModalOpen]);
+
+  // Update handleTextPdf to support previous membership period
   const handleTextPdf = async () => {
     if (!selectedMemberForPdf || !selectedMemberForPdf.phone) {
       toast({
@@ -607,14 +635,10 @@ export default function MemberDetailAdmin() {
       });
       return;
     }
-
     try {
       setSendingPdf(true);
-
-      // Calculate date range
       let startDate, endDate;
       const today = new Date();
-
       switch (pdfDateRange) {
         case 'current_month':
           startDate = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -628,14 +652,19 @@ export default function MemberDetailAdmin() {
           startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
           endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
           break;
+        case 'previous_membership_period':
+          if (!previousPeriodStart || !previousPeriodEnd) {
+            toast({ title: 'Error', description: 'No previous membership period found.', status: 'error', duration: 3000 });
+            setSendingPdf(false);
+            return;
+          }
+          startDate = new Date(previousPeriodStart);
+          endDate = new Date(new Date(previousPeriodEnd).getTime() - 86400000); // day before last renewal
+          break;
         case 'custom':
           if (!customStartDate || !customEndDate) {
-            toast({
-              title: 'Error',
-              description: 'Please select both start and end dates.',
-              status: 'error',
-              duration: 3000,
-            });
+            toast({ title: 'Error', description: 'Please select both start and end dates.', status: 'error', duration: 3000 });
+            setSendingPdf(false);
             return;
           }
           startDate = new Date(customStartDate);
@@ -645,12 +674,9 @@ export default function MemberDetailAdmin() {
           startDate = new Date(today.getFullYear(), today.getMonth(), 1);
           endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       }
-
       const response = await fetch('/api/send-ledger-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           member_id: selectedMemberForPdf.member_id,
           account_id: selectedMemberForPdf.account_id,
@@ -660,34 +686,24 @@ export default function MemberDetailAdmin() {
           member_name: `${selectedMemberForPdf.first_name} ${selectedMemberForPdf.last_name}`
         }),
       });
-
       const result = await response.json();
-
       if (!response.ok) {
         throw new Error(result.error || 'Failed to send PDF');
       }
-
       toast({
         title: 'PDF Sent!',
         description: `Ledger PDF has been sent to ${selectedMemberForPdf.first_name} ${selectedMemberForPdf.last_name}`,
         status: 'success',
         duration: 5000,
       });
-
       setIsTextPdfModalOpen(false);
       setSelectedMemberForPdf(null);
       setPdfDateRange('current_month');
       setCustomStartDate('');
       setCustomEndDate('');
-
     } catch (error: any) {
       console.error('Error sending PDF:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to send PDF',
-        status: 'error',
-        duration: 3000,
-      });
+      toast({ title: 'Error', description: error.message || 'Failed to send PDF', status: 'error', duration: 3000 });
     } finally {
       setSendingPdf(false);
     }
@@ -1442,6 +1458,9 @@ export default function MemberDetailAdmin() {
                       <option value="current_month">Current Month</option>
                       <option value="last_month">Last Month</option>
                       <option value="last_3_months">Last 3 Months</option>
+                      {hasPreviousMembershipPeriod && (
+                        <option value="previous_membership_period">Previous Membership Period</option>
+                      )}
                       <option value="custom">Custom Range</option>
                     </Select>
                   </FormControl>

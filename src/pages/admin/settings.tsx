@@ -6,6 +6,7 @@ import CalendarAvailabilityControl from '../../components/CalendarAvailabilityCo
 import PrivateEventsManager from '../../components/PrivateEventsManager';
 import { Box, Heading, VStack, useColorModeValue, Text, Input, Button, Switch, FormControl, FormLabel, NumberInput, NumberInputField, NumberInputStepper, NumberIncrementStepper, NumberDecrementStepper, HStack } from "@chakra-ui/react";
 import { useSettings } from '../../context/SettingsContext';
+import LedgerNotificationSettingsCard from '../../components/LedgerNotificationSettingsCard';
 
 interface Settings {
   id: string;
@@ -189,6 +190,9 @@ export default function Settings() {
             </Heading>
             <CalendarAvailabilityControl section="booking_window" />
           </Box>
+
+          {/* Ledger Notification Settings Card */}
+          <LedgerNotificationSettingsCard />
 
           {/* Base Hours Card */}
           <Box 
