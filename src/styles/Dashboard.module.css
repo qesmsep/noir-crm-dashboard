@@ -112,3 +112,99 @@
     align-self: flex-end;
   }
 } 
+
+.dashboardRoot {
+  min-height: 100vh;
+  background: #353535;
+  color: #23201C;
+  padding: 2rem 0.5rem 4rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cardsGrid {
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+.listsGrid {
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 1100px) {
+  .cardsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .listsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboardRoot {
+    padding: 1rem 0.25rem 2rem 0.25rem;
+  }
+  .cardsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, auto);
+    gap: 1rem;
+  }
+  .listsGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .cardsGrid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(4, auto);
+  }
+}
+
+.simpleList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.simpleList li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+  font-size: 1.05rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.simpleList li:last-child {
+  border-bottom: none;
+}
+
+.reservationList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.reservationSeats {
+  font-weight: bold;
+  color: #BCA892;
+  font-size: 1.2em;
+}
+
+.paymentAmount {
+  color: #BCA892;
+  font-weight: 600;
+  margin-left: 0.5em;
+} 

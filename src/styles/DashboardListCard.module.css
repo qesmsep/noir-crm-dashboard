@@ -1,0 +1,59 @@
+.listCard {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  padding: 2rem 1.5rem;
+  min-width: 0;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  margin: 0.5rem 0;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.listCard:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  transform: translateY(-2px) scale(1.01);
+}
+
+.label {
+  font-size: 1.25rem;
+  color: #666;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  text-align: left;
+  letter-spacing: 0.04em;
+}
+
+.content {
+  width: 100%;
+  font-size: 1.05rem;
+  color: #23201C;
+  font-family: 'Montserrat', sans-serif;
+}
+
+@media (max-width: 900px) {
+  .listCard {
+    padding: 1.25rem 0.75rem;
+    min-height: 140px;
+  }
+  .label {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .listCard {
+    padding: 1rem 0.5rem;
+    min-height: 120px;
+  }
+  .label {
+    font-size: 1rem;
+  }
+  .content {
+    font-size: 0.98rem;
+  }
+} 

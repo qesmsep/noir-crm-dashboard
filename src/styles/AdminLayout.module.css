@@ -168,6 +168,10 @@
   color: #1a1a1a;
   cursor: pointer;
   padding: 0.5rem;
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1200;
 }
 
 .menuIcon {
@@ -214,6 +218,32 @@
 .mobileNavItem.active {
   background-color: #2a2a2a;
   color: white;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    display: none;
+  }
+  .menuButton {
+    display: block;
+  }
+  .mobileMenu {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    background: #aba8a1;
+    color: #fff;
+    z-index: 2000;
+    box-shadow: 2px 0 16px rgba(0,0,0,0.18);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .mobileMenu.open {
+    transform: translateX(0);
+  }
 }
 
 @media (max-width: 768px) {

@@ -2,6 +2,9 @@ import { Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber, Spinner, VStack,
 import { useEffect, useState } from "react";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
+import DashboardCard from '../../components/dashboard/DashboardCard';
+import DashboardListCard from '../../components/dashboard/DashboardListCard';
+import styles from '../../styles/Dashboard.module.css';
 
 interface Member {
   member_id: string;
@@ -190,211 +193,75 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
-      <Box p={4} minH="100vh" bg="#353535" color="#ECEDE8" position="relative" overflow="hidden">
-        <Box position="absolute" inset={0} zIndex={0} style={{ pointerEvents: 'none', background: 'radial-gradient(circle at 60% 40%, rgba(165,148,128,0.10) 0, transparent 70%)' }} />
-        <Box position="relative" ml={10} mr={10} zIndex={1} pt={28}>
-          {/* Single-stat cards grid */}
-          <SimpleGrid columns={4} spacing={20} mb={10} p={20} borderRadius="10px" shadow="0 8px 32px rgba(0, 0, 0, 0.5)">
-            {/* Total Members */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Total Members</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">{totalMembers}</StatNumber>
-            </Stat>
-            {/* Total Membership Dues */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Monthly Recurring Revenue</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">${totalDues.toFixed(2)}</StatNumber>
-            </Stat>
-            
-            {/* Outstanding Balances */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Outstanding Balances</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">${stats.outstanding?.toFixed(2)}</StatNumber>
-            </Stat>
-           
-            
-            
-            {/* Payments Received */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">{now.toLocaleString('default', { month: 'long' })} Payments Received</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">${payments.toFixed(2)}</StatNumber>
-            </Stat>
-            {/* Purchases */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">{now.toLocaleString('default', { month: 'long' })} Revenue</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">${Math.abs(purchases).toFixed(2)}</StatNumber>
-            </Stat>
-            {/* A/R */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">{now.toLocaleString('default', { month: 'long' })} A/R (Owed to Us)</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">${ar.toFixed(2)}</StatNumber>
-            </Stat>
-            
-            {/* Invitation Requests */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Invitation Requests</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">{stats.invitationRequestsCount}</StatNumber>
-            </Stat>
-            
-            {/* Waitlist */}
-            <Stat bg="#a59480" border="1px solid#ecede8" borderRadius="10px" boxShadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={10} h="100px"
-            >
-              <StatLabel fontSize="20px" textAlign="left" fontFamily="'Montserrat', sans-serif" fontWeight="bold">Waitlist</StatLabel>
-              <StatNumber fontSize="40px" textAlign="center" fontFamily="'Montserrat', sans-serif">{stats.waitlistCount}</StatNumber>
-            </Stat>
-          </SimpleGrid>
-          {/* Multi-stat cards, each in their own row */}
-          <Flex justifyContent="left" mt={20} gap={22} shadow="0 8px 32px rgba(0, 0, 0, 0.5)" p={20} borderRadius="10px">
-             {/* Upcoming Reservations */}
-             <Box width="33%" bg="#a59480" borderRadius="10px" boxShadow="0 8px 32px rgba(53,53,53,0.25)" p={7} minH="300px"
-              shadow="0 8px 32px rgba(0, 0, 0, 0.5)"
-              fontFamily="'Montserrat', sans-serif"
-              display="flex"
-              flexDirection="column"
-              alignItems="center"
-              border="1px solid#ecede8"
-            >
-              <Text fontSize="24px" textAlign="center" fontFamily="'Montserrat', sans-serif" fontWeight="bold" mb={8}>
-                Upcoming Reservations (Seats)
-              </Text>
-              <Box w="100%" display="flex" flexDirection="column" alignItems="center" gap={6}>
-                {/* Thursday */}
-                <Box textAlign="center">
-                  <Text fontSize="20px" fontFamily="'Montserrat', sans-serif" fontWeight="bold">
-                    {nextThursday.toLocaleDateString(undefined, { weekday: 'long' })} - {nextThursday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
-                    
-                  </Text>
-                  <Text fontSize="24px" fontFamily="'Montserrat', sans-serif" fontWeight="bold" mt={1}>{thursdaySeats}</Text>
-                </Box>
-                {/* Friday */}
-                <Box textAlign="center">
-                  <Text fontSize="20px" fontFamily="'Montserrat', sans-serif" fontWeight="bold">
-                    {nextFriday.toLocaleDateString(undefined, { weekday: 'long' })} - {nextFriday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
-                    
-                  </Text>
-                  <Text fontSize="24px" fontFamily="'Montserrat', sans-serif" fontWeight="bold" mt={1}>{fridaySeats}</Text>
-                </Box>
-                {/* Saturday */}
-                <Box textAlign="center">
-                  <Text fontSize="20px" fontFamily="'Montserrat', sans-serif" fontWeight="bold">
-                    {nextSaturday.toLocaleDateString(undefined, { weekday: 'long' })} - {nextSaturday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit'})}
-                    
-                  </Text>
-                  <Text fontSize="24px" fontFamily="'Montserrat', sans-serif" fontWeight="bold" mt={1}>{saturdaySeats}</Text>
-                </Box>
-              </Box>
-            </Box>
-            {/* Next 5 Birthdays */}
-            <Box width="33%" bg="#a59480" borderRadius="10px" boxShadow="0 8px 32px rgba(53,53,53,0.25)" p={7} minH="300px"
-              shadow="0 8px 32px rgba(0, 0, 0, 0.5)"
-              fontFamily="'Montserrat', sans-serif"
-              display="flex"
-              flexDirection="column"
-              alignItems="center"
-              border="1px solid#ecede8"
-            >
-              <Heading fontSize="24px" textAlign="center" mb={4} fontFamily="'Montserrat', sans-serif" >Next 5 Birthdays</Heading>
-              {membersWithBirthday.length === 0 ? <Text fontFamily="'Montserrat', sans-serif" textAlign="center">No upcoming birthdays.</Text> : (
-                <VStack align="stretch" spacing={1} mt={2}>
-                  {membersWithBirthday.map(m => (
-                    <Box key={m.member_id}>
-                      <Text fontWeight="bold" fontFamily="'Montserrat', sans-serif" textAlign="center">{m.first_name} {m.last_name}</Text>
-                      <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" textAlign="center">{(m.nextBirthday as Date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</Text>
-                    </Box>
-                  ))}
-                </VStack>
-              )}
-            </Box>
-            {/* Next 5 Payments Due */}
-            <Box width="33%" bg="#a59480" borderRadius="10px" boxShadow="0 8px 32px rgba(53,53,53,0.25)" p={7} minH="300px"
-              fontFamily="'Montserrat', sans-serif"
-              display="flex"
-              flexDirection="column"
-              shadow="0 8px 32px rgba(0, 0, 0, 0.5)"
-              alignItems="center"
-              border="1px solid#ecede8"
-            >
-              <Heading fontSize="24px" textAlign="center" mb={4} fontFamily="'Montserrat', sans-serif">Next 5 Payments Due</Heading>
-              {membersWithRenewal.length === 0 ? <Text fontFamily="'Montserrat', sans-serif" textAlign="center">No upcoming payments.</Text> : (
-                <VStack align="stretch" spacing={1} mt={2}>
-                  {membersWithRenewal.map(m => (
-                    <Box key={m.member_id} display="flex" justifyContent="space-between" alignItems="center">
-                      <Box>
-                        <Text fontSize="18px"fontWeight="bold" fontFamily="'Montserrat', sans-serif" textAlign="left">{m.first_name} {m.last_name} | {(m.nextRenewal as Date).toLocaleDateString()}</Text>
-                        <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" textAlign="left">${(m.monthly_dues || 0).toFixed(2)}</Text>
-                        
-                      </Box>
-                      
-                    </Box>
-                  ))}
-                </VStack>
-              )}
-            </Box>
-            
-            {/* Invitation Requests Queue */}
-            <Box width="33%" bg="#a59480" borderRadius="10px" boxShadow="0 8px 32px rgba(53,53,53,0.25)" p={7} minH="300px"
-              fontFamily="'Montserrat', sans-serif"
-              display="flex"
-              flexDirection="column"
-              shadow="0 8px 32px rgba(0, 0, 0, 0.5)"
-              alignItems="center"
-              border="1px solid#ecede8"
-            >
-              <Heading fontSize="24px" textAlign="center" mb={4} fontFamily="'Montserrat', sans-serif">Invitation Requests</Heading>
-              {stats.invitationRequests.length === 0 ? (
-                <Text fontFamily="'Montserrat', sans-serif" textAlign="center">No pending requests.</Text>
-              ) : (
-                <VStack align="stretch" spacing={2} mt={2} w="100%">
-                  {stats.invitationRequests.slice(0, 5).map((entry: any) => (
-                    <Box 
-                      key={entry.id} 
-                      p={3} 
-                      bg="#2a2a2a" 
-                      borderRadius="8px" 
-                      cursor="pointer"
-                      onClick={() => {
-                        setSelectedWaitlistEntry(entry);
-                        onWaitlistModalOpen();
-                      }}
-                      _hover={{ bg: "#3a3a3a" }}
-                    >
-                      <Text fontSize="16px" fontWeight="bold" fontFamily="'Montserrat', sans-serif" textAlign="left">
-                        {entry.first_name} {entry.last_name}
-                      </Text>
-                      <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" textAlign="left" color="#a59480">
-                        {new Date(entry.submitted_at).toLocaleDateString()}
-                      </Text>
-                    </Box>
-                  ))}
-                  {stats.invitationRequests.length > 5 && (
-                    <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" textAlign="center" color="#a59480">
-                      +{stats.invitationRequests.length - 5} more requests
-                    </Text>
-                  )}
-                </VStack>
-              )}
-            </Box>
-          </Flex>
-        </Box>
-      </Box>
-      
-      {/* Waitlist Review Drawer */}
-      <WaitlistReviewDrawer
-        isOpen={isWaitlistModalOpen}
-        onClose={onWaitlistModalClose}
-        entry={selectedWaitlistEntry}
-        onStatusUpdate={() => {
-          // Refresh the stats when a waitlist entry is updated
-          fetchStats();
-        }}
-      />
+      <div className={styles.dashboardRoot}>
+        {/* Single-stat cards grid */}
+        <div className={styles.cardsGrid}>
+          <DashboardCard label="Total Members" value={totalMembers} />
+          <DashboardCard label="Monthly Recurring Revenue" value={`$${totalDues.toFixed(2)}`} />
+          <DashboardCard label="Outstanding Balances" value={`$${stats.outstanding?.toFixed(2)}`} />
+          <DashboardCard label={`${now.toLocaleString('default', { month: 'long' })} Payments Received`} value={`$${payments.toFixed(2)}`} />
+          <DashboardCard label={`${now.toLocaleString('default', { month: 'long' })} Revenue`} value={`$${Math.abs(purchases).toFixed(2)}`} />
+          <DashboardCard label={`${now.toLocaleString('default', { month: 'long' })} A/R (Owed to Us)`} value={`$${ar.toFixed(2)}`} />
+          <DashboardCard label="Invitation Requests" value={stats.invitationRequestsCount} />
+          <DashboardCard label="Waitlist" value={stats.waitlistCount} />
+        </div>
+        {/* Multi-data cards stacked below */}
+        <div className={styles.listsGrid}>
+          <DashboardListCard label="Upcoming Reservations (Seats)">
+            <div className={styles.reservationList}>
+              <div>
+                <strong>{nextThursday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextThursday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}: <span className={styles.reservationSeats}>{thursdaySeats}</span>
+              </div>
+              <div>
+                <strong>{nextFriday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextFriday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}: <span className={styles.reservationSeats}>{fridaySeats}</span>
+              </div>
+              <div>
+                <strong>{nextSaturday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextSaturday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit'})}: <span className={styles.reservationSeats}>{saturdaySeats}</span>
+              </div>
+            </div>
+          </DashboardListCard>
+          <DashboardListCard label="Next 5 Birthdays">
+            {membersWithBirthday.length === 0 ? <div>No upcoming birthdays.</div> : (
+              <ul className={styles.simpleList}>
+                {membersWithBirthday.map(m => (
+                  <li key={m.member_id}><strong>{m.first_name} {m.last_name}</strong> - {(m.nextBirthday as Date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</li>
+                ))}
+              </ul>
+            )}
+          </DashboardListCard>
+          <DashboardListCard label="Next 5 Payments Due">
+            {membersWithRenewal.length === 0 ? <div>No upcoming payments.</div> : (
+              <ul className={styles.simpleList}>
+                {membersWithRenewal.map(m => (
+                  <li key={m.member_id}><strong>{m.first_name} {m.last_name}</strong> - {(m.nextRenewal as Date).toLocaleDateString()} <span className={styles.paymentAmount}>${(m.monthly_dues || 0).toFixed(2)}</span></li>
+                ))}
+              </ul>
+            )}
+          </DashboardListCard>
+          <DashboardListCard label="Invitation Requests">
+            {stats.invitationRequests.length === 0 ? (
+              <div>No pending requests.</div>
+            ) : (
+              <ul className={styles.simpleList}>
+                {stats.invitationRequests.slice(0, 5).map((entry: any) => (
+                  <li key={entry.id}>
+                    <strong>{entry.first_name} {entry.last_name}</strong> - {new Date(entry.submitted_at).toLocaleDateString()}
+                  </li>
+                ))}
+                {stats.invitationRequests.length > 5 && (
+                  <li>+{stats.invitationRequests.length - 5} more requests</li>
+                )}
+              </ul>
+            )}
+          </DashboardListCard>
+        </div>
+        <WaitlistReviewDrawer
+          isOpen={isWaitlistModalOpen}
+          onClose={onWaitlistModalClose}
+          entry={selectedWaitlistEntry}
+          onStatusUpdate={fetchStats}
+        />
+      </div>
     </AdminLayout>
   );
 } 
