@@ -32,10 +32,15 @@ import {
   StatLabel,
   StatNumber,
   StatHelpText,
-  SimpleGrid
+  SimpleGrid,
+  Grid,
+  GridItem,
+  Icon,
+  Flex
 } from '@chakra-ui/react';
 import { getSupabaseClient } from '../api/supabaseClient';
 import AdminLayout from '../../components/layouts/AdminLayout';
+import LedgerPDFPreview from '../../components/LedgerPDFPreview';
 
 interface LedgerNotificationSettings {
   id: string;
@@ -275,197 +280,259 @@ export default function LedgerNotificationsPage() {
 
   return (
     <AdminLayout>
-      <Box p={8}>
-        <Heading size="lg" mb={6} fontFamily="IvyJournal-Thin, serif">
-          Ledger Notifications
-        </Heading>
+      <Box p={8} bg="gray.50" minH="100vh">
+        <VStack spacing={8} align="stretch">
+          {/* Header */}
+          <Box>
+            <Heading size="lg" mb={2} fontFamily="IvyJournal-Thin, serif" color="gray.800">
+              Ledger Notifications
+            </Heading>
+            <Text color="gray.600" fontSize="md">
+              Manage automated ledger PDF notifications sent to members
+            </Text>
+          </Box>
 
-        {/* Stats */}
-        <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6} mb={8}>
-          <Stat>
-            <StatLabel>Total Notifications</StatLabel>
-            <StatNumber>{stats.total}</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Pending</StatLabel>
-            <StatNumber color="yellow.500">{stats.pending}</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Sent</StatLabel>
-            <StatNumber color="green.500">{stats.sent}</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Failed</StatLabel>
-            <StatNumber color="red.500">{stats.failed}</StatNumber>
-          </Stat>
-        </SimpleGrid>
+          {/* Stats Cards */}
+          <Grid templateColumns={{ base: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }} gap={6}>
+            <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+              <CardBody>
+                <Stat>
+                  <StatLabel color="gray.600" fontSize="sm">Total Notifications</StatLabel>
+                  <StatNumber fontSize="2xl" color="blue.600">{stats.total}</StatNumber>
+                </Stat>
+              </CardBody>
+            </Card>
+            <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+              <CardBody>
+                <Stat>
+                  <StatLabel color="gray.600" fontSize="sm">Pending</StatLabel>
+                  <StatNumber fontSize="2xl" color="yellow.500">{stats.pending}</StatNumber>
+                </Stat>
+              </CardBody>
+            </Card>
+            <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+              <CardBody>
+                <Stat>
+                  <StatLabel color="gray.600" fontSize="sm">Sent</StatLabel>
+                  <StatNumber fontSize="2xl" color="green.500">{stats.sent}</StatNumber>
+                </Stat>
+              </CardBody>
+            </Card>
+            <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+              <CardBody>
+                <Stat>
+                  <StatLabel color="gray.600" fontSize="sm">Failed</StatLabel>
+                  <StatNumber fontSize="2xl" color="red.500">{stats.failed}</StatNumber>
+                </Stat>
+              </CardBody>
+            </Card>
+          </Grid>
 
-        {/* Settings Card */}
-        <Card mb={8}>
-          <CardHeader>
-            <Heading size="md">Notification Settings</Heading>
-          </CardHeader>
-          <CardBody>
-            {settings ? (
-              <VStack spacing={4} align="stretch">
-                <FormControl display="flex" alignItems="center">
-                  <FormLabel htmlFor="is_enabled" mb="0">
-                    Enable Ledger Notifications
-                  </FormLabel>
-                  <Switch
-                    id="is_enabled"
-                    isChecked={settings.is_enabled}
-                    onChange={(e) => setSettings({ ...settings, is_enabled: e.target.checked })}
-                  />
-                </FormControl>
+          {/* Settings Card */}
+          <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+            <CardHeader bg="gray.50" borderBottom="1px solid" borderColor="gray.200">
+              <Heading size="md" color="gray.800">Notification Settings</Heading>
+            </CardHeader>
+            <CardBody>
+              {settings ? (
+                <VStack spacing={4} align="stretch">
+                  <FormControl display="flex" alignItems="center">
+                    <FormLabel htmlFor="is_enabled" mb="0" color="gray.700">
+                      Enable Ledger Notifications
+                    </FormLabel>
+                    <Switch
+                      id="is_enabled"
+                      isChecked={settings.is_enabled}
+                      onChange={(e) => setSettings({ ...settings, is_enabled: e.target.checked })}
+                    />
+                  </FormControl>
 
-                <FormControl>
-                  <FormLabel>Send Time</FormLabel>
-                  <Input
-                    type="time"
-                    value={settings.send_time}
-                    onChange={(e) => setSettings({ ...settings, send_time: e.target.value })}
-                  />
-                </FormControl>
+                  <FormControl>
+                    <FormLabel color="gray.700">Send Time</FormLabel>
+                    <Input
+                      type="time"
+                      value={settings.send_time}
+                      onChange={(e) => setSettings({ ...settings, send_time: e.target.value })}
+                      bg="white"
+                    />
+                  </FormControl>
 
-                <FormControl>
-                  <FormLabel>Days Before Renewal</FormLabel>
-                  <Input
-                    type="number"
-                    value={settings.days_before_renewal}
-                    onChange={(e) => setSettings({ ...settings, days_before_renewal: parseInt(e.target.value) })}
-                    min={1}
-                    max={30}
-                  />
-                </FormControl>
+                  <FormControl>
+                    <FormLabel color="gray.700">Days Before Renewal</FormLabel>
+                    <Input
+                      type="number"
+                      value={settings.days_before_renewal}
+                      onChange={(e) => setSettings({ ...settings, days_before_renewal: parseInt(e.target.value) })}
+                      min={1}
+                      max={30}
+                      bg="white"
+                    />
+                  </FormControl>
 
-                <FormControl>
-                  <FormLabel>Message Template</FormLabel>
-                  <Textarea
-                    value={settings.message_template}
-                    onChange={(e) => setSettings({ ...settings, message_template: e.target.value })}
-                    placeholder="Enter message template with placeholders: {{first_name}}, {{renewal_date}}"
-                    rows={4}
-                  />
-                  <Text fontSize="sm" color="gray.600" mt={2}>
-                    Available placeholders: {'{{first_name}}'}, {'{{renewal_date}}'}
-                  </Text>
-                </FormControl>
+                  <FormControl>
+                    <FormLabel color="gray.700">Message Template</FormLabel>
+                    <Textarea
+                      value={settings.message_template}
+                      onChange={(e) => setSettings({ ...settings, message_template: e.target.value })}
+                      placeholder="Enter message template with placeholders: {{first_name}}, {{renewal_date}}"
+                      rows={4}
+                      bg="white"
+                    />
+                    <Text fontSize="sm" color="gray.600" mt={2}>
+                      Available placeholders: {'{{first_name}}'}, {'{{renewal_date}}'}
+                    </Text>
+                  </FormControl>
 
+                  <Button
+                    colorScheme="blue"
+                    onClick={handleSaveSettings}
+                    isLoading={saving}
+                    loadingText="Saving..."
+                  >
+                    Save Settings
+                  </Button>
+                </VStack>
+              ) : (
+                <Alert status="warning">
+                  <AlertIcon />
+                  <AlertTitle>No settings found!</AlertTitle>
+                  <AlertDescription>
+                    Please run the database migration to create the default settings.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardBody>
+          </Card>
+
+          {/* Actions Card */}
+          <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+            <CardHeader bg="gray.50" borderBottom="1px solid" borderColor="gray.200">
+              <Heading size="md" color="gray.800">Actions</Heading>
+            </CardHeader>
+            <CardBody>
+              <HStack spacing={4} flexWrap="wrap">
+                <Button
+                  colorScheme="green"
+                  onClick={handleScheduleNotifications}
+                  isLoading={scheduling}
+                  loadingText="Scheduling..."
+                >
+                  Schedule Notifications
+                </Button>
                 <Button
                   colorScheme="blue"
-                  onClick={handleSaveSettings}
-                  isLoading={saving}
-                  loadingText="Saving..."
+                  onClick={handleProcessNotifications}
+                  isLoading={processing}
+                  loadingText="Processing..."
                 >
-                  Save Settings
+                  Process Pending Notifications
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={fetchData}
+                >
+                  Refresh Data
+                </Button>
+              </HStack>
+            </CardBody>
+          </Card>
+
+          {/* PDF Preview Section */}
+          <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+            <CardHeader bg="gray.50" borderBottom="1px solid" borderColor="gray.200">
+              <Heading size="md" color="gray.800">PDF Preview</Heading>
+            </CardHeader>
+            <CardBody>
+              <VStack spacing={4} align="stretch">
+                <Text color="gray.600">
+                  Preview how the ledger PDF will look for a member. Select a member and date range to generate a sample.
+                </Text>
+                <HStack spacing={4} flexWrap="wrap">
+                  <LedgerPDFPreview
+                    memberId="sample-member-id"
+                    memberName="Sample Member"
+                    accountId="SAMPLE-001"
+                  />
+                  <Text fontSize="sm" color="gray.500">
+                    Note: This is a preview feature. Use the member details page for actual PDF generation.
+                  </Text>
+                </HStack>
               </VStack>
-            ) : (
-              <Alert status="warning">
-                <AlertIcon />
-                <AlertTitle>No settings found!</AlertTitle>
-                <AlertDescription>
-                  Please run the database migration to create the default settings.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
 
-        {/* Actions Card */}
-        <Card mb={8}>
-          <CardHeader>
-            <Heading size="md">Actions</Heading>
-          </CardHeader>
-          <CardBody>
-            <HStack spacing={4}>
-              <Button
-                colorScheme="green"
-                onClick={handleScheduleNotifications}
-                isLoading={scheduling}
-                loadingText="Scheduling..."
-              >
-                Schedule Notifications
-              </Button>
-              <Button
-                colorScheme="blue"
-                onClick={handleProcessNotifications}
-                isLoading={processing}
-                loadingText="Processing..."
-              >
-                Process Pending Notifications
-              </Button>
-              <Button
-                variant="outline"
-                onClick={fetchData}
-              >
-                Refresh Data
-              </Button>
-            </HStack>
-          </CardBody>
-        </Card>
-
-        {/* Scheduled Notifications Table */}
-        <Card>
-          <CardHeader>
-            <Heading size="md">Scheduled Notifications</Heading>
-          </CardHeader>
-          <CardBody>
-            {scheduledNotifications.length > 0 ? (
-              <Box overflowX="auto">
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Member</Th>
-                      <Th>Renewal Date</Th>
-                      <Th>Ledger Period</Th>
-                      <Th>Scheduled For</Th>
-                      <Th>Status</Th>
-                      <Th>Sent At</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {scheduledNotifications.map((notification) => (
-                      <Tr key={notification.id}>
-                        <Td>
-                          {notification.members.first_name} {notification.members.last_name}
-                        </Td>
-                        <Td>{new Date(notification.renewal_date).toLocaleDateString()}</Td>
-                        <Td>
-                          {new Date(notification.ledger_start_date).toLocaleDateString()} - {new Date(notification.ledger_end_date).toLocaleDateString()}
-                        </Td>
-                        <Td>{formatDate(notification.scheduled_for)}</Td>
-                        <Td>
-                          <Badge colorScheme={getStatusColor(notification.status)}>
-                            {notification.status}
-                          </Badge>
-                        </Td>
-                        <Td>
-                          {notification.sent_at ? formatDate(notification.sent_at) : '-'}
-                        </Td>
-                        <Td>
-                          {notification.pdf_url && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => window.open(notification.pdf_url, '_blank')}
-                            >
-                              View PDF
-                            </Button>
-                          )}
-                        </Td>
+          {/* Scheduled Notifications Table */}
+          <Card bg="white" shadow="sm" border="1px solid" borderColor="gray.200">
+            <CardHeader bg="gray.50" borderBottom="1px solid" borderColor="gray.200">
+              <Heading size="md" color="gray.800">Scheduled Notifications</Heading>
+            </CardHeader>
+            <CardBody>
+              {scheduledNotifications.length > 0 ? (
+                <Box overflowX="auto">
+                  <Table variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th color="gray.700">Member</Th>
+                        <Th color="gray.700">Renewal Date</Th>
+                        <Th color="gray.700">Ledger Period</Th>
+                        <Th color="gray.700">Scheduled For</Th>
+                        <Th color="gray.700">Status</Th>
+                        <Th color="gray.700">Sent At</Th>
+                        <Th color="gray.700">Actions</Th>
                       </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              </Box>
-            ) : (
-              <Text>No scheduled notifications found.</Text>
-            )}
-          </CardBody>
-        </Card>
+                    </Thead>
+                    <Tbody>
+                      {scheduledNotifications.map((notification) => (
+                        <Tr key={notification.id} _hover={{ bg: 'gray.50' }}>
+                          <Td>
+                            <Text fontWeight="medium">
+                              {notification.members.first_name} {notification.members.last_name}
+                            </Text>
+                          </Td>
+                          <Td>{new Date(notification.renewal_date).toLocaleDateString()}</Td>
+                          <Td>
+                            {new Date(notification.ledger_start_date).toLocaleDateString()} - {new Date(notification.ledger_end_date).toLocaleDateString()}
+                          </Td>
+                          <Td>{formatDate(notification.scheduled_for)}</Td>
+                          <Td>
+                            <Badge colorScheme={getStatusColor(notification.status)} variant="subtle">
+                              {notification.status}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            {notification.sent_at ? formatDate(notification.sent_at) : '-'}
+                          </Td>
+                          <Td>
+                            <HStack spacing={2}>
+                              {notification.pdf_url && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => window.open(notification.pdf_url, '_blank')}
+                                >
+                                  View PDF
+                                </Button>
+                              )}
+                              <LedgerPDFPreview
+                                memberId={notification.member_id}
+                                memberName={`${notification.members.first_name} ${notification.members.last_name}`}
+                                accountId={notification.account_id}
+                              />
+                            </HStack>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              ) : (
+                <Box textAlign="center" py={8}>
+                  <Text color="gray.500">No scheduled notifications found.</Text>
+                </Box>
+              )}
+            </CardBody>
+          </Card>
+        </VStack>
       </Box>
     </AdminLayout>
   );
