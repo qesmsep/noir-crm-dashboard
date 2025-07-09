@@ -43,20 +43,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent
           resourceTitle: `Table ${t.table_number}`
         }));
       setTables(tableResources);
-      const [evRes, resRes] = await Promise.all([
-        fetch('/api/events').then(r => r.json()),
+      const [privateEventsRes, resRes] = await Promise.all([
+        fetch('/api/private-events').then(r => r.json()),
         fetch('/api/reservations').then(r => r.json())
       ]);
-      const mapped: CalendarEvent[] = (evRes.data || []).map((e: any) => ({
+      const mapped: CalendarEvent[] = (privateEventsRes.data || []).map((e: any) => ({
         id: e.id,
         title: e.title,
         start: fromUTC(e.start_time, settings.timezone).toJSDate(),
         end: fromUTC(e.end_time, settings.timezone).toJSDate(),
-        allDay: false,
-        resourceId: e.table_id
+        allDay: e.full_day || false,
+        resourceId: null // Private events don't have table assignments
       })).concat((resRes.data || []).map((r: any) => ({
         id: r.id,
-        title: `Res: ${r.name}`,
+        title: `Res: ${r.first_name || r.name || 'Guest'} ${r.last_name || ''}`,
         start: fromUTC(r.start_time, settings.timezone).toJSDate(),
         end: fromUTC(r.end_time, settings.timezone).toJSDate(),
         allDay: false,

@@ -4,8 +4,7 @@ import { supabase } from '../../lib/supabase';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      // Get pending campaign messages with related data
-      const { data: pendingMessages, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from('scheduled_messages')
         .select(`
           *,
@@ -29,15 +28,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('status', 'pending')
         .order('scheduled_for', { ascending: true });
 
-      if (fetchError) {
-        console.error('Error fetching pending campaign messages:', fetchError);
+      if (error) {
+        console.error('Error fetching pending campaign messages:', error);
         return res.status(500).json({ error: 'Failed to fetch pending messages' });
       }
 
-      res.status(200).json({ pendingMessages: pendingMessages || [] });
+      res.status(200).json(data || []);
     } catch (error) {
-      console.error('Error in pending campaign messages API:', error);
-      res.status(500).json({ error: 'Failed to fetch pending messages' });
+      console.error('Error in pending campaign messages GET:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   } else if (req.method === 'POST') {
     try {
@@ -116,16 +115,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       res.status(200).json({ 
-        message: 'Message sent successfully',
-        openphone_message_id: smsResult.id 
+        success: true, 
+        message: 'Campaign message sent successfully',
+        sms_result: smsResult
       });
-
     } catch (error) {
-      console.error('Error sending individual campaign message:', error);
-      res.status(500).json({ error: 'Failed to send message' });
+      console.error('Error in pending campaign messages POST:', error);
+      res.status(500).json({ error: 'Failed to send campaign message' });
     }
   } else {
     res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 } 
