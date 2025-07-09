@@ -35,6 +35,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className={styles.container}>
+      {/* Hamburger menu button for mobile */}
+      <button
+        className={styles.menuButton}
+        aria-label="Open navigation menu"
+        onClick={() => setIsMenuOpen((open) => !open)}
+        type="button"
+        style={{ display: 'block' }}
+      >
+        <span style={{ fontSize: 32, lineHeight: 1, fontWeight: 700 }}>☰</span>
+      </button>
       <nav className={styles.sidebar}>
         <div className={styles.logo}>
           <Link href="/">
@@ -89,23 +99,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className={styles.content}>{children}</div>
       </main>
 
-      {isMenuOpen && (
-        <div className={styles.mobileMenu}>
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`${styles.mobileNavItem} ${
-                pathname === item.href ? styles.active : ''
-              }`}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <span className={styles.icon}>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className={`${styles.mobileMenu} ${isMenuOpen ? 'open' : ''}`} role="navigation" aria-label="Mobile navigation menu">
+        {navItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`${styles.mobileNavItem} ${pathname === item.href ? styles.active : ''}`}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <span className={styles.icon}>{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 } 
