@@ -11,5 +11,6 @@ jobs:
     steps:
       - name: Call webhook
         run: |
-          curl -X GET "https://noir-crm-dashboard.vercel.app/api/webhook-process-reminders" \
+          curl -X POST "https://noir-crm-dashboard.vercel.app/api/webhook-process-reminders" \
+            -H "Content-Type: application/json" \
             -H "x-webhook-secret: ${{ secrets.WEBHOOK_SECRET }}"
