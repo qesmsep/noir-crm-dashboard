@@ -220,29 +220,45 @@
   color: white;
 }
 
+.mobileHeader {
+  display: none;
+}
+
 @media (max-width: 900px) {
-  .sidebar {
-    display: none;
-  }
-  .menuButton {
-    display: block;
-  }
-  .mobileMenu {
-    display: block;
+  .mobileHeader {
+    display: flex;
     position: fixed;
     top: 0;
     left: 0;
-    width: 260px;
-    height: 100vh;
-    background: #aba8a1;
-    color: #fff;
-    z-index: 2000;
-    box-shadow: 2px 0 16px rgba(0,0,0,0.18);
-    transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    width: 100vw;
+    height: 60px;
+    background: rgba(53, 53, 53, 0.6);
+    z-index: 2100;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    backdrop-filter: blur(6px);
   }
-  .mobileMenu.open {
-    transform: translateX(0);
+  .mobileLogo {
+    display: flex;
+    align-items: center;
+    height: 40px;
+  }
+  .menuButton {
+    display: block;
+    background: none;
+    border: none;
+    color: #ECEDE8;
+    cursor: pointer;
+    padding: 0.5rem;
+    z-index: 2200;
+  }
+  .sidebar {
+    display: none;
+  }
+  .main {
+    padding-top: 60px;
   }
 }
 

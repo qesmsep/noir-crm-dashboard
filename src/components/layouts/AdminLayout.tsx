@@ -35,16 +35,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className={styles.container}>
-      {/* Hamburger menu button for mobile */}
-      <button
-        className={styles.menuButton}
-        aria-label="Open navigation menu"
-        onClick={() => setIsMenuOpen((open) => !open)}
-        type="button"
-        style={{ display: 'block' }}
-      >
-        <span style={{ fontSize: 32, lineHeight: 1, fontWeight: 700 }}>☰</span>
-      </button>
+      {/* Mobile transparent header with logo and hamburger menu */}
+      <header className={styles.mobileHeader}>
+        <Link href="/" className={styles.mobileLogo} aria-label="Home">
+          <Image src="/images/noir-wedding-day.png" alt="Noir Logo" width={100} height={40} style={{ objectFit: 'contain' }} />
+        </Link>
+        <button
+          className={styles.menuButton}
+          aria-label="Open navigation menu"
+          onClick={() => setIsMenuOpen((open) => !open)}
+          type="button"
+        >
+          <span style={{ fontSize: 32, lineHeight: 1, fontWeight: 700 }}>☰</span>
+        </button>
+      </header>
       <nav className={styles.sidebar}>
         <div className={styles.logo}>
           <Link href="/">
