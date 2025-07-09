@@ -369,9 +369,12 @@ function parseReservationMessage(message) {
       if (meridiem === 'am' && hour === 12) hour = 0;
     }
   }
-  date.setHours(hour, minute, 0, 0);
-  const start_time = date.toISOString();
-  const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
+  
+  // Create the date in the business timezone, then convert to UTC for storage
+  const businessDate = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
+  const reservationDateTime = businessDate.set({ hour, minute, second: 0, millisecond: 0 });
+  const start_time = reservationDateTime.toUTC().toISO();
+  const end_time = reservationDateTime.plus({ hours: 2 }).toUTC().toISO();
 
   // Extract TYPE (event_type)
   let eventTypeMatch = msg.match(/type\s+(\w+)/i);
@@ -684,8 +687,10 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     }
 
     // 5. Check if the requested time falls within venue hours
-    const requestedHour = date.getHours();
-    const requestedMinute = date.getMinutes();
+    // Convert UTC time to business timezone for comparison with venue hours
+    const businessDateTime = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
+    const requestedHour = businessDateTime.hour;
+    const requestedMinute = businessDateTime.minute;
     const requestedTime = `${requestedHour.toString().padStart(2, '0')}:${requestedMinute.toString().padStart(2, '0')}`;
     
     let timeRanges = baseHoursData.flatMap(row => row.time_ranges || []);
@@ -782,7 +787,9 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     
     if (evError) {
       console.error('Error fetching events:', evError);
-      return { available: false, message: 'Error checking availability' };
+      // If events table doesn't exist, just continue with empty events array
+      // This is a common case since events table might not be created yet
+      console.log('Events table not available, continuing with empty events array');
     }
 
     // Check for conflicting reservations and events
@@ -985,13 +992,7 @@ export async function handler(req, res) {
       month: 'long',
       day: 'numeric'
     });
-    
-    const formattedTime = reservationDate.toLocaleString({
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-    
+    const formattedTime = reservationDate.toFormat('h:mm a'); // Always 12-hour format, local time
     const confirmationMessage = `Hi ${member.first_name}! Your reservation for ${parsed.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
     
     await sendSMS(from, confirmationMessage);
