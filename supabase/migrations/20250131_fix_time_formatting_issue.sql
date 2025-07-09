@@ -107,23 +107,22 @@ BEGIN
         UPDATE scheduled_reservation_reminders AS srr
         SET scheduled_for =
           CASE
-            WHEN t.reminder_type = 'day_of' THEN
-              -- Handle send_time which might be TIME or TEXT type
+            WHEN t.reminder_type = 'day_of' AND pg_typeof(t.send_time) = 'time without time zone'::regtype THEN
+              -- send_time is TIME type
               (date_trunc('day', NEW.start_time) + 
-               CASE 
-                 WHEN pg_typeof(t.send_time) = 'time without time zone'::regtype THEN
-                   make_time(
-                     EXTRACT(HOUR FROM t.send_time::time), 
-                     EXTRACT(MINUTE FROM t.send_time::time) + t.send_time_minutes, 
-                     0
-                   )
-                 ELSE
-                   make_time(
-                     SPLIT_PART(t.send_time::text, ':', 1)::integer,
-                     SPLIT_PART(t.send_time::text, ':', 2)::integer + t.send_time_minutes,
-                     0
-                   )
-               END)
+               make_time(
+                 EXTRACT(HOUR FROM t.send_time::time), 
+                 EXTRACT(MINUTE FROM t.send_time::time) + t.send_time_minutes, 
+                 0
+               ))
+            WHEN t.reminder_type = 'day_of' THEN
+              -- send_time is TEXT type
+              (date_trunc('day', NEW.start_time) + 
+               make_time(
+                 SPLIT_PART(t.send_time::text, ':', 1)::integer,
+                 SPLIT_PART(t.send_time::text, ':', 2)::integer + t.send_time_minutes,
+                 0
+               ))
             WHEN t.reminder_type = 'hour_before' THEN
               -- Set to X hours and Y minutes before the reservation start_time
               (NEW.start_time - 
