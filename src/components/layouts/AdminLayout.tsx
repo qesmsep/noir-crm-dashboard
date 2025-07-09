@@ -103,18 +103,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className={styles.content}>{children}</div>
       </main>
 
+      {/* Mobile menu: only nav links, no logo or sidebar content */}
       <div className={`${styles.mobileMenu} ${isMenuOpen ? 'open' : ''}`} role="navigation" aria-label="Mobile navigation menu">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`${styles.mobileNavItem} ${pathname === item.href ? styles.active : ''}`}
-            onClick={() => setIsMenuOpen(false)}
-          >
-            <span className={styles.icon}>{item.icon}</span>
-            <span>{item.label}</span>
-          </Link>
-        ))}
+        <nav className={styles.mobileNavLinks}>
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`${styles.mobileNavItem} ${pathname === item.href ? styles.active : ''}`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <span className={styles.icon}>{item.icon}</span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
       </div>
     </div>
   );
