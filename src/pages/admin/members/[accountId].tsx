@@ -103,7 +103,6 @@ export default function MemberDetailAdmin() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [sendingPdf, setSendingPdf] = useState(false);
-  const [hasPreviousMembershipPeriod, setHasPreviousMembershipPeriod] = useState(false);
   const [previousPeriodStart, setPreviousPeriodStart] = useState<string | null>(null);
   const [previousPeriodEnd, setPreviousPeriodEnd] = useState<string | null>(null);
 
@@ -612,11 +611,9 @@ export default function MemberDetailAdmin() {
         .ilike('description', '%renewal%')
         .order('date', { ascending: false });
       if (renewalEntries && renewalEntries.length > 1) {
-        setHasPreviousMembershipPeriod(true);
         setPreviousPeriodEnd(renewalEntries[0].date);
         setPreviousPeriodStart(renewalEntries[1].date);
       } else {
-        setHasPreviousMembershipPeriod(false);
         setPreviousPeriodStart(null);
         setPreviousPeriodEnd(null);
       }
@@ -718,6 +715,10 @@ export default function MemberDetailAdmin() {
   if (!members.length) {
     return <Box p={8}><Text>No members found for this account.</Text></Box>;
   }
+
+  // Remove hasPreviousMembershipPeriod state and logic
+  // Instead, compute showPreviousMembershipPeriod based on join_date
+  const showPreviousMembershipPeriod = selectedMemberForPdf && selectedMemberForPdf.join_date && (new Date().getTime() - new Date(selectedMemberForPdf.join_date).getTime() > 31 * 24 * 60 * 60 * 1000);
 
   return (
     <AdminLayout>
@@ -1458,7 +1459,9 @@ export default function MemberDetailAdmin() {
                       <option value="current_month">Current Month</option>
                       <option value="last_month">Last Month</option>
                       <option value="last_3_months">Last 3 Months</option>
-                      <option value="previous_membership_period">Previous Membership Period</option>
+                      {showPreviousMembershipPeriod && (
+                        <option value="previous_membership_period">Previous Membership Period</option>
+                      )}
                       <option value="custom">Custom Range</option>
                     </Select>
                   </FormControl>
