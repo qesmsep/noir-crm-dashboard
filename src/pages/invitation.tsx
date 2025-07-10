@@ -20,7 +20,7 @@ import {
   AccordionPanel,
   AccordionIcon,
   Divider,
-  Spinner
+  Spinner,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
 
@@ -56,6 +56,14 @@ const InvitationQuestionnaire = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isValid, setIsValid] = useState(false);
   const toast = useToast();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const steps = [
     {
@@ -158,6 +166,19 @@ const InvitationQuestionnaire = () => {
     validateCurrentStep();
   }, [formData, currentStep, errors]);
 
+  useEffect(() => {
+    // Hide main nav/header on mobile for this page only
+    if (isMobile) {
+      const nav = document.querySelector('nav');
+      if (nav) nav.style.display = 'none';
+    }
+    return () => {
+      if (isMobile) {
+        const nav = document.querySelector('nav');
+        if (nav) nav.style.display = '';
+      }
+    };
+  }, [isMobile]);
 
 
   const validateCurrentStep = () => {
@@ -401,20 +422,27 @@ const InvitationQuestionnaire = () => {
       fontFamily="Montserrat, sans-serif"
       background="linear-gradient(rgba(53,53,53,0.6), rgba(53,53,53,0.6)), url('/images/LPR67899.JPG') center/cover no-repeat"
       backgroundAttachment="fixed"
-      position="relative"
+      position="fixed"
+      top={0}
+      left={0}
+      right={0}
+      bottom={0}
+      w="100%"
+      h="100vh"
       display="flex"
       alignItems="center"
-      
       justifyContent="center"
+      overflow="hidden"
+      px={0}
     >
       <Box 
-        maxW="700px" 
-        w="100%" 
+        maxW={{ base: '98vw', md: '500px' }}
+        w="90%"
         mx="auto"
         bg="rgba(0, 0, 0, 0.8)"
         borderRadius="1rem"
-        
-        p={10}
+        px={{ base: 3, md: 8 }}
+        py={{ base: 4, md: 10 }}
         boxShadow="0 4px 6px rgba(0, 0, 0, 0.1)"
         position="relative"
         zIndex={10}
@@ -463,9 +491,9 @@ const InvitationQuestionnaire = () => {
 
           {/* Form Fields */}
           {currentStepData.fields && (
-            <VStack spacing={6} align="center" w="100%">
+            <VStack spacing={6} align="center" w="95%">
               {currentStepData.fields.map((field) => (
-                <FormControl key={field.name} isRequired={field.required} w="100%" maxW="500px" isInvalid={!!errors[field.name]}>
+                <FormControl key={field.name} isRequired={field.required} w="90%" maxW="500px" isInvalid={!!errors[field.name]}>
                   {field.type === 'textarea' ? (
                     <>
                       <Textarea 
@@ -634,12 +662,12 @@ const InvitationQuestionnaire = () => {
               leftIcon={<ChevronLeftIcon />}
               onClick={handlePrevious}
               disabled={currentStep === 0}
-              bg="#a59480"
-              color="#ECEDE8"
-              borderColor="#a59480"
+              bg="#CAC2B9"
+              color="#353535"
+              borderColor="#CAC2B9"
               _hover={{
-                bg: "#8B7A6A",
-                borderColor: "#8B7A6A"
+                bg: "#b3a89c",
+                borderColor: "#b3a89c"
               }}
               fontFamily="Montserrat, sans-serif"
               borderRadius="10px"
@@ -654,9 +682,9 @@ const InvitationQuestionnaire = () => {
               <Button
                 rightIcon={<ChevronRightIcon />}
                 onClick={handleNext}
-                bg="#a59480"
-                color="#ECEDE8"
-                _hover={{ bg: "#8B7A6A" }}
+                bg="#CAC2B9"
+                color="#353535"
+                _hover={{ bg: "#b3a89c" }}
                 fontFamily="Montserrat, sans-serif"
                 borderRadius="10px"
                 px={10}
@@ -668,9 +696,9 @@ const InvitationQuestionnaire = () => {
             ) : currentStep === steps.length - 1 ? (
               <Button
                 onClick={() => window.close()}
-                bg="#a59480"
-                color="#ECEDE8"
-                _hover={{ bg: "#8B7A6A" }}
+                bg="#CAC2B9"
+                color="#353535"
+                _hover={{ bg: "#b3a89c" }}
                 fontFamily="Montserrat, sans-serif"
                 borderRadius="10px"
                 px={10}
@@ -686,9 +714,9 @@ const InvitationQuestionnaire = () => {
                   <Button
                     onClick={handleSubmit}
                     isLoading={submitting}
-                    bg="#a59480"
-                    color="#ECEDE8"
-                    _hover={{ bg: "#8B7A6A" }}
+                    bg="#CAC2B9"
+                    color="#353535"
+                    _hover={{ bg: "#b3a89c" }}
                     fontFamily="Montserrat, sans-serif"
                     borderRadius="10px"
                     px={10}
@@ -718,10 +746,10 @@ const InvitationQuestionnaire = () => {
                 rightIcon={<ChevronRightIcon />}
                 onClick={handleNext}
                 disabled={!isValid}
-                bg={isValid ? "#a59480" : "rgba(165, 148, 128, 0.5)"}
-                color="#ECEDE8"
+                bg={isValid ? "#CAC2B9" : "rgba(165, 148, 128, 0.5)"}
+                color="#353535"
                 _hover={{
-                  bg: isValid ? "#8B7A6A" : "rgba(165, 148, 128, 0.5)"
+                  bg: isValid ? "#b3a89c" : "rgba(165, 148, 128, 0.5)"
                 }}
                 fontFamily="Montserrat, sans-serif"
                 borderRadius="10px"
