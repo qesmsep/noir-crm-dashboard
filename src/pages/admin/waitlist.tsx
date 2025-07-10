@@ -26,7 +26,7 @@ import {
   SimpleGrid,
   useDisclosure
 } from '@chakra-ui/react';
-import { SearchIcon } from '@chakra-ui/icons';
+import { SearchIcon, LinkIcon, CopyIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 
@@ -42,6 +42,13 @@ interface WaitlistEntry {
   why_noir?: string;
   occupation?: string;
   industry?: string;
+  city_state?: string;
+  visit_frequency?: string;
+  go_to_drink?: string;
+  application_token?: string;
+  application_link_sent_at?: string;
+  application_expires_at?: string;
+  application_link_opened_at?: string;
   status: 'review' | 'approved' | 'denied' | 'waitlisted';
   submitted_at: string;
   reviewed_at?: string;
@@ -63,6 +70,7 @@ export default function WaitlistPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [generatingLink, setGeneratingLink] = useState<string | null>(null);
   const { isOpen: isModalOpen, onOpen: onModalOpen, onClose: onModalClose } = useDisclosure();
   const toast = useToast();
 
@@ -161,6 +169,65 @@ export default function WaitlistPage() {
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
+  const generateInvitationLink = async (waitlistId: string) => {
+    setGeneratingLink(waitlistId);
+    try {
+      const response = await fetch('/api/invitation/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ waitlistId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Copy to clipboard
+        await navigator.clipboard.writeText(data.invitationUrl);
+        toast({
+          title: 'Invitation Link Generated',
+          description: 'Link copied to clipboard',
+          status: 'success',
+          duration: 3000,
+        });
+        fetchWaitlist(); // Refresh to show the new link
+      } else {
+        throw new Error(data.error || 'Failed to generate invitation link');
+      }
+    } catch (error) {
+      console.error('Error generating invitation link:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate invitation link',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setGeneratingLink(null);
+    }
+  };
+
+  const copyInvitationLink = async (token: string) => {
+    const invitationUrl = `${window.location.origin}/invitation?token=${token}`;
+    try {
+      await navigator.clipboard.writeText(invitationUrl);
+      toast({
+        title: 'Link Copied',
+        description: 'Invitation link copied to clipboard',
+        status: 'success',
+        duration: 2000,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to copy link',
+        status: 'error',
+        duration: 2000,
+      });
+    }
+  };
+
   return (
     <AdminLayout>
       <Box p={4} minH="100vh" bg="#353535" color="#ECEDE8">
@@ -243,6 +310,7 @@ export default function WaitlistPage() {
                       <Th color="#353535" fontFamily="'Montserrat', sans-serif">Email</Th>
                       <Th color="#353535" fontFamily="'Montserrat', sans-serif">Phone</Th>
                       <Th color="#353535" fontFamily="'Montserrat', sans-serif">Company</Th>
+                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Location</Th>
                       <Th color="#353535" fontFamily="'Montserrat', sans-serif">Status</Th>
                       <Th color="#353535" fontFamily="'Montserrat', sans-serif">Submitted</Th>
                       <Th color="#353535" fontFamily="'Montserrat', sans-serif">Actions</Th>
@@ -257,6 +325,7 @@ export default function WaitlistPage() {
                         <Td fontFamily="'Montserrat', sans-serif">{entry.email}</Td>
                         <Td fontFamily="'Montserrat', sans-serif">{formatPhone(entry.phone)}</Td>
                         <Td fontFamily="'Montserrat', sans-serif">{entry.company || '-'}</Td>
+                        <Td fontFamily="'Montserrat', sans-serif">{entry.city_state || '-'}</Td>
                         <Td>
                           <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
                             {entry.status.toUpperCase()}
@@ -264,19 +333,51 @@ export default function WaitlistPage() {
                         </Td>
                         <Td fontFamily="'Montserrat', sans-serif">{formatDate(entry.submitted_at)}</Td>
                         <Td>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEntry(entry);
-                              onModalOpen();
-                            }}
-                            bg="#a59480"
-                            color="#353535"
-                            _hover={{ bg: "#bca892" }}
-                            fontFamily="'Montserrat', sans-serif"
-                          >
-                            Review
-                          </Button>
+                          <HStack spacing={2}>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEntry(entry);
+                                onModalOpen();
+                              }}
+                              bg="#a59480"
+                              color="#353535"
+                              _hover={{ bg: "#bca892" }}
+                              fontFamily="'Montserrat', sans-serif"
+                            >
+                              Review
+                            </Button>
+                            {!entry.application_token ? (
+                              <Button
+                                size="sm"
+                                onClick={() => generateInvitationLink(entry.id)}
+                                isLoading={generatingLink === entry.id}
+                                leftIcon={<LinkIcon />}
+                                bg="#2a2a2a"
+                                color="#a59480"
+                                borderColor="#a59480"
+                                borderWidth="1px"
+                                _hover={{ bg: "#3a3a3a" }}
+                                fontFamily="'Montserrat', sans-serif"
+                              >
+                                Generate Link
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => copyInvitationLink(entry.application_token!)}
+                                leftIcon={<CopyIcon />}
+                                bg="#2a2a2a"
+                                color="#a59480"
+                                borderColor="#a59480"
+                                borderWidth="1px"
+                                _hover={{ bg: "#3a3a3a" }}
+                                fontFamily="'Montserrat', sans-serif"
+                              >
+                                Copy Link
+                              </Button>
+                            )}
+                          </HStack>
                         </Td>
                       </Tr>
                     ))}
