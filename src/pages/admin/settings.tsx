@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
-import { supabase } from '../../lib/supabase';
+import { supabaseAdmin } from '../../lib/supabase';
 import styles from '../../styles/Settings.module.css';
 import CalendarAvailabilityControl from '../../components/CalendarAvailabilityControl';
 import PrivateEventsManager from '../../components/PrivateEventsManager';
@@ -65,7 +65,7 @@ const defaultSettings: Settings = {
 };
 
 export default function Settings() {
-  const { settings: contextSettings, refreshSettings } = useSettings();
+  const { settings: contextSettings, refreshSettings, refreshHoldFeeSettings } = useSettings();
   const [settings, setSettings] = useState<Settings>(contextSettings);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -82,12 +82,28 @@ export default function Settings() {
     setMessage(null);
 
     try {
-      const { error } = await supabase
-        .from('settings')
-        .upsert(settings, { onConflict: 'id' });
-
-      if (error) throw error;
-
+      if (settings.id) {
+        // Update or upsert the existing row
+        const { error } = await supabaseAdmin
+          .from('settings')
+          .upsert(settings, { onConflict: 'id' });
+        if (error) throw error;
+      } else {
+        // Only insert if no row exists
+        const response = await fetch('/api/settings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(settings),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create initial settings');
+        }
+        const newSettings = await response.json();
+        setSettings(prev => ({ ...prev, id: newSettings.id }));
+      }
       await refreshSettings();
       setMessage({
         type: 'success',
@@ -97,7 +113,7 @@ export default function Settings() {
       console.error('Error saving settings:', error);
       setMessage({
         type: 'error',
-        text: 'Failed to save settings.',
+        text: error instanceof Error ? error.message : 'Failed to save settings.',
       });
     } finally {
       setSaving(false);
@@ -108,14 +124,44 @@ export default function Settings() {
     setHoldFeeSaving(true);
     setHoldFeeMessage(null);
     try {
-      const { error } = await supabase
-        .from('settings')
-        .upsert({ id: settings.id, hold_fee_enabled: settings.hold_fee_enabled, hold_fee_amount: settings.hold_fee_amount }, { onConflict: 'id' });
-      if (error) throw error;
-      await refreshSettings();
+      if (settings.id) {
+        // Update or upsert the existing row
+        const { error } = await supabaseAdmin
+          .from('settings')
+          .upsert({
+            ...settings,
+            hold_fee_enabled: settings.hold_fee_enabled,
+            hold_fee_amount: settings.hold_fee_amount
+          }, { onConflict: 'id' });
+        if (error) throw error;
+      } else {
+        // Only insert if no row exists
+        const response = await fetch('/api/settings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...settings,
+            hold_fee_enabled: settings.hold_fee_enabled,
+            hold_fee_amount: settings.hold_fee_amount
+          }),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create initial settings');
+        }
+        const newSettings = await response.json();
+        setSettings(prev => ({ ...prev, id: newSettings.id }));
+      }
+      await Promise.all([refreshSettings(), refreshHoldFeeSettings()]);
       setHoldFeeMessage({ type: 'success', text: 'Hold fee settings saved successfully.' });
     } catch (error) {
-      setHoldFeeMessage({ type: 'error', text: 'Failed to save hold fee settings.' });
+      console.error('Error saving hold fee settings:', error);
+      setHoldFeeMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to save hold fee settings.'
+      });
     } finally {
       setHoldFeeSaving(false);
     }
@@ -308,7 +354,7 @@ export default function Settings() {
                     size="sm"
                     onClick={async () => {
                       try {
-                        const { error } = await supabase
+                        const { error } = await supabaseAdmin
                           .from('settings')
                           .upsert({ id: settings.id, admin_notification_phone: settings.admin_notification_phone }, { onConflict: 'id' });
                         if (error) throw error;

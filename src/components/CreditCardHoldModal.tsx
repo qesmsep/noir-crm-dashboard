@@ -53,7 +53,12 @@ const CreditCardHoldDrawer: React.FC<CreditCardHoldModalProps> = ({
     email: ''
   });
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const { settings } = useSettings();
+  const { settings, refreshHoldFeeSettings } = useSettings();
+
+  // Refresh hold fee settings when component mounts to ensure we have latest values
+  useEffect(() => {
+    refreshHoldFeeSettings();
+  }, [refreshHoldFeeSettings]);
 
   // Calculate hold amount based on configuration
   const holdAmount = settings.hold_fee_enabled ? settings.hold_fee_amount : 0;

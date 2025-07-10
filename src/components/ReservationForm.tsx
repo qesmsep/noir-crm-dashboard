@@ -133,7 +133,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 }) => {
   const toast = useToast();
   const { colors } = useTheme();
-  const { settings } = useSettings();
+  const { settings, refreshHoldFeeSettings } = useSettings();
   
   // Booking window logic: today or bookingStartDate (if in future)
   const today = DateTime.now();
@@ -199,6 +199,14 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     };
     initStripe();
   }, []);
+
+  // Refresh hold fee settings when component mounts to ensure we have latest values
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Only refresh on client side
+      refreshHoldFeeSettings();
+    }
+  }, [refreshHoldFeeSettings]);
 
   // Mount card element when elements is available and hold fees are enabled
   useEffect(() => {
