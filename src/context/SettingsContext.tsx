@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 interface Settings {
   id: string;
@@ -62,6 +62,7 @@ interface SettingsContextType {
   settings: Settings;
   loading: boolean;
   refreshSettings: () => Promise<void>;
+  refreshHoldFeeSettings: () => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -89,12 +90,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     await fetchSettings();
   };
 
+  const refreshHoldFeeSettings = useCallback(async () => {
+    try {
+      // Fetch hold fee settings specifically to ensure we have the latest values
+      const res = await fetch('/api/settings/hold-fee-config');
+      if (res.ok) {
+        const holdFeeData = await res.json();
+        setSettings(prev => ({
+          ...prev,
+          hold_fee_enabled: holdFeeData.hold_fee_enabled ?? true,
+          hold_fee_amount: holdFeeData.hold_fee_amount ?? 25.00
+        }));
+      }
+    } catch (error) {
+      console.error('Error refreshing hold fee settings:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
   }, []);
 
   return (
-    <SettingsContext.Provider value={{ settings, loading, refreshSettings }}>
+    <SettingsContext.Provider value={{ settings, loading, refreshSettings, refreshHoldFeeSettings }}>
       {children}
     </SettingsContext.Provider>
   );
