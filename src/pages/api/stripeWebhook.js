@@ -21,12 +21,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Debug: Log all headers to see what we're receiving
+  console.log('Webhook headers:', Object.keys(req.headers));
+  console.log('Stripe signature header:', req.headers['stripe-signature']);
+  console.log('Content type:', req.headers['content-type']);
+  console.log('All headers:', req.headers);
+
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
     // Verify webhook signature
     const buf = await buffer(req);
+    console.log('Raw body length:', buf.length);
     event = stripe.webhooks.constructEvent(
       buf,
       sig,
@@ -35,6 +42,7 @@ export default async function handler(req, res) {
     console.log('Received Stripe webhook event:', event.type);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
+    console.error('Full error:', err);
     return res.status(400).json({ error: 'Invalid signature' });
   }
 
