@@ -138,9 +138,11 @@ function parseNaturalDate(dateStr) {
 // AI-powered parsing using OpenAI GPT-4
 async function parseReservationMessageWithAI(message) {
   try {
+    // Convert message to all lowercase before sending to AI
+    const lowerMessage = message.toLowerCase();
     const prompt = `
 Parse this SMS reservation request and return ONLY valid JSON:
-"${message}"
+"${lowerMessage}"
 
 Return ONLY valid JSON with these fields:
 {
@@ -155,11 +157,15 @@ If you can't parse it, return: {"error": "reason"}
 
 IMPORTANT: Use year 2025 for all dates unless explicitly specified otherwise.
 
+Recognize and correctly parse relative date terms such as "tonight", "today", "tomorrow", "this thursday", "next friday", etc. Convert them to the correct MM/DD/YYYY date for the year 2025 unless otherwise specified.
+
 Examples:
-"RESERVATION 2 guests on 6/27/25 at 6:30pm" → {"party_size": 2, "date": "06/27/2025", "time": "18:30"}
+"reservation 2 guests on 6/27/25 at 6:30pm" → {"party_size": 2, "date": "06/27/2025", "time": "18:30"}
 "book me for 4 people tomorrow at 8pm" → {"party_size": 4, "date": "tomorrow", "time": "20:00"}
-"reserve table for 6 on Friday 7pm" → {"party_size": 6, "date": "this Friday", "time": "19:00"}
-"Reservation 8 people on July 4 at 6pm" → {"party_size": 8, "date": "07/04/2025", "time": "18:00"}
+"reserve table for 6 on friday 7pm" → {"party_size": 6, "date": "this friday", "time": "19:00"}
+"reservation 8 people on july 4 at 6pm" → {"party_size": 8, "date": "07/04/2025", "time": "18:00"}
+"reservation for 2 tonight at 7pm" → {"party_size": 2, "date": "tonight", "time": "19:00"}
+"reservation for 2 today at 7pm" → {"party_size": 2, "date": "today", "time": "19:00"}
 
 IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
 `;
@@ -945,7 +951,7 @@ export async function handler(req, res) {
   // Check membership FIRST
   const { isMember, member } = await checkMemberStatus(from);
   if (!isMember) {
-    const errorMessage = `Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noir-crm-dashboard.vercel.app`;
+    const errorMessage = `Thank you for your reservation request, however only Noir members are able to text reservations. You may make a reservation using our website at https://noirkc.com`;
     await sendSMS(from, errorMessage);
     return res.status(200).json({ message: 'Sent non-member error message with website redirect' });
   }
@@ -956,7 +962,7 @@ export async function handler(req, res) {
     
     if (!parsed) {
       console.log('Both regex and AI parsing failed for member:', member.first_name, 'Message:', text);
-      const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please visit our website to make a reservation: https://noir-crm-dashboard.vercel.app`;
+      const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please visit our website to make a reservation: https://noirkc.com`;
       await sendSMS(from, errorMessage);
       return res.status(200).json({ message: 'Sent error message to user with website redirect' });
     }
