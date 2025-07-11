@@ -141,9 +141,9 @@ export default async function handler(req, res) {
       updatedEntry = newEntry;
     }
 
-    // Send confirmation SMS
-    const smsMessage = "Thank you for submitting an invitation to be a Noir Member. We typically respond to all requests within 72 hours.";
-    await sendSMS(phone, smsMessage);
+    // Send confirmation SMS - Removed the 72-hour message as requested
+    // const smsMessage = "Thank you for submitting an invitation to be a Noir Member. We typically respond to all requests within 72 hours.";
+    // await sendSMS(phone, smsMessage);
 
     return res.status(200).json({
       success: true,

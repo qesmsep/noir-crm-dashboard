@@ -20,7 +20,9 @@ const FIELD_MAPPING = {
   // 'occupation': ['Q10', 'occupation_field', 'What is your occupation?'],
   // 'industry': ['Q11', 'industry_field', 'What industry do you work in?'],
   // 'budget': ['Q12', 'budget_field', 'What is your monthly entertainment budget?'],
-  // 'membership_type': ['Q13', 'membership_type_field', 'What type of membership are you interested in?'],
+  'membership_type': ['membership_type_field_id', 'What type of membership are you interested in?'], // Update with actual field ID
+  'honorary_member': ['honorary_member_field_id', 'Are you applying for honorary membership?'], // Update with actual field ID
+  'host_member': ['host_member_field_id', 'Are you applying for host membership?'], // Update with actual field ID
   // 'special_requests': ['Q14', 'special_requests_field', 'Any special requests or notes?'],
 };
 
@@ -38,7 +40,9 @@ const FIELD_TYPES = {
   // 'occupation': 'text',
   // 'industry': 'choice',
   // 'budget': 'choice',
-  // 'membership_type': 'choice',
+  'membership_type': 'choice',
+  'honorary_member': 'boolean',
+  'host_member': 'boolean',
   // 'special_requests': 'long_text',
 };
 

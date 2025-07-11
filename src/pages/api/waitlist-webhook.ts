@@ -160,9 +160,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Failed to save application' });
     }
 
-    // Send confirmation SMS
-    const confirmationMessage = "Thank you for submitting an invitation request. We typically respond to all requests within 72 hours.";
-    await sendSMS(formattedPhone, confirmationMessage);
+    // Send confirmation SMS - Removed the 72-hour message as requested
+    // const confirmationMessage = "Thank you for submitting an invitation request. We typically respond to all requests within 72 hours.";
+    // await sendSMS(formattedPhone, confirmationMessage);
 
     console.log('Waitlist entry created successfully:', waitlistEntry.id);
 

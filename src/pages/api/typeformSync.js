@@ -1,12 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-import Stripe from 'stripe';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -28,26 +26,58 @@ export default async function handler(req, res) {
       if (type === 'phone_number' && ans.phone_number) return ans.phone_number;
       if (type === 'email' && ans.email) return ans.email;
       if (type === 'date' && ans.date) return ans.date;
+      if (type === 'boolean' && ans.boolean !== undefined) return ans.boolean;
       if (ans.text) return ans.text;
       return null;
+    }
+
+    // Validate required fields
+    const requiredFields = {
+      first_name: findAnswer(['a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d']),
+      last_name: findAnswer(['9c123e7b-2643-4819-9b4d-4a9f236302c9']),
+      email: findAnswer(['ee4bcd7b-768d-49fb-b7cc-80cdd25c750a'], 'email'),
+      phone: findAnswer(['6ed12e4b-95a2-4b30-96b2-a7095f673db6'], 'phone_number'),
+      company: findAnswer(['d32131fd-318b-4cbd-41eed4096d36', 'd32131fd-318b-4e39-8fcd-41eed4096d36'])
+    };
+
+    const missingFields = Object.entries(requiredFields)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      res.status(400).json({ 
+        error: 'Missing required fields', 
+        missingFields 
+      });
+      return;
     }
 
     // Generate a new account_id for this submission
     const account_id = uuidv4();
 
-    // Create the account record
-    const { error: accountError } = await supabase
-      .from('accounts')
-      .insert({
-        account_id,
-        stripe_customer_id: null,
-        created_at: new Date().toISOString()
-      });
-
-    if (accountError) {
-      console.error('Error creating account:', accountError);
-      res.status(500).json({ error: accountError.message });
-      return;
+    // Check if partner is being added (question 5)
+    const hasPartner = findAnswer(['f0b72d00-d153-4030-9644-cb3ab890f7dc'], 'boolean');
+    
+    // Check for explicit membership type selection (if field exists)
+    const explicitMembershipType = findAnswer(['membership_type_field_id'], 'choice'); // Update with actual field ID when available
+    
+    // Check for Honorary Member or Host membership indicators
+    // These would be determined by specific questions or routing logic in Typeform
+    const isHonoraryMember = findAnswer(['honorary_member_field_id'], 'boolean'); // Update with actual field ID
+    const isHostMember = findAnswer(['host_member_field_id'], 'boolean'); // Update with actual field ID
+    
+    // Determine membership type
+    let membershipType = 'Solo';
+    if (explicitMembershipType) {
+      // Use explicit selection if available
+      membershipType = explicitMembershipType;
+    } else if (isHonoraryMember === true) {
+      membershipType = 'Honorary Member';
+    } else if (isHostMember === true) {
+      membershipType = 'Host';
+    } else if (hasPartner === true) {
+      // Fall back to partner-based logic
+      membershipType = 'Duo';
     }
 
     // Main member
@@ -56,7 +86,7 @@ export default async function handler(req, res) {
       account_id,
       first_name:   findAnswer(['a229bb86-2442-4cbd-bdf6-c6f2cd4d4b9d']),
       last_name:    findAnswer(['9c123e7b-2643-4819-9b4d-4a9f236302c9']),
-      email:        findAnswer(['ee4bcd7d-768d-49fb-b7cc-80cdd25c750a'], 'email'),
+      email:        findAnswer(['ee4bcd7b-768d-49fb-b7cc-80cdd25c750a'], 'email'),
       phone:        findAnswer(['6ed12e4b-95a2-4b30-96b2-a7095f673db6'], 'phone_number'),
       company:      findAnswer(['d32131fd-318b-4cbd-41eed4096d36', 'd32131fd-318b-4e39-8fcd-41eed4096d36']),
       dob:          findAnswer(['1432cfc0-d3dc-48fc-8561-bf0053ccc097'], 'date'),
@@ -66,23 +96,30 @@ export default async function handler(req, res) {
       state:        findAnswer(['9ab3b62d-a361-480a-856c-7200224f65ac']),
       zip:          findAnswer(['f79dcd7d-a82d-4fca-8987-85014e42e115']),
       country:      findAnswer(['8e920793-22ca-4c89-a25e-2b76407e171f']),
-      membership:   findAnswer(['8101b9b5-5734-4db6-a2d1-27f122c05f9e'], 'choice'),
+      membership:   membershipType,
       photo:        findAnswer(['ddc3eeeb-f2ae-4070-846d-c3194008d0d9'], 'file_url'),
       referral:     findAnswer(['dff5344e-93e0-4ae5-967c-b92e0ad51f65']),
       monthly_dues: 0,
       stripe_customer_id: null,
       join_date:    form.submitted_at,
       token:        form.token || null,
+      member_type:  'primary',
+      deactivated:  false,
+      has_password: false,
+      ledger_notifications_enabled: true,
+      status: 'pending'
     };
+
     // Set monthly_dues based on membership
     const duesMap = { 
+      'Solo': 100, 
+      'Duo': 125,
+      'Honorary Member': 10,
+      // Keep legacy support for existing members
       'Membership': 100, 
       'Membership + Partner': 125, 
       'Membership + Daytime': 350, 
       'Membership + Partner + Daytime': 375,
-      // Keep legacy support for existing members
-      'Solo': 100, 
-      'Duo': 125, 
       'Premier': 250, 
       'Reserve': 1000, 
       'Host': 1 
@@ -101,31 +138,52 @@ export default async function handler(req, res) {
         email:      findAnswer(['b9cde49b-3a69-4181-a738-228f5a11f27c'], 'email'),
         phone:      findAnswer(['9c2688e3-34c0-4da0-8e17-c44a81778cf3'], 'phone_number'),
         company:    findAnswer(['c1f6eef0-4884-49e6-8928-c803b60a115f']),
+        dob:        findAnswer(['b6623266-477c-47aa-99fc-2311888fc733'], 'date'),
         photo:      findAnswer(['95940d74-dda1-4531-be16-ffd01839c49f'], 'file_url'),
-        status:     'pending',
-        balance:    0,
+        monthly_dues: 0, // Secondary members don't pay separately
         stripe_customer_id: null,
         join_date:  form.submitted_at,
-        renewal_date: null,
         token:      form.token || null,
+        member_type:  'secondary',
+        deactivated:  false,
+        has_password: false,
+        ledger_notifications_enabled: true,
+        status: 'pending'
       };
       members.push(member2);
     }
 
-    // Stripe Customer lookup for main member (optional)
-    if (member1.email) {
-      try {
-        const customers = await stripe.customers.list({ email: member1.email, limit: 1 });
-        if (customers.data.length > 0) {
-          member1.stripe_customer_id = customers.data[0].id;
-          // Update the account with the Stripe customer ID
-          await supabase
-            .from('accounts')
-            .update({ stripe_customer_id: customers.data[0].id })
-            .eq('account_id', account_id);
-        }
-      } catch {}
+    // Validate photos based on membership type
+    const primaryPhoto = findAnswer(['ddc3eeeb-f2ae-4070-846d-c3194008d0d9'], 'file_url');
+    const secondaryPhoto = member2FirstName ? findAnswer(['95940d74-dda1-4531-be16-ffd01839c49f'], 'file_url') : null;
+    
+    // Photo requirements by membership type
+    const photoRequirements = {
+      'Solo': { primary: true, secondary: false },
+      'Duo': { primary: true, secondary: true },
+      'Honorary Member': { primary: true, secondary: true }, // Honorary requires 2 photos
+      'Host': { primary: true, secondary: false },
+      'Premier': { primary: true, secondary: false },
+      'Reserve': { primary: true, secondary: false }
+    };
+    
+    const requirements = photoRequirements[membershipType] || { primary: true, secondary: false };
+    
+    if (requirements.primary && !primaryPhoto) {
+      res.status(400).json({ 
+        error: `Photo is required for primary member in ${membershipType} membership` 
+      });
+      return;
     }
+    
+    if (requirements.secondary && member2FirstName && !secondaryPhoto) {
+      res.status(400).json({ 
+        error: `Photo is required for secondary member in ${membershipType} membership` 
+      });
+      return;
+    }
+
+
 
     // Insert both members
     const { error } = await supabase.from('members').insert(members);

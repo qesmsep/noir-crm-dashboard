@@ -99,6 +99,18 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to update account', debug: { ...debugInfo, updateError } });
       }
 
+      // Update all members for this account: set status to 'active' and set stripe_customer_id if not already set
+      const { error: memberUpdateError } = await supabase
+        .from('members')
+        .update({ status: 'active', stripe_customer_id: session.customer })
+        .eq('account_id', account.account_id)
+        .or('status.eq.pending,status.is.null');
+
+      if (memberUpdateError) {
+        console.error('Error updating members to active:', memberUpdateError);
+        return res.status(500).json({ error: 'Failed to update members', debug: { ...debugInfo, memberUpdateError } });
+      }
+
       // Add the payment to the ledger
       const { error: ledgerError } = await supabase
         .from('ledger')
@@ -115,6 +127,43 @@ export default async function handler(req, res) {
       if (ledgerError) {
         console.error('Error adding payment to ledger:', ledgerError);
         return res.status(500).json({ error: 'Failed to update ledger', debug: { ...debugInfo, ledgerError } });
+      }
+
+      // Send welcome SMS to the primary member
+      try {
+        const { data: memberForSMS, error: smsMemberError } = await supabase
+          .from('members')
+          .select('first_name, phone')
+          .eq('member_id', primaryMember.member_id)
+          .single();
+
+        if (!smsMemberError && memberForSMS && memberForSMS.phone) {
+          const welcomeMessage = `Welcome to Noir, ${memberForSMS.first_name}! We're excited to have you as a member. We will be in touch very soon with more information, and please reach out to this number with any questions. Thank you.`;
+          
+          // Send SMS using OpenPhone API
+          const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`,
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              to: [memberForSMS.phone],
+              from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+              content: welcomeMessage
+            })
+          });
+
+          if (smsResponse.ok) {
+            console.log('Welcome SMS sent successfully to:', memberForSMS.phone);
+          } else {
+            console.error('Failed to send welcome SMS:', await smsResponse.text());
+          }
+        }
+      } catch (smsError) {
+        console.error('Error sending welcome SMS:', smsError);
+        // Don't fail the webhook if SMS fails
       }
 
       console.log('Successfully processed payment for account:', accountId);
