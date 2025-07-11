@@ -407,22 +407,22 @@ async function parseReservationMessageHybrid(message) {
   // Normalize message
   const msg = message.replace(/\s+/g, ' ').trim();
 
-  // Try regex parsing first (fast and free)
-  const regexResult = parseReservationMessage(msg);
-  if (regexResult) {
-    console.log('Regex parsing successful');
-    return regexResult;
-  }
-
-  // Fall back to AI parsing
-  console.log('Regex parsing failed, trying AI...');
+  // Try AI parsing first (more robust)
   const aiResult = await parseReservationMessageWithAI(msg);
   if (aiResult) {
     console.log('AI parsing successful');
     return aiResult;
   }
 
-  console.log('Both regex and AI parsing failed');
+  // Fall back to regex parsing
+  console.log('AI parsing failed, trying regex...');
+  const regexResult = parseReservationMessage(msg);
+  if (regexResult) {
+    console.log('Regex parsing successful');
+    return regexResult;
+  }
+
+  console.log('Both AI and regex parsing failed');
   return null;
 }
 
