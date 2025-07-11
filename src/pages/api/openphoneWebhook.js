@@ -5,6 +5,39 @@ import { DateTime } from 'luxon';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+// Conversation state helpers
+async function getConversation(phone) {
+  const { data, error } = await supabase
+    .from('sms_conversations')
+    .select('phone, step, data, suggestion')
+    .eq('phone', phone)
+    .single();
+  return data || null;
+}
+async function saveConversation(phone, fields) {
+  // UPSERT conversation row
+  await supabase
+    .from('sms_conversations')
+    .upsert({ phone, ...fields }, { onConflict: ['phone'] });
+}
+async function clearConversation(phone) {
+  await supabase
+    .from('sms_conversations')
+    .delete()
+    .eq('phone', phone);
+}
+
+// Simple confirmation parser
+async function parseConfirmation(message) {
+  const res = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: `Does this message confirm the proposal? Respond with {"confirm": true} or {"confirm": false}. Message: "${message}"` }],
+    temperature: 0.0
+  });
+  try { return JSON.parse(res.choices[0].message.content.trim()).confirm; }
+  catch { return false; }
+}
+
 // Default timezone
 const DEFAULT_TIMEZONE = 'America/Chicago';
 
@@ -140,7 +173,12 @@ function parseNaturalDate(dateStr) {
 // GPT-driven natural language parser
 async function parseReservationWithGPT(message) {
   const prompt = `
-You are a hospitality reservation assistant. Parse the user's SMS into JSON with exactly these keys:
+You are an incredibly personable, friendly, professional and helpful hospitality reservation assistant for Noir KC, Kansas City's most luxurious cocktail lounge and speakasy. 
+Your job is to provide reservation data and confirmation to the user. 
+IF their requested time is not available, you should provide the next closest available time as close as possible to their requested time of day.
+All times are in America/Chicago (UTC–05:00).
+Interpret relative dates such as "today", "tomorrow", "this Thursday", and "next Friday" relative to the current date in America/Chicago.
+Parse the user's SMS into JSON with exactly these keys:
 {
   "party_size": number,
   "date": "YYYY-MM-DD",
@@ -665,7 +703,7 @@ export async function handler(req, res) {
   console.log('Raw webhook data:', JSON.stringify(data, null, 2));
   console.log('Phone number received from OpenPhone:', from);
   console.log('Message text received:', `"${text}"`);
-  
+
   // Handle "MEMBER" messages for waitlist
   if (text.toLowerCase().trim() === 'member') {
     console.log('Processing MEMBER message for waitlist');
@@ -673,7 +711,7 @@ export async function handler(req, res) {
     await sendSMS(from, waitlistMessage);
     return res.status(200).json({ message: 'Sent waitlist invitation message' });
   }
-  
+
   console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
 
   // Only process messages that start with "Reservation"
@@ -690,43 +728,127 @@ export async function handler(req, res) {
     return res.status(200).json({ message: 'Sent non-member error message with website redirect' });
   }
 
+  // --- Multi-turn conversation state logic ---
+  // Load conversation state
+  const conv = await getConversation(from);
+
+  // Handle suggestion confirmation
+  if (conv?.step === 'suggested') {
+    const userConfirm = await parseConfirmation(text);
+    if (userConfirm) {
+      // User accepted suggestion: inject suggestion into parsed
+      var parsed = conv.suggestion;
+      await clearConversation(from);
+    } else {
+      // User rejected: reset to collecting
+      await saveConversation(from, { step: 'collecting', data: {} });
+      await sendSMS(from, "Okay, what date and time would you like instead?");
+      return res.status(200).end();
+    }
+  }
+
+  // If collecting info, prompt for next missing field
+  if (conv?.step === 'collecting') {
+    const collected = conv.data || {};
+    // If missing party_size
+    if (!collected.party_size) {
+      await sendSMS(from, "How many guests?");
+      await saveConversation(from, { step: 'collecting', data: collected });
+      return res.status(200).end();
+    }
+    // If missing date or time
+    if (!collected.date) {
+      await sendSMS(from, "What date would you like?");
+      await saveConversation(from, { step: 'collecting', data: collected });
+      return res.status(200).end();
+    }
+    if (!collected.time) {
+      await sendSMS(from, "What time would you like?");
+      await saveConversation(from, { step: 'collecting', data: collected });
+      return res.status(200).end();
+    }
+    // All present, continue to parse and booking logic
+  }
+
   try {
-    console.log('Attempting to parse reservation message for member:', member.first_name);
-    console.log('Using GPT parser for message:', text);
-    const parsed = await parseReservationWithGPT(text);
-    
+    let parsed;
+    if (typeof parsed === "undefined") {
+      // Not coming from accepted suggestion, parse with GPT
+      parsed = await parseReservationWithGPT(text);
+    }
+
     if (!parsed) {
-      console.log('Both regex and AI parsing failed for member:', member.first_name, 'Message:', text);
       const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please visit our website to make a reservation: https://noirkc.com`;
       await sendSMS(from, errorMessage);
       return res.status(200).json({ message: 'Sent error message to user with website redirect' });
     }
-    
-    console.log('Successfully parsed reservation for member:', member.first_name, 'Parsed data:', parsed);
-    
-    const availability = await checkComprehensiveAvailability(parsed.start_time, parsed.end_time, parsed.party_size);
-    
+
+    // Save collecting state if missing fields
+    if (!parsed.party_size || !parsed.date || !parsed.time) {
+      await saveConversation(from, {
+        step: 'collecting',
+        data: {
+          ...(conv?.data || {}),
+          ...parsed
+        }
+      });
+      // Ask next missing field
+      if (!parsed.party_size) {
+        await sendSMS(from, "How many guests?");
+        return res.status(200).end();
+      }
+      if (!parsed.date) {
+        await sendSMS(from, "What date would you like?");
+        return res.status(200).end();
+      }
+      if (!parsed.time) {
+        await sendSMS(from, "What time would you like?");
+        return res.status(200).end();
+      }
+      // If error, fallback
+      await sendSMS(from, "Please provide all reservation details.");
+      return res.status(200).end();
+    }
+
+    // Convert parsed local date/time (America/Chicago) to UTC ISO strings
+    const localDt = DateTime.fromISO(`${parsed.date}T${parsed.time}`, { zone: DEFAULT_TIMEZONE });
+    const start_time = localDt.toUTC().toISO();
+    const end_time = localDt.plus({ hours: 2 }).toUTC().toISO();
+
+    const availability = await checkComprehensiveAvailability(start_time, end_time, parsed.party_size);
+
+    // If unavailable but suggestion exists, prompt and store suggestion
+    let suggestedSlot = null;
+    // For this example, assume checkComprehensiveAvailability could return {available: false, message, suggestion}
+    if (!availability.available && availability.suggestion) {
+      suggestedSlot = availability.suggestion;
+    }
+    if (!availability.available && suggestedSlot) {
+      await saveConversation(from, { step: 'suggested', data: parsed, suggestion: suggestedSlot });
+      await sendSMS(from, `Sorry, ${availability.message} Would ${suggestedSlot.date} at ${suggestedSlot.time} work?`);
+      return res.status(200).end();
+    }
     if (!availability.available) {
       await sendSMS(from, availability.message);
       return res.status(200).json({ message: 'Sent availability error message' });
     }
-    
+
     const reservationResult = await createReservation(
-      member, 
-      parsed.start_time, 
-      parsed.end_time, 
-      parsed.party_size, 
+      member,
+      start_time,
+      end_time,
+      parsed.party_size,
       availability.table.id
     );
-    
+
     if (!reservationResult.success) {
       const errorMessage = `Sorry, we encountered an error creating your reservation. Please contact us directly.`;
       await sendSMS(from, errorMessage);
       return res.status(200).json({ message: 'Sent reservation creation error message' });
     }
-    
+
     // Format date and time from the parsed start_time using Luxon
-    const reservationDate = DateTime.fromISO(parsed.start_time, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE);
+    const reservationDate = DateTime.fromISO(start_time, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE);
     const formattedDate = reservationDate.toLocaleString({
       weekday: 'long',
       year: 'numeric',
@@ -735,18 +857,17 @@ export async function handler(req, res) {
     });
     const formattedTime = reservationDate.toFormat('h:mm a'); // Always 12-hour format, local time
     const confirmationMessage = `Hi ${member.first_name}! Your reservation for ${parsed.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
-    
+
+    await clearConversation(from);
     await sendSMS(from, confirmationMessage);
-    
+
     console.log('Reservation created successfully:', reservationResult.reservation);
     return res.status(200).json({ message: 'Reservation processed successfully' });
-    
+
   } catch (error) {
     console.error('Error processing SMS reservation:', error);
-    
     const errorMessage = `Sorry, we encountered an error processing your reservation request. Please contact us directly.`;
     await sendSMS(from, errorMessage);
-    
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
