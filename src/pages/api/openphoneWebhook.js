@@ -58,10 +58,15 @@ function parseNaturalDate(dateStr) {
   if (lowerDateStr === 'today') {
     return today.toJSDate();
   }
-  
+
   // Handle "tomorrow"
   if (lowerDateStr === 'tomorrow') {
     return tomorrow.toJSDate();
+  }
+
+  // Handle "tonight" as equivalent to today
+  if (lowerDateStr === 'tonight') {
+    return today.toJSDate();
   }
   
   // Handle "next [day]"
@@ -178,6 +183,7 @@ Your job is to provide reservation data and confirmation to the user.
 IF their requested time is not available, you should provide the next closest available time as close as possible to their requested time of day.
 All times are in America/Chicago (UTC–05:00).
 Interpret relative dates such as "today", "tomorrow", "this Thursday", and "next Friday" relative to the current date in America/Chicago.
+For expressions like "this <weekday>", interpret as the next occurrence of that weekday (e.g., if today is Tuesday, "this Thursday" should map to the upcoming Thursday).
 Parse the user's SMS into JSON with exactly these keys:
 {
   "party_size": number,
