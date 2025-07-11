@@ -8,6 +8,7 @@ import DayReservationsDrawer from './DayReservationsDrawer';
 import { fromUTC, toUTC, formatDateTime, formatTime, formatDate, isSameDay } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
+import { DateTime } from 'luxon';
 import {
   Box,
   Button,
@@ -376,10 +377,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         return;
       }
   
-      // FullCalendar provides Date objects in the browser's local timezone
-      // We need to convert directly to UTC for database storage
-      const startTimeUTC = newStart.toISOString();
-      const endTimeUTC = newEnd.toISOString();
+      // FullCalendar provides Date objects in the configured timezone (settings.timezone)
+      // We need to properly convert these to UTC for database storage using Luxon
+      console.log('[Drop] Original times from FullCalendar:', {
+        newStart: newStart.toISOString(),
+        newEnd: newEnd.toISOString(),
+        timezone: settings.timezone
+      });
+      
+      // Convert the Date objects to Luxon DateTime objects in the business timezone
+      // then convert to UTC for database storage
+      const startTimeUTC = DateTime.fromJSDate(newStart, { zone: settings.timezone })
+        .toUTC()
+        .toISO({ suppressMilliseconds: true });
+      const endTimeUTC = DateTime.fromJSDate(newEnd, { zone: settings.timezone })
+        .toUTC()
+        .toISO({ suppressMilliseconds: true });
+      
+      console.log('[Drop] Converted to UTC:', {
+        startTimeUTC,
+        endTimeUTC
+      });
   
       const body = {
         start_time: startTimeUTC,
@@ -430,10 +448,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     const { event } = info;
 
     try {
-      // FullCalendar provides Date objects in the browser's local timezone
-      // We need to convert directly to UTC for database storage
-      const startTimeUTC = event.start.toISOString();
-      const endTimeUTC = event.end.toISOString();
+      // FullCalendar provides Date objects in the configured timezone (settings.timezone)
+      // We need to properly convert these to UTC for database storage using Luxon
+      console.log('[Resize] Original times from FullCalendar:', {
+        start: event.start.toISOString(),
+        end: event.end.toISOString(),
+        timezone: settings.timezone
+      });
+      
+      // Convert the Date objects to Luxon DateTime objects in the business timezone
+      // then convert to UTC for database storage
+      const startTimeUTC = DateTime.fromJSDate(event.start, { zone: settings.timezone })
+        .toUTC()
+        .toISO({ suppressMilliseconds: true });
+      const endTimeUTC = DateTime.fromJSDate(event.end, { zone: settings.timezone })
+        .toUTC()
+        .toISO({ suppressMilliseconds: true });
+      
+      console.log('[Resize] Converted to UTC:', {
+        startTimeUTC,
+        endTimeUTC
+      });
 
       const response = await fetch(`/api/reservations/${event.id}`, {
         method: 'PATCH',
