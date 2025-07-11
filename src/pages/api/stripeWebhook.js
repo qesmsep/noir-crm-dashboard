@@ -56,27 +56,9 @@ export default async function handler(req, res) {
       // Get the client reference ID (account_id) from the session
       let accountId = session.client_reference_id;
       
-      // If no client_reference_id (e.g., payment via payment link), try to find account by customer email
-      if (!accountId && session.customer_details && session.customer_details.email) {
-        console.log('No client_reference_id found, searching by customer email:', session.customer_details.email);
-        
-        // Find members with this email
-        const { data: membersByEmail, error: emailSearchError } = await supabase
-          .from('members')
-          .select('account_id')
-          .eq('email', session.customer_details.email)
-          .eq('member_type', 'primary')
-          .limit(1);
-        
-        if (!emailSearchError && membersByEmail && membersByEmail.length > 0) {
-          accountId = membersByEmail[0].account_id;
-          console.log('Found account by email:', accountId);
-        }
-      }
-      
-      // If still no account ID, try to find by customer phone
+      // If no client_reference_id (e.g., payment via payment link), try to find account by customer phone first
       if (!accountId && session.customer_details && session.customer_details.phone) {
-        console.log('No account found by email, searching by customer phone:', session.customer_details.phone);
+        console.log('No client_reference_id found, searching by customer phone:', session.customer_details.phone);
         
         // Find members with this phone
         const { data: membersByPhone, error: phoneSearchError } = await supabase
@@ -89,6 +71,24 @@ export default async function handler(req, res) {
         if (!phoneSearchError && membersByPhone && membersByPhone.length > 0) {
           accountId = membersByPhone[0].account_id;
           console.log('Found account by phone:', accountId);
+        }
+      }
+      
+      // If still no account ID, try to find by customer email
+      if (!accountId && session.customer_details && session.customer_details.email) {
+        console.log('No account found by phone, searching by customer email:', session.customer_details.email);
+        
+        // Find members with this email
+        const { data: membersByEmail, error: emailSearchError } = await supabase
+          .from('members')
+          .select('account_id')
+          .eq('email', session.customer_details.email)
+          .eq('member_type', 'primary')
+          .limit(1);
+        
+        if (!emailSearchError && membersByEmail && membersByEmail.length > 0) {
+          accountId = membersByEmail[0].account_id;
+          console.log('Found account by email:', accountId);
         }
       }
       
