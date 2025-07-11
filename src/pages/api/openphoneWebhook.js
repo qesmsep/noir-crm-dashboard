@@ -204,20 +204,6 @@ User message: """${message}"""
   }
 }
 
-// Helper to get next occurrence of a weekday in 2025
-function getNextWeekdayIn2025(weekday, fromDate, isNext) {
-  const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const targetDay = weekdays.indexOf(weekday.toLowerCase());
-  if (targetDay === -1) return null;
-  let date = new Date(2025, fromDate.getMonth(), fromDate.getDate());
-  let day = date.getDay();
-  let diff = targetDay - day;
-  if (diff < 0 || (diff === 0 && isNext)) diff += 7;
-  if (isNext && diff === 0) diff = 7;
-  date.setDate(date.getDate() + diff);
-  return date;
-}
-
 // Check member status
 async function checkMemberStatus(phone) {
   try {
@@ -609,7 +595,15 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
 
     if (!availableTable) {
       console.log('No available tables for the requested time');
-      return { available: false, message: 'No tables available for the requested time' };
+      // Suggest next slot 30 minutes later as a fallback
+      const fallback = DateTime.fromISO(startTime).plus({ minutes: 30 });
+      const sugDate = fallback.setZone(DEFAULT_TIMEZONE).toISODate();
+      const sugTime = fallback.toFormat('HH:mm');
+      return {
+        available: false,
+        message: 'No tables available for the requested time',
+        suggestion: { date: sugDate, time: sugTime }
+      };
     }
 
     console.log('Comprehensive availability check passed');
@@ -789,6 +783,18 @@ export async function handler(req, res) {
     if (typeof parsed === "undefined") {
       // Not coming from accepted suggestion, parse with GPT
       parsed = await parseReservationWithGPT(text);
+      // Fallback: manual relative date handling if GPT mis-parses
+      const lowerText = text.toLowerCase();
+      const relMatch = lowerText.match(/(today|tonight|tomorrow|this\s+\w+|next\s+\w+)/);
+      if (relMatch && parsed.date) {
+        const key = relMatch[1];
+        const jsDate = parseNaturalDate(key);
+        if (jsDate) {
+          // override parsed.date with correct ISO date
+          parsed.date = DateTime.fromJSDate(jsDate, { zone: DEFAULT_TIMEZONE }).toISODate();
+          console.log('Overrode GPT date with parseNaturalDate for', key, ':', parsed.date);
+        }
+      }
     }
 
     if (!parsed) {
@@ -825,38 +831,7 @@ export async function handler(req, res) {
     }
 
     // Convert parsed local date/time (America/Chicago) to UTC ISO strings
-    let date = null;
-    if (parsed.date) {
-      // Handle relative dates like "tonight", "today", "tomorrow", "this thursday", etc.
-      const now = new Date();
-      if (parsed.date === 'tonight' || parsed.date === 'today') {
-        date = new Date(2025, now.getMonth(), now.getDate());
-      } else if (parsed.date === 'tomorrow') {
-        date = new Date(2025, now.getMonth(), now.getDate() + 1);
-      } else if (/^this \w+$/i.test(parsed.date)) {
-        // e.g., "this thursday"
-        const weekday = parsed.date.split(' ')[1];
-        date = getNextWeekdayIn2025(weekday, now, false);
-      } else if (/^next \w+$/i.test(parsed.date)) {
-        // e.g., "next friday"
-        const weekday = parsed.date.split(' ')[1];
-        date = getNextWeekdayIn2025(weekday, now, true);
-      } else {
-        // Handle MM/DD/YYYY or MM/DD format
-        const dateParts = parsed.date.split('/');
-        if (dateParts.length === 2) {
-          // MM/DD format - use 2025 as year
-          const [month, day] = dateParts;
-          date = new Date(2025, parseInt(month) - 1, parseInt(day));
-        } else if (dateParts.length === 3) {
-          // MM/DD/YYYY format
-          const [month, day, year] = dateParts;
-          date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        }
-      }
-    }
-
-    const localDt = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
+    const localDt = DateTime.fromISO(`${parsed.date}T${parsed.time}`, { zone: DEFAULT_TIMEZONE });
     const start_time = localDt.toUTC().toISO();
     const end_time = localDt.plus({ hours: 2 }).toUTC().toISO();
 
