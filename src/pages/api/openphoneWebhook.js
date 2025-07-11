@@ -204,6 +204,20 @@ User message: """${message}"""
   }
 }
 
+// Helper to get next occurrence of a weekday in 2025
+function getNextWeekdayIn2025(weekday, fromDate, isNext) {
+  const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const targetDay = weekdays.indexOf(weekday.toLowerCase());
+  if (targetDay === -1) return null;
+  let date = new Date(2025, fromDate.getMonth(), fromDate.getDate());
+  let day = date.getDay();
+  let diff = targetDay - day;
+  if (diff < 0 || (diff === 0 && isNext)) diff += 7;
+  if (isNext && diff === 0) diff = 7;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
 // Check member status
 async function checkMemberStatus(phone) {
   try {
@@ -811,7 +825,38 @@ export async function handler(req, res) {
     }
 
     // Convert parsed local date/time (America/Chicago) to UTC ISO strings
-    const localDt = DateTime.fromISO(`${parsed.date}T${parsed.time}`, { zone: DEFAULT_TIMEZONE });
+    let date = null;
+    if (parsed.date) {
+      // Handle relative dates like "tonight", "today", "tomorrow", "this thursday", etc.
+      const now = new Date();
+      if (parsed.date === 'tonight' || parsed.date === 'today') {
+        date = new Date(2025, now.getMonth(), now.getDate());
+      } else if (parsed.date === 'tomorrow') {
+        date = new Date(2025, now.getMonth(), now.getDate() + 1);
+      } else if (/^this \w+$/i.test(parsed.date)) {
+        // e.g., "this thursday"
+        const weekday = parsed.date.split(' ')[1];
+        date = getNextWeekdayIn2025(weekday, now, false);
+      } else if (/^next \w+$/i.test(parsed.date)) {
+        // e.g., "next friday"
+        const weekday = parsed.date.split(' ')[1];
+        date = getNextWeekdayIn2025(weekday, now, true);
+      } else {
+        // Handle MM/DD/YYYY or MM/DD format
+        const dateParts = parsed.date.split('/');
+        if (dateParts.length === 2) {
+          // MM/DD format - use 2025 as year
+          const [month, day] = dateParts;
+          date = new Date(2025, parseInt(month) - 1, parseInt(day));
+        } else if (dateParts.length === 3) {
+          // MM/DD/YYYY format
+          const [month, day, year] = dateParts;
+          date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
+      }
+    }
+
+    const localDt = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
     const start_time = localDt.toUTC().toISO();
     const end_time = localDt.plus({ hours: 2 }).toUTC().toISO();
 
