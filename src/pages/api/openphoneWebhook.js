@@ -1,3 +1,5 @@
+import OpenAI from 'openai';
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 
@@ -135,301 +137,33 @@ function parseNaturalDate(dateStr) {
   return null;
 }
 
-// AI-powered parsing using OpenAI GPT-4
-async function parseReservationMessageWithAI(message) {
-  try {
-    // Convert message to all lowercase before sending to AI
-    const lowerMessage = message.toLowerCase();
-    const prompt = `
-Parse this SMS reservation request and return ONLY valid JSON:
-"${lowerMessage}"
-
-Return ONLY valid JSON with these fields:
+// GPT-driven natural language parser
+async function parseReservationWithGPT(message) {
+  const prompt = `
+You are a hospitality reservation assistant. Parse the user's SMS into JSON with exactly these keys:
 {
   "party_size": number,
-  "date": "MM/DD/YYYY", 
+  "date": "YYYY-MM-DD",
   "time": "HH:MM",
-  "event_type": "string (optional)",
-  "notes": "string (optional)"
+  "event_type": string,        // optional
+  "notes": string              // optional
 }
+Return only the JSON object. If you cannot parse, return {"error":"reason"}.
 
-If you can't parse it, return: {"error": "reason"}
-
-IMPORTANT: Use year 2025 for all dates unless explicitly specified otherwise.
-
-Recognize and correctly parse relative date terms such as "tonight", "today", "tomorrow", "this thursday", "next friday", etc. Convert them to the correct MM/DD/YYYY date for the year 2025 unless otherwise specified.
-
-Examples:
-"reservation 2 guests on 6/27/25 at 6:30pm" → {"party_size": 2, "date": "06/27/2025", "time": "18:30"}
-"book me for 4 people tomorrow at 8pm" → {"party_size": 4, "date": "tomorrow", "time": "20:00"}
-"reserve table for 6 on friday 7pm" → {"party_size": 6, "date": "this friday", "time": "19:00"}
-"reservation 8 people on july 4 at 6pm" → {"party_size": 8, "date": "07/04/2025", "time": "18:00"}
-"reservation for 2 tonight at 7pm" → {"party_size": 2, "date": "tonight", "time": "19:00"}
-"reservation for 2 today at 7pm" → {"party_size": 2, "date": "today", "time": "19:00"}
-
-IMPORTANT: Return ONLY the JSON object, no additional text or formatting.
+User message: """${message}"""
 `;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 200
-      })
-    });
-
-    if (!response.ok) {
-      console.error('OpenAI API error:', response.status, response.statusText);
-      return null;
-    }
-
-    const result = await response.json();
-    const aiResponse = result.choices[0].message.content.trim();
-    
-    console.log('Raw AI response:', aiResponse);
-    
-    // Try to extract JSON from the response (in case AI added extra text)
-    let jsonStart = aiResponse.indexOf('{');
-    let jsonEnd = aiResponse.lastIndexOf('}');
-    
-    if (jsonStart === -1 || jsonEnd === -1) {
-      console.error('No JSON found in AI response');
-      return null;
-    }
-    
-    const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
-    console.log('Extracted JSON string:', jsonString);
-    
-    // Try to parse the JSON response
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonString);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Failed to parse:', jsonString);
-      return null;
-    }
-    
-    if (parsed.error) {
-      console.log('AI parsing error:', parsed.error);
-      return null;
-    }
-
-    // Convert AI response to our expected format
-    let date = null;
-    if (parsed.date) {
-      // Handle relative dates like "tomorrow", "this Friday"
-      if (parsed.date === 'tomorrow') {
-        date = new Date();
-        date.setDate(date.getDate() + 1);
-      } else if (parsed.date.startsWith('this ') || parsed.date.startsWith('next ')) {
-        date = parseNaturalDate(parsed.date);
-      } else {
-        // Handle MM/DD/YYYY format or MM/DD format
-        const dateParts = parsed.date.split('/');
-        if (dateParts.length === 2) {
-          // MM/DD format - use smart year handling
-          date = parseNaturalDate(parsed.date);
-        } else if (dateParts.length === 3) {
-          // MM/DD/YYYY format
-          const [month, day, year] = dateParts;
-          date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        }
-      }
-    }
-
-    if (!date || isNaN(date.getTime())) {
-      console.log('Could not parse date from AI response or date is invalid');
-      return null;
-    }
-
-    // Parse time
-    let hour = 20, minute = 0; // default 8pm
-    if (parsed.time) {
-      const [h, m] = parsed.time.split(':');
-      hour = parseInt(h);
-      minute = parseInt(m);
-      
-      // Validate time values
-      if (isNaN(hour) || hour < 0 || hour > 23) {
-        console.log('Invalid hour in AI response:', hour);
-        return null;
-      }
-      if (isNaN(minute) || minute < 0 || minute > 59) {
-        console.log('Invalid minute in AI response:', minute);
-        return null;
-      }
-    }
-
-    date.setHours(hour, minute, 0, 0);
-    
-    // Final validation to ensure we have a valid date
-    if (isNaN(date.getTime())) {
-      console.log('Invalid date after setting time:', date);
-      return null;
-    }
-    
-    const start_time = date.toISOString();
-    const end_time = new Date(date.getTime() + 2 * 60 * 60 * 1000).toISOString();
-
-    return {
-      party_size: parsed.party_size || 2,
-      start_time,
-      end_time,
-      event_type: parsed.event_type || 'Fun Night Out',
-      notes: parsed.notes || 'AI-parsed reservation'
-    };
-
-  } catch (error) {
-    console.error('Error in AI parsing:', error);
+  const res = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.0,
+  });
+  const text = res.choices[0].message.content.trim();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error('GPT parsing error', e, text);
     return null;
   }
-}
-
-// Enhanced parsing for flexible SMS formats (regex only)
-function parseReservationMessage(message) {
-  console.log('Parsing message:', message);
-  // Normalize message (remove extra spaces, make case-insensitive for keywords)
-  const msg = message.replace(/\s+/g, ' ').trim();
-
-  // Regex for reservation keyword (case-insensitive)
-  const reservationKeyword = /\b(reservation|reserve|book|table)\b/i;
-  if (!reservationKeyword.test(msg)) {
-    console.log('No reservation keyword found');
-    return null;
-  }
-
-  // Flexible party size extraction
-  let party_size = 2; // default
-  const partySizeRegexes = [
-    /for\s+(\d+)\b/i, // for 2
-    /(\d+)\s*guests?/i, // 2 guests
-    /(\d+)\s*people/i, // 2 people
-    /party of (\d+)/i, // party of 2
-    /for a party of (\d+)/i, // for a party of 2
-    /for (\d+)/i, // for 2
-  ];
-  for (const re of partySizeRegexes) {
-    const match = msg.match(re);
-    if (match) {
-      party_size = parseInt(match[1]);
-      break;
-    }
-  }
-
-  // Flexible date and time extraction
-  // Try to find a date (MM/DD/YY, MM/DD, Month Day, this/next Friday, etc.)
-  let dateStr = '';
-  let dateMatch = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
-                  msg.match(/(\d{1,2}\/\d{1,2})/i) ||  // MM/DD format
-                  msg.match(/(\w+\s+\d{1,2}(?:st|nd|rd|th)?)/i) ||
-                  msg.match(/(this|next)\s+\w+/i);
-  if (dateMatch) {
-    dateStr = dateMatch[0];
-  }
-
-  // Try to find a time (at 6:30pm, 18:30, 6pm, 6:30 pm, etc.)
-  let timeStr = '';
-  let timeMatch = msg.match(/(?:at|@)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i) ||
-                  msg.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i) ||
-                  msg.match(/(\d{1,2})\s*(am|pm)/i);
-  if (timeMatch) {
-    timeStr = timeMatch[0].replace(/^(at|@)\s*/i, '');
-  }
-
-  // If date or time is missing, try to find them anywhere in the message
-  if (!dateStr) {
-    const anyDate = msg.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/) || msg.match(/(\d{1,2}\/\d{1,2})/);
-    if (anyDate) dateStr = anyDate[0];
-  }
-  if (!timeStr) {
-    const anyTime = msg.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i) || msg.match(/(\d{1,2})\s*(am|pm)/i);
-    if (anyTime) timeStr = anyTime[0];
-  }
-
-  // Parse date
-  let date = null;
-  if (dateStr) {
-    date = parseNaturalDate(dateStr);
-  }
-  if (!date || isNaN(date.getTime())) {
-    console.log('Could not parse date or date is invalid:', dateStr);
-    return null;
-  }
-
-  // Parse time
-  let hour = 20, minute = 0; // default 8pm
-  if (timeStr) {
-    let timeParts = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-    if (timeParts) {
-      hour = parseInt(timeParts[1]);
-      minute = timeParts[2] ? parseInt(timeParts[2]) : 0;
-      const meridiem = timeParts[3];
-      if (meridiem === 'pm' && hour < 12) hour += 12;
-      if (meridiem === 'am' && hour === 12) hour = 0;
-    }
-  }
-  
-  // Create the date in the business timezone, then convert to UTC for storage
-  const businessDate = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
-  const reservationDateTime = businessDate.set({ hour, minute, second: 0, millisecond: 0 });
-  const start_time = reservationDateTime.toUTC().toISO();
-  const end_time = reservationDateTime.plus({ hours: 2 }).toUTC().toISO();
-
-  // Extract TYPE (event_type)
-  let eventTypeMatch = msg.match(/type\s+(\w+)/i);
-  let event_type = eventTypeMatch ? eventTypeMatch[1] : 'Fun Night Out';
-
-  // Extract NOTES
-  let notesMatch = msg.match(/notes?\s+"([^"]+)"/i) || msg.match(/notes?\s+([\w\s]+)/i);
-  let notes = notesMatch ? notesMatch[1].trim() : event_type;
-  if (!notes) notes = 'Fun Night Out';
-
-  // Fallbacks
-  if (!party_size) {
-    console.log('Could not parse party size');
-    return null;
-  }
-
-  return {
-    party_size,
-    start_time,
-    end_time,
-    event_type,
-    notes
-  };
-}
-
-// Hybrid parsing function
-async function parseReservationMessageHybrid(message) {
-  console.log('Parsing message:', message);
-  
-  // Normalize message
-  const msg = message.replace(/\s+/g, ' ').trim();
-
-  // Try AI parsing first (more robust)
-  const aiResult = await parseReservationMessageWithAI(msg);
-  if (aiResult) {
-    console.log('AI parsing successful');
-    return aiResult;
-  }
-
-  // Fall back to regex parsing
-  console.log('AI parsing failed, trying regex...');
-  const regexResult = parseReservationMessage(msg);
-  if (regexResult) {
-    console.log('Regex parsing successful');
-    return regexResult;
-  }
-
-  console.log('Both AI and regex parsing failed');
-  return null;
 }
 
 // Check member status
@@ -958,7 +692,8 @@ export async function handler(req, res) {
 
   try {
     console.log('Attempting to parse reservation message for member:', member.first_name);
-    const parsed = await parseReservationMessageHybrid(text);
+    console.log('Using GPT parser for message:', text);
+    const parsed = await parseReservationWithGPT(text);
     
     if (!parsed) {
       console.log('Both regex and AI parsing failed for member:', member.first_name, 'Message:', text);
