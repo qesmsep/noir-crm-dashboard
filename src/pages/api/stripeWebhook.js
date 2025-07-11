@@ -60,26 +60,12 @@ export default async function handler(req, res) {
         return res.json({ received: true, debug: { ...debugInfo, error: 'No account ID found' } });
       }
 
-      // Find the account
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
-        .select('account_id')
-        .eq('account_id', accountId)
-        .limit(1)
-        .single();
-
-      // Ignore if no account found
-      if (accountError || !account) {
-        console.log('No account found for ID:', accountId, accountError);
-        return res.json({ received: true, debug: { ...debugInfo, error: 'No account found', accountError } });
-      }
-
       // Get the primary member for this account
       const { data: primaryMember, error: memberError } = await supabase
         .from('members')
-        .select('member_id')
-        .eq('account_id', account.account_id)
-        .order('created_at', { ascending: true })
+        .select('member_id, first_name, phone')
+        .eq('account_id', accountId)
+        .eq('member_type', 'primary')
         .limit(1)
         .single();
 
@@ -88,45 +74,43 @@ export default async function handler(req, res) {
         return res.json({ received: true, debug: { ...debugInfo, error: 'No primary member found', memberError } });
       }
 
-      // Update the account with the Stripe customer ID
-      const { error: updateError } = await supabase
+      // Upsert the account with the Stripe customer ID
+      const { error: upsertAccountError } = await supabase
         .from('accounts')
-        .update({ stripe_customer_id: session.customer })
-        .eq('account_id', account.account_id);
-
-      if (updateError) {
-        console.error('Error updating account with Stripe customer ID:', updateError);
-        return res.status(500).json({ error: 'Failed to update account', debug: { ...debugInfo, updateError } });
+        .upsert({ account_id: accountId, stripe_customer_id: session.customer }, { onConflict: 'account_id' });
+      if (upsertAccountError) {
+        console.error('Error upserting account with Stripe customer ID:', upsertAccountError);
+        return res.status(500).json({ error: 'Failed to upsert account', debug: { ...debugInfo, upsertAccountError } });
       }
 
-      // Update all members for this account: set status to 'active' and set stripe_customer_id if not already set
+      // Update all members for this account: set status to 'active' and set stripe_customer_id
       const { error: memberUpdateError } = await supabase
         .from('members')
         .update({ status: 'active', stripe_customer_id: session.customer })
-        .eq('account_id', account.account_id)
+        .eq('account_id', accountId)
         .or('status.eq.pending,status.is.null');
-
       if (memberUpdateError) {
         console.error('Error updating members to active:', memberUpdateError);
         return res.status(500).json({ error: 'Failed to update members', debug: { ...debugInfo, memberUpdateError } });
       }
 
-      // Add the payment to the ledger
+      // Insert a ledger entry for the payment
+      const paymentAmount = session.amount_total / 100; // Stripe sends amount in cents
+      const paymentDate = new Date().toISOString().split('T')[0];
+      const ledgerNote = 'Noir Membership Dues';
       const { error: ledgerError } = await supabase
         .from('ledger')
         .insert({
-          account_id: account.account_id,
           member_id: primaryMember.member_id,
-          amount: session.amount_total / 100, // Convert from cents to dollars
+          account_id: accountId,
           type: 'payment',
-          note: 'Initial membership payment',
-          date: new Date().toISOString(),
-          stripe_checkout_session_id: session.id
+          amount: paymentAmount,
+          note: ledgerNote,
+          date: paymentDate
         });
-
       if (ledgerError) {
-        console.error('Error adding payment to ledger:', ledgerError);
-        return res.status(500).json({ error: 'Failed to update ledger', debug: { ...debugInfo, ledgerError } });
+        console.error('Error inserting ledger entry:', ledgerError);
+        return res.status(500).json({ error: 'Failed to insert ledger entry', debug: { ...debugInfo, ledgerError } });
       }
 
       // Send welcome SMS to the primary member
