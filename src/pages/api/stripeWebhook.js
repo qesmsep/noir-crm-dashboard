@@ -47,16 +47,54 @@ export default async function handler(req, res) {
         sessionId: session.id,
         customerId: session.customer,
         clientReferenceId: session.client_reference_id,
+        customerEmail: session.customer_details?.email,
+        customerPhone: session.customer_details?.phone,
         amount: session.amount_total
       };
       console.log('Processing checkout.session.completed:', debugInfo);
       
       // Get the client reference ID (account_id) from the session
-      const accountId = session.client_reference_id;
+      let accountId = session.client_reference_id;
       
-      // Ignore if no account ID
+      // If no client_reference_id (e.g., payment via payment link), try to find account by customer email
+      if (!accountId && session.customer_details && session.customer_details.email) {
+        console.log('No client_reference_id found, searching by customer email:', session.customer_details.email);
+        
+        // Find members with this email
+        const { data: membersByEmail, error: emailSearchError } = await supabase
+          .from('members')
+          .select('account_id')
+          .eq('email', session.customer_details.email)
+          .eq('member_type', 'primary')
+          .limit(1);
+        
+        if (!emailSearchError && membersByEmail && membersByEmail.length > 0) {
+          accountId = membersByEmail[0].account_id;
+          console.log('Found account by email:', accountId);
+        }
+      }
+      
+      // If still no account ID, try to find by customer phone
+      if (!accountId && session.customer_details && session.customer_details.phone) {
+        console.log('No account found by email, searching by customer phone:', session.customer_details.phone);
+        
+        // Find members with this phone
+        const { data: membersByPhone, error: phoneSearchError } = await supabase
+          .from('members')
+          .select('account_id')
+          .eq('phone', session.customer_details.phone)
+          .eq('member_type', 'primary')
+          .limit(1);
+        
+        if (!phoneSearchError && membersByPhone && membersByPhone.length > 0) {
+          accountId = membersByPhone[0].account_id;
+          console.log('Found account by phone:', accountId);
+        }
+      }
+      
+      // Ignore if no account ID found
       if (!accountId) {
-        console.log('No account ID found in session');
+        console.log('No account ID found in session or by customer details');
         return res.json({ received: true, debug: { ...debugInfo, error: 'No account ID found' } });
       }
 
