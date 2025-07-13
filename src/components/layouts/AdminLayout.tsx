@@ -104,7 +104,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       </main>
 
       {/* Mobile menu: only nav links, no logo or sidebar content */}
-      <div className={`${styles.mobileMenu} ${isMenuOpen ? 'open' : ''}`} role="navigation" aria-label="Mobile navigation menu">
+      <div className={`${styles.mobileMenu} ${isMenuOpen ? styles.open : ''}`} role="navigation" aria-label="Mobile navigation menu">
         <nav className={styles.mobileNavLinks}>
           {navItems.map((item) => (
             <Link

@@ -197,7 +197,7 @@
 
 @media (max-width: 900px) {
   .mobileMenu {
-    display: block;
+    display: flex;
     position: fixed;
     top: 0;
     left: 0;
@@ -210,13 +210,12 @@
     transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
     padding: 0;
     margin: 0;
-    display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
   }
-  .mobileMenu.open {
-    transform: translateX(0);
+  .open {
+    transform: translateX(0) !important;
   }
   .mobileNavLinks {
     width: 100%;
