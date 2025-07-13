@@ -1,6 +1,6 @@
 "use client";
 import { ReactNode, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth';
 import styles from '../../styles/AdminLayout.module.css';
@@ -12,7 +12,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = router.pathname;
   const { user, signOut } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
