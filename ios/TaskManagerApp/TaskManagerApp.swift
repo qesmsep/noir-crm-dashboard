@@ -19,10 +19,29 @@ struct TaskManagerApp: App {
         }
     }()
 
+    @StateObject private var supabaseService = SupabaseService.shared
+
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .modelContainer(container)
+            Group {
+                if supabaseService.isAuthenticated {
+                    ContentView()
+                        .task {
+                            await SyncService.shared.sync()
+                        }
+                } else {
+                    LoginView()
+                }
+            }
+            .modelContainer(container)
+            .environmentObject(supabaseService)
+            .onChange(of: scenePhase) { phase in
+                if phase == .active {
+                    Task { await SyncService.shared.sync() }
+                }
+            }
         }
     }
 }

@@ -8,7 +8,7 @@ struct TaskDetailView: View {
         Form {
             Section("Info") {
                 TextField("Title", text: $task.title)
-                TextField("Objective", text: Binding($task.objective, replacingNilWith: ""))
+                TextField("Objective", text: Binding($task.objective, ""))
             }
             Section("Attributes") {
                 Picker("Focus", selection: $task.focus) {

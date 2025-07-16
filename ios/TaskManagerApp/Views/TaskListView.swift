@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 struct TaskListView: View {
     @Query(sort: \Task.globalRank) private var tasks: [Task]
@@ -11,6 +12,9 @@ struct TaskListView: View {
                     TaskRowView(task: task)
                 }
             }
+        }
+        .refreshable {
+            await SyncService.shared.sync()
         }
         .navigationDestination(for: Task.self) { task in
             TaskDetailView(task: task)
