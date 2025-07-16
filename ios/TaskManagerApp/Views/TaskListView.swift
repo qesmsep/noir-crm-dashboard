@@ -3,11 +3,17 @@ import SwiftData
 import Combine
 
 struct TaskListView: View {
-    @Query(sort: \Task.globalRank) private var tasks: [Task]
+    @Query(sort: \Task.globalRank) private var allTasks: [Task]
+
+    var rootTasks: [Task] {
+        allTasks.filter { $0.parent == nil }.sorted { $0.globalRank < $1.globalRank }
+    }
 
     var body: some View {
         List {
-            ForEach(tasks) { task in
+            OutlineGroup(rootTasks, children: { task in
+                task.children.sorted { $0.nestedRank < $1.nestedRank }
+            }) { task in
                 NavigationLink(value: task) {
                     TaskRowView(task: task)
                 }

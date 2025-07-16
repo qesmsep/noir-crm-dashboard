@@ -9,7 +9,11 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            TaskListView()
+            VStack(spacing: 0) {
+                GoalProgressView()
+                Divider()
+                TaskListView()
+            }
                 .navigationTitle("Tasks")
                 .toolbar {
                     ToolbarItemGroup(placement: .navigationBarTrailing) {

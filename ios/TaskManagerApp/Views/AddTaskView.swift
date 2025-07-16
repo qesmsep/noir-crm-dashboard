@@ -7,6 +7,9 @@ struct AddTaskView: View {
     
     @State private var title: String = ""
     @State private var objective: String = ""
+    @State private var isParent: Bool = false
+    @State private var focus: String = "speed"
+    @State private var deadline: Date? = nil
 
     var goal: Goal?
     var parent: Task?
@@ -17,6 +20,17 @@ struct AddTaskView: View {
                 Section("Details") {
                     TextField("Title", text: $title)
                     TextField("Objective", text: $objective, axis: .vertical)
+                    DatePicker("Deadline", selection: Binding(get: { deadline ?? Date() }, set: { deadline = $0 }), displayedComponents: .date)
+                }
+                Section("Hierarchy") {
+                    Toggle("This task will contain subtasks", isOn: $isParent)
+                    if isParent {
+                        Picker("Primary focus", selection: $focus) {
+                            Text("Speed").tag("speed")
+                            Text("Cost").tag("cost")
+                            Text("Quality").tag("quality")
+                        }
+                    }
                 }
             }
             .navigationTitle("New Task")
@@ -32,7 +46,7 @@ struct AddTaskView: View {
     }
 
     private func save() {
-        let task = Task(title: title, objective: objective, goal: goal, parent: parent)
+        let task = Task(title: title, objective: objective.isEmpty ? nil : objective, focus: focus, deadline: deadline, goal: goal, parent: parent)
         context.insert(task)
         dismiss()
     }
