@@ -383,41 +383,45 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       const oldResource = info.oldResource;
       const newTableId = newResource?.id;
   
-      const hasTimeChanged = newStart.getTime() !== info.oldEvent.start.getTime() || newEnd.getTime() !== info.oldEvent.end.getTime();
+            const hasTimeChanged = newStart.getTime() !== info.oldEvent.start.getTime() || newEnd.getTime() !== info.oldEvent.end.getTime();
       const hasTableChanged = newTableId !== oldResource?.id;
-  
+
       if (!hasTimeChanged && !hasTableChanged) {
         console.log('No change detected. Skipping update.');
         return;
       }
-  
-      // FullCalendar provides Date objects in the configured timezone (settings.timezone)
-      // We need to properly convert these to UTC for database storage using Luxon
-      console.log('[Drop] Original times from FullCalendar:', {
-        newStart: newStart.toISOString(),
-        newEnd: newEnd.toISOString(),
-        timezone: settings.timezone
-      });
-      
-      // Convert the Date objects to Luxon DateTime objects in the business timezone
-      // then convert to UTC for database storage
-      const startTimeUTC = DateTime.fromJSDate(newStart, { zone: settings.timezone })
-        .toUTC()
-        .toISO({ suppressMilliseconds: true });
-      const endTimeUTC = DateTime.fromJSDate(newEnd, { zone: settings.timezone })
-        .toUTC()
-        .toISO({ suppressMilliseconds: true });
-      
-      console.log('[Drop] Converted to UTC:', {
-        startTimeUTC,
-        endTimeUTC
-      });
-  
-      const body = {
-        start_time: startTimeUTC,
-        end_time: endTimeUTC,
+
+      // Only convert times to UTC if the time actually changed
+      let body: any = {
         table_id: newTableId,
       };
+
+      if (hasTimeChanged) {
+        // FullCalendar provides Date objects in the configured timezone (settings.timezone)
+        // We need to properly convert these to UTC for database storage using Luxon
+        console.log('[Drop] Original times from FullCalendar:', {
+          newStart: newStart.toISOString(),
+          newEnd: newEnd.toISOString(),
+          timezone: settings.timezone
+        });
+        
+        // Convert the Date objects to Luxon DateTime objects in the business timezone
+        // then convert to UTC for database storage
+        const startTimeUTC = DateTime.fromJSDate(newStart, { zone: settings.timezone })
+          .toUTC()
+          .toISO({ suppressMilliseconds: true });
+        const endTimeUTC = DateTime.fromJSDate(newEnd, { zone: settings.timezone })
+          .toUTC()
+          .toISO({ suppressMilliseconds: true });
+        
+        console.log('[Drop] Converted to UTC:', {
+          startTimeUTC,
+          endTimeUTC
+        });
+
+        body.start_time = startTimeUTC;
+        body.end_time = endTimeUTC;
+      }
   
       console.log('[Sending PATCH]', eventId, body);
   

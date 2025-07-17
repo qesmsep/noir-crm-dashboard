@@ -265,12 +265,58 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
         checked_in_at: newCheckedInStatus ? new Date().toISOString() : null
       }));
       
-      toast({
-        title: 'Success',
-        description: newCheckedInStatus ? 'Reservation checked in successfully' : 'Check-in status removed',
-        status: 'success',
-        duration: 3000,
-      });
+      // If checking in and there's a payment hold, release it
+      if (newCheckedInStatus && reservation.payment_intent_id && reservation.hold_status === 'confirmed') {
+        try {
+          const holdResponse = await fetch('/api/release-holds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reservation_id: reservationId }),
+          });
+          
+          if (holdResponse.ok) {
+            const holdResult = await holdResponse.json();
+            console.log('Hold released successfully:', holdResult);
+            
+            // Update local state to reflect hold release
+            setReservation(prev => ({
+              ...prev,
+              hold_status: 'released',
+              hold_released_at: new Date().toISOString()
+            }));
+            
+            toast({
+              title: 'Success',
+              description: 'Reservation checked in and credit card hold released',
+              status: 'success',
+              duration: 3000,
+            });
+          } else {
+            console.error('Failed to release hold:', await holdResponse.text());
+            toast({
+              title: 'Warning',
+              description: 'Reservation checked in but failed to release credit card hold. Please release manually.',
+              status: 'warning',
+              duration: 5000,
+            });
+          }
+        } catch (holdError) {
+          console.error('Error releasing hold:', holdError);
+          toast({
+            title: 'Warning',
+            description: 'Reservation checked in but failed to release credit card hold. Please release manually.',
+            status: 'warning',
+            duration: 5000,
+          });
+        }
+      } else {
+        toast({
+          title: 'Success',
+          description: newCheckedInStatus ? 'Reservation checked in successfully' : 'Check-in status removed',
+          status: 'success',
+          duration: 3000,
+        });
+      }
       
       // Refresh the reservation data
       onReservationUpdated();
