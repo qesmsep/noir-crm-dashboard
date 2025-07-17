@@ -939,44 +939,49 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           resourceAreaWidth={isMobile ? "60px" : "80px"}
           resourceAreaHeaderContent=""
           
-         // Adjust the details of the reservations on the calendar
-          eventContent={(arg) => (
-            <div
-              style={{
-                fontFamily: 'Montserrat, sans-serif',
-                whiteSpace: 'normal',
-                margin: '0px',
-                display: 'center',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: isMobile ? '28px' : '24px',
-                fontSize: isMobile ? '12px' : '14px',
-                background: '#a59480',
-               
-                color: 'white',
-                borderRadius: '4px',
-                padding: isMobile ? '0 4px' : '0 2px',
-                border: '1px solid #353535',
-                cursor: isTouchDeviceState ? 'grab' : 'pointer',
-                userSelect: 'none',
-                touchAction: 'manipulation',
-                // Additional touch optimizations
-                WebkitUserSelect: 'none',
-                WebkitTouchCallout: 'none',
-                WebkitTapHighlightColor: 'transparent',
-                // Hover effects for touch devices
-                ...(isTouchDeviceState && {
-                  transition: 'all 0.2s ease',
-                  '&:active': {
-                    transform: 'scale(0.95)',
-                    opacity: 0.8,
-                  },
-                }),
-              }}
-            >
-              {arg.event.title}
-            </div>
-          )}
+                   // Adjust the details of the reservations on the calendar
+          eventContent={(arg) => {
+            // Determine background color based on check-in status
+            const isCheckedIn = arg.event.extendedProps.checked_in;
+            const backgroundColor = isCheckedIn ? '#353535' : '#a59480';
+            
+            return (
+              <div
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  whiteSpace: 'normal',
+                  margin: '0px',
+                  display: 'center',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: isMobile ? '28px' : '24px',
+                  fontSize: isMobile ? '12px' : '14px',
+                  background: backgroundColor,
+                  color: 'white',
+                  borderRadius: '4px',
+                  padding: isMobile ? '0 4px' : '0 2px',
+                  border: '1px solid #353535',
+                  cursor: isTouchDeviceState ? 'grab' : 'pointer',
+                  userSelect: 'none',
+                  touchAction: 'manipulation',
+                  // Additional touch optimizations
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  // Hover effects for touch devices
+                  ...(isTouchDeviceState && {
+                    transition: 'all 0.2s ease',
+                    '&:active': {
+                      transform: 'scale(0.95)',
+                      opacity: 0.8,
+                    },
+                  }),
+                }}
+              >
+                {arg.event.title}
+              </div>
+            );
+          }}
           datesSet={handleDatesSet}
           eventDidMount={(info) => {
             console.log('Event mounted:', info.event.title);

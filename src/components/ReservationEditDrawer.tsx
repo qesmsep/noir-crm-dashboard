@@ -237,6 +237,57 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
     }
   };
 
+  const handleCheckInToggle = async () => {
+    if (!reservation) return;
+    
+    setIsSaving(true);
+    try {
+      const newCheckedInStatus = !reservation.checked_in;
+      
+      const response = await fetch(`/api/reservations/${reservationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          checked_in: newCheckedInStatus
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update check-in status');
+      }
+      
+      const result = await response.json();
+      
+      // Update local state
+      setReservation(prev => ({
+        ...prev,
+        checked_in: newCheckedInStatus,
+        checked_in_at: newCheckedInStatus ? new Date().toISOString() : null
+      }));
+      
+      toast({
+        title: 'Success',
+        description: newCheckedInStatus ? 'Reservation checked in successfully' : 'Check-in status removed',
+        status: 'success',
+        duration: 3000,
+      });
+      
+      // Refresh the reservation data
+      onReservationUpdated();
+      
+    } catch (error) {
+      console.error('Error toggling check-in status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update check-in status',
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDelete = async () => {
     setIsSaving(true);
     try {
@@ -439,15 +490,34 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
             ) : reservation ? (
               <VStack spacing={1} align="stretch">
                 <Box>
-                  <Text mb="0px" fontSize="24px" fontWeight="bold" fontFamily="IvyJournal, sans-serif">
-                    {formData.first_name} {formData.last_name} <Badge margin="0px" colorScheme={reservation.membership_type === 'member' ? 'purple' : 'gray'} size="sm">
-                      {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
-                    </Badge>
-                  </Text>
-                  <HStack>
-                    <Text margin="0px" fontSize="sm" color="gray.600">
-                      Table {reservation.tables?.table_number || 'N/A'} | Party Size {formData.party_size} {eventIcon && `| ${eventIcon}`}
-                    </Text>
+                  <HStack justify="space-between" align="flex-start">
+                    <VStack align="start" spacing={0} borderRadius="10px" marginTop="0px">
+                      <Text mb="0px" fontSize="24px" fontWeight="bold" fontFamily="IvyJournal, sans-serif">
+                        {formData.first_name} {formData.last_name} <Badge margin="0px" colorScheme={reservation.membership_type === 'member' ? 'purple' : 'gray'} size="sm">
+                          {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
+                        </Badge>
+                      </Text>
+                      <HStack>
+                        <Text margin="0px" fontSize="sm" color="gray.600">
+                          Table {reservation.tables?.table_number || 'N/A'} | Party Size {formData.party_size} {eventIcon && `| ${eventIcon}`}
+                        </Text>
+                      </HStack>
+                    </VStack>
+                    
+                    {/* Check-in Button */}
+                    <Button
+                      size="sm"
+                      colorScheme={reservation.checked_in ? 'green' : 'gray'}
+                      variant={reservation.checked_in ? 'solid' : 'outline'}
+                      onClick={() => handleCheckInToggle()}
+                      fontFamily="Montserrat, sans-serif"
+                      fontWeight="semibold"
+                      borderRadius="10px"
+                      marginTop="15px"
+                      minW="80px"
+                    >
+                      {reservation.checked_in ? 'Checked In' : 'Check In'}
+                    </Button>
                   </HStack>
                 </Box>
               

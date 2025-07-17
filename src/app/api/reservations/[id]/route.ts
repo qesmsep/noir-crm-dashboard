@@ -145,7 +145,8 @@ export async function PATCH(request: Request, { params }: any) {
       phone,
       party_size,
       event_type,
-      notes
+      notes,
+      checked_in
     } = body;
 
     const updateFields: any = {};
@@ -159,6 +160,21 @@ export async function PATCH(request: Request, { params }: any) {
     if (notes !== undefined) updateFields.notes = notes;
     if (email !== undefined) updateFields.email = email;
     if (phone !== undefined) updateFields.phone = phone;
+    
+    // Handle check-in status
+    if (checked_in !== undefined) {
+      updateFields.checked_in = checked_in;
+      if (checked_in) {
+        // Set check-in timestamp and user when checking in
+        updateFields.checked_in_at = new Date().toISOString();
+        // Note: In a real implementation, you'd get the current user ID
+        // For now, we'll leave checked_in_by as null
+      } else {
+        // Clear check-in data when unchecking
+        updateFields.checked_in_at = null;
+        updateFields.checked_in_by = null;
+      }
+    }
 
     updateFields.updated_at = new Date().toISOString();
 
