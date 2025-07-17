@@ -1,0 +1,136 @@
+/* Mobile Calendar Optimizations */
+.mobileCalendarContainer {
+  /* Enable pinch zoom */
+  touch-action: pinch-zoom;
+  -webkit-user-select: none;
+  user-select: none;
+  
+  /* Full viewport on mobile */
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  
+  /* Prevent text selection during pinch zoom */
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* FullCalendar mobile optimizations */
+.mobileCalendarContainer :global(.fc) {
+  touch-action: pinch-zoom !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  height: 100% !important;
+}
+
+/* Resource area optimizations for mobile */
+.mobileCalendarContainer :global(.fc-resource-area) {
+  min-width: 60px !important;
+  width: 60px !important;
+  background-color: #ecede8 !important;
+}
+
+.mobileCalendarContainer :global(.fc-resource-area .fc-resource-title) {
+  font-size: 14px !important;
+  font-weight: bold !important;
+  color: #353535 !important;
+  text-align: center !important;
+  padding: 8px 4px !important;
+}
+
+/* Timeline area optimizations */
+.mobileCalendarContainer :global(.fc-timeline-area) {
+  touch-action: pinch-zoom !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.mobileCalendarContainer :global(.fc-timeline-body) {
+  touch-action: pinch-zoom !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.mobileCalendarContainer :global(.fc-timeline-header) {
+  touch-action: pinch-zoom !important;
+}
+
+.mobileCalendarContainer :global(.fc-timeline-slot) {
+  touch-action: pinch-zoom !important;
+}
+
+/* Event optimizations for mobile */
+.mobileCalendarContainer :global(.fc-event) {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+  min-height: 28px !important;
+  font-size: 12px !important;
+}
+
+/* Header toolbar optimizations */
+.mobileCalendarContainer :global(.fc-header-toolbar) {
+  padding: 8px !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+}
+
+.mobileCalendarContainer :global(.fc-button) {
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+.mobileCalendarContainer :global(.fc-toolbar-title) {
+  font-size: 16px !important;
+  font-weight: bold !important;
+}
+
+/* Slot optimizations */
+.mobileCalendarContainer :global(.fc-timeline-slot) {
+  min-width: 60px !important;
+}
+
+/* Ensure proper scrolling */
+.mobileCalendarContainer :global(.fc-scroller) {
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+}
+
+/* Desktop styles - override mobile styles */
+@media (min-width: 769px) {
+  .mobileCalendarContainer {
+    position: relative !important;
+    height: auto !important;
+    width: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    overflow: visible !important;
+  }
+  
+  .mobileCalendarContainer :global(.fc-resource-area) {
+    min-width: 100px !important;
+    width: 100px !important;
+  }
+  
+  .mobileCalendarContainer :global(.fc-resource-area .fc-resource-title) {
+    font-size: 14px !important;
+    padding: 8px 2px !important;
+  }
+  
+  .mobileCalendarContainer :global(.fc-event) {
+    min-height: 24px !important;
+    font-size: 14px !important;
+  }
+  
+  .mobileCalendarContainer :global(.fc-button) {
+    padding: 6px 12px !important;
+    font-size: 14px !important;
+    min-height: auto !important;
+  }
+} 

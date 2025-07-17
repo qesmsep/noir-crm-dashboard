@@ -8,9 +8,10 @@ import Image from 'next/image';
 
 interface AdminLayoutProps {
   children: ReactNode;
+  isFullScreen?: boolean;
 }
 
-export default function AdminLayout({ children }: AdminLayoutProps) {
+export default function AdminLayout({ children, isFullScreen = false }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, signOut } = useAuth();
@@ -36,20 +37,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className={styles.container}>
       {/* Mobile transparent header with logo and hamburger menu */}
-      <header className={styles.mobileHeader}>
-        <Link href="/" className={styles.mobileLogo} aria-label="Home">
-          <Image src="/images/noir-wedding-day.png" alt="Noir Logo" width={100} height={40} style={{ objectFit: 'contain' }} />
-        </Link>
-        <button
-          className={styles.menuButton}
-          aria-label="Open navigation menu"
-          onClick={() => setIsMenuOpen((open) => !open)}
-          type="button"
-        >
-          <span style={{ fontSize: 32, lineHeight: 1, fontWeight: 700 }}>☰</span>
-        </button>
-      </header>
-      <nav className={styles.sidebar}>
+      
+      {!isFullScreen && (
+        <nav className={styles.sidebar}>
         <div className={styles.logo}>
           <Link href="/">
             <Image src="/images/noir-wedding-day.png" alt="Noir Logo" width={120} height={60} style={{ objectFit: 'contain', marginBottom: '1rem' }} />
@@ -97,7 +87,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </div>
           )}
         </div>
-      </nav>
+        </nav>
+      )}
 
       <main className={styles.main} style={{ background: 'none', boxShadow: 'none', border: 'none' }}>
         <div className={styles.content}>{children}</div>

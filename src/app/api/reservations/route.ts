@@ -453,9 +453,13 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    let query = supabase
       .from('reservations')
       .select(`
         *,
@@ -464,8 +468,16 @@ export async function GET() {
           table_number,
           seats
         )
-      `)
-      .order('start_time', { ascending: true });
+      `);
+
+    // Add date filtering if provided
+    if (startDate && endDate) {
+      query = query
+        .gte('start_time', startDate)
+        .lte('start_time', endDate);
+    }
+
+    const { data, error } = await query.order('start_time', { ascending: true });
 
     if (error) {
       console.error('Error fetching reservations:', error);

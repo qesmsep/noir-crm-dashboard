@@ -27,20 +27,20 @@
 .container {
   display: flex;
   min-height: 100vh;
-  background-color: #353535;
+  background-color: #ECEDE8;
   font-family: 'Montserrat', sans-serif;
   font-weight: 400;
 }
 
 .sidebar {
   width: flex;
-  background-color: #aba8a1;
+  background-color: #a59480;
   color: white;
   padding: 2rem;
   display: flex;
   flex-direction: column;
   margin-top: 0rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   
 }
 
@@ -251,7 +251,7 @@
     left: 0;
     width: 100vw;
     height: 60px;
-    background: rgba(53, 53, 53, 0.6);
+    background: rgba(165, 148, 128, 0.9);
     z-index: 2100;
     align-items: center;
     justify-content: space-between;

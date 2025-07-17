@@ -1,72 +1,70 @@
 const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config({ path: '.env.local' });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function checkReservationsSchema() {
+async function checkSchema() {
+  console.log('🔍 Checking database schema...\n');
+
   try {
-    console.log('Checking reservations table schema...');
-    
-    // Try to get the table structure
-    const { data, error } = await supabase
-      .from('reservations')
+    // Check if accounts table exists
+    console.log('1. Checking accounts table...');
+    const { data: accountsData, error: accountsError } = await supabase
+      .from('accounts')
       .select('*')
       .limit(1);
     
-    if (error) {
-      console.error('Error querying reservations table:', error);
-      return;
-    }
-    
-    console.log('Successfully queried reservations table');
-    console.log('Sample reservation data:', data);
-    
-    // Try to insert a minimal reservation to see what fields are accepted
-    const testReservation = {
-      start_time: new Date().toISOString(),
-      end_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-      party_size: 2,
-      table_id: 'test-table-id',
-      phone: '+1234567890',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      event_type: 'test',
-      notes: 'Test reservation'
-    };
-    
-    console.log('Attempting to insert test reservation...');
-    const { data: insertData, error: insertError } = await supabase
-      .from('reservations')
-      .insert([testReservation])
-      .select();
-    
-    if (insertError) {
-      console.error('Error inserting test reservation:', insertError);
-      console.error('Error details:', {
-        code: insertError.code,
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint
-      });
+    if (accountsError) {
+      console.log('❌ Accounts table error:', accountsError.message);
     } else {
-      console.log('Successfully inserted test reservation:', insertData);
-      
-      // Clean up the test reservation
-      if (insertData && insertData[0]) {
-        await supabase
-          .from('reservations')
-          .delete()
-          .eq('id', insertData[0].id);
-        console.log('Cleaned up test reservation');
+      console.log('✅ Accounts table exists');
+      if (accountsData && accountsData.length > 0) {
+        console.log('   Sample data:', accountsData[0]);
       }
     }
+
+    // Check members table structure
+    console.log('\n2. Checking members table...');
+    const { data: membersData, error: membersError } = await supabase
+      .from('members')
+      .select('*')
+      .limit(1);
     
+    if (membersError) {
+      console.log('❌ Members table error:', membersError.message);
+    } else {
+      console.log('✅ Members table exists');
+      if (membersData && membersData.length > 0) {
+        console.log('   Sample data:', membersData[0]);
+      }
+    }
+
+    // Check ledger table
+    console.log('\n3. Checking ledger table...');
+    const { data: ledgerData, error: ledgerError } = await supabase
+      .from('ledger')
+      .select('*')
+      .limit(1);
+    
+    if (ledgerError) {
+      console.log('❌ Ledger table error:', ledgerError.message);
+    } else {
+      console.log('✅ Ledger table exists');
+      if (ledgerData && ledgerData.length > 0) {
+        console.log('   Sample data:', ledgerData[0]);
+      }
+    }
+
+    // List all tables
+    console.log('\n4. Listing all tables...');
+    // Skipping get_tables RPC for now
+
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('❌ Unexpected error:', error);
   }
 }
 
-checkReservationsSchema(); 
+checkSchema(); 

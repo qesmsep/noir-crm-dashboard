@@ -9,6 +9,7 @@ import { fromUTC, toUTC, formatDateTime, formatTime, formatDate, isSameDay } fro
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { DateTime } from 'luxon';
+import styles from '../styles/MobileCalendar.module.css';
 import {
   Box,
   Button,
@@ -55,6 +56,8 @@ interface FullCalendarTimelineProps {
   baseDays?: number[];
   viewOnly?: boolean;
   onReservationClick?: (reservationId: string) => void;
+  currentDate?: Date;
+  onDateChange?: (date: Date) => void;
 }
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_12345');
@@ -91,7 +94,7 @@ const isTouchDevice = () => {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 };
 
-const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick }) => {
+const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick, currentDate: propCurrentDate, onDateChange }) => {
   // Private Event Table expand/collapse state
   const [expandedId, setExpandedId] = useState<string | null>(null);
   function toggleExpand(id: string) {
@@ -148,7 +151,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           .sort((a, b) => Number(a.table_number) - Number(b.table_number))
           .map(t => ({
             id: t.id,
-            title: `Table ${t.table_number}`,
+            title: `${t.table_number}`,
           }));
         
         setResources(tableResources);
@@ -184,6 +187,17 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
     fetchPrivateEvents();
   }, [reloadKey, localReloadKey]);
+
+  // Update calendar date when prop changes
+  useEffect(() => {
+    if (propCurrentDate) {
+      setCurrentCalendarDate(propCurrentDate);
+      if (calendarRef.current) {
+        const calendarApi = calendarRef.current.getApi();
+        calendarApi.gotoDate(propCurrentDate);
+      }
+    }
+  }, [propCurrentDate]);
 
   useEffect(() => {
     console.log('FullCalendarTimeline: reloadKey changed to', reloadKey);
@@ -654,14 +668,21 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   return (
     <Box
+      className={isMobile ? styles.mobileCalendarContainer : ''}
       style={{
-        // Mobile-specific container styles
+        // Mobile-specific container styles with pinch zoom support
         touchAction: 'manipulation',
         WebkitOverflowScrolling: 'touch',
         overscrollBehavior: 'contain',
+        // Enable pinch zoom
+        ...(isMobile && {
+          touchAction: 'pinch-zoom',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }),
       }}
     >
-      <Box mb={4} display="flex" justifyContent="flex-end">
+      <Box mb={4} display={{ base: "none", md: "flex" }} justifyContent="flex-end">
         <Button
           onClick={() => {
             setSelectedDate(currentCalendarDate);
@@ -674,6 +695,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           fontFamily="Montserrat, sans-serif"
           fontWeight="semibold"
           size="md"
+          
           borderRadius="md"
         >
           View {currentCalendarDate.toDateString() === new Date().toDateString() ? "Today's" : "Date's"} Reservations
@@ -682,23 +704,31 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
       <Box
         style={{
-          // FullCalendar container optimizations
-          touchAction: 'manipulation',
+          // FullCalendar container optimizations with pinch zoom
+          touchAction: isMobile ? 'pinch-zoom' : 'manipulation',
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
           width: '100%',
+          height: isMobile ? 'calc(100vh - 60px)' : 'auto',
           // Mobile-specific adjustments
           ...(isMobile && {
             fontSize: '14px',
             lineHeight: '1.4',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
           }),
         }}
         sx={{
-          // FullCalendar mobile optimizations
+          // FullCalendar mobile optimizations with pinch zoom
           '.fc': {
-            touchAction: 'manipulation',
+            touchAction: isMobile ? 'pinch-zoom' : 'manipulation',
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
+            ...(isMobile && {
+              height: '100%',
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+            }),
           },
           '.fc-resource-area': {
             backgroundColor: '#ecede8',
@@ -706,9 +736,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             verticalAlign: 'middle',
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
-            minWidth: '100px',
-            width: '100px',
+            minWidth: isMobile ? '60px' : '100px',
+            width: isMobile ? '60px' : '100px',
             flexShrink: 0,
+            
           },
           '.fc-resource-area .fc-resource-title': {
             color: 'white',
@@ -752,6 +783,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
          
             margin: '0px',
             minwidth: '10px',
+           
           },
           '.fc-resource-timeline-divider': {
             borderRight: '1px solidrgb(136, 136, 136)',
@@ -765,6 +797,30 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           '.fc-resource-area-header': {
             backgroundColor: '#ecede8',
             borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+            textAlign: 'center',
+            fontWeight: 'bold',
+            color: '#353535'
+          },
+          '.fc-resource-area-header-cell': {
+            textAlign: 'center',
+            verticalAlign: 'middle'
+          },
+          '.fc-resource-area-header-content': {
+            textAlign: 'center',
+            fontWeight: 'bold'
+          },
+          '.fc-resource-area-header-title': {
+            textAlign: 'center',
+            fontWeight: 'bold'
+          },
+          '.fc-resource-area-header-cell-inner': {
+            textAlign: 'center',
+            fontWeight: 'bold'
+            
+          },
+          '.fc-resource-area-header-cell-text': {
+            textAlign: 'center',
+            fontWeight: 'bold'
           },
           '.fc-header-toolbar .fc-prev-button': {
             marginRight: '0.5rem',
@@ -805,6 +861,17 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
               fontSize: '14px',
             }),
           },
+          '.fc-toolbar-chunk:last-child': {
+            paddingRight: '10px',
+          },
+          '.fc-timeline-slot-label': {
+            fontSize: '11px',
+            fontWeight: 'bold',
+          },
+          '.fc-timeline-slot-label.fc-timeline-slot-label-major': {
+            fontSize: '12px',
+            fontWeight: 'bold',
+          },
           // Touch-specific styles
           ...(isTouchDeviceState && {
             '.fc-event': {
@@ -824,9 +891,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           ref={calendarRef}
           plugins={[resourceTimelinePlugin, interactionPlugin]}
           initialView="resourceTimelineDay"
-          initialDate={new Date()}
+          initialDate={propCurrentDate || new Date()}
           timeZone={settings.timezone}
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
+          
           headerToolbar={{
             left: 'prev,next',
             center: 'title',
@@ -843,7 +911,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           eventClick={handleEventClick}
           dateClick={handleDayClick}
           select={handleSlotClick}
-          height="auto"
+          height={isMobile ? 'calc(100vh - 120px)' : 'auto'}
+          
           
           // Touch and mobile optimizations
           longPressDelay={isTouchDeviceState ? 300 : 1000}
@@ -861,12 +930,15 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           
           slotMinTime={slotMinTime}
           slotMaxTime={slotMaxTime}
-          slotDuration="00:30:00"
-          slotLabelInterval="00:30:00"
-          slotLabelFormat={[{ hour: 'numeric', minute: '2-digit', hour12: true }]}
+          slotDuration="00:15:00"
+          slotLabelInterval="01:00:00"
+          slotLabelFormat={[
+            { hour: 'numeric', hour12: true },
+          ]}
           nowIndicator
-          resourceAreaWidth="80px"
-          resourceAreaHeaderContent={' '}
+          resourceAreaWidth={isMobile ? "60px" : "80px"}
+          resourceAreaHeaderContent=""
+          
          // Adjust the details of the reservations on the calendar
           eventContent={(arg) => (
             <div
@@ -912,7 +984,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         />
       </Box>
       
-      <Box width="60%" ml={100} p={0} borderWidth="1px" borderRadius="lg">
+      {/* Event Type Legend */}
+      <Box display={{ base: "none", md: "block" }} width="60%" ml={100} p={0} borderWidth="1px" borderRadius="lg">
         <Grid templateColumns="repeat(7, 1fr)" gap={0}>
           {Object.entries(eventTypeEmojis).map(([key, emoji]) => (
             <GridItem key={key}>
@@ -925,8 +998,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         </Grid>
       </Box>
 
-      {/* Private Events Section */}
+      {/* Private Events Section - Hidden on mobile */}
       <Box
+        display={{ base: "none", md: "block" }}
         bg="white"
         p={6}
         borderRadius="2xl"
