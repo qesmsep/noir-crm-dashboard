@@ -201,17 +201,12 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
 
     setIsSaving(true);
     try {
-      // Format send_time based on reminder type with proper timezone handling
+      // Format send_time based on reminder type
       let sendTime: string;
       if (formData.reminder_type === 'day_of') {
-        // For day_of reminders, we need to include timezone offset to prevent UTC conversion
-        const businessTimezone = settings?.timezone || 'America/Chicago';
-        const dt = DateTime.fromObject(
-          { hour: formData.send_time_hours, minute: formData.send_time_minutes },
-          { zone: businessTimezone }
-        );
-        // Format as HH:mmZZ (e.g. "10:05-05:00")
-        sendTime = dt.toFormat('HH:mmZZ');
+        // For day_of reminders, store as simple HH:MM format
+        // The scheduling system will handle timezone conversion when actually scheduling
+        sendTime = `${formData.send_time_hours.toString().padStart(2, '0')}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
       } else {
         // For hour_before reminders, keep the simple format
         if (formData.send_time_minutes > 0) {
