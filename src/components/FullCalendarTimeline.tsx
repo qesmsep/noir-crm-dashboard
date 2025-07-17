@@ -537,18 +537,48 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const handleSlotClick = (info: any) => {
-    if (viewOnly) return;
+    console.log('🎯 Slot clicked!', info);
+    console.log('viewOnly:', viewOnly);
+    
+    if (viewOnly) {
+      console.log('❌ Slot click blocked - viewOnly is true');
+      return;
+    }
     
     // Extract date and resource information
-    const clickedDate = info.date;
+    // For resource timeline, the date might be in different properties
+    let clickedDate = info.date;
     const resourceId = info.resource?.id;
     
+    // If date is not directly available, try alternative properties
+    if (!clickedDate) {
+      clickedDate = info.start || info.startStr ? new Date(info.start || info.startStr) : null;
+    }
+    
+    // If still no date, use the current calendar date
+    if (!clickedDate) {
+      clickedDate = currentCalendarDate;
+    }
+    
+    console.log('📅 Clicked date:', clickedDate);
+    console.log('🪑 Resource ID:', resourceId);
+    console.log('📊 Full info object:', JSON.stringify(info, null, 2));
+    
     if (clickedDate && resourceId) {
+      console.log('✅ Opening new reservation drawer...');
       setSelectedSlot({
         date: clickedDate,
         resourceId: resourceId
       });
       setIsNewReservationDrawerOpen(true);
+      
+      // Clear the FullCalendar selection to remove the blue box
+      if (calendarRef.current) {
+        const calendarApi = calendarRef.current.getApi();
+        calendarApi.unselect();
+      }
+    } else {
+      console.log('❌ Missing date or resource ID');
     }
   };
 

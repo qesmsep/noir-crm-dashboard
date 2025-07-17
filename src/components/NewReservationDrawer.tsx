@@ -23,6 +23,7 @@ import {
   GridItem,
   Alert,
   AlertIcon,
+  Checkbox,
 } from '@chakra-ui/react';
 import { CloseIcon } from '@chakra-ui/icons';
 import { localInputToUTC } from '../utils/dateUtils';
@@ -69,6 +70,10 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
     table_id: initialTableId || '',
     start_time: '',
     end_time: '',
+    is_checked_in: false,
+    send_access_instructions: false,
+    send_reminder: false,
+    send_confirmation: false,
   });
   const [tables, setTables] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -80,20 +85,63 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchTables();
-      // Set initial times based on the clicked slot
-      if (initialDate) {
-        const startTime = new Date(initialDate);
-        const endTime = new Date(initialDate.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
-        
-        setFormData(prev => ({
-          ...prev,
-          table_id: initialTableId || '',
-          start_time: startTime.toISOString().slice(0, 16), // Format for datetime-local input
-          end_time: endTime.toISOString().slice(0, 16),
-        }));
-      }
+      // Clear form data and set initial values based on the clicked slot
+      const startTime = initialDate ? new Date(initialDate) : new Date();
+      const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
+      
+      setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        party_size: 2,
+        event_type: '',
+        notes: '',
+        table_id: initialTableId || '',
+        start_time: startTime.toISOString().slice(0, 16), // Format for datetime-local input
+        end_time: endTime.toISOString().slice(0, 16),
+        is_checked_in: false,
+        send_access_instructions: false,
+        send_reminder: false,
+        send_confirmation: false,
+      });
+      
+
     }
-  }, [isOpen, initialDate, initialTableId]);
+  }, [isOpen, initialDate]); // Remove initialTableId from dependencies to prevent multiple resets
+
+    // Ensure table ID is set when drawer opens
+  useEffect(() => {
+    if (isOpen && initialTableId) {
+      setFormData(prev => ({
+        ...prev,
+        table_id: initialTableId
+      }));
+
+    }
+  }, [isOpen, initialTableId]);
+
+  // Reset form when drawer closes
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        party_size: 2,
+        event_type: '',
+        notes: '',
+        table_id: '',
+        start_time: '',
+        end_time: '',
+        is_checked_in: false,
+        send_access_instructions: false,
+        send_reminder: false,
+        send_confirmation: false,
+      });
+    }
+  }, [isOpen]);
 
   const fetchTables = async () => {
     try {
@@ -147,6 +195,10 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
       // Handle empty table_id (convert empty string to null)
       const tableId = formData.table_id === '' ? null : formData.table_id;
       
+
+      
+
+      
       const reservationData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
@@ -158,7 +210,13 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
         table_id: tableId,
         start_time: startTimeUTC,
         end_time: endTimeUTC,
+        is_checked_in: formData.is_checked_in,
+        send_access_instructions: formData.send_access_instructions,
+        send_reminder: formData.send_reminder,
+        send_confirmation: formData.send_confirmation,
       };
+
+
 
       const response = await fetch('/api/reservations', {
         method: 'POST',
@@ -172,7 +230,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
       }
 
       const result = await response.json();
-      console.log('Reservation created:', result);
+
       
       toast({
         title: 'Success',
@@ -198,7 +256,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
   };
 
   const handleClose = () => {
-    // Reset form data
+    // Reset form data completely
     setFormData({
       first_name: '',
       last_name: '',
@@ -207,13 +265,19 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
       party_size: 2,
       event_type: '',
       notes: '',
-      table_id: initialTableId || '',
+      table_id: '',
       start_time: '',
       end_time: '',
+      is_checked_in: false,
+      send_access_instructions: false,
+      send_reminder: false,
+      send_confirmation: false,
     });
     onClose();
   };
 
+
+  
   return (
     <Drawer 
       isOpen={isOpen} 
@@ -397,6 +461,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
                       <option key={table.id} value={table.id}>Table {table.table_number}</option>
                     ))}
                   </Select>
+
                 </FormControl>
               </VStack>
 
@@ -413,6 +478,55 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
                     placeholder="Special requests, dietary restrictions, etc."
                   />
                 </FormControl>
+              </VStack>
+
+              <VStack spacing={1} as="section" align="stretch">
+                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
+                <VStack spacing={2} align="stretch">
+                  <FormControl>
+                    <Checkbox 
+                      fontFamily="Montserrat, sans-serif"
+                      isChecked={formData.is_checked_in}
+                      onChange={(e) => handleInputChange('is_checked_in', e.target.checked)}
+                      size="sm"
+                    >
+                      Check in reservation
+                    </Checkbox>
+                  </FormControl>
+                  
+                  <FormControl>
+                    <Checkbox 
+                      fontFamily="Montserrat, sans-serif"
+                      isChecked={formData.send_confirmation}
+                      onChange={(e) => handleInputChange('send_confirmation', e.target.checked)}
+                      size="sm"
+                    >
+                      Send reservation confirmation text
+                    </Checkbox>
+                  </FormControl>
+                  
+                  <FormControl>
+                    <Checkbox 
+                      fontFamily="Montserrat, sans-serif"
+                      isChecked={formData.send_access_instructions}
+                      onChange={(e) => handleInputChange('send_access_instructions', e.target.checked)}
+                      size="sm"
+                    >
+                      Send access instructions
+                    </Checkbox>
+                  </FormControl>
+                  
+                  <FormControl>
+                    <Checkbox 
+                      fontFamily="Montserrat, sans-serif"
+                      isChecked={formData.send_reminder}
+                      onChange={(e) => handleInputChange('send_reminder', e.target.checked)}
+                      size="sm"
+                    >
+                      Send 1-hour reminder
+                    </Checkbox>
+                  </FormControl>
+                </VStack>
               </VStack>
             </VStack>
           </DrawerBody>

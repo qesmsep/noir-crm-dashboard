@@ -164,7 +164,12 @@ export async function POST(request: Request) {
       last_name,
       payment_method_id,
       member_id,
-      is_member
+      is_member,
+      table_id,
+      is_checked_in,
+      send_access_instructions,
+      send_reminder,
+      send_confirmation
     } = body;
 
     // Validate required fields
@@ -229,90 +234,152 @@ export async function POST(request: Request) {
       }
     }
 
-    // Assign a table automatically
-    // 1. Get all tables that fit the party size
-    const { data: tables, error: tablesError } = await supabase
-      .from('tables')
-      .select('*')
-      .gte('seats', party_size);
-
-    if (tablesError) {
-      console.error('Supabase tablesError:', tablesError.message);
-      return NextResponse.json({ error: 'Error fetching tables: ' + tablesError.message }, { status: 500 });
-    }
-
-    if (!tables || tables.length === 0) {
-      return NextResponse.json({ error: 'No available table for this party size' }, { status: 400 });
-    }
-    // 2. Get all reservations for that date
-    const startOfDay = new Date(start_time);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(start_time);
-    endOfDay.setHours(23, 59, 59, 999);
-    const { data: reservations, error: resError } = await supabase
-      .from('reservations')
-      .select('table_id, start_time, end_time')
-      .gte('start_time', startOfDay.toISOString())
-      .lte('end_time', endOfDay.toISOString());
-    if (resError) {
-      return NextResponse.json({ error: 'Error fetching reservations' }, { status: 500 });
-    }
-    // 3. Find the smallest available table
-    const slotStart = new Date(start_time);
-    const slotEnd = new Date(end_time);
-    const availableTable = tables
-      .sort((a, b) => a.seats - b.seats)
-      .find(table => {
-        const tableReservations = reservations.filter(r => r.table_id === table.id);
-        // Check for overlap
-        return !tableReservations.some(r => {
-          const resStart = new Date(r.start_time);
-          const resEnd = new Date(r.end_time);
-          return (
-            (slotStart < resEnd) && (slotEnd > resStart)
-          );
-        });
-      });
+    // Handle table assignment
+    let selectedTableId: string;
     
-    if (!availableTable) {
-      // No table available at requested time - find alternative times
-      console.log('No table available, attempting to find alternative times...');
-      try {
-        // Convert time to 12-hour format using UTC to avoid timezone issues
-        const startDate = new Date(start_time);
-        const dateString = startDate.toISOString().split('T')[0];
-        
-        // Use UTC methods to avoid timezone conversion issues
-        const hours = startDate.getUTCHours();
-        const minutes = startDate.getUTCMinutes();
-        const ampm = hours >= 12 ? 'pm' : 'am';
-        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
-        const timeString = `${displayHours}:${minutes.toString().padStart(2, '0')}${ampm}`;
-        
-        console.log('Calling alternative times function with:', { dateString, party_size, requested_time: timeString });
-        console.log('Original start_time:', start_time);
-        console.log('Parsed hours (UTC):', hours, 'minutes:', minutes, 'ampm:', ampm);
-        console.log('Converted time string:', timeString);
-        
-        // Call the alternative times function directly
-        const altData = await findAlternativeTimes(dateString, party_size, timeString);
-        
-        console.log('Alternative times result:', altData);
-        
-        if (altData) {
-          return NextResponse.json({
-            error: 'No available table for this time and party size',
-            alternative_times: altData.alternative_times,
-            message: altData.message,
-            requested_time: altData.requested_time
-          }, { status: 409 }); // 409 Conflict - indicates alternative times are available
-        }
-      } catch (altError) {
-        console.error('Error finding alternative times:', altError);
+    if (table_id) {
+      // Use the provided table_id if it exists
+      console.log('Using provided table_id:', table_id);
+      
+      // Verify the table exists and can accommodate the party size
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('*')
+        .eq('id', table_id)
+        .single();
+      
+      if (tableError || !table) {
+        return NextResponse.json({ error: 'Invalid table ID' }, { status: 400 });
       }
       
-      // Fallback to original error if alternative times lookup fails
-      return NextResponse.json({ error: 'No available table for this time and party size' }, { status: 400 });
+      if (table.seats < party_size) {
+        return NextResponse.json({ error: 'Selected table cannot accommodate this party size' }, { status: 400 });
+      }
+      
+      // Check if the table is available at the requested time
+      const startOfDay = new Date(start_time);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(start_time);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      const { data: reservations, error: resError } = await supabase
+        .from('reservations')
+        .select('table_id, start_time, end_time')
+        .eq('table_id', table_id)
+        .gte('start_time', startOfDay.toISOString())
+        .lte('end_time', endOfDay.toISOString());
+        
+      if (resError) {
+        return NextResponse.json({ error: 'Error checking table availability' }, { status: 500 });
+      }
+      
+      const slotStart = new Date(start_time);
+      const slotEnd = new Date(end_time);
+      
+      // Check for overlap
+      const hasConflict = reservations.some(r => {
+        const resStart = new Date(r.start_time);
+        const resEnd = new Date(r.end_time);
+        return (slotStart < resEnd) && (slotEnd > resStart);
+      });
+      
+      if (hasConflict) {
+        return NextResponse.json({ error: 'Selected table is not available at this time' }, { status: 400 });
+      }
+      
+      selectedTableId = table_id;
+    } else {
+      // Auto-assign a table if no table_id provided
+      console.log('No table_id provided, auto-assigning table...');
+      
+      // 1. Get all tables that fit the party size
+      const { data: tables, error: tablesError } = await supabase
+        .from('tables')
+        .select('*')
+        .gte('seats', party_size);
+
+      if (tablesError) {
+        console.error('Supabase tablesError:', tablesError.message);
+        return NextResponse.json({ error: 'Error fetching tables: ' + tablesError.message }, { status: 500 });
+      }
+
+      if (!tables || tables.length === 0) {
+        return NextResponse.json({ error: 'No available table for this party size' }, { status: 400 });
+      }
+      
+      // 2. Get all reservations for that date
+      const startOfDay = new Date(start_time);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(start_time);
+      endOfDay.setHours(23, 59, 59, 999);
+      const { data: reservations, error: resError } = await supabase
+        .from('reservations')
+        .select('table_id, start_time, end_time')
+        .gte('start_time', startOfDay.toISOString())
+        .lte('end_time', endOfDay.toISOString());
+      if (resError) {
+        return NextResponse.json({ error: 'Error fetching reservations' }, { status: 500 });
+      }
+      
+      // 3. Find the smallest available table
+      const slotStart = new Date(start_time);
+      const slotEnd = new Date(end_time);
+      const availableTable = tables
+        .sort((a, b) => a.seats - b.seats)
+        .find(table => {
+          const tableReservations = reservations.filter(r => r.table_id === table.id);
+          // Check for overlap
+          return !tableReservations.some(r => {
+            const resStart = new Date(r.start_time);
+            const resEnd = new Date(r.end_time);
+            return (
+              (slotStart < resEnd) && (slotEnd > resStart)
+            );
+          });
+        });
+      
+      if (!availableTable) {
+        // No table available at requested time - find alternative times
+        console.log('No table available, attempting to find alternative times...');
+        try {
+          // Convert time to 12-hour format using UTC to avoid timezone issues
+          const startDate = new Date(start_time);
+          const dateString = startDate.toISOString().split('T')[0];
+          
+          // Use UTC methods to avoid timezone conversion issues
+          const hours = startDate.getUTCHours();
+          const minutes = startDate.getUTCMinutes();
+          const ampm = hours >= 12 ? 'pm' : 'am';
+          const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+          const timeString = `${displayHours}:${minutes.toString().padStart(2, '0')}${ampm}`;
+          
+          console.log('Calling alternative times function with:', { dateString, party_size, requested_time: timeString });
+          console.log('Original start_time:', start_time);
+          console.log('Parsed hours (UTC):', hours, 'minutes:', minutes, 'ampm:', ampm);
+          console.log('Converted time string:', timeString);
+          
+          // Call the alternative times function directly
+          const altData = await findAlternativeTimes(dateString, party_size, timeString);
+          
+          console.log('Alternative times result:', altData);
+          
+          if (altData) {
+            return NextResponse.json({
+              error: 'No available table for this time and party size',
+              alternative_times: altData.alternative_times,
+              message: altData.message,
+              requested_time: altData.requested_time
+            }, { status: 409 }); // 409 Conflict - indicates alternative times are available
+          }
+        } catch (altError) {
+          console.error('Error finding alternative times:', altError);
+        }
+        
+        // Fallback to original error if alternative times lookup fails
+        return NextResponse.json({ error: 'No available table for this time and party size' }, { status: 400 });
+      }
+      
+      selectedTableId = availableTable.id;
     }
     
     // For non-members, create Stripe hold before creating reservation
@@ -368,11 +435,12 @@ export async function POST(request: Request) {
       last_name: body.last_name,
       membership_type: body.is_member ? 'member' : 'non-member',
       payment_method_id,
-      table_id: availableTable.id,
+      table_id: selectedTableId,
       payment_intent_id: paymentIntentId,
       hold_amount: holdAmount,
       hold_status: paymentIntentId ? 'confirmed' : null,
-      hold_created_at: paymentIntentId ? new Date().toISOString() : null
+      hold_created_at: paymentIntentId ? new Date().toISOString() : null,
+      checked_in: is_checked_in || false
     };
 
     const { data: reservation, error } = await supabase
@@ -411,6 +479,30 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error('Error sending admin notification:', error);
       // Don't fail the reservation creation if admin notification fails
+    }
+
+    // Handle additional options
+    try {
+      // Send reservation confirmation text if requested
+      if (send_confirmation) {
+        console.log('Sending reservation confirmation text for reservation:', reservation.id);
+        await sendReservationConfirmationText(reservation);
+      }
+
+      // Send access instructions if requested
+      if (send_access_instructions) {
+        console.log('Sending access instructions for reservation:', reservation.id);
+        await sendAccessInstructions(reservation);
+      }
+
+      // Create reminder if requested
+      if (send_reminder) {
+        console.log('Creating reminder for reservation:', reservation.id);
+        await createReservationReminder(reservation);
+      }
+    } catch (error) {
+      console.error('Error handling additional options:', error);
+      // Don't fail the reservation creation if these fail
     }
 
     // Schedule reservation reminders
@@ -720,6 +812,173 @@ async function sendSMSConfirmation(reservation: any) {
     return true;
   } catch (error) {
     console.error('Error sending SMS confirmation:', error);
+    return false;
+  }
+}
+
+// Function to send access instructions
+async function sendAccessInstructions(reservation: any) {
+  try {
+    // Check if OpenPhone credentials are configured
+    if (!process.env.OPENPHONE_API_KEY || !process.env.OPENPHONE_PHONE_NUMBER_ID) {
+      console.error('OpenPhone credentials not configured');
+      return false;
+    }
+
+    // Get access instructions template from settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('settings')
+      .select('access_instructions_template')
+      .single();
+
+    if (settingsError || !settings?.access_instructions_template) {
+      console.error('Access instructions template not configured');
+      return false;
+    }
+
+    // Format phone number
+    let formattedPhone = reservation.phone;
+    if (!formattedPhone.startsWith('+')) {
+      const digits = formattedPhone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        formattedPhone = '+1' + digits;
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        formattedPhone = '+' + digits;
+      } else {
+        formattedPhone = '+' + digits;
+      }
+    }
+
+    // Send access instructions via SMS
+    const response = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: [formattedPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: settings.access_instructions_template
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Failed to send access instructions');
+      return false;
+    }
+
+    console.log('Access instructions sent successfully to:', formattedPhone);
+    return true;
+  } catch (error) {
+    console.error('Error sending access instructions:', error);
+    return false;
+  }
+}
+
+// Function to send reservation confirmation text
+async function sendReservationConfirmationText(reservation: any) {
+  try {
+    // Check if OpenPhone credentials are configured
+    if (!process.env.OPENPHONE_API_KEY || !process.env.OPENPHONE_PHONE_NUMBER_ID) {
+      console.error('OpenPhone credentials not configured');
+      return false;
+    }
+
+    // Format the date and time using Luxon with timezone awareness
+    const startDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone('America/Chicago');
+    const formattedDate = startDate.toLocaleString({
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const timeString = startDate.toLocaleString({
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    // Create the confirmation message
+    const customerName = reservation.first_name || 'Guest';
+    const occasion = reservation.event_type || 'dining';
+    
+    const messageContent = `Thank you, ${customerName}. Your reservation has been confirmed for Noir on ${formattedDate} at ${timeString} for ${reservation.party_size} guests. ${occasion !== 'dining' ? `Occasion: ${occasion}. ` : ''}Please respond directly to this text message if you need to make any changes or if you have any questions.`;
+
+    // Format phone number
+    let formattedPhone = reservation.phone;
+    if (!formattedPhone.startsWith('+')) {
+      const digits = formattedPhone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        formattedPhone = '+1' + digits;
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        formattedPhone = '+' + digits;
+      } else {
+        formattedPhone = '+' + digits;
+      }
+    }
+
+    console.log('Sending reservation confirmation text to:', formattedPhone);
+
+    // Send SMS using OpenPhone API
+    const response = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: [formattedPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: messageContent
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Failed to send reservation confirmation text');
+      return false;
+    }
+
+    console.log('Reservation confirmation text sent successfully to:', formattedPhone);
+    return true;
+  } catch (error) {
+    console.error('Error sending reservation confirmation text:', error);
+    return false;
+  }
+}
+
+// Function to create reservation reminder
+async function createReservationReminder(reservation: any) {
+  try {
+    // Calculate reminder time (1 hour before reservation)
+    const reservationTime = new Date(reservation.start_time);
+    const reminderTime = new Date(reservationTime.getTime() - 60 * 60 * 1000); // 1 hour before
+
+    // Create reminder record
+    const { data: reminder, error } = await supabase
+      .from('reservation_reminders')
+      .insert([{
+        reservation_id: reservation.id,
+        reminder_type: '1_hour_before',
+        scheduled_time: reminderTime.toISOString(),
+        status: 'pending',
+        phone: reservation.phone,
+        message: `Reminder: Your reservation at Noir is in 1 hour. We look forward to seeing you!`
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating reminder:', error);
+      return false;
+    }
+
+    console.log('Reminder created successfully:', reminder.id);
+    return true;
+  } catch (error) {
+    console.error('Error creating reservation reminder:', error);
     return false;
   }
 } 
