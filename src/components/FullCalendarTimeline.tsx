@@ -903,7 +903,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
           eventClick={handleEventClick}
-          dateClick={handleDayClick}
           select={handleSlotClick}
           height={isMobile ? 'calc(100vh - 120px)' : 'auto'}
           
