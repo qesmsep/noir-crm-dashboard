@@ -936,9 +936,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           
                    // Adjust the details of the reservations on the calendar
           eventContent={(arg) => {
-            // Determine background color based on check-in status
+            // Determine colors based on check-in status
             const isCheckedIn = arg.event.extendedProps.checked_in;
-            const backgroundColor = isCheckedIn ? '#353535' : '#a59480';
+            const backgroundColor = isCheckedIn ? '#a59480' : '#353535';
+            const textColor = isCheckedIn ? '#353535' : '#ecede8';
             
             return (
               <div
@@ -952,7 +953,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
                   height: isMobile ? '28px' : '24px',
                   fontSize: isMobile ? '12px' : '14px',
                   background: backgroundColor,
-                  color: 'white',
+                  color: textColor,
                   borderRadius: '4px',
                   padding: isMobile ? '0 4px' : '0 2px',
                   border: '1px solid #353535',
