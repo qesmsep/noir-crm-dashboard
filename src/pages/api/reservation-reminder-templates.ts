@@ -18,6 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'POST') {
     try {
+      console.log('POST request body:', req.body);
       const { name, description, message_template, reminder_type, send_time, is_active } = req.body;
 
       // Validate send_time format based on reminder type
@@ -63,6 +64,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'PUT') {
     try {
+      console.log('PUT request query:', req.query);
+      console.log('PUT request body:', req.body);
       const { id } = req.query;
       const { name, description, message_template, reminder_type, send_time, is_active } = req.body;
 

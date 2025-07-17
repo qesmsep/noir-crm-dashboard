@@ -234,6 +234,10 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
       const url = isCreateMode ? '/api/reservation-reminder-templates' : `/api/reservation-reminder-templates?id=${templateId}`;
       const method = isCreateMode ? 'POST' : 'PUT';
 
+      console.log('Saving template with payload:', payload);
+      console.log('URL:', url);
+      console.log('Method:', method);
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -242,8 +246,12 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
         body: JSON.stringify(payload),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Error response:', errorData);
         throw new Error(errorData.error || 'Failed to save template');
       }
 
