@@ -256,6 +256,9 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
                               >
                                 Party of {reservation.party_size}
                               </Text>
+                              <Badge size="sm" colorScheme="blue" fontFamily="Montserrat, sans-serif">
+                                {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
+                              </Badge>
                               <Text 
                                 fontSize="sm" 
                                 color="#666"

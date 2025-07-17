@@ -123,16 +123,20 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
             hours = foundTemplate.send_time;
             minutes = 0;
           } else if (typeof foundTemplate.send_time === 'string') {
-            // New format: "HH:MM" or "HH:MMZZ" (with timezone offset)
+            // New format: "HH:MM" (stored in UTC)
             const timeParts = foundTemplate.send_time.split(':');
-            hours = parseInt(timeParts[0]);
-            // Handle timezone offset in minutes part (e.g., "05-05:00" -> "05")
-            const minutesPart = timeParts[1];
-            if (minutesPart && minutesPart.includes('-')) {
-              minutes = parseInt(minutesPart.split('-')[0]);
-            } else {
-              minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
-            }
+            const utcHours = parseInt(timeParts[0]);
+            const utcMinutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+            
+            // Convert UTC time to business timezone for display
+            const today = DateTime.now().setZone('utc').startOf('day');
+            const utcTime = today.set({ hour: utcHours, minute: utcMinutes, second: 0, millisecond: 0 });
+            const businessTimezone = settings?.timezone || 'America/Chicago';
+            const localTime = utcTime.setZone(businessTimezone);
+            
+            // Convert to 12-hour format for the input fields
+            hours = localTime.hour === 0 ? 12 : localTime.hour > 12 ? localTime.hour - 12 : localTime.hour;
+            minutes = localTime.minute;
           }
           
           // Add minutes from send_time_minutes if available
@@ -329,11 +333,19 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
       if (!str) str = '0 Minutes';
       return str + ' Before';
     } else {
-      const hour12 = formData.send_time_hours === 0 ? 12 : 
-                    formData.send_time_hours > 12 ? formData.send_time_hours - 12 : 
-                    formData.send_time_hours;
-      const ampm = formData.send_time_hours < 12 ? 'AM' : 'PM';
-      return `${hour12.toString().padStart(2, '0')}:${formData.send_time_minutes.toString().padStart(2, '0')} ${ampm}`;
+      // For day_of reminders, convert UTC time to business timezone
+      // Create a DateTime object for today at the specified UTC time
+      const today = DateTime.now().setZone('utc').startOf('day');
+      const utcTime = today.set({ hour: formData.send_time_hours, minute: formData.send_time_minutes, second: 0, millisecond: 0 });
+      
+      // Convert to business timezone
+      const businessTimezone = settings?.timezone || 'America/Chicago';
+      const localTime = utcTime.setZone(businessTimezone);
+      
+      // Format for display
+      const hour12 = localTime.hour === 0 ? 12 : localTime.hour > 12 ? localTime.hour - 12 : localTime.hour;
+      const ampm = localTime.hour < 12 ? 'AM' : 'PM';
+      return `${hour12.toString().padStart(2, '0')}:${localTime.minute.toString().padStart(2, '0')} ${ampm}`;
     }
   };
 
@@ -446,39 +458,62 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                         <NumberInput
                           value={formData.send_time_hours}
                           onChange={(_, value) => handleInputChange('send_time_hours', value)}
-                          min={0}
-                          max={23}
+                          min={1}
+                          max={12}
                           size="sm"
+                          w="60px"
                           bg="#ecede8"
                           borderColor="#23201C"
                           _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                         >
-                          <NumberInputField />
+                          <NumberInputField textAlign="center" />
                           <NumberInputStepper>
                             <NumberIncrementStepper />
                             <NumberDecrementStepper />
                           </NumberInputStepper>
                         </NumberInput>
-                        <Text color="#353535">:</Text>
+                        <Text color="#353535" fontSize="sm">:</Text>
                         <NumberInput
-                          value={formData.send_time_minutes}
+                          value={formData.send_time_minutes.toString().padStart(2, '0')}
                           onChange={(_, value) => handleInputChange('send_time_minutes', value)}
                           min={0}
                           max={59}
                           size="sm"
+                          w="60px"
                           bg="#ecede8"
                           borderColor="#23201C"
                           _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                         >
-                          <NumberInputField />
+                          <NumberInputField textAlign="center" />
                           <NumberInputStepper>
                             <NumberIncrementStepper />
                             <NumberDecrementStepper />
                           </NumberInputStepper>
                         </NumberInput>
-                        <Text color="#353535" fontSize="sm">
-                          {formatSendTimeDisplay()}
-                        </Text>
+                        <Select
+                          value={formData.send_time_hours < 12 ? 'AM' : 'PM'}
+                          onChange={(e) => {
+                            const isPM = e.target.value === 'PM';
+                            const currentHour = formData.send_time_hours;
+                            let newHour = currentHour;
+                            
+                            if (isPM && currentHour <= 12) {
+                              newHour = currentHour === 12 ? 12 : currentHour + 12;
+                            } else if (!isPM && currentHour > 12) {
+                              newHour = currentHour === 12 ? 12 : currentHour - 12;
+                            }
+                            
+                            handleInputChange('send_time_hours', newHour);
+                          }}
+                          size="sm"
+                          w="70px"
+                          bg="#ecede8"
+                          borderColor="#23201C"
+                          _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </Select>
                       </>
                     ) : (
                       <>
@@ -531,7 +566,8 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                     onChange={(e) => handleInputChange('message_template', e.target.value)}
                     placeholder="Enter message template. Use {{first_name}}, {{reservation_time}}, and {{party_size}} as placeholders. You can add line breaks for better formatting."
                     size="sm"
-                    rows={4}
+                    rows={6}
+                    w="100%"
                     bg="#ecede8"
                     borderColor="#23201C"
                     _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
@@ -581,13 +617,13 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
                       <HStack justify="space-between" w="100%">
                         <Text fontSize="12px" color="gray.600" fontWeight="medium">Created:</Text>
                         <Text fontSize="12px">
-                          {template.created_at ? new Date(template.created_at).toLocaleDateString() : 'N/A'}
+                          {template.created_at ? DateTime.fromISO(template.created_at, { zone: 'utc' }).setZone(settings?.timezone || 'America/Chicago').toFormat('MMM d, yyyy h:mm a') : 'N/A'}
                         </Text>
                       </HStack>
                       <HStack justify="space-between" w="100%">
                         <Text fontSize="12px" color="gray.600" fontWeight="medium">Last Updated:</Text>
                         <Text fontSize="12px">
-                          {template.updated_at ? new Date(template.updated_at).toLocaleDateString() : 'N/A'}
+                          {template.updated_at ? DateTime.fromISO(template.updated_at, { zone: 'utc' }).setZone(settings?.timezone || 'America/Chicago').toFormat('MMM d, yyyy h:mm a') : 'N/A'}
                         </Text>
                       </HStack>
                     </VStack>

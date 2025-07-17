@@ -214,6 +214,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
         send_access_instructions: formData.send_access_instructions,
         send_reminder: formData.send_reminder,
         send_confirmation: formData.send_confirmation,
+        source: 'manual' // Track that this reservation was made manually in the admin interface
       };
 
 

@@ -721,6 +721,7 @@ function AllReservationsView({ onReservationClick }: {
             <Box as="th" p={2} textAlign="left" color="#353535" fontWeight="bold">Table</Box>
             <Box as="th" p={2} textAlign="left" color="#353535" fontWeight="bold">Party</Box>
             <Box as="th" p={2} textAlign="left" color="#353535" fontWeight="bold">Type</Box>
+            <Box as="th" p={2} textAlign="left" color="#353535" fontWeight="bold">Source</Box>
           </Box>
         </Box>
         <Box as="tbody">
@@ -752,6 +753,9 @@ function AllReservationsView({ onReservationClick }: {
                 <Text fontSize="lg">
                   {getEventTypeIcon(reservation.event_type || 'default')}
                 </Text>
+              </Box>
+              <Box as="td" p={2} color="#353535">
+                {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
               </Box>
             </Box>
           ))}

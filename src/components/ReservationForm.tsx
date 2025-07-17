@@ -592,7 +592,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       email: form.email,
       first_name: form.first_name,
       last_name: form.last_name,
-      is_member: isMember
+      is_member: isMember,
+      source: 'website' // Track that this reservation came from the website
     };
 
     console.log('=== RESERVATION DATA DEBUG ===');

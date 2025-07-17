@@ -567,7 +567,8 @@ export default function TemplatesPage() {
       if (!result) result = '0 Minutes';
       return result + ' Before';
     } else {
-      // Handle both old integer format and new minute-level precision
+      // For day_of reminders, the send_time is stored as "HH:MM" in UTC
+      // We need to convert it to the business timezone for display
       let hours, minutes;
       
       if (typeof template.send_time === 'number') {
@@ -575,7 +576,7 @@ export default function TemplatesPage() {
         hours = template.send_time;
         minutes = 0;
       } else if (typeof template.send_time === 'string') {
-        // New format: "HH:MM"
+        // Format: "HH:MM" (stored in UTC)
         const timeParts = template.send_time.split(':');
         hours = parseInt(timeParts[0]);
         minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
@@ -590,9 +591,19 @@ export default function TemplatesPage() {
         minutes = template.send_time_minutes;
       }
       
-      const hour12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-      const ampm = hours < 12 ? 'AM' : 'PM';
-      return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+      // Convert UTC time to business timezone
+      // Create a DateTime object for today at the specified UTC time
+      const today = DateTime.now().setZone('utc').startOf('day');
+      const utcTime = today.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+      
+      // Convert to business timezone
+      const businessTimezone = settings?.timezone || 'America/Chicago';
+      const localTime = utcTime.setZone(businessTimezone);
+      
+      // Format for display
+      const hour12 = localTime.hour === 0 ? 12 : localTime.hour > 12 ? localTime.hour - 12 : localTime.hour;
+      const ampm = localTime.hour < 12 ? 'AM' : 'PM';
+      return `${hour12.toString().padStart(2, '0')}:${localTime.minute.toString().padStart(2, '0')} ${ampm}`;
     }
   }
 

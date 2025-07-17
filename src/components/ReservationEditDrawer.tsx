@@ -542,6 +542,9 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                         {formData.first_name} {formData.last_name} <Badge margin="0px" colorScheme={reservation.membership_type === 'member' ? 'purple' : 'gray'} size="sm">
                           {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
                         </Badge>
+                        <Badge marginLeft="8px" colorScheme="blue" size="sm" fontFamily="Montserrat, sans-serif">
+                          {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
+                        </Badge>
                       </Text>
                       <HStack>
                         <Text margin="0px" fontSize="sm" color="gray.600">
@@ -715,9 +718,13 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                 <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
                   
                   <VStack spacing={1} fontSize="xs">
-                    <HStack justify="space-between">
-                      <Text fontSize="12px" color="gray.600" fontWeight="medium">Created:</Text>
-                      <Text fontSize="12px">{reservation.created_at ? formatDateTime(new Date(reservation.created_at), timezone, { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}</Text>
+                    <HStack justify="space-between" align="center" mt={2}>
+                      <Text fontSize="sm" color="gray.600">
+                        Created {reservation.created_at ? formatDateTime(new Date(reservation.created_at), settings?.timezone || 'America/Chicago', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : ''}
+                      </Text>
+                      <Badge colorScheme="blue" fontFamily="Montserrat, sans-serif">
+                        {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
+                      </Badge>
                     </HStack>
                   
                   

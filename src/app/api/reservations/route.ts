@@ -440,7 +440,8 @@ export async function POST(request: Request) {
       hold_amount: holdAmount,
       hold_status: paymentIntentId ? 'confirmed' : null,
       hold_created_at: paymentIntentId ? new Date().toISOString() : null,
-      checked_in: is_checked_in || false
+      checked_in: is_checked_in || false,
+      source: body.source || 'website' // Default to 'website' if not specified
     };
 
     const { data: reservation, error } = await supabase
@@ -951,12 +952,10 @@ async function scheduleAccessInstructions(reservation: any) {
     const now = DateTime.now().setZone(businessTimezone);
     
     // Schedule for the time specified in the template (e.g., "10:05")
-    const [hours, minutes] = template.send_time.split(':').map(Number);
-    const scheduledLocal = reservationDateTime.set({ 
-      hour: hours, 
-      minute: minutes || 0, 
-      second: 0, 
-      millisecond: 0 
+    // FIXED: Use the correct approach to create the scheduled time in business timezone
+    const reservationDate = reservationDateTime.toFormat('yyyy-MM-dd');
+    const scheduledLocal = DateTime.fromISO(`${reservationDate}T${template.send_time}:00`, { 
+      zone: businessTimezone 
     });
     
     // Convert to UTC for database storage
