@@ -483,56 +483,26 @@ export async function POST(request: Request) {
 
     // Handle additional options
     try {
-      // Send reservation confirmation text if requested
+      // Send reservation confirmation text if requested (sends immediately)
       if (send_confirmation) {
         console.log('Sending reservation confirmation text for reservation:', reservation.id);
         await sendReservationConfirmationText(reservation);
       }
 
-      // Send access instructions if requested
+      // Send access instructions if requested (sends immediately)
       if (send_access_instructions) {
         console.log('Sending access instructions for reservation:', reservation.id);
         await sendAccessInstructions(reservation);
       }
 
-      // Create reminder if requested
+      // Create reminder record if requested (only creates database record, doesn't send immediately)
       if (send_reminder) {
-        console.log('Creating reminder for reservation:', reservation.id);
+        console.log('Creating reminder record for reservation:', reservation.id);
         await createReservationReminder(reservation);
       }
     } catch (error) {
       console.error('Error handling additional options:', error);
       // Don't fail the reservation creation if these fail
-    }
-
-    // Schedule reservation reminders
-    try {
-      console.log('=== SCHEDULING RESERVATION REMINDERS ===');
-      console.log('NEXT_PUBLIC_SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
-      console.log('VERCEL_URL:', process.env.VERCEL_URL);
-      console.log('NODE_ENV:', process.env.NODE_ENV);
-      
-      // Use VERCEL_URL in production, or NEXT_PUBLIC_SITE_URL, or construct from request
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NEXT_PUBLIC_SITE_URL 
-        ? process.env.NEXT_PUBLIC_SITE_URL
-        : 'http://localhost:3000';
-        
-      const reminderUrl = `${baseUrl}/api/schedule-reservation-reminders`;
-      
-      console.log('Reminder URL:', reminderUrl);
-        
-      await fetch(reminderUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reservation_id: reservation.id })
-      });
-      
-      console.log('✅ Reservation reminders scheduled successfully');
-    } catch (error) {
-      console.error('Error scheduling reservation reminders:', error);
-      // Don't fail the reservation creation if reminder scheduling fails
     }
 
     return NextResponse.json(reservation);
