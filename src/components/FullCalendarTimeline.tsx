@@ -3,8 +3,8 @@ import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
-import ReservationForm from './ReservationForm';
 import DayReservationsDrawer from './DayReservationsDrawer';
+import NewReservationDrawer from './NewReservationDrawer';
 import { fromUTC, toUTC, formatDateTime, formatTime, formatDate, isSameDay } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
@@ -36,8 +36,6 @@ import {
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, CheckCircleIcon, TimeIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
 
 interface Resource {
   id: string;
@@ -60,7 +58,7 @@ interface FullCalendarTimelineProps {
   onDateChange?: (date: Date) => void;
 }
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_12345');
+
 
 const eventTypeEmojis: Record<string, string> = {
   birthday: '🎂',
@@ -734,6 +732,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             minWidth: isMobile ? '60px' : '100px',
             width: isMobile ? '60px' : '100px',
             flexShrink: 0,
+            textAlign: 'center',
             
           },
           '.fc-resource-area .fc-resource-title': {
@@ -1097,15 +1096,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         )}
       </Box>
 
-      {!viewOnly && (
-        <Elements stripe={stripePromise}>
-          <ReservationForm
-            bookingStartDate={bookingStartDate}
-            bookingEndDate={bookingEndDate}
-            baseDays={baseDays}
-          />
-        </Elements>
-      )}
+
 
       <DayReservationsDrawer
         isOpen={isDayReservationsDrawerOpen}
@@ -1115,21 +1106,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       />
 
       {/* New Reservation Drawer */}
-      {!viewOnly && selectedSlot && (
-        <Elements stripe={stripePromise}>
-          <ReservationForm
-            initialStart={selectedSlot.date.toISOString()}
-            initialEnd={new Date(selectedSlot.date.getTime() + 2 * 60 * 60 * 1000).toISOString()}
-            table_id={selectedSlot.resourceId}
-            bookingStartDate={bookingStartDate}
-            bookingEndDate={bookingEndDate}
-            baseDays={baseDays}
-            onSave={handleNewReservationCreated}
-            onClose={handleNewReservationClose}
-            isEdit={false}
-          />
-        </Elements>
-      )}
+      <NewReservationDrawer
+        isOpen={isNewReservationDrawerOpen}
+        onClose={handleNewReservationClose}
+        initialDate={selectedSlot?.date}
+        initialTableId={selectedSlot?.resourceId}
+        onReservationCreated={handleNewReservationCreated}
+      />
     </Box>
   );
 };
