@@ -32,6 +32,7 @@ import {
 } from '@chakra-ui/react';
 import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
 import { useSettings } from '../context/SettingsContext';
+import { DateTime } from 'luxon';
 
 interface ReservationReminderTemplate {
   id: string;
@@ -122,10 +123,16 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
             hours = foundTemplate.send_time;
             minutes = 0;
           } else if (typeof foundTemplate.send_time === 'string') {
-            // New format: "HH:MM"
+            // New format: "HH:MM" or "HH:MMZZ" (with timezone offset)
             const timeParts = foundTemplate.send_time.split(':');
             hours = parseInt(timeParts[0]);
-            minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+            // Handle timezone offset in minutes part (e.g., "05-05:00" -> "05")
+            const minutesPart = timeParts[1];
+            if (minutesPart && minutesPart.includes('-')) {
+              minutes = parseInt(minutesPart.split('-')[0]);
+            } else {
+              minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
+            }
           }
           
           // Add minutes from send_time_minutes if available
@@ -194,13 +201,19 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
 
     setIsSaving(true);
     try {
-      // Format send_time based on reminder type
+      // Format send_time based on reminder type with proper timezone handling
       let sendTime: string;
       if (formData.reminder_type === 'day_of') {
-        // Format as "HH:MM"
-        sendTime = `${formData.send_time_hours.toString().padStart(2, '0')}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
+        // For day_of reminders, we need to include timezone offset to prevent UTC conversion
+        const businessTimezone = settings?.timezone || 'America/Chicago';
+        const dt = DateTime.fromObject(
+          { hour: formData.send_time_hours, minute: formData.send_time_minutes },
+          { zone: businessTimezone }
+        );
+        // Format as HH:mmZZ (e.g. "10:05-05:00")
+        sendTime = dt.toFormat('HH:mmZZ');
       } else {
-        // Format as "H:M" or "H" for hour_before
+        // For hour_before reminders, keep the simple format
         if (formData.send_time_minutes > 0) {
           sendTime = `${formData.send_time_hours}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
         } else {
