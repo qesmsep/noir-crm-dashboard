@@ -922,58 +922,94 @@ async function sendReservationConfirmationText(reservation: any) {
 // Function to schedule access instructions for 10:05 AM local time on day of reservation
 async function scheduleAccessInstructions(reservation: any) {
   try {
-    // Get access instructions template from settings
+    // Get business timezone from settings
+    let businessTimezone = 'America/Chicago';
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
-      .select('access_instructions_template, timezone')
+      .select('timezone')
+      .single();
+    if (!settingsError && settings?.timezone) {
+      businessTimezone = settings.timezone;
+    }
+
+    // Get access instructions template
+    const { data: template, error: templateError } = await supabase
+      .from('reservation_reminder_templates')
+      .select('*')
+      .eq('reminder_type', 'day_of')
+      .eq('name', 'Access Instructions')
+      .eq('is_active', true)
       .single();
 
-    if (settingsError || !settings?.access_instructions_template) {
-      console.error('Access instructions template not configured');
+    if (templateError || !template) {
+      console.error('Access instructions template not found:', templateError);
       return false;
     }
 
-    // Get business timezone (default to America/Chicago)
-    const businessTimezone = settings.timezone || 'America/Chicago';
-
-    // Calculate 10:05 AM local time on the day of the reservation
+    // Convert reservation time to business timezone for calculations
     const reservationDateTime = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
+    const now = DateTime.now().setZone(businessTimezone);
+    
+    // Schedule for the time specified in the template (e.g., "10:05")
+    const [hours, minutes] = template.send_time.split(':').map(Number);
     const scheduledLocal = reservationDateTime.set({ 
-      hour: 10, 
-      minute: 5, 
+      hour: hours, 
+      minute: minutes || 0, 
       second: 0, 
       millisecond: 0 
     });
-    const scheduledTimeUTC = scheduledLocal.toUTC().toISO();
-
-    console.log('Scheduling access instructions:', {
+    
+    // Convert to UTC for database storage
+    let scheduledTimeUTC = scheduledLocal.toUTC().toISO();
+    
+    // Check if this is a same-day reservation and the scheduled time has already passed
+    const isSameDay = reservationDateTime.hasSame(now, 'day');
+    let shouldSendImmediately = false;
+    
+    if (isSameDay && scheduledLocal < now) {
+      shouldSendImmediately = true;
+      scheduledTimeUTC = now.toUTC().toISO();
+      console.log(`✅ Scheduling immediate send for access instructions`);
+    }
+    
+    console.log('Access instructions scheduling:', {
       reservationDate: reservationDateTime.toFormat('yyyy-MM-dd'),
-      scheduledLocal: scheduledLocal.toFormat('HH:mm ZZZZ'),
-      scheduledUTC: scheduledTimeUTC,
-      businessTimezone
+      businessTimezone,
+      scheduledLocal: scheduledLocal.toFormat('HH:mm'),
+      scheduledTimeUTC,
+      template: template.name,
+      templateSendTime: template.send_time,
+      isSameDay,
+      shouldSendImmediately
     });
 
-    // Create reminder record in the scheduled_reservation_reminders table
-    const { data: reminder, error } = await supabase
+    // Create message content with placeholders
+    let messageContent = template.message_template;
+    messageContent = messageContent.replace(/\{\{first_name\}\}/g, reservation.first_name || 'Guest');
+    messageContent = messageContent.replace(/\{\{reservation_time\}\}/g,
+      reservationDateTime.toFormat('hh:mm a'));
+    messageContent = messageContent.replace(/\{\{party_size\}\}/g, reservation.party_size.toString());
+
+    // Insert scheduled reminder
+    const { data: scheduledReminder, error: insertError } = await supabase
       .from('scheduled_reservation_reminders')
-      .insert([{
+      .insert({
         reservation_id: reservation.id,
-        template_id: null, // No template ID since this is a custom access instruction
-        customer_name: `${reservation.first_name || 'Guest'} ${reservation.last_name || ''}`,
+        template_id: template.id,
+        customer_name: `${reservation.first_name || ''} ${reservation.last_name || ''}`.trim() || 'Guest',
         customer_phone: reservation.phone,
-        message_content: settings.access_instructions_template,
-        scheduled_for: scheduledTimeUTC,
-        status: 'pending'
-      }])
+        message_content: messageContent,
+        scheduled_for: scheduledTimeUTC
+      })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error scheduling access instructions:', error);
+    if (insertError) {
+      console.error('Error scheduling access instructions:', insertError);
       return false;
     }
 
-    console.log('Access instructions scheduled successfully:', reminder.id);
+    console.log('✅ Successfully scheduled access instructions for:', scheduledTimeUTC);
     return true;
   } catch (error) {
     console.error('Error scheduling access instructions:', error);
