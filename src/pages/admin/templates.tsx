@@ -156,12 +156,16 @@ export default function TemplatesPage() {
   const businessTimezone = settings?.timezone || 'America/Chicago';
 
   const fetchReminderTemplates = async () => {
+    console.log('📡 fetchReminderTemplates called...');
     try {
       const response = await fetch('/api/reservation-reminder-templates');
       const data = await response.json();
+      console.log('📡 fetchReminderTemplates response:', data);
       if (response.ok) {
         setReminderTemplates(data.templates || []);
+        console.log('✅ Reminder templates updated:', data.templates?.length || 0, 'templates');
       } else {
+        console.error('❌ fetchReminderTemplates error:', data.error);
         toast({
           title: 'Error',
           description: data.error || 'Failed to fetch reminder templates',
@@ -170,6 +174,7 @@ export default function TemplatesPage() {
         });
       }
     } catch (error) {
+      console.error('❌ fetchReminderTemplates exception:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch reminder templates',
@@ -409,6 +414,7 @@ export default function TemplatesPage() {
   };
 
   const handleTemplateUpdated = () => {
+    console.log('🔄 handleTemplateUpdated called - refreshing reminder templates...');
     fetchReminderTemplates();
   };
 

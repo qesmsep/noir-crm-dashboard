@@ -255,6 +255,8 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
         throw new Error(errorData.error || 'Failed to save template');
       }
 
+      console.log('✅ Template saved successfully!');
+      
       toast({
         title: 'Success',
         description: isCreateMode ? 'Reminder template created successfully' : 'Reminder template updated successfully',
@@ -262,7 +264,9 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
         duration: 3000,
       });
       
+      console.log('Calling onTemplateUpdated...');
       onTemplateUpdated();
+      console.log('Calling onClose...');
       onClose();
     } catch (error: any) {
       toast({
