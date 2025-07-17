@@ -24,10 +24,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let validatedSendTime: string;
 
       if (reminder_type === 'day_of') {
-        // send_time format: "HH:MM" (e.g., "10:05", "14:30")
+        // send_time format: "HH:MM" (e.g., "10:05", "14:30") or "HH:MMZZ" (e.g., "10:05-05:00")
         const timeRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$/;
-        if (!timeRegex.test(send_time)) {
-          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05")' });
+        const timezoneRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])([+-][0-9]{2}:[0-9]{2})$/;
+        if (!timeRegex.test(send_time) && !timezoneRegex.test(send_time)) {
+          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05") or HH:MMZZ format (e.g., "10:05-05:00")' });
         }
         validatedSendTime = send_time;
       } else if (reminder_type === 'hour_before') {
@@ -73,10 +74,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let validatedSendTime: string;
 
       if (reminder_type === 'day_of') {
-        // send_time format: "HH:MM" (e.g., "10:05", "14:30")
+        // send_time format: "HH:MM" (e.g., "10:05", "14:30") or "HH:MMZZ" (e.g., "10:05-05:00")
         const timeRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$/;
-        if (!timeRegex.test(send_time)) {
-          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05")' });
+        const timezoneRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])([+-][0-9]{2}:[0-9]{2})$/;
+        if (!timeRegex.test(send_time) && !timezoneRegex.test(send_time)) {
+          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05") or HH:MMZZ format (e.g., "10:05-05:00")' });
         }
         validatedSendTime = send_time;
       } else if (reminder_type === 'hour_before') {
