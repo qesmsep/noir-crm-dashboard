@@ -155,7 +155,6 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
           borderRadius="10px"  
           fontFamily="Montserrat, sans-serif" 
           maxW="400px" 
-          maxH="flex" 
           w="40vw" 
           boxShadow="xl" 
           mt="80px" 
@@ -166,16 +165,15 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
           position="fixed"
           top="0"
           right="0"
-          height="100vh"
           style={{
             transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform 0.3s ease-in-out'
+            transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
           <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
             Edit Reservation Reminder
           </DrawerHeader>
-          <DrawerBody p={4} overflowY="auto">
+          <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
             {isLoading ? (
               <VStack justify="center" align="center" h="100%">
                 <Spinner size="xl" />
@@ -216,7 +214,7 @@ const ReminderEditDrawer: React.FC<ReminderEditDrawerProps> = ({
               <Text>Reminder not found</Text>
             )}
           </DrawerBody>
-          <DrawerFooter borderTopWidth="1px" justifyContent="flex-end">
+          <DrawerFooter borderTopWidth="1px" justifyContent="flex-end" className="drawer-footer-content">
             <Button variant="outline" onClick={onClose} mr={3}>Cancel</Button>
             <Button colorScheme="blue" onClick={handleSave} isLoading={isSaving} loadingText="Saving...">Save</Button>
             <Button colorScheme="green" onClick={handleSendNow} isLoading={isSending} loadingText="Sending..." ml={3} disabled={isLoading || isSaving || isSending}>Send</Button>

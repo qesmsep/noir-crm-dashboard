@@ -628,7 +628,7 @@ const QuestionnaireAdminPage: React.FC = () => {
             height="100vh"
             style={{
               transform: responseModalOpen ? 'translateX(0)' : 'translateX(100%)',
-              transition: 'transform 0.3s ease-in-out',
+              transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               fontFamily: 'Montserrat, sans-serif',
             }}
           >
@@ -840,7 +840,7 @@ const QuestionnaireAdminPage: React.FC = () => {
             height="100vh"
             style={{
               transform: shareModalOpen ? 'translateX(0)' : 'translateX(100%)',
-              transition: 'transform 0.3s ease-in-out',
+              transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               fontFamily: 'Montserrat, sans-serif',
             }}
           >

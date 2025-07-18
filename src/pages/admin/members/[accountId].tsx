@@ -1412,32 +1412,30 @@ export default function MemberDetailAdmin() {
         >
           <Box zIndex="2000" position="relative">
             <DrawerOverlay bg="blackAlpha.600" onClick={() => setIsTextPdfModalOpen(false)} />
-            <DrawerContent 
-              border="2px solid #353535" 
-              borderRadius="10px"  
-              fontFamily="Montserrat, sans-serif" 
-              maxW="400px" 
-              maxH="flex" 
-              w="40vw" 
-              boxShadow="xl" 
-              mt="80px" 
-              mb="25px" 
-              paddingRight="40px" 
-              paddingLeft="40px" 
-              backgroundColor="#ecede8"
-              position="fixed"
-              top="0"
-              right="0"
-              height="100vh"
-              style={{
-                transform: isTextPdfModalOpen ? 'translateX(0)' : 'translateX(100%)',
-                transition: 'transform 0.3s ease-in-out'
-              }}
-            >
+                    <DrawerContent 
+          border="2px solid #353535" 
+          borderRadius="10px"  
+          fontFamily="Montserrat, sans-serif" 
+          maxW="400px" 
+          w="40vw" 
+          boxShadow="xl" 
+          mt="80px" 
+          mb="25px" 
+          paddingRight="40px" 
+          paddingLeft="40px" 
+          backgroundColor="#ecede8"
+          position="fixed"
+          top="0"
+          right="0"
+          style={{
+            transform: isTextPdfModalOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+        >
               <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
                 Send Ledger PDF via SMS
               </DrawerHeader>
-              <DrawerBody p={4} overflowY="auto">
+              <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
                 <VStack spacing={4}>
                   <Box>
                     <Text fontSize="lg" fontWeight="bold" fontFamily="IvyJournal, sans-serif" color="#353535">
@@ -1498,7 +1496,7 @@ export default function MemberDetailAdmin() {
                   </Box>
                 </VStack>
               </DrawerBody>
-              <DrawerFooter borderTopWidth="1px" justifyContent="space-between">
+              <DrawerFooter borderTopWidth="1px" justifyContent="space-between" className="drawer-footer-content">
                 <Button 
                   variant="outline" 
                   onClick={() => setIsTextPdfModalOpen(false)}

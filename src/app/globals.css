@@ -38,6 +38,20 @@
   font-display: swap;
 }
 
+/* Dynamic viewport height for mobile devices */
+:root {
+  --vh: 1vh;
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+}
+
+/* Update viewport height on resize and orientation change */
+@media screen and (max-width: 1024px) {
+  :root {
+    --vh: 1vh;
+  }
+}
+
 body {
   font-family: 'Montserrat', 'IvyJournal', 'CONEBARS', 'Holimount', sans-serif;
   color: rgb(var(--foreground-rgb));
@@ -47,6 +61,214 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+}
+
+/* Enhanced drawer modal fixes for iPad and mobile */
+/* High specificity to override any component-specific styles */
+.chakra-drawer__content,
+[data-overlay] + .chakra-drawer__content,
+.chakra-drawer__content[style*="height"],
+.chakra-drawer__content[style*="100vh"] {
+  /* Use dynamic viewport height instead of fixed 100vh */
+  height: calc(100 * var(--vh)) !important;
+  max-height: calc(100 * var(--vh)) !important;
+  min-height: calc(100 * var(--vh)) !important;
+  
+  /* Add safe area padding for modern devices */
+  padding-bottom: var(--safe-area-inset-bottom) !important;
+  padding-top: var(--safe-area-inset-top) !important;
+  
+  /* Ensure proper flex layout */
+  display: flex !important;
+  flex-direction: column !important;
+  
+  /* Prevent horizontal overflow */
+  overflow-x: hidden !important;
+  
+  /* Better positioning for mobile */
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  
+  /* Override any conflicting styles from component CSS modules */
+  width: auto !important;
+  transform: none !important;
+  
+  /* Smooth slide animation - prevent hesitation */
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: transform !important;
+  transform-style: preserve-3d !important;
+  backface-visibility: hidden !important;
+}
+
+/* Drawer body with proper scrolling */
+/* High specificity to override any component-specific styles */
+.chakra-drawer__body,
+.chakra-drawer__body[style*="height"],
+.chakra-drawer__body[style*="100vh"] {
+  /* Make body scrollable */
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  
+  /* Add padding to prevent content from being hidden behind footer */
+  padding-bottom: 80px !important;
+  
+  /* Better scrolling on mobile */
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth !important;
+  
+  /* Ensure content doesn't get cut off */
+  min-height: 0 !important;
+  
+  /* Override any conflicting styles */
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Drawer footer with proper positioning */
+/* High specificity to override any component-specific styles */
+.chakra-drawer__footer,
+.chakra-drawer__footer[style*="height"],
+.chakra-drawer__footer[style*="100vh"] {
+  /* Position footer at bottom */
+  position: sticky !important;
+  bottom: 0 !important;
+  
+  /* Add background to prevent content showing through */
+  background-color: inherit !important;
+  
+  /* Add padding for safe area */
+  padding-bottom: calc(16px + var(--safe-area-inset-bottom)) !important;
+  
+  /* Ensure footer is always visible */
+  z-index: 10 !important;
+  
+  /* Add border for visual separation */
+  border-top: 1px solid #e2e8f0 !important;
+  
+  /* Prevent footer from shrinking */
+  flex-shrink: 0 !important;
+  
+  /* Override any conflicting styles */
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Drawer header with proper positioning */
+.chakra-drawer__header {
+  /* Position header at top */
+  position: sticky !important;
+  top: 0 !important;
+  
+  /* Add background to prevent content showing through */
+  background-color: inherit !important;
+  
+  /* Add padding for safe area */
+  padding-top: calc(16px + var(--safe-area-inset-top)) !important;
+  
+  /* Ensure header is always visible */
+  z-index: 10 !important;
+  
+  /* Prevent header from shrinking */
+  flex-shrink: 0 !important;
+}
+
+/* Specific fixes for reservation edit drawer */
+.reservation-edit-drawer .chakra-drawer__content {
+  /* Ensure proper height calculation */
+  height: calc(100 * var(--vh)) !important;
+  max-height: calc(100 * var(--vh)) !important;
+}
+
+/* Additional drawer content fixes */
+.drawer-body-content {
+  /* Ensure proper scrolling */
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  
+  /* Add padding to prevent content from being hidden behind footer */
+  padding-bottom: 80px !important;
+  
+  /* Better scrolling on mobile */
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth !important;
+  
+  /* Ensure content doesn't get cut off */
+  min-height: 0 !important;
+}
+
+.drawer-footer-content {
+  /* Ensure footer is always visible */
+  position: sticky !important;
+  bottom: 0 !important;
+  background-color: inherit !important;
+  z-index: 10 !important;
+  flex-shrink: 0 !important;
+  
+  /* Add border for visual separation */
+  border-top: 1px solid #e2e8f0 !important;
+  
+  /* Add padding for safe area */
+  padding-bottom: calc(16px + var(--safe-area-inset-bottom)) !important;
+}
+
+/* Ensure all drawer content uses the new height system */
+/* Override any existing height settings */
+.chakra-drawer__content {
+  height: calc(100 * var(--vh)) !important;
+  max-height: calc(100 * var(--vh)) !important;
+  min-height: calc(100 * var(--vh)) !important;
+}
+
+/* Fix for any remaining height issues */
+[data-overlay] + .chakra-drawer__content {
+  height: calc(100 * var(--vh)) !important;
+  max-height: calc(100 * var(--vh)) !important;
+}
+
+/* Override MobileCalendar.module.css styles that might conflict with drawers */
+/* Ensure drawer modals are not affected by calendar container styles */
+.chakra-drawer__content,
+.chakra-drawer__overlay,
+.chakra-drawer__body,
+.chakra-drawer__footer,
+.chakra-drawer__header {
+  /* Override any height: 100vh from MobileCalendar.module.css */
+  height: auto !important;
+  max-height: none !important;
+  min-height: auto !important;
+}
+
+/* Specific override for drawer content */
+.chakra-drawer__content {
+  height: calc(100 * var(--vh)) !important;
+  max-height: calc(100 * var(--vh)) !important;
+  min-height: calc(100 * var(--vh)) !important;
+}
+
+/* Ensure drawer modals are above calendar content */
+.chakra-drawer__overlay {
+  z-index: 999998 !important;
+  /* Smooth overlay animation */
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  /* Prevent any hesitation by ensuring immediate opacity changes */
+  opacity: 1 !important;
+}
+
+/* Ensure overlay is properly animated when drawer opens/closes */
+.chakra-drawer__overlay[data-state="closed"] {
+  opacity: 0 !important;
+}
+
+.chakra-drawer__overlay[data-state="open"] {
+  opacity: 1 !important;
+}
+
+.chakra-drawer__content {
+  z-index: 999999 !important;
 }
 
 /* Mobile-specific improvements */
@@ -198,66 +420,67 @@ body {
   /* Better hero section on mobile */
   .hero-section {
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
   
-  /* Improve section spacing on mobile */
-  section {
-    padding-left: 1rem;
-    padding-right: 1rem;
+  /* Enhanced drawer fixes for mobile */
+  .chakra-drawer__content {
+    /* Reduce width on mobile for better usability */
+    max-width: 90vw !important;
+    width: 90vw !important;
+    
+    /* Add more bottom padding for mobile */
+    padding-bottom: calc(20px + var(--safe-area-inset-bottom)) !important;
   }
   
-  /* Better card layouts on mobile */
-  .card-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+  .chakra-drawer__body {
+    /* Increase bottom padding on mobile */
+    padding-bottom: 100px !important;
   }
   
-  /* Improve footer on mobile */
-  footer {
-    text-align: center;
+  .chakra-drawer__footer {
+    /* Increase bottom padding on mobile */
+    padding-bottom: calc(20px + var(--safe-area-inset-bottom)) !important;
+  }
+}
+
+/* iPad-specific fixes */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .chakra-drawer__content {
+    /* Optimize for iPad */
+    max-width: 400px !important;
+    width: 400px !important;
+    
+    /* Add extra bottom padding for iPad */
+    padding-bottom: calc(24px + var(--safe-area-inset-bottom)) !important;
   }
   
-  /* Better image responsiveness */
-  .responsive-image {
-    width: 100%;
-    height: auto;
-    object-fit: cover;
+  .chakra-drawer__body {
+    /* Increase bottom padding for iPad */
+    padding-bottom: 120px !important;
   }
   
-  /* Improve text sizing on mobile */
-  .mobile-text {
-    font-size: 0.875rem;
-    line-height: 1.5;
+  .chakra-drawer__footer {
+    /* Increase bottom padding for iPad */
+    padding-bottom: calc(24px + var(--safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Landscape orientation fixes */
+@media (max-height: 600px) and (orientation: landscape) {
+  .chakra-drawer__content {
+    /* Reduce height in landscape to account for keyboard */
+    height: calc(90 * var(--vh)) !important;
+    max-height: calc(90 * var(--vh)) !important;
   }
   
-  /* Better button sizing on mobile */
-  .mobile-button {
-    padding: 0.75rem 1.5rem;
-    font-size: 0.875rem;
-    min-height: 44px;
+  .chakra-drawer__body {
+    /* Reduce padding in landscape */
+    padding-bottom: 60px !important;
   }
   
-  /* Improve form container on mobile */
-  .form-container {
-    padding: 1rem;
-    margin: 0.5rem;
-  }
-  
-  /* Better spacing for mobile */
-  .mobile-spacing {
-    margin-bottom: 1rem;
-  }
-  
-  /* Improve accessibility on mobile */
-  .mobile-accessible {
-    min-height: 44px;
-    min-width: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .chakra-drawer__footer {
+    /* Reduce padding in landscape */
+    padding-bottom: calc(12px + var(--safe-area-inset-bottom)) !important;
   }
 }
 
@@ -466,4 +689,50 @@ button:hover {
 
 [role="dialog"] {
   z-index: 999999 !important;
-} 
+}
+
+/* Ensure drawer modals override any conflicting styles */
+/* This is the highest priority override for drawer components */
+.chakra-drawer__content[style*="transform"],
+.chakra-drawer__content[style*="translateX"],
+.chakra-drawer__content[style*="height"] {
+  /* Force our drawer styles to take precedence */
+  height: calc(100 * var(--vh)) !important;
+  max-height: calc(100 * var(--vh)) !important;
+  min-height: calc(100 * var(--vh)) !important;
+  width: auto !important;
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 999999 !important;
+}
+
+/* Override any inline styles that might be set by components */
+.chakra-drawer__content[style] {
+  height: calc(100 * var(--vh)) !important;
+  max-height: calc(100 * var(--vh)) !important;
+  min-height: calc(100 * var(--vh)) !important;
+}
+
+/* Smooth slide animation for drawer modals */
+.drawer-slide-animation {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: transform !important;
+  transform-style: preserve-3d !important;
+  backface-visibility: hidden !important;
+}
+
+/* Overlay fade animation */
+.drawer-overlay-animation {
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: opacity !important;
+}
+
+/* Force immediate animation start for any hesitant drawers */
+.chakra-drawer__content[style*="translateX"] {
+  transition-delay: 0s !important;
+  animation-delay: 0s !important;
+}
+
+/* Dynamic viewport height updates handled by JavaScript in layout.js */ 

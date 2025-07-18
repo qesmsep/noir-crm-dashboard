@@ -141,7 +141,6 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
           borderRadius="10px" 
           fontFamily="Montserrat, sans-serif" 
           maxW="350px" 
-          maxH="flex" 
           w="50vw" 
           boxShadow="xl" 
           mt="80px" 
@@ -173,7 +172,7 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
             </HStack>
           </DrawerHeader>
 
-          <DrawerBody p={4} overflowY="auto">
+          <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
             {isLoading ? (
               <VStack justify="center" align="center" h="100%">
                 <Spinner size="xl" color="#353535" />
@@ -297,7 +296,7 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
             )}
           </DrawerBody>
 
-          <DrawerFooter borderTopWidth="1px" borderColor="#A59480" justifyContent="center">
+          <DrawerFooter borderTopWidth="1px" borderColor="#A59480" justifyContent="center" className="drawer-footer-content">
             <Button
               onClick={onClose}
               variant="outline"

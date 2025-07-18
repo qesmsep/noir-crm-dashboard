@@ -22,6 +22,35 @@ export default function RootLayout({ children }) {
             </SettingsProvider>
           </AuthProvider>
         </ChakraClientProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function setVH() {
+                  const vh = window.innerHeight * 0.01;
+                  document.documentElement.style.setProperty('--vh', vh + 'px');
+                }
+
+                // Set initial value
+                setVH();
+
+                // Update on resize
+                window.addEventListener('resize', setVH);
+                
+                // Update on orientation change
+                window.addEventListener('orientationchange', function() {
+                  // Delay to ensure orientation change is complete
+                  setTimeout(setVH, 100);
+                });
+                
+                // Update when virtual keyboard appears/disappears (iOS)
+                if ('visualViewport' in window) {
+                  window.visualViewport.addEventListener('resize', setVH);
+                }
+              })();
+            `,
+          }}
+        />
       </body>
     </html>
   );

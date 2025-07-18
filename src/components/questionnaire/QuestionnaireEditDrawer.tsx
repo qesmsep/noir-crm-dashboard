@@ -185,12 +185,11 @@ const QuestionnaireEditDrawer: React.FC<QuestionnaireEditDrawerProps> = ({
           position="fixed"
           top="0"
           right="0"
-          height="100vh"
-          style={{
-            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform 0.3s ease-in-out',
-            fontFamily: 'Montserrat, sans-serif',
-          }}
+                      style={{
+              transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+              transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+              fontFamily: 'Montserrat, sans-serif',
+            }}
         >
           <DrawerHeader 
             borderBottomWidth="1px" 
@@ -212,8 +211,7 @@ const QuestionnaireEditDrawer: React.FC<QuestionnaireEditDrawerProps> = ({
             p={4} 
             overflowY="auto" 
             fontFamily="Montserrat, sans-serif" 
-            maxHeight="calc(100vh - 120px)"
-            pb="20px"
+            className="drawer-body-content"
           >
             <VStack spacing={4} align="stretch">
               <FormControl>
@@ -544,6 +542,7 @@ const QuestionnaireEditDrawer: React.FC<QuestionnaireEditDrawerProps> = ({
             bottom="0" 
             bg="#ecede8"
             zIndex="1"
+            className="drawer-footer-content"
           >
             <HStack spacing={3} width="100%" justify="space-between">
               <Button 

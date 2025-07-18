@@ -508,7 +508,6 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
           borderRadius="10px"  
           fontFamily="Montserrat, sans-serif" 
           maxW="350px" 
-          maxH="flex" 
           w="50vw" 
           boxShadow="xl" 
           mt="80px" 
@@ -519,16 +518,18 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
           position="fixed"
           top="0"
           right="0"
-          height="100vh"
           style={{
             transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform 0.3s ease-in-out'
+            transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            willChange: 'transform',
+            transformStyle: 'preserve-3d',
+            backfaceVisibility: 'hidden'
           }}
         >
           <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="0px" fontFamily="IvyJournal, sans-serif" color="#353535">
             
           </DrawerHeader>
-          <DrawerBody p={4} overflowY="auto">
+          <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
             {isLoading ? (
               <VStack justify="center" align="center" h="100%">
                 <Spinner size="xl" />
@@ -735,7 +736,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
               <Text>Reservation not found</Text>
             )}
           </DrawerBody>
-          <DrawerFooter borderTopWidth="1px" justifyContent="space-between">
+          <DrawerFooter borderTopWidth="1px" justifyContent="space-between" className="drawer-footer-content">
             {isConfirmingDelete ? (
               <HStack w="100%" justifyContent="space-between">
                 <Text fontWeight="bold" >Are you sure?</Text>
