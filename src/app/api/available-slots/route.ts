@@ -67,13 +67,12 @@ export async function POST(request: Request) {
       }
     }
     
-    // Check for private events
+    // Check for private events that block this date
     const { data: privateEvents } = await supabase
       .from('private_events')
       .select('start_time, end_time, full_day')
-      .gte('start_time', `${dateStr}T00:00:00`)
-      .lte('end_time', `${dateStr}T23:59:59`)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .or(`and(start_time.gte.${dateStr}T00:00:00Z,start_time.lte.${dateStr}T23:59:59Z),and(end_time.gte.${dateStr}T00:00:00Z,end_time.lte.${dateStr}T23:59:59Z),and(start_time.lte.${dateStr}T00:00:00Z,end_time.gte.${dateStr}T23:59:59Z)`);
     
     console.log('Private events found:', privateEvents);
     

@@ -303,9 +303,8 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     const { data: privateEvents, error: privateEventsError } = await supabase
       .from('private_events')
       .select('start_time, end_time, full_day, title')
-      .gte('start_time', `${dateStr}T00:00:00`)
-      .lte('end_time', `${dateStr}T23:59:59`)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .or(`and(start_time.gte.${dateStr}T00:00:00Z,start_time.lte.${dateStr}T23:59:59Z),and(end_time.gte.${dateStr}T00:00:00Z,end_time.lte.${dateStr}T23:59:59Z),and(start_time.lte.${dateStr}T00:00:00Z,end_time.gte.${dateStr}T23:59:59Z)`);
     
     if (privateEventsError) {
       console.error('Error fetching private events:', privateEventsError);

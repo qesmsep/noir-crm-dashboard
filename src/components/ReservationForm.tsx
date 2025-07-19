@@ -259,10 +259,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     // Format date as YYYY-MM-DD using local timezone (consistent with fetchAvailableTimes)
     const dateStr = date ? (() => {
       const result = date.toFormat('yyyy-MM-dd');
-      console.log('=== DATE STRING CONVERSION DEBUG ===');
-      console.log('Original date:', date);
-      console.log('Calculated dateStr:', result);
-      console.log('=== END DATE STRING CONVERSION DEBUG ===');
       return result;
     })() : '';
     const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
@@ -271,24 +267,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     const isClosed = exceptionalClosures.includes(dateStr);
     const isPrivateEvent = privateEventDates.includes(dateStr);
     
-    console.log('=== AVAILABILITY CHECK DEBUG ===');
-    console.log('dateStr:', dateStr);
-    console.log('isBaseDay:', isBaseDay);
-    console.log('isExceptionalOpen:', isExceptionalOpen);
-    console.log('isClosed:', isClosed);
-    console.log('isPrivateEvent:', isPrivateEvent);
-    console.log('baseDays:', baseDays);
-    console.log('internalBaseDays:', internalBaseDays);
-    console.log('exceptionalOpens:', exceptionalOpens);
-    console.log('exceptionalClosures:', exceptionalClosures);
-    console.log('privateEventDates:', privateEventDates);
-    console.log('day of week:', date?.weekday);
-    console.log('=== END AVAILABILITY CHECK DEBUG ===');
-    
     // Only fetch if the date is available (base day OR exceptional open) AND not closed/private event
     if (!date || (!isBaseDay && !isExceptionalOpen) || isClosed || isPrivateEvent) {
-      console.log('Setting availableTimes to empty array due to availability check failure');
-      console.log('Reason: !date =', !date, ', (!isBaseDay && !isExceptionalOpen) =', (!isBaseDay && !isExceptionalOpen), ', isClosed =', isClosed, ', isPrivateEvent =', isPrivateEvent);
       setAvailableTimes([]);
       return;
     }
@@ -298,12 +278,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       
       // Format date as YYYY-MM-DD using Luxon
       const dateStr = date.toFormat('yyyy-MM-dd');
-      
-      console.log('=== FETCH AVAILABLE TIMES DEBUG ===');
-      console.log('date:', date);
-      console.log('dateStr:', dateStr);
-      console.log('party_size:', form.party_size);
-      console.log('=== END FETCH AVAILABLE TIMES DEBUG ===');
       
       const res = await fetch('/api/available-slots', {
         method: 'POST',
@@ -318,7 +292,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       }
 
       const { slots } = await res.json();
-      console.log('Available slots received:', slots);
       setAvailableTimes(Array.isArray(slots) ? slots : []);
     }
     fetchAvailableTimes();
@@ -341,6 +314,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       // Get booking window range
       const start = bookingStartDate ? DateTime.fromJSDate(bookingStartDate) : DateTime.now();
       const end = bookingEndDate ? DateTime.fromJSDate(bookingEndDate) : DateTime.now().plus({ days: 60 });
+      
       // Exceptional Closures (full day)
       const { data: closures } = await supabase
         .from('venue_hours')
@@ -358,12 +332,23 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         .eq('type', 'exceptional_open');
       setExceptionalOpens((opens || []).map((o: any) => o.date));
       // Private Events (any event that blocks the whole day)
-      const { data: events } = await supabase
+      // Get all active private events and filter them in JavaScript for better control
+      const { data: allEvents } = await supabase
         .from('private_events')
         .select('start_time, end_time, full_day')
-        .gte('start_time', start.toISO({ suppressMilliseconds: true }))
-        .lte('end_time', end.toISO({ suppressMilliseconds: true }))
         .eq('status', 'active');
+      
+      // Filter events that overlap with our booking window
+      const events = (allEvents || []).filter(ev => {
+        const eventStart = DateTime.fromISO(ev.start_time);
+        const eventEnd = DateTime.fromISO(ev.end_time);
+        const bookingStart = start;
+        const bookingEnd = end;
+        
+        // Check if events overlap with booking window
+        return (eventStart <= bookingEnd && eventEnd >= bookingStart);
+      });
+      
       // Collect all dates covered by private events
       const eventDates = new Set<string>();
       (events || []).forEach((ev: any) => {
@@ -384,6 +369,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
           }
         }
       });
+      
       setPrivateEventDates(Array.from(eventDates));
     }
     fetchBlockedDates();
@@ -908,20 +894,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     const isBaseDay = effectiveBaseDays.includes(d.getDay());
                     const isClosed = exceptionalClosures.includes(dateStr);
                     const isPrivateEvent = privateEventDates.includes(dateStr);
-                    
-                    console.log(`=== FILTER DATE DEBUG for ${dateStr} ===`);
-                    console.log('dateStr:', dateStr);
-                    console.log('day of week:', d.getDay());
-                    console.log('effectiveBaseDays:', effectiveBaseDays);
-                    console.log('isBaseDay:', isBaseDay);
-                    console.log('isExceptionalOpen:', isExceptionalOpen);
-                    console.log('isClosed:', isClosed);
-                    console.log('isPrivateEvent:', isPrivateEvent);
-                    console.log('exceptionalOpens:', exceptionalOpens);
-                    console.log('exceptionalClosures:', exceptionalClosures);
-                    console.log('privateEventDates:', privateEventDates);
-                    console.log('result:', (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent);
-                    console.log('=== END FILTER DATE DEBUG ===');
                     
                     return (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent;
                   }}
