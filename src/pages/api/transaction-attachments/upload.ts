@@ -16,34 +16,29 @@ export const config = {
   },
 };
 
+// Define allowed MIME types
+const allowedMimeTypes = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/rtf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/zip',
+  'application/x-rar-compressed'
+];
+
 // Configure multer for file upload
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: '/tmp',
-    filename: (req, file, cb) => {
-      cb(null, `${Date.now()}-${file.originalname}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    // Define allowed MIME types
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'text/plain',
-      'text/rtf',
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'application/zip',
-      'application/x-rar-compressed'
-    ];
-    
     if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -72,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return new Promise((resolve, reject) => {
         console.log('Request headers:', req.headers);
         console.log('Request method:', req.method);
+        console.log('Content-Type:', req.headers['content-type']);
         
         uploadMiddleware(req as any, res as any, (err) => {
           if (err) {
@@ -81,7 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log('Form parsed successfully');
             console.log('File:', (req as any).file);
             console.log('Body:', (req as any).body);
-            console.log('Files:', (req as any).files);
             resolve({ file: (req as any).file, body: (req as any).body });
           }
         });
@@ -110,38 +105,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate file type
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'text/plain',
-      'text/rtf',
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'application/zip',
-      'application/x-rar-compressed'
-    ];
-    
     if (!file.mimetype || !allowedMimeTypes.includes(file.mimetype)) {
       console.error('Invalid file type:', file.mimetype);
       return res.status(400).json({ error: 'File type not allowed. Please upload PDF, Word, Excel, PowerPoint, text, image, or archive files.' });
     }
 
     console.log('Reading file buffer...');
-    // Read file content
-    const fileBuffer = fs.readFileSync(file.path);
-    const fileName = `${memberId}/${Date.now()}_${file.originalname}`;
+    // Use the buffer directly from multer memory storage
+    const fileBuffer = file.buffer;
+    
+    // Sanitize the filename to remove special characters and spaces
+    const sanitizeFilename = (filename: string) => {
+      return filename
+        .replace(/[^a-zA-Z0-9.-]/g, '_') // Replace special characters with underscores
+        .replace(/_+/g, '_') // Replace multiple underscores with single underscore
+        .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+    };
+    
+    const sanitizedOriginalName = sanitizeFilename(file.originalname);
+    const fileName = `${memberId}/${Date.now()}_${sanitizedOriginalName}`;
     
     console.log('File details:', {
       fileName,
       fileSize: fileBuffer.length,
-      originalName: file.originalname
+      originalName: file.originalname,
+      sanitizedOriginalName
     });
 
     console.log('Uploading to Supabase Storage...');
@@ -194,9 +182,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     console.log('Database record saved successfully');
-
-    // Clean up temporary file
-    fs.unlinkSync(file.path);
 
     console.log('Upload completed successfully');
     res.status(200).json({
