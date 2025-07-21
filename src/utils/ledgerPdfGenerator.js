@@ -284,6 +284,12 @@ export class LedgerPdfGenerator {
       .fontSize(10)
       .font('Helvetica')
       .text(`Generated on ${new Date().toLocaleDateString()}\nat ${new Date().toLocaleTimeString()}\nNoir CRM System\nAccount ID: ${member.account_id}`, { align: 'right' });
+    
+    // Add note about opening links in new tabs
+    this.doc
+      .fontSize(8)
+      .font('Helvetica')
+      .text('Note: To open attachment links in a new tab, right-click the link and select "Open in new tab" or hold Ctrl/Cmd while clicking.', { align: 'center' });
   }
 
   calculateSummary(transactions) {
