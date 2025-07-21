@@ -84,12 +84,12 @@ export class LedgerPdfGenerator {
         .lt('date', startDate);
       const priorBalance = priorEntries ? priorEntries.reduce((sum, e) => sum + (e.amount || 0), 0) : 0;
 
-      // Fetch renewal dates (using description contains 'renewal')
+      // Fetch renewal dates (using note contains 'renewal')
       const { data: renewalEntries } = await supabase
         .from('ledger')
         .select('date')
         .eq('account_id', accountId)
-        .ilike('description', '%renewal%')
+        .ilike('note', '%renewal%')
         .order('date', { ascending: false });
       let lastRenewalDate = null;
       let nextRenewalDate = null;
@@ -148,7 +148,6 @@ export class LedgerPdfGenerator {
       .fontSize(12)
       .font('Helvetica')
       .text(`Name: ${member.first_name} ${member.last_name}`)
-      .text(`Account ID: ${member.account_id}`)
       .text(`Membership: ${member.membership || 'N/A'}`)
       .text(`Period: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`)
       .moveDown(1);
