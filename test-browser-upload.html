@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload Test</title>
+</head>
+<body>
+    <h1>File Upload Test</h1>
+    
+    <form id="uploadForm">
+        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar" />
+        <br><br>
+        <button type="submit">Upload File</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const resultDiv = document.getElementById('result');
+            
+            if (!file) {
+                resultDiv.innerHTML = '<p style="color: red;">Please select a file</p>';
+                return;
+            }
+            
+            console.log('File details:', {
+                name: file.name,
+                size: file.size,
+                type: file.type
+            });
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('ledgerId', '0fac5cd5-9b49-4a77-adbf-2c29ac4584ad');
+            formData.append('memberId', '081d8a5d-9cae-4ebf-88e0-a3c7e9948fd6');
+            formData.append('accountId', 'c162a3b7-b3af-44ae-90a7-bab901028a21');
+            
+            try {
+                resultDiv.innerHTML = '<p>Uploading...</p>';
+                
+                const response = await fetch('/api/transaction-attachments/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                const result = await response.text();
+                console.log('Response body:', result);
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = '<p style="color: green;">Upload successful!</p><pre>' + result + '</pre>';
+                } else {
+                    resultDiv.innerHTML = '<p style="color: red;">Upload failed!</p><pre>' + result + '</pre>';
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+            }
+        });
+    </script>
+</body>
+</html> 

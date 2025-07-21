@@ -21,6 +21,34 @@ interface LedgerEntry {
   amount: number;
 }
 
+interface FinancialMetrics {
+  monthlyRecurringRevenue: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+  julyPaymentsReceived: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+  julyRevenue: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+  julyAR: {
+    total: number;
+    description: string;
+    breakdown?: any[];
+  };
+  outstandingBalances: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+}
+
 interface Stats {
   members: Member[];
   ledger: LedgerEntry[];
@@ -31,6 +59,7 @@ interface Stats {
   waitlistEntries: any[];
   invitationRequestsCount: number;
   invitationRequests: any[];
+  financialMetrics?: FinancialMetrics;
 }
 
 function getNextBirthday(dob?: string) {
@@ -76,15 +105,22 @@ export default function Dashboard() {
       // Fetch all members
       const membersRes = await fetch("/api/members");
       const membersData = await membersRes.json();
+      
       // Fetch ledger
       const ledgerRes = await fetch("/api/ledger");
       const ledgerData = await ledgerRes.json();
+      
       // Fetch all upcoming reservations (not just count)
       const reservationsRes = await fetch("/api/reservations?upcoming=1");
       const reservationsData = await reservationsRes.json();
+      
       // Fetch outstanding balances
       const outstandingRes = await fetch("/api/ledger?outstanding=1");
       const outstandingData = await outstandingRes.json();
+
+      // Fetch detailed financial metrics
+      const financialRes = await fetch("/api/financial-metrics");
+      const financialData = await financialRes.json();
 
       // Fetch waitlist data
       const waitlistRes = await fetch("/api/waitlist?status=review&limit=5");
@@ -104,9 +140,11 @@ export default function Dashboard() {
         waitlistEntries: waitlistedData.data || [],
         invitationRequestsCount: waitlistData.count || 0,
         invitationRequests: waitlistData.data || [],
+        financialMetrics: financialData,
       });
       setReservationDetails(reservationsData.data || []);
     } catch (err) {
+      console.error('Error fetching stats:', err);
       setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [], invitationRequestsCount: 0, invitationRequests: [] });
       setReservationDetails([]);
     }
@@ -197,14 +235,51 @@ export default function Dashboard() {
         {/* Single-stat cards grid */}
         <div className={styles.cardsGrid}>
           <DashboardCard label="Total Members" value={totalMembers} />
-          <DashboardCard label="Monthly Recurring Revenue" value={`$${totalDues.toFixed(2)}`} />
-          <DashboardCard label="Outstanding Balances" value={`$${stats.outstanding?.toFixed(2)}`} />
-          <DashboardCard label={`${now.toLocaleString('default', { month: 'long' })} Payments Received`} value={`$${payments.toFixed(2)}`} />
-          <DashboardCard label={`${now.toLocaleString('default', { month: 'long' })} Revenue`} value={`$${Math.abs(purchases).toFixed(2)}`} />
-          <DashboardCard label={`${now.toLocaleString('default', { month: 'long' })} A/R (Owed to Us)`} value={`$${ar.toFixed(2)}`} />
+          
+          <DashboardCard 
+            label="Monthly Memberships" 
+            value={`$${stats.financialMetrics?.monthlyRecurringRevenue?.total?.toFixed(2) || totalDues.toFixed(2)}`}
+            description={stats.financialMetrics?.monthlyRecurringRevenue?.description}
+            breakdown={stats.financialMetrics?.monthlyRecurringRevenue?.breakdown}
+            breakdownTitle="MRR Breakdown"
+          />
+          
+          <DashboardCard 
+            label="Outstanding Balances" 
+            value={`$${stats.financialMetrics?.outstandingBalances?.total?.toFixed(2) || stats.outstanding?.toFixed(2)}`}
+            description={stats.financialMetrics?.outstandingBalances?.description}
+            breakdown={stats.financialMetrics?.outstandingBalances?.breakdown}
+            breakdownTitle="Outstanding Balances"
+          />
+          
+          <DashboardCard 
+            label={`${now.toLocaleString('default', { month: 'long' })} Member Revenue`} 
+            value={`$${stats.financialMetrics?.julyRevenue?.total?.toFixed(2) || Math.abs(purchases).toFixed(2)}`}
+            description={stats.financialMetrics?.julyRevenue?.description}
+            breakdown={stats.financialMetrics?.julyRevenue?.breakdown}
+            breakdownTitle={`${now.toLocaleString('default', { month: 'long' })} Member Revenue`}
+          />
+          
+          <DashboardCard 
+            label={`${now.toLocaleString('default', { month: 'long' })} Toast Revenue`} 
+            value={`$${stats.financialMetrics?.julyPaymentsReceived?.total?.toFixed(2) || payments.toFixed(2)}`}
+            description={stats.financialMetrics?.julyPaymentsReceived?.description}
+            breakdown={stats.financialMetrics?.julyPaymentsReceived?.breakdown}
+            breakdownTitle={`${now.toLocaleString('default', { month: 'long' })} Toast Revenue`}
+          />
+          
+          <DashboardCard 
+            label={`${now.toLocaleString('default', { month: 'long' })} A/R (Owed to Us)`} 
+            value={`$${stats.financialMetrics?.julyAR?.total?.toFixed(2) || ar.toFixed(2)}`}
+            description={stats.financialMetrics?.julyAR?.description}
+            breakdown={stats.financialMetrics?.julyAR?.breakdown}
+            breakdownTitle={`${now.toLocaleString('default', { month: 'long' })} A/R Calculation`}
+          />
+          
           <DashboardCard label="Invitation Requests" value={stats.invitationRequestsCount} />
           <DashboardCard label="Waitlist" value={stats.waitlistCount} />
         </div>
+        
         {/* Multi-data cards stacked below */}
         <div className={styles.listsGrid}>
           <DashboardListCard label="Upcoming Reservations (Seats)">

@@ -21,8 +21,20 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: error.message });
       }
       if (outstanding === '1') {
-        // Outstanding = sum of all negative balances (purchases - payments)
-        const total = (data || []).reduce((sum, tx) => sum + (tx.type === 'purchase' ? Number(tx.amount) : tx.type === 'payment' ? -Number(tx.amount) : 0), 0);
+        // FIXED: Outstanding = sum of all negative account balances (amounts owed to us)
+        const accountBalances = {};
+        (data || []).forEach(tx => {
+          if (!accountBalances[tx.account_id]) {
+            accountBalances[tx.account_id] = 0;
+          }
+          accountBalances[tx.account_id] += Number(tx.amount);
+        });
+        
+        // Sum only negative balances (amounts owed to us)
+        const total = Object.values(accountBalances)
+          .filter(balance => balance < 0)
+          .reduce((sum, balance) => sum + Math.abs(balance), 0);
+        
         return res.status(200).json({ total });
       }
 

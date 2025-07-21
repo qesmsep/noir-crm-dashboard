@@ -1,68 +1,182 @@
 .card {
   background: #fff;
+  padding: 1.5rem;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  padding: 2rem 1.5rem;
-  min-width: 0;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin: 0.5rem 0;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-@media (max-width: 700px) {
-  .card {
-    flex-direction: column-reverse;
-    padding: 1.25rem 0.75rem;
-    min-height: 100px;
-  }
+  min-width: 200px;
+  position: relative;
+  transition: all 0.2s ease;
 }
 
 .card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.label {
-  font-size: 1.1rem;
-  color: #666;
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  text-align: center;
-  letter-spacing: 0.04em;
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+}
+
+.cardContent {
+  position: relative;
 }
 
 .value {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: bold;
-  color: #23201C;
-  font-family: 'Montserrat', sans-serif;
-  text-align: center;
-  margin-bottom: 0.25rem;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.description {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.8rem;
+  color: #999;
+  cursor: help;
 }
 
 .extra {
+  font-size: 0.8rem;
+  color: #888;
   margin-top: 0.5rem;
+}
+
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999998;
+}
+
+.breakdown {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 600px;
+  max-height: 80vh;
+  background: #ffffff !important;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  z-index: 999999;
+  overflow-y: auto;
+  backdrop-filter: blur(4px);
+}
+
+.breakdownHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  background: #ffffff !important;
+  border-radius: 8px 8px 0 0;
+}
+
+.breakdownHeader h4 {
+  margin: 0;
   font-size: 1rem;
-  color: #444;
-  text-align: center;
+  color: #333;
+  margin-bottom: 0.5rem;
 }
 
-@media (max-width: 900px) {
-  .value {
-    font-size: 2rem;
-  }
+.breakdownDescription {
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.4;
+  max-width: 400px;
 }
 
-@media (max-width: 600px) {
-  .label {
-    font-size: 1rem;
-  }
-  .value {
-    font-size: 1.5rem;
+.closeButton {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 4px 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.closeButton:hover {
+  background-color: #e0e0e0;
+  color: #333;
+  transform: scale(1.1);
+}
+
+.closeButton:active {
+  transform: scale(0.95);
+}
+
+.breakdownContent {
+  padding: 1rem;
+  background: #ffffff !important;
+}
+
+.breakdownItem {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.breakdownItem:last-child {
+  border-bottom: none;
+}
+
+.breakdownName {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.25rem;
+}
+
+.breakdownAmount {
+  font-weight: bold;
+  color: #2c5282;
+  font-size: 1.1rem;
+}
+
+.breakdownNote {
+  font-size: 0.8rem;
+  color: #fff;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+.breakdownDate {
+  font-size: 0.75rem;
+  color: #999;
+  margin-top: 0.25rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .breakdown {
+    width: 95vw;
+    max-width: none;
   }
 } 
