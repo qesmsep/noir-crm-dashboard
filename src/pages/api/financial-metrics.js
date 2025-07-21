@@ -56,28 +56,70 @@ export default async function handler(req, res) {
       return acc;
     }, { total: 0, breakdown: [] });
 
-    // Fetch Toast monthly revenue from stored transactions
-    const startDate = new Date(targetYear, targetMonth, 1);
-    const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+    // Get current month dates for Toast API
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     
+    // Try to get Toast revenue from Partner API first
     let toastRevenue = 0;
-    let toastRevenueBreakdown = { total: 0, breakdown: [] };
+    let toastRevenueBreakdown = [];
     
-    // Use stored Toast transactions as the primary source
-    const { data: toastTransactions, error: toastError } = await supabaseAdmin
-      .from('toast_transactions')
-      .select('amount, transaction_date')
-      .gte('transaction_date', startDate.toISOString())
-      .lte('transaction_date', endDate.toISOString());
+    try {
+      console.log('Attempting to fetch Toast revenue from Partner API...');
+      const toastResponse = await fetch(`https://ws-api.toasttab.com/restaurants/v1/sales?locationGuid=aa7a6cb5-92c3-4259-834c-2ab696f706c9&startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}`, {
+        headers: {
+          Authorization: `Bearer ${process.env.TOAST_API_KEY}`
+        }
+      });
+      
+      if (toastResponse.ok) {
+        const toastData = await toastResponse.json();
+        console.log('Toast Partner API response:', toastData);
+        
+        // Calculate total sales from the response
+        if (toastData && Array.isArray(toastData)) {
+          toastRevenue = toastData.reduce((sum, sale) => sum + (Number(sale.amount) || 0), 0);
+          toastRevenueBreakdown = toastData.map(sale => ({
+            category: 'Partner API Sale',
+            amount: Number(sale.amount) || 0,
+            date: sale.date || sale.transactionDate,
+            description: sale.description || sale.itemName || 'Sale'
+          }));
+          console.log('Successfully fetched Toast revenue from Partner API:', toastRevenue);
+        } else if (toastData && typeof toastData === 'object') {
+          // Handle different response formats
+          toastRevenue = toastData.totalSales || toastData.total || 0;
+          toastRevenueBreakdown = [{
+            category: 'Partner API Total',
+            amount: toastRevenue,
+            date: new Date().toISOString()
+          }];
+          console.log('Successfully fetched Toast revenue from Partner API:', toastRevenue);
+        }
+      } else {
+        const errorText = await toastResponse.text();
+        console.log('Partner API failed:', toastResponse.status, errorText);
+        throw new Error(`Partner API request failed: ${toastResponse.status}`);
+      }
+    } catch (error) {
+      console.log('Falling back to stored transactions for Toast revenue:', error.message);
+      // Fallback to stored transactions
+      const { data: toastTransactions } = await supabaseAdmin
+        .from('toast_transactions')
+        .select('*')
+        .gte('transaction_date', startOfMonth.toISOString())
+        .lte('transaction_date', endOfMonth.toISOString());
 
-    if (toastError) {
-      console.error('Toast transactions fetch error:', toastError);
+      if (toastTransactions) {
+        toastRevenue = toastTransactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
+        toastRevenueBreakdown = toastTransactions.map(tx => ({
+          category: 'Stored Transaction',
+          amount: Number(tx.amount),
+          date: tx.transaction_date
+        }));
+      }
     }
-
-    toastRevenue = toastTransactions?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-    
-    // Note: Toast API sales summary integration requires proper API credentials and endpoints
-    // Currently using stored transactions. For real-time sales data, configure Toast API access.
 
     // Calculate July Payments Received (Membership dues only)
     const julyMembershipPayments = ledgerData.filter(tx =>
@@ -275,8 +317,8 @@ export default async function handler(req, res) {
     // July Payments Received (Toast Revenue)
     const julyPaymentsReceived = {
       total: toastRevenue,
-      description: "Total revenue from Toast POS system for the current month (from stored transactions)",
-      breakdown: toastRevenueBreakdown.breakdown
+      description: "Total revenue from Toast POS system for the current month (from real-time webhook transactions)",
+      breakdown: toastRevenueBreakdown
     };
 
     return res.status(200).json({

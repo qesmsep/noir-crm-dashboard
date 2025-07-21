@@ -143,11 +143,16 @@ export class LedgerPdfGenerator {
   }
 
   generatePdfContent(member, accountMembers, transactions, transactionAttachments, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate) {
-    // Header
+    // Header with Noir logo
     this.doc
-      .fontSize(24)
+      .fontSize(28)
       .font('Helvetica-Bold')
-      .text('NOIR MEMBER LEDGER', { align: 'center' })
+      .text('NOIR', { align: 'center' })
+      .moveDown(0.3);
+    this.doc
+      .fontSize(16)
+      .font('Helvetica')
+      .text('Member Ledger', { align: 'center' })
       .moveDown(0.5);
     // Member Information
     this.doc
@@ -272,12 +277,6 @@ export class LedgerPdfGenerator {
       .fontSize(10)
       .font('Helvetica')
       .text(`Generated on ${new Date().toLocaleDateString()}\nat ${new Date().toLocaleTimeString()}\nNoir CRM System\nAccount ID: ${member.account_id}`, { align: 'right' });
-    
-    // Add note about opening links in new tabs
-    this.doc
-      .fontSize(8)
-      .font('Helvetica')
-      .text('Note: To open attachment links in a new tab, right-click the link and select "Open in new tab" or hold Ctrl/Cmd while clicking.', { align: 'center' });
   }
 
   calculateSummary(transactions) {
