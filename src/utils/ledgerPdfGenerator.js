@@ -58,6 +58,24 @@ export class LedgerPdfGenerator {
         throw new Error('Failed to fetch ledger transactions');
       }
 
+      // Get transaction attachments for the period
+      let transactionAttachments = [];
+      if (transactions && transactions.length > 0) {
+        const ledgerIds = transactions.map(tx => tx.id);
+        const { data: attachments, error: attachmentsError } = await supabase
+          .from('transaction_attachments')
+          .select('*')
+          .in('ledger_id', ledgerIds)
+          .order('uploaded_at', { ascending: true });
+
+        if (attachmentsError) {
+          console.error('Error fetching attachments:', attachmentsError);
+          // Don't fail the PDF generation if attachments can't be fetched
+        } else {
+          transactionAttachments = attachments || [];
+        }
+      }
+
       // Calculate prior balance (sum of all entries before startDate)
       const { data: priorEntries } = await supabase
         .from('ledger')
@@ -94,7 +112,7 @@ export class LedgerPdfGenerator {
       }
 
       // Generate PDF
-      const pdfBuffer = await this.createPdfBuffer(member, accountMembers, transactions, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate);
+      const pdfBuffer = await this.createPdfBuffer(member, accountMembers, transactions, transactionAttachments, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate);
       return pdfBuffer;
     } catch (error) {
       console.error('Error generating ledger PDF:', error);
@@ -102,18 +120,18 @@ export class LedgerPdfGenerator {
     }
   }
 
-  async createPdfBuffer(member, accountMembers, transactions, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate) {
+  async createPdfBuffer(member, accountMembers, transactions, transactionAttachments, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate) {
     return new Promise((resolve, reject) => {
       const chunks = [];
       this.doc.on('data', chunk => chunks.push(chunk));
       this.doc.on('end', () => resolve(Buffer.concat(chunks)));
       this.doc.on('error', reject);
-      this.generatePdfContent(member, accountMembers, transactions, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate);
+      this.generatePdfContent(member, accountMembers, transactions, transactionAttachments, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate);
       this.doc.end();
     });
   }
 
-  generatePdfContent(member, accountMembers, transactions, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate) {
+  generatePdfContent(member, accountMembers, transactions, transactionAttachments, startDate, endDate, priorBalance, previousPeriodEntries, lastRenewalDate, nextRenewalDate) {
     // Header
     this.doc
       .fontSize(24)
@@ -196,29 +214,44 @@ export class LedgerPdfGenerator {
         .text('Transaction Details');
       const tableTop = this.doc.y;
       const tableLeft = 50;
-      const colWidth = 120;
+      const colWidth = 100;
       const rowHeight = 20;
       this.doc.fontSize(10).font('Helvetica-Bold')
         .text('Date', tableLeft, tableTop)
         .text('Description', tableLeft + colWidth, tableTop)
         .text('Type', tableLeft + colWidth * 2, tableTop)
         .text('Amount', tableLeft + colWidth * 3, tableTop)
-        .text('Balance', tableLeft + colWidth * 4, tableTop);
-      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 5, tableTop + 15).stroke();
+        .text('Balance', tableLeft + colWidth * 4, tableTop)
+        .text('Attachments', tableLeft + colWidth * 5, tableTop);
+      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 6, tableTop + 15).stroke();
       let currentY = tableTop + 20;
       let runningBalance = priorBalance;
+      
+      // Create a map of attachments by ledger_id for quick lookup
+      const attachmentsByLedgerId = {};
+      transactionAttachments.forEach(attachment => {
+        if (!attachmentsByLedgerId[attachment.ledger_id]) {
+          attachmentsByLedgerId[attachment.ledger_id] = [];
+        }
+        attachmentsByLedgerId[attachment.ledger_id].push(attachment);
+      });
+      
       transactions.forEach((entry) => {
+        const attachments = attachmentsByLedgerId[entry.id] || [];
+        const attachmentText = attachments.length > 0 ? `${attachments.length} file(s)` : '';
+        
         this.doc.fontSize(9).font('Helvetica')
           .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY)
           .text(entry.description || 'No description', tableLeft + colWidth, currentY)
           .text(entry.type || '', tableLeft + colWidth * 2, currentY)
           .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth * 3, currentY)
-          .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY);
+          .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY)
+          .text(attachmentText, tableLeft + colWidth * 5, currentY);
         runningBalance += entry.amount;
         currentY += rowHeight;
       });
       // Draw bottom line after table
-      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth * 5, currentY - 5).stroke();
+      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth * 6, currentY - 5).stroke();
       // Add space before footer
       this.doc.moveDown(2);
     } else {
@@ -228,6 +261,56 @@ export class LedgerPdfGenerator {
         .text('No transactions found for this period.')
         .moveDown(1);
     }
+    
+    // Transaction Attachments Section
+    if (transactionAttachments.length > 0) {
+      this.doc
+        .fontSize(14)
+        .font('Helvetica-Bold')
+        .text('Transaction Attachments')
+        .moveDown(0.5);
+      
+      this.doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`This period includes ${transactionAttachments.length} attached file(s) for your transactions.`)
+        .moveDown(0.5);
+      
+      // Group attachments by transaction
+      const attachmentsByTransaction = {};
+      transactionAttachments.forEach(attachment => {
+        const transaction = transactions.find(tx => tx.id === attachment.ledger_id);
+        if (transaction) {
+          const key = `${transaction.date} - ${transaction.description}`;
+          if (!attachmentsByTransaction[key]) {
+            attachmentsByTransaction[key] = [];
+          }
+          attachmentsByTransaction[key].push(attachment);
+        }
+      });
+      
+      // List attachments by transaction
+      Object.entries(attachmentsByTransaction).forEach(([transactionKey, attachments]) => {
+        this.doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .text(transactionKey)
+          .moveDown(0.3);
+        
+        attachments.forEach(attachment => {
+          const fileSizeKB = (attachment.file_size / 1024).toFixed(1);
+          this.doc
+            .fontSize(9)
+            .font('Helvetica')
+            .text(`• ${attachment.file_name} (${fileSizeKB} KB) - Uploaded: ${new Date(attachment.uploaded_at).toLocaleDateString()}`);
+        });
+        
+        this.doc.moveDown(0.5);
+      });
+      
+      this.doc.moveDown(1);
+    }
+    
     // Footer
     this.doc
       .fontSize(10)
