@@ -229,11 +229,11 @@ const MemberLedger = ({
               <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
                 Type
               </Th>
-              <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" isNumeric>
+              <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" textAlign="center">
                 Amount
               </Th>
-              <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" isNumeric>
-                Running Balance
+              <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" textAlign="center">
+                Balance
               </Th>
               <Th px={6} py={5}borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
                 Actions
@@ -320,7 +320,7 @@ const MemberLedger = ({
                   <option value="purchase">Purchase</option>
                 </Select>
               </Td>
-              <Td px={6} py={2} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
+              <Td px={6} py={2} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8" textAlign="center">
                 <Input
                   type="number"
                   placeholder="Amount"
@@ -447,7 +447,7 @@ const MemberLedger = ({
                         tx.type === 'payment' ? 'Payment' : 'Purchase'
                       )}
                     </Td>
-                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" isNumeric>
+                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" textAlign="center">
                       {isEditing ? (
                         <Input
                           type="number"
@@ -467,8 +467,8 @@ const MemberLedger = ({
                         </Text>
                       )}
                     </Td>
-                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" isNumeric>
-                      <Text color={calculateRunningBalance(memberLedger, idx) >= 0 ? 'green.500' : 'red.500'}>
+                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" textAlign="center">
+                      <Text color={calculateRunningBalance(memberLedger, idx) >= 0 ? 'green.500' : '#FF0000'}>
                         {formatCurrency(calculateRunningBalance(memberLedger, idx))}
                       </Text>
                     </Td>
