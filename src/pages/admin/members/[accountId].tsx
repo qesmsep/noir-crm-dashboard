@@ -9,8 +9,7 @@ const MemberLedger = require("../../../components/pages/MemberLedger").default;
 import AddMemberModal from '../../../components/members/AddMemberModal';
 import SendMessageForm from '../../../components/messages/SendMessageForm';
 import AdminLayout from '../../../components/layouts/AdminLayout';
-import ToastTransactionsSection from '../../../components/ToastTransactionsSection';
-import ToastSyncStatusCard from '../../../components/ToastSyncStatusCard';
+
 import { EmailIcon, PhoneIcon, CalendarIcon } from "@chakra-ui/icons";
 import { FaBriefcase, FaUser } from 'react-icons/fa';
 
@@ -1350,18 +1349,7 @@ export default function MemberDetailAdmin() {
           )}
         </Box>
         
-        {/* Toast Transactions Section */}
-        <Box bg="white" border="3px solid #a59480" borderRadius="16px" width="94%" marginLeft="2%" boxShadow="lg" p={8} mb={8} paddingTop={20}>
-          <ToastTransactionsSection 
-            memberId={members[0]?.member_id || ''} 
-            memberName={`${members[0]?.first_name} ${members[0]?.last_name}`}
-          />
-        </Box>
-        
-        {/* Toast Sync Status Card */}
-        <Box bg="white" border="3px solid #a59480" borderRadius="16px" width="94%" marginLeft="2%" boxShadow="lg" p={8} mb={8} paddingTop={20}>
-          <ToastSyncStatusCard />
-        </Box>
+
         
         {/* Message + History Card */}
         <Box bg="white" border="3px solid #a59480" borderRadius="16px" width="94%" marginLeft="2%" boxShadow="lg" p={8} mb={8} paddingTop={20}> 
