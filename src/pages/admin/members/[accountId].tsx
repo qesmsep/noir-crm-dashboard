@@ -608,16 +608,19 @@ export default function MemberDetailAdmin() {
       const supabase = getSupabaseClient();
       const { data: renewalEntries } = await supabase
         .from('ledger')
-        .select('date')
+        .select('date, note')
         .eq('account_id', selectedMemberForPdf.account_id)
-        .ilike('description', '%renewal%')
+        .ilike('note', '%renewal%')
         .order('date', { ascending: false });
+      console.log('Renewal entries found:', renewalEntries);
       if (renewalEntries && renewalEntries.length > 1) {
         setPreviousPeriodEnd(renewalEntries[0].date);
         setPreviousPeriodStart(renewalEntries[1].date);
+        console.log('Previous period dates set:', renewalEntries[0].date, renewalEntries[1].date);
       } else {
         setPreviousPeriodStart(null);
         setPreviousPeriodEnd(null);
+        console.log('No renewal entries found or insufficient data');
       }
     };
     if (isTextPdfModalOpen) fetchRenewalDates();
@@ -652,6 +655,9 @@ export default function MemberDetailAdmin() {
           endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
           break;
         case 'previous_membership_period':
+          console.log('Previous membership period selected');
+          console.log('previousPeriodStart:', previousPeriodStart);
+          console.log('previousPeriodEnd:', previousPeriodEnd);
           if (!previousPeriodStart || !previousPeriodEnd) {
             toast({ title: 'Error', description: 'No previous membership period found.', status: 'error', duration: 3000 });
             setSendingPdf(false);
@@ -659,6 +665,7 @@ export default function MemberDetailAdmin() {
           }
           startDate = new Date(previousPeriodStart);
           endDate = new Date(new Date(previousPeriodEnd).getTime() - 86400000); // day before last renewal
+          console.log('Calculated dates:', startDate, endDate);
           break;
         case 'custom':
           if (!customStartDate || !customEndDate) {

@@ -26,12 +26,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Fetch renewal dates (assuming you have a 'renewals' table or similar)
-    // For demo, we'll use ledger entries with description containing 'renewal'
+    // For demo, we'll use ledger entries with note containing 'renewal'
     const { data: renewalEntries } = await getSupabaseClient()
       .from('ledger')
       .select('date')
       .eq('account_id', member.account_id)
-      .ilike('description', '%renewal%')
+      .ilike('note', '%renewal%')
       .order('date', { ascending: false });
 
     let lastRenewalDate = null;
