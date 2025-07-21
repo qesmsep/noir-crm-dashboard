@@ -319,6 +319,16 @@ export class LedgerPdfGenerator {
             .fontSize(9)
             .font('Helvetica')
             .text(`• ${attachment.file_name} (${fileSizeKB} KB) - Uploaded: ${new Date(attachment.uploaded_at).toLocaleDateString()}`);
+          
+          // Add clickable link to the file
+          this.doc
+            .fontSize(8)
+            .font('Helvetica')
+            .fillColor('blue')
+            .text(`  📎 Download: ${attachment.file_url}`, { underline: true });
+          
+          // Reset color back to black
+          this.doc.fillColor('black');
         });
         
         this.doc.moveDown(0.5);
