@@ -5,9 +5,8 @@ import {
   storeToastTransaction, 
   sendErrorNotification,
   updateSyncStatus,
-  ToastAPI,
   ToastWebhookPayload
-} from '../../lib/toast-api';
+} from '../../lib/webhook-utils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
