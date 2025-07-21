@@ -57,12 +57,21 @@ const TransactionAttachmentUpload: React.FC<TransactionAttachmentUploadProps> = 
   const fetchAttachments = async () => {
     setIsLoading(true);
     try {
+      console.log('Fetching attachments for ledgerId:', ledgerId);
       const response = await fetch(`/api/transaction-attachments/${ledgerId}`);
+      
+      console.log('Fetch response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Fetch response data:', data);
         setAttachments(data.data || []);
         setAttachmentCount(data.data?.length || 0);
+        console.log('Updated attachments count:', data.data?.length || 0);
+      } else {
+        console.error('Fetch failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('Fetch error response:', errorText);
       }
     } catch (error) {
       console.error('Error fetching attachments:', error);
@@ -173,7 +182,9 @@ const TransactionAttachmentUpload: React.FC<TransactionAttachmentUploadProps> = 
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-        fetchAttachments();
+        console.log('Calling fetchAttachments after successful upload...');
+        await fetchAttachments();
+        console.log('Calling onUploadSuccess callback...');
         onUploadSuccess?.();
       } else {
         const error = await response.json();
