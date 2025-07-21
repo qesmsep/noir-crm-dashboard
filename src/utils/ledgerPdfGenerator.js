@@ -221,12 +221,23 @@ export class LedgerPdfGenerator {
         .text('Description', tableLeft + colWidth, tableTop)
         .text('Type', tableLeft + colWidth * 2, tableTop)
         .text('Amount', tableLeft + colWidth * 3, tableTop)
-        .text('Balance', tableLeft + colWidth * 4, tableTop);
-      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 5, tableTop + 15).stroke();
+        .text('Balance', tableLeft + colWidth * 4, tableTop)
+        .text('Files', tableLeft + colWidth * 5, tableTop);
+      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 6, tableTop + 15).stroke();
+      // Create a map of attachments by ledger_id for quick lookup
+      const attachmentsByLedgerId = {};
+      transactionAttachments.forEach(attachment => {
+        if (!attachmentsByLedgerId[attachment.ledger_id]) {
+          attachmentsByLedgerId[attachment.ledger_id] = [];
+        }
+        attachmentsByLedgerId[attachment.ledger_id].push(attachment);
+      });
+      
       let currentY = tableTop + 20;
       let runningBalance = priorBalance;
       
       transactions.forEach((entry) => {
+        const attachments = attachmentsByLedgerId[entry.id] || [];
         // Check if we need a new page
         if (currentY > 700) { // If we're getting close to the bottom
           this.doc.addPage();
@@ -239,11 +250,22 @@ export class LedgerPdfGenerator {
           .text(entry.type || '', tableLeft + colWidth * 2, currentY)
           .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth * 3, currentY)
           .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY);
+        
+        // Add Files column with clickable link if attachments exist
+        if (attachments.length > 0) {
+          // Use the first attachment's URL for the link
+          const attachmentUrl = attachments[0].file_url;
+          this.doc
+            .fillColor('blue')
+            .text('link', tableLeft + colWidth * 5, currentY, { underline: true, link: attachmentUrl })
+            .fillColor('black');
+        }
+        
         runningBalance += entry.amount;
         currentY += rowHeight;
       });
       // Draw bottom line after table
-      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth * 5, currentY - 5).stroke();
+      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth * 6, currentY - 5).stroke();
       // Add space before footer
       this.doc.moveDown(2);
     } else {
