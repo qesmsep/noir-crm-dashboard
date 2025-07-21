@@ -204,17 +204,8 @@ export class LedgerPdfGenerator {
       .font('Helvetica')
       .text(`Total Payments: $${summary.totalPayments.toFixed(2)}`)
       .text(`Total Purchases: $${summary.totalPurchases.toFixed(2)}`)
-      .text(`Net Balance: $${summary.netBalance.toFixed(2)}`);
-    
-    // Add reference to attachments if any exist
-    if (transactionAttachments.length > 0) {
-      this.doc
-        .fillColor('blue')
-        .text(`📎 View ${transactionAttachments.length} attachment(s) below`, { underline: true })
-        .fillColor('black');
-    }
-    
-    this.doc.moveDown(1);
+      .text(`Net Balance: $${summary.netBalance.toFixed(2)}`)
+      .moveDown(1);
     // Transactions Table
     if (transactions.length > 0) {
       this.doc
@@ -230,25 +221,12 @@ export class LedgerPdfGenerator {
         .text('Description', tableLeft + colWidth, tableTop)
         .text('Type', tableLeft + colWidth * 2, tableTop)
         .text('Amount', tableLeft + colWidth * 3, tableTop)
-        .text('Balance', tableLeft + colWidth * 4, tableTop)
-        .text('Files', tableLeft + colWidth * 5, tableTop);
-      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 6, tableTop + 15).stroke();
+        .text('Balance', tableLeft + colWidth * 4, tableTop);
+      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 5, tableTop + 15).stroke();
       let currentY = tableTop + 20;
       let runningBalance = priorBalance;
       
-      // Create a map of attachments by ledger_id for quick lookup
-      const attachmentsByLedgerId = {};
-      transactionAttachments.forEach(attachment => {
-        if (!attachmentsByLedgerId[attachment.ledger_id]) {
-          attachmentsByLedgerId[attachment.ledger_id] = [];
-        }
-        attachmentsByLedgerId[attachment.ledger_id].push(attachment);
-      });
-      
       transactions.forEach((entry) => {
-        const attachments = attachmentsByLedgerId[entry.id] || [];
-        const attachmentText = attachments.length > 0 ? `${attachments.length}` : '';
-        
         // Check if we need a new page
         if (currentY > 700) { // If we're getting close to the bottom
           this.doc.addPage();
@@ -256,29 +234,16 @@ export class LedgerPdfGenerator {
         }
         
         this.doc.fontSize(8).font('Helvetica')
-          .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY);
-        
-        // Handle description - make it clickable if there are attachments
-        if (attachments.length > 0) {
-          this.doc
-            .fillColor('blue')
-            .text(`📎 ${entry.description || 'No description'}`, tableLeft + colWidth, currentY, { width: colWidth - 5, underline: true })
-            .fillColor('black');
-        } else {
-          this.doc
-            .text(entry.description || 'No description', tableLeft + colWidth, currentY, { width: colWidth - 5 });
-        }
-        
-        this.doc
+          .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY)
+          .text(entry.note || 'No description', tableLeft + colWidth, currentY, { width: colWidth - 5 })
           .text(entry.type || '', tableLeft + colWidth * 2, currentY)
           .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth * 3, currentY)
-          .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY)
-          .text(attachmentText, tableLeft + colWidth * 5, currentY);
+          .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY);
         runningBalance += entry.amount;
         currentY += rowHeight;
       });
       // Draw bottom line after table
-      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth * 6, currentY - 5).stroke();
+      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth * 5, currentY - 5).stroke();
       // Add space before footer
       this.doc.moveDown(2);
     } else {
@@ -287,75 +252,6 @@ export class LedgerPdfGenerator {
         .font('Helvetica')
         .text('No transactions found for this period.')
         .moveDown(1);
-    }
-    
-    // Transaction Attachments Section
-    if (transactionAttachments.length > 0) {
-      // Check if we need a new page for attachments
-      if (this.doc.y > 600) {
-        this.doc.addPage();
-      }
-      
-      this.doc
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text('Transaction Attachments')
-        .moveDown(0.5);
-      
-      this.doc
-        .fontSize(10)
-        .font('Helvetica')
-        .text(`This period includes ${transactionAttachments.length} attached file(s) for your transactions.`)
-        .moveDown(0.5);
-      
-      // Group attachments by transaction
-      const attachmentsByTransaction = {};
-      transactionAttachments.forEach(attachment => {
-        const transaction = transactions.find(tx => tx.id === attachment.ledger_id);
-        if (transaction) {
-          const key = `${new Date(transaction.date).toLocaleDateString()} - ${transaction.description || 'No description'}`;
-          if (!attachmentsByTransaction[key]) {
-            attachmentsByTransaction[key] = [];
-          }
-          attachmentsByTransaction[key].push(attachment);
-        }
-      });
-      
-      // List attachments by transaction
-      Object.entries(attachmentsByTransaction).forEach(([transactionKey, attachments]) => {
-        // Check if we need a new page
-        if (this.doc.y > 650) {
-          this.doc.addPage();
-        }
-        
-        this.doc
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text(transactionKey)
-          .moveDown(0.3);
-        
-        attachments.forEach(attachment => {
-          const fileSizeKB = (attachment.file_size / 1024).toFixed(1);
-          this.doc
-            .fontSize(9)
-            .font('Helvetica')
-            .text(`• ${attachment.file_name} (${fileSizeKB} KB) - Uploaded: ${new Date(attachment.uploaded_at).toLocaleDateString()}`);
-          
-          // Add clickable link to the file
-          this.doc
-            .fontSize(8)
-            .font('Helvetica')
-            .fillColor('blue')
-            .text(`  📎 Download: ${attachment.file_url}`, { underline: true });
-          
-          // Reset color back to black
-          this.doc.fillColor('black');
-        });
-        
-        this.doc.moveDown(0.5);
-      });
-      
-      this.doc.moveDown(1);
     }
     
     // Footer
