@@ -177,31 +177,8 @@ export class LedgerPdfGenerator {
       });
       this.doc.moveDown(1);
     }
-    // Previous Membership Period Section
-    if (lastRenewalDate && nextRenewalDate && previousPeriodEntries.length > 0) {
-      this.doc.fontSize(14).font('Helvetica-Bold').text('Previous Membership Period', { underline: true });
-      this.doc.fontSize(10).font('Helvetica').text(`From: ${new Date(nextRenewalDate).toLocaleDateString()} To: ${new Date(new Date(lastRenewalDate).getTime() - 86400000).toLocaleDateString()}`);
-      this.doc.moveDown(0.5);
-      // Table header
-      const prevTableTop = this.doc.y;
-      const tableLeft = 50;
-      const colWidth = 120;
-      const rowHeight = 20;
-      this.doc.fontSize(10).font('Helvetica-Bold')
-        .text('Date', tableLeft, prevTableTop)
-        .text('Description', tableLeft + colWidth, prevTableTop)
-        .text('Amount', tableLeft + colWidth * 2, prevTableTop);
-      this.doc.moveTo(tableLeft, prevTableTop + 15).lineTo(tableLeft + colWidth * 3, prevTableTop + 15).stroke();
-      let prevY = prevTableTop + 20;
-      previousPeriodEntries.forEach((entry) => {
-        this.doc.fontSize(9).font('Helvetica')
-          .text(new Date(entry.date).toLocaleDateString(), tableLeft, prevY)
-          .text(entry.description || 'No description', tableLeft + colWidth, prevY)
-          .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth * 2, prevY);
-        prevY += rowHeight;
-      });
-      this.doc.moveDown(1);
-    }
+    // Previous Membership Period Section - REMOVED
+    // We only want to show the main transaction details for the selected period
     // Summary
     const summary = this.calculateSummary(transactions);
     this.doc
