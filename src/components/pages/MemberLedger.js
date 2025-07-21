@@ -74,6 +74,11 @@ const MemberLedger = ({
     return (memberLedger || []).reduce((acc, t) => acc + Number(t.amount), 0);
   };
 
+  const calculateRunningBalance = (transactions, currentIndex) => {
+    if (!transactions || currentIndex < 0) return 0;
+    return transactions.slice(0, currentIndex + 1).reduce((acc, t) => acc + Number(t.amount), 0);
+  };
+
   const handleStartEdit = (transaction) => {
     setEditingId(transaction.id);
     setTempEditForm({
@@ -223,6 +228,9 @@ const MemberLedger = ({
               </Th>
               <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" isNumeric>
                 Amount
+              </Th>
+              <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" isNumeric>
+                Running Balance
               </Th>
               <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
                 Type
@@ -435,6 +443,11 @@ const MemberLedger = ({
                         </Text>
                       )}
                     </Td>
+                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" isNumeric>
+                      <Text color={calculateRunningBalance(memberLedger, idx) >= 0 ? 'green.500' : 'red.500'}>
+                        {formatCurrency(calculateRunningBalance(memberLedger, idx))}
+                      </Text>
+                    </Td>
                     <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8">
                       {isEditing ? (
                         <Select
@@ -530,7 +543,7 @@ const MemberLedger = ({
               })
             ) : (
               <Tr>
-                <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" colSpan={6} textAlign="center">No transactions found.</Td>
+                <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" colSpan={7} textAlign="center">No transactions found.</Td>
               </Tr>
             )}
           </Tbody>
