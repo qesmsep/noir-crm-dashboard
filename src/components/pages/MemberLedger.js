@@ -26,6 +26,7 @@ import {
   TableContainer,
 } from '@chakra-ui/react';
 import PropTypes from 'prop-types';
+import TransactionAttachmentUpload from '../TransactionAttachmentUpload';
 
 const MemberLedger = ({
   members,
@@ -498,18 +499,30 @@ const MemberLedger = ({
                           </Button>
                         </HStack>
                       ) : (
-                        <Button
-                          size="md"
-                          bg="#353535"
-                          color="#ecede8"
-                          _hover={{ bg: '#2a2a2a' }}
-                          onClick={() => handleStartEdit(tx)}
-                          borderRadius="lg"
-                          px={4}
-                          py={2}
-                        >
-                          Edit
-                        </Button>
+                        <HStack spacing={2}>
+                          <Button
+                            size="md"
+                            bg="#353535"
+                            color="#ecede8"
+                            _hover={{ bg: '#2a2a2a' }}
+                            onClick={() => handleStartEdit(tx)}
+                            borderRadius="lg"
+                            px={4}
+                            py={2}
+                          >
+                            Edit
+                          </Button>
+                          <TransactionAttachmentUpload
+                            ledgerId={tx.id}
+                            memberId={tx.member_id}
+                            accountId={selectedMember.account_id}
+                            transactionNote={tx.note || ''}
+                            onUploadSuccess={() => {
+                              // Refresh the ledger to update attachment counts
+                              fetchLedger(selectedMember.account_id);
+                            }}
+                          />
+                        </HStack>
                       )}
                     </Td>
                   </Tr>

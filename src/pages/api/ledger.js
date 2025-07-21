@@ -25,6 +25,29 @@ export default async function handler(req, res) {
         const total = (data || []).reduce((sum, tx) => sum + (tx.type === 'purchase' ? Number(tx.amount) : tx.type === 'payment' ? -Number(tx.amount) : 0), 0);
         return res.status(200).json({ total });
       }
+
+      // If we have ledger data, fetch attachment counts for each transaction
+      if (data && data.length > 0) {
+        const ledgerIds = data.map(tx => tx.id);
+        const { data: attachmentCounts, error: attachmentError } = await supabaseAdmin
+          .from("transaction_attachments")
+          .select("ledger_id")
+          .in("ledger_id", ledgerIds);
+
+        if (!attachmentError && attachmentCounts) {
+          // Create a map of ledger_id to attachment count
+          const attachmentCountMap = attachmentCounts.reduce((acc, attachment) => {
+            acc[attachment.ledger_id] = (acc[attachment.ledger_id] || 0) + 1;
+            return acc;
+          }, {});
+
+          // Add attachment count to each ledger entry
+          data.forEach(tx => {
+            tx.attachment_count = attachmentCountMap[tx.id] || 0;
+          });
+        }
+      }
+
       return res.status(200).json({ data });
     }
 
