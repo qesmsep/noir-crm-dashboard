@@ -260,8 +260,7 @@ export class LedgerPdfGenerator {
             .fillColor('blue')
             .text('link', tableLeft + colWidth + descColWidth + colWidth * 3, currentY, { 
               underline: true, 
-              link: attachmentUrl,
-              target: '_blank' // Open in new tab
+              link: attachmentUrl
             })
             .fillColor('black');
         }
@@ -285,7 +284,7 @@ export class LedgerPdfGenerator {
     this.doc
       .fontSize(10)
       .font('Helvetica')
-      .text(`Generated on ${new Date().toLocaleDateString()}\nat ${new Date().toLocaleTimeString()}\nNoir CRM System`, { align: 'right' });
+      .text(`Generated on ${new Date().toLocaleDateString()}\nat ${new Date().toLocaleTimeString()}\nNoir CRM System\nAccount ID: ${member.account_id}`, { align: 'right' });
   }
 
   calculateSummary(transactions) {
