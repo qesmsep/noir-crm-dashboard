@@ -56,10 +56,14 @@ export default async function handler(req, res) {
       return acc;
     }, { total: 0, breakdown: [] });
 
-    // Fetch Toast monthly revenue directly from database
+    // Fetch Toast monthly revenue from stored transactions
     const startDate = new Date(targetYear, targetMonth, 1);
     const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
     
+    let toastRevenue = 0;
+    let toastRevenueBreakdown = { total: 0, breakdown: [] };
+    
+    // Use stored Toast transactions as the primary source
     const { data: toastTransactions, error: toastError } = await supabaseAdmin
       .from('toast_transactions')
       .select('amount, transaction_date')
@@ -70,7 +74,10 @@ export default async function handler(req, res) {
       console.error('Toast transactions fetch error:', toastError);
     }
 
-    const toastRevenue = toastTransactions?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+    toastRevenue = toastTransactions?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+    
+    // Note: Toast API sales summary integration requires proper API credentials and endpoints
+    // Currently using stored transactions. For real-time sales data, configure Toast API access.
 
     // Calculate July Payments Received (Membership dues only)
     const julyMembershipPayments = ledgerData.filter(tx =>
@@ -265,17 +272,20 @@ export default async function handler(req, res) {
       return dateA.getTime() - dateB.getTime();
     });
 
+    // July Payments Received (Toast Revenue)
+    const julyPaymentsReceived = {
+      total: toastRevenue,
+      description: "Total revenue from Toast POS system for the current month (from stored transactions)",
+      breakdown: toastRevenueBreakdown.breakdown
+    };
+
     return res.status(200).json({
       monthlyRecurringRevenue: {
         total: mrrBreakdown.total,
         breakdown: mrrBreakdown.breakdown,
         description: "Sum of all active members' monthly dues - represents predictable monthly income from membership fees"
       },
-      julyPaymentsReceived: {
-        total: toastRevenue,
-        breakdown: paymentsBreakdown.breakdown,
-        description: "Total revenue from Toast POS system for the current month"
-      },
+      julyPaymentsReceived: julyPaymentsReceived,
       julyRevenue: {
         total: totalJulyRevenue,
         breakdown: combinedRevenueBreakdown,

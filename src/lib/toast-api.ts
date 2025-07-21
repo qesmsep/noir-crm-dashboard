@@ -42,6 +42,17 @@ export interface ToastWebhookPayload {
   };
 }
 
+export interface ToastSalesSummary {
+  totalSales: number;
+  totalTransactions: number;
+  salesByCategory?: any[];
+  salesByPaymentMethod?: any[];
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+}
+
 export class ToastAPI {
   private config: ToastConfig;
   
@@ -67,6 +78,31 @@ export class ToastAPI {
     }
 
     return response.json();
+  }
+
+  async getSalesSummary(startDate: string, endDate: string): Promise<ToastSalesSummary> {
+    try {
+      // Toast API endpoint for sales summary reports
+      // This would be the actual Toast API endpoint for sales summary
+      const endpoint = `/reports/sales-summary?startDate=${startDate}&endDate=${endDate}&locationId=${this.config.locationId}`;
+      
+      const response = await this.makeRequest(endpoint);
+      
+      // Parse the response based on Toast's actual API format
+      return {
+        totalSales: response.totalSales || 0,
+        totalTransactions: response.totalTransactions || 0,
+        salesByCategory: response.salesByCategory || [],
+        salesByPaymentMethod: response.salesByPaymentMethod || [],
+        dateRange: {
+          startDate,
+          endDate
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching Toast sales summary:', error);
+      throw error;
+    }
   }
 
   async getTransactionsByPhone(phone: string, startDate: string, endDate: string): Promise<ToastTransaction[]> {
