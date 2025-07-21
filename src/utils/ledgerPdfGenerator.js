@@ -214,9 +214,8 @@ export class LedgerPdfGenerator {
         .text('Description', tableLeft + colWidth, tableTop)
         .text('Type', tableLeft + colWidth + descColWidth, tableTop)
         .text('Amount', tableLeft + colWidth + descColWidth + colWidth, tableTop)
-        .text('Balance', tableLeft + colWidth + descColWidth + colWidth * 2, tableTop)
-        .text('Files', tableLeft + colWidth + descColWidth + colWidth * 3, tableTop);
-      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth + descColWidth + colWidth * 4, tableTop + 15).stroke();
+        .text('Files', tableLeft + colWidth + descColWidth + colWidth * 2, tableTop);
+      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth + descColWidth + colWidth * 3, tableTop + 15).stroke();
       // Create a map of attachments by ledger_id for quick lookup
       const attachmentsByLedgerId = {};
       transactionAttachments.forEach(attachment => {
@@ -227,7 +226,6 @@ export class LedgerPdfGenerator {
       });
       
       let currentY = tableTop + 20;
-      let runningBalance = priorBalance;
       
       transactions.forEach((entry) => {
         const attachments = attachmentsByLedgerId[entry.id] || [];
@@ -241,8 +239,7 @@ export class LedgerPdfGenerator {
           .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY)
           .text(entry.note || 'No description', tableLeft + colWidth, currentY, { width: descColWidth - 5 })
           .text(entry.type || '', tableLeft + colWidth + descColWidth, currentY)
-          .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth + descColWidth + colWidth, currentY)
-          .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth + descColWidth + colWidth * 2, currentY);
+          .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth + descColWidth + colWidth, currentY);
         
         // Add Files column with clickable link if attachments exist
         if (attachments.length > 0) {
@@ -250,18 +247,17 @@ export class LedgerPdfGenerator {
           const attachmentUrl = attachments[0].file_url;
           this.doc
             .fillColor('blue')
-            .text('link', tableLeft + colWidth + descColWidth + colWidth * 3, currentY, { 
+            .text('link', tableLeft + colWidth + descColWidth + colWidth * 2, currentY, { 
               underline: true, 
               link: attachmentUrl
             })
             .fillColor('black');
         }
         
-        runningBalance += entry.amount;
         currentY += rowHeight;
       });
       // Draw bottom line after table
-      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth + descColWidth + colWidth * 4, currentY - 5).stroke();
+      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth + descColWidth + colWidth * 3, currentY - 5).stroke();
       // Add space before footer
       this.doc.moveDown(2);
     } else {

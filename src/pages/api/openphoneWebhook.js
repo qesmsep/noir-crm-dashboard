@@ -725,6 +725,104 @@ export async function handler(req, res) {
     return res.status(200).json({ message: 'Sent waitlist invitation message' });
   }
 
+  // Handle "BALANCE" messages for ledger PDF
+  if (text.toLowerCase().trim() === 'balance') {
+    console.log('Processing BALANCE message for ledger PDF');
+    
+    // Check if sender is a member
+    const { isMember, member } = await checkMemberStatus(from);
+    if (!isMember) {
+      const errorMessage = `Thank you for your balance request, however only Noir members are able to request their ledger. You may contact us directly for assistance.`;
+      await sendSMS(from, errorMessage);
+      return res.status(200).json({ message: 'Sent non-member error message for balance request' });
+    }
+
+    try {
+      // Calculate current billing month based on member's join date
+      const today = new Date();
+      const joinDate = new Date(member.join_date);
+      
+      // Calculate how many months have passed since join date
+      const monthsSinceJoin = (today.getFullYear() - joinDate.getFullYear()) * 12 + 
+                             (today.getMonth() - joinDate.getMonth());
+      
+      // Calculate the start and end of the current billing period
+      const currentPeriodStart = new Date(joinDate);
+      currentPeriodStart.setMonth(joinDate.getMonth() + monthsSinceJoin);
+      currentPeriodStart.setDate(joinDate.getDate());
+      
+      const currentPeriodEnd = new Date(joinDate);
+      currentPeriodEnd.setMonth(joinDate.getMonth() + monthsSinceJoin + 1);
+      currentPeriodEnd.setDate(joinDate.getDate() - 1); // Day before next period
+      
+      const startDate = currentPeriodStart.toISOString().split('T')[0];
+      const endDate = currentPeriodEnd.toISOString().split('T')[0];
+      
+      console.log('Calculated billing period:', { startDate, endDate, member: member.member_id });
+      
+      // Generate PDF using existing functionality
+      const { LedgerPdfGenerator } = await import('../../utils/ledgerPdfGenerator');
+      const pdfGenerator = new LedgerPdfGenerator();
+      const pdfBuffer = await pdfGenerator.generateLedgerPdf(member.member_id, member.account_id, startDate, endDate);
+      
+      // Upload PDF to Supabase storage
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `balance_${member.member_id}_${startDate}_${endDate}_${timestamp}.pdf`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('ledger-pdfs')
+        .upload(fileName, pdfBuffer, {
+          contentType: 'application/pdf',
+          cacheControl: '3600'
+        });
+
+      if (uploadError) {
+        console.error('Error uploading PDF:', uploadError);
+        throw new Error('Failed to upload PDF to storage');
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('ledger-pdfs')
+        .getPublicUrl(fileName);
+
+      // Send SMS with PDF link
+      const message = `Hi ${member.first_name} - Here is the most recent statement for your Noir membership. Please let us know if you have any questions. Thank you! ${publicUrl}`;
+      
+      const smsResult = await sendSMS(from, message);
+      
+      console.log('Balance PDF sent successfully:', {
+        member: member.member_id,
+        phone: from,
+        pdfUrl: publicUrl,
+        smsId: smsResult.id
+      });
+      
+      return res.status(200).json({ 
+        message: 'Balance PDF sent successfully',
+        member_id: member.member_id,
+        pdf_url: publicUrl,
+        sms_id: smsResult.id
+      });
+      
+    } catch (error) {
+      console.error('Error processing BALANCE request:', error);
+      
+      // Send error notification to admin
+      const adminMessage = `Error processing BALANCE request from ${from}: ${error.message}`;
+      await sendSMS('+19137774488', adminMessage);
+      
+      // Send user-friendly error message
+      const userMessage = `Sorry, we encountered an error processing your balance request. Please try again later or contact us directly.`;
+      await sendSMS(from, userMessage);
+      
+      return res.status(500).json({ 
+        error: 'Failed to process balance request',
+        details: error.message 
+      });
+    }
+  }
+
   console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
 
   // Only process messages that start with "Reservation"
