@@ -29,13 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const payload = req.body as ToastWebhookPayload;
     
-    // Verify webhook signature if needed
-    const toastAPI = new ToastAPI({
-      apiKey: process.env.TOAST_API_KEY || '',
-      baseUrl: process.env.TOAST_BASE_URL || '',
-      locationId: process.env.TOAST_LOCATION || ''
-    });
-
     // For now, we'll skip signature verification until we know Toast's exact method
     // const signature = req.headers['x-toast-signature'] as string;
     // const isValid = await toastAPI.verifyWebhookSignature(JSON.stringify(payload), signature);
