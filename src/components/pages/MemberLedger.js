@@ -226,14 +226,14 @@ const MemberLedger = ({
               <Th px={10} py={5}borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
                 Description
               </Th>
+              <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
+                Type
+              </Th>
               <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" isNumeric>
                 Amount
               </Th>
               <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal" isNumeric>
                 Running Balance
-              </Th>
-              <Th px={6} py={5} borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
-                Type
               </Th>
               <Th px={6} py={5}borderRadius="16px" borderColor="gray.300" borderBottomWidth="1px" color="#ecede8" fontWeight="normal">
                 Actions
@@ -300,24 +300,6 @@ const MemberLedger = ({
                 />
               </Td>
               <Td px={6} py={2} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
-                <Input
-                  type="number"
-                  placeholder="Amount"
-                  variant="filled"
-                  bg="white"
-                  size="sm"
-                  value={newTransaction.amount || ''}
-                  onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                  borderRadius="10px"
-                  padding={2}
-                  width="95%"
-                  ml={-5}
-                  border="1px solid"
-                  borderColor="gray.300"
-                  _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                />
-              </Td>
-              <Td px={6} py={2} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
                 <Select
                   variant="filled"
                   bg="white"
@@ -337,6 +319,27 @@ const MemberLedger = ({
                   <option value="payment">Payment</option>
                   <option value="purchase">Purchase</option>
                 </Select>
+              </Td>
+              <Td px={6} py={2} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
+                <Input
+                  type="number"
+                  placeholder="Amount"
+                  variant="filled"
+                  bg="white"
+                  size="sm"
+                  value={newTransaction.amount || ''}
+                  onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                  borderRadius="10px"
+                  padding={2}
+                  width="95%"
+                  ml={-5}
+                  border="1px solid"
+                  borderColor="gray.300"
+                  _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                />
+              </Td>
+              <Td px={6} py={2} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
+                {/* Running Balance will be calculated automatically */}
               </Td>
               <Td px={6} py={2} borderColor="gray.200" borderBottomWidth="1px" bg="#ecede8">
                 <Button
@@ -423,6 +426,27 @@ const MemberLedger = ({
                         tx.note
                       )}
                     </Td>
+                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8">
+                      {isEditing ? (
+                        <Select
+                          variant="filled"
+                          bg="white"
+                          size="sm"
+                          value={tempEditForm.type || ''}
+                          onChange={e => setTempEditForm({ ...tempEditForm, type: e.target.value })}
+                          borderRadius="md"
+                          border="1px solid"
+                          borderColor="gray.300"
+                          _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                          icon={<></>}
+                        >
+                          <option value="payment">Payment</option>
+                          <option value="purchase">Purchase</option>
+                        </Select>
+                      ) : (
+                        tx.type === 'payment' ? 'Payment' : 'Purchase'
+                      )}
+                    </Td>
                     <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8" isNumeric>
                       {isEditing ? (
                         <Input
@@ -447,27 +471,6 @@ const MemberLedger = ({
                       <Text color={calculateRunningBalance(memberLedger, idx) >= 0 ? 'green.500' : 'red.500'}>
                         {formatCurrency(calculateRunningBalance(memberLedger, idx))}
                       </Text>
-                    </Td>
-                    <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8">
-                      {isEditing ? (
-                        <Select
-                          variant="filled"
-                          bg="white"
-                          size="sm"
-                          value={tempEditForm.type || ''}
-                          onChange={e => setTempEditForm({ ...tempEditForm, type: e.target.value })}
-                          borderRadius="md"
-                          border="1px solid"
-                          borderColor="gray.300"
-                          _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                          icon={<></>}
-                        >
-                          <option value="payment">Payment</option>
-                          <option value="purchase">Purchase</option>
-                        </Select>
-                      ) : (
-                        tx.type === 'payment' ? 'Payment' : 'Purchase'
-                      )}
                     </Td>
                     <Td px={6} py={1} borderColor="gray.200" margin={0} borderBottomWidth="1px" bg="#ecede8">
                       {isEditing ? (
