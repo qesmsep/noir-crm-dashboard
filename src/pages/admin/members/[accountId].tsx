@@ -606,21 +606,47 @@ export default function MemberDetailAdmin() {
     const fetchRenewalDates = async () => {
       if (!selectedMemberForPdf) return;
       const supabase = getSupabaseClient();
+      
+      // First, let's see all ledger entries for this account to understand the data
+      const { data: allEntries } = await supabase
+        .from('ledger')
+        .select('date, note, description, type, amount')
+        .eq('account_id', selectedMemberForPdf.account_id)
+        .order('date', { ascending: false })
+        .limit(10);
+      console.log('All ledger entries for account:', allEntries);
+      
+      // Now search for renewal entries
       const { data: renewalEntries } = await supabase
         .from('ledger')
-        .select('date, note')
+        .select('date, note, description')
         .eq('account_id', selectedMemberForPdf.account_id)
         .ilike('note', '%renewal%')
         .order('date', { ascending: false });
       console.log('Renewal entries found:', renewalEntries);
+      
+      // Also try searching in description field as backup
+      const { data: renewalEntriesDesc } = await supabase
+        .from('ledger')
+        .select('date, note, description')
+        .eq('account_id', selectedMemberForPdf.account_id)
+        .ilike('description', '%renewal%')
+        .order('date', { ascending: false });
+      console.log('Renewal entries in description field:', renewalEntriesDesc);
+      
       if (renewalEntries && renewalEntries.length > 1) {
         setPreviousPeriodEnd(renewalEntries[0].date);
         setPreviousPeriodStart(renewalEntries[1].date);
         console.log('Previous period dates set:', renewalEntries[0].date, renewalEntries[1].date);
+      } else if (renewalEntriesDesc && renewalEntriesDesc.length > 1) {
+        // Fallback to description field if note field has no results
+        setPreviousPeriodEnd(renewalEntriesDesc[0].date);
+        setPreviousPeriodStart(renewalEntriesDesc[1].date);
+        console.log('Previous period dates set (from description):', renewalEntriesDesc[0].date, renewalEntriesDesc[1].date);
       } else {
         setPreviousPeriodStart(null);
         setPreviousPeriodEnd(null);
-        console.log('No renewal entries found or insufficient data');
+        console.log('No renewal entries found in either note or description fields');
       }
     };
     if (isTextPdfModalOpen) fetchRenewalDates();
