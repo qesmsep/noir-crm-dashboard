@@ -204,8 +204,17 @@ export class LedgerPdfGenerator {
       .font('Helvetica')
       .text(`Total Payments: $${summary.totalPayments.toFixed(2)}`)
       .text(`Total Purchases: $${summary.totalPurchases.toFixed(2)}`)
-      .text(`Net Balance: $${summary.netBalance.toFixed(2)}`)
-      .moveDown(1);
+      .text(`Net Balance: $${summary.netBalance.toFixed(2)}`);
+    
+    // Add reference to attachments if any exist
+    if (transactionAttachments.length > 0) {
+      this.doc
+        .fillColor('blue')
+        .text(`📎 View ${transactionAttachments.length} attachment(s) below`, { underline: true })
+        .fillColor('black');
+    }
+    
+    this.doc.moveDown(1);
     // Transactions Table
     if (transactions.length > 0) {
       this.doc
@@ -247,8 +256,20 @@ export class LedgerPdfGenerator {
         }
         
         this.doc.fontSize(8).font('Helvetica')
-          .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY)
-          .text(entry.description || 'No description', tableLeft + colWidth, currentY, { width: colWidth - 5 })
+          .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY);
+        
+        // Handle description - make it clickable if there are attachments
+        if (attachments.length > 0) {
+          this.doc
+            .fillColor('blue')
+            .text(`📎 ${entry.description || 'No description'}`, tableLeft + colWidth, currentY, { width: colWidth - 5, underline: true })
+            .fillColor('black');
+        } else {
+          this.doc
+            .text(entry.description || 'No description', tableLeft + colWidth, currentY, { width: colWidth - 5 });
+        }
+        
+        this.doc
           .text(entry.type || '', tableLeft + colWidth * 2, currentY)
           .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth * 3, currentY)
           .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY)
