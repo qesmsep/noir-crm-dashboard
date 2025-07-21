@@ -214,15 +214,15 @@ export class LedgerPdfGenerator {
         .text('Transaction Details');
       const tableTop = this.doc.y;
       const tableLeft = 50;
-      const colWidth = 100;
-      const rowHeight = 20;
-      this.doc.fontSize(10).font('Helvetica-Bold')
+      const colWidth = 80; // Reduced column width
+      const rowHeight = 25; // Increased row height for better readability
+      this.doc.fontSize(9).font('Helvetica-Bold')
         .text('Date', tableLeft, tableTop)
         .text('Description', tableLeft + colWidth, tableTop)
         .text('Type', tableLeft + colWidth * 2, tableTop)
         .text('Amount', tableLeft + colWidth * 3, tableTop)
         .text('Balance', tableLeft + colWidth * 4, tableTop)
-        .text('Attachments', tableLeft + colWidth * 5, tableTop);
+        .text('Files', tableLeft + colWidth * 5, tableTop);
       this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 6, tableTop + 15).stroke();
       let currentY = tableTop + 20;
       let runningBalance = priorBalance;
@@ -238,11 +238,17 @@ export class LedgerPdfGenerator {
       
       transactions.forEach((entry) => {
         const attachments = attachmentsByLedgerId[entry.id] || [];
-        const attachmentText = attachments.length > 0 ? `${attachments.length} file(s)` : '';
+        const attachmentText = attachments.length > 0 ? `${attachments.length}` : '';
         
-        this.doc.fontSize(9).font('Helvetica')
+        // Check if we need a new page
+        if (currentY > 700) { // If we're getting close to the bottom
+          this.doc.addPage();
+          currentY = 50; // Reset to top of new page
+        }
+        
+        this.doc.fontSize(8).font('Helvetica')
           .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY)
-          .text(entry.description || 'No description', tableLeft + colWidth, currentY)
+          .text(entry.description || 'No description', tableLeft + colWidth, currentY, { width: colWidth - 5 })
           .text(entry.type || '', tableLeft + colWidth * 2, currentY)
           .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth * 3, currentY)
           .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY)
@@ -264,6 +270,11 @@ export class LedgerPdfGenerator {
     
     // Transaction Attachments Section
     if (transactionAttachments.length > 0) {
+      // Check if we need a new page for attachments
+      if (this.doc.y > 600) {
+        this.doc.addPage();
+      }
+      
       this.doc
         .fontSize(14)
         .font('Helvetica-Bold')
@@ -281,7 +292,7 @@ export class LedgerPdfGenerator {
       transactionAttachments.forEach(attachment => {
         const transaction = transactions.find(tx => tx.id === attachment.ledger_id);
         if (transaction) {
-          const key = `${transaction.date} - ${transaction.description}`;
+          const key = `${new Date(transaction.date).toLocaleDateString()} - ${transaction.description || 'No description'}`;
           if (!attachmentsByTransaction[key]) {
             attachmentsByTransaction[key] = [];
           }
@@ -291,6 +302,11 @@ export class LedgerPdfGenerator {
       
       // List attachments by transaction
       Object.entries(attachmentsByTransaction).forEach(([transactionKey, attachments]) => {
+        // Check if we need a new page
+        if (this.doc.y > 650) {
+          this.doc.addPage();
+        }
+        
         this.doc
           .fontSize(11)
           .font('Helvetica-Bold')
