@@ -214,16 +214,17 @@ export class LedgerPdfGenerator {
         .text('Transaction Details');
       const tableTop = this.doc.y;
       const tableLeft = 50;
-      const colWidth = 80; // Reduced column width
+      const colWidth = 80; // Column width for most columns
+      const descColWidth = 120; // Wider column for description
       const rowHeight = 25; // Increased row height for better readability
       this.doc.fontSize(9).font('Helvetica-Bold')
         .text('Date', tableLeft, tableTop)
         .text('Description', tableLeft + colWidth, tableTop)
-        .text('Type', tableLeft + colWidth * 2, tableTop)
-        .text('Amount', tableLeft + colWidth * 3, tableTop)
-        .text('Balance', tableLeft + colWidth * 4, tableTop)
-        .text('Files', tableLeft + colWidth * 5, tableTop);
-      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth * 6, tableTop + 15).stroke();
+        .text('Type', tableLeft + colWidth + descColWidth, tableTop)
+        .text('Amount', tableLeft + colWidth + descColWidth + colWidth, tableTop)
+        .text('Balance', tableLeft + colWidth + descColWidth + colWidth * 2, tableTop)
+        .text('Files', tableLeft + colWidth + descColWidth + colWidth * 3, tableTop);
+      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth + descColWidth + colWidth * 4, tableTop + 15).stroke();
       // Create a map of attachments by ledger_id for quick lookup
       const attachmentsByLedgerId = {};
       transactionAttachments.forEach(attachment => {
@@ -246,10 +247,10 @@ export class LedgerPdfGenerator {
         
         this.doc.fontSize(8).font('Helvetica')
           .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY)
-          .text(entry.note || 'No description', tableLeft + colWidth, currentY, { width: colWidth - 5 })
-          .text(entry.type || '', tableLeft + colWidth * 2, currentY)
-          .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth * 3, currentY)
-          .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth * 4, currentY);
+          .text(entry.note || 'No description', tableLeft + colWidth, currentY, { width: descColWidth - 5 })
+          .text(entry.type || '', tableLeft + colWidth + descColWidth, currentY)
+          .text(`$${entry.amount.toFixed(2)}`, tableLeft + colWidth + descColWidth + colWidth, currentY)
+          .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth + descColWidth + colWidth * 2, currentY);
         
         // Add Files column with clickable link if attachments exist
         if (attachments.length > 0) {
@@ -257,7 +258,11 @@ export class LedgerPdfGenerator {
           const attachmentUrl = attachments[0].file_url;
           this.doc
             .fillColor('blue')
-            .text('link', tableLeft + colWidth * 5, currentY, { underline: true, link: attachmentUrl })
+            .text('link', tableLeft + colWidth + descColWidth + colWidth * 3, currentY, { 
+              underline: true, 
+              link: attachmentUrl,
+              target: '_blank' // Open in new tab
+            })
             .fillColor('black');
         }
         
@@ -265,7 +270,7 @@ export class LedgerPdfGenerator {
         currentY += rowHeight;
       });
       // Draw bottom line after table
-      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth * 6, currentY - 5).stroke();
+      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth + descColWidth + colWidth * 4, currentY - 5).stroke();
       // Add space before footer
       this.doc.moveDown(2);
     } else {
