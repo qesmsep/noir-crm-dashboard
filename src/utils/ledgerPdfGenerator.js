@@ -342,13 +342,18 @@ export class LedgerPdfGenerator {
       if (transaction.type === 'payment') {
         totalPayments += amount;
       } else if (transaction.type === 'purchase') {
+        // Purchases are already negative amounts, so we add them (which subtracts)
         totalPurchases += amount;
       }
     });
+    
+    // Net balance is payments + purchases (since purchases are negative)
+    const netBalance = totalPayments + totalPurchases;
+    
     return {
       totalPayments,
       totalPurchases,
-      netBalance: totalPayments - totalPurchases
+      netBalance
     };
   }
 }
