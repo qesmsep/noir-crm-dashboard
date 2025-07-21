@@ -1,7 +1,7 @@
 # Transaction Attachments Implementation Summary
 
 ## Overview
-Successfully implemented a file upload feature that allows admins to attach PDF files to ledger transactions, with members only able to view/download them.
+Successfully implemented a file upload feature that allows admins to attach various file types to ledger transactions, with members only able to view/download them.
 
 ## ✅ Completed Implementation
 
@@ -22,7 +22,7 @@ Successfully implemented a file upload feature that allows admins to attach PDF 
 - **Integration**: Added to MemberLedger component in the Actions column
 
 ### 4. Features Implemented
-- ✅ PDF-only file uploads (10MB limit)
+- ✅ Multiple file type uploads (PDF, Word, Excel, PowerPoint, text, images, archives) (10MB limit)
 - ✅ File organization by member ID and date
 - ✅ Drag-and-drop file selection
 - ✅ File preview and download links
@@ -149,7 +149,7 @@ END $$;
 ### For Admins:
 1. Navigate to any member's ledger page
 2. In the Actions column, click "Attachments (0)" button
-3. Click "Choose PDF File" to select a PDF
+3. Click "Choose File" to select a document, image, or archive
 4. File will be uploaded and stored securely
 5. Use "Download" or "Delete" buttons to manage files
 
@@ -165,7 +165,7 @@ END $$;
 - Database tracks: file metadata, relationships, and access permissions
 
 ### Security:
-- Only PDF files allowed (mime type validation)
+- Multiple file types allowed (PDF, Word, Excel, PowerPoint, text, images, archives)
 - 10MB file size limit
 - Admin-only upload permissions
 - Public read access for file downloads

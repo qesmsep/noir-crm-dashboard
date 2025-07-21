@@ -25,10 +25,29 @@ const upload = multer({
     },
   }),
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
+    // Define allowed MIME types
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'text/rtf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/zip',
+      'application/x-rar-compressed'
+    ];
+    
+    if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF files are allowed'));
+      cb(new Error('File type not allowed. Please upload PDF, Word, Excel, PowerPoint, text, image, or archive files.'));
     }
   },
   limits: {
@@ -91,9 +110,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate file type
-    if (!file.mimetype || !file.mimetype.includes('pdf')) {
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'text/rtf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/zip',
+      'application/x-rar-compressed'
+    ];
+    
+    if (!file.mimetype || !allowedMimeTypes.includes(file.mimetype)) {
       console.error('Invalid file type:', file.mimetype);
-      return res.status(400).json({ error: 'Only PDF files are allowed' });
+      return res.status(400).json({ error: 'File type not allowed. Please upload PDF, Word, Excel, PowerPoint, text, image, or archive files.' });
     }
 
     console.log('Reading file buffer...');
@@ -112,7 +149,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('transaction-attachments')
       .upload(fileName, fileBuffer, {
-        contentType: 'application/pdf',
+        contentType: file.mimetype,
         cacheControl: '3600',
       });
 

@@ -88,10 +88,29 @@ const TransactionAttachmentUpload: React.FC<TransactionAttachmentUploadProps> = 
       size: file.size
     });
 
-    if (!file.type.includes('pdf')) {
+    // Define allowed file types
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'text/rtf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/zip',
+      'application/x-rar-compressed'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
       toast({
         title: 'Invalid file type',
-        description: 'Only PDF files are allowed',
+        description: 'Please upload PDF, Word, Excel, PowerPoint, text, image, or archive files.',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -315,13 +334,13 @@ const TransactionAttachmentUpload: React.FC<TransactionAttachmentUploadProps> = 
                   <Box>
                     <FormControl>
                       <FormLabel fontSize="sm" mb={2} fontFamily="Montserrat, sans-serif">
-                        Upload PDF Attachment
+                        Upload File Attachment
                       </FormLabel>
                       <VStack spacing={3} align="stretch">
                         <Input
                           ref={fileInputRef}
                           type="file"
-                          accept=".pdf"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar"
                           onChange={handleFileSelect}
                           disabled={isUploading}
                           fontFamily="Montserrat, sans-serif"

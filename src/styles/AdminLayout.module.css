@@ -134,15 +134,70 @@
   color: #e0e0e0;
 }
 
+.userButton {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: #ecede8;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+  width: 100%;
+  text-align: left;
+}
+
+.userButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 .userAvatar {
   width: 32px;
   height: 32px;
   border-radius: 50%;
+  background-color: #353535;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-right: 0.75rem;
+  font-weight: bold;
+  color: #ecede8;
 }
 
-.userName {
+.userEmail {
+  font-size: 14px;
   font-weight: 500;
+  color: #ecede8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userMenu {
+  margin-top: 0.5rem;
+  background-color: #353535;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  color: #ecede8;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.menuItem:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .logoutButton {
@@ -195,7 +250,37 @@
   display: none;
 }
 
+.mobileHeader {
+  display: none;
+}
+
+.mobileLogo {
+  display: none;
+}
+
 @media (max-width: 900px) {
+  .mobileHeader {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 60px;
+    background: rgba(165, 148, 128, 0.9);
+    z-index: 2100;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    box-sizing: border-box;
+    backdrop-filter: blur(6px);
+  }
+  
+  .mobileLogo {
+    display: flex;
+    align-items: center;
+    height: 40px;
+  }
+  
   .mobileMenu {
     display: flex;
     position: fixed;
@@ -244,21 +329,6 @@
   .sidebar {
     display: none !important;
   }
-  .mobileHeader {
-    display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 60px;
-    background: rgba(165, 148, 128, 0.9);
-    z-index: 2100;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem;
-    box-sizing: border-box;
-    backdrop-filter: blur(6px);
-  }
   .menuButton {
     display: block;
     background: none;
@@ -271,11 +341,6 @@
     position: absolute;
     right: 1.2rem;
     top: 0.7rem;
-  }
-  .mobileLogo {
-    display: flex;
-    align-items: center;
-    height: 40px;
   }
   .main {
     padding-top: 60px;

@@ -36,7 +36,21 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
 
   return (
     <div className={styles.container}>
-      {/* Mobile transparent header with logo and hamburger menu */}
+      {/* Mobile header with logo and hamburger menu */}
+      <div className={styles.mobileHeader}>
+        <div className={styles.mobileLogo}>
+          <Link href="/">
+            <Image src="/images/noir-wedding-day.png" alt="Noir Logo" width={80} height={40} style={{ objectFit: 'contain' }} />
+          </Link>
+        </div>
+        <button
+          className={styles.menuButton}
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          aria-label="Toggle navigation menu"
+        >
+          <span className={styles.menuIcon}>☰</span>
+        </button>
+      </div>
       
       {!isFullScreen && (
         <nav className={styles.sidebar}>
