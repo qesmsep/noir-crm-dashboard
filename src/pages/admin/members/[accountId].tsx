@@ -601,55 +601,55 @@ export default function MemberDetailAdmin() {
     }
   };
 
-  // Fetch renewal dates when member is selected for PDF
+  // Calculate previous membership period based on join date
   useEffect(() => {
-    const fetchRenewalDates = async () => {
-      if (!selectedMemberForPdf) return;
-      const supabase = getSupabaseClient();
-      
-      // First, let's see all ledger entries for this account to understand the data
-      const { data: allEntries } = await supabase
-        .from('ledger')
-        .select('date, note, description, type, amount')
-        .eq('account_id', selectedMemberForPdf.account_id)
-        .order('date', { ascending: false })
-        .limit(10);
-      console.log('All ledger entries for account:', allEntries);
-      
-      // Now search for renewal entries
-      const { data: renewalEntries } = await supabase
-        .from('ledger')
-        .select('date, note, description')
-        .eq('account_id', selectedMemberForPdf.account_id)
-        .ilike('note', '%renewal%')
-        .order('date', { ascending: false });
-      console.log('Renewal entries found:', renewalEntries);
-      
-      // Also try searching in description field as backup
-      const { data: renewalEntriesDesc } = await supabase
-        .from('ledger')
-        .select('date, note, description')
-        .eq('account_id', selectedMemberForPdf.account_id)
-        .ilike('description', '%renewal%')
-        .order('date', { ascending: false });
-      console.log('Renewal entries in description field:', renewalEntriesDesc);
-      
-      if (renewalEntries && renewalEntries.length > 1) {
-        setPreviousPeriodEnd(renewalEntries[0].date);
-        setPreviousPeriodStart(renewalEntries[1].date);
-        console.log('Previous period dates set:', renewalEntries[0].date, renewalEntries[1].date);
-      } else if (renewalEntriesDesc && renewalEntriesDesc.length > 1) {
-        // Fallback to description field if note field has no results
-        setPreviousPeriodEnd(renewalEntriesDesc[0].date);
-        setPreviousPeriodStart(renewalEntriesDesc[1].date);
-        console.log('Previous period dates set (from description):', renewalEntriesDesc[0].date, renewalEntriesDesc[1].date);
-      } else {
+    const calculatePreviousPeriod = () => {
+      if (!selectedMemberForPdf || !selectedMemberForPdf.join_date) {
+        console.log('No member selected or no join date available');
         setPreviousPeriodStart(null);
         setPreviousPeriodEnd(null);
-        console.log('No renewal entries found in either note or description fields');
+        return;
       }
+
+      const today = new Date();
+      const joinDate = new Date(selectedMemberForPdf.join_date);
+      
+      console.log('Today:', today.toISOString().split('T')[0]);
+      console.log('Join date:', joinDate.toISOString().split('T')[0]);
+      
+      // Calculate how many months have passed since join date
+      const monthsSinceJoin = (today.getFullYear() - joinDate.getFullYear()) * 12 + 
+                             (today.getMonth() - joinDate.getMonth());
+      
+      console.log('Months since join:', monthsSinceJoin);
+      
+      if (monthsSinceJoin < 1) {
+        // Member joined less than a month ago, no previous period
+        console.log('Member joined less than a month ago, no previous period');
+        setPreviousPeriodStart(null);
+        setPreviousPeriodEnd(null);
+        return;
+      }
+      
+      // Calculate the end of the previous membership period
+      // This would be the day before the current period started
+      const previousPeriodEnd = new Date(joinDate);
+      previousPeriodEnd.setMonth(joinDate.getMonth() + monthsSinceJoin);
+      previousPeriodEnd.setDate(joinDate.getDate() - 1); // Day before current period
+      
+      // Calculate the start of the previous membership period
+      const previousPeriodStart = new Date(joinDate);
+      previousPeriodStart.setMonth(joinDate.getMonth() + monthsSinceJoin - 1);
+      previousPeriodStart.setDate(joinDate.getDate());
+      
+      console.log('Previous period start:', previousPeriodStart.toISOString().split('T')[0]);
+      console.log('Previous period end:', previousPeriodEnd.toISOString().split('T')[0]);
+      
+      setPreviousPeriodStart(previousPeriodStart.toISOString().split('T')[0]);
+      setPreviousPeriodEnd(previousPeriodEnd.toISOString().split('T')[0]);
     };
-    if (isTextPdfModalOpen) fetchRenewalDates();
+    
+    if (isTextPdfModalOpen) calculatePreviousPeriod();
   }, [selectedMemberForPdf, isTextPdfModalOpen]);
 
   // Update handleTextPdf to support previous membership period

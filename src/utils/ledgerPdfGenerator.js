@@ -84,31 +84,42 @@ export class LedgerPdfGenerator {
         .lt('date', startDate);
       const priorBalance = priorEntries ? priorEntries.reduce((sum, e) => sum + (e.amount || 0), 0) : 0;
 
-      // Fetch renewal dates (using note contains 'renewal')
-      const { data: renewalEntries } = await supabase
-        .from('ledger')
-        .select('date')
-        .eq('account_id', accountId)
-        .ilike('note', '%renewal%')
-        .order('date', { ascending: false });
+      // Calculate previous membership period based on member join date
       let lastRenewalDate = null;
       let nextRenewalDate = null;
-      if (renewalEntries && renewalEntries.length > 0) {
-        lastRenewalDate = renewalEntries[0].date;
-        if (renewalEntries.length > 1) {
-          nextRenewalDate = renewalEntries[1].date;
-        }
-      }
-      // Fetch previous membership period entries if renewal dates found
       let previousPeriodEntries = [];
-      if (lastRenewalDate && nextRenewalDate) {
-        const { data: prevPeriod } = await supabase
-          .from('ledger')
-          .select('*')
-          .eq('account_id', accountId)
-          .gte('date', nextRenewalDate)
-          .lt('date', lastRenewalDate);
-        previousPeriodEntries = prevPeriod || [];
+      
+      if (member.join_date) {
+        const today = new Date();
+        const joinDate = new Date(member.join_date);
+        
+        // Calculate how many months have passed since join date
+        const monthsSinceJoin = (today.getFullYear() - joinDate.getFullYear()) * 12 + 
+                               (today.getMonth() - joinDate.getMonth());
+        
+        if (monthsSinceJoin >= 1) {
+          // Calculate the end of the previous membership period
+          const previousPeriodEnd = new Date(joinDate);
+          previousPeriodEnd.setMonth(joinDate.getMonth() + monthsSinceJoin);
+          previousPeriodEnd.setDate(joinDate.getDate() - 1); // Day before current period
+          
+          // Calculate the start of the previous membership period
+          const previousPeriodStart = new Date(joinDate);
+          previousPeriodStart.setMonth(joinDate.getMonth() + monthsSinceJoin - 1);
+          previousPeriodStart.setDate(joinDate.getDate());
+          
+          lastRenewalDate = previousPeriodEnd.toISOString().split('T')[0];
+          nextRenewalDate = previousPeriodStart.toISOString().split('T')[0];
+          
+          // Fetch previous membership period entries
+          const { data: prevPeriod } = await supabase
+            .from('ledger')
+            .select('*')
+            .eq('account_id', accountId)
+            .gte('date', nextRenewalDate)
+            .lte('date', lastRenewalDate);
+          previousPeriodEntries = prevPeriod || [];
+        }
       }
 
       // Generate PDF
