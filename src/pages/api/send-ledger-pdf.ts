@@ -100,8 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Send SMS with PDF link
     const message = uploadSuccess 
-      ? `Hi ${member_name}, here's your ledger for ${start_date} to ${end_date}: ${pdfUrl}`
-      : `Hi ${member_name}, your ledger PDF for ${start_date} to ${end_date} has been generated. Please contact us to receive it.`;
+      ? `Hi ${member_name}. Here is your account detail for your Noir membership. Please let us know if you have any questions. Thank you! ${pdfUrl}`
+      : `Hi ${member_name}. Here is your account detail for your Noir membership. Please let us know if you have any questions. Thank you!`;
     
     const smsResult = await sendSMS(phone, message);
 
