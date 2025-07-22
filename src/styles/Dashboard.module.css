@@ -129,24 +129,24 @@
 
 .cardsGrid {
   width: 100%;
-  max-width: 98%;
+  max-width: 95%;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
   margin-bottom: 2.5rem;
   overflow-x: hidden;
-  margin-left: 10px;
+  margin-left: 20px;
   
 }
 
 .listsGrid {
   width: 100%;
-  max-width: 98%;
+  max-width: 95%;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
   overflow-x: hidden;
-  margin-left: 10px;
+  margin-left: 20px;
   
 }
 
