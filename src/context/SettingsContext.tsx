@@ -53,8 +53,8 @@ const defaultSettings: Settings = {
     sms_notifications: false,
     notification_email: '',
   },
-  hold_fee_enabled: true,
-  hold_fee_amount: 25.00,
+  hold_fee_enabled: false,
+  hold_fee_amount: 0,
   admin_notification_phone: '',
 };
 
@@ -98,8 +98,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const holdFeeData = await res.json();
         setSettings(prev => ({
           ...prev,
-          hold_fee_enabled: holdFeeData.hold_fee_enabled ?? true,
-          hold_fee_amount: holdFeeData.hold_fee_amount ?? 25.00
+          hold_fee_enabled: holdFeeData.hold_fee_enabled ?? false,
+          hold_fee_amount: holdFeeData.hold_fee_amount ?? 0
         }));
       }
     } catch (error) {

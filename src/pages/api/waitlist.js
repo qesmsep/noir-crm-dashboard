@@ -116,7 +116,7 @@ export default async function handler(req, res) {
       // Send appropriate SMS based on status
       let smsMessage = '';
       if (status === 'approved') {
-        smsMessage = "We've reviewed your request and would like to formally invite you to take the next steps to becoming a Member of Noir.\n\nPlease complete the following form within 24 hours:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nFinally, respond to this text with any questions.\n\nThank you.";
+        smsMessage = "We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nTo officially join, please complete the following:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nThe link expires in 24 hours, so please respond to this text with any questions.\n\nThank you.";
       } else if (status === 'waitlisted') {
         smsMessage = "We appreciate your request.\n\nNoir is intentionally intimate—each additional member carefully considered to preserve the experience we value most at Noir.\n\nAt this time, we aren't able to extend an invitation. However, you've been added to our waitlist, and as space allows, your request will be revisited and you'll be notified.\n\nThank you for your patience. We hope to welcome you, when the time is right.";
       } else if (status === 'denied') {

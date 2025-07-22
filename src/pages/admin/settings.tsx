@@ -59,8 +59,8 @@ const defaultSettings: Settings = {
     sms_notifications: false,
     notification_email: '',
   },
-  hold_fee_enabled: true,
-  hold_fee_amount: 25.00,
+  hold_fee_enabled: false,
+  hold_fee_amount: 0,
   admin_notification_phone: '',
 };
 

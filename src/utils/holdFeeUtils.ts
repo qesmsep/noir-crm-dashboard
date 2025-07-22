@@ -15,11 +15,11 @@ export async function getHoldFeeConfig(): Promise<HoldFeeConfig> {
         const data = await response.json();
         return {
           enabled: data.hold_fee_enabled ?? true,
-          amount: data.hold_fee_amount ?? 25.00
+          amount: data.hold_fee_amount ?? 0
         };
       } else {
         console.warn('Failed to fetch hold fee config from API, using defaults');
-        return { enabled: true, amount: 25.00 };
+        return { enabled: false, amount: 0 };
       }
     } else {
       // Server-side: direct database access
@@ -30,17 +30,17 @@ export async function getHoldFeeConfig(): Promise<HoldFeeConfig> {
 
       if (error) {
         console.error('Error fetching hold fee config:', error);
-        return { enabled: true, amount: 25.00 }; // Default fallback
+        return { enabled: false, amount: 0 }; // Default fallback
       }
 
       return {
         enabled: data.hold_fee_enabled ?? true,
-        amount: data.hold_fee_amount ?? 25.00
+        amount: data.hold_fee_amount ?? 0
       };
     }
   } catch (error) {
     console.error('Error in getHoldFeeConfig:', error);
-    return { enabled: true, amount: 25.00 }; // Default fallback
+    return { enabled: false, amount: 0 }; // Default fallback
   }
 }
 

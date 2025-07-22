@@ -16,23 +16,23 @@ export async function GET() {
       if (error.code === 'PGRST116') {
         console.log('No settings record found, returning defaults');
         return NextResponse.json({
-          hold_fee_enabled: true,
-          hold_fee_amount: 25.00
+          hold_fee_enabled: false,
+          hold_fee_amount: 0
         });
       }
       
       return NextResponse.json(
         { 
-          hold_fee_enabled: true, 
-          hold_fee_amount: 25.00 
+          hold_fee_enabled: false, 
+          hold_fee_amount: 0 
         },
         { status: 200 }
       );
     }
 
     return NextResponse.json({
-      hold_fee_enabled: data.hold_fee_enabled ?? true,
-      hold_fee_amount: data.hold_fee_amount ?? 25.00
+      hold_fee_enabled: data.hold_fee_enabled ?? false,
+      hold_fee_amount: data.hold_fee_amount ?? 0
     });
   } catch (error) {
     console.error('Error in hold-fee-config API:', error);
