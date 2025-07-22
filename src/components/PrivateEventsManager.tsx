@@ -81,6 +81,9 @@ const EVENT_TYPES = [
   'Graduation',
   'Holiday Party',
   'Party',
+  'Wind Down Party',
+  'After Party',
+  'Rehearsal Dinner',
   'Other'
 ];
 
@@ -92,6 +95,9 @@ const EVENT_TYPE_ICONS: { [key: string]: any } = {
   'Graduation': TriangleDownIcon,
   'Holiday Party': SettingsIcon,
   'Party': SettingsIcon,
+  'Wind Down Party': SettingsIcon,
+  'After Party': SettingsIcon,
+  'Rehearsal Dinner': SettingsIcon,
   'Other': SettingsIcon
 };
 
