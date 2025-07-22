@@ -55,12 +55,21 @@
 body {
   font-family: 'Montserrat', 'IvyJournal', 'CONEBARS', 'Holimount', sans-serif;
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: #353535;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  background: #353535;
+  margin: 0;
+  padding: 0;
 }
 
 /* Enhanced drawer modal fixes for iPad and mobile */
@@ -440,6 +449,42 @@ body {
   .chakra-drawer__footer {
     /* Increase bottom padding on mobile */
     padding-bottom: calc(20px + var(--safe-area-inset-bottom)) !important;
+  }
+}
+
+/* iPhone-specific optimizations */
+@media (max-width: 428px) {
+  /* Ensure full viewport usage */
+  html, body {
+    width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  /* Better touch targets for iPhone */
+  button, a, input, select, textarea {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  /* Improve text rendering on iPhone */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Better scrolling on iPhone */
+  .chakra-drawer__body {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
+/* iPhone SE and smaller screens */
+@media (max-width: 375px) {
+  /* Optimize for smaller screens */
+  button, a, input, select, textarea {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 

@@ -6,6 +6,11 @@
   min-width: 200px;
   position: relative;
   transition: all 0.2s ease;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  
 }
 
 .card:hover {
@@ -23,6 +28,12 @@
 
 .cardContent {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .value {
@@ -30,12 +41,16 @@
   font-weight: bold;
   color: #333;
   margin-bottom: 0.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .label {
   font-size: 0.9rem;
   color: #666;
   margin-bottom: 0.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .description {
@@ -51,6 +66,8 @@
   font-size: 0.8rem;
   color: #888;
   margin-top: 0.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .backdrop {
@@ -179,4 +196,78 @@
     width: 95vw;
     max-width: none;
   }
-} 
+}
+
+/* iPhone and mobile optimizations */
+@media (max-width: 428px) {
+  .card {
+    padding: 0.75rem;
+    min-width: 0;
+    border-radius: 8px;
+   
+  }
+  
+  .value {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .label {
+    font-size: 0.7rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .description {
+    top: 0.25rem;
+    right: 0.25rem;
+    font-size: 0.6rem;
+  }
+  
+  .extra {
+    font-size: 0.6rem;
+    margin-top: 0.25rem;
+  }
+  
+  .breakdown {
+    width: 100vw;
+    max-width: none;
+    border-radius: 0;
+    height: 100vh;
+    max-height: none;
+  }
+  
+  .breakdownHeader {
+    padding: 0.75rem;
+  }
+  
+  .breakdownContent {
+    padding: 0.75rem;
+  }
+  
+  .breakdownItem {
+    padding: 0.5rem 0;
+  }
+}
+
+/* iPhone SE and smaller screens */
+@media (max-width: 375px) {
+  .card {
+    padding: 0.5rem;
+  }
+  
+  .value {
+    font-size: 1.1rem;
+  }
+  
+  .label {
+    font-size: 0.65rem;
+  }
+  
+  .description {
+    font-size: 0.55rem;
+  }
+  
+  .extra {
+    font-size: 0.55rem;
+  }
+}
