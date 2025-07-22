@@ -182,6 +182,32 @@ export class LedgerPdfGenerator {
       });
       this.doc.moveDown(1);
     }
+    
+    // Summary Section
+    this.doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Summary')
+      .moveDown(0.3);
+    
+    const summary = this.calculateSummary(transactions);
+    
+    this.doc
+      .fontSize(12)
+      .font('Helvetica')
+      .text(`Starting Balance: $${priorBalance.toFixed(2)}`)
+      .text(`Period Payments: $${summary.totalPayments.toFixed(2)}`)
+      .text(`Period Purchases: $${summary.totalPurchases.toFixed(2)}`)
+      .text(`Period Net: $${summary.netBalance.toFixed(2)}`)
+      .moveDown(0.3);
+    
+    const finalBalance = priorBalance + summary.netBalance;
+    this.doc
+      .fontSize(12)
+      .font('Helvetica-Bold')
+      .text(`Final Balance: $${finalBalance.toFixed(2)}`)
+      .moveDown(1);
+    
     // Previous Membership Period Section - REMOVED
     // We only want to show the main transaction details for the selected period
     // Transactions Table
@@ -254,36 +280,25 @@ export class LedgerPdfGenerator {
         .moveDown(1);
     }
     
-    // Summary Section
+    // Footer - Full width at bottom of page
+    const pageHeight = this.doc.page.height;
+    const footerHeight = 60; // Height for footer content
+    const footerY = pageHeight - footerHeight - 50; // 50px margin from bottom
+    
+    // Draw footer background
     this.doc
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text('Summary')
-      .moveDown(0.3);
+      .rect(0, footerY, this.doc.page.width, footerHeight)
+      .fill('#f5f5f5'); // Light gray background
     
-    const summary = this.calculateSummary(transactions);
-    
-    this.doc
-      .fontSize(12)
-      .font('Helvetica')
-      .text(`Starting Balance: $${priorBalance.toFixed(2)}`)
-      .text(`Period Payments: $${summary.totalPayments.toFixed(2)}`)
-      .text(`Period Purchases: $${summary.totalPurchases.toFixed(2)}`)
-      .text(`Period Net: $${summary.netBalance.toFixed(2)}`)
-      .moveDown(0.3);
-    
-    const finalBalance = priorBalance + summary.netBalance;
-    this.doc
-      .fontSize(12)
-      .font('Helvetica-Bold')
-      .text(`Final Balance: $${finalBalance.toFixed(2)}`)
-      .moveDown(1);
-    
-    // Footer
+    // Add footer content
     this.doc
       .fontSize(10)
       .font('Helvetica')
-      .text(`Generated on ${new Date().toLocaleDateString()}\nat ${new Date().toLocaleTimeString()}\nNoir CRM System\nAccount ID: ${member.account_id}`, { align: 'right' });
+      .fillColor('#666666') // Dark gray text
+      .text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 50, footerY + 10)
+      .text(`Noir CRM System`, 50, footerY + 25)
+      .text(`Account ID: ${member.account_id}`, 50, footerY + 40)
+      .fillColor('black'); // Reset text color
   }
 
   calculateSummary(transactions) {
