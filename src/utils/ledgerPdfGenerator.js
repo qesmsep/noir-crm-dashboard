@@ -184,20 +184,6 @@ export class LedgerPdfGenerator {
     }
     // Previous Membership Period Section - REMOVED
     // We only want to show the main transaction details for the selected period
-    // Summary
-    const summary = this.calculateSummary(transactions);
-    this.doc
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text('Summary')
-      .moveDown(0.3);
-    this.doc
-      .fontSize(12)
-      .font('Helvetica')
-      .text(`Total Payments: $${summary.totalPayments.toFixed(2)}`)
-      .text(`Total Purchases: $${summary.totalPurchases.toFixed(2)}`)
-      .text(`Net Balance: $${summary.netBalance.toFixed(2)}`)
-      .moveDown(1);
     // Transactions Table
     if (transactions.length > 0) {
       this.doc
@@ -267,6 +253,31 @@ export class LedgerPdfGenerator {
         .text('No transactions found for this period.')
         .moveDown(1);
     }
+    
+    // Summary Section
+    this.doc
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text('Summary')
+      .moveDown(0.3);
+    
+    const summary = this.calculateSummary(transactions);
+    
+    this.doc
+      .fontSize(12)
+      .font('Helvetica')
+      .text(`Starting Balance: $${priorBalance.toFixed(2)}`)
+      .text(`Period Payments: $${summary.totalPayments.toFixed(2)}`)
+      .text(`Period Purchases: $${summary.totalPurchases.toFixed(2)}`)
+      .text(`Period Net: $${summary.netBalance.toFixed(2)}`)
+      .moveDown(0.3);
+    
+    const finalBalance = priorBalance + summary.netBalance;
+    this.doc
+      .fontSize(12)
+      .font('Helvetica-Bold')
+      .text(`Final Balance: $${finalBalance.toFixed(2)}`)
+      .moveDown(1);
     
     // Footer
     this.doc
