@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { updateContactAndSendPersonalizedMessage } from '../../utils/openphoneUtils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Function to send SMS using OpenPhone
+// Function to send SMS using OpenPhone (legacy function for backward compatibility)
 async function sendSMS(to, message) {
   try {
     const response = await fetch('https://api.openphone.com/v1/messages', {
@@ -113,18 +114,38 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to update waitlist entry' });
       }
 
-      // Send appropriate SMS based on status
+      // Send appropriate SMS based on status with personalization
       let smsMessage = '';
       if (status === 'approved') {
-        smsMessage = "We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nTo officially join, please complete the following:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nThe link expires in 24 hours, so please respond to this text with any questions.\n\nThank you.";
+        smsMessage = "Hi {firstName} - We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nTo officially join, please complete the following:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nThe link expires in 24 hours, so please respond to this text with any questions.\n\nThank you.";
       } else if (status === 'waitlisted') {
-        smsMessage = "We appreciate your request.\n\nNoir is intentionally intimate—each additional member carefully considered to preserve the experience we value most at Noir.\n\nAt this time, we aren't able to extend an invitation. However, you've been added to our waitlist, and as space allows, your request will be revisited and you'll be notified.\n\nThank you for your patience. We hope to welcome you, when the time is right.";
+        smsMessage = "Hi {firstName} - We appreciate your request.\n\nNoir is intentionally intimate—each additional member carefully considered to preserve the experience we value most at Noir.\n\nAt this time, we aren't able to extend an invitation. However, you've been added to our waitlist, and as space allows, your request will be revisited and you'll be notified.\n\nThank you for your patience. We hope to welcome you, when the time is right.";
       } else if (status === 'denied') {
-        smsMessage = "Thank you for your interest in Noir. After careful consideration, we are unable to extend an invitation at this time. We wish you the best in your future endeavors.";
+        smsMessage = "Hi {firstName} - Thank you for your interest in Noir. After careful consideration, we are unable to extend an invitation at this time. We wish you the best in your future endeavors.";
       }
 
       if (smsMessage) {
-        await sendSMS(waitlistEntry.phone, smsMessage);
+        // Prepare contact data for OpenPhone
+        const contactData = {
+          first_name: waitlistEntry.first_name || '',
+          last_name: waitlistEntry.last_name || '',
+          email: waitlistEntry.email || '',
+          company: waitlistEntry.company || '',
+          notes: `Waitlist ${status} - ${waitlistEntry.city_state || ''} - ${waitlistEntry.referral || ''}`
+        };
+
+        // Update OpenPhone contact and send personalized message
+        const result = await updateContactAndSendPersonalizedMessage(
+          waitlistEntry.phone, 
+          contactData, 
+          smsMessage
+        );
+
+        if (!result.success) {
+          console.error('Failed to send personalized SMS:', result.error);
+          // Fallback to regular SMS if personalized fails
+          await sendSMS(waitlistEntry.phone, smsMessage.replace(/\{firstName\}/g, waitlistEntry.first_name || 'there'));
+        }
       }
 
       return res.status(200).json({
