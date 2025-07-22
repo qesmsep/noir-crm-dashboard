@@ -486,7 +486,7 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
     reservations: any[];
     privateEvents: any[];
     regularReservations: any[];
-    totalReservations: number;
+    totalGuests: number;
     isCurrentMonth: boolean;
   }>>([]);
   const [loading, setLoading] = useState(true);
@@ -517,42 +517,45 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
       const reservationsData = await reservationsResponse.json();
       const privateEventsData = await privateEventsResponse.json();
       
-             // Create calendar grid
-       const calendarData: Array<{
-         date: Date;
-         reservations: any[];
-         privateEvents: any[];
-         regularReservations: any[];
-         totalReservations: number;
-         isCurrentMonth: boolean;
-       }> = [];
-       const current = new Date(calendarStart);
-       
-       while (current <= calendarEnd) {
-         const dayReservations = reservationsData.data?.filter((r: any) => {
-           const resDate = fromUTC(r.start_time, settings.timezone);
-           return isSameDay(resDate, current, settings.timezone);
-         }) || [];
-         
-         const dayPrivateEvents = privateEventsData.data?.filter((pe: any) => {
-           const eventDate = fromUTC(pe.start_time, settings.timezone);
-           return isSameDay(eventDate, current, settings.timezone);
-         }) || [];
-         
-         const privateEvents = dayReservations.filter((r: any) => r.private_event_id);
-         const regularReservations = dayReservations.filter((r: any) => !r.private_event_id);
-         
-         calendarData.push({
-           date: new Date(current),
-           reservations: dayReservations,
-           privateEvents: dayPrivateEvents,
-           regularReservations,
-           totalReservations: dayReservations.length + dayPrivateEvents.length,
-           isCurrentMonth: current.getMonth() === currentDate.getMonth()
-         });
-         
-         current.setDate(current.getDate() + 1);
-       }
+      // Create calendar grid
+      const calendarData: Array<{
+        date: Date;
+        reservations: any[];
+        privateEvents: any[];
+        regularReservations: any[];
+        totalGuests: number;
+        isCurrentMonth: boolean;
+      }> = [];
+      const current = new Date(calendarStart);
+      
+      while (current <= calendarEnd) {
+        const dayReservations = reservationsData.data?.filter((r: any) => {
+          const resDate = fromUTC(r.start_time, settings.timezone);
+          return isSameDay(resDate, current, settings.timezone);
+        }) || [];
+        
+        const dayPrivateEvents = privateEventsData.data?.filter((pe: any) => {
+          const eventDate = fromUTC(pe.start_time, settings.timezone);
+          return isSameDay(eventDate, current, settings.timezone);
+        }) || [];
+        
+        const privateEvents = dayReservations.filter((r: any) => r.private_event_id);
+        const regularReservations = dayReservations.filter((r: any) => !r.private_event_id);
+        
+        // Calculate total guests from regular reservations only
+        const totalGuests = regularReservations.reduce((sum: number, r: any) => sum + (r.party_size || 0), 0);
+        
+        calendarData.push({
+          date: new Date(current),
+          reservations: dayReservations,
+          privateEvents: dayPrivateEvents,
+          regularReservations,
+          totalGuests,
+          isCurrentMonth: current.getMonth() === currentDate.getMonth()
+        });
+        
+        current.setDate(current.getDate() + 1);
+      }
       
       setMonthData(calendarData);
     } catch (error) {
@@ -613,8 +616,32 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
               {day.date.getDate()}
             </Text>
             
-            {/* Reservation count */}
-            {day.totalReservations > 0 && (
+            {/* Content based on whether there are private events or regular guests */}
+            {day.privateEvents.length > 0 ? (
+              // Show private event names
+              <Box 
+                position="absolute"
+                top="50%"
+                left="50%"
+                transform="translate(-50%, -50%)"
+                textAlign="center"
+                zIndex={2}
+                maxW="90%"
+              >
+                {day.privateEvents.map((event, eventIndex) => (
+                  <Text 
+                    key={eventIndex}
+                    fontSize="xs" 
+                    color="#545454" 
+                    fontWeight="bold"
+                    mb={eventIndex < day.privateEvents.length - 1 ? 1 : 0}
+                  >
+                    Private Event: {event.title}
+                  </Text>
+                ))}
+              </Box>
+            ) : day.totalGuests > 0 ? (
+              // Show guest count for regular reservations
               <Box 
                 position="absolute"
                 top="50%"
@@ -623,17 +650,11 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
                 textAlign="center"
                 zIndex={2}
               >
-                <Text fontSize="24px" fontWeight="bold" color="#353535" backgroundColor="#CAC2b9"  borderRadius="10px" padding="5px">
-                  {day.totalReservations}
-                </Text>
-                <Text fontSize="xs" color="#666">
-                  {day.privateEvents.length > 0 && (
-                    <span style={{ color: '#e74c3c' }}>🔒</span>
-                  )}
-                  
+                <Text fontSize="32px" fontWeight="900" color="#353535">
+                  {day.totalGuests}
                 </Text>
               </Box>
-            )}
+            ) : null}
           </Box>
         ))}
       </Box>
