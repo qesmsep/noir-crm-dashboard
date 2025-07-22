@@ -1,8 +1,8 @@
 "use client";
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '../../lib/auth';
+import { useAuth } from '../../lib/auth-context';
 import styles from '../../styles/AdminLayout.module.css';
 import Image from 'next/image';
 
@@ -14,14 +14,37 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children, isFullScreen = false }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/admin');
+    }
+  }, [user, loading, router]);
 
   const handleSignOut = async () => {
     await signOut();
     router.push('/auth/admin');
   };
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not authenticated
+  if (!user) {
+    return null;
+  }
 
   const navItems = [
     { href: '/admin/dashboard', label: 'Dashboard', icon: '📊' },

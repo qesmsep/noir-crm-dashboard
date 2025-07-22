@@ -6,6 +6,7 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import { ChevronLeftIcon, ChevronRightIcon, ViewIcon, CalendarIcon, RepeatIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import { useSettings } from '../../context/SettingsContext';
 import { fromUTC, isSameDay } from '../../utils/dateUtils';
+import { supabase } from '../../lib/supabase';
 
 type ViewType = 'day' | 'week' | 'month' | 'all';
 
@@ -286,6 +287,48 @@ export default function Calendar() {
   );
 }
 
+// Helper function to check if a day is open for reservations (optimized version)
+function isDayOpenOptimized(date: Date, baseHours: any[], exceptionalClosures: any[], privateEvents: any[]): boolean {
+  try {
+    const dateStr = date.toISOString().split('T')[0];
+    const dayOfWeek = date.getDay();
+    
+    // Check for exceptional closure
+    const exceptionalClosure = exceptionalClosures.find(closure => closure.date === dateStr);
+    if (exceptionalClosure) {
+      // If it's a full-day closure, the day is closed
+      if (exceptionalClosure.full_day || !exceptionalClosure.time_ranges) {
+        return false;
+      }
+    }
+    
+    // Check for private events that block this date
+    const dayPrivateEvents = privateEvents.filter(ev => {
+      const eventDate = ev.start_time.split('T')[0];
+      return eventDate === dateStr && ev.full_day;
+    });
+    
+    if (dayPrivateEvents.length > 0) {
+      // If there's a full-day private event, the day is closed
+      return false;
+    }
+    
+    // Check if it's a base day or exceptional open
+    const baseHoursForDay = baseHours.filter(h => h.day_of_week === dayOfWeek);
+    const exceptionalOpen = exceptionalClosures.find(open => open.date === dateStr && open.type === 'exceptional_open');
+    
+    // If it's neither a base day nor an exceptional open, the day is closed
+    if (baseHoursForDay.length === 0 && !exceptionalOpen) {
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error checking if day is open:', error);
+    return false;
+  }
+}
+
 // Week View Component
 function WeekView({ currentDate, onDateChange, onReservationClick }: {
   currentDate: Date;
@@ -488,6 +531,7 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
     regularReservations: any[];
     totalGuests: number;
     isCurrentMonth: boolean;
+    isOpen: boolean;
   }>>([]);
   const [loading, setLoading] = useState(true);
 
@@ -517,6 +561,26 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
       const reservationsData = await reservationsResponse.json();
       const privateEventsData = await privateEventsResponse.json();
       
+      // Fetch venue hours for the entire month
+      const { data: venueHoursData } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'base');
+
+      const { data: exceptionalClosuresData } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'exceptional_closure')
+        .gte('date', calendarStart.toISOString().split('T')[0])
+        .lte('date', calendarEnd.toISOString().split('T')[0]);
+
+      const { data: exceptionalOpenData } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'exceptional_open')
+        .gte('date', calendarStart.toISOString().split('T')[0])
+        .lte('date', calendarEnd.toISOString().split('T')[0]);
+
       // Create calendar grid
       const calendarData: Array<{
         date: Date;
@@ -525,6 +589,7 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
         regularReservations: any[];
         totalGuests: number;
         isCurrentMonth: boolean;
+        isOpen: boolean;
       }> = [];
       const current = new Date(calendarStart);
       
@@ -545,13 +610,17 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
         // Calculate total guests from regular reservations only
         const totalGuests = regularReservations.reduce((sum: number, r: any) => sum + (r.party_size || 0), 0);
         
+        // Check if the day is open for reservations
+        const isOpen = isDayOpenOptimized(current, venueHoursData || [], [...(exceptionalClosuresData || []), ...(exceptionalOpenData || [])], privateEventsData.data || []);
+        
         calendarData.push({
           date: new Date(current),
           reservations: dayReservations,
           privateEvents: dayPrivateEvents,
           regularReservations,
           totalGuests,
-          isCurrentMonth: current.getMonth() === currentDate.getMonth()
+          isCurrentMonth: current.getMonth() === currentDate.getMonth(),
+          isOpen
         });
         
         current.setDate(current.getDate() + 1);
@@ -598,17 +667,18 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
             p={20}
             cursor="pointer"
             onClick={() => handleDayClick(day.date)}
-            bg={day.isCurrentMonth ? 'white' : '#f5f5f5'}
+            bg={day.isCurrentMonth ? (day.isOpen ? 'white' : '#f0f0f0') : '#f5f5f5'}
             minH="80px"
             position="relative"
-            _hover={{ bg: day.isCurrentMonth ? '#f0f0f0' : '#e8e8e8' }}
+            _hover={{ bg: day.isCurrentMonth ? (day.isOpen ? '#f0f0f0' : '#e8e8e8') : '#e8e8e8' }}
             transition="all 0.2s"
+            opacity={day.isCurrentMonth && !day.isOpen ? 0.6 : 1}
           >
             {/* Date number */}
             <Text 
               fontSize="sm" 
               fontWeight="bold" 
-              color={day.isCurrentMonth ? '#353535' : '#999'}
+              color={day.isCurrentMonth ? (day.isOpen ? '#353535' : '#999') : '#999'}
               position="absolute"
               top="0px"
               left="4px"
@@ -640,21 +710,23 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
                   </Text>
                 ))}
               </Box>
-            ) : day.totalGuests > 0 ? (
-              // Show guest count for regular reservations
-              <Box 
-                position="absolute"
-                top="50%"
-                left="50%"
-                transform="translate(-50%, -50%)"
-                textAlign="center"
-                zIndex={2}
-              >
-                <Text fontSize="32px" fontWeight="900" color="#353535">
-                  {day.totalGuests}
-                </Text>
-              </Box>
-            ) : null}
+            ) : (
+              // Show guest count for regular reservations (only if day is open)
+              day.isOpen ? (
+                <Box 
+                  position="absolute"
+                  top="50%"
+                  left="50%"
+                  transform="translate(-50%, -50%)"
+                  textAlign="center"
+                  zIndex={2}
+                >
+                  <Text fontSize="32px" fontWeight="900" color="#353535">
+                    {day.totalGuests}
+                  </Text>
+                </Box>
+              ) : null
+            )}
           </Box>
         ))}
       </Box>
