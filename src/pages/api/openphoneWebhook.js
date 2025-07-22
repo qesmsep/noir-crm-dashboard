@@ -738,7 +738,7 @@ export async function handler(req, res) {
     }
 
     try {
-      // Calculate current billing month based on member's join date
+      // Calculate previous billing month based on member's join date
       const today = new Date();
       const joinDate = new Date(member.join_date);
       
@@ -746,19 +746,19 @@ export async function handler(req, res) {
       const monthsSinceJoin = (today.getFullYear() - joinDate.getFullYear()) * 12 + 
                              (today.getMonth() - joinDate.getMonth());
       
-      // Calculate the start and end of the current billing period
-      const currentPeriodStart = new Date(joinDate);
-      currentPeriodStart.setMonth(joinDate.getMonth() + monthsSinceJoin);
-      currentPeriodStart.setDate(joinDate.getDate());
+      // Calculate the start and end of the PREVIOUS billing period (not current)
+      const previousPeriodStart = new Date(joinDate);
+      previousPeriodStart.setMonth(joinDate.getMonth() + monthsSinceJoin - 1); // Subtract 1 month
+      previousPeriodStart.setDate(joinDate.getDate());
       
-      const currentPeriodEnd = new Date(joinDate);
-      currentPeriodEnd.setMonth(joinDate.getMonth() + monthsSinceJoin + 1);
-      currentPeriodEnd.setDate(joinDate.getDate() - 1); // Day before next period
+      const previousPeriodEnd = new Date(joinDate);
+      previousPeriodEnd.setMonth(joinDate.getMonth() + monthsSinceJoin);
+      previousPeriodEnd.setDate(joinDate.getDate() - 1); // Day before current period
       
-      const startDate = currentPeriodStart.toISOString().split('T')[0];
-      const endDate = currentPeriodEnd.toISOString().split('T')[0];
+      const startDate = previousPeriodStart.toISOString().split('T')[0];
+      const endDate = previousPeriodEnd.toISOString().split('T')[0];
       
-      console.log('Calculated billing period:', { startDate, endDate, member: member.member_id });
+      console.log('Calculated previous billing period:', { startDate, endDate, member: member.member_id });
       
       // Generate PDF using existing functionality
       const { LedgerPdfGenerator } = await import('../../utils/ledgerPdfGenerator');
@@ -787,11 +787,11 @@ export async function handler(req, res) {
         .getPublicUrl(fileName);
 
       // Send SMS with PDF link
-      const message = `Hi ${member.first_name} - Here is the most recent statement for your Noir membership. Please let us know if you have any questions. Thank you! ${publicUrl}`;
+      const message = `Hi ${member.first_name} - Here is your previous membership period statement for your Noir membership. Please let us know if you have any questions. Thank you! ${publicUrl}`;
       
       const smsResult = await sendSMS(from, message);
       
-      console.log('Balance PDF sent successfully:', {
+      console.log('Previous period PDF sent successfully:', {
         member: member.member_id,
         phone: from,
         pdfUrl: publicUrl,
@@ -799,7 +799,7 @@ export async function handler(req, res) {
       });
       
       return res.status(200).json({ 
-        message: 'Balance PDF sent successfully',
+        message: 'Previous period PDF sent successfully',
         member_id: member.member_id,
         pdf_url: publicUrl,
         sms_id: smsResult.id
