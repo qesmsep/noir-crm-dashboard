@@ -125,23 +125,6 @@ export default function Calendar() {
     setCurrentDate(newDate);
   };
 
-  // Day navigation functions for day view
-  const prevDay = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() - 1);
-    setCurrentDate(d);
-  };
-
-  const nextDay = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + 1);
-    setCurrentDate(d);
-  };
-
-  const goToday = () => {
-    setCurrentDate(new Date());
-  };
-
   return (
     <AdminLayout isFullScreen={isFullScreen}>
       {/* Drawer rendered at page level */}
@@ -164,22 +147,23 @@ export default function Calendar() {
         right={{ base: 0, md: isFullScreen ? 0 : "auto" }}
         bottom={{ base: 0, md: isFullScreen ? 0 : "auto" }}
         overflow={{ base: "auto", md: isFullScreen ? "hidden" : "visible" }}
-        bg="transparent"
+        
+        paddingLeft={10}
+        bg={useColorModeValue('white', '#ECEDE8')}
       >
         {/* Navigation Header - Centered on mobile */}
         <Box 
-          className="calendar-navigation-header"
           bg={useColorModeValue('white', '#ECEDE8')}
           borderBottom="1px solid"
           borderColor={useColorModeValue('gray.200', '#a59480')}
-          p={{ base: 2, md: 1 }} // Significantly reduced desktop padding
-          paddingTop={{ base: "60px", md: 1 }} // Significantly reduced desktop top padding
+          p={{ base: 2, md: 4 }}
+          paddingLeft={10}
+          
           position="sticky"
-          top="60px"
-          zIndex={2000}
-          backgroundClip="padding-box"
+          top={0}
+          zIndex={10}
         >
-          <HStack justify="space-between" align="center" spacing={{ base: 2, md: 1 }}>
+          <HStack justify="space-between" align="center">
             {/* Left side - Navigation buttons */}
             <HStack spacing={{ base: 1, md: 2 }}>
               {currentView !== 'day' && (
@@ -216,15 +200,26 @@ export default function Calendar() {
                   />
                 </>
               )}
+              {currentView === 'day' && (
+                <Text 
+                  fontSize={{ base: "sm", md: "lg" }}
+                  fontWeight="semibold"
+                  color={useColorModeValue('gray.800', '#353535')}
+                  minW={{ base: "120px", md: "200px" }}
+                  textAlign="center"
+                  
+                >
+                  {getViewTitle()}
+                </Text>
+              )}
             </HStack>
 
             {/* Center - View navigation (centered on mobile) */}
-          <HStack 
-            spacing={{ base: 1, md: 2 }} 
-            justify={{ base: "center", md: "flex-start" }}
-            flex={{ base: 1, md: "auto" }}
-            zIndex={2001}
-          >
+            <HStack 
+              spacing={{ base: 1, md: 2 }} 
+              justify={{ base: "center", md: "flex-start" }}
+              flex={{ base: 1, md: "auto" }}
+            >
               <Button
                 size={{ base: "sm", md: "md" }}
                 variant={currentView === 'day' ? 'solid' : 'ghost'}
@@ -275,48 +270,6 @@ export default function Calendar() {
               _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
             />
           </HStack>
-
-          {currentView === 'day' && (
-            <HStack mt={{ base: 2, md: 0 }} spacing={{ base: 1, md: 2 }} justify="center">
-              <Button
-                size={{ base: "sm", md: "md" }}
-                leftIcon={<CalendarIcon />}
-                variant="outline"
-                onClick={() => setCurrentView('all')}
-                color={useColorModeValue('gray.700', '#353535')}
-                _hover={{ bg: useColorModeValue('gray.100', '#a59480'), color: 'white' }}
-              >
-                All Reservations
-              </Button>
-              <IconButton
-                aria-label="Previous day"
-                icon={<ChevronLeftIcon />}
-                size={{ base: "sm", md: "md" }}
-                variant="ghost"
-                onClick={prevDay}
-                color={useColorModeValue('gray.600', '#353535')}
-                _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
-              />
-              <IconButton
-                aria-label="Next day"
-                icon={<ChevronRightIcon />}
-                size={{ base: "sm", md: "md" }}
-                variant="ghost"
-                onClick={nextDay}
-                color={useColorModeValue('gray.600', '#353535')}
-                _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
-              />
-              <Button
-                size={{ base: "sm", md: "md" }}
-                variant="ghost"
-                onClick={goToday}
-                color={useColorModeValue('gray.700', '#353535')}
-                _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
-              >
-                today
-              </Button>
-            </HStack>
-          )}
         </Box>
 
         {/* Calendar Content - Full height on mobile */}
@@ -324,9 +277,10 @@ export default function Calendar() {
           borderRadius={0}
           boxShadow="none"
           p={0}
+          margin={0}
           border="none"
           className="calendar-container"
-          h={{ base: "calc(100vh - 240px)", md: isFullScreen ? "100%" : "auto" }} // Adjusted height for mobile
+          h={{ base: "calc(100vh - 120px)", md: isFullScreen ? "100%" : "auto" }}
           w="100%"
           overflow={{ base: "auto", md: isFullScreen ? "hidden" : "visible" }}
         >

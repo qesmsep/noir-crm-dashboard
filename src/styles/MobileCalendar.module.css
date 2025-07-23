@@ -106,27 +106,21 @@
   overflow: auto !important;
 }
 
-.mobileCalendarContainer :global(.fc-timeline-area),
-.mobileCalendarContainer :global(.fc-scroller),
-.mobileCalendarContainer :global(.fc-timeline-body) {
-  overflow-x: auto !important;
-}
-
 /* Phone-specific optimizations - disable touch selection */
 @media (max-width: 428px) {
   .mobileCalendarContainer :global(.fc-timeline-slot) {
-    touch-action: pan-x pan-y !important;
+    touch-action: pinch-zoom !important;
     pointer-events: auto !important;
   }
   
   .mobileCalendarContainer :global(.fc-timeline-body) {
-    touch-action: pan-x pan-y !important;
+    touch-action: pinch-zoom !important;
     -webkit-overflow-scrolling: touch !important;
   }
   
   /* Disable slot clicking on phones */
   .mobileCalendarContainer :global(.fc-timeline-slot:not(.fc-event)) {
-    pointer-events: auto !important;
+    pointer-events: none !important;
   }
   
   /* Keep event clicking enabled */
@@ -175,12 +169,3 @@
     pointer-events: auto !important;
   }
 } 
-  .calendar-navigation-header {
-    z-index: 2000 !important;
-  }
-.mobileCalendarContainer :global(.fc-view-harness),
-.mobileCalendarContainer :global(.fc-timeline),
-.mobileCalendarContainer :global(.fc-timeline-slots) {
-  overflow-x: auto !important;
-  touch-action: pan-x pan-y !important;
-}

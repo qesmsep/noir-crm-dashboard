@@ -127,7 +127,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
         </nav>
       )}
 
-      <main className={styles.main} style={{ background: '#FFF', boxShadow: 'none', border: 'none' }}>
+      <main className={styles.main} style={{ background: 'none', boxShadow: 'none', border: 'none' }}>
         <div className={styles.content}>{children}</div>
       </main>
 

@@ -147,17 +147,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Scroll-sync: Make times header scroll with the grid
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const bodyEl = document.querySelector('.fc-timeline-body') as HTMLElement | null;
-    const headerEl = document.querySelector('.fc-timeline-header') as HTMLElement | null;
-    if (!bodyEl || !headerEl) return;
-    const onScroll = () => { headerEl.scrollLeft = bodyEl.scrollLeft; };
-    bodyEl.addEventListener('scroll', onScroll, { passive: true });
-    return () => bodyEl.removeEventListener('scroll', onScroll);
-  }, [reloadKey]);
-
   useEffect(() => {
     async function loadTables() {
       try {
@@ -714,12 +703,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       className={isMobile ? styles.mobileCalendarContainer : ''}
       style={{
         // Mobile-specific container styles with pinch zoom support
-        touchAction: isMobile ? 'pan-x pan-y' : 'manipulation', // Allow scrolling on mobile
+        touchAction: 'manipulation',
         WebkitOverflowScrolling: 'touch',
         overscrollBehavior: 'contain',
         // Enable pinch zoom
         ...(isMobile && {
-          touchAction: 'pan-x pan-y', // Allow scrolling on mobile
+          touchAction: 'pinch-zoom',
           WebkitUserSelect: 'none',
           userSelect: 'none',
         }),
@@ -732,8 +721,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           p={3} 
           borderBottom="0px solid #a59480"
           position="sticky"
-          top="10px" // Adjusted top position to account for calendar page navigation header
-          zIndex={5} // Decreased z-index to appear below navigation header
+          top={0}
+          zIndex={10}
         >
           {/* Top Row: All Reservations Button, Nav Arrows, Today Button */}
           <HStack justify="space-between" align="center" mb={2}>
@@ -858,7 +847,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             lineHeight: '1',
             WebkitUserSelect: 'none',
             userSelect: 'none',
-            paddingTop: '20px', // Add top padding for mobile header
           }),
         }}
         sx={{
@@ -900,12 +888,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           '.fc-timeline, .fc-timeline-header, .fc-timeline-body': {
             width: '100%',
             tableLayout: 'fixed',
-            // Add scrolling for timeline components
-            ...(isMobile && {
-              overflow: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }),
           },
           '.fc-timeline-header, .fc-timeline-body': {
             borderRight: '1px solid rgba(0,0,0,0.12)',
@@ -915,51 +897,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             justifyContent: 'center',
             paddingTop: '0px',
             width: '100%',
-            // Add scrolling for timeline areas
-            ...(isMobile && {
-              overflow: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }),
           },
           
           '.fc-timeline-body td': {
             borderBottom: '1px solid rgba(0,0,0,0.08)',
-            // Add scrolling for timeline body cells
-            ...(isMobile && {
-              overflow: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }),
+            
           },
           '.fc-timeline-body tr': {
             borderBottom: '1px solid rgba(0,0,0,0.08)',
-            // Add scrolling for timeline body rows
-            ...(isMobile && {
-              overflow: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }),
+            
+            
           },
           '.fc-timeline-slot': {
             borderBottom: '1px solid rgba(0,0,0,0.08)',
             minwidth: '10px',
-            // Add scrolling for timeline slots
-            ...(isMobile && {
-              overflow: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }),
+            
           },
           '.fc-timeline-slot-lane': {
+         
             margin: '0px',
             minwidth: '10px',
-            // Add scrolling for timeline slot lanes
-            ...(isMobile && {
-              overflow: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }),
+           
           },
           '.fc-resource-timeline-divider': {
             borderRight: '1px solidrgb(136, 136, 136)',
@@ -968,12 +926,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           },
           '.fc-resource-area, .fc-timeline-area': {
             verticalAlign: 'top',
-            // Add scrolling for timeline area
-            ...(isMobile && {
-              overflow: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }),
+            
           },
           '.fc-resource-area-header': {
             backgroundColor: '#ecede8',
@@ -1018,7 +971,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             
             margin: '0px',
             // Touch optimizations
-            touchAction: isMobile ? 'pan-x pan-y' : 'manipulation', // Allow scrolling on mobile
+            touchAction: 'manipulation',
             WebkitUserSelect: 'none',
             WebkitTouchCallout: 'none',
             WebkitTapHighlightColor: 'transparent',
@@ -1063,7 +1016,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
               },
             },
             '.fc-event-main': {
-              touchAction: isMobile ? 'pan-x pan-y' : 'manipulation', // Allow scrolling on mobile
+              touchAction: 'manipulation',
             },
           }),
         }}
@@ -1091,7 +1044,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           eventResize={handleEventResize}
           eventClick={handleEventClick}
           select={handleSlotClick}
-          height={isMobile ? 'calc(100vh - 300px)' : 'auto'}
+          height={isMobile ? 'calc(100vh - 180px)' : 'auto'}
           
           // FullCalendar scrolling properties
           scrollTime={isMobile ? '01:00:00' : '08:00:00'}
@@ -1149,7 +1102,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
                   border: '1px solid #353535',
                   cursor: isTouchDeviceState ? 'grab' : 'pointer',
                   userSelect: 'none',
-                  touchAction: isMobile ? 'pan-x pan-y' : 'manipulation', // Allow scrolling on mobile
+                  touchAction: 'manipulation',
                   // Additional touch optimizations
                   WebkitUserSelect: 'none',
                   WebkitTouchCallout: 'none',
