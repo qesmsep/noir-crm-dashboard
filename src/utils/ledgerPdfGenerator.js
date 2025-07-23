@@ -241,6 +241,16 @@ export class LedgerPdfGenerator {
       let currentY = tableTop + 20;
       let runningBalance = priorBalance; // Start with the prior balance
       
+      // Add starting balance as first row
+      this.doc.fontSize(8).font('Helvetica')
+        .text('Starting Balance', tableLeft, currentY)
+        .text('', tableLeft + colWidth, currentY) // Empty description
+        .text('', tableLeft + colWidth + descColWidth, currentY) // Empty type
+        .text('', tableLeft + colWidth + descColWidth + colWidth, currentY) // Empty amount
+        .text(`$${runningBalance.toFixed(2)}`, tableLeft + colWidth + descColWidth + colWidth * 2, currentY);
+      
+      currentY += rowHeight;
+      
       transactions.forEach((entry) => {
         const attachments = attachmentsByLedgerId[entry.id] || [];
         // Check if we need a new page
@@ -248,6 +258,9 @@ export class LedgerPdfGenerator {
           this.doc.addPage();
           currentY = 50; // Reset to top of new page
         }
+        
+        // Update running balance before displaying the transaction
+        runningBalance += entry.amount;
         
         this.doc.fontSize(8).font('Helvetica')
           .text(new Date(entry.date).toLocaleDateString(), tableLeft, currentY)
@@ -269,8 +282,6 @@ export class LedgerPdfGenerator {
             .fillColor('black');
         }
         
-        // Update running balance for next transaction
-        runningBalance += entry.amount;
         currentY += rowHeight;
       });
       // Draw bottom line after table
