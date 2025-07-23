@@ -520,6 +520,44 @@ html {
     overflow: auto !important;
     -webkit-overflow-scrolling: touch !important;
   }
+  
+  /* Additional FullCalendar scrolling fixes */
+  .fc-view-harness {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .fc-scroller-liquid {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .fc-scroller-liquid-absolute {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .fc-timeline-body {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: auto !important;
+  }
+  
+  .fc-timeline-area {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Mobile dashboard improvements */
+  .dashboardRoot {
+    padding-top: calc(1rem + env(safe-area-inset-top, 0)) !important;
+    margin-top: env(safe-area-inset-top, 0) !important;
+  }
+  
+  /* Ensure cards grid has proper top spacing */
+  .cardsGrid {
+    margin-top: 80px !important;
+  }
 }
 
 /* iPhone SE and smaller screens */
@@ -528,6 +566,11 @@ html {
   button, a, input, select, textarea {
     min-height: 44px;
     min-width: 44px;
+  }
+  
+  /* iPhone SE dashboard improvements */
+  .cardsGrid {
+    margin-top: 70px !important;
   }
 }
 

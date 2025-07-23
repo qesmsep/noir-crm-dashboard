@@ -839,12 +839,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'auto',
           width: '100%',
-          height: isMobile ? 'calc(100vh - 150px)' : 'auto',
+          height: isMobile ? 'calc(100vh - 260px)' : 'auto',
           overflow: isMobile ? 'auto' : 'visible',
           // Mobile-specific adjustments
           ...(isMobile && {
-            fontSize: '12.5px',
-            lineHeight: '1.3',
+            fontSize: '11px',
+            lineHeight: '1',
             WebkitUserSelect: 'none',
             userSelect: 'none',
           }),
@@ -1046,6 +1046,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           select={handleSlotClick}
           height={isMobile ? 'calc(100vh - 180px)' : 'auto'}
           
+          // FullCalendar scrolling properties
+          scrollTime={isMobile ? '01:00:00' : '08:00:00'}
+          scrollTimeReset={false}
+          handleWindowResize={true}
           
           // Touch and mobile optimizations
           longPressDelay={isTouchDeviceState ? 300 : 1000}
@@ -1125,11 +1129,11 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       </Box>
       
       {/* Event Type Legend */}
-      <Box display={{ base: "none", md: "block" }} width="60%" ml={20} p={0} borderWidth="1px" borderRadius="lg" padding="0px" >
-        <Grid templateColumns="repeat(7, 1fr)" gap={0}>
+      <Box display={{ base: "none", sm: "block" }} width="50%" ml={10} p={0} borderWidth="1px" borderRadius="lg" padding="0px" >
+        <Grid templateColumns="repeat(4, 1fr)" gap={0}>
           {Object.entries(eventTypeEmojis).map(([key, emoji]) => (
             <GridItem key={key}>
-              <HStack>
+              <HStack width="25%">
                 <Text fontSize="10px">{emoji}</Text>
                 <Text fontSize="10px">{key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}</Text>
               </HStack>

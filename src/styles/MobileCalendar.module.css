@@ -7,9 +7,9 @@
   
   /* Full viewport on mobile */
   height: 100vh;
-  width: 100vw;
-  position: fixed;
-  top: 60px;
+  width: 98%;
+  position: relative;
+  top: 25px;
   left: 0;
   right: 0;
   bottom: 0;
