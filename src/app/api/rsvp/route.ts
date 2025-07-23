@@ -126,49 +126,51 @@ export async function POST(request: Request) {
 
     // Send SMS confirmation
     try {
-      const eventDateTime = DateTime.fromISO(event.start_time, { zone: 'utc' }).setZone('America/Chicago');
-      const formattedDate = eventDateTime.toLocaleString({
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+      // Check if OpenPhone credentials are configured
+      if (!process.env.OPENPHONE_API_KEY) {
+        console.error('OpenPhone API key not configured');
+      } else if (!process.env.OPENPHONE_PHONE_NUMBER_ID) {
+        console.error('OpenPhone phone number ID not configured');
+      } else {
+        const eventDateTime = DateTime.fromISO(event.start_time, { zone: 'utc' }).setZone('America/Chicago');
+        const formattedDate = eventDateTime.toLocaleString({
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
 
-      const timeString = eventDateTime.toLocaleString({
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
+        const timeString = eventDateTime.toLocaleString({
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
 
-      const messageContent = `Thank you, ${first_name}. Your RSVP has been confirmed for ${event.title} on ${formattedDate} at ${timeString} for ${party_size} guests. Please respond directly to this text message if you need to make any changes.`;
+        const messageContent = `Thank you, ${first_name}. Your RSVP has been confirmed for ${event.title} on ${formattedDate} at ${timeString} for ${party_size} guests. Please respond directly to this text message if you need to make any changes.`;
 
-      // Format phone number
-      let formattedPhone = phone;
-      if (phone) {
-        const digits = phone.replace(/\D/g, '');
-        if (digits.length === 10) {
-          formattedPhone = '+1' + digits;
-        } else if (digits.length === 11 && digits.startsWith('1')) {
-          formattedPhone = '+' + digits;
-        } else {
-          formattedPhone = '+' + digits;
+        // Format phone number
+        let formattedPhone = phone;
+        if (phone) {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.length === 10) {
+            formattedPhone = '+1' + digits;
+          } else if (digits.length === 11 && digits.startsWith('1')) {
+            formattedPhone = '+' + digits;
+          } else {
+            formattedPhone = '+' + digits;
+          }
         }
-      }
 
-      console.log('Attempting to send SMS confirmation:', {
-        to: formattedPhone,
-        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-        messageLength: messageContent.length
-      });
+        console.log('Sending SMS confirmation to:', formattedPhone);
+        console.log('Sending from phone ID:', process.env.OPENPHONE_PHONE_NUMBER_ID);
+        console.log('Event time (CST):', formattedDate, 'at', timeString);
 
-      // Send SMS using OpenPhone API
-      const openPhoneApiKey = process.env.OPENPHONE_API_KEY;
-      if (openPhoneApiKey) {
+        // Send SMS using OpenPhone API
         const response = await fetch('https://api.openphone.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openPhoneApiKey}`,
+            'Authorization': process.env.OPENPHONE_API_KEY,
             'Accept': 'application/json'
           },
           body: JSON.stringify({
@@ -178,17 +180,16 @@ export async function POST(request: Request) {
           })
         });
 
-        const responseData = await response.text();
-        console.log('OpenPhone API response status:', response.status);
-        console.log('OpenPhone API response:', responseData);
+        // Debug logging for response
+        console.log('OpenPhone API Response Status:', response.status);
+        const responseText = await response.text();
+        console.log('OpenPhone API Response:', responseText);
 
         if (!response.ok) {
-          console.error('Failed to send SMS confirmation. Status:', response.status, 'Response:', responseData);
+          console.error('Failed to send SMS confirmation:', responseText);
         } else {
-          console.log('SMS confirmation sent successfully');
+          console.log('SMS confirmation sent successfully to:', formattedPhone);
         }
-      } else {
-        console.error('OpenPhone API key not configured');
       }
     } catch (smsError) {
       console.error('Error sending SMS confirmation:', smsError);
