@@ -16,6 +16,47 @@ export const config = {
   },
 };
 
+// Helper function to check if a ledger entry already exists
+async function checkExistingLedgerEntry(stripeInvoiceId, stripePaymentIntentId) {
+  if (stripeInvoiceId) {
+    const { data: existingInvoice } = await supabase
+      .from('ledger')
+      .select('id')
+      .eq('stripe_invoice_id', stripeInvoiceId)
+      .single();
+    if (existingInvoice) return true;
+  }
+  
+  if (stripePaymentIntentId) {
+    const { data: existingPaymentIntent } = await supabase
+      .from('ledger')
+      .select('id')
+      .eq('stripe_payment_intent_id', stripePaymentIntentId)
+      .single();
+    if (existingPaymentIntent) return true;
+  }
+  
+  return false;
+}
+
+// Helper function to format subscription renewal description
+function formatSubscriptionDescription(invoice) {
+  const startDate = new Date(invoice.period_start * 1000);
+  const endDate = new Date(invoice.period_end * 1000);
+  
+  // Format dates to show month and day (e.g., "Jan 25 - Feb 24")
+  const startFormatted = startDate.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  });
+  const endFormatted = endDate.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric' 
+  });
+  
+  return `Noir Subscription Renewal for ${startFormatted} - ${endFormatted}`;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -140,6 +181,16 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to update members', debug: { ...debugInfo, memberUpdateError } });
       }
 
+      // Check if ledger entry already exists for this payment intent
+      const paymentIntentId = session.payment_intent;
+      if (paymentIntentId) {
+        const exists = await checkExistingLedgerEntry(null, paymentIntentId);
+        if (exists) {
+          console.log('Ledger entry already exists for payment intent:', paymentIntentId);
+          return res.json({ success: true, debug: { ...debugInfo, message: 'Ledger entry already exists' } });
+        }
+      }
+
       // Insert a ledger entry for the payment
       const paymentAmount = session.amount_total / 100; // Stripe sends amount in cents
       const paymentDate = new Date().toISOString().split('T')[0];
@@ -152,7 +203,8 @@ export default async function handler(req, res) {
           type: 'payment',
           amount: paymentAmount,
           note: ledgerNote,
-          date: paymentDate
+          date: paymentDate,
+          stripe_payment_intent_id: paymentIntentId
         });
       if (ledgerError) {
         console.error('Error inserting ledger entry:', ledgerError);
@@ -211,6 +263,13 @@ export default async function handler(req, res) {
       
       // Only process subscription invoices
       if (invoice.subscription) {
+        // Check if ledger entry already exists for this invoice
+        const exists = await checkExistingLedgerEntry(invoice.id, null);
+        if (exists) {
+          console.log('Ledger entry already exists for invoice:', invoice.id);
+          return res.json({ success: true, message: 'Ledger entry already exists' });
+        }
+
         // Get the customer ID from the invoice
         const customerId = invoice.customer;
         
@@ -241,7 +300,7 @@ export default async function handler(req, res) {
           return res.json({ received: true });
         }
 
-        // Add the payment to the ledger
+        // Add the payment to the ledger with updated description format
         const { error: ledgerError } = await supabase
           .from('ledger')
           .insert({
@@ -249,7 +308,7 @@ export default async function handler(req, res) {
             member_id: primaryMember.member_id,
             amount: invoice.amount_paid / 100, // Convert from cents to dollars
             type: 'payment',
-            note: `Subscription renewal payment for ${new Date(invoice.period_start * 1000).toLocaleDateString()} - ${new Date(invoice.period_end * 1000).toLocaleDateString()}`,
+            note: formatSubscriptionDescription(invoice),
             date: new Date().toISOString(),
             stripe_invoice_id: invoice.id
           });
@@ -272,6 +331,13 @@ export default async function handler(req, res) {
         customerId: paymentIntent.customer,
         amount: paymentIntent.amount
       });
+      
+      // Check if ledger entry already exists for this payment intent
+      const exists = await checkExistingLedgerEntry(null, paymentIntent.id);
+      if (exists) {
+        console.log('Ledger entry already exists for payment intent:', paymentIntent.id);
+        return res.json({ success: true, message: 'Ledger entry already exists' });
+      }
       
       // Get the customer ID from the payment intent
       const customerId = paymentIntent.customer;
