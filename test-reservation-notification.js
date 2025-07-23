@@ -33,7 +33,7 @@ async function testReservationNotification() {
 
     // Test the notification endpoint
     console.log('\n📱 Testing notification endpoint...');
-    const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/reservation-notifications`, {
+    const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://noir-crm-dashboard.vercel.app'}/api/reservation-notifications`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

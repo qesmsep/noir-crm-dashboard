@@ -485,7 +485,8 @@ export async function POST(request: Request) {
     // Send notification to 6199713730
     console.log('=== SENDING NOTIFICATION TO 6199713730 ===');
     try {
-      const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/reservation-notifications`, {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://noir-crm-dashboard.vercel.app';
+      const notificationResponse = await fetch(`${siteUrl}/api/reservation-notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
