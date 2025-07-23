@@ -172,8 +172,8 @@ export default function Calendar() {
           bg={useColorModeValue('white', '#ECEDE8')}
           borderBottom="1px solid"
           borderColor={useColorModeValue('gray.200', '#a59480')}
-          p={{ base: 2, md: 4 }}
-          paddingTop={{ base: "60px", md: 4 }} // Reduced top padding for mobile header
+          p={{ base: 2, md: 2 }} // Reduced desktop padding
+          paddingTop={{ base: "60px", md: 2 }} // Reduced desktop top padding
           position="sticky"
           top="60px"
           zIndex={2000}
@@ -277,7 +277,7 @@ export default function Calendar() {
           </HStack>
 
           {currentView === 'day' && (
-            <HStack mt={2} spacing={{ base: 1, md: 2 }} justify="center">
+            <HStack mt={{ base: 2, md: 1 }} spacing={{ base: 1, md: 2 }} justify="center">
               <Button
                 size={{ base: "sm", md: "md" }}
                 leftIcon={<CalendarIcon />}
