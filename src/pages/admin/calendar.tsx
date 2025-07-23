@@ -149,12 +149,12 @@ export default function Calendar() {
         overflow={{ base: "hidden", md: isFullScreen ? "hidden" : "visible" }}
         
         paddingLeft={10}
-        bg={useColorModeValue('white', '#cac2b9')}
+        bg={useColorModeValue('white', '#ECEDE8')}
       >
-        {/* Navigation Header */}
+        {/* Navigation Header - Centered on mobile */}
         <Box 
-          bg={useColorModeValue('white', '#353535')}
-          borderBottom="0px solid"
+          bg={useColorModeValue('white', '#ECEDE8')}
+          borderBottom="1px solid"
           borderColor={useColorModeValue('gray.200', '#a59480')}
           p={{ base: 2, md: 4 }}
           paddingLeft={10}
@@ -174,14 +174,14 @@ export default function Calendar() {
                     size={{ base: "sm", md: "md" }}
                     variant="ghost"
                     onClick={() => navigateDate('prev')}
-                    color={useColorModeValue('gray.600', '#ECEDE8')}
+                    color={useColorModeValue('gray.600', '#353535')}
                     _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
                   />
                   
                   <Text 
                     fontSize={{ base: "sm", md: "lg" }}
                     fontWeight="semibold"
-                    color={useColorModeValue('gray.800', '#ECEDE8')}
+                    color={useColorModeValue('gray.800', '#353535')}
                     minW={{ base: "120px", md: "200px" }}
                     textAlign="center"
                     padding={10}
@@ -195,7 +195,7 @@ export default function Calendar() {
                     size={{ base: "sm", md: "md" }}
                     variant="ghost"
                     onClick={() => navigateDate('next')}
-                    color={useColorModeValue('gray.600', '#ECEDE8')}
+                    color={useColorModeValue('gray.600', '#353535')}
                     _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
                   />
                 </>
@@ -204,7 +204,7 @@ export default function Calendar() {
                 <Text 
                   fontSize={{ base: "sm", md: "lg" }}
                   fontWeight="semibold"
-                  color={useColorModeValue('gray.800', '#ECEDE8')}
+                  color={useColorModeValue('gray.800', '#353535')}
                   minW={{ base: "120px", md: "200px" }}
                   textAlign="center"
                   
@@ -214,8 +214,12 @@ export default function Calendar() {
               )}
             </HStack>
 
-            {/* Center - View navigation */}
-            <HStack spacing={{ base: 1, md: 2 }}>
+            {/* Center - View navigation (centered on mobile) */}
+            <HStack 
+              spacing={{ base: 1, md: 2 }} 
+              justify={{ base: "center", md: "flex-start" }}
+              flex={{ base: 1, md: "auto" }}
+            >
               <Button
                 size={{ base: "sm", md: "md" }}
                 variant={currentView === 'day' ? 'solid' : 'ghost'}
@@ -223,7 +227,7 @@ export default function Calendar() {
                 leftIcon={<CalendarIcon />}
                 colorScheme="gray"
                 bg={currentView === 'day' ? '#a59480' : 'transparent'}
-                color={currentView === 'day' ? 'white' : useColorModeValue('gray.600', '#ECEDE8')}
+                color={currentView === 'day' ? 'white' : useColorModeValue('gray.600', '#353535')}
                 _hover={{ bg: currentView === 'day' ? '#a59480' : useColorModeValue('gray.100', '#a59480') }}
               >
                 Day
@@ -236,7 +240,7 @@ export default function Calendar() {
                 leftIcon={<ViewIcon />}
                 colorScheme="gray"
                 bg={currentView === 'month' ? '#a59480' : 'transparent'}
-                color={currentView === 'month' ? 'white' : useColorModeValue('gray.600', '#ECEDE8')}
+                color={currentView === 'month' ? 'white' : useColorModeValue('gray.600', '#353535')}
                 _hover={{ bg: currentView === 'month' ? '#a59480' : useColorModeValue('gray.100', '#a59480') }}
               >
                 Month
@@ -244,11 +248,11 @@ export default function Calendar() {
               <Button
                 size={{ base: "sm", md: "md" }}
                 variant={currentView === 'all' ? 'solid' : 'ghost'}
-                onClick={() => handleViewChange('all')}
                 colorScheme="gray"
                 bg={currentView === 'all' ? '#a59480' : 'transparent'}
-                color={currentView === 'all' ? 'white' : useColorModeValue('gray.600', '#ECEDE8')}
+                color={currentView === 'all' ? 'white' : useColorModeValue('gray.600', '#353535')}
                 _hover={{ bg: currentView === 'all' ? '#a59480' : useColorModeValue('gray.100', '#a59480') }}
+                onClick={() => handleViewChange('all')}
               >
                 📋 All
               </Button>
@@ -262,13 +266,13 @@ export default function Calendar() {
               variant="ghost"
               marginRight={20}
               onClick={toggleFullScreen}
-              color={useColorModeValue('gray.600', '#ECEDE8')}
+              color={useColorModeValue('gray.600', '#353535')}
               _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
             />
           </HStack>
         </Box>
 
-        {/* Calendar Content */}
+        {/* Calendar Content - Full height on mobile */}
         <Box 
           borderRadius={0}
           boxShadow="none"
@@ -276,7 +280,7 @@ export default function Calendar() {
           margin={0}
           border="none"
           className="calendar-container"
-          h={{ base: "100%", md: isFullScreen ? "100%" : "auto" }}
+          h={{ base: "calc(100vh - 120px)", md: isFullScreen ? "100%" : "auto" }}
           w="100%"
           overflow={{ base: "hidden", md: isFullScreen ? "hidden" : "visible" }}
         >

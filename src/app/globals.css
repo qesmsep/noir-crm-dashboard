@@ -477,6 +477,31 @@ html {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
+  
+  /* Calendar-specific mobile optimizations */
+  .calendar-container {
+    background-color: #ECEDE8 !important;
+    height: calc(100vh - 120px) !important;
+    overflow: hidden !important;
+  }
+  
+  /* Ensure calendar header is properly centered */
+  .calendar-header {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  /* Disable touch selection on calendar slots for phones */
+  .fc-timeline-slot:not(.fc-event) {
+    pointer-events: none !important;
+  }
+  
+  /* Keep event clicking enabled */
+  .fc-event {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
 }
 
 /* iPhone SE and smaller screens */

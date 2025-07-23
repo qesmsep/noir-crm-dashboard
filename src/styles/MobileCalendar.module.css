@@ -30,15 +30,17 @@
 
 /* Resource area optimizations for mobile */
 .mobileCalendarContainer :global(.fc-resource-area) {
-  min-width: 60px !important;
-  width: 60px !important;
+  min-width: 80px !important;
+  width: 80px !important;
+  
   background-color: #ecede8 !important;
 }
 
 .mobileCalendarContainer :global(.fc-resource-area .fc-resource-title) {
   font-size: 14px !important;
   font-weight: bold !important;
-  color: #353535 !important;
+
+  color: #FFF !important;
   text-align: center !important;
   padding: 8px 4px !important;
 }
@@ -51,11 +53,13 @@
 
 .mobileCalendarContainer :global(.fc-timeline-body) {
   touch-action: pinch-zoom !important;
+  
   -webkit-overflow-scrolling: touch !important;
 }
 
 .mobileCalendarContainer :global(.fc-timeline-header) {
   touch-action: pinch-zoom !important;
+  
 }
 
 .mobileCalendarContainer :global(.fc-timeline-slot) {
@@ -100,6 +104,30 @@
   overscroll-behavior: contain !important;
 }
 
+/* Phone-specific optimizations - disable touch selection */
+@media (max-width: 428px) {
+  .mobileCalendarContainer :global(.fc-timeline-slot) {
+    touch-action: pinch-zoom !important;
+    pointer-events: auto !important;
+  }
+  
+  .mobileCalendarContainer :global(.fc-timeline-body) {
+    touch-action: pinch-zoom !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Disable slot clicking on phones */
+  .mobileCalendarContainer :global(.fc-timeline-slot:not(.fc-event)) {
+    pointer-events: none !important;
+  }
+  
+  /* Keep event clicking enabled */
+  .mobileCalendarContainer :global(.fc-event) {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
+}
+
 /* Desktop styles - override mobile styles */
 @media (min-width: 769px) {
   .mobileCalendarContainer {
@@ -132,5 +160,10 @@
     padding: 6px 12px !important;
     font-size: 14px !important;
     min-height: auto !important;
+  }
+  
+  /* Re-enable slot clicking on desktop/iPad */
+  .mobileCalendarContainer :global(.fc-timeline-slot) {
+    pointer-events: auto !important;
   }
 } 

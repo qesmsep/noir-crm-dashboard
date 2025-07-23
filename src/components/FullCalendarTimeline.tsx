@@ -88,8 +88,17 @@ function isSameDayLocal(a: Date, b: Date) {
 
 // Touch detection utility
 const isTouchDevice = () => {
-  if (typeof window === 'undefined') return false;
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+};
+
+// Detect if it's a phone (not iPad)
+const isPhone = () => {
+  const userAgent = navigator.userAgent;
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const isTablet = /iPad/i.test(userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  
+  // Return true if it's mobile but not a tablet (iPad)
+  return isMobile && !isTablet;
 };
 
 const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick, currentDate: propCurrentDate, onDateChange }) => {
@@ -705,25 +714,123 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         }),
       }}
     >
-      <Box mb={4} display={{ base: "none", md: "flex" }} justifyContent="flex-end">
-        <Button
-          onClick={() => {
-            setSelectedDate(currentCalendarDate);
-            setIsDayReservationsDrawerOpen(true);
-          }}
-          leftIcon={<CalendarIcon />}
-          bg="#353535"
-          color="#ecede8"
-          _hover={{ bg: '#4f4f4f' }}
-          fontFamily="Montserrat, sans-serif"
-          fontWeight="semibold"
-          size="md"
-          
-          borderRadius="md"
+      {/* Custom Header for Mobile */}
+      {isMobile && (
+        <Box 
+          bg="#fff" 
+          p={3} 
+          borderBottom="0px solid #a59480"
+          position="sticky"
+          top={0}
+          zIndex={10}
         >
-          View {currentCalendarDate.toDateString() === new Date().toDateString() ? "Today's" : "Date's"} Reservations
-        </Button>
-      </Box>
+          {/* Top Row: All Reservations Button, Nav Arrows, Today Button */}
+          <HStack justify="space-between" align="center" mb={2}>
+            {/* Left: All Reservations Button */}
+            <Button
+              onClick={() => {
+                setSelectedDate(currentCalendarDate);
+                setIsDayReservationsDrawerOpen(true);
+              }}
+              leftIcon={<CalendarIcon />}
+              bg="#ecede8"
+              color="#353535"
+              marginLeft="10px"
+              _hover={{ bg: '#4f4f4f' }}
+              fontFamily="Montserrat, sans-serif"
+              fontWeight="semibold"
+              size="md"
+              borderRadius="10px"
+            >
+              All Reservations
+            </Button>
+
+            {/* Center: Navigation Arrows */}
+            <HStack spacing={10}>
+              <IconButton
+                aria-label="Previous day"
+                icon={<ChevronLeftIcon />}
+                fontSize="18px"
+                variant="ghost"
+                onClick={handlePrevDay}
+                color="#353535"
+                borderRadius="10px"
+                paddingRight="10px"
+                paddingLeft="10px"
+                _hover={{ bg: '#a59480' }}
+              />
+              <IconButton
+                aria-label="Next day"
+                icon={<ChevronRightIcon />}
+                fontSize="18px"
+                variant="ghost"
+                onClick={handleNextDay}
+                color="#353535"
+                borderRadius="10px"
+                paddingRight="10px"
+                paddingLeft="10px"
+                _hover={{ bg: '#a59480' }}
+              />
+            </HStack>
+
+            {/* Right: Today Button */}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const today = new Date();
+                setCurrentCalendarDate(today);
+                if (onDateChange) onDateChange(today);
+              }}
+              color="#353535"
+              _hover={{ bg: '#a59480' }}
+              borderRadius="10px"
+              marginRight="10px"
+              fontFamily="Montserrat, sans-serif"
+            >
+              today
+            </Button>
+          </HStack>
+
+          {/* Bottom Row: Centered Date */}
+          <Box textAlign="center">
+            <Text
+              fontSize="lg"
+              fontWeight="semibold"
+              color="#353535"
+              fontFamily="Montserrat, sans-serif"
+            >
+              {currentCalendarDate.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </Text>
+          </Box>
+        </Box>
+      )}
+
+      {/* Desktop Button (unchanged) */}
+      {!isMobile && (
+        <Box mb={4} display="flex" justifyContent="flex-end">
+          <Button
+            onClick={() => {
+              setSelectedDate(currentCalendarDate);
+              setIsDayReservationsDrawerOpen(true);
+            }}
+            leftIcon={<CalendarIcon />}
+            bg="#353535"
+            color="#ecede8"
+            _hover={{ bg: '#4f4f4f' }}
+            fontFamily="Montserrat, sans-serif"
+            fontWeight="semibold"
+            size="md"
+            borderRadius="md"
+          >
+            All Reservations
+          </Button>
+        </Box>
+      )}
 
       <Box
         style={{
@@ -732,11 +839,11 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
           width: '100%',
-          height: isMobile ? 'calc(100vh - 60px)' : 'auto',
+          height: isMobile ? 'calc(100vh - 150px)' : 'auto',
           // Mobile-specific adjustments
           ...(isMobile && {
-            fontSize: '14px',
-            lineHeight: '1.4',
+            fontSize: '12.5px',
+            lineHeight: '1.3',
             WebkitUserSelect: 'none',
             userSelect: 'none',
           }),
@@ -759,9 +866,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             verticalAlign: 'middle',
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
-            minWidth: isMobile ? '60px' : '100px',
-            width: isMobile ? '60px' : '100px',
+            minWidth: isMobile ? '80px' : '100px',
+            width: isMobile ? '80px' : '100px',
             flexShrink: 0,
+          
             textAlign: 'center',
             
           },
@@ -770,7 +878,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             verticalAlign: 'middle',
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
-            fontSize: isMobile ? '12px' : '14px',
+            fontSize: isMobile ? '12px' : '12px',
             padding: '8px 2px',
             textAlign: 'center',
           },
@@ -919,7 +1027,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           timeZone={settings.timezone}
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
           
-          headerToolbar={{
+          headerToolbar={isMobile ? false : {
             left: 'prev,next',
             center: 'title',
             right: 'today',
@@ -929,12 +1037,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           events={events}
           editable={true}
           droppable={true}
-          selectable={!viewOnly}
+          selectable={!viewOnly && !isPhone()}
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
           eventClick={handleEventClick}
           select={handleSlotClick}
-          height={isMobile ? 'calc(100vh - 120px)' : 'auto'}
+          height={isMobile ? 'calc(100vh - 180px)' : 'auto'}
           
           
           // Touch and mobile optimizations
@@ -959,7 +1067,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             { hour: 'numeric', hour12: true },
           ]}
           nowIndicator
-          resourceAreaWidth={isMobile ? "60px" : "80px"}
+          resourceAreaWidth={isMobile ? "40px" : "80px"}
+          
           resourceAreaHeaderContent=""
           
                    // Adjust the details of the reservations on the calendar
@@ -1014,13 +1123,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       </Box>
       
       {/* Event Type Legend */}
-      <Box display={{ base: "none", md: "block" }} width="60%" ml={100} p={0} borderWidth="1px" borderRadius="lg">
+      <Box display={{ base: "none", md: "block" }} width="60%" ml={20} p={0} borderWidth="1px" borderRadius="lg" padding="0px" >
         <Grid templateColumns="repeat(7, 1fr)" gap={0}>
           {Object.entries(eventTypeEmojis).map(([key, emoji]) => (
             <GridItem key={key}>
               <HStack>
-                <Text fontSize="12px">{emoji}</Text>
-                <Text fontSize="12px">{key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}</Text>
+                <Text fontSize="10px">{emoji}</Text>
+                <Text fontSize="10px">{key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ')}</Text>
               </HStack>
             </GridItem>
           ))}
