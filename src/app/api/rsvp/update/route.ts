@@ -8,7 +8,10 @@ const supabase = createClient(
 
 export async function PUT(request: Request) {
   try {
+    console.log('RSVP update API called');
     const body = await request.json();
+    console.log('Request body received:', body);
+    
     const {
       id,
       first_name,
@@ -20,8 +23,20 @@ export async function PUT(request: Request) {
       special_requests
     } = body;
 
+    console.log('Extracted fields:', {
+      id,
+      first_name,
+      last_name,
+      email,
+      phone,
+      party_size,
+      time_selected,
+      special_requests
+    });
+
     // Validate required fields
     if (!id || !first_name || !last_name || !email || !phone || !party_size) {
+      console.error('Missing required fields:', { id, first_name, last_name, email, phone, party_size });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -71,6 +86,7 @@ export async function PUT(request: Request) {
     }
 
     // Update the reservation
+    console.log('Updating reservation with ID:', id);
     const { data: updatedReservation, error: updateError } = await supabase
       .from('reservations')
       .update({
@@ -88,12 +104,14 @@ export async function PUT(request: Request) {
       .single();
 
     if (updateError) {
+      console.error('Database update error:', updateError);
       return NextResponse.json(
         { error: 'Failed to update reservation' },
         { status: 500 }
       );
     }
 
+    console.log('Reservation updated successfully:', updatedReservation);
     return NextResponse.json({
       success: true,
       reservation: updatedReservation

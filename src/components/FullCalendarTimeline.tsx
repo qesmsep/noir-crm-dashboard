@@ -738,21 +738,37 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const handleSaveInlineEdit = async () => {
-    if (!editingRowId) return;
+    if (!editingRowId) {
+      console.error('No editing row ID found');
+      return;
+    }
+
+    console.log('Saving inline edit with data:', {
+      editingRowId,
+      editingData
+    });
 
     try {
+      const requestBody = {
+        id: editingRowId,
+        ...editingData
+      };
+      
+      console.log('Sending request to /api/rsvp/update with body:', requestBody);
+
       const response = await fetch('/api/rsvp/update', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          id: editingRowId,
-          ...editingData
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
       const result = await response.json();
+      console.log('Response result:', result);
 
       if (response.ok) {
         toast({
