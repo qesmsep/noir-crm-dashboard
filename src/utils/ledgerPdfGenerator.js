@@ -218,8 +218,9 @@ export class LedgerPdfGenerator {
         .text('Transaction Details');
       const tableTop = this.doc.y;
       const tableLeft = 50;
-      const colWidth = 70; // Reduced column width to accommodate balance column
-      const descColWidth = 100; // Slightly reduced description width
+      const colWidth = 70; // Column width for most columns
+      const descColWidth = 150; // Wider description column
+      const filesColWidth = 50; // Narrow files column (about 10% of total width)
       const rowHeight = 25; // Increased row height for better readability
       this.doc.fontSize(9).font('Helvetica-Bold')
         .text('Date', tableLeft, tableTop)
@@ -228,7 +229,7 @@ export class LedgerPdfGenerator {
         .text('Amount', tableLeft + colWidth + descColWidth + colWidth, tableTop)
         .text('Balance', tableLeft + colWidth + descColWidth + colWidth * 2, tableTop)
         .text('Files', tableLeft + colWidth + descColWidth + colWidth * 3, tableTop);
-      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth + descColWidth + colWidth * 4, tableTop + 15).stroke();
+      this.doc.moveTo(tableLeft, tableTop + 15).lineTo(tableLeft + colWidth + descColWidth + colWidth * 3 + filesColWidth, tableTop + 15).stroke();
       // Create a map of attachments by ledger_id for quick lookup
       const attachmentsByLedgerId = {};
       transactionAttachments.forEach(attachment => {
@@ -285,7 +286,7 @@ export class LedgerPdfGenerator {
         currentY += rowHeight;
       });
       // Draw bottom line after table
-      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth + descColWidth + colWidth * 4, currentY - 5).stroke();
+      this.doc.moveTo(tableLeft, currentY - 5).lineTo(tableLeft + colWidth + descColWidth + colWidth * 3 + filesColWidth, currentY - 5).stroke();
       // Add space before footer
       this.doc.moveDown(2);
     } else {
@@ -341,4 +342,4 @@ export class LedgerPdfGenerator {
   }
 }
 
-export default LedgerPdfGenerator; 
+export default LedgerPdfGenerator;
