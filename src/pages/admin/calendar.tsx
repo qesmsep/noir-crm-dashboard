@@ -146,7 +146,7 @@ export default function Calendar() {
         left={{ base: 0, md: isFullScreen ? 0 : "auto" }}
         right={{ base: 0, md: isFullScreen ? 0 : "auto" }}
         bottom={{ base: 0, md: isFullScreen ? 0 : "auto" }}
-        overflow={{ base: "hidden", md: isFullScreen ? "hidden" : "visible" }}
+        overflow={{ base: "auto", md: isFullScreen ? "hidden" : "visible" }}
         
         paddingLeft={10}
         bg={useColorModeValue('white', '#ECEDE8')}
@@ -282,7 +282,7 @@ export default function Calendar() {
           className="calendar-container"
           h={{ base: "calc(100vh - 120px)", md: isFullScreen ? "100%" : "auto" }}
           w="100%"
-          overflow={{ base: "hidden", md: isFullScreen ? "hidden" : "visible" }}
+          overflow={{ base: "auto", md: isFullScreen ? "hidden" : "visible" }}
         >
           {renderView()}
         </Box>

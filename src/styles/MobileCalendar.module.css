@@ -1,7 +1,7 @@
 /* Mobile Calendar Optimizations */
 .mobileCalendarContainer {
-  /* Enable pinch zoom */
-  touch-action: pinch-zoom;
+  /* Enable proper scrolling */
+  touch-action: pan-x pan-y;
   -webkit-user-select: none;
   user-select: none;
   
@@ -13,19 +13,20 @@
   left: 0;
   right: 0;
   bottom: 0;
-  overflow: hidden;
+  overflow: auto;
   
-  /* Prevent text selection during pinch zoom */
+  /* Prevent text selection during scrolling */
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 /* FullCalendar mobile optimizations */
 .mobileCalendarContainer :global(.fc) {
-  touch-action: pinch-zoom !important;
+  touch-action: pan-x pan-y !important;
   -webkit-user-select: none !important;
   user-select: none !important;
   height: 100% !important;
+  overflow: auto !important;
 }
 
 /* Resource area optimizations for mobile */
@@ -47,23 +48,23 @@
 
 /* Timeline area optimizations */
 .mobileCalendarContainer :global(.fc-timeline-area) {
-  touch-action: pinch-zoom !important;
+  touch-action: pan-x pan-y !important;
   -webkit-overflow-scrolling: touch !important;
+  overflow: auto !important;
 }
 
 .mobileCalendarContainer :global(.fc-timeline-body) {
-  touch-action: pinch-zoom !important;
-  
+  touch-action: pan-x pan-y !important;
   -webkit-overflow-scrolling: touch !important;
+  overflow: auto !important;
 }
 
 .mobileCalendarContainer :global(.fc-timeline-header) {
-  touch-action: pinch-zoom !important;
-  
+  touch-action: pan-x pan-y !important;
 }
 
 .mobileCalendarContainer :global(.fc-timeline-slot) {
-  touch-action: pinch-zoom !important;
+  touch-action: pan-x pan-y !important;
 }
 
 /* Event optimizations for mobile */
@@ -101,7 +102,8 @@
 /* Ensure proper scrolling */
 .mobileCalendarContainer :global(.fc-scroller) {
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior: contain !important;
+  overscroll-behavior: auto !important;
+  overflow: auto !important;
 }
 
 /* Phone-specific optimizations - disable touch selection */

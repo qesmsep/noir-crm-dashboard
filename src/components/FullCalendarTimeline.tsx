@@ -834,12 +834,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
       <Box
         style={{
-          // FullCalendar container optimizations with pinch zoom
-          touchAction: isMobile ? 'pinch-zoom' : 'manipulation',
+          // FullCalendar container optimizations with proper scrolling
+          touchAction: isMobile ? 'pan-x pan-y' : 'manipulation',
           WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain',
+          overscrollBehavior: 'auto',
           width: '100%',
           height: isMobile ? 'calc(100vh - 150px)' : 'auto',
+          overflow: isMobile ? 'auto' : 'visible',
           // Mobile-specific adjustments
           ...(isMobile && {
             fontSize: '12.5px',
@@ -849,15 +850,16 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           }),
         }}
         sx={{
-          // FullCalendar mobile optimizations with pinch zoom
+          // FullCalendar mobile optimizations with proper scrolling
           '.fc': {
-            touchAction: isMobile ? 'pinch-zoom' : 'manipulation',
+            touchAction: isMobile ? 'pan-x pan-y' : 'manipulation',
             WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'contain',
+            overscrollBehavior: 'auto',
             ...(isMobile && {
               height: '100%',
               WebkitUserSelect: 'none',
               userSelect: 'none',
+              overflow: 'auto',
             }),
           },
           '.fc-resource-area': {

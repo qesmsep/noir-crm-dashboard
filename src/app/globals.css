@@ -482,7 +482,8 @@ html {
   .calendar-container {
     background-color: #ECEDE8 !important;
     height: calc(100vh - 120px) !important;
-    overflow: hidden !important;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
   
   /* Ensure calendar header is properly centered */
@@ -501,6 +502,23 @@ html {
   .fc-event {
     pointer-events: auto !important;
     touch-action: manipulation !important;
+  }
+  
+  /* Enable proper scrolling for calendar */
+  .fc {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: auto !important;
+  }
+  
+  .fc-timeline-body {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .fc-scroller {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 }
 
