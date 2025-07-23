@@ -177,6 +177,8 @@ function parseNaturalDate(dateStr) {
 
 // GPT-driven natural language parser
 async function parseReservationWithGPT(message) {
+  console.log('Parsing message with GPT:', message);
+  
   const prompt = `
 You are an incredibly personable, friendly, professional and helpful hospitality reservation assistant for Noir KC, Kansas City's most luxurious cocktail lounge and speakasy. 
 Your job is to provide reservation data and confirmation to the user. 
@@ -184,6 +186,14 @@ IF their requested time is not available, you should provide the next closest av
 All times are in America/Chicago (UTC–05:00).
 Interpret relative dates such as "today", "tomorrow", "this Thursday", and "next Friday" relative to the current date in America/Chicago.
 For expressions like "this <weekday>", interpret as the next occurrence of that weekday (e.g., if today is Tuesday, "this Thursday" should map to the upcoming Thursday).
+
+IMPORTANT: Parse the message case-insensitively. Handle mixed case, all caps, and all lowercase gracefully.
+
+Examples of case variations you should handle:
+- "RESERVATION for 7 GUESTS at 10:15PM on 7/24/25"
+- "reservation for 7 guests at 10:15pm on 7/24/25"
+- "Reservation for 7 Guests at 10:15PM on 7/24/25"
+
 Parse the user's SMS into JSON with exactly these keys:
 {
   "party_size": number,
@@ -202,8 +212,11 @@ User message: """${message}"""
     temperature: 0.0,
   });
   const text = res.choices[0].message.content.trim();
+  console.log('GPT response:', text);
   try {
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    console.log('Parsed result:', parsed);
+    return parsed;
   } catch (e) {
     console.error('GPT parsing error', e, text);
     return null;
@@ -716,6 +729,8 @@ export async function handler(req, res) {
   console.log('Raw webhook data:', JSON.stringify(data, null, 2));
   console.log('Phone number received from OpenPhone:', from);
   console.log('Message text received:', `"${text}"`);
+  console.log('Message length:', text.length);
+  console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
 
   // Handle "MEMBER" messages for waitlist
   if (text.toLowerCase().trim() === 'member') {
@@ -907,7 +922,17 @@ export async function handler(req, res) {
     }
 
     // Save collecting state if missing fields
+    console.log('Checking parsed data for missing fields:', {
+      party_size: parsed.party_size,
+      date: parsed.date,
+      time: parsed.time,
+      has_party_size: !!parsed.party_size,
+      has_date: !!parsed.date,
+      has_time: !!parsed.time
+    });
+    
     if (!parsed.party_size || !parsed.date || !parsed.time) {
+      console.log('Missing fields detected, saving conversation state');
       await saveConversation(from, {
         step: 'collecting',
         data: {
@@ -917,18 +942,22 @@ export async function handler(req, res) {
       });
       // Ask next missing field
       if (!parsed.party_size) {
+        console.log('Missing party_size, asking for guests');
         await sendSMS(from, "How many guests?");
         return res.status(200).end();
       }
       if (!parsed.date) {
+        console.log('Missing date, asking for date');
         await sendSMS(from, "What date would you like?");
         return res.status(200).end();
       }
       if (!parsed.time) {
+        console.log('Missing time, asking for time');
         await sendSMS(from, "What time would you like?");
         return res.status(200).end();
       }
       // If error, fallback
+      console.log('All fields missing, sending generic message');
       await sendSMS(from, "Please provide all reservation details.");
       return res.status(200).end();
     }
