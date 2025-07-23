@@ -384,7 +384,9 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
 
                 <Button
                   type="submit"
-                  colorScheme="blue"
+                  bg="#a59480"
+                  color="white"
+                  _hover={{ bg: '#8c7a5a' }}
                   size="lg"
                   w="full"
                   isLoading={submitting}
@@ -414,7 +416,7 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" onClick={onClose}>
+            <Button bg="#a59480" color="white" _hover={{ bg: '#8c7a5a' }} onClick={onClose}>
               Close
             </Button>
           </ModalFooter>

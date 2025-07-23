@@ -33,6 +33,7 @@ import {
   Th,
   Td,
   Link,
+  Badge,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, CheckCircleIcon, TimeIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
@@ -1164,75 +1165,113 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         </Heading>
         
         {currentDayPrivateEvents.length > 0 ? (
-          <Table variant="simple" size="sm">
-            <Thead>
-              <Tr>
-                <Th>Title</Th>
-                <Th>Type</Th>
-                <Th>Time</Th>
-                <Th>Capacity</Th>
-                <Th>RSVPs</Th>
-                <Th>Link</Th>
-                <Th></Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {currentDayPrivateEvents.map(pe => {
-                const reservations = getReservationsForPrivateEvent(pe.id);
-                return (
-                  <React.Fragment key={pe.id}>
-                    <Tr>
-                      <Td>{pe.title}</Td>
-                      <Td>{pe.event_type}</Td>
-                      <Td>
-                        {formatTime(new Date(pe.start_time), settings.timezone)} - {formatTime(new Date(pe.end_time), settings.timezone)}
-                      </Td>
-                      <Td>
-                        {reservations.reduce((sum: number, r: any) => sum + (r.party_size || 0), 0)}/{pe.total_attendees_maximum}
-                      </Td>
-                      <Td>{reservations.length}</Td>
-                      <Td>
-                        {pe.rsvp_url ? (
-                          <Link href={`/rsvp/${pe.rsvp_url}`} isExternal fontSize="sm" color="blue.500">
-                            View
-                          </Link>
-                        ) : (
-                          '-'
-                        )}
-                      </Td>
-                      <Td>
-                        <IconButton
-                          size="xs"
-                          variant="ghost"
-                          aria-label="Expand RSVPs"
-                          icon={<ChevronDownIcon />}
-                          onClick={() => toggleExpand(pe.id)}
-                        />
-                      </Td>
-                    </Tr>
-                    {expandedId === pe.id && (
+          <VStack spacing={4} align="stretch">
+            <Table variant="simple" size="sm">
+              <Thead>
+                <Tr>
+                  <Th>Title</Th>
+                  <Th>Type</Th>
+                  <Th>Time</Th>
+                  <Th>Capacity</Th>
+                  <Th>RSVPs</Th>
+                  <Th>Link</Th>
+                  <Th></Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {currentDayPrivateEvents.map(pe => {
+                  const reservations = getReservationsForPrivateEvent(pe.id);
+                  return (
+                    <React.Fragment key={pe.id}>
                       <Tr>
-                        <Td colSpan={7}>
-                          <Box p={2} bg="gray.50" borderRadius="md">
-                            {pe.event_description && (
-                              <Text fontSize="sm" mb={2}>{pe.event_description}</Text>
-                            )}
-                            <List spacing={2}>
-                              {reservations.map((r: any) => (
-                                <ListItem key={r.id}>
-                                  <Text fontSize="sm">{r.first_name} {r.last_name} — {r.party_size} guests — {r.email}</Text>
-                                </ListItem>
-                              ))}
-                            </List>
-                          </Box>
+                        <Td>{pe.title}</Td>
+                        <Td>{pe.event_type}</Td>
+                        <Td>
+                          {formatTime(new Date(pe.start_time), settings.timezone)} - {formatTime(new Date(pe.end_time), settings.timezone)}
+                        </Td>
+                        <Td>
+                          {reservations.reduce((sum: number, r: any) => sum + (r.party_size || 0), 0)}/{pe.total_attendees_maximum}
+                        </Td>
+                        <Td>{reservations.length}</Td>
+                        <Td>
+                          {pe.rsvp_url ? (
+                            <Link href={`/rsvp/${pe.rsvp_url}`} isExternal fontSize="sm" color="blue.500">
+                              View
+                            </Link>
+                          ) : (
+                            '-'
+                          )}
+                        </Td>
+                        <Td>
+                          <IconButton
+                            size="xs"
+                            variant="ghost"
+                            aria-label="Expand RSVPs"
+                            icon={<ChevronDownIcon />}
+                            onClick={() => toggleExpand(pe.id)}
+                          />
                         </Td>
                       </Tr>
-                    )}
-                  </React.Fragment>
+                      {expandedId === pe.id && (
+                        <Tr>
+                          <Td colSpan={7}>
+                            <Box p={2} bg="gray.50" borderRadius="md">
+                              {pe.event_description && (
+                                <Text fontSize="sm" mb={2}>{pe.event_description}</Text>
+                              )}
+                              <List spacing={2}>
+                                {reservations.map((r: any) => (
+                                  <ListItem key={r.id}>
+                                    <Text fontSize="sm">{r.first_name} {r.last_name} — {r.party_size} guests — {r.email}</Text>
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Box>
+                          </Td>
+                        </Tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </Tbody>
+            </Table>
+            
+            {/* RSVPs Summary Section */}
+            <Box bg="gray.50" p={4} borderRadius="md">
+              <Heading size="sm" mb={3} color="nightSky" fontWeight="600">
+                📋 RSVPs Summary
+              </Heading>
+              {currentDayPrivateEvents.map(pe => {
+                const reservations = getReservationsForPrivateEvent(pe.id);
+                if (reservations.length === 0) return null;
+                
+                return (
+                  <Box key={pe.id} mb={4} p={3} bg="white" borderRadius="md" border="1px solid" borderColor="gray.200">
+                    <HStack justify="space-between" mb={2}>
+                      <Text fontWeight="600" fontSize="sm" color="nightSky">
+                        {pe.title}
+                      </Text>
+                      <Badge colorScheme="blue" fontSize="xs">
+                        {reservations.length} RSVP{reservations.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </HStack>
+                    <VStack spacing={1} align="stretch">
+                      {reservations.map((r: any) => (
+                        <HStack key={r.id} justify="space-between" fontSize="xs">
+                          <Text>
+                            <strong>{r.first_name} {r.last_name}</strong> — {r.party_size} guest{r.party_size !== 1 ? 's' : ''}
+                          </Text>
+                          <Text color="gray.500" fontSize="xs">
+                            {r.phone}
+                          </Text>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  </Box>
                 );
               })}
-            </Tbody>
-          </Table>
+            </Box>
+          </VStack>
         ) : (
           <Text color="gray.500" textAlign="center" py={4}>
             No private events scheduled for this date.
