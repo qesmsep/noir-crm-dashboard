@@ -145,6 +145,19 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
               <span>{item.label}</span>
             </Link>
           ))}
+          
+          {/* Sign Out Button */}
+          <button
+            onClick={() => {
+              setIsMenuOpen(false);
+              handleSignOut();
+            }}
+            className={styles.mobileNavItem}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', width: '90%' }}
+          >
+            <span className={styles.icon}>🚪</span>
+            <span>Sign Out</span>
+          </button>
         </nav>
       </div>
     </div>

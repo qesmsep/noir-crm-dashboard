@@ -306,8 +306,10 @@
     padding: 0;
     margin: 0;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .open {
     transform: translateX(0) !important;
@@ -317,20 +319,23 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2rem;
-    margin-top: 2rem;
+    gap: 0rem;
+    margin-top: 3rem;
+    padding: 1rem;
   }
   .mobileNavItem {
     color: #ECEDE8;
-    font-size: 1.3rem;
+    font-size: 1rem;
     font-family: 'Montserrat', sans-serif;
     text-decoration: none;
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 2rem;
+    gap: 0.1rem;
+    padding: 0.5rem 1rem;
     border-radius: 8px;
     transition: background 0.2s;
+    width: 90%;
+    justify-content: flex-start;
   }
   .mobileNavItem:hover, .mobileNavItem.active {
     background: rgba(255,255,255,0.08);
@@ -386,11 +391,12 @@
   }
   
   .mobileNavItem {
-    font-size: 1.2rem;
-    padding: 1rem 1.5rem;
+    font-size: 1.0rem;
+    padding: 0rem 1.0rem;
     min-height: 48px;
-    width: 80%;
+    width: 90%;
     justify-content: center;
+    gap: 0.75rem;
   }
   .container {
     background-color: #FFF;
