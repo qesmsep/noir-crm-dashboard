@@ -147,6 +147,17 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Scroll-sync: Make times header scroll with the grid
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const bodyEl = document.querySelector('.fc-timeline-body') as HTMLElement | null;
+    const headerEl = document.querySelector('.fc-timeline-header') as HTMLElement | null;
+    if (!bodyEl || !headerEl) return;
+    const onScroll = () => { headerEl.scrollLeft = bodyEl.scrollLeft; };
+    bodyEl.addEventListener('scroll', onScroll, { passive: true });
+    return () => bodyEl.removeEventListener('scroll', onScroll);
+  }, [reloadKey]);
+
   useEffect(() => {
     async function loadTables() {
       try {

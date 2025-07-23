@@ -548,10 +548,11 @@ html {
     -webkit-overflow-scrolling: touch !important;
   }
   
-  /* Additional timeline scrolling fixes */
-  .fc-timeline {
-    overflow: auto !important;
+  /* Scroll-sync optimizations */
+  .fc-timeline-header {
+    overflow: hidden !important; /* Prevent header from scrolling independently for scroll-sync */
     -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
   }
   
   .fc-timeline-body {
@@ -560,7 +561,8 @@ html {
     overscroll-behavior: auto !important;
   }
   
-  .fc-timeline-header {
+  /* Additional timeline scrolling fixes */
+  .fc-timeline {
     overflow: auto !important;
     -webkit-overflow-scrolling: touch !important;
   }
@@ -590,7 +592,7 @@ html {
     }
     
     .fc-timeline-header {
-      overflow: auto !important;
+      overflow: hidden !important; /* Prevent header from scrolling independently for scroll-sync */
       -webkit-overflow-scrolling: touch !important;
       touch-action: pan-x pan-y !important;
     }

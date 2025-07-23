@@ -125,6 +125,23 @@ export default function Calendar() {
     setCurrentDate(newDate);
   };
 
+  // Day navigation functions for day view
+  const prevDay = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - 1);
+    setCurrentDate(d);
+  };
+
+  const nextDay = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + 1);
+    setCurrentDate(d);
+  };
+
+  const goToday = () => {
+    setCurrentDate(new Date());
+  };
+
   return (
     <AdminLayout isFullScreen={isFullScreen}>
       {/* Drawer rendered at page level */}
@@ -147,9 +164,7 @@ export default function Calendar() {
         right={{ base: 0, md: isFullScreen ? 0 : "auto" }}
         bottom={{ base: 0, md: isFullScreen ? 0 : "auto" }}
         overflow={{ base: "auto", md: isFullScreen ? "hidden" : "visible" }}
-        
-        paddingLeft={10}
-        bg={useColorModeValue('white', '#ECEDE8')}
+        bg="transparent"
       >
         {/* Navigation Header - Centered on mobile */}
         <Box 
@@ -158,12 +173,11 @@ export default function Calendar() {
           borderBottom="1px solid"
           borderColor={useColorModeValue('gray.200', '#a59480')}
           p={{ base: 2, md: 4 }}
-          paddingLeft={10}
           paddingTop={{ base: "60px", md: 4 }} // Reduced top padding for mobile header
-          
           position="sticky"
-          top={0}
-          zIndex={20} // Increased z-index to appear above mobile header
+          top="60px"
+          zIndex={2000}
+          backgroundClip="padding-box"
         >
           <HStack justify="space-between" align="center">
             {/* Left side - Navigation buttons */}
@@ -203,25 +217,58 @@ export default function Calendar() {
                 </>
               )}
               {currentView === 'day' && (
-                <Text 
-                  fontSize={{ base: "sm", md: "lg" }}
-                  fontWeight="semibold"
-                  color={useColorModeValue('gray.800', '#353535')}
-                  minW={{ base: "120px", md: "200px" }}
-                  textAlign="center"
+                <HStack spacing={{ base: 1, md: 2 }} align="center">
+                  <Button
+                    size={{ base: "sm", md: "md" }}
+                    leftIcon={<CalendarIcon />}
+                    variant="outline"
+                    onClick={() => setCurrentView('all')}
+                    color={useColorModeValue('gray.700', '#353535')}
+                    _hover={{ bg: useColorModeValue('gray.100', '#a59480'), color: 'white' }}
+                  >
+                    All Reservations
+                  </Button>
                   
-                >
-                  {getViewTitle()}
-                </Text>
+                  <IconButton
+                    aria-label="Previous day"
+                    icon={<ChevronLeftIcon />}
+                    size={{ base: "sm", md: "md" }}
+                    variant="ghost"
+                    onClick={prevDay}
+                    color={useColorModeValue('gray.600', '#353535')}
+                    _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
+                  />
+                  
+                  <IconButton
+                    aria-label="Next day"
+                    icon={<ChevronRightIcon />}
+                    size={{ base: "sm", md: "md" }}
+                    variant="ghost"
+                    onClick={nextDay}
+                    color={useColorModeValue('gray.600', '#353535')}
+                    _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
+                  />
+                  
+                  <Button
+                    size={{ base: "sm", md: "md" }}
+                    variant="ghost"
+                    onClick={goToday}
+                    color={useColorModeValue('gray.700', '#353535')}
+                    _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
+                  >
+                    today
+                  </Button>
+                </HStack>
               )}
             </HStack>
 
             {/* Center - View navigation (centered on mobile) */}
-            <HStack 
-              spacing={{ base: 1, md: 2 }} 
-              justify={{ base: "center", md: "flex-start" }}
-              flex={{ base: 1, md: "auto" }}
-            >
+          <HStack 
+            spacing={{ base: 1, md: 2 }} 
+            justify={{ base: "center", md: "flex-start" }}
+            flex={{ base: 1, md: "auto" }}
+            zIndex={2001}
+          >
               <Button
                 size={{ base: "sm", md: "md" }}
                 variant={currentView === 'day' ? 'solid' : 'ghost'}
@@ -279,7 +326,6 @@ export default function Calendar() {
           borderRadius={0}
           boxShadow="none"
           p={0}
-          margin={0}
           border="none"
           className="calendar-container"
           h={{ base: "calc(100vh - 240px)", md: isFullScreen ? "100%" : "auto" }} // Adjusted height for mobile
