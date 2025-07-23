@@ -216,50 +216,6 @@ export default function Calendar() {
                   />
                 </>
               )}
-              {currentView === 'day' && (
-                <HStack spacing={{ base: 1, md: 2 }} align="center">
-                  <Button
-                    size={{ base: "sm", md: "md" }}
-                    leftIcon={<CalendarIcon />}
-                    variant="outline"
-                    onClick={() => setCurrentView('all')}
-                    color={useColorModeValue('gray.700', '#353535')}
-                    _hover={{ bg: useColorModeValue('gray.100', '#a59480'), color: 'white' }}
-                  >
-                    All Reservations
-                  </Button>
-                  
-                  <IconButton
-                    aria-label="Previous day"
-                    icon={<ChevronLeftIcon />}
-                    size={{ base: "sm", md: "md" }}
-                    variant="ghost"
-                    onClick={prevDay}
-                    color={useColorModeValue('gray.600', '#353535')}
-                    _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
-                  />
-                  
-                  <IconButton
-                    aria-label="Next day"
-                    icon={<ChevronRightIcon />}
-                    size={{ base: "sm", md: "md" }}
-                    variant="ghost"
-                    onClick={nextDay}
-                    color={useColorModeValue('gray.600', '#353535')}
-                    _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
-                  />
-                  
-                  <Button
-                    size={{ base: "sm", md: "md" }}
-                    variant="ghost"
-                    onClick={goToday}
-                    color={useColorModeValue('gray.700', '#353535')}
-                    _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
-                  >
-                    today
-                  </Button>
-                </HStack>
-              )}
             </HStack>
 
             {/* Center - View navigation (centered on mobile) */}
@@ -319,6 +275,48 @@ export default function Calendar() {
               _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
             />
           </HStack>
+
+          {currentView === 'day' && (
+            <HStack mt={2} spacing={{ base: 1, md: 2 }} justify="center">
+              <Button
+                size={{ base: "sm", md: "md" }}
+                leftIcon={<CalendarIcon />}
+                variant="outline"
+                onClick={() => setCurrentView('all')}
+                color={useColorModeValue('gray.700', '#353535')}
+                _hover={{ bg: useColorModeValue('gray.100', '#a59480'), color: 'white' }}
+              >
+                All Reservations
+              </Button>
+              <IconButton
+                aria-label="Previous day"
+                icon={<ChevronLeftIcon />}
+                size={{ base: "sm", md: "md" }}
+                variant="ghost"
+                onClick={prevDay}
+                color={useColorModeValue('gray.600', '#353535')}
+                _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
+              />
+              <IconButton
+                aria-label="Next day"
+                icon={<ChevronRightIcon />}
+                size={{ base: "sm", md: "md" }}
+                variant="ghost"
+                onClick={nextDay}
+                color={useColorModeValue('gray.600', '#353535')}
+                _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
+              />
+              <Button
+                size={{ base: "sm", md: "md" }}
+                variant="ghost"
+                onClick={goToday}
+                color={useColorModeValue('gray.700', '#353535')}
+                _hover={{ bg: useColorModeValue('gray.100', '#a59480') }}
+              >
+                today
+              </Button>
+            </HStack>
+          )}
         </Box>
 
         {/* Calendar Content - Full height on mobile */}
