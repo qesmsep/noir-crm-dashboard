@@ -482,6 +482,30 @@ export async function POST(request: Request) {
       // Don't fail the reservation creation if admin notification fails
     }
 
+    // Send notification to 6199713730
+    console.log('=== SENDING NOTIFICATION TO 6199713730 ===');
+    try {
+      const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/reservation-notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reservation_id: reservation.id,
+          action: 'created'
+        })
+      });
+
+      if (!notificationResponse.ok) {
+        console.error('Failed to send notification to 6199713730:', await notificationResponse.text());
+      } else {
+        console.log('Notification sent successfully to 6199713730');
+      }
+    } catch (error) {
+      console.error('Error sending notification to 6199713730:', error);
+      // Don't fail the reservation creation if notification fails
+    }
+
     // Handle additional options
     try {
       // Send reservation confirmation text if requested (sends immediately)

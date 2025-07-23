@@ -946,6 +946,30 @@ export default async function handler(req, res) {
     console.error('Failed to send confirmation SMS:', err);
   }
 
+  // Send notification to 6199713730 for SMS reservation
+  console.log('=== SENDING SMS RESERVATION NOTIFICATION TO 6199713730 ===');
+  try {
+    const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/reservation-notifications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reservation_id: reservation.id,
+        action: 'created'
+      })
+    });
+
+    if (!notificationResponse.ok) {
+      console.error('Failed to send SMS reservation notification to 6199713730:', await notificationResponse.text());
+    } else {
+      console.log('SMS reservation notification sent successfully to 6199713730');
+    }
+  } catch (error) {
+    console.error('Error sending SMS reservation notification to 6199713730:', error);
+    // Don't fail the SMS reservation if notification fails
+  }
+
   return res.status(201).json({
     success: true,
     reservation,

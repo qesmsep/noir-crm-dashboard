@@ -200,6 +200,30 @@ export async function PATCH(request: Request, { params }: any) {
       // Don't fail the reservation update if admin notification fails
     }
 
+    // Send notification to 6199713730 for reservation modification
+    console.log('=== SENDING MODIFICATION NOTIFICATION TO 6199713730 ===');
+    try {
+      const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/reservation-notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reservation_id: reservationId,
+          action: 'modified'
+        })
+      });
+
+      if (!notificationResponse.ok) {
+        console.error('Failed to send modification notification to 6199713730:', await notificationResponse.text());
+      } else {
+        console.log('Modification notification sent successfully to 6199713730');
+      }
+    } catch (error) {
+      console.error('Error sending modification notification to 6199713730:', error);
+      // Don't fail the reservation update if notification fails
+    }
+
     return NextResponse.json(data);
 
   } catch (error) {
