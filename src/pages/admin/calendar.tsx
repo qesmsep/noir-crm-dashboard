@@ -153,15 +153,17 @@ export default function Calendar() {
       >
         {/* Navigation Header - Centered on mobile */}
         <Box 
+          className="calendar-navigation-header"
           bg={useColorModeValue('white', '#ECEDE8')}
           borderBottom="1px solid"
           borderColor={useColorModeValue('gray.200', '#a59480')}
           p={{ base: 2, md: 4 }}
           paddingLeft={10}
+          paddingTop={{ base: "60px", md: 4 }} // Reduced top padding for mobile header
           
           position="sticky"
           top={0}
-          zIndex={10}
+          zIndex={20} // Increased z-index to appear above mobile header
         >
           <HStack justify="space-between" align="center">
             {/* Left side - Navigation buttons */}
@@ -280,7 +282,7 @@ export default function Calendar() {
           margin={0}
           border="none"
           className="calendar-container"
-          h={{ base: "calc(100vh - 120px)", md: isFullScreen ? "100%" : "auto" }}
+          h={{ base: "calc(100vh - 240px)", md: isFullScreen ? "100%" : "auto" }} // Adjusted height for mobile
           w="100%"
           overflow={{ base: "auto", md: isFullScreen ? "hidden" : "visible" }}
         >
