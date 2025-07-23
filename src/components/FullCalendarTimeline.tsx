@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -34,9 +34,13 @@ import {
   Td,
   Link,
   Badge,
+  Input,
+  Select,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, CheckCircleIcon, TimeIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
+import { EditIcon, DeleteIcon } from '@chakra-ui/icons';
+import RSVPEditModal from './RSVPEditModal';
 
 interface Resource {
   id: string;
@@ -120,7 +124,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
   const [isNewReservationDrawerOpen, setIsNewReservationDrawerOpen] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{date: Date, resourceId: string} | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [editingRSVP, setEditingRSVP] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [editingData, setEditingData] = useState<any>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const toast = useToast();
   const [slotMinTime, setSlotMinTime] = useState<string>('18:00:00');
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
@@ -699,6 +708,151 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     console.log(`- ${pe.title}: ${pe.start_time} (status: ${pe.status})`);
   });
 
+  const formatPhoneNumber = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    }
+    return phone;
+  };
+
+  const handleEditRSVP = (reservation: any) => {
+    setEditingRSVP(reservation);
+    setIsEditModalOpen(true);
+  };
+
+  const handleInlineEdit = (reservation: any) => {
+    setEditingRowId(reservation.id);
+    setEditingData({
+      first_name: reservation.first_name,
+      last_name: reservation.last_name,
+      email: reservation.email,
+      phone: reservation.phone,
+      party_size: reservation.party_size,
+      time_selected: reservation.time_selected ? 
+        new Date(reservation.time_selected).toISOString().slice(0, 16) : '',
+      special_requests: reservation.special_requests || ''
+    });
+  };
+
+  const handleSaveInlineEdit = async () => {
+    if (!editingRowId) return;
+
+    try {
+      const response = await fetch('/api/rsvp/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingRowId,
+          ...editingData
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: 'RSVP Updated',
+          description: 'The RSVP has been updated successfully.',
+          status: 'success',
+          duration: 3000,
+        });
+        setLocalReloadKey(prev => prev + 1);
+        setEditingRowId(null);
+        setEditingData({});
+      } else {
+        throw new Error(result.error || 'Failed to update RSVP');
+      }
+    } catch (error) {
+      console.error('Error updating RSVP:', error);
+      toast({
+        title: 'Error updating RSVP',
+        description: error instanceof Error ? error.message : 'Failed to update RSVP. Please try again.',
+        status: 'error',
+        duration: 6000,
+      });
+    }
+  };
+
+  const handleCancelInlineEdit = () => {
+    setEditingRowId(null);
+    setEditingData({});
+  };
+
+  const handleRSVPUpdated = (updatedReservation: any) => {
+    // Refresh the data
+    setLocalReloadKey(prev => prev + 1);
+    setEditingRSVP(null);
+    setIsEditModalOpen(false);
+  };
+
+  const handleDeleteRSVP = async (reservationId: string) => {
+    console.log('Delete RSVP:', reservationId);
+    try {
+      const { data, error } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', reservationId);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: 'RSVP deleted',
+        description: 'The RSVP has been deleted.',
+        status: 'success',
+        duration: 3000,
+      });
+      setLocalReloadKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error deleting RSVP:', error);
+      toast({
+        title: 'Error deleting RSVP',
+        description: 'Failed to delete RSVP. Please try again.',
+        status: 'error',
+        duration: 6000,
+      });
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmId) return;
+
+    try {
+      const response = await fetch(`/api/rsvp/delete?id=${deleteConfirmId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'RSVP deleted',
+          description: 'The RSVP has been deleted successfully.',
+          status: 'success',
+          duration: 3000,
+        });
+        setLocalReloadKey(prev => prev + 1);
+      } else {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to delete RSVP');
+      }
+    } catch (error) {
+      console.error('Error deleting RSVP:', error);
+      toast({
+        title: 'Error deleting RSVP',
+        description: error instanceof Error ? error.message : 'Failed to delete RSVP. Please try again.',
+        status: 'error',
+        duration: 6000,
+      });
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
+
   return (
     <Box
       className={isMobile ? styles.mobileCalendarContainer : ''}
@@ -1149,7 +1303,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         bg="white"
         p={6}
         borderRadius="2xl"
-        boxShadow="0 2px 8px rgba(0,0,0,0.07)"
+        boxShadow="0 8px 32px rgba(0,0,0,0.12)"
         border="1px solid"
         borderColor="gray.100"
         mx="auto"
@@ -1237,40 +1391,203 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             </Table>
             
             {/* RSVPs Summary Section */}
-            <Box bg="gray.50" p={4} borderRadius="md">
-              <Heading size="sm" mb={3} color="nightSky" fontWeight="600">
-                📋 RSVPs Summary
-              </Heading>
-              {currentDayPrivateEvents.map(pe => {
-                const reservations = getReservationsForPrivateEvent(pe.id);
-                if (reservations.length === 0) return null;
-                
-                return (
-                  <Box key={pe.id} mb={4} p={3} bg="white" borderRadius="md" border="1px solid" borderColor="gray.200">
-                    <HStack justify="space-between" mb={2}>
-                      <Text fontWeight="600" fontSize="sm" color="nightSky">
-                        {pe.title}
-                      </Text>
-                      <Badge colorScheme="blue" fontSize="xs">
-                        {reservations.length} RSVP{reservations.length !== 1 ? 's' : ''}
-                      </Badge>
-                    </HStack>
-                    <VStack spacing={1} align="stretch">
-                      {reservations.map((r: any) => (
-                        <HStack key={r.id} justify="space-between" fontSize="xs">
-                          <Text>
-                            <strong>{r.first_name} {r.last_name}</strong> — {r.party_size} guest{r.party_size !== 1 ? 's' : ''}
-                          </Text>
-                          <Text color="gray.500" fontSize="xs">
-                            {r.phone}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </Box>
-                );
-              })}
-            </Box>
+            {currentDayPrivateEvents.length > 0 && (
+              <Box mt={6} p={4} bg="gray.50" borderRadius="lg" border="1px solid" borderColor="gray.200">
+                <Heading size="sm" mb={4} color="nightSky" fontWeight="600">
+                  
+                </Heading>
+                <VStack spacing={3} align="stretch">
+                  {currentDayPrivateEvents.map(pe => {
+                    const reservations = getReservationsForPrivateEvent(pe.id);
+                    return (
+                      <Box key={pe.id} p={4} bg="white" borderRadius="md" border="1px solid" borderColor="gray.200" padding="20px" width="90%">
+                        <Text fontWeight="bold" fontSize="26px" color="nightSky" mb={3}>
+                          {pe.title} - {reservations.length} RSVP{reservations.length !== 1 ? 's' : ''}
+                        </Text>
+                        {reservations.length > 0 ? (
+                          <Box overflowX="auto">
+                            <Table variant="simple" size="sm" width="100%">
+                              <Thead>
+                                <Tr>
+                                  <Th textAlign="left">Name</Th>
+                                  <Th textAlign="left">Phone</Th>
+                                  <Th textAlign="left">Email</Th>
+                                  <Th textAlign="left">Guests</Th>
+                                  <Th textAlign="left">Time</Th>
+                                  <Th textAlign="left">Notes</Th>
+                                  <Th textAlign="left">Actions</Th>
+                                </Tr>
+                              </Thead>
+                              <Tbody>
+                                {reservations.map((reservation) => (
+                                  <Tr key={reservation.id}>
+                                    <Td>
+                                      {editingRowId === reservation.id ? (
+                                        <Input
+                                          size="sm"
+                                          value={editingData.first_name || ''}
+                                          onChange={(e) => setEditingData(prev => ({ ...prev, first_name: e.target.value }))}
+                                          placeholder="First Name"
+                                        />
+                                      ) : (
+                                        <Text fontWeight="600">
+                                          {reservation.first_name} {reservation.last_name}
+                                        </Text>
+                                      )}
+                                    </Td>
+                                    <Td>
+                                      {editingRowId === reservation.id ? (
+                                        <Input
+                                          size="sm"
+                                          value={editingData.phone || ''}
+                                          onChange={(e) => setEditingData(prev => ({ ...prev, phone: e.target.value }))}
+                                          placeholder="Phone"
+                                        />
+                                      ) : (
+                                        reservation.phone ? formatPhoneNumber(reservation.phone) : 'N/A'
+                                      )}
+                                    </Td>
+                                    <Td>
+                                      {editingRowId === reservation.id ? (
+                                        <Input
+                                          size="sm"
+                                          type="email"
+                                          value={editingData.email || ''}
+                                          onChange={(e) => setEditingData(prev => ({ ...prev, email: e.target.value }))}
+                                          placeholder="Email"
+                                        />
+                                      ) : (
+                                        reservation.email ? (
+                                          <Text color="blue.600" fontSize="sm">
+                                            {reservation.email}
+                                          </Text>
+                                        ) : (
+                                          'N/A'
+                                        )
+                                      )}
+                                    </Td>
+                                    <Td>
+                                      {editingRowId === reservation.id ? (
+                                        <Select
+                                          size="sm"
+                                          value={editingData.party_size || 1}
+                                          onChange={(e) => setEditingData(prev => ({ ...prev, party_size: parseInt(e.target.value) }))}
+                                        >
+                                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                                            <option key={num} value={num}>{num}</option>
+                                          ))}
+                                        </Select>
+                                      ) : (
+                                        <Text fontWeight="600">
+                                          {reservation.party_size} {reservation.party_size === 1 ? 'guest' : 'guests'}
+                                        </Text>
+                                      )}
+                                    </Td>
+                                    <Td>
+                                      {editingRowId === reservation.id ? (
+                                        <Input
+                                          size="sm"
+                                          type="datetime-local"
+                                          value={editingData.time_selected || ''}
+                                          onChange={(e) => setEditingData(prev => ({ ...prev, time_selected: e.target.value }))}
+                                        />
+                                      ) : (
+                                        reservation.time_selected ? 
+                                          formatDate(new Date(reservation.time_selected), settings.timezone, { 
+                                            hour: 'numeric', 
+                                            minute: '2-digit',
+                                            hour12: true 
+                                          }) : 'N/A'
+                                      )}
+                                    </Td>
+                                    <Td>
+                                      {editingRowId === reservation.id ? (
+                                        <Input
+                                          size="sm"
+                                          value={editingData.special_requests || ''}
+                                          onChange={(e) => setEditingData(prev => ({ ...prev, special_requests: e.target.value }))}
+                                          placeholder="Special requests"
+                                        />
+                                      ) : (
+                                        reservation.special_requests ? (
+                                          <Text fontSize="sm" color="gray.700" maxW="200px" noOfLines={2}>
+                                            {reservation.special_requests}
+                                          </Text>
+                                        ) : (
+                                          '-'
+                                        )
+                                      )}
+                                    </Td>
+                                    <Td>
+                                      {editingRowId === reservation.id ? (
+                                        <HStack spacing={1}>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="green"
+                                            onClick={handleSaveInlineEdit}
+                                          >
+                                            Save
+                                          </Button>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="gray"
+                                            onClick={handleCancelInlineEdit}
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </HStack>
+                                      ) : deleteConfirmId === reservation.id ? (
+                                        <HStack spacing={1}>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="red"
+                                            onClick={handleDeleteConfirm}
+                                          >
+                                            Confirm
+                                          </Button>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="gray"
+                                            onClick={() => setDeleteConfirmId(null)}
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </HStack>
+                                      ) : (
+                                        <HStack spacing={2}>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="blue"
+                                            variant="outline"
+                                            onClick={() => handleInlineEdit(reservation)}
+                                          >
+                                            Edit
+                                          </Button>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="red"
+                                            variant="outline"
+                                            onClick={() => setDeleteConfirmId(reservation.id)}
+                                          >
+                                            Delete
+                                          </Button>
+                                        </HStack>
+                                      )}
+                                    </Td>
+                                  </Tr>
+                                ))}
+                              </Tbody>
+                            </Table>
+                          </Box>
+                        ) : (
+                          <Text color="gray.500" fontSize="sm">No RSVPs yet</Text>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </VStack>
+              </Box>
+            )}
           </VStack>
         ) : (
           <Text color="gray.500" textAlign="center" py={4}>
@@ -1295,6 +1612,14 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         initialDate={selectedSlot?.date}
         initialTableId={selectedSlot?.resourceId}
         onReservationCreated={handleNewReservationCreated}
+      />
+
+      {/* RSVP Edit Modal */}
+      <RSVPEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        reservation={editingRSVP}
+        onUpdate={handleRSVPUpdated}
       />
     </Box>
   );
