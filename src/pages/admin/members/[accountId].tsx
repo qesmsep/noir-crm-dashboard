@@ -603,7 +603,7 @@ export default function MemberDetailAdmin() {
   // Calculate previous membership period based on join date
   useEffect(() => {
     const calculatePreviousPeriod = () => {
-      if (!selectedMemberForPdf || !selectedMemberForPdf.join_date) {
+      if (!selectedMemberForPdf?.join_date) {
         console.log('No member selected or no join date available');
         setPreviousPeriodStart(null);
         setPreviousPeriodEnd(null);
@@ -653,10 +653,126 @@ export default function MemberDetailAdmin() {
 
   // Update handleTextPdf to support previous membership period
   const handleTextPdf = async () => {
-    if (!selectedMemberForPdf || !selectedMemberForPdf.phone) {
+    if (!selectedMemberForPdf) {
       toast({
         title: 'Error',
-        description: 'Please select a member with a valid phone number.',
+        description: 'Please select a member to send the PDF to.',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+    
+    // Handle sending to both members
+    if (selectedMemberForPdf.member_id === 'both') {
+      const membersWithPhone = members.filter(m => m.phone);
+      if (membersWithPhone.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'No members have valid phone numbers.',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+      
+      try {
+        setSendingPdf(true);
+        let startDate, endDate;
+        const today = new Date();
+        switch (pdfDateRange) {
+          case 'current_month':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+          case 'last_month':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+          case 'last_3_months':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+          case 'previous_membership_period':
+            if (!previousPeriodStart || !previousPeriodEnd) {
+              toast({ title: 'Error', description: 'No previous membership period found.', status: 'error', duration: 3000 });
+              setSendingPdf(false);
+              return;
+            }
+            startDate = new Date(previousPeriodStart);
+            endDate = new Date(new Date(previousPeriodEnd).getTime() - 86400000);
+            break;
+          case 'custom':
+            if (!customStartDate || !customEndDate) {
+              toast({ title: 'Error', description: 'Please select both start and end dates.', status: 'error', duration: 3000 });
+              setSendingPdf(false);
+              return;
+            }
+            startDate = new Date(customStartDate);
+            endDate = new Date(customEndDate);
+            break;
+          default:
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        }
+        
+        // Send to all members with phone numbers
+        const sendPromises = membersWithPhone.map(async (member) => {
+          const response = await fetch('/api/send-ledger-pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              member_id: member.member_id,
+              account_id: member.account_id,
+              start_date: startDate.toISOString().split('T')[0],
+              end_date: endDate.toISOString().split('T')[0],
+              phone: member.phone,
+              member_name: `${member.first_name} ${member.last_name}`
+            }),
+          });
+          return { member, response };
+        });
+        
+        const results = await Promise.all(sendPromises);
+        const successfulSends = results.filter(r => r.response.ok);
+        const failedSends = results.filter(r => !r.response.ok);
+        
+        if (successfulSends.length > 0) {
+          toast({
+            title: 'PDFs Sent!',
+            description: `Ledger PDF has been sent to ${successfulSends.length} member(s)`,
+            status: 'success',
+            duration: 5000,
+          });
+        }
+        
+        if (failedSends.length > 0) {
+          toast({
+            title: 'Partial Error',
+            description: `Failed to send PDF to ${failedSends.length} member(s)`,
+            status: 'warning',
+            duration: 5000,
+          });
+        }
+        
+        setIsTextPdfModalOpen(false);
+        setSelectedMemberForPdf(null);
+        setPdfDateRange('current_month');
+        setCustomStartDate('');
+        setCustomEndDate('');
+      } catch (error: any) {
+        console.error('Error sending PDFs:', error);
+        toast({ title: 'Error', description: error.message || 'Failed to send PDFs', status: 'error', duration: 3000 });
+      } finally {
+        setSendingPdf(false);
+      }
+      return;
+    }
+    
+    if (!selectedMemberForPdf.phone) {
+      toast({
+        title: 'Error',
+        description: 'The selected member does not have a valid phone number.',
         status: 'error',
         duration: 3000,
       });
@@ -752,7 +868,7 @@ export default function MemberDetailAdmin() {
 
   // Remove hasPreviousMembershipPeriod state and logic
   // Instead, compute showPreviousMembershipPeriod based on join_date
-  const showPreviousMembershipPeriod = selectedMemberForPdf && selectedMemberForPdf.join_date && (new Date().getTime() - new Date(selectedMemberForPdf.join_date).getTime() > 31 * 24 * 60 * 60 * 1000);
+  const showPreviousMembershipPeriod = selectedMemberForPdf?.join_date && (new Date().getTime() - new Date(selectedMemberForPdf.join_date).getTime() > 31 * 24 * 60 * 60 * 1000);
 
   return (
     <AdminLayout>
@@ -1313,7 +1429,6 @@ export default function MemberDetailAdmin() {
               fontSize="md"
               _hover={{ bg: '#8B7B68' }}
               onClick={() => {
-                setSelectedMemberForPdf(members[0]);
                 setIsTextPdfModalOpen(true);
               }}
             >
@@ -1441,13 +1556,25 @@ export default function MemberDetailAdmin() {
         <Drawer 
           isOpen={isTextPdfModalOpen} 
           placement="right" 
-          onClose={() => setIsTextPdfModalOpen(false)} 
+          onClose={() => {
+            setIsTextPdfModalOpen(false);
+            setSelectedMemberForPdf(null);
+            setPdfDateRange('current_month');
+            setCustomStartDate('');
+            setCustomEndDate('');
+          }} 
           size="sm"
           closeOnOverlayClick={true}
           closeOnEsc={true}
         >
           <Box zIndex="2000" position="relative">
-            <DrawerOverlay bg="blackAlpha.600" onClick={() => setIsTextPdfModalOpen(false)} />
+            <DrawerOverlay bg="blackAlpha.600" onClick={() => {
+              setIsTextPdfModalOpen(false);
+              setSelectedMemberForPdf(null);
+              setPdfDateRange('current_month');
+              setCustomStartDate('');
+              setCustomEndDate('');
+            }} />
                     <DrawerContent 
           border="2px solid #353535" 
           borderRadius="10px"  
@@ -1473,14 +1600,49 @@ export default function MemberDetailAdmin() {
               </DrawerHeader>
               <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
                 <VStack spacing={4}>
-                  <Box>
-                    <Text fontSize="lg" fontWeight="bold" fontFamily="IvyJournal, sans-serif" color="#353535">
-                      {selectedMemberForPdf?.first_name} {selectedMemberForPdf?.last_name}
-                    </Text>
-                    <Text fontSize="sm" color="gray.600" fontFamily="Montserrat, sans-serif">
-                      Phone: {selectedMemberForPdf?.phone}
-                    </Text>
-                  </Box>
+                  <FormControl>
+                    <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">Select Member</FormLabel>
+                    <Select
+                      value={selectedMemberForPdf?.member_id || ''}
+                      onChange={(e) => {
+                        if (e.target.value === 'both') {
+                          setSelectedMemberForPdf({ member_id: 'both', first_name: 'Both', last_name: 'Members', phone: 'both' } as any);
+                        } else {
+                          const selectedMember = members.find(m => m.member_id === e.target.value);
+                          setSelectedMemberForPdf(selectedMember || null);
+                        }
+                      }}
+                      fontFamily="Montserrat, sans-serif"
+                      size="sm"
+                      placeholder="Choose a member"
+                    >
+                      {members.length > 1 && (
+                        <option value="both">Both Members</option>
+                      )}
+                      {members.map((member) => (
+                        <option key={member.member_id} value={member.member_id}>
+                          {member.first_name} {member.last_name} {member.phone ? `(${member.phone})` : ''}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {selectedMemberForPdf && (
+                    <Box>
+                      <Text fontSize="lg" fontWeight="bold" fontFamily="IvyJournal, sans-serif" color="#353535">
+                        {selectedMemberForPdf.member_id === 'both' 
+                          ? 'Both Members' 
+                          : `${selectedMemberForPdf.first_name} ${selectedMemberForPdf.last_name}`
+                        }
+                      </Text>
+                      <Text fontSize="sm" color="gray.600" fontFamily="Montserrat, sans-serif">
+                        {selectedMemberForPdf.member_id === 'both' 
+                          ? `Will send to ${members.filter(m => m.phone).length} member(s) with phone numbers`
+                          : `Phone: ${selectedMemberForPdf.phone || 'No phone number'}`
+                        }
+                      </Text>
+                    </Box>
+                  )}
                   
                   <FormControl>
                     <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">Date Range</FormLabel>
@@ -1535,7 +1697,13 @@ export default function MemberDetailAdmin() {
               <DrawerFooter borderTopWidth="1px" justifyContent="space-between" className="drawer-footer-content">
                 <Button 
                   variant="outline" 
-                  onClick={() => setIsTextPdfModalOpen(false)}
+                  onClick={() => {
+                    setIsTextPdfModalOpen(false);
+                    setSelectedMemberForPdf(null);
+                    setPdfDateRange('current_month');
+                    setCustomStartDate('');
+                    setCustomEndDate('');
+                  }}
                   fontFamily="Montserrat, sans-serif"
                 >
                   Cancel
