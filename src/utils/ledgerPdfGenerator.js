@@ -77,12 +77,24 @@ export class LedgerPdfGenerator {
       }
 
       // Calculate prior balance (sum of all entries before startDate)
+      // Use strict less than to exclude the start date itself
+      console.log('Calculating prior balance:', {
+        startDate,
+        accountId
+      });
+      
       const { data: priorEntries } = await supabase
         .from('ledger')
         .select('amount')
         .eq('account_id', accountId)
         .lt('date', startDate);
       const priorBalance = priorEntries ? priorEntries.reduce((sum, e) => sum + (e.amount || 0), 0) : 0;
+      
+      console.log('Prior balance calculation:', {
+        priorEntriesCount: priorEntries?.length || 0,
+        priorBalance,
+        startDate
+      });
 
       // Calculate previous membership period based on member join date
       let lastRenewalDate = null;
