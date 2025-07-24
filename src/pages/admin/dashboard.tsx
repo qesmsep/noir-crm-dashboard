@@ -60,6 +60,7 @@ interface Stats {
   invitationRequestsCount: number;
   invitationRequests: any[];
   financialMetrics?: FinancialMetrics;
+  privateEvents?: any[];
 }
 
 function getNextBirthday(dob?: string) {
@@ -94,6 +95,7 @@ export default function Dashboard() {
     waitlistEntries: [],
     invitationRequestsCount: 0,
     invitationRequests: [],
+    privateEvents: [],
   });
   const [reservationDetails, setReservationDetails] = useState<any[]>([]);
   const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<any>(null);
@@ -129,6 +131,13 @@ export default function Dashboard() {
       // Fetch waitlisted data (denied but kept on file)
       const waitlistedRes = await fetch("/api/waitlist?status=waitlisted&limit=5");
       const waitlistedData = await waitlistedRes.json();
+
+      // Fetch private events for the upcoming week
+      const now = new Date();
+      const startDate = now.toISOString();
+      const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const privateEventsRes = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
+      const privateEventsData = await privateEventsRes.json();
       
       setStats({
         members: membersData.data || [],
@@ -141,11 +150,12 @@ export default function Dashboard() {
         invitationRequestsCount: waitlistData.count || 0,
         invitationRequests: waitlistData.data || [],
         financialMetrics: financialData,
+        privateEvents: privateEventsData.data || [],
       });
       setReservationDetails(reservationsData.data || []);
     } catch (err) {
       console.error('Error fetching stats:', err);
-      setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [], invitationRequestsCount: 0, invitationRequests: [] });
+      setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [], invitationRequestsCount: 0, invitationRequests: [], privateEvents: [] });
       setReservationDetails([]);
     }
   };
@@ -214,20 +224,34 @@ export default function Dashboard() {
       date1.getDate() === date2.getDate();
   }
 
-  const thursdaySeats = reservationDetails.filter(r => {
+  // Get private events for each day
+  const getPrivateEventForDay = (date: Date) => {
+    return stats.privateEvents?.find(event => {
+      const eventDate = new Date(event.start_time);
+      return isSameDay(eventDate, date);
+    });
+  };
+
+  const thursdayReservations = reservationDetails.filter(r => {
     const d = new Date(r.start_time);
     return isSameDay(d, nextThursday);
-  }).reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  });
+  const thursdaySeats = thursdayReservations.reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  const thursdayPrivateEvent = getPrivateEventForDay(nextThursday);
 
-  const fridaySeats = reservationDetails.filter(r => {
+  const fridayReservations = reservationDetails.filter(r => {
     const d = new Date(r.start_time);
     return isSameDay(d, nextFriday);
-  }).reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  });
+  const fridaySeats = fridayReservations.reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  const fridayPrivateEvent = getPrivateEventForDay(nextFriday);
 
-  const saturdaySeats = reservationDetails.filter(r => {
+  const saturdayReservations = reservationDetails.filter(r => {
     const d = new Date(r.start_time);
     return isSameDay(d, nextSaturday);
-  }).reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  });
+  const saturdaySeats = saturdayReservations.reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  const saturdayPrivateEvent = getPrivateEventForDay(nextSaturday);
 
   return (
     <AdminLayout>
@@ -282,51 +306,107 @@ export default function Dashboard() {
         
         {/* Multi-data cards stacked below */}
         <div className={styles.listsGrid}>
-          <DashboardListCard label="Upcoming Reservations (Seats)">
+          <DashboardListCard label="Upcoming Week">
             <div className={styles.reservationList}>
-              <div>
-                <strong>{nextThursday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextThursday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}: <span className={styles.reservationSeats}>{thursdaySeats}</span>
+              <div className={styles.weekDayItem}>
+                <div className={styles.weekDayHeader}>
+                  <strong>{nextThursday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextThursday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
+                </div>
+                {thursdayPrivateEvent ? (
+                  <div className={styles.privateEventName}>🔒 {thursdayPrivateEvent.title}</div>
+                ) : thursdayReservations.length > 0 ? (
+                  <div className={styles.reservationSummary}>
+                    {thursdayReservations.length} Reservation{thursdayReservations.length !== 1 ? 's' : ''} & {thursdaySeats} Cover{thursdaySeats !== 1 ? 's' : ''}
+                  </div>
+                ) : (
+                  <div className={styles.noReservations}>No reservations</div>
+                )}
               </div>
-              <div>
-                <strong>{nextFriday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextFriday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}: <span className={styles.reservationSeats}>{fridaySeats}</span>
+              <div className={styles.weekDayItem}>
+                <div className={styles.weekDayHeader}>
+                  <strong>{nextFriday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextFriday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
+                </div>
+                {fridayPrivateEvent ? (
+                  <div className={styles.privateEventName}>🔒 {fridayPrivateEvent.title}</div>
+                ) : fridayReservations.length > 0 ? (
+                  <div className={styles.reservationSummary}>
+                    {fridayReservations.length} Reservation{fridayReservations.length !== 1 ? 's' : ''} & {fridaySeats} Cover{fridaySeats !== 1 ? 's' : ''}
+                  </div>
+                ) : (
+                  <div className={styles.noReservations}>No reservations</div>
+                )}
               </div>
-              <div>
-                <strong>{nextSaturday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextSaturday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit'})}: <span className={styles.reservationSeats}>{saturdaySeats}</span>
+              <div className={styles.weekDayItem}>
+                <div className={styles.weekDayHeader}>
+                  <strong>{nextSaturday.toLocaleDateString(undefined, { weekday: 'long' })}</strong> - {nextSaturday.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit'})}
+                </div>
+                {saturdayPrivateEvent ? (
+                  <div className={styles.privateEventName}>🔒 {saturdayPrivateEvent.title}</div>
+                ) : saturdayReservations.length > 0 ? (
+                  <div className={styles.reservationSummary}>
+                    {saturdayReservations.length} Reservation{saturdayReservations.length !== 1 ? 's' : ''} & {saturdaySeats} Cover{saturdaySeats !== 1 ? 's' : ''}
+                  </div>
+                ) : (
+                  <div className={styles.noReservations}>No reservations</div>
+                )}
               </div>
             </div>
           </DashboardListCard>
           <DashboardListCard label="Next 5 Birthdays">
-            {membersWithBirthday.length === 0 ? <div>No upcoming birthdays.</div> : (
-              <ul className={styles.simpleList}>
+            {membersWithBirthday.length === 0 ? <div className={styles.noReservations}>No upcoming birthdays.</div> : (
+              <div className={styles.reservationList}>
                 {membersWithBirthday.map(m => (
-                  <li key={m.member_id}><strong>{m.first_name} {m.last_name}</strong> - {(m.nextBirthday as Date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</li>
+                  <div key={m.member_id} className={styles.weekDayItem}>
+                    <div className={styles.weekDayHeader}>
+                      <strong>{m.first_name} {m.last_name}</strong>
+                    </div>
+                    <div className={styles.reservationSummary}>
+                      🎂 {(m.nextBirthday as Date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
           </DashboardListCard>
           <DashboardListCard label="Next 5 Payments Due">
-            {membersWithRenewal.length === 0 ? <div>No upcoming payments.</div> : (
-              <ul className={styles.simpleList}>
+            {membersWithRenewal.length === 0 ? <div className={styles.noReservations}>No upcoming payments.</div> : (
+              <div className={styles.reservationList}>
                 {membersWithRenewal.map(m => (
-                  <li key={m.member_id}><strong>{m.first_name} {m.last_name}</strong> - {(m.nextRenewal as Date).toLocaleDateString()} <span className={styles.paymentAmount}>${(m.monthly_dues || 0).toFixed(2)}</span></li>
+                  <div key={m.member_id} className={styles.weekDayItem}>
+                    <div className={styles.weekDayHeader}>
+                      <strong>{m.first_name} {m.last_name}</strong>
+                    </div>
+                    <div className={styles.reservationSummary}>
+                      💳 {(m.nextRenewal as Date).toLocaleDateString()} - <span className={styles.paymentAmount}>${(m.monthly_dues || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
           </DashboardListCard>
           <DashboardListCard label="Invitation Requests">
             {stats.invitationRequests.length === 0 ? (
-              <div>No pending requests.</div>
+              <div className={styles.noReservations}>No pending requests.</div>
             ) : (
-              <ul className={styles.simpleList}>
+              <div className={styles.reservationList}>
                 {stats.invitationRequests.slice(0, 5).map((entry: any) => (
-                  <li key={entry.id}>
-                    <strong>{entry.first_name} {entry.last_name}</strong> - {new Date(entry.submitted_at).toLocaleDateString()}
-                  </li>
+                  <div key={entry.id} className={styles.weekDayItem}>
+                    <div className={styles.weekDayHeader}>
+                      <strong>{entry.first_name} {entry.last_name}</strong>
+                    </div>
+                    <div className={styles.reservationSummary}>
+                      📝 {new Date(entry.submitted_at).toLocaleDateString()}
+                    </div>
+                  </div>
                 ))}
                 {stats.invitationRequests.length > 5 && (
-                  <li>+{stats.invitationRequests.length - 5} more requests</li>
+                  <div className={styles.weekDayItem}>
+                    <div className={styles.reservationSummary}>
+                      +{stats.invitationRequests.length - 5} more requests
+                    </div>
+                  </div>
                 )}
-              </ul>
+              </div>
             )}
           </DashboardListCard>
         </div>

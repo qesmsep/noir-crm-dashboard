@@ -332,3 +332,42 @@
   font-weight: 600;
   margin-left: 0.5em;
 }
+
+.weekDayItem {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(188, 168, 146, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.weekDayItem:last-child {
+  border-bottom: none;
+}
+
+.weekDayHeader {
+  font-size: 1rem;
+  color: #353535;
+  font-weight: 600;
+}
+
+.privateEventName {
+  color: #BCA892;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.25rem 0;
+}
+
+.reservationSummary {
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.25rem 0;
+}
+
+.noReservations {
+  color: #999;
+  font-size: 0.85rem;
+  font-style: italic;
+  padding: 0.25rem 0;
+}
