@@ -597,12 +597,21 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
 
     // 5. Check if the requested time falls within venue hours
     // Convert UTC time to business timezone for comparison with venue hours
-    const businessDateTime = DateTime.fromJSDate(date).setZone(DEFAULT_TIMEZONE);
+    console.log('=== VENUE HOURS TIMEZONE CHECK ===');
+    console.log('Original startTime (UTC):', startTime);
+    console.log('Original date object:', date);
+    
+    // Use the UTC startTime that was already converted from local time
+    const businessDateTime = DateTime.fromISO(startTime, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE);
     const requestedHour = businessDateTime.hour;
     const requestedMinute = businessDateTime.minute;
     const requestedTime = `${requestedHour.toString().padStart(2, '0')}:${requestedMinute.toString().padStart(2, '0')}`;
     
+    console.log('Business DateTime (CST):', businessDateTime.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'));
+    console.log('Requested time for venue hours check:', requestedTime);
+    
     let timeRanges = baseHoursData.flatMap(row => row.time_ranges || []);
+    console.log('Available time ranges:', timeRanges);
     
     // Remove closed time ranges if partial closure
     if (exceptionalClosure && exceptionalClosure.time_ranges) {
@@ -623,6 +632,10 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     const isWithinHours = timeRanges.some(range => 
       requestedTime >= range.start && requestedTime <= range.end
     );
+    
+    console.log('Is within venue hours?', isWithinHours);
+    console.log('Requested time:', requestedTime);
+    console.log('Available ranges:', timeRanges);
     
     if (!isWithinHours) {
       console.log('Requested time outside venue hours:', { requestedTime, timeRanges });
@@ -1145,11 +1158,28 @@ export async function handler(req, res) {
     }
 
     // Convert parsed local date/time (America/Chicago) to UTC ISO strings
+    console.log('=== TIMEZONE CONVERSION ===');
+    console.log('Parsed date:', parsed.date);
+    console.log('Parsed time:', parsed.time);
+    console.log('Default timezone:', DEFAULT_TIMEZONE);
+    
     const localDt = DateTime.fromISO(`${parsed.date}T${parsed.time}`, { zone: DEFAULT_TIMEZONE });
+    console.log('Local DateTime object:', localDt.toISO());
+    console.log('Local DateTime in CST:', localDt.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'));
+    
     const start_time = localDt.toUTC().toISO();
     const end_time = localDt.plus({ hours: 2 }).toUTC().toISO();
-
+    
+    console.log('Start time (UTC):', start_time);
+    console.log('End time (UTC):', end_time);
+    console.log('Start time (CST):', DateTime.fromISO(start_time, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE).toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'));
+    console.log('End time (CST):', DateTime.fromISO(end_time, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE).toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'));
+    
+    console.log('Party size:', parsed.party_size);
+    console.log('=== AVAILABILITY CHECK ===');
     const availability = await checkComprehensiveAvailability(start_time, end_time, parsed.party_size);
+    console.log('=== AVAILABILITY RESULT ===');
+    console.log('Availability result:', availability);
 
     // If unavailable but suggestion exists, prompt and store suggestion
     let suggestedSlot = null;
