@@ -181,17 +181,19 @@ async function parseReservationWithGPT(message) {
   
   const prompt = `
 You are an incredibly proficient reservation assistant for Noir KC. 
-Your job is to interpret the user's reservation request andprovide reservation data and confirmation to the user. 
+Your job is to interpret the user's reservation request and provide reservation data and confirmation to the user. 
 IF their requested time is not available, you should provide the next closest available time as close as possible to their requested time of day.
 All times are in America/Chicago (UTC–05:00).
 Interpret relative dates such as "today", "tomorrow", "this Thursday", and "next Friday" relative to the current date in America/Chicago.
 For expressions like "this <weekday>", interpret as the next occurrence of that weekday (e.g., if today is Tuesday, "this Thursday" should map to the upcoming Thursday).
 IMPORTANT: Parse the message case-insensitively. Handle mixed case, all caps, and all lowercase gracefully.
-Ignore symbols such as + - etc. Reservation + 1 GUEST should be interpreted as a reservation request for 2 guests. 
+When you see "+ 1 guest" or "+1 guest", interpret this as adding 1 to the base reservation size, so "Reservation + 1 guest" means 2 total guests.
+Ignore other symbols such as - etc. 
 Examples of case variations you should handle:
 - "RESERVATION for 7 GUESTS at 10:15PM on 7/24/25"
 - "reservation for 7 guests at 10:15pm on 7/24/25"
 - "Reservation for 7 Guests at 10:15PM on 7/24/25"
+- "Reservation + 1 guest at 6:30 pm on 9/13" → party_size: 2
 
 Parse the user's SMS into JSON with exactly these keys:
 {
