@@ -177,6 +177,7 @@ function parseNaturalDate(dateStr) {
 
 // GPT-driven natural language parser
 async function parseReservationWithGPT(message) {
+  console.log('=== GPT PARSING START ===');
   console.log('Parsing message with GPT:', message);
   
   const prompt = `
@@ -209,28 +210,44 @@ Examples:
 - "Reservation 2 people" → {"party_size":2,"date":"2025-01-20","time":"20:00"}
 User message: """${message}"""
 `;
+  
+  console.log('=== GPT PROMPT SENT ===');
+  console.log('Sending prompt to GPT...');
+  
   const res = await openai.chat.completions.create({
     model: 'gpt-4',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.0,
   });
+  
   const text = res.choices[0].message.content.trim();
-  console.log('GPT response:', text);
+  console.log('=== GPT RESPONSE RECEIVED ===');
+  console.log('GPT raw response:', text);
+  console.log('GPT response length:', text.length);
+  
   try {
     const parsed = JSON.parse(text);
+    console.log('=== GPT PARSING SUCCESS ===');
     console.log('Parsed result:', parsed);
+    console.log('Has party_size?', !!parsed.party_size);
+    console.log('Has date?', !!parsed.date);
+    console.log('Has time?', !!parsed.time);
     return parsed;
   } catch (e) {
-    console.error('GPT parsing error', e, text);
+    console.log('=== GPT PARSING FAILED ===');
+    console.error('GPT parsing error', e);
+    console.error('Failed to parse GPT response:', text);
     return null;
   }
 }
 
 // Enhanced regex fallback parser for when GPT fails
 function parseReservationWithRegex(message) {
+  console.log('=== REGEX FALLBACK START ===');
   console.log('Parsing message with regex fallback:', message);
   
   const msg = message.toLowerCase().trim();
+  console.log('Normalized message:', msg);
   
   // Enhanced party size extraction patterns
   const partySizePatterns = [
@@ -245,9 +262,12 @@ function parseReservationWithRegex(message) {
     /(\d+)\s*people/i,          // 2 people (standalone)
   ];
   
+  console.log('=== TESTING PARTY SIZE PATTERNS ===');
   let party_size = null;
-  for (const pattern of partySizePatterns) {
+  for (let i = 0; i < partySizePatterns.length; i++) {
+    const pattern = partySizePatterns[i];
     const match = msg.match(pattern);
+    console.log(`Pattern ${i + 1}: ${pattern} - Match:`, match);
     if (match) {
       party_size = parseInt(match[1]);
       console.log('Found party size with pattern:', pattern, '=', party_size);
@@ -257,6 +277,7 @@ function parseReservationWithRegex(message) {
   
   // If no party size found, return null
   if (!party_size) {
+    console.log('=== NO PARTY SIZE FOUND ===');
     console.log('No party size found in message');
     return null;
   }
@@ -266,6 +287,7 @@ function parseReservationWithRegex(message) {
   const defaultDate = today.toISODate();
   const defaultTime = '20:00';
   
+  console.log('=== REGEX FALLBACK RESULT ===');
   console.log('Regex fallback result:', { party_size, date: defaultDate, time: defaultTime });
   
   return {
@@ -752,6 +774,7 @@ async function sendSMS(to, message) {
 }
 
 export async function handler(req, res) {
+  console.log('=== OPENPHONE WEBHOOK RECEIVED ===');
   console.log('Webhook received:', {
     method: req.method,
     body: req.body,
@@ -779,12 +802,15 @@ export async function handler(req, res) {
     from: data?.object?.from || '',
     text: data?.object?.text || data?.object?.body || ''
   };
+  console.log('=== MESSAGE PROCESSING START ===');
   console.log('Processing message:', { from, text });
   console.log('Raw webhook data:', JSON.stringify(data, null, 2));
   console.log('Phone number received from OpenPhone:', from);
   console.log('Message text received:', `"${text}"`);
   console.log('Message length:', text.length);
   console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
+  console.log('Message lowercase:', text.toLowerCase());
+  console.log('Message trimmed:', text.toLowerCase().trim());
 
   // Handle "MEMBER" messages for waitlist
   if (text.toLowerCase().trim() === 'member') {
@@ -911,16 +937,25 @@ export async function handler(req, res) {
   // --- Multi-turn conversation state logic ---
   // Load conversation state
   const conv = await getConversation(from);
+  console.log('=== CONVERSATION STATE ===');
+  console.log('Conversation state for phone:', from);
+  console.log('Conversation data:', conv);
+  console.log('Conversation step:', conv?.step);
+  console.log('Conversation data:', conv?.data);
 
   // Handle suggestion confirmation
   if (conv?.step === 'suggested') {
+    console.log('=== HANDLING SUGGESTION CONFIRMATION ===');
     const userConfirm = await parseConfirmation(text);
+    console.log('User confirmation result:', userConfirm);
     if (userConfirm) {
       // User accepted suggestion: inject suggestion into parsed
       var parsed = conv.suggestion;
+      console.log('User accepted suggestion, using:', parsed);
       await clearConversation(from);
     } else {
       // User rejected: reset to collecting
+      console.log('User rejected suggestion, resetting to collecting');
       await saveConversation(from, { step: 'collecting', data: {} });
       await sendSMS(from, "Okay, what date and time would you like instead?");
       return res.status(200).end();
@@ -929,33 +964,45 @@ export async function handler(req, res) {
 
   // If collecting info, prompt for next missing field
   if (conv?.step === 'collecting') {
+    console.log('=== HANDLING COLLECTING STATE ===');
     const collected = conv.data || {};
+    console.log('Collected data so far:', collected);
+    console.log('Missing party_size?', !collected.party_size);
+    console.log('Missing date?', !collected.date);
+    console.log('Missing time?', !collected.time);
+    
     // If missing party_size
     if (!collected.party_size) {
+      console.log('=== ASKING FOR PARTY SIZE ===');
       await sendSMS(from, "How many guests?");
       await saveConversation(from, { step: 'collecting', data: collected });
       return res.status(200).end();
     }
     // If missing date or time
     if (!collected.date) {
+      console.log('=== ASKING FOR DATE ===');
       await sendSMS(from, "What date would you like?");
       await saveConversation(from, { step: 'collecting', data: collected });
       return res.status(200).end();
     }
     if (!collected.time) {
+      console.log('=== ASKING FOR TIME ===');
       await sendSMS(from, "What time would you like?");
       await saveConversation(from, { step: 'collecting', data: collected });
       return res.status(200).end();
     }
     // All present, continue to parse and booking logic
+    console.log('=== ALL FIELDS COLLECTED, CONTINUING ===');
   }
 
   try {
     let parsed;
     if (typeof parsed === "undefined") {
       // Not coming from accepted suggestion, parse with GPT
+      console.log('=== ATTEMPTING PARSING ===');
       console.log('Attempting GPT parsing for message:', text);
       parsed = await parseReservationWithGPT(text);
+      console.log('GPT parsing result:', parsed);
       
       // If GPT parsing failed, try regex fallback
       if (!parsed) {
@@ -963,6 +1010,8 @@ export async function handler(req, res) {
         parsed = parseReservationWithRegex(text);
         if (parsed) {
           console.log('Regex fallback parsing successful:', parsed);
+        } else {
+          console.log('Regex fallback also failed');
         }
       }
       
@@ -982,6 +1031,12 @@ export async function handler(req, res) {
       }
     }
 
+    console.log('=== FINAL PARSED RESULT ===');
+    console.log('Final parsed result:', parsed);
+    console.log('Has party_size?', !!parsed?.party_size);
+    console.log('Has date?', !!parsed?.date);
+    console.log('Has time?', !!parsed?.time);
+
     if (!parsed) {
       console.log('Both GPT and regex parsing failed for message:', text);
       const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please visit our website to make a reservation: https://noirkc.com`;
@@ -990,6 +1045,7 @@ export async function handler(req, res) {
     }
 
     // Save collecting state if missing fields
+    console.log('=== CHECKING FOR MISSING FIELDS ===');
     console.log('Checking parsed data for missing fields:', {
       party_size: parsed.party_size,
       date: parsed.date,
@@ -1000,7 +1056,12 @@ export async function handler(req, res) {
     });
     
     if (!parsed.party_size || !parsed.date || !parsed.time) {
+      console.log('=== MISSING FIELDS DETECTED ===');
       console.log('Missing fields detected, saving conversation state');
+      console.log('Missing party_size?', !parsed.party_size);
+      console.log('Missing date?', !parsed.date);
+      console.log('Missing time?', !parsed.time);
+      
       await saveConversation(from, {
         step: 'collecting',
         data: {
@@ -1010,22 +1071,22 @@ export async function handler(req, res) {
       });
       // Ask next missing field
       if (!parsed.party_size) {
-        console.log('Missing party_size, asking for guests');
+        console.log('=== ASKING FOR PARTY SIZE (MISSING) ===');
         await sendSMS(from, "How many guests?");
         return res.status(200).end();
       }
       if (!parsed.date) {
-        console.log('Missing date, asking for date');
+        console.log('=== ASKING FOR DATE (MISSING) ===');
         await sendSMS(from, "What date would you like?");
         return res.status(200).end();
       }
       if (!parsed.time) {
-        console.log('Missing time, asking for time');
+        console.log('=== ASKING FOR TIME (MISSING) ===');
         await sendSMS(from, "What time would you like?");
         return res.status(200).end();
       }
       // If error, fallback
-      console.log('All fields missing, sending generic message');
+      console.log('=== ALL FIELDS MISSING, SENDING GENERIC MESSAGE ===');
       await sendSMS(from, "Please provide all reservation details.");
       return res.status(200).end();
     }
