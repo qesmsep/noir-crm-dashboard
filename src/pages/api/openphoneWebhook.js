@@ -180,31 +180,30 @@ async function parseReservationWithGPT(message) {
   console.log('Parsing message with GPT:', message);
   
   const prompt = `
-You are an incredibly proficient reservation assistant for Noir KC. 
-Your job is to interpret the user's reservation request and provide reservation data and confirmation to the user. 
-IF their requested time is not available, you should provide the next closest available time as close as possible to their requested time of day.
-All times are in America/Chicago (UTC–05:00).
-Interpret relative dates such as "today", "tomorrow", "this Thursday", and "next Friday" relative to the current date in America/Chicago.
-For expressions like "this <weekday>", interpret as the next occurrence of that weekday (e.g., if today is Tuesday, "this Thursday" should map to the upcoming Thursday).
-IMPORTANT: Parse the message case-insensitively. Handle mixed case, all caps, and all lowercase gracefully.
-When you see "+ 1 guest" or "+1 guest", interpret this as adding 1 to the base reservation size, so "Reservation + 1 guest" means 2 total guests.
-Ignore other symbols such as - etc. 
-Examples of case variations you should handle:
-- "RESERVATION for 7 GUESTS at 10:15PM on 7/24/25"
-- "reservation for 7 guests at 10:15pm on 7/24/25"
-- "Reservation for 7 Guests at 10:15PM on 7/24/25"
-- "Reservation + 1 guest at 6:30 pm on 9/13" → party_size: 2
-
-Parse the user's SMS into JSON with exactly these keys:
+You are an expert reservation assistant for Noir KC. Parse the user's SMS reservation requests and return ONLY a JSON object with these keys:
 {
   "party_size": number,
   "date": "YYYY-MM-DD",
   "time": "HH:MM",
-  "event_type": string,        // optional
-  "notes": string              // optional
+  "event_type": string,  // optional
+  "notes": string        // optional
 }
-Return only the JSON object. If you cannot parse, return {"error":"reason"}.
-
+Requirements:
+- Interpret "+ n guest" or "+n guest" as base 1 + n (e.g., "Reservation +1 guest" → party_size: 2).
+- Accept synonyms: "for 2", "2 guests", "2 people", "party of 2".
+- Handle dates in formats: MM/DD, M/D, MM/DD/YY, MM/DD/YYYY, Month Day (e.g., "July 4th"), Month Day Year, as well as relative dates ("today", "tomorrow", "this Friday", "next Monday"). Default missing year to 2025.
+- Handle times in 12‑hour or 24‑hour formats, with or without colon, with or without "at" (e.g., "6pm", "6:30 pm", "19:00").
+- Normalize output: date must be ISO (YYYY-MM-DD), time must be 24‑hour HH:MM.
+- Interpret all times in America/Chicago.
+- Handle mixed case and extra punctuation gracefully.
+- If parsing fails, return {"error":"reason"}.
+Examples:
+- "RESERVATION for 7 GUESTS at 10:15PM on 07/24/25" → {"party_size":7,"date":"2025-07-24","time":"22:15"}
+- "reservation for 7 guests at 10:15pm 7/24" → {"party_size":7,"date":"2025-07-24","time":"22:15"}
+- "Reservation + 1 guest at 6:30 pm on 9/13" → {"party_size":2,"date":"2025-09-13","time":"18:30"}
+- "Reservation +1 guest at 6:30 pm 9/13" → {"party_size":2,"date":"2025-09-13","time":"18:30"}
+- "Reservation for 4 on tomorrow at 8pm" → {"party_size":4,"date":"<ISO tomorrow>","time":"20:00"}
+- "Book me for 3 people 19:00 10/05/2025" → {"party_size":3,"date":"2025-10-05","time":"19:00"}
 User message: """${message}"""
 `;
   const res = await openai.chat.completions.create({
