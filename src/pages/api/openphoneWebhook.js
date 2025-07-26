@@ -7,24 +7,61 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 // Conversation state helpers
 async function getConversation(phone) {
-  const { data, error } = await supabase
-    .from('sms_conversations')
-    .select('phone, step, data, suggestion')
-    .eq('phone', phone)
-    .single();
-  return data || null;
+  try {
+    console.log('Getting conversation for phone:', phone);
+    const { data, error } = await supabase
+      .from('sms_conversations')
+      .select('phone, step, data, suggestion')
+      .eq('phone', phone)
+      .single();
+    
+    if (error) {
+      console.log('Error getting conversation:', error);
+      return null;
+    }
+    
+    console.log('Retrieved conversation:', data);
+    return data || null;
+  } catch (error) {
+    console.error('Exception getting conversation:', error);
+    return null;
+  }
 }
+
 async function saveConversation(phone, fields) {
-  // UPSERT conversation row
-  await supabase
-    .from('sms_conversations')
-    .upsert({ phone, ...fields }, { onConflict: ['phone'] });
+  try {
+    console.log('Saving conversation for phone:', phone, 'fields:', fields);
+    // UPSERT conversation row
+    const { error } = await supabase
+      .from('sms_conversations')
+      .upsert({ phone, ...fields }, { onConflict: ['phone'] });
+    
+    if (error) {
+      console.error('Error saving conversation:', error);
+    } else {
+      console.log('Conversation saved successfully');
+    }
+  } catch (error) {
+    console.error('Exception saving conversation:', error);
+  }
 }
+
 async function clearConversation(phone) {
-  await supabase
-    .from('sms_conversations')
-    .delete()
-    .eq('phone', phone);
+  try {
+    console.log('Clearing conversation for phone:', phone);
+    const { error } = await supabase
+      .from('sms_conversations')
+      .delete()
+      .eq('phone', phone);
+    
+    if (error) {
+      console.error('Error clearing conversation:', error);
+    } else {
+      console.log('Conversation cleared successfully');
+    }
+  } catch (error) {
+    console.error('Exception clearing conversation:', error);
+  }
 }
 
 // Simple confirmation parser
@@ -943,56 +980,72 @@ export async function handler(req, res) {
   console.log('Conversation step:', conv?.step);
   console.log('Conversation data:', conv?.data);
 
-  // Handle suggestion confirmation
-  if (conv?.step === 'suggested') {
-    console.log('=== HANDLING SUGGESTION CONFIRMATION ===');
-    const userConfirm = await parseConfirmation(text);
-    console.log('User confirmation result:', userConfirm);
-    if (userConfirm) {
-      // User accepted suggestion: inject suggestion into parsed
-      var parsed = conv.suggestion;
-      console.log('User accepted suggestion, using:', parsed);
-      await clearConversation(from);
-    } else {
-      // User rejected: reset to collecting
-      console.log('User rejected suggestion, resetting to collecting');
-      await saveConversation(from, { step: 'collecting', data: {} });
-      await sendSMS(from, "Okay, what date and time would you like instead?");
-      return res.status(200).end();
-    }
+  // Clear any existing conversation state for new reservation messages
+  // This prevents getting stuck in collecting mode from previous incomplete messages
+  if (conv && (conv.step === 'collecting' || conv.step === 'suggested')) {
+    console.log('=== CLEARING EXISTING CONVERSATION STATE ===');
+    console.log('Clearing conversation state to start fresh');
+    await clearConversation(from);
   }
 
-  // If collecting info, prompt for next missing field
-  if (conv?.step === 'collecting') {
-    console.log('=== HANDLING COLLECTING STATE ===');
-    const collected = conv.data || {};
-    console.log('Collected data so far:', collected);
-    console.log('Missing party_size?', !collected.party_size);
-    console.log('Missing date?', !collected.date);
-    console.log('Missing time?', !collected.time);
-    
-    // If missing party_size
-    if (!collected.party_size) {
-      console.log('=== ASKING FOR PARTY SIZE ===');
-      await sendSMS(from, "How many guests?");
-      await saveConversation(from, { step: 'collecting', data: collected });
-      return res.status(200).end();
+  // Simple fallback: if conversation state is causing issues, force fresh parsing
+  // This bypasses all conversation logic and goes straight to parsing
+  const forceFreshParsing = true; // Set to true to bypass conversation state issues
+  if (forceFreshParsing) {
+    console.log('=== FORCING FRESH PARSING (BYPASSING CONVERSATION STATE) ===');
+    // Skip all conversation logic and go straight to parsing
+  } else {
+    // Handle suggestion confirmation
+    if (conv?.step === 'suggested') {
+      console.log('=== HANDLING SUGGESTION CONFIRMATION ===');
+      const userConfirm = await parseConfirmation(text);
+      console.log('User confirmation result:', userConfirm);
+      if (userConfirm) {
+        // User accepted suggestion: inject suggestion into parsed
+        var parsed = conv.suggestion;
+        console.log('User accepted suggestion, using:', parsed);
+        await clearConversation(from);
+      } else {
+        // User rejected: reset to collecting
+        console.log('User rejected suggestion, resetting to collecting');
+        await saveConversation(from, { step: 'collecting', data: {} });
+        await sendSMS(from, "Okay, what date and time would you like instead?");
+        return res.status(200).end();
+      }
     }
-    // If missing date or time
-    if (!collected.date) {
-      console.log('=== ASKING FOR DATE ===');
-      await sendSMS(from, "What date would you like?");
-      await saveConversation(from, { step: 'collecting', data: collected });
-      return res.status(200).end();
+
+    // If collecting info, prompt for next missing field
+    if (conv?.step === 'collecting') {
+      console.log('=== HANDLING COLLECTING STATE ===');
+      const collected = conv.data || {};
+      console.log('Collected data so far:', collected);
+      console.log('Missing party_size?', !collected.party_size);
+      console.log('Missing date?', !collected.date);
+      console.log('Missing time?', !collected.time);
+      
+      // If missing party_size
+      if (!collected.party_size) {
+        console.log('=== ASKING FOR PARTY SIZE ===');
+        await sendSMS(from, "How many guests?");
+        await saveConversation(from, { step: 'collecting', data: collected });
+        return res.status(200).end();
+      }
+      // If missing date or time
+      if (!collected.date) {
+        console.log('=== ASKING FOR DATE ===');
+        await sendSMS(from, "What date would you like?");
+        await saveConversation(from, { step: 'collecting', data: collected });
+        return res.status(200).end();
+      }
+      if (!collected.time) {
+        console.log('=== ASKING FOR TIME ===');
+        await sendSMS(from, "What time would you like?");
+        await saveConversation(from, { step: 'collecting', data: collected });
+        return res.status(200).end();
+      }
+      // All present, continue to parse and booking logic
+      console.log('=== ALL FIELDS COLLECTED, CONTINUING ===');
     }
-    if (!collected.time) {
-      console.log('=== ASKING FOR TIME ===');
-      await sendSMS(from, "What time would you like?");
-      await saveConversation(from, { step: 'collecting', data: collected });
-      return res.status(200).end();
-    }
-    // All present, continue to parse and booking logic
-    console.log('=== ALL FIELDS COLLECTED, CONTINUING ===');
   }
 
   try {
