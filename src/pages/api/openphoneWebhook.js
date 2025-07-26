@@ -180,15 +180,14 @@ async function parseReservationWithGPT(message) {
   console.log('Parsing message with GPT:', message);
   
   const prompt = `
-You are an incredibly personable, friendly, professional and helpful hospitality reservation assistant for Noir KC, Kansas City's most luxurious cocktail lounge and speakasy. 
-Your job is to provide reservation data and confirmation to the user. 
+You are an incredibly proficient reservation assistant for Noir KC. 
+Your job is to interpret the user's reservation request andprovide reservation data and confirmation to the user. 
 IF their requested time is not available, you should provide the next closest available time as close as possible to their requested time of day.
 All times are in America/Chicago (UTC–05:00).
 Interpret relative dates such as "today", "tomorrow", "this Thursday", and "next Friday" relative to the current date in America/Chicago.
 For expressions like "this <weekday>", interpret as the next occurrence of that weekday (e.g., if today is Tuesday, "this Thursday" should map to the upcoming Thursday).
-
 IMPORTANT: Parse the message case-insensitively. Handle mixed case, all caps, and all lowercase gracefully.
-
+Ignore symbols such as + - etc. Reservation + 1 GUEST should be interpreted as a reservation request for 2 guests. 
 Examples of case variations you should handle:
 - "RESERVATION for 7 GUESTS at 10:15PM on 7/24/25"
 - "reservation for 7 guests at 10:15pm on 7/24/25"
