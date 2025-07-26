@@ -398,11 +398,19 @@ async function checkMemberStatus(phone) {
 // Comprehensive availability checking
 async function checkComprehensiveAvailability(startTime, endTime, partySize) {
   try {
-    const date = new Date(startTime);
-    const dateStr = date.toISOString().split('T')[0];
-    const dayOfWeek = date.getDay();
+    // Convert UTC startTime back to CST to get the correct date and day of week
+    const cstDateTime = DateTime.fromISO(startTime, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE);
+    const dateStr = cstDateTime.toISODate();
+    const dayOfWeek = cstDateTime.weekday % 7; // Luxon uses 1-7, JavaScript uses 0-6
 
-    console.log('Checking comprehensive availability for:', { dateStr, dayOfWeek, partySize, startTime, endTime });
+    console.log('Checking comprehensive availability for:', { 
+      dateStr, 
+      dayOfWeek, 
+      partySize, 
+      startTime, 
+      endTime,
+      cstDateTime: cstDateTime.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ')
+    });
 
     // 1. Check Booking Window (settings table)
     const { data: startSetting } = await supabase
@@ -508,8 +516,8 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       
       // For partial-day closures without custom message, check if requested time conflicts
       if (exceptionalClosure.time_ranges) {
-        const requestedHour = date.getHours();
-        const requestedMinute = date.getMinutes();
+        const requestedHour = cstDateTime.hour;
+        const requestedMinute = cstDateTime.minute;
         const requestedTime = `${requestedHour.toString().padStart(2, '0')}:${requestedMinute.toString().padStart(2, '0')}`;
         
         const isDuringClosure = exceptionalClosure.time_ranges.some(range => 
@@ -599,7 +607,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     // Convert UTC time to business timezone for comparison with venue hours
     console.log('=== VENUE HOURS TIMEZONE CHECK ===');
     console.log('Original startTime (UTC):', startTime);
-    console.log('Original date object:', date);
+    console.log('Original date object:', cstDateTime);
     
     // Use the UTC startTime that was already converted from local time
     const businessDateTime = DateTime.fromISO(startTime, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE);
