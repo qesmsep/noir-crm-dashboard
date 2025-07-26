@@ -190,7 +190,7 @@ You are an expert reservation assistant for Noir KC. Parse the user's SMS reserv
 }
 Requirements:
 - Interpret "+ n guest" or "+n guest" as base 1 + n (e.g., "Reservation +1 guest" → party_size: 2).
-- Accept synonyms: "for 2", "2 guests", "2 people", "party of 2".
+- Accept synonyms: "for 2", "2 guests", "2 people", "party of 2", "- 2 guests", "2 guests", "2 people".
 - Handle dates in formats: MM/DD, M/D, MM/DD/YY, MM/DD/YYYY, Month Day (e.g., "July 4th"), Month Day Year, as well as relative dates ("today", "tomorrow", "this Friday", "next Monday"). Default missing year to 2025.
 - Handle times in 12‑hour or 24‑hour formats, with or without colon, with or without "at" (e.g., "6pm", "6:30 pm", "19:00").
 - Normalize output: date must be ISO (YYYY-MM-DD), time must be 24‑hour HH:MM.
@@ -204,6 +204,9 @@ Examples:
 - "Reservation +1 guest at 6:30 pm 9/13" → {"party_size":2,"date":"2025-09-13","time":"18:30"}
 - "Reservation for 4 on tomorrow at 8pm" → {"party_size":4,"date":"<ISO tomorrow>","time":"20:00"}
 - "Book me for 3 people 19:00 10/05/2025" → {"party_size":3,"date":"2025-10-05","time":"19:00"}
+- "Reservation - 2 guests" → {"party_size":2,"date":"2025-01-20","time":"20:00"}
+- "Reservation 2 guests" → {"party_size":2,"date":"2025-01-20","time":"20:00"}
+- "Reservation 2 people" → {"party_size":2,"date":"2025-01-20","time":"20:00"}
 User message: """${message}"""
 `;
   const res = await openai.chat.completions.create({
@@ -221,6 +224,57 @@ User message: """${message}"""
     console.error('GPT parsing error', e, text);
     return null;
   }
+}
+
+// Enhanced regex fallback parser for when GPT fails
+function parseReservationWithRegex(message) {
+  console.log('Parsing message with regex fallback:', message);
+  
+  const msg = message.toLowerCase().trim();
+  
+  // Enhanced party size extraction patterns
+  const partySizePatterns = [
+    /for\s+(\d+)\b/i,           // for 2
+    /(\d+)\s*guests?/i,         // 2 guests
+    /(\d+)\s*people/i,          // 2 people
+    /party of (\d+)/i,          // party of 2
+    /for a party of (\d+)/i,    // for a party of 2
+    /for (\d+)/i,               // for 2
+    /- (\d+)\s*guests?/i,       // - 2 guests
+    /(\d+)\s*guests?/i,         // 2 guests (standalone)
+    /(\d+)\s*people/i,          // 2 people (standalone)
+  ];
+  
+  let party_size = null;
+  for (const pattern of partySizePatterns) {
+    const match = msg.match(pattern);
+    if (match) {
+      party_size = parseInt(match[1]);
+      console.log('Found party size with pattern:', pattern, '=', party_size);
+      break;
+    }
+  }
+  
+  // If no party size found, return null
+  if (!party_size) {
+    console.log('No party size found in message');
+    return null;
+  }
+  
+  // Default to today and 8pm if no date/time specified
+  const today = DateTime.now().setZone(DEFAULT_TIMEZONE);
+  const defaultDate = today.toISODate();
+  const defaultTime = '20:00';
+  
+  console.log('Regex fallback result:', { party_size, date: defaultDate, time: defaultTime });
+  
+  return {
+    party_size,
+    date: defaultDate,
+    time: defaultTime,
+    event_type: 'SMS Reservation',
+    notes: 'Reservation made via SMS'
+  };
 }
 
 // Check member status
@@ -900,22 +954,36 @@ export async function handler(req, res) {
     let parsed;
     if (typeof parsed === "undefined") {
       // Not coming from accepted suggestion, parse with GPT
+      console.log('Attempting GPT parsing for message:', text);
       parsed = await parseReservationWithGPT(text);
+      
+      // If GPT parsing failed, try regex fallback
+      if (!parsed) {
+        console.log('GPT parsing failed, attempting regex fallback');
+        parsed = parseReservationWithRegex(text);
+        if (parsed) {
+          console.log('Regex fallback parsing successful:', parsed);
+        }
+      }
+      
       // Fallback: manual relative date handling if GPT mis-parses
-      const lowerText = text.toLowerCase();
-      const relMatch = lowerText.match(/(today|tonight|tomorrow|this\s+\w+|next\s+\w+)/);
-      if (relMatch && parsed.date) {
-        const key = relMatch[1];
-        const jsDate = parseNaturalDate(key);
-        if (jsDate) {
-          // override parsed.date with correct ISO date
-          parsed.date = DateTime.fromJSDate(jsDate, { zone: DEFAULT_TIMEZONE }).toISODate();
-          console.log('Overrode GPT date with parseNaturalDate for', key, ':', parsed.date);
+      if (parsed && parsed.date) {
+        const lowerText = text.toLowerCase();
+        const relMatch = lowerText.match(/(today|tonight|tomorrow|this\s+\w+|next\s+\w+)/);
+        if (relMatch) {
+          const key = relMatch[1];
+          const jsDate = parseNaturalDate(key);
+          if (jsDate) {
+            // override parsed.date with correct ISO date
+            parsed.date = DateTime.fromJSDate(jsDate, { zone: DEFAULT_TIMEZONE }).toISODate();
+            console.log('Overrode parsed date with parseNaturalDate for', key, ':', parsed.date);
+          }
         }
       }
     }
 
     if (!parsed) {
+      console.log('Both GPT and regex parsing failed for message:', text);
       const errorMessage = `Thank you for your reservation request, however I'm having trouble understanding. Please visit our website to make a reservation: https://noirkc.com`;
       await sendSMS(from, errorMessage);
       return res.status(200).json({ message: 'Sent error message to user with website redirect' });

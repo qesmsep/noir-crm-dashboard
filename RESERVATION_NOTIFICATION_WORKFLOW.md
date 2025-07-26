@@ -45,11 +45,6 @@ The notification is triggered at these key points:
 - **Trigger**: After successful SMS reservation creation
 - **Action**: `created`
 
-#### Legacy SMS Reservations
-- **Location**: `src/pages/api/smsReservation.js`
-- **Trigger**: After successful SMS reservation creation
-- **Action**: `created`
-
 ### 3. Message Format
 
 The notification message includes:
