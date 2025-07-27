@@ -137,7 +137,7 @@ export default function Calendar() {
       
       {/* Mobile-optimized container that fills the screen */}
       <Box 
-        p={0}
+        paddingTop={50}
         zIndex={100}
         h={{ base: "100vh", md: isFullScreen ? "100vh" : "auto" }}
         w="100%"
