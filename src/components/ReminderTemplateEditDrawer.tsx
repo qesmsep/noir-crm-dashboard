@@ -39,9 +39,9 @@ interface ReservationReminderTemplate {
   name: string;
   description: string;
   message_template: string;
-  reminder_type: 'day_of' | 'hour_before';
-  send_time: string | number;
-  send_time_minutes?: number;
+  quantity: number;
+  time_unit: 'hr' | 'min' | 'day';
+  proximity: 'before' | 'after';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -67,9 +67,9 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
     name: '',
     description: '',
     message_template: '',
-    reminder_type: 'day_of' as 'day_of' | 'hour_before',
-    send_time_hours: 10,
-    send_time_minutes: 0,
+    quantity: 1,
+    time_unit: 'hr' as 'hr' | 'min' | 'day',
+    proximity: 'before' as 'before' | 'after',
     is_active: true,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -86,9 +86,9 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
           name: '',
           description: '',
           message_template: '',
-          reminder_type: 'day_of',
-          send_time_hours: 10,
-          send_time_minutes: 0,
+          quantity: 1,
+          time_unit: 'hr',
+          proximity: 'before',
           is_active: true,
         });
         setTemplate(null);
@@ -205,28 +205,13 @@ const ReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerProps> = ({
 
     setIsSaving(true);
     try {
-      // Format send_time based on reminder type
-      let sendTime: string;
-      if (formData.reminder_type === 'day_of') {
-        // For day_of reminders, store as simple HH:MM format
-        // The scheduling system will handle timezone conversion when actually scheduling
-        sendTime = `${formData.send_time_hours.toString().padStart(2, '0')}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
-      } else {
-        // For hour_before reminders, keep the simple format
-        if (formData.send_time_minutes > 0) {
-          sendTime = `${formData.send_time_hours}:${formData.send_time_minutes.toString().padStart(2, '0')}`;
-        } else {
-          sendTime = formData.send_time_hours.toString();
-        }
-      }
-
       const payload = {
         name: formData.name.trim(),
         description: formData.description.trim(),
         message_template: formData.message_template.trim(),
-        reminder_type: formData.reminder_type,
-        send_time: sendTime,
-        send_time_minutes: formData.send_time_minutes,
+        quantity: formData.quantity,
+        time_unit: formData.time_unit,
+        proximity: formData.proximity,
         is_active: formData.is_active,
       };
 

@@ -255,7 +255,7 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
-      <div className={styles.dashboardRoot}>
+      <div className={styles.dashboardRoot} >
         {/* Single-stat cards grid */}
         <div className={styles.cardsGrid}>
           <DashboardCard label="Total Members" value={totalMembers} />

@@ -83,14 +83,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Calculate target time based on template settings
         let targetTime: DateTime;
-        if (template.send_time) {
-          const [hourStr, minuteStr] = template.send_time.split(':');
-          const sendHour = parseInt(hourStr, 10);
-          const sendMinute = parseInt(minuteStr, 10);
-          targetTime = reservationTime.startOf('day').set({ hour: sendHour, minute: sendMinute });
-        } else if (template.quantity === 0) {
+        if (template.quantity === 0) {
+          // Day of reservation (same day)
           targetTime = reservationTime.startOf('day');
         } else {
+          // Calculate time offset based on new fields
           targetTime = template.proximity === 'before'
             ? reservationTime.minus({ [template.time_unit]: template.quantity })
             : reservationTime.plus({ [template.time_unit]: template.quantity });
