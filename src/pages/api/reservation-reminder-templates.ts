@@ -7,11 +7,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { data, error } = await supabase
         .from('reservation_reminder_templates')
         .select('*')
-        .order('reminder_type', { ascending: true })
-        .order('send_time', { ascending: true });
+        .order('name', { ascending: true });
 
       if (error) throw error;
-      res.status(200).json({ templates: data });
+      res.status(200).json(data);
     } catch (error) {
       console.error('Error fetching reservation reminder templates:', error);
       res.status(500).json({ error: 'Failed to fetch templates' });
@@ -19,27 +18,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } else if (req.method === 'POST') {
     try {
       console.log('POST request body:', req.body);
-      const { name, description, message_template, reminder_type, send_time, is_active } = req.body;
+      const { name, description, message_template, quantity, time_unit, proximity, is_active, send_time } = req.body;
 
-      // Validate send_time format based on reminder type
-      let validatedSendTime: string;
+      // Validate new fields
+      if (quantity < 0 || quantity > 99) {
+        return res.status(400).json({ error: 'Quantity must be between 0 and 99' });
+      }
 
-      if (reminder_type === 'day_of') {
-        // send_time format: "HH:MM" (e.g., "10:05", "14:30")
-        const timeRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$/;
-        if (!timeRegex.test(send_time)) {
-          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05")' });
-        }
-        validatedSendTime = send_time;
-      } else if (reminder_type === 'hour_before') {
-        // send_time format: "H:M" or "H" (e.g., "1:30", "2:00", "1")
-        const timeRegex = /^([0-9]|[1-9][0-9]):([0-5][0-9])$|^([0-9]|[1-9][0-9])$/;
-        if (!timeRegex.test(send_time)) {
-          return res.status(400).json({ error: 'Invalid time format for hour_before reminder. Use H:M or H format (e.g., "1:30" or "2")' });
-        }
-        validatedSendTime = send_time;
-      } else {
-        return res.status(400).json({ error: 'Invalid reminder_type' });
+      if (!['hr', 'min', 'day'].includes(time_unit)) {
+        return res.status(400).json({ error: 'Invalid time_unit. Must be hr, min, or day' });
+      }
+
+      if (!['before', 'after'].includes(proximity)) {
+        return res.status(400).json({ error: 'Invalid proximity. Must be before or after' });
       }
 
       const { data, error } = await supabase
@@ -48,49 +39,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name,
           description,
           message_template,
-          reminder_type,
-          send_time: validatedSendTime,
-          is_active: is_active ?? true
+          quantity,
+          time_unit,
+          proximity,
+          is_active: is_active ?? true,
+          // Add old fields for backward compatibility
+          reminder_type: time_unit === 'hr' && quantity === 0 ? 'day_of' : 'hour_before',
+          send_time: quantity.toString(),
+          send_time_minutes: 0,
+          created_by: null
         }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       res.status(201).json(data);
     } catch (error) {
       console.error('Error creating reservation reminder template:', error);
-      res.status(500).json({ error: 'Failed to create template' });
+      res.status(500).json({ error: 'Failed to create template', details: error.message });
     }
   } else if (req.method === 'PUT') {
     try {
       console.log('PUT request query:', req.query);
       console.log('PUT request body:', req.body);
       const { id } = req.query;
-      const { name, description, message_template, reminder_type, send_time, is_active } = req.body;
+      const { name, description, message_template, quantity, time_unit, proximity, is_active, send_time } = req.body;
 
       if (!id || typeof id !== 'string') {
         return res.status(400).json({ error: 'Template ID is required' });
       }
 
-      // Validate send_time format based on reminder type
-      let validatedSendTime: string;
+      // Validate new fields
+      if (quantity < 0 || quantity > 99) {
+        return res.status(400).json({ error: 'Quantity must be between 0 and 99' });
+      }
 
-      if (reminder_type === 'day_of') {
-        // send_time format: "HH:MM" (e.g., "10:05", "14:30")
-        const timeRegex = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$/;
-        if (!timeRegex.test(send_time)) {
-          return res.status(400).json({ error: 'Invalid time format for day_of reminder. Use HH:MM format (e.g., "10:05")' });
-        }
-        validatedSendTime = send_time;
-      } else if (reminder_type === 'hour_before') {
-        // send_time format: "H:M" or "H" (e.g., "1:30", "2:00", "1")
-        const timeRegex = /^([0-9]|[1-9][0-9]):([0-5][0-9])$|^([0-9]|[1-9][0-9])$/;
-        if (!timeRegex.test(send_time)) {
-          return res.status(400).json({ error: 'Invalid time format for hour_before reminder. Use H:M or H format (e.g., "1:30" or "2")' });
-        }
-        validatedSendTime = send_time;
-      } else {
-        return res.status(400).json({ error: 'Invalid reminder_type' });
+      if (!['hr', 'min', 'day'].includes(time_unit)) {
+        return res.status(400).json({ error: 'Invalid time_unit. Must be hr, min, or day' });
+      }
+
+      if (!['before', 'after'].includes(proximity)) {
+        return res.status(400).json({ error: 'Invalid proximity. Must be before or after' });
       }
 
       const { data, error } = await supabase
@@ -99,9 +91,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name,
           description,
           message_template,
-          reminder_type,
-          send_time: validatedSendTime,
-          is_active: is_active ?? true
+          quantity,
+          time_unit,
+          proximity,
+          is_active: is_active ?? true,
+          send_time,
         })
         .eq('id', id)
         .select()

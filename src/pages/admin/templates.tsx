@@ -35,12 +35,13 @@ import {
   FormLabel,
   Input,
   Select,
+  Switch,
   useDisclosure
 } from '@chakra-ui/react';
 import { EditIcon, DeleteIcon, ViewIcon, ArrowForwardIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import ReminderEditDrawer from '../../components/ReminderEditDrawer';
-import ReminderTemplateEditDrawer from '../../components/ReminderTemplateEditDrawer';
+import SimplifiedReminderTemplateEditDrawer from '../../components/SimplifiedReminderTemplateEditDrawer';
 import { DateTime } from 'luxon';
 import { useSettings } from '../../context/SettingsContext';
 
@@ -61,9 +62,9 @@ interface ReservationReminderTemplate {
   name: string;
   description: string;
   message_template: string;
-  reminder_type: 'day_of' | 'hour_before';
-  send_time: string | number;
-  send_time_minutes?: number;
+  quantity: number;
+  time_unit: 'hr' | 'min' | 'day';
+  proximity: 'before' | 'after';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -120,8 +121,9 @@ interface PendingReservationReminder {
   reservation_reminder_templates: {
     id: string;
     name: string;
-    reminder_type: string;
-    send_time: string;
+    quantity: number;
+    time_unit: string;
+    proximity: string;
   };
 }
 
@@ -162,8 +164,8 @@ export default function TemplatesPage() {
       const data = await response.json();
       console.log('📡 fetchReminderTemplates response:', data);
       if (response.ok) {
-        setReminderTemplates(data.templates || []);
-        console.log('✅ Reminder templates updated:', data.templates?.length || 0, 'templates');
+        setReminderTemplates(data || []);
+        console.log('✅ Reminder templates updated:', data?.length || 0, 'templates');
       } else {
         console.error('❌ fetchReminderTemplates error:', data.error);
         toast({
@@ -534,76 +536,96 @@ export default function TemplatesPage() {
     setIsTemplateDrawerOpen(true);
   };
 
+  const handleToggleTemplateActive = async (template: ReservationReminderTemplate) => {
+    try {
+      const response = await fetch(`/api/reservation-reminder-templates?id=${template.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: template.name,
+          description: template.description,
+          message_template: template.message_template,
+          quantity: template.quantity,
+          time_unit: template.time_unit,
+          proximity: template.proximity,
+          is_active: !template.is_active
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update template status');
+      }
+
+      // If we're deactivating the template, also cancel pending reminders
+      if (template.is_active) {
+        try {
+          const cancelResponse = await fetch('/api/cancel-pending-reminders', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              template_id: template.id
+            }),
+          });
+
+          if (cancelResponse.ok) {
+            const cancelData = await cancelResponse.json();
+            toast({
+              title: 'Success',
+              description: `Template deactivated and ${cancelData.cancelled_count || 0} pending reminders cancelled`,
+              status: 'success',
+              duration: 3000,
+            });
+          } else {
+            toast({
+              title: 'Success',
+              description: `Template deactivated successfully`,
+              status: 'success',
+              duration: 3000,
+            });
+          }
+        } catch (cancelError) {
+          console.error('Error cancelling pending reminders:', cancelError);
+          toast({
+            title: 'Success',
+            description: `Template deactivated successfully`,
+            status: 'success',
+            duration: 3000,
+          });
+        }
+      } else {
+        toast({
+          title: 'Success',
+          description: `Template activated successfully`,
+          status: 'success',
+          duration: 3000,
+        });
+      }
+
+      // Refresh the templates list and pending reminders
+      fetchReminderTemplates();
+      fetchPendingReservationReminders();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update template status',
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
   // Helper to format send time
   function formatSendTime(template) {
-    if (template.reminder_type === 'hour_before') {
-      // Handle both old integer format and new minute-level precision
-      let hours, minutes;
-      
-      if (typeof template.send_time === 'number') {
-        // Old format: integer hours
-        hours = template.send_time;
-        minutes = 0;
-      } else if (typeof template.send_time === 'string') {
-        // New format: "H:M" or "H"
-        const timeParts = template.send_time.split(':');
-        hours = parseInt(timeParts[0]);
-        minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
-      } else {
-        // Fallback
-        hours = 0;
-        minutes = 0;
-      }
-      
-      // Add minutes from send_time_minutes if available
-      if (template.send_time_minutes !== undefined) {
-        minutes = template.send_time_minutes;
-      }
-      
-      let result = '';
-      if (hours > 0) result += `${hours} Hour${hours === 1 ? '' : 's'}`;
-      if (hours > 0 && minutes > 0) result += ' ';
-      if (minutes > 0) result += `${minutes} Minute${minutes === 1 ? '' : 's'}`;
-      if (!result) result = '0 Minutes';
-      return result + ' Before';
+    if (template.quantity === 0) {
+      return 'Day of reservation';
     } else {
-      // For day_of reminders, the send_time is stored as "HH:MM" in UTC
-      // We need to convert it to the business timezone for display
-      let hours, minutes;
-      
-      if (typeof template.send_time === 'number') {
-        // Old format: integer hours
-        hours = template.send_time;
-        minutes = 0;
-      } else if (typeof template.send_time === 'string') {
-        // Format: "HH:MM" (stored in UTC)
-        const timeParts = template.send_time.split(':');
-        hours = parseInt(timeParts[0]);
-        minutes = timeParts.length > 1 ? parseInt(timeParts[1]) : 0;
-      } else {
-        // Fallback
-        hours = 0;
-        minutes = 0;
-      }
-      
-      // Add minutes from send_time_minutes if available
-      if (template.send_time_minutes !== undefined) {
-        minutes = template.send_time_minutes;
-      }
-      
-      // Convert UTC time to business timezone
-      // Create a DateTime object for today at the specified UTC time
-      const today = DateTime.now().setZone('utc').startOf('day');
-      const utcTime = today.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
-      
-      // Convert to business timezone
-      const businessTimezone = settings?.timezone || 'America/Chicago';
-      const localTime = utcTime.setZone(businessTimezone);
-      
-      // Format for display
-      const hour12 = localTime.hour === 0 ? 12 : localTime.hour > 12 ? localTime.hour - 12 : localTime.hour;
-      const ampm = localTime.hour < 12 ? 'AM' : 'PM';
-      return `${hour12.toString().padStart(2, '0')}:${localTime.minute.toString().padStart(2, '0')} ${ampm}`;
+      const unit = template.quantity === 1 ? template.time_unit : template.time_unit + 's';
+      return `${template.quantity} ${unit} ${template.proximity}`;
     }
   }
 
@@ -615,7 +637,7 @@ export default function TemplatesPage() {
         reminderId={selectedReminderId}
         onReminderUpdated={handleReminderUpdated}
       />
-      <ReminderTemplateEditDrawer
+      <SimplifiedReminderTemplateEditDrawer
         isOpen={isTemplateDrawerOpen}
         onClose={() => setIsTemplateDrawerOpen(false)}
         templateId={selectedTemplateId}
@@ -810,8 +832,7 @@ export default function TemplatesPage() {
                     <Thead style={{ background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
                       <Tr>
                         <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Name</Th>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Type</Th>
-                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Send Time</Th>
+                        <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Timing</Th>
                         <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Message</Th>
                         <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Status</Th>
                         <Th fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">Actions</Th>
@@ -821,17 +842,33 @@ export default function TemplatesPage() {
                       {reminderTemplates.map((template) => (
                         <Tr key={template.id} style={{ verticalAlign: 'top', background: '#ecede8', color: '#353535', borderColor: '#a59480' }}>
                           <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="#353535" borderColor="#a59480">{template.name}</Td>
-                          <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">{template.reminder_type === 'day_of' ? 'Day Of' : 'Hour Before'}</Td>
                           <Td fontFamily="'Montserrat', sans-serif" color="#353535" borderColor="#a59480">{formatSendTime(template)}</Td>
                           <Td fontFamily="'Montserrat', sans-serif" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: 'sm', maxWidth: 400, background: '#f7f5f2', borderRadius: 8, padding: 8, color: '#353535', borderColor: '#a59480' }}>{template.message_template}</Td>
                           <Td borderColor="#a59480">
-                            <Badge colorScheme={template.is_active ? 'green' : 'red'} fontFamily="'Montserrat', sans-serif">
-                              {template.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
+                            <Box 
+                              border="2px solid #a59480" 
+                              borderRadius="md" 
+                              p={0}
+                              margin="0"
+                              width="100px"
+                              bg={template.is_active ? "#22c55e" : "#ef4444"}
+                              cursor="pointer"
+                              onClick={() => handleToggleTemplateActive(template)}
+                              textAlign="center"
+                            >
+                              <Text 
+                                fontSize="sm" 
+                                fontFamily="'Montserrat', sans-serif" 
+                                color="#FFF"
+                                fontWeight="bold"
+                              >
+                                {template.is_active ? 'ACTIVE' : 'INACTIVE'}
+                              </Text>
+                            </Box>
                           </Td>
                           <Td borderColor="#a59480">
                             <HStack spacing={2} align="flex-start">
-                              <IconButton aria-label="Test template" icon={<ViewIcon />} size="sm" colorScheme="blue" onClick={() => handleTestReminderTemplate(template)} />
+                              <IconButton aria-label="Test template" icon={<ViewIcon />} size="md" colorScheme="blue" onClick={() => handleTestReminderTemplate(template)} />
                               <IconButton aria-label="Edit reminder template" icon={<EditIcon />} size="sm" colorScheme="yellow" onClick={() => handleEditReminderTemplate(template)} />
                               <IconButton aria-label="Delete reminder template" icon={<DeleteIcon />} size="sm" colorScheme="red" onClick={() => handleDeleteReminderTemplate(template.id)} />
                             </HStack>
