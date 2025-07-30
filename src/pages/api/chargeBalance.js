@@ -117,15 +117,34 @@ export default async function handler(req, res) {
   }
 
   // 6) Log payment in ledger (include both account_id and member_id)
+  // Check for duplicate payment by amount and date
+  const paymentAmount = Math.abs(balance);
+  const paymentDate = new Date().toISOString().split('T')[0];
+  
+  const { data: existingPayment } = await supabase
+    .from('ledger')
+    .select('id')
+    .eq('account_id', account_id)
+    .eq('amount', paymentAmount)
+    .eq('type', 'payment')
+    .eq('date', paymentDate)
+    .limit(1)
+    .single();
+  
+  if (existingPayment) {
+    console.log('Duplicate payment detected for account:', account_id, 'amount:', paymentAmount, 'date:', paymentDate);
+    return res.status(200).json({ success: true, message: 'Payment already recorded' });
+  }
+  
   const { error: insertErr } = await supabase
     .from('ledger')
     .insert({
       account_id,
       member_id,
       type: 'payment',
-      amount: Math.abs(balance),
+      amount: paymentAmount,
       note: 'Balance charged via Stripe',
-      // date will default to today if your schema has a default
+      date: paymentDate
     });
   if (insertErr) {
     console.error('Failed to update ledger:', insertErr);

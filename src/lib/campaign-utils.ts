@@ -105,7 +105,6 @@ export const CAMPAIGN_NAMES = {
   RESERVATION_REMINDER: 'reservation-reminder',
   WELCOME_SERIES: 'welcome-series',
   BIRTHDAY_CAMPAIGN: 'birthday-campaign',
-  ONBOARDING_FOLLOWUP: 'onboarding-followup',
   TEST_CAMPAIGN: 'test-campaign'
 } as const;
 
@@ -129,11 +128,7 @@ export async function initializeCommonCampaigns(): Promise<void> {
       description: 'Birthday messages for members',
       trigger_type: 'member_birthday' as const
     },
-    {
-      name: CAMPAIGN_NAMES.ONBOARDING_FOLLOWUP,
-      description: 'Follow-up messages for new members',
-      trigger_type: 'member_signup' as const
-    },
+
     {
       name: CAMPAIGN_NAMES.TEST_CAMPAIGN,
       description: 'Test campaign for development',

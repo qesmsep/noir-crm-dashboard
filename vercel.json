@@ -16,10 +16,7 @@
       "path": "/api/process-ledger-notifications",
       "schedule": "0 10 * * *"
     },
-            {
-          "path": "/api/process-onboarding-messages",
-          "schedule": "*/10 * * * *"
-        },
+            
         {
           "path": "/api/process-campaign-messages",
           "schedule": "*/1 * * * *"

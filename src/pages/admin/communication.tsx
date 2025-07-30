@@ -36,10 +36,11 @@ interface Campaign {
   campaign_id: string;
   name: string;
   description: string;
-  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time';
+  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created';
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  message_count?: number;
 }
 
 interface CampaignTemplate {
@@ -101,21 +102,40 @@ export default function CommunicationPage() {
 
   const fetchCampaigns = async () => {
     try {
-      const { data, error } = await supabase
+      // First, get all campaigns
+      const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
+      if (campaignsError) {
         // If table doesn't exist yet, show empty state
-        if (error.code === '42P01') { // Table doesn't exist
+        if (campaignsError.code === '42P01') { // Table doesn't exist
           console.log('Campaigns table not found - run migration first');
           setCampaigns([]);
           return;
         }
-        throw error;
+        throw campaignsError;
       }
-      setCampaigns(data || []);
+
+      // Then, get message counts for each campaign
+      const campaignsWithCounts = await Promise.all(
+        (campaignsData || []).map(async (campaign) => {
+          const { count, error: countError } = await supabase
+            .from('campaign_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('campaign_id', campaign.id);
+
+          if (countError) {
+            console.error(`Error fetching message count for campaign ${campaign.id}:`, countError);
+            return { ...campaign, message_count: 0 };
+          }
+
+          return { ...campaign, message_count: count || 0 };
+        })
+      );
+
+      setCampaigns(campaignsWithCounts);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       // Don't show error toast if table doesn't exist - just set empty array
@@ -718,11 +738,12 @@ export default function CommunicationPage() {
                         <Table variant="simple" size="lg">
                           <Thead>
                             <Tr>
-                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={4}>Campaign Name</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={4}>Description</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={4}>Trigger</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={4}>Status</Th>
-                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={4}>Actions</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={6} px={6}>Campaign Name</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={6} px={6}>Description</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={6} px={6}>Trigger</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={6} px={6}>Messages</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={6} px={6}>Status</Th>
+                              <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="lg" py={6} px={6}>Actions</Th>
                             </Tr>
                           </Thead>
                           <Tbody>
@@ -730,18 +751,30 @@ export default function CommunicationPage() {
                               .sort((a, b) => a.name.localeCompare(b.name))
                               .map((campaign) => (
                                 <Tr key={campaign.id} _hover={{ bg: '#f0f0f0' }}>
-                                  <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="md" py={4}>
+                                  <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="md" py={6} px={6}>
                                     {campaign.name}
                                   </Td>
-                                  <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={4}>
+                                  <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={6}>
                                     {campaign.description || '-'}
                                   </Td>
-                                  <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={4}>
+                                  <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={6}>
                                     <Badge colorScheme="blue" fontFamily="'Montserrat', sans-serif">
                                       {campaign.trigger_type.charAt(0).toUpperCase() + campaign.trigger_type.slice(1)}
                                     </Badge>
                                   </Td>
-                                  <Td py={4}>
+                                  <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={6} textAlign="center">
+                                    <Badge 
+                                      colorScheme="purple" 
+                                      fontFamily="'Montserrat', sans-serif"
+                                      fontSize="md"
+                                      px={4}
+                                      py={2}
+                                      borderRadius="full"
+                                    >
+                                      {campaign.message_count || 0}
+                                    </Badge>
+                                  </Td>
+                                  <Td py={6} px={6}>
                                     <Badge 
                                       colorScheme={campaign.is_active ? 'green' : 'red'} 
                                       fontFamily="'Montserrat', sans-serif"
@@ -752,8 +785,8 @@ export default function CommunicationPage() {
                                       {campaign.is_active ? 'Active' : 'Inactive'}
                                     </Badge>
                                   </Td>
-                                  <Td py={4}>
-                                    <HStack spacing={2}>
+                                  <Td py={6} px={6}>
+                                    <HStack spacing={3}>
                                       <Switch
                                         isChecked={campaign.is_active}
                                         onChange={() => handleToggleCampaignActive(campaign)}

@@ -208,17 +208,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (template.trigger_type === 'member_signup') {
           // Get members who joined recently (within last 30 days)
           const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
-          const { data: onboardingMembers, error: onboardingError } = await supabaseAdmin
+          const { data: recentMembers, error: membersError } = await supabaseAdmin
             .from('members')
             .select('*')
             .gte('join_date', thirtyDaysAgo)
             .order('join_date', { ascending: false });
 
-          if (onboardingError) {
-            console.error('Error fetching onboarding members:', onboardingError);
+          if (membersError) {
+            console.error('Error fetching recent members:', membersError);
             continue;
           }
-          members = onboardingMembers || [];
+          members = recentMembers || [];
         } else if (template.trigger_type === 'member_birthday') {
           // Get all members with dob and filter by birthday in JavaScript
           const { data: allMembers, error: membersError } = await supabaseAdmin

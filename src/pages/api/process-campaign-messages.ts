@@ -150,17 +150,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (triggerType === 'member_signup') {
         // Get members who joined recently (within last 30 days)
         const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
-        const { data: onboardingMembers, error: onboardingError } = await supabaseAdmin
+        const { data: recentMembers, error: membersError } = await supabaseAdmin
           .from('members')
           .select('*')
           .gte('join_date', thirtyDaysAgo)
           .order('join_date', { ascending: false });
 
-        if (onboardingError) {
-          console.error('Error fetching onboarding members:', onboardingError);
+        if (membersError) {
+          console.error('Error fetching recent members:', membersError);
           continue;
         }
-        members = onboardingMembers || [];
+        members = recentMembers || [];
       } else if (triggerType === 'reservation_time') {
         // Get members with upcoming reservations
         // Look for reservations in the next 24 hours to catch messages that should be sent soon

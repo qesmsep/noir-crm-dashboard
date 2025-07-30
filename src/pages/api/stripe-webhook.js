@@ -39,17 +39,38 @@ async function checkExistingLedgerEntry(stripeInvoiceId, stripePaymentIntentId) 
   return false;
 }
 
+// Helper function to check for duplicate payments by customer, amount, and date
+async function checkDuplicatePayment(accountId, amount, date) {
+  const { data: existingPayment } = await supabase
+    .from('ledger')
+    .select('id')
+    .eq('account_id', accountId)
+    .eq('amount', amount)
+    .eq('type', 'payment')
+    .eq('date', date)
+    .limit(1)
+    .single();
+  
+  return !!existingPayment;
+}
+
 // Helper function to format subscription renewal description
 function formatSubscriptionDescription(invoice) {
-  const startDate = new Date(invoice.period_start * 1000);
-  const endDate = new Date(invoice.period_end * 1000);
+  // The invoice period represents the period that was just paid for
+  // We want to show the renewal period going forward from the payment date
+  const paymentDate = new Date();
+  const renewalStartDate = new Date(paymentDate);
+  const renewalEndDate = new Date(paymentDate);
   
-  // Format dates to show month and day (e.g., "Jan 25 - Feb 24")
-  const startFormatted = startDate.toLocaleDateString('en-US', { 
+  // Set the renewal end date to one month from the payment date
+  renewalEndDate.setMonth(renewalEndDate.getMonth() + 1);
+  
+  // Format dates to show month and day (e.g., "Jul 29 - Aug 28")
+  const startFormatted = renewalStartDate.toLocaleDateString('en-US', { 
     month: 'short', 
     day: 'numeric' 
   });
-  const endFormatted = endDate.toLocaleDateString('en-US', { 
+  const endFormatted = renewalEndDate.toLocaleDateString('en-US', { 
     month: 'short', 
     day: 'numeric' 
   });
@@ -270,6 +291,15 @@ export default async function handler(req, res) {
           return res.json({ success: true, message: 'Ledger entry already exists' });
         }
 
+        // Check for duplicate payment by amount and date
+        const paymentAmount = invoice.amount_paid / 100;
+        const paymentDate = new Date().toISOString().split('T')[0];
+        const duplicateExists = await checkDuplicatePayment(account.account_id, paymentAmount, paymentDate);
+        if (duplicateExists) {
+          console.log('Duplicate payment detected for account:', account.account_id, 'amount:', paymentAmount, 'date:', paymentDate);
+          return res.json({ success: true, message: 'Duplicate payment detected' });
+        }
+
         // Get the customer ID from the invoice
         const customerId = invoice.customer;
         
@@ -309,7 +339,7 @@ export default async function handler(req, res) {
             amount: invoice.amount_paid / 100, // Convert from cents to dollars
             type: 'payment',
             note: formatSubscriptionDescription(invoice),
-            date: new Date().toISOString(),
+            date: paymentDate,
             stripe_invoice_id: invoice.id
           });
 
@@ -337,6 +367,15 @@ export default async function handler(req, res) {
       if (exists) {
         console.log('Ledger entry already exists for payment intent:', paymentIntent.id);
         return res.json({ success: true, message: 'Ledger entry already exists' });
+      }
+
+      // Check for duplicate payment by amount and date
+      const paymentAmount = paymentIntent.amount / 100;
+      const paymentDate = new Date().toISOString().split('T')[0];
+      const duplicateExists = await checkDuplicatePayment(account.account_id, paymentAmount, paymentDate);
+      if (duplicateExists) {
+        console.log('Duplicate payment detected for account:', account.account_id, 'amount:', paymentAmount, 'date:', paymentDate);
+        return res.json({ success: true, message: 'Duplicate payment detected' });
       }
       
       // Get the customer ID from the payment intent
@@ -385,7 +424,7 @@ export default async function handler(req, res) {
           amount: paymentIntent.amount / 100, // Convert from cents to dollars
           type: 'payment',
           note: `Manual payment${paymentIntent.description ? `: ${paymentIntent.description}` : ''}`,
-          date: new Date().toISOString(),
+          date: paymentDate,
           stripe_payment_intent_id: paymentIntent.id
         });
 
