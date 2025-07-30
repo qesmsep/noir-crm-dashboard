@@ -692,7 +692,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                         w="90%"
                       />
                       <Text fontSize="xs" color="#a59480" mt={1}>
-                        Available placeholders: {'{first_name}'}, {'{last_name}'}, {'{member_name}'}, {'{phone}'}, {'{email}'}
+                        Available placeholders: {'{{first_name}}'}, {'{{last_name}}'}, {'{{member_name}}'}, {'{{phone}}'}, {'{{email}}'}
                       </Text>
                     </FormControl>
 
