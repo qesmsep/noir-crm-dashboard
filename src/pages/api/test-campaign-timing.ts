@@ -225,7 +225,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const { data: birthdayMembers, error: birthdayError } = await supabaseAdmin
             .from('members')
             .select('*')
-            .ilike('dob', `%${today}%`);
+            .filter('dob', 'not.is', null)
+            .filter('to_char(dob, \'MM-dd\')', 'eq', today);
 
           if (birthdayError) {
             console.error('Error fetching birthday members:', birthdayError);
