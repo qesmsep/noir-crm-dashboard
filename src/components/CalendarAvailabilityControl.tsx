@@ -48,6 +48,14 @@ function formatTime12h(timeStr: string) {
   return dt.toLocaleString({ hour: 'numeric', minute: '2-digit' });
 }
 
+// Utility function to format date in local timezone to avoid UTC conversion issues
+function formatDateToLocal(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = ({ section }) => {
   // Booking window state
   const [bookingStartDate, setBookingStartDate] = useState<Date>(() => {
@@ -83,7 +91,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       const response = await fetch('/api/booking-window', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] })
+        body: JSON.stringify({ start: formatDateToLocal(start), end: formatDateToLocal(end) })
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -219,15 +227,16 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     if (!newOpenDate) return;
     try {
       setError('');
-      // Format the new open date as YYYY-MM-DD for consistent comparison
-      const newOpenDateStr = newOpenDate.toISOString().split('T')[0];
+      // Format the new open date as YYYY-MM-DD in local timezone to avoid UTC conversion issues
+      const newOpenDateStr = formatDateToLocal(newOpenDate);
+      
       const isOverlapping = exceptionalClosures.some(closure => closure.date === newOpenDateStr);
       if (isOverlapping) {
         setError('Cannot add exceptional open on a closure date.');
         return;
       }
       const newOpen = {
-        date: newOpenDate.toISOString().split('T')[0],
+        date: newOpenDateStr,
         time_ranges: newOpenTimeRanges,
         label: newOpenLabel,
         type: 'exceptional_open'
@@ -260,15 +269,16 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     if (!newClosureDate) return;
     try {
       setError('');
-      // Format the new closure date as YYYY-MM-DD for consistent comparison
-      const newClosureDateStr = newClosureDate.toISOString().split('T')[0];
+      // Format the new closure date as YYYY-MM-DD in local timezone to avoid UTC conversion issues
+      const newClosureDateStr = formatDateToLocal(newClosureDate);
+      
       const isOverlapping = exceptionalOpens.some(open => open.date === newClosureDateStr);
       if (isOverlapping) {
         setError('Cannot add closure on an exceptional open date.');
         return;
       }
       const newClosure = {
-        date: newClosureDate.toISOString().split('T')[0],
+        date: newClosureDateStr,
         reason: newClosureReason,
         type: 'exceptional_closure',
         full_day: newClosureFullDay,

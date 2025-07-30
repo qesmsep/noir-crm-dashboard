@@ -1,0 +1,291 @@
+import { NextApiRequest, NextApiResponse } from 'next';
+import { supabase, supabaseAdmin } from '../../lib/supabase';
+import { DateTime } from 'luxon';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  try {
+    console.log('Processing campaign messages...');
+
+    // Get all active campaign messages from the new table
+    const { data: messages, error: messagesError } = await supabaseAdmin
+      .from('campaign_messages')
+      .select(`
+        *,
+        campaigns (
+          id,
+          name,
+          trigger_type
+        )
+      `)
+      .eq('is_active', true);
+
+    if (messagesError) {
+      console.error('Error fetching campaign messages:', messagesError);
+      return res.status(500).json({ error: 'Failed to fetch campaign messages' });
+    }
+
+    if (!messages || messages.length === 0) {
+      console.log('No active campaign messages found');
+      return res.status(200).json({ message: 'No active campaign messages found' });
+    }
+
+    const now = DateTime.now();
+    const businessTimezone = 'America/Chicago'; // Adjust as needed
+    let processedCount = 0;
+
+    for (const message of messages) {
+      console.log(`Processing campaign message: ${message.name}`);
+      
+      // Get the campaign trigger type
+      const triggerType = message.campaigns?.trigger_type || 'member_signup';
+
+      // Get relevant members based on campaign trigger type
+      let members: any[] = [];
+      
+      if (triggerType === 'member_signup') {
+        // Get members who joined recently (within last 30 days)
+        const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
+        const { data: onboardingMembers, error: onboardingError } = await supabaseAdmin
+          .from('members')
+          .select('*')
+          .gte('join_date', thirtyDaysAgo)
+          .order('join_date', { ascending: false });
+
+        if (onboardingError) {
+          console.error('Error fetching onboarding members:', onboardingError);
+          continue;
+        }
+        members = onboardingMembers || [];
+      } else if (triggerType === 'reservation_time') {
+        // Get members with upcoming reservations
+        const { data: reservationMembers, error: reservationError } = await supabaseAdmin
+          .from('reservations')
+          .select(`
+            *,
+            members!inner(*)
+          `)
+          .gte('reservation_time', now.toISO())
+          .lte('reservation_time', now.plus({ days: 7 }).toISO());
+
+        if (reservationError) {
+          console.error('Error fetching reservation members:', reservationError);
+          continue;
+        }
+        members = (reservationMembers || []).map((r: any) => r.members);
+      } else if (triggerType === 'member_birthday') {
+        // Get members with birthdays today
+        const today = now.toFormat('MM-dd');
+        const { data: birthdayMembers, error: birthdayError } = await supabaseAdmin
+          .from('members')
+          .select('*')
+          .ilike('birthday', `%${today}%`);
+
+        if (birthdayError) {
+          console.error('Error fetching birthday members:', birthdayError);
+          continue;
+        }
+        members = birthdayMembers || [];
+      } else if (triggerType === 'member_renewal') {
+        // Get members with renewal dates today
+        const today = now.toFormat('yyyy-MM-dd');
+        const { data: renewalMembers, error: renewalError } = await supabaseAdmin
+          .from('members')
+          .select('*')
+          .ilike('renewal_date', `%${today}%`);
+
+        if (renewalError) {
+          console.error('Error fetching renewal members:', renewalError);
+          continue;
+        }
+        members = renewalMembers || [];
+      }
+
+      for (const member of members) {
+        try {
+          // Calculate send time based on message timing
+          let targetSendTime: DateTime;
+          let triggerDate: DateTime;
+
+          if (triggerType === 'member_signup') {
+            triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
+          } else if (triggerType === 'reservation_time') {
+            // Find the member's reservation
+            const { data: reservation } = await supabaseAdmin
+              .from('reservations')
+              .select('reservation_time')
+              .eq('member_id', member.member_id)
+              .gte('reservation_time', now.toISO())
+              .order('reservation_time', { ascending: true })
+              .limit(1)
+              .single();
+
+            if (!reservation) continue;
+            triggerDate = DateTime.fromISO(reservation.reservation_time, { zone: 'utc' }).setZone(businessTimezone);
+          } else if (triggerType === 'member_birthday') {
+            // Use today as trigger date for birthdays
+            triggerDate = now.setZone(businessTimezone);
+          } else if (triggerType === 'member_renewal') {
+            // Use today as trigger date for renewals
+            triggerDate = now.setZone(businessTimezone);
+          } else {
+            continue;
+          }
+
+          if (message.timing_type === 'specific_time') {
+            // Send at specific time on trigger date
+            const [hours, minutes] = message.specific_time?.split(':').map(Number) || [10, 0];
+            targetSendTime = triggerDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+          } else {
+            // Send based on duration relative to trigger
+            const quantity = message.duration_quantity || 1;
+            const unit = message.duration_unit || 'hr';
+            const proximity = message.duration_proximity || 'before';
+            
+            targetSendTime = triggerDate.plus({
+              [unit]: proximity === 'after' ? quantity : -quantity
+            });
+          }
+
+          // Check if message should be sent now (within 10 minutes of target time)
+          const timeDiff = Math.abs(targetSendTime.diff(now, 'minutes').minutes);
+          if (timeDiff > 10) {
+            continue; // Not time to send yet
+          }
+
+          // Check if message already sent
+          const { data: existingMessage } = await supabaseAdmin
+            .from('scheduled_messages')
+            .select('id')
+            .eq('campaign_message_id', message.id)
+            .eq('member_id', member.member_id)
+            .eq('status', 'sent')
+            .single();
+
+          if (existingMessage) {
+            console.log(`Message already sent for campaign message ${message.id} and member ${member.member_id}`);
+            continue;
+          }
+
+          // Determine recipient phone
+          let recipientPhone = member.phone;
+          if (message.recipient_type === 'member') {
+            // Get primary member's phone
+            const { data: primaryMember } = await supabaseAdmin
+              .from('members')
+              .select('phone')
+              .eq('account_id', member.account_id)
+              .eq('member_type', 'primary')
+              .single();
+            if (primaryMember?.phone) {
+              recipientPhone = primaryMember.phone;
+            }
+          } else if (message.recipient_type === 'specific_phone' && message.specific_phone) {
+            recipientPhone = message.specific_phone;
+          }
+
+          if (!recipientPhone) {
+            console.log(`No phone number found for member ${member.member_id}`);
+            continue;
+          }
+
+          // Create message content with placeholders
+          let messageContent = message.content;
+          messageContent = messageContent.replace(/\{\{first_name\}\}/g, member.first_name || '');
+          messageContent = messageContent.replace(/\{\{last_name\}\}/g, member.last_name || '');
+          messageContent = messageContent.replace(/\{\{member_name\}\}/g, `${member.first_name || ''} ${member.last_name || ''}`.trim());
+          messageContent = messageContent.replace(/\{\{phone\}\}/g, member.phone || '');
+          messageContent = messageContent.replace(/\{\{email\}\}/g, member.email || '');
+
+          // Format phone number for OpenPhone
+          let formattedPhone = recipientPhone;
+          if (!formattedPhone.startsWith('+')) {
+            const digits = formattedPhone.replace(/\D/g, '');
+            if (digits.length === 10) {
+              formattedPhone = '+1' + digits;
+            } else if (digits.length === 11 && digits.startsWith('1')) {
+              formattedPhone = '+' + digits;
+            } else {
+              formattedPhone = '+' + digits;
+            }
+          }
+
+          // Send SMS via OpenPhone API
+          const openphoneResponse = await fetch('https://api.openphone.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: formattedPhone,
+              text: messageContent,
+            }),
+          });
+
+          if (!openphoneResponse.ok) {
+            const errorData = await openphoneResponse.text();
+            console.error('OpenPhone API error:', errorData);
+            throw new Error(`OpenPhone API error: ${openphoneResponse.status}`);
+          }
+
+          const openphoneData = await openphoneResponse.json();
+
+          // Record the sent message
+          const { error: insertError } = await supabaseAdmin
+            .from('scheduled_messages')
+            .insert({
+              campaign_message_id: message.id,
+              member_id: member.member_id,
+              recipient_phone: formattedPhone,
+              message_content: messageContent,
+              scheduled_send_time: targetSendTime.toISO(),
+              sent_at: now.toISO(),
+              status: 'sent',
+            });
+
+          if (insertError) {
+            console.error('Error recording sent message:', insertError);
+          } else {
+            console.log(`Successfully sent campaign message to ${formattedPhone}`);
+            processedCount++;
+          }
+
+        } catch (error) {
+          console.error(`Error processing campaign message for member ${member.member_id}:`, error);
+          
+          // Record failed message
+          try {
+            await supabaseAdmin
+              .from('scheduled_messages')
+              .insert({
+                campaign_message_id: message.id,
+                member_id: member.member_id,
+                recipient_phone: member.phone || '',
+                message_content: message.content,
+                scheduled_send_time: now.toISO(),
+                status: 'failed',
+                error_message: error instanceof Error ? error.message : 'Unknown error',
+              });
+          } catch (recordError) {
+            console.error('Error recording failed message:', recordError);
+          }
+        }
+      }
+    }
+
+    console.log(`Campaign processing complete. Processed ${processedCount} messages.`);
+    res.status(200).json({ 
+      message: 'Campaign processing complete', 
+      processedCount 
+    });
+
+  } catch (error) {
+    console.error('Error processing campaign messages:', error);
+    res.status(500).json({ error: 'Failed to process campaign messages' });
+  }
+} 
