@@ -114,23 +114,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Get unique phone numbers from reservations
         const phoneNumbers = [...new Set(reservations.map(r => r.phone).filter(Boolean))];
+        console.log('Found phone numbers in reservations:', phoneNumbers);
         
         if (phoneNumbers.length === 0) {
           console.log('No phone numbers found in reservations');
           continue;
         }
         
-        // Fetch member data for these phone numbers
+        // Create multiple phone number formats to match against members table
+        const allPhoneFormats = phoneNumbers.flatMap((phone: string) => {
+          const digits = phone.replace(/\D/g, '');
+          const formats: string[] = [];
+          
+          // Original format
+          formats.push(phone);
+          
+          // With +1 prefix
+          if (digits.length === 10) {
+            formats.push('+1' + digits);
+          }
+          
+          // Without +1 prefix
+          if (phone.startsWith('+1')) {
+            formats.push(phone.substring(2));
+          }
+          
+          // Just digits
+          formats.push(digits);
+          
+          return formats;
+        });
+        
+        console.log('Searching for members with phone formats:', allPhoneFormats);
+        
+        // Fetch member data for these phone numbers (try multiple formats)
         const { data: reservationMembers, error: membersError } = await supabaseAdmin
           .from('members')
           .select('*')
-          .in('phone', phoneNumbers);
+          .in('phone', allPhoneFormats);
 
         if (membersError) {
           console.error('Error fetching reservation members:', membersError);
           continue;
         }
         
+        console.log('Found members for reservations:', reservationMembers?.length || 0);
         members = reservationMembers || [];
       } else if (triggerType === 'member_birthday') {
         // Get members with birthdays today
@@ -208,7 +236,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           // Check if message should be sent now (within 10 minutes of target time)
           const timeDiff = Math.abs(targetSendTime.diff(now, 'minutes').minutes);
+          console.log(`Campaign message ${message.name}: target time ${targetSendTime.toISO()}, now ${now.toISO()}, diff ${timeDiff} minutes`);
           if (timeDiff > 10) {
+            console.log(`Message not ready to send yet (diff: ${timeDiff} minutes)`);
             continue; // Not time to send yet
           }
 
