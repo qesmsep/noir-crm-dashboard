@@ -95,9 +95,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Get members with upcoming reservations
         const { data: reservationData, error: reservationError } = await supabaseAdmin
           .from('reservations')
-          .select('member_id, reservation_time')
-          .gte('reservation_time', now.toISO())
-          .lte('reservation_time', now.plus({ days: 7 }).toISO());
+          .select('phone, start_time')
+          .gte('start_time', now.toISO())
+          .lte('start_time', now.plus({ days: 7 }).toISO());
 
         if (reservationError) {
           console.error('Error fetching reservations:', reservationError);
@@ -112,14 +112,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Store reservations for later use
         reservations = reservationData;
 
-        // Get unique member IDs from reservations
-        const memberIds = [...new Set(reservations.map(r => r.member_id))];
+        // Get unique phone numbers from reservations
+        const phoneNumbers = [...new Set(reservations.map(r => r.phone).filter(Boolean))];
         
-        // Fetch member data for these IDs
+        if (phoneNumbers.length === 0) {
+          console.log('No phone numbers found in reservations');
+          continue;
+        }
+        
+        // Fetch member data for these phone numbers
         const { data: reservationMembers, error: membersError } = await supabaseAdmin
           .from('members')
           .select('*')
-          .in('member_id', memberIds);
+          .in('phone', phoneNumbers);
 
         if (membersError) {
           console.error('Error fetching reservation members:', membersError);
@@ -165,10 +170,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
           } else if (triggerType === 'reservation_time') {
             // Find the member's reservation from the already fetched reservations
-            const memberReservation = reservations.find(r => r.member_id === member.member_id);
+            const memberReservation = reservations.find(r => r.phone === member.phone);
             
             if (!memberReservation) continue;
-            triggerDate = DateTime.fromISO(memberReservation.reservation_time, { zone: 'utc' }).setZone(businessTimezone);
+            triggerDate = DateTime.fromISO(memberReservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
             triggerDate = now.setZone(businessTimezone);
