@@ -68,25 +68,32 @@ export function calculateTimeOffset(template: CampaignTemplate): number {
  */
 export function calculateSortingOffset(template: CampaignTemplate): number {
   if (template.timing_type === 'specific_time') {
-    const quantity = Number(template.specific_time_quantity) || 0;
-    const unit = template.specific_time_unit || 'day';
-    const proximity = template.specific_time_proximity || 'after';
-    
-    console.log(`specific_time template: ${template.name}, quantity: ${quantity}, unit: ${unit}, proximity: ${proximity}`);
-    
-    // Convert to minutes for consistent comparison
-    const minutesPerUnit: Record<string, number> = {
-      'min': 1,
-      'hr': 60,
-      'day': 24 * 60,
-      'month': 30 * 24 * 60, // Approximate
-      'year': 365 * 24 * 60 // Approximate
-    };
-    
-    const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
-    const result = proximity === 'before' ? -totalMinutes : totalMinutes;
-    console.log(`specific_time result for ${template.name}: ${result} minutes`);
-    return result;
+    // Check if new fields exist, if not, fall back to old logic
+    if (template.specific_time_quantity !== undefined && template.specific_time_unit !== undefined && template.specific_time_proximity !== undefined) {
+      const quantity = Number(template.specific_time_quantity) || 0;
+      const unit = template.specific_time_unit || 'day';
+      const proximity = template.specific_time_proximity || 'after';
+      
+      console.log(`specific_time template (new fields): ${template.name}, quantity: ${quantity}, unit: ${unit}, proximity: ${proximity}`);
+      
+      // Convert to minutes for consistent comparison
+      const minutesPerUnit: Record<string, number> = {
+        'min': 1,
+        'hr': 60,
+        'day': 24 * 60,
+        'month': 30 * 24 * 60, // Approximate
+        'year': 365 * 24 * 60 // Approximate
+      };
+      
+      const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
+      const result = proximity === 'before' ? -totalMinutes : totalMinutes;
+      console.log(`specific_time result for ${template.name}: ${result} minutes`);
+      return result;
+    } else {
+      // Fall back to old logic - treat as "on trigger date"
+      console.log(`specific_time template (old fields): ${template.name}, treating as "on trigger date"`);
+      return 0; // On trigger date
+    }
   } else {
     // duration timing type
     const quantity = Number(template.duration_quantity) || 1;
