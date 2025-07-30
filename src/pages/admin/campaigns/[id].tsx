@@ -28,6 +28,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../../lib/supabase';
 import AdminLayout from '../../../components/layouts/AdminLayout';
 import CampaignTemplateDrawer from '../../../components/CampaignTemplateDrawer';
+import { sortCampaignTemplates } from '../../../utils/campaignSorting';
 
 interface Campaign {
   id: string;
@@ -129,7 +130,11 @@ export default function CampaignEditPage() {
       const data = await response.json();
       console.log('All templates fetched:', data);
       
-      setTemplates(data);
+      // Sort templates by proximity to trigger event
+      const sortedTemplates = sortCampaignTemplates(data);
+      console.log('Sorted templates:', sortedTemplates);
+      
+      setTemplates(sortedTemplates);
     } catch (error) {
       console.error('Error fetching templates:', error);
       toast({

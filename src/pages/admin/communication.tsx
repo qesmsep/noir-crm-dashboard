@@ -29,6 +29,7 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import CampaignDrawer from '../../components/CampaignDrawer';
 import CampaignTemplateDrawer from '../../components/CampaignTemplateDrawer';
 import SimplifiedReminderTemplateEditDrawer from '../../components/SimplifiedReminderTemplateEditDrawer';
+import { sortCampaignTemplates } from '../../utils/campaignSorting';
 
 interface Campaign {
   id: string;
@@ -136,7 +137,12 @@ export default function CommunicationPage() {
         throw new Error('Failed to fetch campaign templates');
       }
       const data = await response.json();
-      setCampaignTemplates(data || []);
+      
+      // Sort templates by proximity to trigger event
+      const sortedTemplates = sortCampaignTemplates(data || []);
+      console.log('Sorted campaign templates:', sortedTemplates);
+      
+      setCampaignTemplates(sortedTemplates);
     } catch (error) {
       console.error('Error fetching campaign templates:', error);
       toast({
