@@ -129,45 +129,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
         
-        // Create multiple phone number formats to match against members table
-        const allPhoneFormats = phoneNumbers.flatMap((phone: string) => {
-          const digits = phone.replace(/\D/g, '');
-          const formats: string[] = [];
-          
-          // Original format
-          formats.push(phone);
-          
-          // With +1 prefix
-          if (digits.length === 10) {
-            formats.push('+1' + digits);
-          }
-          
-          // Without +1 prefix
-          if (phone.startsWith('+1')) {
-            formats.push(phone.substring(2));
-          }
-          
-          // Just digits
-          formats.push(digits);
-          
-          return formats;
-        });
+        // For reservation_time triggers, we'll create "virtual members" from reservations
+        // This allows sending messages to anyone with a reservation, not just members
+        const virtualMembers = reservations.map(reservation => ({
+          member_id: `reservation_${reservation.phone}_${reservation.start_time}`,
+          account_id: `reservation_account_${reservation.phone}`,
+          first_name: 'Guest', // We'll get this from the reservation
+          last_name: '',
+          email: '',
+          phone: reservation.phone,
+          member_type: 'guest',
+          join_date: reservation.start_time,
+          created_at: reservation.start_time,
+          updated_at: reservation.start_time
+        }));
         
-        console.log('Searching for members with phone formats:', allPhoneFormats);
-        
-        // Fetch member data for these phone numbers (try multiple formats)
-        const { data: reservationMembers, error: membersError } = await supabaseAdmin
-          .from('members')
-          .select('*')
-          .in('phone', allPhoneFormats);
-
-        if (membersError) {
-          console.error('Error fetching reservation members:', membersError);
-          continue;
-        }
-        
-        console.log('Found members for reservations:', reservationMembers?.length || 0);
-        members = reservationMembers || [];
+        console.log('Created virtual members from reservations:', virtualMembers.length);
+        members = virtualMembers;
       } else if (triggerType === 'member_birthday') {
         // Get members with birthdays today
         const today = now.toFormat('MM-dd');
@@ -205,16 +183,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (triggerType === 'member_signup') {
             triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
           } else if (triggerType === 'reservation_time') {
-            // Find the member's reservation from the already fetched reservations
-            const memberReservation = reservations.find(r => r.phone === member.phone);
+            // For virtual members, the reservation data is embedded in the member object
+            const reservationStartTime = member.join_date; // This contains the reservation start_time
             
-            if (!memberReservation) {
-              console.log(`No reservation found for member ${member.member_id} with phone ${member.phone}`);
+            if (!reservationStartTime) {
+              console.log(`No reservation time found for virtual member ${member.member_id}`);
               continue;
             }
             
-            console.log(`Found reservation for member ${member.member_id}:`, memberReservation);
-            triggerDate = DateTime.fromISO(memberReservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
+            console.log(`Found reservation for virtual member ${member.member_id}:`, {
+              phone: member.phone,
+              start_time: reservationStartTime
+            });
+            triggerDate = DateTime.fromISO(reservationStartTime, { zone: 'utc' }).setZone(businessTimezone);
             console.log(`Trigger date (business timezone): ${triggerDate.toISO()}`);
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
@@ -273,15 +254,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Determine recipient phone
           let recipientPhone = member.phone;
           if (message.recipient_type === 'member') {
-            // Get primary member's phone
-            const { data: primaryMember } = await supabaseAdmin
-              .from('members')
-              .select('phone')
-              .eq('account_id', member.account_id)
-              .eq('member_type', 'primary')
-              .single();
-            if (primaryMember?.phone) {
-              recipientPhone = primaryMember.phone;
+            // For virtual members (reservations), use the reservation phone
+            if (member.member_type === 'guest') {
+              recipientPhone = member.phone; // Use the phone from the reservation
+            } else {
+              // For real members, get primary member's phone
+              const { data: primaryMember } = await supabaseAdmin
+                .from('members')
+                .select('phone')
+                .eq('account_id', member.account_id)
+                .eq('member_type', 'primary')
+                .single();
+              if (primaryMember?.phone) {
+                recipientPhone = primaryMember.phone;
+              }
             }
           } else if (message.recipient_type === 'specific_phone' && message.specific_phone) {
             recipientPhone = message.specific_phone;
