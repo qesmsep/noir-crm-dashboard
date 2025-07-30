@@ -562,7 +562,6 @@ export default function CommunicationPage() {
                                   size="md" 
                                   colorScheme="blue" 
                                   onClick={() => handleEditTemplate(template)}
-                                  _hover={{ transform: 'scale(1.1)' }}
                                 />
                                 <IconButton 
                                   aria-label="Delete template" 
@@ -570,7 +569,6 @@ export default function CommunicationPage() {
                                   size="md" 
                                   colorScheme="red" 
                                   onClick={() => handleDeleteTemplate(template.id)}
-                                  _hover={{ transform: 'scale(1.1)' }}
                                 />
                               </HStack>
                             </Td>

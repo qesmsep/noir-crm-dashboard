@@ -596,11 +596,6 @@ export default function CampaignEditPage() {
             overflow="hidden"
             boxShadow="0 10px 30px rgba(0,0,0,0.15)"
             w="100%"
-            transition="all 0.3s ease"
-            _hover={{
-              transform: 'translateY(-4px)',
-              boxShadow: '0 15px 40px rgba(0,0,0,0.2)',
-            }}
           >
             <Box bg="#a59480" px={6} py={4}>
               <Text fontSize="2xl" letterSpacing="wide" fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="white">
@@ -654,10 +649,7 @@ export default function CampaignEditPage() {
                               onClick={() => handleToggleTemplateActive(template)}
                               fontFamily="'Montserrat', sans-serif"
                               fontWeight="bold"
-                              _hover={{
-                                transform: 'translateY(-1px)',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                              }}
+
                             >
                               {template.is_active ? 'Active' : 'Inactive'}
                             </Button>
@@ -670,7 +662,6 @@ export default function CampaignEditPage() {
                                 size="md" 
                                 colorScheme="blue" 
                                 onClick={() => handleEditTemplate(template)}
-                                _hover={{ transform: 'scale(1.1)' }}
                               />
                               <IconButton 
                                 aria-label="Delete template" 
@@ -678,7 +669,6 @@ export default function CampaignEditPage() {
                                 size="md" 
                                 colorScheme="red" 
                                 onClick={() => handleDeleteTemplate(template.id)}
-                                _hover={{ transform: 'scale(1.1)' }}
                               />
                             </HStack>
                           </Td>
