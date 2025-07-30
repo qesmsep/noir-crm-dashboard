@@ -1,6 +1,7 @@
 import ChakraClientProvider from '../components/ChakraClientProvider';
 import { AuthProvider } from '../lib/auth-context';
 import { SettingsProvider } from '../context/SettingsContext';
+import { Analytics } from '@vercel/analytics/react';
 import './globals.css';
 
 export const metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }) {
             </SettingsProvider>
           </AuthProvider>
         </ChakraClientProvider>
+        <Analytics />
         <script
           dangerouslySetInnerHTML={{
             __html: `
