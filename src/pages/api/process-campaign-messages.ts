@@ -2,6 +2,74 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { DateTime } from 'luxon';
 
+// Helper function to generate and upload ledger PDF (same as BALANCE command)
+async function generateLedgerPdf(memberId: string, accountId: string) {
+  try {
+    // Calculate previous billing month based on member's join date
+    const today = new Date();
+    const { data: member } = await supabaseAdmin
+      .from('members')
+      .select('join_date')
+      .eq('member_id', memberId)
+      .single();
+    
+    if (!member?.join_date) {
+      throw new Error('Member join date not found');
+    }
+    
+    const joinDate = new Date(member.join_date);
+    
+    // Calculate how many months have passed since join date
+    const monthsSinceJoin = (today.getFullYear() - joinDate.getFullYear()) * 12 + 
+                           (today.getMonth() - joinDate.getMonth());
+    
+    // Calculate the start and end of the PREVIOUS billing period (not current)
+    const previousPeriodStart = new Date(joinDate);
+    previousPeriodStart.setMonth(joinDate.getMonth() + monthsSinceJoin - 1); // Subtract 1 month
+    previousPeriodStart.setDate(joinDate.getDate());
+    
+    const previousPeriodEnd = new Date(joinDate);
+    previousPeriodEnd.setMonth(joinDate.getMonth() + monthsSinceJoin);
+    previousPeriodEnd.setDate(joinDate.getDate() - 1); // Day before current period
+    
+    const startDate = previousPeriodStart.toISOString().split('T')[0];
+    const endDate = previousPeriodEnd.toISOString().split('T')[0];
+    
+    console.log('Calculated previous billing period:', { startDate, endDate, member: memberId });
+    
+    // Generate PDF using existing functionality
+    const { LedgerPdfGenerator } = await import('../../utils/ledgerPdfGenerator');
+    const pdfGenerator = new LedgerPdfGenerator();
+    const pdfBuffer = await pdfGenerator.generateLedgerPdf(memberId, accountId, startDate, endDate);
+    
+    // Upload PDF to Supabase storage
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `campaign_${memberId}_${startDate}_${endDate}_${timestamp}.pdf`;
+    
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from('ledger-pdfs')
+      .upload(fileName, pdfBuffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600'
+      });
+
+    if (uploadError) {
+      console.error('Error uploading PDF:', uploadError);
+      throw new Error('Failed to upload PDF to storage');
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from('ledger-pdfs')
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Error generating ledger PDF:', error);
+    throw error;
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     res.setHeader('Allow', ['POST', 'GET']);
@@ -111,7 +179,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Look for reservations in the next 24 hours to catch messages that should be sent soon
         const { data: reservationData, error: reservationError } = await supabaseAdmin
           .from('reservations')
-          .select('phone, start_time')
+          .select('phone, start_time, end_time, party_size')
           .gte('start_time', now.minus({ hours: 1 }).toISO()) // Include reservations from 1 hour ago
           .lte('start_time', now.plus({ days: 1 }).toISO()); // Up to 1 day in the future
 
@@ -167,6 +235,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             member_type: 'guest',
             join_date: reservation.start_time, // Store start_time in join_date
             end_time: reservation.end_time, // Store end_time for after messages
+            party_size: reservation.party_size, // Store party_size for placeholders
             created_at: reservation.start_time,
             updated_at: reservation.start_time
           };
@@ -180,7 +249,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { data: birthdayMembers, error: birthdayError } = await supabaseAdmin
           .from('members')
           .select('*')
-          .ilike('birthday', `%${today}%`);
+          .ilike('dob', `%${today}%`);
 
         if (birthdayError) {
           console.error('Error fetching birthday members:', birthdayError);
@@ -353,6 +422,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           messageContent = messageContent.replace(/\{\{member_name\}\}/g, `${member.first_name || ''} ${member.last_name || ''}`.trim());
           messageContent = messageContent.replace(/\{\{phone\}\}/g, member.phone || '');
           messageContent = messageContent.replace(/\{\{email\}\}/g, member.email || '');
+          
+          // Add reservation-specific placeholders for reservation_time triggers
+          if (triggerType === 'reservation_time') {
+            // Format reservation time
+            if (member.join_date) {
+              const reservationTime = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
+              const formattedTime = reservationTime.toFormat('h:mm a');
+              messageContent = messageContent.replace(/\{\{reservation_time\}\}/g, formattedTime);
+            }
+            
+            // Add party size
+            if (member.party_size) {
+              messageContent = messageContent.replace(/\{\{party_size\}\}/g, member.party_size.toString());
+            }
+          }
+          
+          // Add ledger PDF link if enabled (only for member-related triggers)
+          if (message.include_ledger_pdf && triggerType !== 'reservation_time') {
+            try {
+              console.log('Generating ledger PDF for campaign message');
+              const pdfUrl = await generateLedgerPdf(member.member_id, member.account_id);
+              messageContent += `\n\nYour ledger statement: ${pdfUrl}`;
+              console.log('Added ledger PDF link to message:', pdfUrl);
+            } catch (error) {
+              console.error('Failed to generate ledger PDF for campaign message:', error);
+              // Continue without the PDF link rather than failing the entire message
+            }
+          }
 
           // Format phone number for OpenPhone
           let formattedPhone = recipientPhone;

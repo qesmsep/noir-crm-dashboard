@@ -23,7 +23,6 @@ import {
 
 interface Campaign {
   id?: string;
-  campaign_id: string; // Now a UUID string
   name: string;
   description: string;
   trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time';
@@ -49,10 +48,9 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
 }) => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [formData, setFormData] = useState<Campaign>({
-    campaign_id: '',
     name: '',
     description: '',
-            trigger_type: 'member_signup',
+    trigger_type: 'member_signup',
     is_active: true,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +63,6 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
     } else if (isOpen && isCreateMode) {
       // Reset form for create mode
       setFormData({
-        campaign_id: '',
         name: '',
         description: '',
         trigger_type: 'member_signup',
@@ -98,7 +95,6 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       const data = await response.json();
       setCampaign(data);
       setFormData({
-        campaign_id: data.campaign_id || '',
         name: data.name || '',
         description: data.description || '',
         trigger_type: data.trigger_type || 'member_signup',
@@ -319,7 +315,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
               {!isCreateMode && campaign && (
                 <Box bg="#ecede8" p={4} borderRadius="md">
                   <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif">
-                    <strong>Campaign ID:</strong> {campaign.campaign_id}
+                    <strong>Campaign ID:</strong> {campaign.id}
                   </Text>
                   <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif">
                     <strong>Created:</strong> {new Date(campaign.created_at || '').toLocaleDateString()}

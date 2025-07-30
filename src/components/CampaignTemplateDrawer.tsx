@@ -52,6 +52,7 @@ interface CampaignTemplate {
   duration_quantity?: number;
   duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
   duration_proximity?: 'before' | 'after';
+  include_ledger_pdf?: boolean; // Whether to include ledger PDF link
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -94,6 +95,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     duration_quantity: 1,
     duration_unit: 'hr' as 'min' | 'hr' | 'day' | 'month' | 'year',
     duration_proximity: 'after' as 'before' | 'after',
+    include_ledger_pdf: false,
 
     is_active: true,
   });
@@ -123,6 +125,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           duration_quantity: 1,
           duration_unit: 'hr',
           duration_proximity: 'after',
+          include_ledger_pdf: false,
 
           is_active: true,
         });
@@ -172,6 +175,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         duration_quantity: data.duration_quantity || 1,
         duration_unit: data.duration_unit || 'hr',
         duration_proximity: data.duration_proximity || 'after',
+        include_ledger_pdf: data.include_ledger_pdf || false,
 
         is_active: data.is_active !== undefined ? data.is_active : true,
       });
@@ -354,12 +358,21 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const getPreviewMessage = () => {
-    return formData.content
+    let previewContent = formData.content
       .replace(/\{\{first_name\}\}/g, 'John')
       .replace(/\{\{last_name\}\}/g, 'Doe')
       .replace(/\{\{member_name\}\}/g, 'John Doe')
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
+    
+    // Add reservation-specific placeholders if this is a reservation_time campaign
+    if (campaignTriggerType === 'reservation_time') {
+      previewContent = previewContent
+        .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
+        .replace(/\{\{party_size\}\}/g, '4');
+    }
+    
+    return previewContent;
   };
 
   const formatTimingDisplay = () => {
@@ -758,7 +771,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                         color="#353535"
                         borderColor="#a59480"
                         _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                        placeholder="Enter your message template here. Use {{first_name}}, {{last_name}}, {{member_name}}, {{phone}}, and {{email}} as placeholders."
+                        placeholder={`Enter your message template here. Use {{first_name}}, {{last_name}}, {{member_name}}, {{phone}}, and {{email}} as placeholders.${campaignTriggerType === 'reservation_time' ? ' For reservation campaigns, you can also use {{reservation_time}} and {{party_size}}.' : ''}`}
                         fontFamily="'Montserrat', sans-serif"
                         fontSize="14px"
                         lineHeight="1.5"
@@ -766,6 +779,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                       />
                       <Text fontSize="xs" color="#a59480" mt={1}>
                         Available placeholders: {'{{first_name}}'}, {'{{last_name}}'}, {'{{member_name}}'}, {'{{phone}}'}, {'{{email}}'}
+                        {campaignTriggerType === 'reservation_time' && (
+                          <>, {'{{reservation_time}}'}, {'{{party_size}}'}</>
+                        )}
                       </Text>
                     </FormControl>
 
@@ -814,6 +830,27 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                 </Box>
 
                 <Divider borderColor="#a59480" />
+
+                {/* Ledger PDF Option - Only for member-related triggers */}
+                {campaignTriggerType && campaignTriggerType !== 'reservation_time' && (
+                  <>
+                    <Button
+                      size="sm"
+                      colorScheme={formData.include_ledger_pdf ? 'green' : 'gray'}
+                      variant="outline"
+                      onClick={() => handleInputChange('include_ledger_pdf', !formData.include_ledger_pdf)}
+                      fontFamily="'Montserrat', sans-serif"
+                      fontWeight="bold"
+                      _hover={{
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      }}
+                    >
+                      {formData.include_ledger_pdf ? '✓ Include Ledger PDF' : 'Include Ledger PDF'}
+                    </Button>
+                    <Divider borderColor="#a59480" />
+                  </>
+                )}
 
                 {/* Status */}
                 <Box>
