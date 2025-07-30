@@ -65,6 +65,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const now = DateTime.now();
     const businessTimezone = 'America/Chicago'; // Adjust as needed
+    console.log('Current time (UTC):', now.toISO());
+    console.log('Current time (business timezone):', now.setZone(businessTimezone).toISO());
     let processedCount = 0;
 
     for (const message of messages) {
@@ -93,11 +95,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         members = onboardingMembers || [];
       } else if (triggerType === 'reservation_time') {
         // Get members with upcoming reservations
+        // Look for reservations in the next 24 hours to catch messages that should be sent soon
         const { data: reservationData, error: reservationError } = await supabaseAdmin
           .from('reservations')
           .select('phone, start_time')
-          .gte('start_time', now.toISO())
-          .lte('start_time', now.plus({ days: 7 }).toISO());
+          .gte('start_time', now.minus({ hours: 1 }).toISO()) // Include reservations from 1 hour ago
+          .lte('start_time', now.plus({ days: 1 }).toISO()); // Up to 1 day in the future
 
         if (reservationError) {
           console.error('Error fetching reservations:', reservationError);
@@ -108,6 +111,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log('No upcoming reservations found');
           continue;
         }
+
+        console.log('Found reservations:', reservationData.map(r => ({
+          phone: r.phone,
+          start_time: r.start_time
+        })));
 
         // Store reservations for later use
         reservations = reservationData;
@@ -200,8 +208,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Find the member's reservation from the already fetched reservations
             const memberReservation = reservations.find(r => r.phone === member.phone);
             
-            if (!memberReservation) continue;
+            if (!memberReservation) {
+              console.log(`No reservation found for member ${member.member_id} with phone ${member.phone}`);
+              continue;
+            }
+            
+            console.log(`Found reservation for member ${member.member_id}:`, memberReservation);
             triggerDate = DateTime.fromISO(memberReservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
+            console.log(`Trigger date (business timezone): ${triggerDate.toISO()}`);
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
             triggerDate = now.setZone(businessTimezone);
