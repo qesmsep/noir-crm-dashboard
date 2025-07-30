@@ -25,8 +25,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase query error:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
 
+      console.log('Successfully fetched campaign messages:', data?.length || 0, 'messages');
       res.status(200).json(data);
     } catch (error) {
       console.error('Error fetching campaign messages:', error);
