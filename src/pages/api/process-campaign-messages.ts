@@ -161,19 +161,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
         members = onboardingMembers || [];
-        
-        // TEST MODE: Only process messages for your phone number
-        const testPhoneNumber = '+18584129797';
-        const originalCount = members.length;
-        members = members.filter(member => {
-          const memberPhone = member.phone.replace(/\D/g, '');
-          const isTestMember = memberPhone === '18584129797';
-          if (isTestMember) {
-            console.log(`🧪 TEST MODE: Processing member ${member.member_id} with phone ${member.phone}`);
-          }
-          return isTestMember;
-        });
-        console.log(`🧪 TEST MODE: Filtered from ${originalCount} to ${members.length} members (phone: ${testPhoneNumber})`);
       } else if (triggerType === 'reservation_time') {
         // Get members with upcoming reservations
         // Look for reservations in the next 24 hours to catch messages that should be sent soon
@@ -266,19 +253,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           return dobFormatted === today;
         });
-        
-        // TEST MODE: Only process messages for your phone number
-        const testPhoneNumber = '+18584129797';
-        const originalCount = members.length;
-        members = members.filter(member => {
-          const memberPhone = member.phone.replace(/\D/g, '');
-          const isTestMember = memberPhone === '18584129797';
-          if (isTestMember) {
-            console.log(`🧪 TEST MODE: Processing member ${member.member_id} with phone ${member.phone}`);
-          }
-          return isTestMember;
-        });
-        console.log(`🧪 TEST MODE: Filtered from ${originalCount} to ${members.length} members (phone: ${testPhoneNumber})`);
       } else if (triggerType === 'member_renewal') {
         // Get all members and filter by renewal date calculated from join_date
         const { data: allMembers, error: membersError } = await supabaseAdmin
@@ -311,19 +285,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           return isRenewalToday;
         });
-        
-        // TEST MODE: Only process messages for your phone number
-        const testPhoneNumber = '+18584129797';
-        const originalCount = members.length;
-        members = members.filter(member => {
-          const memberPhone = member.phone.replace(/\D/g, '');
-          const isTestMember = memberPhone === '18584129797';
-          if (isTestMember) {
-            console.log(`🧪 TEST MODE: Processing member ${member.member_id} with phone ${member.phone}`);
-          }
-          return isTestMember;
-        });
-        console.log(`🧪 TEST MODE: Filtered from ${originalCount} to ${members.length} members (phone: ${testPhoneNumber})`);
       }
 
       for (const member of members) {
