@@ -251,20 +251,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             continue; // Not time to send yet
           }
 
-          // Check if message already sent
-          const { data: existingMessage } = await supabaseAdmin
-            .from('scheduled_messages')
-            .select('id')
-            .eq('campaign_message_id', message.id)
-            .eq('member_id', member.member_id)
-            .eq('status', 'sent')
-            .single();
-
-          if (existingMessage) {
-            console.log(`Message already sent for campaign message ${message.id} and member ${member.member_id}`);
-            continue;
-          }
-
           // Determine recipient phone
           let recipientPhone = member.phone;
           if (message.recipient_type === 'member') {
@@ -313,6 +299,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
 
+          // Check if message already sent
+          const { data: existingMessage } = await supabaseAdmin
+            .from('scheduled_messages')
+            .select('id')
+            .eq('campaign_message_id', message.id)
+            .eq('phone_number', formattedPhone)
+            .eq('status', 'sent')
+            .single();
+
+          if (existingMessage) {
+            console.log(`Message already sent for campaign message ${message.id} to phone ${formattedPhone}`);
+            continue;
+          }
+
           // Send SMS via OpenPhone API
           console.log('Sending SMS via OpenPhone API...');
           console.log('OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
@@ -346,7 +346,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .from('scheduled_messages')
             .insert({
               campaign_message_id: message.id,
-              member_id: member.member_id,
+              member_id: null, // Use null since virtual members don't exist in members table
               phone_number: formattedPhone,
               message_content: messageContent,
               scheduled_time: targetSendTime.toISO(),
@@ -370,7 +370,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               .from('scheduled_messages')
               .insert({
                 campaign_message_id: message.id,
-                member_id: member.member_id,
+                member_id: null, // Use null since virtual members don't exist in members table
                 phone_number: member.phone || '',
                 message_content: message.content,
                 scheduled_time: now.toISO(),
