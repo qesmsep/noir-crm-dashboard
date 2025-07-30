@@ -958,15 +958,119 @@ async function scheduleAccessInstructions(reservation: any) {
       businessTimezone = settings.timezone;
     }
 
-    // Note: Removed template lookup - using campaigns instead
-    console.log('✅ Access instructions would be sent via campaigns system');
-    return true;
+    // Get access instructions template
+    const { data: template, error: templateError } = await supabase
+      .from('reservation_reminder_templates')
+      .select('*')
+      .eq('reminder_type', 'day_of')
+      .eq('name', 'Access Instructions')
+      .eq('is_active', true)
+      .single();
 
-    // Note: Removed all scheduling logic - using campaigns instead
+    if (templateError || !template) {
+      console.error('Access instructions template not found:', templateError);
+      return false;
+    }
+
+    // Convert reservation time to business timezone for calculations
+    const reservationDateTime = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(businessTimezone);
+    const now = DateTime.now().setZone(businessTimezone);
+    
+    // Schedule for the time specified in the template (e.g., "10:05")
+    // FIXED: Use the correct approach to create the scheduled time in business timezone
+    const reservationDate = reservationDateTime.toFormat('yyyy-MM-dd');
+    const scheduledLocal = DateTime.fromISO(`${reservationDate}T${template.send_time}:00`, { 
+      zone: businessTimezone 
+    });
+    
+    // Convert to UTC for database storage
+    let scheduledTimeUTC = scheduledLocal.toUTC().toISO();
+    
+    // Check if this is a same-day reservation and the scheduled time has already passed
+    const isSameDay = reservationDateTime.hasSame(now, 'day');
+    let shouldSendImmediately = false;
+    
+    if (isSameDay && scheduledLocal < now) {
+      shouldSendImmediately = true;
+      scheduledTimeUTC = now.toUTC().toISO();
+      console.log(`✅ Scheduling immediate send for access instructions`);
+    }
+    
+    console.log('Access instructions scheduling:', {
+      reservationDate: reservationDateTime.toFormat('yyyy-MM-dd'),
+      businessTimezone,
+      scheduledLocal: scheduledLocal.toFormat('HH:mm'),
+      scheduledTimeUTC,
+      template: template.name,
+      templateSendTime: template.send_time,
+      isSameDay,
+      shouldSendImmediately
+    });
+
+    // Create message content with placeholders
+    let messageContent = template.message_template;
+    messageContent = messageContent.replace(/\{\{first_name\}\}/g, reservation.first_name || 'Guest');
+    messageContent = messageContent.replace(/\{\{reservation_time\}\}/g,
+      reservationDateTime.toFormat('hh:mm a'));
+    messageContent = messageContent.replace(/\{\{party_size\}\}/g, reservation.party_size.toString());
+
+    // Insert scheduled reminder
+    const { data: scheduledReminder, error: insertError } = await supabase
+      .from('scheduled_reservation_reminders')
+      .insert({
+        reservation_id: reservation.id,
+        template_id: template.id,
+        customer_name: `${reservation.first_name || ''} ${reservation.last_name || ''}`.trim() || 'Guest',
+        customer_phone: reservation.phone,
+        message_content: messageContent,
+        scheduled_for: scheduledTimeUTC
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error scheduling access instructions:', insertError);
+      return false;
+    }
+
+    console.log('✅ Successfully scheduled access instructions for:', scheduledTimeUTC);
+    return true;
   } catch (error) {
     console.error('Error scheduling access instructions:', error);
     return false;
   }
 }
 
-// Note: Removed createReservationReminder function - using campaigns instead 
+// Function to create reservation reminder
+async function createReservationReminder(reservation: any) {
+  try {
+    // Calculate reminder time (1 hour before reservation)
+    const reservationTime = new Date(reservation.start_time);
+    const reminderTime = new Date(reservationTime.getTime() - 60 * 60 * 1000); // 1 hour before
+
+    // Create reminder record
+    const { data: reminder, error } = await supabase
+      .from('reservation_reminders')
+      .insert([{
+        reservation_id: reservation.id,
+        reminder_type: '1_hour_before',
+        scheduled_time: reminderTime.toISOString(),
+        status: 'pending',
+        phone: reservation.phone,
+        message: `Reminder: Your reservation at Noir is in 1 hour. We look forward to seeing you!`
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating reminder:', error);
+      return false;
+    }
+
+    console.log('Reminder created successfully:', reminder.id);
+    return true;
+  } catch (error) {
+    console.error('Error creating reservation reminder:', error);
+    return false;
+  }
+} 
