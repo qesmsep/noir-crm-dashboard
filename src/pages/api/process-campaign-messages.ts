@@ -95,11 +95,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         members = onboardingMembers || [];
         
         // TEST MODE: Only process messages for your phone number
-        const testPhoneNumber = '8584129797';
+        const testPhoneNumber = '+18584129797';
         const originalCount = members.length;
         members = members.filter(member => {
           const memberPhone = member.phone.replace(/\D/g, '');
-          const isTestMember = memberPhone === testPhoneNumber;
+          const isTestMember = memberPhone === '18584129797';
           if (isTestMember) {
             console.log(`🧪 TEST MODE: Processing member ${member.member_id} with phone ${member.phone}`);
           }
@@ -189,11 +189,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         members = birthdayMembers || [];
         
         // TEST MODE: Only process messages for your phone number
-        const testPhoneNumber = '8584129797';
+        const testPhoneNumber = '+18584129797';
         const originalCount = members.length;
         members = members.filter(member => {
           const memberPhone = member.phone.replace(/\D/g, '');
-          const isTestMember = memberPhone === testPhoneNumber;
+          const isTestMember = memberPhone === '18584129797';
           if (isTestMember) {
             console.log(`🧪 TEST MODE: Processing member ${member.member_id} with phone ${member.phone}`);
           }
@@ -215,11 +215,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         members = renewalMembers || [];
         
         // TEST MODE: Only process messages for your phone number
-        const testPhoneNumber = '8584129797';
+        const testPhoneNumber = '+18584129797';
         const originalCount = members.length;
         members = members.filter(member => {
           const memberPhone = member.phone.replace(/\D/g, '');
-          const isTestMember = memberPhone === testPhoneNumber;
+          const isTestMember = memberPhone === '18584129797';
           if (isTestMember) {
             console.log(`🧪 TEST MODE: Processing member ${member.member_id} with phone ${member.phone}`);
           }
