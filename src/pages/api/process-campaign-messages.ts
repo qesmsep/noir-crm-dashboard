@@ -152,7 +152,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             email: '',
             phone: formattedPhone, // Use the formatted phone number
             member_type: 'guest',
-            join_date: reservation.start_time,
+            join_date: reservation.start_time, // Store start_time in join_date
+            end_time: reservation.end_time, // Store end_time for after messages
             created_at: reservation.start_time,
             updated_at: reservation.start_time
           };
@@ -199,6 +200,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else if (triggerType === 'reservation_time') {
             // For virtual members, the reservation data is embedded in the member object
             const reservationStartTime = member.join_date; // This contains the reservation start_time
+            const reservationEndTime = member.end_time; // This contains the reservation end_time
             
             if (!reservationStartTime) {
               console.log(`No reservation time found for virtual member ${member.member_id}`);
@@ -207,10 +209,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             
             console.log(`Found reservation for virtual member ${member.member_id}:`, {
               phone: member.phone,
-              start_time: reservationStartTime
+              start_time: reservationStartTime,
+              end_time: reservationEndTime
             });
-            triggerDate = DateTime.fromISO(reservationStartTime, { zone: 'utc' }).setZone(businessTimezone);
-            console.log(`Trigger date (business timezone): ${triggerDate.toISO()}`);
+            
+            // Use start_time for 'before' messages and end_time for 'after' messages
+            const isAfterMessage = message.duration_proximity === 'after';
+            const triggerTime = isAfterMessage && reservationEndTime ? reservationEndTime : reservationStartTime;
+            triggerDate = DateTime.fromISO(triggerTime, { zone: 'utc' }).setZone(businessTimezone);
+            console.log(`Trigger date (business timezone): ${triggerDate.toISO()} (using ${isAfterMessage ? 'end_time' : 'start_time'})`);
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
             triggerDate = now.setZone(businessTimezone);
