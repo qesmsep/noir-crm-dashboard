@@ -26,6 +26,9 @@ DROP INDEX IF EXISTS idx_scheduled_reservation_reminders_scheduled_for;
 DROP INDEX IF EXISTS idx_reservation_reminder_templates_type;
 DROP INDEX IF EXISTS idx_reservation_reminder_templates_active;
 
+-- Drop views first
+DROP VIEW IF EXISTS public.reservation_reminder_templates_view;
+
 -- Drop RLS policies
 DROP POLICY IF EXISTS "Admins can manage scheduled reservation reminders" ON public.scheduled_reservation_reminders;
 DROP POLICY IF EXISTS "Admins can manage reservation reminder templates" ON public.reservation_reminder_templates;
@@ -34,11 +37,16 @@ DROP POLICY IF EXISTS "Admins can manage reservation reminder templates" ON publ
 DROP TABLE IF EXISTS public.scheduled_reservation_reminders;
 DROP TABLE IF EXISTS public.reservation_reminder_templates;
 
--- Verify tables are gone
-SELECT table_name 
+-- Verify tables and views are gone
+SELECT table_name, 'table' as object_type
 FROM information_schema.tables 
 WHERE table_schema = 'public' 
-  AND table_name IN ('scheduled_reservation_reminders', 'reservation_reminder_templates');
+  AND table_name IN ('scheduled_reservation_reminders', 'reservation_reminder_templates')
+UNION ALL
+SELECT table_name, 'view' as object_type
+FROM information_schema.views 
+WHERE table_schema = 'public' 
+  AND table_name IN ('reservation_reminder_templates_view');
 
 -- Note: The reminder_type and message_status enums will remain in the database
 -- but they're not harmful to keep around 
