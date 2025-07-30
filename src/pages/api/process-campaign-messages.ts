@@ -474,8 +474,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           messageContent = messageContent.replace(/\{\{phone\}\}/g, member.phone || '');
           messageContent = messageContent.replace(/\{\{email\}\}/g, member.email || '');
           
-          // Add reservation-specific placeholders for reservation_time triggers
-          if (triggerType === 'reservation_time') {
+          // Add reservation-specific placeholders for reservation_time and reservation_created triggers
+          if (triggerType === 'reservation_time' || triggerType === 'reservation_created') {
             // Format reservation time
             if (member.join_date) {
               const reservationTime = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);

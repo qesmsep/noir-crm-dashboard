@@ -66,7 +66,7 @@ interface CampaignTemplateDrawerProps {
   onTemplateUpdated: () => void;
   campaignId?: string;
   isCampaignMode?: boolean;
-  campaignTriggerType?: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time';
+  campaignTriggerType?: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created';
 }
 
 const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
@@ -365,8 +365,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
     
-    // Add reservation-specific placeholders if this is a reservation_time campaign
-    if (campaignTriggerType === 'reservation_time') {
+    // Add reservation-specific placeholders if this is a reservation_time or reservation_created campaign
+    if (campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
         .replace(/\{\{party_size\}\}/g, '4');
@@ -419,7 +419,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const getRecipientOptions = () => {
     if (!campaignTriggerType) return [];
     
-    if (campaignTriggerType === 'reservation_time') {
+    if (campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
       return [
         { value: 'member', label: 'Phone number on reservation' },
         { value: 'specific_phone', label: 'Custom phone number' }
@@ -771,7 +771,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                         color="#353535"
                         borderColor="#a59480"
                         _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                        placeholder={`Enter your message template here. Use {{first_name}}, {{last_name}}, {{member_name}}, {{phone}}, and {{email}} as placeholders.${campaignTriggerType === 'reservation_time' ? ' For reservation campaigns, you can also use {{reservation_time}} and {{party_size}}.' : ''}`}
+                        placeholder={`Enter your message template here. Use {{first_name}}, {{last_name}}, {{member_name}}, {{phone}}, and {{email}} as placeholders.${campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created' ? ' For reservation campaigns, you can also use {{reservation_time}} and {{party_size}}.' : ''}`}
                         fontFamily="'Montserrat', sans-serif"
                         fontSize="14px"
                         lineHeight="1.5"
@@ -779,7 +779,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                       />
                       <Text fontSize="xs" color="#a59480" mt={1}>
                         Available placeholders: {'{{first_name}}'}, {'{{last_name}}'}, {'{{member_name}}'}, {'{{phone}}'}, {'{{email}}'}
-                        {campaignTriggerType === 'reservation_time' && (
+                        {(campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') && (
                           <>, {'{{reservation_time}}'}, {'{{party_size}}'}</>
                         )}
                       </Text>
@@ -832,7 +832,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                 <Divider borderColor="#a59480" />
 
                 {/* Ledger PDF Option - Only for member-related triggers */}
-                {campaignTriggerType && campaignTriggerType !== 'reservation_time' && (
+                {campaignTriggerType && campaignTriggerType !== 'reservation_time' && campaignTriggerType !== 'reservation_created' && (
                   <>
                     <Button
                       size="sm"
