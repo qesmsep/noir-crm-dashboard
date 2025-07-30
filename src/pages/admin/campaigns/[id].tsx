@@ -641,32 +641,34 @@ export default function CampaignEditPage() {
                 <Table variant="striped" colorScheme="gray" size="lg">
                   <Thead>
                     <Tr >
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14}>Template Name</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14}>Description</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14}>Timing</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14}>Recipient</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14}>Status</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14}>Actions</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="15%">Template Name</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="25%">Description</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="25%">Timing</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="15%">Recipient</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="10%">Status</Th>
+                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="10%">Actions</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {templates
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((template) => (
+                    {templates.map((template) => (
                         <Tr key={template.id} _hover={{ bg: '#f0f0f0' }}>
-                          <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="md" py={4}>
+                          <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="md" py={6} px={4}>
                             {template.name}
                           </Td>
-                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={4}>
-                            {template.description || '-'}
+                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={4} maxW="300px">
+                            <Text noOfLines={3} wordBreak="break-word">
+                              {template.description || '-'}
+                            </Text>
                           </Td>
-                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={4}>
-                            {formatTiming(template)}
+                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={4} maxW="300px">
+                            <Text noOfLines={2} wordBreak="break-word">
+                              {formatTiming(template)}
+                            </Text>
                           </Td>
-                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={4}>
+                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={4}>
                             {formatRecipient(template)}
                           </Td>
-                          <Td py={4}>
+                          <Td py={6} px={4}>
                             <Button
                               size="sm"
                               colorScheme={template.is_active ? 'green' : 'red'}
@@ -674,12 +676,11 @@ export default function CampaignEditPage() {
                               onClick={() => handleToggleTemplateActive(template)}
                               fontFamily="'Montserrat', sans-serif"
                               fontWeight="bold"
-
                             >
                               {template.is_active ? 'Active' : 'Inactive'}
                             </Button>
                           </Td>
-                          <Td py={4}>
+                          <Td py={6} px={4}>
                             <HStack spacing={2}>
                               <IconButton 
                                 aria-label="Edit template" 
