@@ -134,8 +134,24 @@ export default function CampaignEditPage() {
       console.log('All templates fetched:', data);
       
       // Sort templates by proximity to trigger event
+      console.log('Raw templates before sorting:', data);
       const sortedTemplates = sortCampaignTemplates(data);
       console.log('Sorted templates:', sortedTemplates);
+      
+      // Debug: Log each template's timing info
+      sortedTemplates.forEach((template, index) => {
+        console.log(`Template ${index + 1}:`, {
+          name: template.name,
+          timing_type: template.timing_type,
+          specific_time: template.specific_time,
+          specific_time_quantity: template.specific_time_quantity,
+          specific_time_unit: template.specific_time_unit,
+          specific_time_proximity: template.specific_time_proximity,
+          duration_quantity: template.duration_quantity,
+          duration_unit: template.duration_unit,
+          duration_proximity: template.duration_proximity
+        });
+      });
       
       setTemplates(sortedTemplates);
     } catch (error) {

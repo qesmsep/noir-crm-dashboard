@@ -16,8 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             description,
             trigger_type
           )
-        `)
-        .order('created_at', { ascending: false });
+        `);
 
       // Filter by campaign if specified
       if (campaign_id) {

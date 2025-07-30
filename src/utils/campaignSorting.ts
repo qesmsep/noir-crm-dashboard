@@ -68,10 +68,12 @@ export function calculateTimeOffset(template: CampaignTemplate): number {
  */
 export function calculateSortingOffset(template: CampaignTemplate): number {
   if (template.timing_type === 'specific_time') {
-    const quantity = template.specific_time_quantity || 0;
+    const quantity = Number(template.specific_time_quantity) || 0;
     const unit = template.specific_time_unit || 'day';
     const proximity = template.specific_time_proximity || 'after';
     
+    console.log(`specific_time template: ${template.name}, quantity: ${quantity}, unit: ${unit}, proximity: ${proximity}`);
+    
     // Convert to minutes for consistent comparison
     const minutesPerUnit: Record<string, number> = {
       'min': 1,
@@ -82,13 +84,17 @@ export function calculateSortingOffset(template: CampaignTemplate): number {
     };
     
     const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
-    return proximity === 'before' ? -totalMinutes : totalMinutes;
+    const result = proximity === 'before' ? -totalMinutes : totalMinutes;
+    console.log(`specific_time result for ${template.name}: ${result} minutes`);
+    return result;
   } else {
     // duration timing type
-    const quantity = template.duration_quantity || 1;
+    const quantity = Number(template.duration_quantity) || 1;
     const unit = template.duration_unit || 'hr';
     const proximity = template.duration_proximity || 'after';
     
+    console.log(`duration template: ${template.name}, quantity: ${quantity}, unit: ${unit}, proximity: ${proximity}`);
+    
     // Convert to minutes for consistent comparison
     const minutesPerUnit: Record<string, number> = {
       'min': 1,
@@ -99,7 +105,9 @@ export function calculateSortingOffset(template: CampaignTemplate): number {
     };
     
     const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
-    return proximity === 'before' ? -totalMinutes : totalMinutes;
+    const result = proximity === 'before' ? -totalMinutes : totalMinutes;
+    console.log(`duration result for ${template.name}: ${result} minutes`);
+    return result;
   }
 }
 
@@ -109,18 +117,24 @@ export function calculateSortingOffset(template: CampaignTemplate): number {
  * Within each group, sort by how close they are to the trigger
  */
 export function sortCampaignTemplates(templates: CampaignTemplate[]): CampaignTemplate[] {
+  console.log('Sorting templates:', templates.map(t => ({ name: t.name, timing_type: t.timing_type })));
+  
   return [...templates].sort((a, b) => {
     const offsetA = calculateSortingOffset(a);
     const offsetB = calculateSortingOffset(b);
+    
+    console.log(`Comparing ${a.name} (offset: ${offsetA}) vs ${b.name} (offset: ${offsetB})`);
     
     // First, separate before and after messages
     const isBeforeA = offsetA < 0;
     const isBeforeB = offsetB < 0;
     
     if (isBeforeA && !isBeforeB) {
+      console.log(`${a.name} is before, ${b.name} is after - ${a.name} comes first`);
       return -1; // A is before, B is after, so A comes first
     }
     if (!isBeforeA && isBeforeB) {
+      console.log(`${b.name} is before, ${a.name} is after - ${b.name} comes first`);
       return 1; // A is after, B is before, so B comes first
     }
     
@@ -130,10 +144,14 @@ export function sortCampaignTemplates(templates: CampaignTemplate[]): CampaignTe
     if (isBeforeA) {
       // Both are "before" - sort by proximity (furthest first)
       // Since offsetA and offsetB are negative, we want the smaller (more negative) first
-      return offsetA - offsetB;
+      const result = offsetA - offsetB;
+      console.log(`Both are before: ${a.name} vs ${b.name}, result: ${result}`);
+      return result;
     } else {
       // Both are "after" - sort by proximity (closest first)
-      return offsetA - offsetB;
+      const result = offsetA - offsetB;
+      console.log(`Both are after: ${a.name} vs ${b.name}, result: ${result}`);
+      return result;
     }
   });
 } 
