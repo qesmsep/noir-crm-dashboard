@@ -270,18 +270,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         console.log(`🧪 TEST MODE: Filtered from ${originalCount} to ${members.length} members (phone: ${testPhoneNumber})`);
       } else if (triggerType === 'member_renewal') {
-        // Get members with renewal dates today
-        const today = now.toFormat('yyyy-MM-dd');
-        const { data: renewalMembers, error: renewalError } = await supabaseAdmin
+        // Get all members and filter by renewal date calculated from join_date
+        const { data: allMembers, error: membersError } = await supabaseAdmin
           .from('members')
           .select('*')
-          .ilike('renewal_date', `%${today}%`);
+          .not('join_date', 'is', null);
 
-        if (renewalError) {
-          console.error('Error fetching renewal members:', renewalError);
+        if (membersError) {
+          console.error('Error fetching members for renewal check:', membersError);
           continue;
         }
-        members = renewalMembers || [];
+
+        // Filter members whose renewal date is today (calculated from join_date)
+        const today = now.toFormat('yyyy-MM-dd');
+        members = (allMembers || []).filter(member => {
+          if (!member.join_date) return false;
+          
+          // Calculate renewal date based on join_date
+          const joinDate = DateTime.fromISO(member.join_date);
+          const todayDate = now.startOf('day');
+          
+          // Calculate how many months have passed since join date
+          const monthsSinceJoin = todayDate.diff(joinDate, 'months').months;
+          
+          // Calculate the next renewal date
+          const nextRenewalDate = joinDate.plus({ months: Math.ceil(monthsSinceJoin) });
+          
+          // Check if today is the renewal date
+          const isRenewalToday = nextRenewalDate.toFormat('yyyy-MM-dd') === today;
+          
+          return isRenewalToday;
+        });
         
         // TEST MODE: Only process messages for your phone number
         const testPhoneNumber = '+18584129797';
