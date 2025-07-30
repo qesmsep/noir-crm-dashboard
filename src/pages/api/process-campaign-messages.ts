@@ -145,8 +145,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
           
           return {
-            member_id: `reservation_${reservation.phone}_${reservation.start_time}`,
-            account_id: `reservation_account_${reservation.phone}`,
+            member_id: crypto.randomUUID(), // Generate proper UUID
+            account_id: crypto.randomUUID(), // Generate proper UUID
             first_name: 'Guest', // We'll get this from the reservation
             last_name: '',
             email: '',
