@@ -407,12 +407,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
           }
 
-          // Check if message should be sent now (within 5 minutes of target time)
+          // Check if message should be sent now
           const timeDiff = targetSendTime.diff(now, 'minutes').minutes;
           console.log(`Campaign message ${message.name}: target time ${targetSendTime.toISO()}, now ${now.toISO()}, diff ${timeDiff} minutes`);
           
-          // Only send if we're within 5 minutes AFTER the target time (not before)
-          if (timeDiff > 5 || timeDiff < -60) {
+          // Special handling for birthday campaigns - allow 24 hour window since they're annual events
+          let shouldSend = false;
+          if (triggerType === 'member_birthday') {
+            // For birthdays, allow sending within 24 hours of the target time
+            shouldSend = timeDiff >= -1440 && timeDiff <= 5; // -24 hours to +5 minutes
+          } else {
+            // For other campaigns, use the standard 5 minutes after to 60 minutes before window
+            shouldSend = timeDiff >= -60 && timeDiff <= 5;
+          }
+          
+          if (!shouldSend) {
             console.log(`Message not ready to send yet (diff: ${timeDiff} minutes)`);
             continue; // Not time to send yet
           }
