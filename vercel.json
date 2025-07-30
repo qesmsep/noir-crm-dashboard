@@ -5,10 +5,6 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/cron-process-reminders",
-      "schedule": "*/1 * * * *"
-    },
-    {
       "path": "/api/schedule-ledger-notifications",
       "schedule": "0 2 * * *"
     },
@@ -16,21 +12,13 @@
       "path": "/api/process-ledger-notifications",
       "schedule": "0 10 * * *"
     },
-            
-        {
-          "path": "/api/process-campaign-messages",
-          "schedule": "*/1 * * * *"
-        }
+    {
+      "path": "/api/process-campaign-messages",
+      "schedule": "*/1 * * * *"
+    }
   ],
   "functions": {
-    "src/pages/api/cron-process-reminders.ts": {
-      "maxDuration": 30
-    }
   },
   "rewrites": [
-    {
-      "source": "/api/cron-process-reminders",
-      "destination": "/api/cron-process-reminders"
-    }
   ]
 } 

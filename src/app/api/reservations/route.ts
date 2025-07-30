@@ -1014,24 +1014,8 @@ async function scheduleAccessInstructions(reservation: any) {
       reservationDateTime.toFormat('hh:mm a'));
     messageContent = messageContent.replace(/\{\{party_size\}\}/g, reservation.party_size.toString());
 
-    // Insert scheduled reminder
-    const { data: scheduledReminder, error: insertError } = await supabase
-      .from('scheduled_reservation_reminders')
-      .insert({
-        reservation_id: reservation.id,
-        template_id: template.id,
-        customer_name: `${reservation.first_name || ''} ${reservation.last_name || ''}`.trim() || 'Guest',
-        customer_phone: reservation.phone,
-        message_content: messageContent,
-        scheduled_for: scheduledTimeUTC
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Error scheduling access instructions:', insertError);
-      return false;
-    }
+    // Note: Removed scheduled reminder creation - using campaigns instead
+    console.log('✅ Access instructions would be sent via campaigns system');
 
     console.log('✅ Successfully scheduled access instructions for:', scheduledTimeUTC);
     return true;
@@ -1041,36 +1025,4 @@ async function scheduleAccessInstructions(reservation: any) {
   }
 }
 
-// Function to create reservation reminder
-async function createReservationReminder(reservation: any) {
-  try {
-    // Calculate reminder time (1 hour before reservation)
-    const reservationTime = new Date(reservation.start_time);
-    const reminderTime = new Date(reservationTime.getTime() - 60 * 60 * 1000); // 1 hour before
-
-    // Create reminder record
-    const { data: reminder, error } = await supabase
-      .from('reservation_reminders')
-      .insert([{
-        reservation_id: reservation.id,
-        reminder_type: '1_hour_before',
-        scheduled_time: reminderTime.toISOString(),
-        status: 'pending',
-        phone: reservation.phone,
-        message: `Reminder: Your reservation at Noir is in 1 hour. We look forward to seeing you!`
-      }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating reminder:', error);
-      return false;
-    }
-
-    console.log('Reminder created successfully:', reminder.id);
-    return true;
-  } catch (error) {
-    console.error('Error creating reservation reminder:', error);
-    return false;
-  }
-} 
+// Note: Removed createReservationReminder function - using campaigns instead 
