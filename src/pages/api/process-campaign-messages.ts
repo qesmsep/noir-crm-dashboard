@@ -194,8 +194,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const unit = message.duration_unit || 'hr';
             const proximity = message.duration_proximity || 'before';
             
+            // Convert database unit names to Luxon unit names
+            const luxonUnit = unit === 'min' ? 'minutes' : 
+                             unit === 'hr' ? 'hours' : 
+                             unit === 'day' ? 'days' : 
+                             unit === 'month' ? 'months' : 
+                             unit === 'year' ? 'years' : 'hours';
+            
             targetSendTime = triggerDate.plus({
-              [unit]: proximity === 'after' ? quantity : -quantity
+              [luxonUnit]: proximity === 'after' ? quantity : -quantity
             });
           }
 
