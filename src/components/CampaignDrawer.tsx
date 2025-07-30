@@ -129,7 +129,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
     }
 
     // Validate trigger_type
-    const validTriggerTypes = ['member_signup', 'member_birthday', 'member_renewal', 'reservation_time'];
+    const validTriggerTypes = ['member_signup', 'member_birthday', 'member_renewal', 'reservation_time', 'reservation_created'];
     if (!validTriggerTypes.includes(formData.trigger_type)) {
       toast({
         title: 'Validation Error',
