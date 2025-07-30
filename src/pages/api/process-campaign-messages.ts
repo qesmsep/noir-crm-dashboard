@@ -314,15 +314,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
 
           // Send SMS via OpenPhone API
+          console.log('Sending SMS via OpenPhone API...');
+          console.log('OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
+          console.log('Recipient phone:', formattedPhone);
+          console.log('Message content:', messageContent);
+          
           const openphoneResponse = await fetch('https://api.openphone.com/v1/messages', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${process.env.OPENPHONE_API_KEY}`,
               'Content-Type': 'application/json',
+              'Authorization': process.env.OPENPHONE_API_KEY || '',
+              'Accept': 'application/json'
             },
             body: JSON.stringify({
-              to: formattedPhone,
-              text: messageContent,
+              to: [formattedPhone],
+              from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+              content: messageContent
             }),
           });
 
