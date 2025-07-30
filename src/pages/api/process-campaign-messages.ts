@@ -174,19 +174,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log('Created virtual members from reservations:', virtualMembers.length);
         members = virtualMembers;
-        
-        // TEST MODE: Only process messages for your phone number
-        const testPhoneNumber = '8584129797';
-        const originalCount = members.length;
-        members = members.filter(member => {
-          const memberPhone = member.phone.replace(/\D/g, '');
-          const isTestMember = memberPhone === testPhoneNumber;
-          if (isTestMember) {
-            console.log(`🧪 TEST MODE: Processing member ${member.member_id} with phone ${member.phone}`);
-          }
-          return isTestMember;
-        });
-        console.log(`🧪 TEST MODE: Filtered from ${originalCount} to ${members.length} members (phone: ${testPhoneNumber})`);
       } else if (triggerType === 'member_birthday') {
         // Get members with birthdays today
         const today = now.toFormat('MM-dd');
