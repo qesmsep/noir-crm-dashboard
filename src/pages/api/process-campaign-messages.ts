@@ -131,18 +131,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // For reservation_time triggers, we'll create "virtual members" from reservations
         // This allows sending messages to anyone with a reservation, not just members
-        const virtualMembers = reservations.map(reservation => ({
-          member_id: `reservation_${reservation.phone}_${reservation.start_time}`,
-          account_id: `reservation_account_${reservation.phone}`,
-          first_name: 'Guest', // We'll get this from the reservation
-          last_name: '',
-          email: '',
-          phone: reservation.phone,
-          member_type: 'guest',
-          join_date: reservation.start_time,
-          created_at: reservation.start_time,
-          updated_at: reservation.start_time
-        }));
+        const virtualMembers = reservations.map(reservation => {
+          // Convert phone number to international format
+          let formattedPhone = reservation.phone;
+          const digits = reservation.phone.replace(/\D/g, '');
+          
+          if (digits.length === 10) {
+            formattedPhone = '+1' + digits;
+          } else if (digits.length === 11 && digits.startsWith('1')) {
+            formattedPhone = '+' + digits;
+          } else if (!formattedPhone.startsWith('+')) {
+            formattedPhone = '+' + digits;
+          }
+          
+          return {
+            member_id: `reservation_${reservation.phone}_${reservation.start_time}`,
+            account_id: `reservation_account_${reservation.phone}`,
+            first_name: 'Guest', // We'll get this from the reservation
+            last_name: '',
+            email: '',
+            phone: formattedPhone, // Use the formatted phone number
+            member_type: 'guest',
+            join_date: reservation.start_time,
+            created_at: reservation.start_time,
+            updated_at: reservation.start_time
+          };
+        });
         
         console.log('Created virtual members from reservations:', virtualMembers.length);
         members = virtualMembers;
