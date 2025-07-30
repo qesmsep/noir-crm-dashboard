@@ -347,7 +347,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .insert({
               campaign_message_id: message.id,
               member_id: member.member_id,
-              recipient_phone: formattedPhone,
               message_content: messageContent,
               scheduled_send_time: targetSendTime.toISO(),
               sent_at: now.toISO(),
@@ -371,7 +370,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               .insert({
                 campaign_message_id: message.id,
                 member_id: member.member_id,
-                recipient_phone: member.phone || '',
                 message_content: message.content,
                 scheduled_send_time: now.toISO(),
                 status: 'failed',
