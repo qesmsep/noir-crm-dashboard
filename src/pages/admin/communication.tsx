@@ -52,6 +52,9 @@ interface CampaignTemplate {
   specific_phone?: string;
   timing_type: 'specific_time' | 'duration';
   specific_time?: string;
+  specific_time_quantity?: number;
+  specific_time_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
+  specific_time_proximity?: 'before' | 'after';
   duration_quantity?: number;
   duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
   duration_proximity?: 'before' | 'after';
@@ -390,16 +393,32 @@ export default function CommunicationPage() {
   };
 
   const formatTiming = (template: CampaignTemplate) => {
-    const parts: string[] = [];
     if (template.timing_type === 'specific_time') {
-      return `At ${template.specific_time}`;
-    } else {
-      if (template.duration_quantity && template.duration_unit) {
-        const unit = template.duration_unit === 'hr' ? 'hour' : template.duration_unit;
-        const plural = template.duration_quantity !== 1 ? 's' : '';
-        parts.push(`${template.duration_quantity} ${unit}${plural}`);
+      // Convert 24-hour format to 12-hour format with AM/PM
+      const time = template.specific_time || '10:00';
+      const [hours, minutes] = time.split(':').map(Number);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+      const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
+      
+      // Get relative timing information
+      const quantity = template.specific_time_quantity || 0;
+      const unit = template.specific_time_unit || 'day';
+      const proximity = template.specific_time_proximity || 'after';
+      
+      if (quantity === 0) {
+        return `${displayTime} on trigger date`;
+      } else {
+        const unitText = quantity === 1 ? unit : unit + 's';
+        return `${displayTime} ${quantity} ${unitText} ${proximity}`;
       }
-      return `${template.duration_proximity === 'after' ? 'After' : 'Before'} ${parts.join(' ')}`;
+    } else {
+      // duration timing type
+      const quantity = template.duration_quantity || 1;
+      const unit = template.duration_unit || 'hr';
+      const proximity = template.duration_proximity || 'after';
+      const unitText = quantity === 1 ? unit : unit + 's';
+      return `${quantity} ${unitText} ${proximity}`;
     }
   };
 
