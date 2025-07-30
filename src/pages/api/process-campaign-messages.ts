@@ -230,6 +230,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log('Created virtual members from reservations:', virtualMembers.length);
         members = virtualMembers;
+      } else if (triggerType === 'reservation_created') {
+        // Get reservations created recently (within last 24 hours)
+        const { data: reservationData, error: reservationError } = await supabaseAdmin
+          .from('reservations')
+          .select('phone, start_time, end_time, party_size, created_at, first_name, last_name')
+          .gte('created_at', now.minus({ hours: 24 }).toISO()) // Reservations created in last 24 hours
+          .lte('created_at', now.toISO()); // Up to now
+
+        if (reservationError) {
+          console.error('Error fetching recent reservations:', reservationError);
+          continue;
+        }
+
+        if (!reservationData || reservationData.length === 0) {
+          console.log('No recently created reservations found');
+          continue;
+        }
+
+        console.log('Found recently created reservations:', reservationData.map(r => ({
+          phone: r.phone,
+          created_at: r.created_at,
+          first_name: r.first_name,
+          last_name: r.last_name
+        })));
+
+        // Create virtual members from recently created reservations
+        const virtualMembers = reservationData.map(reservation => {
+          // Convert phone number to international format
+          let formattedPhone = reservation.phone;
+          const digits = reservation.phone.replace(/\D/g, '');
+          
+          if (digits.length === 10) {
+            formattedPhone = '+1' + digits;
+          } else if (digits.length === 11 && digits.startsWith('1')) {
+            formattedPhone = '+' + digits;
+          } else if (!formattedPhone.startsWith('+')) {
+            formattedPhone = '+' + digits;
+          }
+          
+          return {
+            member_id: crypto.randomUUID(),
+            account_id: crypto.randomUUID(),
+            first_name: reservation.first_name || 'Guest',
+            last_name: reservation.last_name || '',
+            email: '',
+            phone: formattedPhone,
+            member_type: 'guest',
+            join_date: reservation.created_at, // Use created_at as trigger point
+            end_time: reservation.end_time,
+            party_size: reservation.party_size,
+            created_at: reservation.created_at,
+            updated_at: reservation.created_at
+          };
+        });
+        
+        console.log('Created virtual members from recent reservations:', virtualMembers.length);
+        members = virtualMembers;
       } else if (triggerType === 'member_birthday') {
         // Get all members with dob and filter by birthday in JavaScript
         const { data: allMembers, error: membersError } = await supabaseAdmin
@@ -316,6 +373,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const triggerTime = isAfterMessage && reservationEndTime ? reservationEndTime : reservationStartTime;
             triggerDate = DateTime.fromISO(triggerTime, { zone: 'utc' }).setZone(businessTimezone);
             console.log(`Trigger date (business timezone): ${triggerDate.toISO()} (using ${isAfterMessage ? 'end_time' : 'start_time'})`);
+          } else if (triggerType === 'reservation_created') {
+            // Use reservation created_at as trigger date
+            triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
+            console.log(`Trigger date (business timezone): ${triggerDate.toISO()} (using created_at)`);
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
             triggerDate = now.setZone(businessTimezone);

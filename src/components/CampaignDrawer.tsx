@@ -25,7 +25,7 @@ interface Campaign {
   id?: string;
   name: string;
   description: string;
-  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time';
+  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created';
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -289,6 +289,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
                       <option value="member_birthday">Member Birthday</option>
                       <option value="member_renewal">Member Renewal Date</option>
                       <option value="reservation_time">Reservation Time</option>
+                      <option value="reservation_created">Reservation Created</option>
                     </Select>
                   </FormControl>
 
