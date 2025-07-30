@@ -17,8 +17,5 @@
       "schedule": "*/1 * * * *"
     }
   ],
-  "functions": {
-  },
-  "rewrites": [
-  ]
+
 } 
