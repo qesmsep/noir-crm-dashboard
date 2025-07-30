@@ -347,9 +347,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .insert({
               campaign_message_id: message.id,
               member_id: member.member_id,
+              phone_number: formattedPhone,
               message_content: messageContent,
-              scheduled_send_time: targetSendTime.toISO(),
-              sent_at: now.toISO(),
+              scheduled_time: targetSendTime.toISO(),
+              sent_time: now.toISO(),
               status: 'sent',
             });
 
@@ -370,8 +371,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               .insert({
                 campaign_message_id: message.id,
                 member_id: member.member_id,
+                phone_number: member.phone || '',
                 message_content: message.content,
-                scheduled_send_time: now.toISO(),
+                scheduled_time: now.toISO(),
                 status: 'failed',
                 error_message: error instanceof Error ? error.message : 'Unknown error',
               });
