@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Validate trigger_type
-      const validTriggerTypes = ['member_signup', 'member_birthday', 'member_renewal', 'reservation_time'];
+      const validTriggerTypes = ['member_signup', 'member_birthday', 'member_renewal', 'reservation_time', 'reservation_created'];
       if (!validTriggerTypes.includes(campaign.trigger_type)) {
         console.log('Invalid trigger_type:', campaign.trigger_type);
         res.status(400).json({ 
