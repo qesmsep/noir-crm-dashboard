@@ -243,10 +243,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
           }
 
-          // Check if message should be sent now (within 10 minutes of target time)
-          const timeDiff = Math.abs(targetSendTime.diff(now, 'minutes').minutes);
+          // Check if message should be sent now (within 5 minutes of target time)
+          const timeDiff = targetSendTime.diff(now, 'minutes').minutes;
           console.log(`Campaign message ${message.name}: target time ${targetSendTime.toISO()}, now ${now.toISO()}, diff ${timeDiff} minutes`);
-          if (timeDiff > 10) {
+          
+          // Only send if we're within 5 minutes AFTER the target time (not before)
+          if (timeDiff > 5 || timeDiff < -60) {
             console.log(`Message not ready to send yet (diff: ${timeDiff} minutes)`);
             continue; // Not time to send yet
           }
