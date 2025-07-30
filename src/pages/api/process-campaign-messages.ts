@@ -75,6 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Get relevant members based on campaign trigger type
       let members: any[] = [];
+      let reservations: any[] = []; // Add this to store reservations for reservation_time trigger
       
       if (triggerType === 'member_signup') {
         // Get members who joined recently (within last 30 days)
@@ -92,20 +93,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         members = onboardingMembers || [];
       } else if (triggerType === 'reservation_time') {
         // Get members with upcoming reservations
-        const { data: reservationMembers, error: reservationError } = await supabaseAdmin
+        const { data: reservationData, error: reservationError } = await supabaseAdmin
           .from('reservations')
-          .select(`
-            *,
-            members!inner(*)
-          `)
+          .select('member_id, reservation_time')
           .gte('reservation_time', now.toISO())
           .lte('reservation_time', now.plus({ days: 7 }).toISO());
 
         if (reservationError) {
-          console.error('Error fetching reservation members:', reservationError);
+          console.error('Error fetching reservations:', reservationError);
           continue;
         }
-        members = (reservationMembers || []).map((r: any) => r.members);
+
+        if (!reservationData || reservationData.length === 0) {
+          console.log('No upcoming reservations found');
+          continue;
+        }
+
+        // Store reservations for later use
+        reservations = reservationData;
+
+        // Get unique member IDs from reservations
+        const memberIds = [...new Set(reservations.map(r => r.member_id))];
+        
+        // Fetch member data for these IDs
+        const { data: reservationMembers, error: membersError } = await supabaseAdmin
+          .from('members')
+          .select('*')
+          .in('member_id', memberIds);
+
+        if (membersError) {
+          console.error('Error fetching reservation members:', membersError);
+          continue;
+        }
+        
+        members = reservationMembers || [];
       } else if (triggerType === 'member_birthday') {
         // Get members with birthdays today
         const today = now.toFormat('MM-dd');
@@ -143,18 +164,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (triggerType === 'member_signup') {
             triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
           } else if (triggerType === 'reservation_time') {
-            // Find the member's reservation
-            const { data: reservation } = await supabaseAdmin
-              .from('reservations')
-              .select('reservation_time')
-              .eq('member_id', member.member_id)
-              .gte('reservation_time', now.toISO())
-              .order('reservation_time', { ascending: true })
-              .limit(1)
-              .single();
-
-            if (!reservation) continue;
-            triggerDate = DateTime.fromISO(reservation.reservation_time, { zone: 'utc' }).setZone(businessTimezone);
+            // Find the member's reservation from the already fetched reservations
+            const memberReservation = reservations.find(r => r.member_id === member.member_id);
+            
+            if (!memberReservation) continue;
+            triggerDate = DateTime.fromISO(memberReservation.reservation_time, { zone: 'utc' }).setZone(businessTimezone);
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
             triggerDate = now.setZone(businessTimezone);
