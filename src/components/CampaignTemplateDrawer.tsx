@@ -46,6 +46,9 @@ interface CampaignTemplate {
   specific_phone?: string;
   timing_type: 'specific_time' | 'duration';
   specific_time?: string; // HH:MM format
+  specific_time_quantity?: number; // Number of time units relative to trigger date
+  specific_time_unit?: 'min' | 'hr' | 'day' | 'month' | 'year'; // Time unit for relative timing
+  specific_time_proximity?: 'before' | 'after'; // Whether to send before or after trigger date
   duration_quantity?: number;
   duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
   duration_proximity?: 'before' | 'after';
@@ -85,6 +88,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     specific_phone: '',
     timing_type: 'specific_time' as 'specific_time' | 'duration',
     specific_time: '10:00',
+    specific_time_quantity: 0,
+    specific_time_unit: 'day' as 'min' | 'hr' | 'day' | 'month' | 'year',
+    specific_time_proximity: 'after' as 'before' | 'after',
     duration_quantity: 1,
     duration_unit: 'hr' as 'min' | 'hr' | 'day' | 'month' | 'year',
     duration_proximity: 'after' as 'before' | 'after',
@@ -111,6 +117,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           specific_phone: '',
           timing_type: 'specific_time',
           specific_time: '10:00',
+          specific_time_quantity: 0,
+          specific_time_unit: 'day',
+          specific_time_proximity: 'after',
           duration_quantity: 1,
           duration_unit: 'hr',
           duration_proximity: 'after',
@@ -157,6 +166,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         specific_phone: data.specific_phone || '',
         timing_type: data.timing_type || 'specific_time',
         specific_time: data.specific_time || '10:00',
+        specific_time_quantity: data.specific_time_quantity || 0,
+        specific_time_unit: data.specific_time_unit || 'day',
+        specific_time_proximity: data.specific_time_proximity || 'after',
         duration_quantity: data.duration_quantity || 1,
         duration_unit: data.duration_unit || 'hr',
         duration_proximity: data.duration_proximity || 'after',
@@ -352,7 +364,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
   const formatTimingDisplay = () => {
     if (formData.timing_type === 'specific_time') {
-      return `Send at ${formData.specific_time} on trigger date`;
+      const unit = formData.specific_time_quantity === 1 ? formData.specific_time_unit : formData.specific_time_unit + 's';
+      return `Send at ${formData.specific_time} ${formData.specific_time_quantity} ${unit} ${formData.specific_time_proximity} trigger date`;
     } else {
       const unit = formData.duration_quantity === 1 ? formData.duration_unit : formData.duration_unit + 's';
       return `Send ${formData.duration_quantity} ${unit} ${formData.duration_proximity} trigger`;
@@ -565,7 +578,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                             borderRadius="md"
                             border={formData.timing_type === 'specific_time' ? '2px solid #a59480' : '1px solid transparent'}
                           >
-                            Send at specific time on trigger date
+                            Send at specific time relative to trigger date
                           </Radio>
                           <Radio 
                             value="duration" 
@@ -582,21 +595,81 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                     </FormControl>
 
                     {formData.timing_type === 'specific_time' ? (
-                      <FormControl>
-                        <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Send Time</FormLabel>
-                        <Input
-                          type="time"
-                          value={formData.specific_time}
-                          onChange={(e) => handleInputChange('specific_time', e.target.value)}
-                          bg="#ecede8"
-                          color="#353535"
-                          borderColor="#a59480"
-                          _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                        />
-                        <Text fontSize="xs" color="#a59480" mt={1}>
-                          Time on the trigger date (e.g., 10:00 AM)
-                        </Text>
-                      </FormControl>
+                      <VStack spacing={4} width="100%">
+                        <FormControl>
+                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Send Time</FormLabel>
+                          <Input
+                            type="time"
+                            value={formData.specific_time}
+                            onChange={(e) => handleInputChange('specific_time', e.target.value)}
+                            bg="#ecede8"
+                            color="#353535"
+                            borderColor="#a59480"
+                            _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                          />
+                          <Text fontSize="xs" color="#a59480" mt={1}>
+                            Time of day (e.g., 10:00 AM)
+                          </Text>
+                        </FormControl>
+
+                        <HStack spacing={4} width="100%">
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Quantity</FormLabel>
+                            <NumberInput
+                              value={formData.specific_time_quantity}
+                              onChange={(value) => handleInputChange('specific_time_quantity', parseInt(value))}
+                              min={0}
+                              max={2000}
+                              bg="#ecede8"
+                              color="#353535"
+                              borderColor="#a59480"
+                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            >
+                              <NumberInputField 
+                                placeholder="0-2000"
+                                _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                              />
+                              <NumberInputStepper>
+                                <NumberIncrementStepper />
+                                <NumberDecrementStepper />
+                              </NumberInputStepper>
+                            </NumberInput>
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time Unit</FormLabel>
+                            <Select
+                              value={formData.specific_time_unit}
+                              onChange={(e) => handleInputChange('specific_time_unit', e.target.value)}
+                              bg="#ecede8"
+                              color="#353535"
+                              borderColor="#a59480"
+                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            >
+                              <option value="min">Minutes</option>
+                              <option value="hr">Hours</option>
+                              <option value="day">Days</option>
+                              <option value="month">Months</option>
+                              <option value="year">Years</option>
+                            </Select>
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Proximity</FormLabel>
+                            <Select
+                              value={formData.specific_time_proximity}
+                              onChange={(e) => handleInputChange('specific_time_proximity', e.target.value)}
+                              bg="#ecede8"
+                              color="#353535"
+                              borderColor="#a59480"
+                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            >
+                              <option value="before">Before</option>
+                              <option value="after">After</option>
+                            </Select>
+                          </FormControl>
+                        </HStack>
+                      </VStack>
                     ) : (
                       <HStack spacing={4} width="100%">
                         <FormControl>

@@ -268,9 +268,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
 
           if (message.timing_type === 'specific_time') {
-            // Send at specific time on trigger date
+            // Send at specific time relative to trigger date
             const [hours, minutes] = message.specific_time?.split(':').map(Number) || [10, 0];
-            targetSendTime = triggerDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+            const quantity = message.specific_time_quantity || 0;
+            const unit = message.specific_time_unit || 'day';
+            const proximity = message.specific_time_proximity || 'after';
+            
+            // Convert database unit names to Luxon unit names
+            const luxonUnit = unit === 'min' ? 'minutes' : 
+                             unit === 'hr' ? 'hours' : 
+                             unit === 'day' ? 'days' : 
+                             unit === 'month' ? 'months' : 
+                             unit === 'year' ? 'years' : 'days';
+            
+            // Calculate the relative date first
+            let relativeDate = triggerDate;
+            if (quantity > 0) {
+              relativeDate = triggerDate.plus({
+                [luxonUnit]: proximity === 'after' ? quantity : -quantity
+              });
+            }
+            
+            // Then set the specific time on that date
+            targetSendTime = relativeDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
           } else {
             // Send based on duration relative to trigger
             const quantity = message.duration_quantity || 1;

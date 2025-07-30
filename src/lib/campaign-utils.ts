@@ -21,6 +21,9 @@ export interface CampaignMessage {
   specific_phone?: string;
   timing_type: 'specific_time' | 'duration';
   specific_time?: string;
+  specific_time_quantity?: number;
+  specific_time_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
+  specific_time_proximity?: 'before' | 'after';
   duration_quantity?: number;
   duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
   duration_proximity?: 'before' | 'after';
