@@ -84,11 +84,12 @@ export function sortCampaignTemplates(templates: CampaignTemplate[]): CampaignTe
     }
     
     // Both are in the same category (before or after), sort by proximity
-    // For both "before" and "after" messages: closest to trigger comes first
+    // For "before" messages: furthest from trigger comes first (chronological order)
+    // For "after" messages: closest to trigger comes first (chronological order)
     if (isBeforeA) {
-      // Both are "before" - sort by proximity (closest first)
-      // Since offsetA and offsetB are negative, we want the larger (less negative) first
-      return offsetB - offsetA;
+      // Both are "before" - sort by proximity (furthest first)
+      // Since offsetA and offsetB are negative, we want the smaller (more negative) first
+      return offsetA - offsetB;
     } else {
       // Both are "after" - sort by proximity (closest first)
       return offsetA - offsetB;
