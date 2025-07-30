@@ -244,19 +244,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log('Created virtual members from reservations:', virtualMembers.length);
         members = virtualMembers;
       } else if (triggerType === 'member_birthday') {
-        // Get members with birthdays today
-        const today = now.toFormat('MM-dd');
-        const { data: birthdayMembers, error: birthdayError } = await supabaseAdmin
+        // Get all members with dob and filter by birthday in JavaScript
+        const { data: allMembers, error: membersError } = await supabaseAdmin
           .from('members')
           .select('*')
-          .filter('dob', 'not.is', null)
-          .filter('to_char(dob, \'MM-dd\')', 'eq', today);
+          .not('dob', 'is', null);
 
-        if (birthdayError) {
-          console.error('Error fetching birthday members:', birthdayError);
+        if (membersError) {
+          console.error('Error fetching members for birthday check:', membersError);
           continue;
         }
-        members = birthdayMembers || [];
+
+        // Filter members whose birthday is today
+        const today = now.toFormat('MM-dd');
+        members = (allMembers || []).filter(member => {
+          if (!member.dob) return false;
+          
+          // Convert dob to MM-dd format for comparison
+          const dobDate = DateTime.fromISO(member.dob);
+          const dobFormatted = dobDate.toFormat('MM-dd');
+          
+          return dobFormatted === today;
+        });
         
         // TEST MODE: Only process messages for your phone number
         const testPhoneNumber = '+18584129797';
