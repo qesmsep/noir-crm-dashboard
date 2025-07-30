@@ -149,7 +149,9 @@ export default function CampaignEditPage() {
           specific_time_proximity: template.specific_time_proximity,
           duration_quantity: template.duration_quantity,
           duration_unit: template.duration_unit,
-          duration_proximity: template.duration_proximity
+          duration_proximity: template.duration_proximity,
+          // Log all template properties to see what's available
+          allProps: Object.keys(template)
         });
       });
       
