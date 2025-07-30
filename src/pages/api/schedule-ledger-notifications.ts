@@ -7,9 +7,38 @@ const supabase = createClient(
 );
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    res.setHeader('Allow', ['POST', 'GET']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  // Verify this is a legitimate Vercel cron request or authorized token
+  const isVercelCron = req.headers['x-vercel-cron'] === '1' || 
+                      req.headers['user-agent']?.includes('Vercel') ||
+                      req.headers['x-vercel-deployment-url'];
+
+  if (!isVercelCron) {
+    // For manual testing, allow with a secret token
+    let token: string | undefined;
+    
+    // Check Authorization header (for POST requests)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+    
+    // Check query parameter (for GET requests)
+    if (!token && req.method === 'GET') {
+      token = req.query.token as string;
+    }
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized - Only Vercel cron jobs or authorized tokens allowed' });
+    }
+    
+    if (token !== 'cron-secret-token-2024') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
   }
 
   console.log('📅 Scheduling ledger notifications...');
