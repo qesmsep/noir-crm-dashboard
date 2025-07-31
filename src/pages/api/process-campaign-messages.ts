@@ -646,12 +646,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   console.log(`📅 Found ${events.length} events for date range:`, campaignData.event_list_date_range);
                   
                   if (events.length > 0) {
-                    const eventList = events.map((event: any) => 
-                      `• ${event.date} at ${event.time} - ${event.title}`
-                    ).join('\n');
+                    const eventList = events.map((event: any) => {
+                      let eventLine = `• ${event.date} at ${event.time} - ${event.title}`;
+                      
+                      // Add RSVP URL if available
+                      if (event.rsvpEnabled && event.rsvpUrl) {
+                        const rsvpUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/rsvp/${event.rsvpUrl}`;
+                        eventLine += `\n  RSVP: ${rsvpUrl}`;
+                      }
+                      
+                      return eventLine;
+                    }).join('\n\n');
                     
                     messageContent += '\n\n📅 Upcoming Noir Member Events:\n' + eventList;
-                    console.log(`✅ Added ${events.length} events to message`);
+                    console.log(`✅ Added ${events.length} events to message with RSVP links`);
                   } else {
                     console.log('ℹ️  No events found for the specified date range');
                   }

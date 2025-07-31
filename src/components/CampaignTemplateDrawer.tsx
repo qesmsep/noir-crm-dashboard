@@ -569,9 +569,17 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     
     // Add event list if this is an all_members campaign with event list enabled
     if (campaignTriggerType === 'all_members' && campaignData?.include_event_list && noirMemberEvents.length > 0) {
-      const eventList = noirMemberEvents.map(event => 
-        `• ${event.date} at ${event.time} - ${event.title}`
-      ).join('\n');
+      const eventList = noirMemberEvents.map(event => {
+        let eventLine = `• ${event.date} at ${event.time} - ${event.title}`;
+        
+        // Add RSVP URL if available
+        if (event.rsvpEnabled && event.rsvpUrl) {
+          const rsvpUrl = `${window.location.origin}/rsvp/${event.rsvpUrl}`;
+          eventLine += `\n  RSVP: ${rsvpUrl}`;
+        }
+        
+        return eventLine;
+      }).join('\n\n');
       
       previewContent += '\n\n📅 Upcoming Noir Member Events:\n' + eventList;
     }

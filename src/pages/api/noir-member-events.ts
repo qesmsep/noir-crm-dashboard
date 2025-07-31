@@ -57,7 +57,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         event_description,
         max_guests,
         total_attendees_maximum,
-        status
+        status,
+        rsvp_enabled,
+        rsvp_url
       `)
       .eq('event_type', 'Noir Member Event')
       .eq('status', 'active')
@@ -87,7 +89,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }),
       description: event.event_description,
       maxGuests: event.max_guests,
-      totalAttendees: event.total_attendees_maximum
+      totalAttendees: event.total_attendees_maximum,
+      rsvpEnabled: event.rsvp_enabled,
+      rsvpUrl: event.rsvp_url
     })) || [];
 
     res.status(200).json({ events: formattedEvents });
