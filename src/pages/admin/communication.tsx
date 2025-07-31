@@ -30,11 +30,23 @@ interface Campaign {
   campaign_id: string;
   name: string;
   description: string;
-  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created';
+  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members';
   is_active: boolean;
   created_at: string;
   updated_at: string;
   message_count?: number;
+  // New fields for recurring campaigns
+  recurring_schedule?: any;
+  recurring_start_date?: string;
+  recurring_end_date?: string;
+  // New fields for reservation range campaigns
+  reservation_range_start?: string;
+  reservation_range_end?: string;
+  // New fields for private event campaigns
+  selected_private_event_id?: string;
+  // New fields for event list feature
+  include_event_list?: boolean;
+  event_list_date_range?: any;
 }
 
 interface CampaignTemplate {
@@ -43,19 +55,31 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'duration';
+  timing_type: 'specific_time' | 'recurring' | 'relative';
   specific_time?: string;
-  specific_time_quantity?: number;
-  specific_time_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
-  specific_time_proximity?: 'before' | 'after';
-  duration_quantity?: number;
-  duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
-  duration_proximity?: 'before' | 'after';
+  specific_date?: string;
+  recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurring_time?: string;
+  recurring_weekdays?: number[];
+  recurring_monthly_type?: 'first' | 'last' | 'second' | 'third' | 'fourth';
+  recurring_monthly_day?: 'day' | 'weekday';
+  recurring_monthly_value?: number;
+  recurring_yearly_date?: string;
+  relative_time?: string;
+  relative_quantity?: number;
+  relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+  relative_proximity?: 'before' | 'after';
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // New fields for reservation range campaigns
+  reservation_range_include_past?: boolean;
+  reservation_range_minute_precision?: boolean;
+  // New fields for private event campaigns
+  private_event_date_range?: any;
+  private_event_include_old?: boolean;
 }
 
 export default function CommunicationPage() {
@@ -155,9 +179,11 @@ export default function CommunicationPage() {
   };
 
   const handleCreateCampaign = () => {
+    console.log('Create Campaign button clicked!');
     setIsCampaignCreateMode(true);
     setSelectedCampaignId(null);
     setIsCampaignDrawerOpen(true);
+    console.log('Campaign drawer should now be open:', true);
   };
 
   const handleEditCampaign = (campaign: Campaign) => {
@@ -323,40 +349,32 @@ export default function CommunicationPage() {
     setCampaignTemplates([]);
   };
 
-  const formatTiming = (template: CampaignTemplate) => {
+  const formatTimingDisplay = (template: CampaignTemplate) => {
     if (template.timing_type === 'specific_time') {
-      // Convert 24-hour format to 12-hour format with AM/PM
-      const time = template.specific_time || '10:00';
-      const [hours, minutes] = time.split(':').map(Number);
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-      const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
-      
-      // Get relative timing information
-      const quantity = template.specific_time_quantity || 0;
-      const unit = template.specific_time_unit || 'day';
-      const proximity = template.specific_time_proximity || 'after';
-      
-      if (quantity === 0) {
-        return `${displayTime} on trigger date`;
-      } else {
-        const unitText = quantity === 1 ? unit : unit + 's';
-        return `${displayTime} ${quantity} ${unitText} ${proximity}`;
+      return `Send at ${template.specific_time} on ${template.specific_date || 'trigger date'}`;
+    } else if (template.timing_type === 'recurring') {
+      let display = `Send ${template.recurring_type} at ${template.recurring_time || '10:00'}`;
+      if (template.recurring_type === 'weekly') {
+        const days = template.recurring_weekdays?.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ') || 'selected days';
+        display += ` on ${days}`;
+      } else if (template.recurring_type === 'monthly') {
+        display += ` on ${template.recurring_monthly_type} ${template.recurring_monthly_day} ${template.recurring_monthly_value}`;
+      } else if (template.recurring_type === 'yearly') {
+        display += ` on ${template.recurring_yearly_date}`;
       }
+      return display;
+    } else if (template.timing_type === 'relative') {
+      const unit = template.relative_quantity === 1 ? template.relative_unit : template.relative_unit + 's';
+      return `Send at ${template.relative_time} ${template.relative_quantity} ${unit} ${template.relative_proximity} trigger`;
     } else {
-      // duration timing type
-      const quantity = template.duration_quantity || 1;
-      const unit = template.duration_unit || 'hr';
-      const proximity = template.duration_proximity || 'after';
-      const unitText = quantity === 1 ? unit : unit + 's';
-      return `${quantity} ${unitText} ${proximity}`;
+      return 'Timing not configured';
     }
   };
 
   const formatRecipient = (template: CampaignTemplate) => {
     switch (template.recipient_type) {
       case 'member':
-        return selectedCampaign?.trigger_type === 'reservation_time' ? 'Phone number on reservation' : 'Primary Member';
+        return (selectedCampaign?.trigger_type === 'reservation' || selectedCampaign?.trigger_type === 'reservation_time' || selectedCampaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
       case 'specific_phone':
@@ -488,7 +506,7 @@ export default function CommunicationPage() {
                                 {template.description || '-'}
                               </Td>
                               <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={4}>
-                                {formatTiming(template)}
+                                {formatTimingDisplay(template)}
                               </Td>
                               <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={4}>
                                 {formatRecipient(template)}
@@ -714,7 +732,10 @@ export default function CommunicationPage() {
         {/* Campaign Drawer */}
         <CampaignDrawer
           isOpen={isCampaignDrawerOpen}
-          onClose={() => setIsCampaignDrawerOpen(false)}
+          onClose={() => {
+            console.log('Closing campaign drawer');
+            setIsCampaignDrawerOpen(false);
+          }}
           campaignId={selectedCampaignId}
           isCreateMode={isCampaignCreateMode}
           onCampaignUpdated={handleCampaignUpdated}

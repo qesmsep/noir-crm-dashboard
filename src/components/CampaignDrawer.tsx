@@ -19,16 +19,42 @@ import {
   Text,
   useToast,
   Box,
+  Checkbox,
+  CheckboxGroup,
+  Stack,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper,
+  Radio,
+  RadioGroup,
+  Divider,
+  Badge,
+  IconButton,
 } from '@chakra-ui/react';
+import { CloseIcon, CalendarIcon } from '@chakra-ui/icons';
 
 interface Campaign {
   id?: string;
   name: string;
   description: string;
-  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created';
+  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members';
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+  // New fields for recurring campaigns
+  recurring_schedule?: any;
+  recurring_start_date?: string;
+  recurring_end_date?: string;
+  // New fields for reservation range campaigns
+  reservation_range_start?: string;
+  reservation_range_end?: string;
+  // New fields for private event campaigns
+  selected_private_event_id?: string;
+  // New fields for event list feature
+  include_event_list?: boolean;
+  event_list_date_range?: any;
 }
 
 interface CampaignDrawerProps {
@@ -50,27 +76,37 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
   const [formData, setFormData] = useState<Campaign>({
     name: '',
     description: '',
-    trigger_type: 'member_signup',
+    trigger_type: 'reservation',
     is_active: true,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const toast = useToast();
 
+  // Initialization effect: runs when drawer opens or mode/campaign changes
   useEffect(() => {
-    if (isOpen && !isCreateMode && campaignId) {
-      fetchCampaign();
-    } else if (isOpen && isCreateMode) {
-      // Reset form for create mode
-      setFormData({
-        name: '',
-        description: '',
-        trigger_type: 'member_signup',
-        is_active: true,
-      });
-      setCampaign(null);
+    if (isOpen) {
+      if (!isCreateMode && campaignId) {
+        fetchCampaign();
+      } else if (isCreateMode) {
+        setFormData({
+          name: '',
+          description: '',
+          trigger_type: 'member_signup',
+          is_active: true,
+        });
+        setCampaign(null);
+      }
     }
   }, [isOpen, campaignId, isCreateMode]);
+
+  // Fetch private events only when private_event trigger type is selected
+  useEffect(() => {
+    if (isOpen && formData.trigger_type === 'private_event') {
+      fetchPrivateEvents();
+    }
+  }, [isOpen, formData.trigger_type]);
 
   const fetchCampaign = async () => {
     if (!campaignId) return;
@@ -99,6 +135,14 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
         description: data.description || '',
         trigger_type: data.trigger_type || 'member_signup',
         is_active: data.is_active !== undefined ? data.is_active : true,
+        recurring_schedule: data.recurring_schedule,
+        recurring_start_date: data.recurring_start_date,
+        recurring_end_date: data.recurring_end_date,
+        reservation_range_start: data.reservation_range_start,
+        reservation_range_end: data.reservation_range_end,
+        selected_private_event_id: data.selected_private_event_id,
+        include_event_list: data.include_event_list,
+        event_list_date_range: data.event_list_date_range,
       });
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -113,29 +157,203 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
     }
   };
 
+  const fetchPrivateEvents = async () => {
+    try {
+      const response = await fetch('/api/private-events');
+      if (response.ok) {
+        const data = await response.json();
+        setPrivateEvents(data);
+      }
+    } catch (error) {
+      console.error('Error fetching private events:', error);
+    }
+  };
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const getTriggerTypeOptions = () => [
+    { value: 'all_members', label: 'All Members' },
+    { value: 'member_birthday', label: 'Member Birthday' },
+    { value: 'member_renewal', label: 'Member Renewal' },
+    { value: 'member_signup', label: 'Member Signup' },
+    { value: 'private_event', label: 'Private Event' },
+    { value: 'recurring', label: 'Recurring' },
+    { value: 'reservation', label: 'Reservation' },
+    { value: 'reservation_created', label: 'Reservation Created' },
+    { value: 'reservation_range', label: 'Reservation Range' },
+    { value: 'reservation_time', label: 'Reservation Time' },
+  ];
+
+  const renderTriggerTypeSpecificFields = () => {
+    switch (formData.trigger_type) {
+      case 'recurring':
+        return (
+          <VStack spacing={4} align="stretch">
+            <FormControl>
+              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                Recurring Schedule
+              </FormLabel>
+              <RadioGroup value={formData.recurring_schedule?.type || 'weekly'} onChange={(value) => handleInputChange('recurring_schedule', { ...formData.recurring_schedule, type: value })}>
+                <Stack direction="column">
+                  <Radio value="daily" colorScheme="green">Daily</Radio>
+                  <Radio value="weekly" colorScheme="green">Weekly</Radio>
+                  <Radio value="monthly" colorScheme="green">Monthly</Radio>
+                  <Radio value="yearly" colorScheme="green">Yearly</Radio>
+                  <Radio value="weekdays" colorScheme="green">Specific Weekdays</Radio>
+                  <Radio value="first_of_month" colorScheme="green">1st of Month</Radio>
+                  <Radio value="last_of_month" colorScheme="green">Last Day of Month</Radio>
+                </Stack>
+              </RadioGroup>
+            </FormControl>
+
+            {(formData.recurring_schedule?.type === 'weekdays') && (
+              <FormControl>
+                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                  Select Weekdays
+                </FormLabel>
+                <CheckboxGroup value={formData.recurring_schedule?.weekdays || []} onChange={(value) => handleInputChange('recurring_schedule', { ...formData.recurring_schedule, weekdays: value })}>
+                  <Stack direction="column">
+                    <Checkbox value="0">Sunday</Checkbox>
+                    <Checkbox value="1">Monday</Checkbox>
+                    <Checkbox value="2">Tuesday</Checkbox>
+                    <Checkbox value="3">Wednesday</Checkbox>
+                    <Checkbox value="4">Thursday</Checkbox>
+                    <Checkbox value="5">Friday</Checkbox>
+                    <Checkbox value="6">Saturday</Checkbox>
+                  </Stack>
+                </CheckboxGroup>
+              </FormControl>
+            )}
+
+            <HStack spacing={4}>
+              <FormControl>
+                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                  Start Date
+                </FormLabel>
+                <Input
+                  type="date"
+                  value={formData.recurring_start_date || ''}
+                  onChange={(e) => handleInputChange('recurring_start_date', e.target.value)}
+                  borderColor="#a59480"
+                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                  End Date (Optional)
+                </FormLabel>
+                <Input
+                  type="date"
+                  value={formData.recurring_end_date || ''}
+                  onChange={(e) => handleInputChange('recurring_end_date', e.target.value)}
+                  borderColor="#a59480"
+                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
+                />
+              </FormControl>
+            </HStack>
+          </VStack>
+        );
+
+      case 'reservation_range':
+        return (
+          <VStack spacing={4} align="stretch">
+            <HStack spacing={4}>
+              <FormControl>
+                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                  Start Date & Time
+                </FormLabel>
+                <Input
+                  type="datetime-local"
+                  value={formData.reservation_range_start || ''}
+                  onChange={(e) => handleInputChange('reservation_range_start', e.target.value)}
+                  borderColor="#a59480"
+                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                  End Date & Time
+                </FormLabel>
+                <Input
+                  type="datetime-local"
+                  value={formData.reservation_range_end || ''}
+                  onChange={(e) => handleInputChange('reservation_range_end', e.target.value)}
+                  borderColor="#a59480"
+                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
+                />
+              </FormControl>
+            </HStack>
+          </VStack>
+        );
+
+      case 'private_event':
+        return (
+          <VStack spacing={4} align="stretch">
+            <FormControl>
+              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                Select Private Event
+              </FormLabel>
+              <Select
+                value={formData.selected_private_event_id || ''}
+                onChange={(e) => handleInputChange('selected_private_event_id', e.target.value)}
+                borderColor="#a59480"
+                _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
+                placeholder="Select a private event"
+              >
+                {privateEvents.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.title} - {new Date(event.start_time).toLocaleDateString()}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
+          </VStack>
+        );
+
+      case 'all_members':
+        return (
+          <VStack spacing={4} align="stretch">
+            <FormControl display="flex" alignItems="center">
+              <FormLabel htmlFor="include-event-list" mb="0" fontFamily="'Montserrat', sans-serif" color="#a59480">
+                Include Event List
+              </FormLabel>
+              <Switch
+                id="include-event-list"
+                isChecked={formData.include_event_list || false}
+                onChange={(e) => handleInputChange('include_event_list', e.target.checked)}
+                colorScheme="green"
+              />
+            </FormControl>
+            
+            {formData.include_event_list && (
+              <Text fontSize="sm" color="#a59480">
+                Note: Event list feature will be implemented in the next phase.
+              </Text>
+            )}
+          </VStack>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   const handleSave = async () => {
+    console.log('Save button clicked!');
+    console.log('Form data:', formData);
+    console.log('Is create mode:', isCreateMode);
+    
     if (!formData.name.trim()) {
+      console.log('Validation failed: name is empty');
       toast({
         title: 'Validation Error',
-        description: 'Please fill in the campaign name',
+        description: 'Please fill in all required fields',
         status: 'error',
         duration: 3000,
-      });
-      return;
-    }
-
-    // Validate trigger_type
-    const validTriggerTypes = ['member_signup', 'member_birthday', 'member_renewal', 'reservation_time', 'reservation_created'];
-    if (!validTriggerTypes.includes(formData.trigger_type)) {
-      toast({
-        title: 'Validation Error',
-        description: `Invalid trigger type: ${formData.trigger_type}. Must be one of: ${validTriggerTypes.join(', ')}`,
-        status: 'error',
-        duration: 5000,
       });
       return;
     }
@@ -148,8 +366,9 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       
       const method = isCreateMode ? 'POST' : 'PUT';
       
-      console.log('Saving campaign with data:', formData);
-      console.log('Using URL:', url, 'Method:', method);
+      console.log('Making request to:', url);
+      console.log('Method:', method);
+      console.log('Request body:', JSON.stringify(formData, null, 2));
       
       const response = await fetch(url, {
         method,
@@ -160,12 +379,16 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       });
 
       console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || errorData.details || `HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.log('Error response:', errorText);
+        throw new Error('Failed to save campaign');
       }
+
+      const result = await response.json();
+      console.log('Success response:', result);
 
       toast({
         title: 'Success',
@@ -276,7 +499,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
 
                   <FormControl>
                     <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      Trigger Type
+                      Trigger Type *
                     </FormLabel>
                     <Select
                       value={formData.trigger_type}
@@ -285,75 +508,82 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
                       _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
                       fontFamily="'Montserrat', sans-serif"
                     >
-                      <option value="member_signup">Member Signup</option>
-                      <option value="member_birthday">Member Birthday</option>
-                      <option value="member_renewal">Member Renewal Date</option>
-                      <option value="reservation_time">Reservation Time</option>
-                      <option value="reservation_created">Reservation Created</option>
+                      {getTriggerTypeOptions().map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </Select>
-                  </FormControl>
-
-                  <FormControl>
-                    <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      Active Status
-                    </FormLabel>
-                    <HStack spacing={4}>
-                      <Switch
-                        isChecked={formData.is_active}
-                        onChange={(e) => handleInputChange('is_active', e.target.checked)}
-                        colorScheme="green"
-                        size="lg"
-                      />
-                      <Text fontFamily="'Montserrat', sans-serif" color="#353535">
-                        {formData.is_active ? 'Active' : 'Inactive'}
-                      </Text>
-                    </HStack>
                   </FormControl>
                 </VStack>
               </Box>
 
-              {/* Campaign ID Info */}
-              {!isCreateMode && campaign && (
-                <Box bg="#ecede8" p={4} borderRadius="md">
-                  <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif">
-                    <strong>Campaign ID:</strong> {campaign.id}
-                  </Text>
-                  <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif">
-                    <strong>Created:</strong> {new Date(campaign.created_at || '').toLocaleDateString()}
-                  </Text>
-                  {campaign.updated_at && (
-                    <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif">
-                      <strong>Last Updated:</strong> {new Date(campaign.updated_at).toLocaleDateString()}
+              {/* Trigger Type Specific Fields */}
+              {formData.trigger_type && (
+                <>
+                  <Divider borderColor="#a59480" />
+                  <Box>
+                    <Text fontSize="lg" fontWeight="bold" color="#353535" mb={4}>
+                      {formData.trigger_type === 'recurring' && 'Recurring Schedule'}
+                      {formData.trigger_type === 'reservation_range' && 'Reservation Range'}
+                      {formData.trigger_type === 'private_event' && 'Private Event Selection'}
+                      {formData.trigger_type === 'all_members' && 'All Members Options'}
                     </Text>
-                  )}
-                </Box>
+                    {renderTriggerTypeSpecificFields()}
+                  </Box>
+                </>
               )}
+
+              {/* Status */}
+              <Divider borderColor="#a59480" />
+              <Box>
+                <Text fontSize="lg" fontWeight="bold" color="#353535" mb={4}>
+                  Status
+                </Text>
+                <HStack spacing={4} align="center">
+                  <Button
+                    size="sm"
+                    colorScheme={formData.is_active ? 'green' : 'red'}
+                    variant="outline"
+                    onClick={() => handleInputChange('is_active', !formData.is_active)}
+                    fontFamily="'Montserrat', sans-serif"
+                    fontWeight="bold"
+                    _hover={{
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    {formData.is_active ? 'Active' : 'Inactive'}
+                  </Button>
+                </HStack>
+              </Box>
             </VStack>
           )}
         </DrawerBody>
 
-        <DrawerFooter borderTop="2px solid #ecede8" backgroundColor="#ecede8">
-          <HStack spacing={4} width="100%">
+        <DrawerFooter>
+          <HStack spacing={4} w="full">
             <Button
               variant="outline"
               onClick={onClose}
-              color="#a59480"
-              borderColor="#a59480"
-              _hover={{ bg: '#ecede8' }}
-              fontFamily="'Montserrat', sans-serif"
               flex={1}
+              fontFamily="'Montserrat', sans-serif"
+              borderColor="#353535"
+              color="#353535"
+              _hover={{ bg: '#f0f0f0' }}
             >
               Cancel
             </Button>
             <Button
+              colorScheme="blue"
               onClick={handleSave}
               isLoading={isSaving}
               loadingText="Saving..."
-              colorScheme="green"
-              bg="#a59480"
-              _hover={{ bg: '#8a7a66' }}
-              fontFamily="'Montserrat', sans-serif"
               flex={1}
+              fontFamily="'Montserrat', sans-serif"
+              bg="#a59480"
+              color="#ECEDE8"
+              _hover={{ bg: '#8a7a6a' }}
             >
               {isCreateMode ? 'Create Campaign' : 'Update Campaign'}
             </Button>

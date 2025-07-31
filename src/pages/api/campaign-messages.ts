@@ -59,7 +59,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Validate recipient_type
-      const validRecipientTypes = ['member', 'all_members', 'specific_phone'];
+      const validRecipientTypes = [
+        'member', 'all_members', 'specific_phone', 'both_members',
+        'reservation_phones', 'private_event_rsvps', 'all_primary_members'
+      ];
       if (message.recipient_type && !validRecipientTypes.includes(message.recipient_type)) {
         res.status(400).json({ 
           error: 'Invalid recipient_type', 
@@ -69,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Validate timing_type
-      const validTimingTypes = ['specific_time', 'duration'];
+      const validTimingTypes = ['specific_time', 'recurring', 'relative'];
       if (message.timing_type && !validTimingTypes.includes(message.timing_type)) {
         res.status(400).json({ 
           error: 'Invalid timing_type', 

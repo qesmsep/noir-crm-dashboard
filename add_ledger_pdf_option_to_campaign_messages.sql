@@ -13,6 +13,7 @@ CREATE INDEX IF NOT EXISTS idx_campaign_messages_include_ledger_pdf ON campaign_
 
 -- Verify the column was added
 DO $$
+DECLARE r RECORD;
 BEGIN
   RAISE NOTICE 'Added include_ledger_pdf column to campaign_messages table';
   RAISE NOTICE 'Column details:';

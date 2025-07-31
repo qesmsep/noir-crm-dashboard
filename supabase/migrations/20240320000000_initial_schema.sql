@@ -2,6 +2,19 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Create a function to generate UUIDs that works with or without uuid-ossp
+CREATE OR REPLACE FUNCTION generate_uuid()
+RETURNS UUID AS $$
+BEGIN
+    -- Try uuid_generate_v4 first, fallback to gen_random_uuid
+    BEGIN
+        RETURN uuid_generate_v4();
+    EXCEPTION WHEN undefined_function THEN
+        RETURN gen_random_uuid();
+    END;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create enum types if they don't exist
 DO $$ 
 BEGIN
@@ -51,7 +64,7 @@ CREATE TABLE public.profiles (
 );
 
 CREATE TABLE public.roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT generate_uuid(),
     name TEXT UNIQUE NOT NULL,
     description TEXT,
     permissions JSONB NOT NULL,

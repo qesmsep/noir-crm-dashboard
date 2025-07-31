@@ -32,9 +32,19 @@ import {
   Radio,
   RadioGroup,
   Stack,
+  Checkbox,
+  CheckboxGroup,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
 import { useSettings } from '../context/SettingsContext';
+import { InfoIcon } from '@chakra-ui/icons';
 
 interface CampaignTemplate {
   id?: string;
@@ -42,20 +52,36 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'duration';
+  timing_type: 'specific_time' | 'recurring' | 'relative';
+  // Specific time fields
   specific_time?: string; // HH:MM format
-  specific_time_quantity?: number; // Number of time units relative to trigger date
-  specific_time_unit?: 'min' | 'hr' | 'day' | 'month' | 'year'; // Time unit for relative timing
-  specific_time_proximity?: 'before' | 'after'; // Whether to send before or after trigger date
-  duration_quantity?: number;
-  duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
-  duration_proximity?: 'before' | 'after';
+  specific_date?: string; // YYYY-MM-DD format
+  // Recurring fields
+  recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurring_time?: string; // HH:MM format
+  recurring_weekdays?: number[]; // Array of weekday numbers (0=Sunday, 1=Monday, etc.)
+  recurring_monthly_type?: 'first' | 'last' | 'second' | 'third' | 'fourth';
+  recurring_monthly_day?: 'day' | 'weekday';
+  recurring_monthly_value?: number; // 1-31 for day, 1-7 for weekday
+  recurring_yearly_date?: string; // MM-DD format
+  // Relative fields
+  relative_time?: string; // HH:MM format
+  relative_quantity?: number;
+  relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+  relative_proximity?: 'before' | 'after';
   include_ledger_pdf?: boolean; // Whether to include ledger PDF link
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+  // New fields for reservation range campaigns
+  reservation_range_include_past?: boolean;
+  reservation_range_minute_precision?: boolean;
+  // New fields for private event campaigns
+  private_event_date_range?: any;
+  private_event_include_old?: boolean;
+  selected_private_event_id?: string;
 }
 
 interface CampaignTemplateDrawerProps {
@@ -66,7 +92,7 @@ interface CampaignTemplateDrawerProps {
   onTemplateUpdated: () => void;
   campaignId?: string;
   isCampaignMode?: boolean;
-  campaignTriggerType?: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created';
+  campaignTriggerType?: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members';
 }
 
 const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
@@ -79,30 +105,45 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   isCampaignMode = false,
   campaignTriggerType,
 }) => {
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
   const [template, setTemplate] = useState<CampaignTemplate | null>(null);
   const [formData, setFormData] = useState({
     campaign_id: '',
     name: '',
     description: '',
     content: '',
-    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone',
+    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members',
     specific_phone: '',
-    timing_type: 'specific_time' as 'specific_time' | 'duration',
+    timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative',
     specific_time: '10:00',
-    specific_time_quantity: 0,
-    specific_time_unit: 'day' as 'min' | 'hr' | 'day' | 'month' | 'year',
-    specific_time_proximity: 'after' as 'before' | 'after',
-    duration_quantity: 1,
-    duration_unit: 'hr' as 'min' | 'hr' | 'day' | 'month' | 'year',
-    duration_proximity: 'after' as 'before' | 'after',
+    specific_date: '',
+    recurring_type: undefined as 'daily' | 'weekly' | 'monthly' | 'yearly' | undefined,
+    recurring_time: '10:00',
+    recurring_weekdays: [] as number[],
+    recurring_monthly_type: undefined as 'first' | 'last' | 'second' | 'third' | 'fourth' | undefined,
+    recurring_monthly_day: undefined as 'day' | 'weekday' | undefined,
+    recurring_monthly_value: undefined as number | undefined,
+    recurring_yearly_date: undefined as string | undefined,
+    relative_time: '10:00',
+    relative_quantity: 1,
+    relative_unit: 'day' as 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year',
+    relative_proximity: 'after' as 'before' | 'after',
     include_ledger_pdf: false,
-
     is_active: true,
+    // New fields for reservation range campaigns
+    reservation_range_include_past: true,
+    reservation_range_minute_precision: false,
+    // New fields for private event campaigns
+    private_event_date_range: undefined as any,
+    private_event_include_old: false,
+    selected_private_event_id: undefined as string | undefined,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [privateEvents, setPrivateEvents] = useState<any[]>([]);
+  const [isLoadingPrivateEvents, setIsLoadingPrivateEvents] = useState(false);
   const toast = useToast();
   const { settings } = useSettings();
 
@@ -119,15 +160,27 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           specific_phone: '',
           timing_type: 'specific_time',
           specific_time: '10:00',
-          specific_time_quantity: 0,
-          specific_time_unit: 'day',
-          specific_time_proximity: 'after',
-          duration_quantity: 1,
-          duration_unit: 'hr',
-          duration_proximity: 'after',
+          specific_date: '',
+          recurring_type: undefined,
+          recurring_time: '10:00',
+          recurring_weekdays: [],
+          recurring_monthly_type: undefined,
+          recurring_monthly_day: undefined,
+          recurring_monthly_value: undefined,
+          recurring_yearly_date: undefined,
+          relative_time: '10:00',
+          relative_quantity: 1,
+          relative_unit: 'day',
+          relative_proximity: 'after',
           include_ledger_pdf: false,
-
           is_active: true,
+          // New fields for reservation range campaigns
+          reservation_range_include_past: true,
+          reservation_range_minute_precision: false,
+                  // New fields for private event campaigns
+        private_event_date_range: undefined,
+        private_event_include_old: false,
+        selected_private_event_id: undefined,
         });
         setTemplate(null);
         setShowPreview(false);
@@ -137,6 +190,13 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       }
     }
   }, [isOpen, isCreateMode, templateId, campaignTriggerType]);
+
+  // Fetch private events when drawer opens for private_event campaigns or when recipient type changes
+  useEffect(() => {
+    if (isOpen && (campaignTriggerType === 'private_event' || formData.recipient_type === 'private_event_rsvps')) {
+      fetchPrivateEvents();
+    }
+  }, [isOpen, campaignTriggerType, formData.recipient_type]);
 
   const fetchTemplate = async () => {
     if (!templateId) return;
@@ -169,15 +229,27 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         specific_phone: data.specific_phone || '',
         timing_type: data.timing_type || 'specific_time',
         specific_time: data.specific_time || '10:00',
-        specific_time_quantity: data.specific_time_quantity || 0,
-        specific_time_unit: data.specific_time_unit || 'day',
-        specific_time_proximity: data.specific_time_proximity || 'after',
-        duration_quantity: data.duration_quantity || 1,
-        duration_unit: data.duration_unit || 'hr',
-        duration_proximity: data.duration_proximity || 'after',
+        specific_date: data.specific_date || '',
+        recurring_type: data.recurring_type || undefined,
+        recurring_time: data.recurring_time || '10:00',
+        recurring_weekdays: data.recurring_weekdays || [],
+        recurring_monthly_type: data.recurring_monthly_type || undefined,
+        recurring_monthly_day: data.recurring_monthly_day || undefined,
+        recurring_monthly_value: data.recurring_monthly_value || undefined,
+        recurring_yearly_date: data.recurring_yearly_date || undefined,
+        relative_time: data.relative_time || '10:00',
+        relative_quantity: data.relative_quantity || 1,
+        relative_unit: data.relative_unit || 'day',
+        relative_proximity: data.relative_proximity || 'after',
         include_ledger_pdf: data.include_ledger_pdf || false,
-
         is_active: data.is_active !== undefined ? data.is_active : true,
+        // New fields for reservation range campaigns
+        reservation_range_include_past: data.reservation_range_include_past || true,
+        reservation_range_minute_precision: data.reservation_range_minute_precision || false,
+        // New fields for private event campaigns
+        private_event_date_range: data.private_event_date_range || undefined,
+        private_event_include_old: data.private_event_include_old || false,
+        selected_private_event_id: data.selected_private_event_id || undefined,
       });
     } catch (error) {
       console.error('Error fetching template:', error);
@@ -189,6 +261,49 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchPrivateEvents = async () => {
+    setIsLoadingPrivateEvents(true);
+    try {
+      const response = await fetch('/api/private-events');
+      if (response.ok) {
+        const data = await response.json();
+        // Sort events chronologically by date first, then by name
+        const sortedEvents = (data.data || []).sort((a: any, b: any) => {
+          const dateA = new Date(a.start_time);
+          const dateB = new Date(b.start_time);
+          
+          // First sort by date
+          if (dateA.getTime() !== dateB.getTime()) {
+            return dateA.getTime() - dateB.getTime();
+          }
+          
+          // If dates are the same, sort by name
+          return a.title.localeCompare(b.title);
+        });
+        
+        setPrivateEvents(sortedEvents);
+      } else {
+        console.error('Failed to fetch private events');
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch private events',
+          status: 'error',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching private events:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch private events',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setIsLoadingPrivateEvents(false);
     }
   };
 
@@ -218,8 +333,17 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     console.log('=== MESSAGE TIMING ANALYSIS ===');
     if (formData.timing_type === 'specific_time') {
       console.log(`Message will be sent at: ${formData.specific_time} on trigger date`);
-    } else {
-      console.log(`Message will be sent: ${formData.duration_quantity} ${formData.duration_unit} ${formData.duration_proximity} trigger`);
+    } else if (formData.timing_type === 'recurring') {
+      console.log(`Message will be sent: ${formData.recurring_type} at ${formData.recurring_time}`);
+      if (formData.recurring_type === 'weekly') {
+        console.log(`Selected weekdays: ${formData.recurring_weekdays?.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}`);
+      } else if (formData.recurring_type === 'monthly') {
+        console.log(`Monthly type: ${formData.recurring_monthly_type}, day/weekday: ${formData.recurring_monthly_day}, value: ${formData.recurring_monthly_value}`);
+      } else if (formData.recurring_type === 'yearly') {
+        console.log(`Yearly date: ${formData.recurring_yearly_date}`);
+      }
+    } else if (formData.timing_type === 'relative') {
+      console.log(`Message will be sent: ${formData.relative_quantity} ${formData.relative_unit} ${formData.relative_proximity} trigger`);
     }
     
     // Log recipient information
@@ -255,16 +379,22 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       // Remove trigger_type as it's not in the database schema
       delete cleanedData.trigger_type;
       
-      // Only include timing-specific fields based on timing_type
-      if (formData.timing_type === 'specific_time') {
-        // For specific_time, only include specific_time field
-        delete cleanedData.duration_quantity;
-        delete cleanedData.duration_unit;
-        delete cleanedData.duration_proximity;
-      } else {
-        // For duration, only include duration fields
-        delete cleanedData.specific_time;
-      }
+      // Send all relevant fields including the new timing fields
+      const basicFields = [
+        'campaign_id', 'name', 'description', 'content', 'recipient_type',
+        'specific_phone', 'timing_type', 'specific_time', 'specific_date',
+        'recurring_type', 'recurring_time', 'recurring_weekdays', 'recurring_monthly_type',
+        'recurring_monthly_day', 'recurring_monthly_value', 'recurring_yearly_date',
+        'relative_time', 'relative_quantity', 'relative_unit', 'relative_proximity',
+        'include_ledger_pdf', 'is_active', 'selected_private_event_id'
+      ];
+      
+      // Remove all fields except the basic ones
+      Object.keys(cleanedData).forEach(key => {
+        if (!basicFields.includes(key)) {
+          delete cleanedData[key];
+        }
+      });
       
       // If creating a template within a campaign, set the campaign_id
       const dataToSend = isCreateMode && campaignId 
@@ -365,8 +495,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
     
-    // Add reservation-specific placeholders if this is a reservation_time or reservation_created campaign
-    if (campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
+    // Add reservation-specific placeholders if this is a reservation campaign
+    if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
         .replace(/\{\{party_size\}\}/g, '4');
@@ -377,11 +507,31 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
   const formatTimingDisplay = () => {
     if (formData.timing_type === 'specific_time') {
-      const unit = formData.specific_time_quantity === 1 ? formData.specific_time_unit : formData.specific_time_unit + 's';
-      return `Send at ${formData.specific_time} ${formData.specific_time_quantity} ${unit} ${formData.specific_time_proximity} trigger date`;
+      return `Send at ${formData.specific_time} on ${formData.specific_date || 'trigger date'}`;
+    } else if (formData.timing_type === 'recurring') {
+      let display = `Send ${formData.recurring_type} at ${formData.recurring_time || '10:00'}`;
+      if (formData.recurring_type === 'weekly') {
+        const days = formData.recurring_weekdays?.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ') || 'selected days';
+        display += ` on ${days}`;
+      } else if (formData.recurring_type === 'monthly') {
+        display += ` on ${formData.recurring_monthly_type} ${formData.recurring_monthly_day} ${formData.recurring_monthly_value}`;
+      } else if (formData.recurring_type === 'yearly') {
+        display += ` on ${formData.recurring_yearly_date}`;
+      }
+      return display;
+    } else if (formData.timing_type === 'relative') {
+      if (formData.relative_quantity === 0) {
+        return `Send at ${formData.relative_time} ON trigger date`;
+      } else {
+        const unit = formData.relative_quantity === 1 ? formData.relative_unit : formData.relative_unit + 's';
+        if (formData.relative_unit === 'minute') {
+          return `Send ${formData.relative_quantity} ${unit} ${formData.relative_proximity} trigger`;
+        } else {
+          return `Send at ${formData.relative_time} ${formData.relative_quantity} ${unit} ${formData.relative_proximity} trigger`;
+        }
+      }
     } else {
-      const unit = formData.duration_quantity === 1 ? formData.duration_unit : formData.duration_unit + 's';
-      return `Send ${formData.duration_quantity} ${unit} ${formData.duration_proximity} trigger`;
+      return 'Timing not configured';
     }
   };
 
@@ -419,19 +569,108 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const getRecipientOptions = () => {
     if (!campaignTriggerType) return [];
     
-    if (campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
-      return [
-        { value: 'member', label: 'Phone number on reservation' },
-        { value: 'specific_phone', label: 'Custom phone number' }
-      ];
-    } else {
-      // member_signup, member_birthday, member_renewal
-      return [
-        { value: 'member', label: 'Primary member' },
-        { value: 'all_members', label: 'All members' },
-        { value: 'specific_phone', label: 'Custom phone number' }
-      ];
+    switch (campaignTriggerType) {
+      case 'member_signup':
+      case 'member_birthday':
+      case 'member_renewal':
+        return [
+          { value: 'member', label: 'Member' },
+          { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+      
+      case 'reservation':
+      case 'reservation_time':
+      case 'reservation_created':
+        return [
+          { value: 'member', label: 'Phone number on reservation' },
+          { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+      
+      case 'recurring':
+        return [
+          { value: 'member', label: 'Member' },
+          { value: 'all_members', label: 'All Members' },
+          { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+      
+      case 'reservation_range':
+        return [
+          { value: 'reservation_phones', label: 'Phone numbers on Reservations within time period' },
+          { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+      
+      case 'private_event':
+        return [
+          { value: 'private_event_rsvps', label: 'Phone numbers of RSVPs for Private event' },
+          { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+      
+      case 'all_members':
+        return [
+          { value: 'all_members', label: 'Phone numbers of all existing members' },
+          { value: 'all_primary_members', label: 'All primary members' },
+          { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+      
+      default:
+        // member_signup, member_birthday, member_renewal
+        return [
+          { value: 'member', label: 'Primary member' },
+          { value: 'all_members', label: 'All members' },
+          { value: 'specific_phone', label: 'Custom phone number' }
+        ];
     }
+  };
+
+  const getTimingOptions = () => {
+    if (!campaignTriggerType) return ['specific_time', 'recurring', 'relative'];
+    
+    switch (campaignTriggerType) {
+      case 'recurring':
+        return ['specific_time', 'recurring', 'relative'];
+      
+      case 'all_members':
+        return ['specific_time', 'recurring', 'relative'];
+      
+      case 'reservation_range':
+      case 'private_event':
+        return ['specific_time', 'recurring', 'relative'];
+      
+      default:
+        // member_signup, member_birthday, member_renewal, reservation_time, reservation_created
+        return ['specific_time', 'recurring', 'relative'];
+    }
+  };
+
+  const shouldShowRelativeOption = () => {
+    if (!campaignTriggerType) return false;
+    
+    // Only show relative option for triggers that have specific dates/times
+    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'private_event'].includes(campaignTriggerType);
+  };
+
+  const getAvailablePlaceholders = () => {
+    const placeholders = [
+      { name: '{{first_name}}', description: 'Member first name' },
+      { name: '{{last_name}}', description: 'Member last name' },
+      { name: '{{member_name}}', description: 'Full member name' },
+      { name: '{{phone}}', description: 'Member phone number' },
+      { name: '{{email}}', description: 'Member email address' },
+      { name: '{{reservation_time}}', description: 'Reservation date and time' },
+      { name: '{{reservation_date}}', description: 'Reservation date only' },
+      { name: '{{event_name}}', description: 'Private event name' },
+      { name: '{{event_date}}', description: 'Private event date' },
+      { name: '{{event_time}}', description: 'Private event time' },
+    ];
+    
+    return placeholders;
+  };
+
+  const shouldShowLedgerPdfOption = () => {
+    if (!campaignTriggerType) return false;
+    
+    // Only show ledger PDF for member-related triggers
+    return ['member_signup', 'member_birthday', 'member_renewal'].includes(campaignTriggerType);
   };
 
   return (
@@ -529,9 +768,6 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
                 {/* Recipient Configuration */}
                 <Box>
-                  <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                    Recipient Configuration
-                  </Text>
                   <VStack spacing={4}>
                     <FormControl>
                       <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Recipient Type</FormLabel>
@@ -568,6 +804,39 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                         </Text>
                       </FormControl>
                     )}
+
+                    {formData.recipient_type === 'private_event_rsvps' && (
+                      <FormControl>
+                        <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Select Private Event</FormLabel>
+                        {isLoadingPrivateEvents ? (
+                          <Box display="flex" justifyContent="center" alignItems="center" height="100px">
+                            <Spinner size="md" color="#a59480" />
+                          </Box>
+                        ) : (
+                          <Select
+                            value={formData.selected_private_event_id || ''}
+                            onChange={(e) => handleInputChange('selected_private_event_id', e.target.value)}
+                            bg="#ecede8"
+                            color="#353535"
+                            borderColor="#a59480"
+                            _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            placeholder="Select a private event"
+                          >
+                            <option value="">Select a private event</option>
+                            {privateEvents.map((event) => (
+                              <option key={event.id} value={event.id}>
+                                {new Date(event.start_time).toLocaleDateString()} {new Date(event.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {event.title}
+                              </option>
+                            ))}
+                          </Select>
+                        )}
+                        {privateEvents.length === 0 && !isLoadingPrivateEvents && (
+                          <Text fontSize="xs" color="#a59480" mt={1}>
+                            No private events found. Create some private events first.
+                          </Text>
+                        )}
+                      </FormControl>
+                    )}
                   </VStack>
                 </Box>
 
@@ -575,9 +844,6 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
                 {/* Timing Configuration */}
                 <Box>
-                  <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                    When to Send
-                  </Text>
                   <VStack spacing={4}>
                     <FormControl>
                       <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Timing Type</FormLabel>
@@ -591,55 +857,209 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                             borderRadius="md"
                             border={formData.timing_type === 'specific_time' ? '2px solid #a59480' : '1px solid transparent'}
                           >
-                            Send at specific time relative to trigger date
+                            Send at specific time
                           </Radio>
                           <Radio 
-                            value="duration" 
+                            value="recurring" 
                             colorScheme="green"
-                            bg={formData.timing_type === 'duration' ? '#ecede8' : 'transparent'}
+                            bg={formData.timing_type === 'recurring' ? '#ecede8' : 'transparent'}
                             p={2}
                             borderRadius="md"
-                            border={formData.timing_type === 'duration' ? '2px solid #a59480' : '1px solid transparent'}
+                            border={formData.timing_type === 'recurring' ? '2px solid #a59480' : '1px solid transparent'}
                           >
-                            Send after/before trigger by duration
+                            Send on recurring schedule
                           </Radio>
+                          {shouldShowRelativeOption() && (
+                            <Radio 
+                              value="relative" 
+                              colorScheme="green"
+                              bg={formData.timing_type === 'relative' ? '#ecede8' : 'transparent'}
+                              p={2}
+                              borderRadius="md"
+                              border={formData.timing_type === 'relative' ? '2px solid #a59480' : '1px solid transparent'}
+                            >
+                              Send relative to trigger date
+                            </Radio>
+                          )}
                         </Stack>
                       </RadioGroup>
                     </FormControl>
 
-                    {formData.timing_type === 'specific_time' ? (
+                    {formData.timing_type === 'specific_time' && (
+                      <VStack spacing={4} width="100%">
+                        <HStack spacing={4} width="100%">
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time</FormLabel>
+                            <Input
+                              type="time"
+                              value={formData.specific_time}
+                              onChange={(e) => handleInputChange('specific_time', e.target.value)}
+                              bg="#ecede8"
+                              color="#353535"
+                              borderColor="#a59480"
+                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Date</FormLabel>
+                            <Input
+                              type="date"
+                              value={formData.specific_date}
+                              onChange={(e) => handleInputChange('specific_date', e.target.value)}
+                              bg="#ecede8"
+                              color="#353535"
+                              borderColor="#a59480"
+                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            />
+                          </FormControl>
+                        </HStack>
+                      </VStack>
+                    )}
+
+                    {formData.timing_type === 'recurring' && (
                       <VStack spacing={4} width="100%">
                         <FormControl>
-                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Send Time</FormLabel>
+                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Recurring Type</FormLabel>
+                          <RadioGroup value={formData.recurring_type} onChange={(value) => handleInputChange('recurring_type', value)}>
+                            <Stack direction="column">
+                              <Radio value="daily" colorScheme="green">Daily</Radio>
+                              <Radio value="weekly" colorScheme="green">Weekly</Radio>
+                              <Radio value="monthly" colorScheme="green">Monthly</Radio>
+                              <Radio value="yearly" colorScheme="green">Yearly</Radio>
+                            </Stack>
+                          </RadioGroup>
+                        </FormControl>
+
+                        <FormControl>
+                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time</FormLabel>
                           <Input
                             type="time"
-                            value={formData.specific_time}
-                            onChange={(e) => handleInputChange('specific_time', e.target.value)}
+                            value={formData.recurring_time || '10:00'}
+                            onChange={(e) => handleInputChange('recurring_time', e.target.value)}
                             bg="#ecede8"
                             color="#353535"
                             borderColor="#a59480"
                             _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                           />
-                          <Text fontSize="xs" color="#a59480" mt={1}>
-                            Time of day (e.g., 10:00 AM)
-                          </Text>
                         </FormControl>
 
+                        {formData.recurring_type === 'weekly' && (
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Select Weekdays</FormLabel>
+                            <CheckboxGroup value={formData.recurring_weekdays || []} onChange={(value) => handleInputChange('recurring_weekdays', value)}>
+                              <Stack direction="column">
+                                <Checkbox value="0">Sunday</Checkbox>
+                                <Checkbox value="1">Monday</Checkbox>
+                                <Checkbox value="2">Tuesday</Checkbox>
+                                <Checkbox value="3">Wednesday</Checkbox>
+                                <Checkbox value="4">Thursday</Checkbox>
+                                <Checkbox value="5">Friday</Checkbox>
+                                <Checkbox value="6">Saturday</Checkbox>
+                              </Stack>
+                            </CheckboxGroup>
+                          </FormControl>
+                        )}
+
+                        {formData.recurring_type === 'monthly' && (
+                          <>
+                            <FormControl>
+                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Monthly Type</FormLabel>
+                              <RadioGroup value={formData.recurring_monthly_type} onChange={(value) => handleInputChange('recurring_monthly_type', value)}>
+                                <Stack direction="column">
+                                  <Radio value="first" colorScheme="green">First</Radio>
+                                  <Radio value="second" colorScheme="green">Second</Radio>
+                                  <Radio value="third" colorScheme="green">Third</Radio>
+                                  <Radio value="fourth" colorScheme="green">Fourth</Radio>
+                                  <Radio value="last" colorScheme="green">Last</Radio>
+                                </Stack>
+                              </RadioGroup>
+                            </FormControl>
+
+                            <FormControl>
+                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Day/Weekday</FormLabel>
+                              <RadioGroup value={formData.recurring_monthly_day} onChange={(value) => handleInputChange('recurring_monthly_day', value)}>
+                                <Stack direction="column">
+                                  <Radio value="day" colorScheme="green">Day</Radio>
+                                  <Radio value="weekday" colorScheme="green">Weekday</Radio>
+                                </Stack>
+                              </RadioGroup>
+                            </FormControl>
+
+                            <FormControl>
+                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Value</FormLabel>
+                              <NumberInput
+                                value={formData.recurring_monthly_value || 1}
+                                onChange={(value) => handleInputChange('recurring_monthly_value', parseInt(value))}
+                                min={0}
+                                max={31}
+                                bg="#ecede8"
+                                color="#353535"
+                                borderColor="#a59480"
+                                _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                              >
+                                <NumberInputField 
+                                  placeholder="1-31"
+                                  _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                                />
+                                <NumberInputStepper>
+                                  <NumberIncrementStepper />
+                                  <NumberDecrementStepper />
+                                </NumberInputStepper>
+                              </NumberInput>
+                            </FormControl>
+                          </>
+                        )}
+
+                        {formData.recurring_type === 'yearly' && (
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Yearly Date</FormLabel>
+                            <Input
+                              type="date"
+                              value={formData.recurring_yearly_date || ''}
+                              onChange={(e) => handleInputChange('recurring_yearly_date', e.target.value)}
+                              bg="#ecede8"
+                              color="#353535"
+                              borderColor="#a59480"
+                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            />
+                          </FormControl>
+                        )}
+                      </VStack>
+                    )}
+
+                    {formData.timing_type === 'relative' && (
+                      <VStack spacing={4} width="100%">
                         <HStack spacing={4} width="100%">
+                          {formData.relative_unit !== 'minute' && (
+                            <FormControl>
+                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time</FormLabel>
+                              <Input
+                                type="time"
+                                value={formData.relative_time || '10:00'}
+                                onChange={(e) => handleInputChange('relative_time', e.target.value)}
+                                bg="#ecede8"
+                                color="#353535"
+                                borderColor="#a59480"
+                                _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                              />
+                            </FormControl>
+                          )}
+
                           <FormControl>
                             <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Quantity</FormLabel>
                             <NumberInput
-                              value={formData.specific_time_quantity}
-                              onChange={(value) => handleInputChange('specific_time_quantity', parseInt(value))}
+                              value={formData.relative_quantity ?? 1}
+                              onChange={(value) => handleInputChange('relative_quantity', parseInt(value))}
                               min={0}
-                              max={2000}
+                              max={formData.relative_unit === 'minute' ? 1440 : 365}
                               bg="#ecede8"
                               color="#353535"
                               borderColor="#a59480"
                               _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                             >
                               <NumberInputField 
-                                placeholder="0-2000"
+                                placeholder={formData.relative_unit === 'minute' ? "1-1440" : "1-365"}
                                 _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                               />
                               <NumberInputStepper>
@@ -652,16 +1072,17 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                           <FormControl>
                             <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time Unit</FormLabel>
                             <Select
-                              value={formData.specific_time_unit}
-                              onChange={(e) => handleInputChange('specific_time_unit', e.target.value)}
+                              value={formData.relative_unit || 'day'}
+                              onChange={(e) => handleInputChange('relative_unit', e.target.value)}
                               bg="#ecede8"
                               color="#353535"
                               borderColor="#a59480"
                               _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                             >
-                              <option value="min">Minutes</option>
-                              <option value="hr">Hours</option>
+                              <option value="minute">Minutes</option>
+                              <option value="hour">Hours</option>
                               <option value="day">Days</option>
+                              <option value="week">Weeks</option>
                               <option value="month">Months</option>
                               <option value="year">Years</option>
                             </Select>
@@ -670,8 +1091,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                           <FormControl>
                             <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Proximity</FormLabel>
                             <Select
-                              value={formData.specific_time_proximity}
-                              onChange={(e) => handleInputChange('specific_time_proximity', e.target.value)}
+                              value={formData.relative_proximity || 'after'}
+                              onChange={(e) => handleInputChange('relative_proximity', e.target.value)}
                               bg="#ecede8"
                               color="#353535"
                               borderColor="#a59480"
@@ -683,64 +1104,6 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                           </FormControl>
                         </HStack>
                       </VStack>
-                    ) : (
-                      <HStack spacing={4} width="100%">
-                        <FormControl>
-                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Quantity</FormLabel>
-                          <NumberInput
-                            value={formData.duration_quantity}
-                            onChange={(value) => handleInputChange('duration_quantity', parseInt(value))}
-                            min={0}
-                            max={2000}
-                            bg="#ecede8"
-                            color="#353535"
-                            borderColor="#a59480"
-                            _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                          >
-                            <NumberInputField 
-                              placeholder="0-2000"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            />
-                            <NumberInputStepper>
-                              <NumberIncrementStepper />
-                              <NumberDecrementStepper />
-                            </NumberInputStepper>
-                          </NumberInput>
-                        </FormControl>
-
-                        <FormControl>
-                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time Unit</FormLabel>
-                          <Select
-                            value={formData.duration_unit}
-                            onChange={(e) => handleInputChange('duration_unit', e.target.value)}
-                            bg="#ecede8"
-                            color="#353535"
-                            borderColor="#a59480"
-                            _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                          >
-                            <option value="min">Minutes</option>
-                            <option value="hr">Hours</option>
-                            <option value="day">Days</option>
-                            <option value="month">Months</option>
-                            <option value="year">Years</option>
-                          </Select>
-                        </FormControl>
-
-                        <FormControl>
-                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Proximity</FormLabel>
-                          <Select
-                            value={formData.duration_proximity}
-                            onChange={(e) => handleInputChange('duration_proximity', e.target.value)}
-                            bg="#ecede8"
-                            color="#353535"
-                            borderColor="#a59480"
-                            _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                          >
-                            <option value="before">Before</option>
-                            <option value="after">After</option>
-                          </Select>
-                        </FormControl>
-                      </HStack>
                     )}
 
                     <Box p={4} bg="#ecede8" borderRadius="md" border="1px solid #a59480">
@@ -755,12 +1118,24 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
                 {/* Message Template */}
                 <Box>
-                  <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                    Message Template
-                  </Text>
                   <VStack spacing={4}>
                     <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Message Content</FormLabel>
+                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
+                        Message Content
+                        <IconButton
+                          aria-label="View available placeholders"
+                          icon={<InfoIcon />}
+                          size="sm"
+                          variant="ghost"
+                          color="#a59480"
+                          ml={2}
+                          onClick={() => {
+                            const placeholders = getAvailablePlaceholders();
+                            const placeholderText = placeholders.map(p => `${p.name}: ${p.description}`).join('\n');
+                            alert(`Available Placeholders:\n\n${placeholderText}`);
+                          }}
+                        />
+                      </FormLabel>
                       <Textarea
                         value={formData.content}
                         onChange={(e) => handleInputChange('content', e.target.value)}
@@ -771,18 +1146,12 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                         color="#353535"
                         borderColor="#a59480"
                         _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                        placeholder={`Enter your message template here. Use {{first_name}}, {{last_name}}, {{member_name}}, {{phone}}, and {{email}} as placeholders.${campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created' ? ' For reservation campaigns, you can also use {{reservation_time}} and {{party_size}}.' : ''}`}
+                        placeholder="Enter your message template here. Use placeholders like {{first_name}}, {{last_name}}, etc."
                         fontFamily="'Montserrat', sans-serif"
                         fontSize="14px"
                         lineHeight="1.5"
                         w="90%"
                       />
-                      <Text fontSize="xs" color="#a59480" mt={1}>
-                        Available placeholders: {'{{first_name}}'}, {'{{last_name}}'}, {'{{member_name}}'}, {'{{phone}}'}, {'{{email}}'}
-                        {(campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') && (
-                          <>, {'{{reservation_time}}'}, {'{{party_size}}'}</>
-                        )}
-                      </Text>
                     </FormControl>
 
                     {/* Preview Toggle */}
@@ -832,7 +1201,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                 <Divider borderColor="#a59480" />
 
                 {/* Ledger PDF Option - Only for member-related triggers */}
-                {campaignTriggerType && campaignTriggerType !== 'reservation_time' && campaignTriggerType !== 'reservation_created' && (
+                {shouldShowLedgerPdfOption() && (
                   <>
                     <Button
                       size="sm"
@@ -928,6 +1297,34 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           </DrawerFooter>
         </DrawerContent>
       </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isConfirmingDelete}
+        onClose={() => setIsConfirmingDelete(false)}
+        leastDestructiveRef={cancelRef}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete Template
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              Are you sure you want to delete this template? This action cannot be undone.
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button onClick={() => setIsConfirmingDelete(false)}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={handleDelete} ml={3}>
+                Delete
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Drawer>
   );
 };

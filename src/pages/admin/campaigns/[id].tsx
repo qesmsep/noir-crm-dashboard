@@ -35,7 +35,7 @@ interface Campaign {
   campaign_id: string;
   name: string;
   description: string;
-  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time';
+  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members';
   is_active: boolean;
   created_at: string;
   updated_at?: string;
@@ -47,16 +47,22 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'duration';
+  timing_type: 'specific_time' | 'recurring' | 'relative';
   specific_time?: string;
-  specific_time_quantity?: number;
-  specific_time_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
-  specific_time_proximity?: 'before' | 'after';
-  duration_quantity?: number;
-  duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
-  duration_proximity?: 'before' | 'after';
+  specific_date?: string;
+  recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurring_time?: string;
+  recurring_weekdays?: number[];
+  recurring_monthly_type?: 'first' | 'last' | 'second' | 'third' | 'fourth';
+  recurring_monthly_day?: 'day' | 'weekday';
+  recurring_monthly_value?: number;
+  recurring_yearly_date?: string;
+  relative_time?: string;
+  relative_quantity?: number;
+  relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+  relative_proximity?: 'before' | 'after';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -154,9 +160,6 @@ export default function CampaignEditPage() {
 
     setSaving(true);
     try {
-      const updatedCampaign = { ...campaign, [field]: value };
-      setCampaign(updatedCampaign);
-
       const response = await fetch(`/api/campaigns/${campaign.id}`, {
         method: 'PUT',
         headers: {
@@ -168,6 +171,10 @@ export default function CampaignEditPage() {
       if (!response.ok) {
         throw new Error('Failed to update campaign');
       }
+
+      // Get the updated campaign data from the server response
+      const updatedCampaign = await response.json();
+      setCampaign(updatedCampaign);
 
       toast({
         title: 'Success',
@@ -185,8 +192,6 @@ export default function CampaignEditPage() {
         duration: 5000,
         isClosable: true,
       });
-      // Revert the change
-      setCampaign(campaign);
     } finally {
       setSaving(false);
     }
@@ -305,31 +310,57 @@ export default function CampaignEditPage() {
       const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
       const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
       
-      // Get relative timing information
-      const quantity = template.specific_time_quantity || 0;
-      const unit = template.specific_time_unit || 'day';
-      const proximity = template.specific_time_proximity || 'after';
+      if (template.specific_date) {
+        return `${displayTime} on ${template.specific_date}`;
+      } else {
+        return `${displayTime} on trigger date`;
+      }
+    } else if (template.timing_type === 'recurring') {
+      const time = template.recurring_time || '10:00';
+      const [hours, minutes] = time.split(':').map(Number);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+      const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
+      
+      if (template.recurring_type === 'daily') {
+        return `Daily at ${displayTime}`;
+      } else if (template.recurring_type === 'weekly') {
+        const days = template.recurring_weekdays?.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ') || 'selected days';
+        return `Weekly on ${days} at ${displayTime}`;
+      } else if (template.recurring_type === 'monthly') {
+        const type = template.recurring_monthly_type || 'first';
+        const day = template.recurring_monthly_day || 'day';
+        const value = template.recurring_monthly_value || 1;
+        return `Monthly on ${type} ${day} ${value} at ${displayTime}`;
+      } else if (template.recurring_type === 'yearly') {
+        return `Yearly on ${template.recurring_yearly_date} at ${displayTime}`;
+      }
+      return `Recurring at ${displayTime}`;
+    } else if (template.timing_type === 'relative') {
+      const time = template.relative_time || '10:00';
+      const [hours, minutes] = time.split(':').map(Number);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+      const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
+      
+      const quantity = template.relative_quantity || 0;
+      const unit = template.relative_unit || 'day';
+      const proximity = template.relative_proximity || 'after';
       
       if (quantity === 0) {
         return `${displayTime} on trigger date`;
       } else {
         const unitText = quantity === 1 ? unit : unit + 's';
-        return `${displayTime} ${quantity} ${unitText} ${proximity}`;
+        return `${displayTime} ${quantity} ${unitText} ${proximity} trigger`;
       }
-    } else {
-      // duration timing type
-      const quantity = template.duration_quantity || 1;
-      const unit = template.duration_unit || 'hr';
-      const proximity = template.duration_proximity || 'after';
-      const unitText = quantity === 1 ? unit : unit + 's';
-      return `${quantity} ${unitText} ${proximity}`;
     }
+    return 'Timing not configured';
   };
 
   const formatRecipient = (template: CampaignTemplate) => {
     switch (template.recipient_type) {
       case 'member':
-        return campaign?.trigger_type === 'reservation_time' ? 'Phone number on reservation' : 'Primary Member';
+        return (campaign?.trigger_type === 'reservation' || campaign?.trigger_type === 'reservation_time' || campaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
       case 'specific_phone':
@@ -583,9 +614,15 @@ export default function CampaignEditPage() {
                           _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
                           fontFamily="'Montserrat', sans-serif"
                         >
-                          <option value="member_signup">Member Signup</option>
+                          <option value="all_members">All Members</option>
                           <option value="member_birthday">Member Birthday</option>
                           <option value="member_renewal">Member Renewal Date</option>
+                          <option value="member_signup">Member Signup</option>
+                          <option value="private_event">Private Event</option>
+                          <option value="recurring">Recurring</option>
+                          <option value="reservation">Reservation</option>
+                          <option value="reservation_created">Reservation Created</option>
+                          <option value="reservation_range">Reservation Range</option>
                           <option value="reservation_time">Reservation Time</option>
                         </Select>
                         <Button size="sm" colorScheme="green" onClick={saveEdit}>

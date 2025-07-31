@@ -6,16 +6,22 @@ export interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'duration';
+  timing_type: 'specific_time' | 'recurring' | 'relative';
   specific_time?: string;
-  specific_time_quantity?: number;
-  specific_time_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
-  specific_time_proximity?: 'before' | 'after';
-  duration_quantity?: number;
-  duration_unit?: 'min' | 'hr' | 'day' | 'month' | 'year';
-  duration_proximity?: 'before' | 'after';
+  specific_date?: string;
+  recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurring_time?: string;
+  recurring_weekdays?: number[];
+  recurring_monthly_type?: 'first' | 'last' | 'second' | 'third' | 'fourth';
+  recurring_monthly_day?: 'day' | 'weekday';
+  recurring_monthly_value?: number;
+  recurring_yearly_date?: string;
+  relative_time?: string;
+  relative_quantity?: number;
+  relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+  relative_proximity?: 'before' | 'after';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -27,15 +33,18 @@ export interface CampaignTemplate {
  */
 export function calculateTimeOffset(template: CampaignTemplate): number {
   if (template.timing_type === 'specific_time') {
-    const quantity = template.specific_time_quantity || 0;
-    const unit = template.specific_time_unit || 'day';
-    const proximity = template.specific_time_proximity || 'after';
+    // For specific_time, we're sending at a specific time on the trigger date
+    return 0; // On trigger date
+  } else if (template.timing_type === 'relative') {
+    const quantity = template.relative_quantity || 0;
+    const unit = template.relative_unit || 'day';
+    const proximity = template.relative_proximity || 'after';
     
     // Convert to minutes for consistent comparison
     const minutesPerUnit: Record<string, number> = {
-      'min': 1,
-      'hr': 60,
+      'hour': 60,
       'day': 24 * 60,
+      'week': 7 * 24 * 60,
       'month': 30 * 24 * 60, // Approximate
       'year': 365 * 24 * 60 // Approximate
     };
@@ -43,22 +52,8 @@ export function calculateTimeOffset(template: CampaignTemplate): number {
     const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
     return proximity === 'before' ? -totalMinutes : totalMinutes;
   } else {
-    // duration timing type
-    const quantity = template.duration_quantity || 1;
-    const unit = template.duration_unit || 'hr';
-    const proximity = template.duration_proximity || 'after';
-    
-    // Convert to minutes for consistent comparison
-    const minutesPerUnit: Record<string, number> = {
-      'min': 1,
-      'hr': 60,
-      'day': 24 * 60,
-      'month': 30 * 24 * 60, // Approximate
-      'year': 365 * 24 * 60 // Approximate
-    };
-    
-    const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
-    return proximity === 'before' ? -totalMinutes : totalMinutes;
+    // recurring timing type - treat as "on trigger date"
+    return 0;
   }
 }
 
@@ -68,44 +63,27 @@ export function calculateTimeOffset(template: CampaignTemplate): number {
  */
 export function calculateSortingOffset(template: CampaignTemplate): number {
   if (template.timing_type === 'specific_time') {
-    // Check if new fields exist, if not, fall back to old logic
-    if (template.specific_time_quantity !== undefined && template.specific_time_unit !== undefined && template.specific_time_proximity !== undefined) {
-      const quantity = Number(template.specific_time_quantity) || 0;
-      const unit = template.specific_time_unit || 'day';
-      const proximity = template.specific_time_proximity || 'after';
-      
-      // Convert to minutes for consistent comparison
-      const minutesPerUnit: Record<string, number> = {
-        'min': 1,
-        'hr': 60,
-        'day': 24 * 60,
-        'month': 30 * 24 * 60, // Approximate
-        'year': 365 * 24 * 60 // Approximate
-      };
-      
-      const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
-      return proximity === 'before' ? -totalMinutes : totalMinutes;
-    } else {
-      // Fall back to old logic - treat as "on trigger date"
-      return 0; // On trigger date
-    }
-  } else {
-    // duration timing type
-    const quantity = Number(template.duration_quantity) || 1;
-    const unit = template.duration_unit || 'hr';
-    const proximity = template.duration_proximity || 'after';
+    // For specific_time, we're sending at a specific time on the trigger date
+    return 0; // On trigger date
+  } else if (template.timing_type === 'relative') {
+    const quantity = template.relative_quantity || 0;
+    const unit = template.relative_unit || 'day';
+    const proximity = template.relative_proximity || 'after';
     
     // Convert to minutes for consistent comparison
     const minutesPerUnit: Record<string, number> = {
-      'min': 1,
-      'hr': 60,
+      'hour': 60,
       'day': 24 * 60,
+      'week': 7 * 24 * 60,
       'month': 30 * 24 * 60, // Approximate
       'year': 365 * 24 * 60 // Approximate
     };
     
     const totalMinutes = quantity * (minutesPerUnit[unit] || 60);
     return proximity === 'before' ? -totalMinutes : totalMinutes;
+  } else {
+    // recurring timing type - treat as "on trigger date"
+    return 0;
   }
 }
 
