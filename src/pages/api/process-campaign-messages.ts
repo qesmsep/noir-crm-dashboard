@@ -142,6 +142,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           for (const message of messages) {
         console.log('\n📝 ==========================================');
         console.log(`📝 Processing campaign message: ${message.name}`);
+        console.log(`🔍 DEBUG: Starting detailed processing for message: ${message.name}`);
         console.log(`📝 Message ID: ${message.id}`);
         console.log(`📝 Campaign ID: ${message.campaign_id}`);
         console.log(`📝 Campaign Name: ${message.campaigns?.name || 'Unknown'}`);
@@ -150,6 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log(`📝 Specific Phone: ${message.specific_phone || 'None'}`);
         console.log(`📝 Include Ledger PDF: ${message.include_ledger_pdf}`);
         console.log(`📝 Full message object:`, JSON.stringify(message, null, 2));
+        console.log(`🔍 DEBUG: Past detailed logging for message: ${message.name}`);
         
         // Get the campaign trigger type
         const triggerType = message.campaigns?.trigger_type || 'member_signup';
