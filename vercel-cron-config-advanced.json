@@ -1,0 +1,14 @@
+{
+  "crons": [
+    {
+      "path": "/api/process-monthly-credits",
+      "schedule": "0 7 * * *",
+      "description": "Daily Skyline member credit processing at 7am CST"
+    },
+    {
+      "path": "/api/process-monthly-credits",
+      "schedule": "0 8 * * *",
+      "description": "Backup credit processing at 8am CST (in case 7am fails)"
+    }
+  ]
+} 
