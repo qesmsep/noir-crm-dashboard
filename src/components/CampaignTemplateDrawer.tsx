@@ -144,6 +144,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const [isLoadingPrivateEvents, setIsLoadingPrivateEvents] = useState(false);
+  const [campaignData, setCampaignData] = useState<any>(null);
+  const [noirMemberEvents, setNoirMemberEvents] = useState<any[]>([]);
   const toast = useToast();
   const { settings } = useSettings();
 
@@ -197,6 +199,13 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       fetchPrivateEvents();
     }
   }, [isOpen, campaignTriggerType, formData.recipient_type]);
+
+  // Fetch campaign data and noir member events when drawer opens for all_members campaigns
+  useEffect(() => {
+    if (isOpen && campaignTriggerType === 'all_members' && campaignId) {
+      fetchCampaignData();
+    }
+  }, [isOpen, campaignTriggerType, campaignId]);
 
   const fetchTemplate = async () => {
     if (!templateId) return;
@@ -304,6 +313,38 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       });
     } finally {
       setIsLoadingPrivateEvents(false);
+    }
+  };
+
+  const fetchCampaignData = async () => {
+    if (!campaignId) return;
+    
+    try {
+      // Fetch campaign data
+      const campaignResponse = await fetch(`/api/campaigns/${campaignId}`);
+      if (campaignResponse.ok) {
+        const campaignData = await campaignResponse.json();
+        setCampaignData(campaignData);
+        
+        // If campaign has event list enabled, fetch noir member events
+        if (campaignData.include_event_list && campaignData.event_list_date_range) {
+          await fetchNoirMemberEvents(campaignData.event_list_date_range);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching campaign data:', error);
+    }
+  };
+
+  const fetchNoirMemberEvents = async (dateRange: any) => {
+    try {
+      const eventsResponse = await fetch(`/api/noir-member-events?dateRange=${encodeURIComponent(JSON.stringify(dateRange))}`);
+      if (eventsResponse.ok) {
+        const eventsData = await eventsResponse.json();
+        setNoirMemberEvents(eventsData.events || []);
+      }
+    } catch (error) {
+      console.error('Error fetching Noir Member Events:', error);
     }
   };
 
@@ -429,6 +470,30 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       console.log('Template will be processed by cron job every 10 minutes');
       console.log('Next processing time:', new Date(Date.now() + 10 * 60 * 1000).toLocaleString());
       
+      // If this is an all_members campaign and campaign data has been modified, save the campaign
+      if (campaignTriggerType === 'all_members' && campaignId && campaignData) {
+        try {
+          const campaignResponse = await fetch(`/api/campaigns/${campaignId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              include_event_list: campaignData.include_event_list,
+              event_list_date_range: campaignData.event_list_date_range,
+            }),
+          });
+
+          if (!campaignResponse.ok) {
+            console.error('Failed to update campaign event list settings');
+          } else {
+            console.log('Campaign event list settings updated successfully');
+          }
+        } catch (error) {
+          console.error('Error updating campaign event list settings:', error);
+        }
+      }
+      
       toast({
         title: 'Success',
         description: `Message ${isCreateMode ? 'created' : 'updated'} successfully`,
@@ -500,6 +565,15 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
         .replace(/\{\{party_size\}\}/g, '4');
+    }
+    
+    // Add event list if this is an all_members campaign with event list enabled
+    if (campaignTriggerType === 'all_members' && campaignData?.include_event_list && noirMemberEvents.length > 0) {
+      const eventList = noirMemberEvents.map(event => 
+        `• ${event.date} at ${event.time} - ${event.title}`
+      ).join('\n');
+      
+      previewContent += '\n\n📅 Upcoming Noir Member Events:\n' + eventList;
     }
     
     return previewContent;
@@ -839,6 +913,130 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                     )}
                   </VStack>
                 </Box>
+
+                <Divider borderColor="#a59480" />
+
+                {/* Event List Configuration - Only for all_members campaigns */}
+                {campaignTriggerType === 'all_members' && (
+                  <Box>
+                    <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
+                      Event List Configuration
+                    </Text>
+                    <VStack spacing={4}>
+                      <FormControl display="flex" alignItems="center">
+                        <FormLabel htmlFor="include-event-list" mb="0" fontFamily="'Montserrat', sans-serif" color="#a59480">
+                          Include Event List
+                        </FormLabel>
+                        <Switch
+                          id="include-event-list"
+                          isChecked={campaignData?.include_event_list || false}
+                          onChange={(e) => {
+                            // Update campaign data locally for preview
+                            setCampaignData(prev => ({
+                              ...prev,
+                              include_event_list: e.target.checked,
+                              event_list_date_range: e.target.checked ? (prev?.event_list_date_range || { type: 'this_month' }) : null
+                            }));
+                            // If enabling, fetch events immediately
+                            if (e.target.checked) {
+                              fetchNoirMemberEvents(campaignData?.event_list_date_range || { type: 'this_month' });
+                            } else {
+                              setNoirMemberEvents([]);
+                            }
+                          }}
+                          colorScheme="green"
+                        />
+                      </FormControl>
+                      
+                      {campaignData?.include_event_list && (
+                        <VStack spacing={4} align="stretch">
+                          <FormControl>
+                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Event Date Range</FormLabel>
+                            <Select
+                              value={campaignData?.event_list_date_range?.type || 'this_month'}
+                              onChange={(e) => {
+                                const newDateRange = { 
+                                  ...campaignData?.event_list_date_range, 
+                                  type: e.target.value 
+                                };
+                                setCampaignData(prev => ({
+                                  ...prev,
+                                  event_list_date_range: newDateRange
+                                }));
+                                fetchNoirMemberEvents(newDateRange);
+                              }}
+                              bg="#ecede8"
+                              color="#353535"
+                              borderColor="#a59480"
+                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                            >
+                              <option value="this_month">This Month</option>
+                              <option value="next_month">Next Month</option>
+                              <option value="specific_range">Specific Date Range</option>
+                            </Select>
+                          </FormControl>
+
+                          {campaignData?.event_list_date_range?.type === 'specific_range' && (
+                            <HStack spacing={4}>
+                              <FormControl>
+                                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Start Date</FormLabel>
+                                <Input
+                                  type="date"
+                                  value={campaignData?.event_list_date_range?.start_date || ''}
+                                  onChange={(e) => {
+                                    const newDateRange = { 
+                                      ...campaignData?.event_list_date_range, 
+                                      start_date: e.target.value 
+                                    };
+                                    setCampaignData(prev => ({
+                                      ...prev,
+                                      event_list_date_range: newDateRange
+                                    }));
+                                    if (newDateRange.start_date && newDateRange.end_date) {
+                                      fetchNoirMemberEvents(newDateRange);
+                                    }
+                                  }}
+                                  bg="#ecede8"
+                                  color="#353535"
+                                  borderColor="#a59480"
+                                  _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">End Date</FormLabel>
+                                <Input
+                                  type="date"
+                                  value={campaignData?.event_list_date_range?.end_date || ''}
+                                  onChange={(e) => {
+                                    const newDateRange = { 
+                                      ...campaignData?.event_list_date_range, 
+                                      end_date: e.target.value 
+                                    };
+                                    setCampaignData(prev => ({
+                                      ...prev,
+                                      event_list_date_range: newDateRange
+                                    }));
+                                    if (newDateRange.start_date && newDateRange.end_date) {
+                                      fetchNoirMemberEvents(newDateRange);
+                                    }
+                                  }}
+                                  bg="#ecede8"
+                                  color="#353535"
+                                  borderColor="#a59480"
+                                  _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                                />
+                              </FormControl>
+                            </HStack>
+                          )}
+
+                          <Text fontSize="sm" color="#a59480">
+                            Will include all "Noir Member Event" events within the selected date range.
+                          </Text>
+                        </VStack>
+                      )}
+                    </VStack>
+                  </Box>
+                )}
 
                 <Divider borderColor="#a59480" />
 
@@ -1192,6 +1390,49 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                           >
                             {getPreviewMessage()}
                           </Text>
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Event List Preview - Only for all_members campaigns with event list enabled */}
+                    {campaignTriggerType === 'all_members' && campaignData?.include_event_list && (
+                      <Box>
+                        <Text fontSize="sm" fontWeight="bold" mb={2} fontFamily="'Montserrat', sans-serif" color="#a59480">
+                          Event List Preview:
+                        </Text>
+                        <Box 
+                          p={4} 
+                          bg="#f0f8ff" 
+                          borderRadius="md" 
+                          border="1px solid #a59480"
+                          minH="100px"
+                          maxH="200px"
+                          overflowY="auto"
+                          w="90%"
+                        >
+                          {noirMemberEvents.length > 0 ? (
+                            <VStack spacing={2} align="stretch">
+                              {noirMemberEvents.map((event, index) => (
+                                <Box key={index} p={2} bg="white" borderRadius="sm" border="1px solid #e0e0e0">
+                                  <Text fontWeight="bold" fontSize="sm" color="#353535">
+                                    {event.title}
+                                  </Text>
+                                  <Text fontSize="xs" color="#666">
+                                    {event.date} at {event.time}
+                                  </Text>
+                                  {event.description && (
+                                    <Text fontSize="xs" color="#666" mt={1}>
+                                      {event.description}
+                                    </Text>
+                                  )}
+                                </Box>
+                              ))}
+                            </VStack>
+                          ) : (
+                            <Text fontSize="sm" color="#666" fontStyle="italic">
+                              No Noir Member Events found for the selected date range.
+                            </Text>
+                          )}
                         </Box>
                       </Box>
                     )}

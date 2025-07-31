@@ -84,6 +84,7 @@ const EVENT_TYPES = [
   'Wind Down Party',
   'After Party',
   'Rehearsal Dinner',
+  'Noir Member Event',
   'Other'
 ];
 
@@ -98,6 +99,7 @@ const EVENT_TYPE_ICONS: { [key: string]: any } = {
   'Wind Down Party': SettingsIcon,
   'After Party': SettingsIcon,
   'Rehearsal Dinner': SettingsIcon,
+  'Noir Member Event': StarIcon,
   'Other': SettingsIcon
 };
 

@@ -106,7 +106,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log('Processing campaign messages...');
+    console.log('🚀 Starting campaign message processing...');
+    console.log('==========================================');
 
     // Get all active campaign messages from the new table
     const { data: messages, error: messagesError } = await supabaseAdmin
@@ -122,34 +123,69 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq('is_active', true);
 
     if (messagesError) {
-      console.error('Error fetching campaign messages:', messagesError);
+      console.error('❌ Error fetching campaign messages:', messagesError);
       return res.status(500).json({ error: 'Failed to fetch campaign messages' });
     }
 
     if (!messages || messages.length === 0) {
-      console.log('No active campaign messages found');
+      console.log('ℹ️  No active campaign messages found');
       return res.status(200).json({ message: 'No active campaign messages found' });
     }
 
     const now = DateTime.now();
     const businessTimezone = 'America/Chicago'; // Adjust as needed
-    console.log('Current time (UTC):', now.toISO());
-    console.log('Current time (business timezone):', now.setZone(businessTimezone).toISO());
+    console.log('⏰ Current time (UTC):', now.toISO());
+    console.log('⏰ Current time (business timezone):', now.setZone(businessTimezone).toISO());
+    console.log(`📊 Found ${messages.length} active campaign messages to process`);
     let processedCount = 0;
 
-    for (const message of messages) {
-      console.log(`Processing campaign message: ${message.name}`);
-      
-      // Get the campaign trigger type
-      const triggerType = message.campaigns?.trigger_type || 'member_signup';
+          for (const message of messages) {
+        console.log('\n📝 ==========================================');
+        console.log(`📝 Processing campaign message: ${message.name}`);
+        console.log(`📝 Message ID: ${message.id}`);
+        console.log(`📝 Campaign ID: ${message.campaign_id}`);
+        console.log(`📝 Campaign Name: ${message.campaigns?.name || 'Unknown'}`);
+        console.log(`📝 Recipient Type: ${message.recipient_type}`);
+        console.log(`📝 Timing Type: ${message.timing_type}`);
+        console.log(`📝 Specific Phone: ${message.specific_phone || 'None'}`);
+        console.log(`📝 Include Ledger PDF: ${message.include_ledger_pdf}`);
+        console.log(`📝 Full message object:`, JSON.stringify(message, null, 2));
+        
+        // Get the campaign trigger type
+        const triggerType = message.campaigns?.trigger_type || 'member_signup';
+        console.log(`🎯 Campaign trigger type: ${triggerType}`);
 
-      // Get relevant members based on campaign trigger type
-      let members: any[] = [];
-      let reservations: any[] = []; // Add this to store reservations for reservation_time trigger
+        // Special handling for specific_phone messages - always send to the specified phone
+        let members: any[] = [];
+        let reservations: any[] = []; // Add this to store reservations for reservation_time trigger
+        
+        if (message.recipient_type === 'specific_phone' && message.specific_phone) {
+          console.log('📱 Processing specific_phone message - will send to:', message.specific_phone);
+          
+          // Create a virtual member for the specific phone
+          members = [{
+            member_id: 'specific_phone_user',
+            account_id: 'specific_phone_account',
+            first_name: 'Specific',
+            last_name: 'Phone',
+            email: '',
+            phone: message.specific_phone,
+            member_type: 'specific_phone',
+            join_date: now.toISO(), // Use current time as trigger date
+            created_at: now.toISO(),
+            updated_at: now.toISO()
+          }];
+          
+          console.log(`✅ Created virtual member for specific phone: ${message.specific_phone}`);
+        } else {
+          // Get relevant members based on campaign trigger type
       
       if (triggerType === 'member_signup') {
+        console.log('👥 Fetching members for member_signup trigger...');
         // Get members who joined recently (within last 30 days)
         const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
+        console.log(`📅 Looking for members who joined after: ${thirtyDaysAgo}`);
+        
         const { data: recentMembers, error: membersError } = await supabaseAdmin
           .from('members')
           .select('*')
@@ -157,32 +193,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .order('join_date', { ascending: false });
 
         if (membersError) {
-          console.error('Error fetching recent members:', membersError);
+          console.error('❌ Error fetching recent members:', membersError);
           continue;
         }
         members = recentMembers || [];
+        console.log(`✅ Found ${members.length} recent members for member_signup trigger`);
       } else if (triggerType === 'reservation_time') {
+        console.log('📅 Fetching reservations for reservation_time trigger...');
         // Get members with upcoming reservations
         // Look for reservations in the next 24 hours to catch messages that should be sent soon
+        const searchStart = now.minus({ hours: 1 }).toISO();
+        const searchEnd = now.plus({ days: 1 }).toISO();
+        console.log(`📅 Looking for reservations between: ${searchStart} and ${searchEnd}`);
+        
         const { data: reservationData, error: reservationError } = await supabaseAdmin
           .from('reservations')
           .select('phone, start_time, end_time, party_size')
-          .gte('start_time', now.minus({ hours: 1 }).toISO()) // Include reservations from 1 hour ago
-          .lte('start_time', now.plus({ days: 1 }).toISO()); // Up to 1 day in the future
+          .gte('start_time', searchStart) // Include reservations from 1 hour ago
+          .lte('start_time', searchEnd); // Up to 1 day in the future
 
         if (reservationError) {
-          console.error('Error fetching reservations:', reservationError);
+          console.error('❌ Error fetching reservations:', reservationError);
           continue;
         }
 
         if (!reservationData || reservationData.length === 0) {
-          console.log('No upcoming reservations found');
+          console.log('ℹ️  No upcoming reservations found');
           continue;
         }
 
-        console.log('Found reservations:', reservationData.map(r => ({
+        console.log('📋 Found reservations:', reservationData.map(r => ({
           phone: r.phone,
-          start_time: r.start_time
+          start_time: r.start_time,
+          party_size: r.party_size
         })));
 
         // Store reservations for later use
@@ -190,10 +233,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Get unique phone numbers from reservations
         const phoneNumbers = [...new Set(reservations.map(r => r.phone).filter(Boolean))];
-        console.log('Found phone numbers in reservations:', phoneNumbers);
+        console.log('📱 Found phone numbers in reservations:', phoneNumbers);
         
         if (phoneNumbers.length === 0) {
-          console.log('No phone numbers found in reservations');
+          console.log('⚠️  No phone numbers found in reservations');
           continue;
         }
         
@@ -228,27 +271,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         });
         
-        console.log('Created virtual members from reservations:', virtualMembers.length);
+        console.log(`✅ Created ${virtualMembers.length} virtual members from reservations`);
         members = virtualMembers;
       } else if (triggerType === 'reservation_created') {
+        console.log('🆕 Fetching recently created reservations...');
         // Get reservations created recently (within last 24 hours)
+        const searchStart = now.minus({ hours: 24 }).toISO();
+        const searchEnd = now.toISO();
+        console.log(`📅 Looking for reservations created between: ${searchStart} and ${searchEnd}`);
+        
         const { data: reservationData, error: reservationError } = await supabaseAdmin
           .from('reservations')
           .select('phone, start_time, end_time, party_size, created_at, first_name, last_name')
-          .gte('created_at', now.minus({ hours: 24 }).toISO()) // Reservations created in last 24 hours
-          .lte('created_at', now.toISO()); // Up to now
+          .gte('created_at', searchStart) // Reservations created in last 24 hours
+          .lte('created_at', searchEnd); // Up to now
 
         if (reservationError) {
-          console.error('Error fetching recent reservations:', reservationError);
+          console.error('❌ Error fetching recent reservations:', reservationError);
           continue;
         }
 
         if (!reservationData || reservationData.length === 0) {
-          console.log('No recently created reservations found');
+          console.log('ℹ️  No recently created reservations found');
           continue;
         }
 
-        console.log('Found recently created reservations:', reservationData.map(r => ({
+        console.log('📋 Found recently created reservations:', reservationData.map(r => ({
           phone: r.phone,
           created_at: r.created_at,
           first_name: r.first_name,
@@ -285,9 +333,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         });
         
-        console.log('Created virtual members from recent reservations:', virtualMembers.length);
+        console.log(`✅ Created ${virtualMembers.length} virtual members from recent reservations`);
         members = virtualMembers;
       } else if (triggerType === 'member_birthday') {
+        console.log('🎂 Fetching members for birthday check...');
         // Get all members with dob and filter by birthday in JavaScript
         const { data: allMembers, error: membersError } = await supabaseAdmin
           .from('members')
@@ -295,12 +344,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .not('dob', 'is', null);
 
         if (membersError) {
-          console.error('Error fetching members for birthday check:', membersError);
+          console.error('❌ Error fetching members for birthday check:', membersError);
           continue;
         }
 
+        console.log(`📊 Found ${allMembers?.length || 0} members with DOB`);
+
         // Filter members whose birthday is today
         const today = now.toFormat('MM-dd');
+        console.log(`📅 Looking for birthdays on: ${today}`);
+        
         members = (allMembers || []).filter(member => {
           if (!member.dob) return false;
           
@@ -310,7 +363,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           return dobFormatted === today;
         });
+        
+        console.log(`🎂 Found ${members.length} members with birthdays today`);
       } else if (triggerType === 'member_renewal') {
+        console.log('🔄 Fetching members for renewal check...');
         // Get all members and filter by renewal date calculated from join_date
         const { data: allMembers, error: membersError } = await supabaseAdmin
           .from('members')
@@ -318,12 +374,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .not('join_date', 'is', null);
 
         if (membersError) {
-          console.error('Error fetching members for renewal check:', membersError);
+          console.error('❌ Error fetching members for renewal check:', membersError);
           continue;
         }
 
+        console.log(`📊 Found ${allMembers?.length || 0} members with join_date`);
+
         // Filter members whose renewal date is today (calculated from join_date)
         const today = now.toFormat('yyyy-MM-dd');
+        console.log(`📅 Looking for renewals on: ${today}`);
+        
         members = (allMembers || []).filter(member => {
           if (!member.join_date) return false;
           
@@ -342,16 +402,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           return isRenewalToday;
         });
+        
+        console.log(`🔄 Found ${members.length} members with renewals today`);
+      } else if (triggerType === 'all_members') {
+        console.log('👥 Fetching all active members for all_members campaign...');
+        // Get all active members for all_members campaigns (not deactivated)
+        const { data: allMembers, error: membersError } = await supabaseAdmin
+          .from('members')
+          .select('*')
+          .eq('deactivated', false);
+
+        if (membersError) {
+          console.error('❌ Error fetching all members:', membersError);
+          continue;
+        }
+
+        members = allMembers || [];
+        console.log(`✅ Found ${members.length} active members for all_members campaign`);
+      }
+    }
+
+      console.log(`👤 Processing ${members.length} members for campaign message: ${message.name}`);
+      
+      if (members.length === 0) {
+        console.log(`⚠️  No members found for campaign message: ${message.name} (trigger type: ${triggerType})`);
+        console.log(`📝 Message details:`, {
+          name: message.name,
+          recipient_type: message.recipient_type,
+          specific_phone: message.specific_phone,
+          timing_type: message.timing_type,
+          specific_time: message.specific_time
+        });
       }
 
       for (const member of members) {
         try {
+          console.log(`\n👤 Processing member: ${member.first_name} ${member.last_name} (${member.phone})`);
+          
           // Calculate send time based on message timing
           let targetSendTime: DateTime;
           let triggerDate: DateTime;
 
           if (triggerType === 'member_signup') {
             triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
+            console.log(`📅 Member signup trigger date: ${triggerDate.toISO()}`);
           } else if (triggerType === 'reservation_time') {
             // For virtual members, the reservation data is embedded in the member object
             const reservationStartTime = member.join_date; // This contains the reservation start_time
@@ -380,10 +474,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
             triggerDate = now.setZone(businessTimezone);
+            console.log(`📅 Birthday trigger date: ${triggerDate.toISO()}`);
           } else if (triggerType === 'member_renewal') {
             // Use today as trigger date for renewals
             triggerDate = now.setZone(businessTimezone);
+            console.log(`📅 Renewal trigger date: ${triggerDate.toISO()}`);
+          } else if (triggerType === 'all_members') {
+            // Use today as trigger date for all_members campaigns
+            triggerDate = now.setZone(businessTimezone);
+            console.log(`📅 All members trigger date: ${triggerDate.toISO()}`);
           } else {
+            console.log(`⚠️  Unknown trigger type: ${triggerType}`);
             continue;
           }
 
@@ -393,6 +494,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const quantity = message.specific_time_quantity || 0;
             const unit = message.specific_time_unit || 'day';
             const proximity = message.specific_time_proximity || 'after';
+            
+            console.log(`Specific time calculation: hours=${hours}, minutes=${minutes}, quantity=${quantity}, unit=${unit}, proximity=${proximity}`);
             
             // Convert database unit names to Luxon unit names
             const luxonUnit = unit === 'min' ? 'minutes' : 
@@ -408,6 +511,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 [luxonUnit]: proximity === 'after' ? quantity : -quantity
               });
             }
+            
+            console.log(`Trigger date: ${triggerDate.toISO()}, Relative date: ${relativeDate.toISO()}`);
             
             // Then set the specific time on that date
             targetSendTime = relativeDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
@@ -431,13 +536,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           // Check if message should be sent now (within 5 minutes of target time)
           const timeDiff = targetSendTime.diff(now, 'minutes').minutes;
-          console.log(`Campaign message ${message.name}: target time ${targetSendTime.toISO()}, now ${now.toISO()}, diff ${timeDiff} minutes`);
+          console.log(`⏰ Campaign message ${message.name}: target time ${targetSendTime.toISO()}, now ${now.toISO()}, diff ${timeDiff} minutes`);
+          console.log(`⏰ Campaign message ${message.name}: target time (business): ${targetSendTime.setZone(businessTimezone).toISO()}, now (business): ${now.setZone(businessTimezone).toISO()}`);
+          console.log(`⏰ Timing check: timeDiff=${timeDiff}, should send: ${timeDiff <= 5 && timeDiff >= -60}`);
           
           // Only send if we're within 5 minutes AFTER the target time (not before)
           if (timeDiff > 5 || timeDiff < -60) {
-            console.log(`Message not ready to send yet (diff: ${timeDiff} minutes)`);
+            console.log(`⏳ Message not ready to send yet (diff: ${timeDiff} minutes)`);
             continue; // Not time to send yet
           }
+          
+          console.log(`✅ Message ready to send! (diff: ${timeDiff} minutes)`);
 
           // Determine recipient phone
           let recipientPhone = member.phone;
@@ -462,7 +571,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
 
           if (!recipientPhone) {
-            console.log(`No phone number found for member ${member.member_id}`);
+            console.log(`⚠️  No phone number found for member ${member.member_id}`);
             continue;
           }
 
@@ -502,6 +611,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
 
+          // Add event list if this is an all_members campaign with event list enabled
+          if (triggerType === 'all_members') {
+            try {
+              console.log('🎯 Checking for event list configuration...');
+              // Get campaign data to check if event list is enabled
+              const { data: campaignData, error: campaignError } = await supabaseAdmin
+                .from('campaigns')
+                .select('include_event_list, event_list_date_range')
+                .eq('id', message.campaign_id)
+                .single();
+
+              if (campaignError) {
+                console.log('⚠️  Error fetching campaign data for event list:', campaignError);
+              } else {
+                console.log('📋 Campaign event list config:', {
+                  include_event_list: campaignData?.include_event_list,
+                  event_list_date_range: campaignData?.event_list_date_range
+                });
+              }
+
+              if (!campaignError && campaignData?.include_event_list && campaignData?.event_list_date_range) {
+                console.log('📅 Fetching event list for all_members campaign...');
+                
+                // Fetch Noir Member Events for the specified date range
+                const eventsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/noir-member-events?dateRange=${encodeURIComponent(JSON.stringify(campaignData.event_list_date_range))}`);
+                
+                if (eventsResponse.ok) {
+                  const eventsData = await eventsResponse.json();
+                  const events = eventsData.events || [];
+                  
+                  console.log(`📅 Found ${events.length} events for date range:`, campaignData.event_list_date_range);
+                  
+                  if (events.length > 0) {
+                    const eventList = events.map((event: any) => 
+                      `• ${event.date} at ${event.time} - ${event.title}`
+                    ).join('\n');
+                    
+                    messageContent += '\n\n📅 Upcoming Noir Member Events:\n' + eventList;
+                    console.log(`✅ Added ${events.length} events to message`);
+                  } else {
+                    console.log('ℹ️  No events found for the specified date range');
+                  }
+                } else {
+                  console.error('❌ Failed to fetch event list:', await eventsResponse.text());
+                }
+              } else {
+                console.log('ℹ️  Event list not enabled for this campaign');
+              }
+            } catch (error) {
+              console.error('❌ Error adding event list to message:', error);
+              // Continue without the event list rather than failing the entire message
+            }
+          }
+
           // Format phone number for OpenPhone
           let formattedPhone = recipientPhone;
           if (!formattedPhone.startsWith('+')) {
@@ -525,15 +688,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .single();
 
           if (existingMessage) {
-            console.log(`Message already sent for campaign message ${message.id} to phone ${formattedPhone}`);
+            console.log(`⏭️  Message already sent for campaign message ${message.id} to phone ${formattedPhone}`);
             continue;
           }
 
           // Send SMS via OpenPhone API
-          console.log('Sending SMS via OpenPhone API...');
-          console.log('OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
-          console.log('Recipient phone:', formattedPhone);
-          console.log('Message content:', messageContent);
+          console.log('📤 Sending SMS via OpenPhone API...');
+          console.log('🔑 OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
+          console.log('📱 Recipient phone:', formattedPhone);
+          console.log('📄 Message content:', messageContent);
           
           const openphoneResponse = await fetch('https://api.openphone.com/v1/messages', {
             method: 'POST',
@@ -551,11 +714,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           if (!openphoneResponse.ok) {
             const errorData = await openphoneResponse.text();
-            console.error('OpenPhone API error:', errorData);
+            console.error('❌ OpenPhone API error:', errorData);
             throw new Error(`OpenPhone API error: ${openphoneResponse.status}`);
           }
 
           const openphoneData = await openphoneResponse.json();
+          console.log('✅ OpenPhone API response:', openphoneData);
 
           // Record the sent message
           const { error: insertError } = await supabaseAdmin
@@ -571,14 +735,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
 
           if (insertError) {
-            console.error('Error recording sent message:', insertError);
+            console.error('❌ Error recording sent message:', insertError);
           } else {
-            console.log(`Successfully sent campaign message to ${formattedPhone}`);
+            console.log(`✅ Successfully sent campaign message to ${formattedPhone}`);
             processedCount++;
           }
 
         } catch (error) {
-          console.error(`Error processing campaign message for member ${member.member_id}:`, error);
+          console.error(`❌ Error processing campaign message for member ${member.member_id}:`, error);
           
           // Record failed message
           try {
@@ -593,21 +757,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 status: 'failed',
                 error_message: error instanceof Error ? error.message : 'Unknown error',
               });
+            console.log('📝 Recorded failed message in database');
           } catch (recordError) {
-            console.error('Error recording failed message:', recordError);
+            console.error('❌ Error recording failed message:', recordError);
           }
         }
       }
     }
 
-    console.log(`Campaign processing complete. Processed ${processedCount} messages.`);
+    console.log('\n🎉 ==========================================');
+    console.log(`🎉 Campaign processing complete. Processed ${processedCount} messages.`);
+    console.log('🎉 ==========================================');
     res.status(200).json({ 
       message: 'Campaign processing complete', 
       processedCount 
     });
 
   } catch (error) {
-    console.error('Error processing campaign messages:', error);
+    console.error('💥 Fatal error processing campaign messages:', error);
     res.status(500).json({ error: 'Failed to process campaign messages' });
   }
 } 

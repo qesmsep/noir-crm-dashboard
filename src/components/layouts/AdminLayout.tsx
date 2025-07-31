@@ -50,9 +50,9 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/admin/members', label: 'Members', icon: '👥' },
     { href: '/admin/waitlist', label: 'Waitlist', icon: '⏳' },
-    { href: '/admin/calendar', label: 'Calendar', icon: '📅' },
+    { href: '/admin/calendar', label: 'Reservations', icon: '📅' },
+    { href: '/admin/event-calendar', label: 'Event Calendar', icon: '🎯' },
     { href: '/admin/communication', label: 'Communication', icon: '📝' },
-    { href: '/admin/questionnaires', label: 'Questionnaires', icon: '🧾' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
     { href: '/admin/admins', label: 'Admins', icon: '👑' },
   ];

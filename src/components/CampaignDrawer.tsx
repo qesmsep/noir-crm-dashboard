@@ -95,6 +95,8 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
           description: '',
           trigger_type: 'member_signup',
           is_active: true,
+          include_event_list: false,
+          event_list_date_range: { type: 'this_month' },
         });
         setCampaign(null);
       }
@@ -330,9 +332,65 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
             </FormControl>
             
             {formData.include_event_list && (
-              <Text fontSize="sm" color="#a59480">
-                Note: Event list feature will be implemented in the next phase.
-              </Text>
+              <VStack spacing={4} align="stretch">
+                <FormControl>
+                  <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Event Date Range</FormLabel>
+                  <Select
+                    value={formData.event_list_date_range?.type || 'this_month'}
+                    onChange={(e) => handleInputChange('event_list_date_range', { 
+                      ...formData.event_list_date_range, 
+                      type: e.target.value 
+                    })}
+                    bg="#ecede8"
+                    color="#353535"
+                    borderColor="#a59480"
+                    _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                  >
+                    <option value="this_month">This Month</option>
+                    <option value="next_month">Next Month</option>
+                    <option value="specific_range">Specific Date Range</option>
+                  </Select>
+                </FormControl>
+
+                {formData.event_list_date_range?.type === 'specific_range' && (
+                  <HStack spacing={4}>
+                    <FormControl>
+                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Start Date</FormLabel>
+                      <Input
+                        type="date"
+                        value={formData.event_list_date_range?.start_date || ''}
+                        onChange={(e) => handleInputChange('event_list_date_range', { 
+                          ...formData.event_list_date_range, 
+                          start_date: e.target.value 
+                        })}
+                        bg="#ecede8"
+                        color="#353535"
+                        borderColor="#a59480"
+                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">End Date</FormLabel>
+                      <Input
+                        type="date"
+                        value={formData.event_list_date_range?.end_date || ''}
+                        onChange={(e) => handleInputChange('event_list_date_range', { 
+                          ...formData.event_list_date_range, 
+                          end_date: e.target.value 
+                        })}
+                        bg="#ecede8"
+                        color="#353535"
+                        borderColor="#a59480"
+                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                      />
+                    </FormControl>
+                  </HStack>
+                )}
+
+                <Text fontSize="sm" color="#a59480">
+                  Will include all "Noir Member Event" events within the selected date range.
+                </Text>
+              </VStack>
             )}
           </VStack>
         );
