@@ -646,6 +646,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   console.log(`📅 Found ${events.length} events for date range:`, campaignData.event_list_date_range);
                   
                   if (events.length > 0) {
+                    console.log('📋 Processing events for message:');
+                    events.forEach((event: any) => {
+                      console.log(`  Event: ${event.title}`);
+                      console.log(`    RSVP Enabled: ${event.rsvpEnabled}`);
+                      console.log(`    RSVP URL: ${event.rsvpUrl || 'null'}`);
+                    });
+                    
                     const eventList = events.map((event: any) => {
                       let eventLine = `• ${event.date} at ${event.time} - ${event.title}`;
                       
@@ -653,6 +660,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                       if (event.rsvpEnabled && event.rsvpUrl) {
                         const rsvpUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/rsvp/${event.rsvpUrl}`;
                         eventLine += `\n  RSVP: ${rsvpUrl}`;
+                        console.log(`    ✅ Added RSVP link for ${event.title}: ${rsvpUrl}`);
+                      } else {
+                        console.log(`    ⚠️  No RSVP URL for ${event.title} (enabled: ${event.rsvpEnabled}, url: ${event.rsvpUrl})`);
                       }
                       
                       return eventLine;
