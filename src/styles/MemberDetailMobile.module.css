@@ -308,6 +308,14 @@
   margin-bottom: 20px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  display: none;
+}
+
+/* Show mobile ledger section only on mobile */
+@media (max-width: 767px) {
+  .mobileLedgerSection {
+    display: block;
+  }
 }
 
 .mobileLedgerHeader {
@@ -346,6 +354,14 @@
   margin-bottom: 20px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  display: none;
+}
+
+/* Show mobile message section only on mobile */
+@media (max-width: 767px) {
+  .mobileMessageSection {
+    display: block;
+  }
 }
 
 .mobileMessageHeader {
