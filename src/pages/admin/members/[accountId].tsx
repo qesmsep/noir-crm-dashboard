@@ -1929,8 +1929,192 @@ export default function MemberDetailAdmin() {
                         <div className={styles.mobileLoading}>Loading ledger...</div>
                       ) : (
                         <div>
-                          {/* Simplified ledger view for mobile */}
-                          <p>Ledger transactions will be displayed here in a mobile-optimized format.</p>
+                          {/* Mobile-optimized ledger view */}
+                          <div className={styles.mobileLedgerAddRow}>
+                            <div className={styles.mobileLedgerAddForm}>
+                              <div className={styles.mobileLedgerFormRow}>
+                                <input
+                                  type="date"
+                                  className={styles.mobileLedgerInput}
+                                  value={newTransaction.date || new Date().toISOString().split('T')[0]}
+                                  onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                                />
+                                <select
+                                  className={styles.mobileLedgerSelect}
+                                  value={selectedTransactionMemberId}
+                                  onChange={e => setSelectedTransactionMemberId(e.target.value)}
+                                >
+                                  <option value="">Select Member</option>
+                                  {members.filter(m => m.account_id === member.account_id).map(m => (
+                                    <option key={m.member_id} value={m.member_id}>
+                                      {m.first_name} {m.last_name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className={styles.mobileLedgerFormRow}>
+                                <input
+                                  type="text"
+                                  placeholder="Note"
+                                  className={styles.mobileLedgerInput}
+                                  value={newTransaction.note || ''}
+                                  onChange={e => setNewTransaction({ ...newTransaction, note: e.target.value })}
+                                />
+                                <select
+                                  className={styles.mobileLedgerSelect}
+                                  value={newTransaction.type || ''}
+                                  onChange={e => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                                >
+                                  <option value="">Type</option>
+                                  <option value="payment">Payment</option>
+                                  <option value="purchase">Purchase</option>
+                                </select>
+                              </div>
+                              <div className={styles.mobileLedgerFormRow}>
+                                <input
+                                  type="number"
+                                  placeholder="Amount"
+                                  className={styles.mobileLedgerInput}
+                                  value={newTransaction.amount || ''}
+                                  onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                                />
+                                <button
+                                  className={styles.mobileLedgerAddButton}
+                                  onClick={() => handleAddTransaction(selectedTransactionMemberId, member.account_id)}
+                                  disabled={!selectedTransactionMemberId || !newTransaction.type || !newTransaction.amount || transactionStatus === 'loading'}
+                                >
+                                  {transactionStatus === 'loading' ? 'Adding...' : 'Add'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Ledger transactions list */}
+                          <div className={styles.mobileLedgerTransactions}>
+                            {ledger && ledger.length > 0 ? (
+                              ledger.map((tx, idx) => {
+                                const txMember = members.find(m => m.member_id === tx.member_id);
+                                const isEditing = editingTransaction && editingTransaction.id === tx.id;
+                                
+                                return (
+                                  <div key={tx.id || idx} className={styles.mobileLedgerTransaction}>
+                                    {isEditing ? (
+                                      <div className={styles.mobileLedgerEditForm}>
+                                        <div className={styles.mobileLedgerFormRow}>
+                                          <input
+                                            type="date"
+                                            className={styles.mobileLedgerInput}
+                                            value={editTransactionForm.date || ''}
+                                            onChange={e => setEditTransactionForm({ ...editTransactionForm, date: e.target.value })}
+                                          />
+                                          <select
+                                            className={styles.mobileLedgerSelect}
+                                            value={editTransactionForm.member_id || ''}
+                                            onChange={e => setEditTransactionForm({ ...editTransactionForm, member_id: e.target.value })}
+                                          >
+                                            {members.filter(m => m.account_id === member.account_id).map(m => (
+                                              <option key={m.member_id} value={m.member_id}>
+                                                {m.first_name} {m.last_name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <div className={styles.mobileLedgerFormRow}>
+                                          <input
+                                            type="text"
+                                            placeholder="Note"
+                                            className={styles.mobileLedgerInput}
+                                            value={editTransactionForm.note || ''}
+                                            onChange={e => setEditTransactionForm({ ...editTransactionForm, note: e.target.value })}
+                                          />
+                                          <select
+                                            className={styles.mobileLedgerSelect}
+                                            value={editTransactionForm.type || ''}
+                                            onChange={e => setEditTransactionForm({ ...editTransactionForm, type: e.target.value })}
+                                          >
+                                            <option value="payment">Payment</option>
+                                            <option value="purchase">Purchase</option>
+                                          </select>
+                                        </div>
+                                        <div className={styles.mobileLedgerFormRow}>
+                                          <input
+                                            type="number"
+                                            placeholder="Amount"
+                                            className={styles.mobileLedgerInput}
+                                            value={editTransactionForm.amount || ''}
+                                            onChange={e => setEditTransactionForm({ ...editTransactionForm, amount: e.target.value })}
+                                          />
+                                          <div className={styles.mobileLedgerEditActions}>
+                                            <button
+                                              className={styles.mobileLedgerSaveButton}
+                                              onClick={() => handleUpdateTransaction(editTransactionForm)}
+                                            >
+                                              Save
+                                            </button>
+                                            <button
+                                              className={styles.mobileLedgerCancelButton}
+                                              onClick={() => setEditingTransaction(null)}
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className={styles.mobileLedgerTransactionContent}>
+                                        <div className={styles.mobileLedgerTransactionHeader}>
+                                          <div className={styles.mobileLedgerTransactionDate}>
+                                            {new Date(tx.date).toLocaleDateString('en-US', { 
+                                              month: 'short', 
+                                              day: 'numeric', 
+                                              year: 'numeric' 
+                                            })}
+                                          </div>
+                                          <div className={styles.mobileLedgerTransactionAmount}>
+                                            {new Intl.NumberFormat('en-US', {
+                                              style: 'currency',
+                                              currency: 'USD',
+                                            }).format(tx.amount)}
+                                          </div>
+                                        </div>
+                                        <div className={styles.mobileLedgerTransactionDetails}>
+                                          <div className={styles.mobileLedgerTransactionType}>
+                                            {tx.type === 'payment' ? '💳 Payment' : '🛒 Purchase'}
+                                          </div>
+                                          <div className={styles.mobileLedgerTransactionMember}>
+                                            {txMember ? `${txMember.first_name} ${txMember.last_name}` : 'Unknown'}
+                                          </div>
+                                          {tx.note && (
+                                            <div className={styles.mobileLedgerTransactionNote}>
+                                              {tx.note}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className={styles.mobileLedgerTransactionActions}>
+                                          <button
+                                            className={styles.mobileLedgerEditButton}
+                                            onClick={() => handleEditTransaction(tx)}
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            className={styles.mobileLedgerDeleteButton}
+                                            onClick={() => handleDeleteTransaction(tx.id)}
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className={styles.mobileLedgerEmpty}>
+                                No ledger transactions found.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

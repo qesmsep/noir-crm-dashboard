@@ -321,7 +321,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     });
     
     // Add blocking events for private events
-    const blockingEvents = [];
+    const blockingEvents: any[] = [];
     const currentDayPrivateEvents = getCurrentDayPrivateEvents();
     
     currentDayPrivateEvents.forEach((privateEvent: any) => {
@@ -1323,10 +1323,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
           resources={resources}
           events={events}
-          editable={(info) => {
-            // Prevent editing of blocking events
-            return !info.event.extendedProps.is_blocking;
-          }}
+          editable={!viewOnly}
           droppable={true}
           selectable={!viewOnly && !isPhone()}
           eventDrop={handleEventDrop}

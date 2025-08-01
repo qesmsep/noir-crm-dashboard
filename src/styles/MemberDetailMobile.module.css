@@ -433,4 +433,244 @@
   text-align: center;
   padding: 40px;
   color: #999;
+}
+
+/* Mobile Ledger Styles */
+.mobileLedgerAddRow {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f7fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.mobileLedgerAddForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileLedgerFormRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.mobileLedgerInput {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  min-height: 36px;
+}
+
+.mobileLedgerInput:focus {
+  outline: none;
+  border-color: #A59480;
+  box-shadow: 0 0 0 1px #A59480;
+}
+
+.mobileLedgerSelect {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  min-height: 36px;
+}
+
+.mobileLedgerSelect:focus {
+  outline: none;
+  border-color: #A59480;
+  box-shadow: 0 0 0 1px #A59480;
+}
+
+.mobileLedgerAddButton {
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-height: 36px;
+  min-width: 80px;
+}
+
+.mobileLedgerAddButton:hover:not(:disabled) {
+  background: #8B7B68;
+}
+
+.mobileLedgerAddButton:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+}
+
+.mobileLedgerTransactions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobileLedgerTransaction {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.mobileLedgerEditForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileLedgerEditActions {
+  display: flex;
+  gap: 8px;
+}
+
+.mobileLedgerSaveButton {
+  background: #38a169;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-height: 36px;
+  flex: 1;
+}
+
+.mobileLedgerSaveButton:hover {
+  background: #2f855a;
+}
+
+.mobileLedgerCancelButton {
+  background: #718096;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-height: 36px;
+  flex: 1;
+}
+
+.mobileLedgerCancelButton:hover {
+  background: #4a5568;
+}
+
+.mobileLedgerTransactionContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileLedgerTransactionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobileLedgerTransactionDate {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.mobileLedgerTransactionAmount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.mobileLedgerTransactionDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobileLedgerTransactionType {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.mobileLedgerTransactionMember {
+  font-size: 13px;
+  color: #718096;
+}
+
+.mobileLedgerTransactionNote {
+  font-size: 13px;
+  color: #4a5568;
+  font-style: italic;
+  background: #f7fafc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.mobileLedgerTransactionActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.mobileLedgerEditButton {
+  background: #3182ce;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex: 1;
+}
+
+.mobileLedgerEditButton:hover {
+  background: #2c5282;
+}
+
+.mobileLedgerDeleteButton {
+  background: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex: 1;
+}
+
+.mobileLedgerDeleteButton:hover {
+  background: #c53030;
+}
+
+.mobileLedgerEmpty {
+  text-align: center;
+  padding: 24px;
+  color: #718096;
+  font-size: 14px;
+  font-style: italic;
 } 
