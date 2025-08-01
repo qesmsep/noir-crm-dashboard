@@ -71,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         campaign_messages: {
           schedule: '*/5 * * * * (every 5 minutes)',
-          last_run: recentCampaigns?.length > 0 ? recentCampaigns[0].updated_at : null,
+          last_run: recentCampaigns && recentCampaigns.length > 0 ? recentCampaigns[0].updated_at : null,
           status: 'active'
         }
       },
