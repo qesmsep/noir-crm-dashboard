@@ -282,7 +282,7 @@
   
   .listsGrid {
     gap: 0.5rem;
-    padding: 0;
+    padding-top: 100px;
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
@@ -300,7 +300,7 @@
     overflow-x: hidden;
     padding-left: 5px;
     padding-right: 5px;
-    padding-top: calc(1rem + env(safe-area-inset-top, 0));
+    padding-top: 100px;
     align-items: flex-start;
   }
 }
