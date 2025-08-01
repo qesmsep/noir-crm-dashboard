@@ -320,8 +320,45 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       return event;
     });
     
-    console.log('Final mapped events:', mapped);
-    setEvents(mapped);
+    // Add blocking events for private events
+    const blockingEvents = [];
+    const currentDayPrivateEvents = getCurrentDayPrivateEvents();
+    
+    currentDayPrivateEvents.forEach((privateEvent: any) => {
+      // Create a blocking event for each table/resource
+      resources.forEach((resource: Resource) => {
+        const startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+        const endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+        
+        const blockingEvent = {
+          id: `blocking-${privateEvent.id}-${resource.id}`,
+          title: `🔒 ${privateEvent.title} - Private Event`,
+          extendedProps: {
+            private_event_id: privateEvent.id,
+            is_blocking: true,
+            event_type: 'private_event',
+            ...privateEvent
+          },
+          start: startTime,
+          end: endTime,
+          resourceId: resource.id,
+          type: 'blocking',
+          backgroundColor: '#6b7280',
+          borderColor: '#6b7280',
+          textColor: '#ffffff',
+          display: 'background',
+          classNames: ['private-event-blocking']
+        };
+        
+        blockingEvents.push(blockingEvent);
+      });
+    });
+    
+    // Combine regular events with blocking events
+    const allEvents = [...mapped, ...blockingEvents];
+    
+    console.log('Final mapped events:', allEvents);
+    setEvents(allEvents);
     setSlotMinTime('18:00:00');
     setSlotMaxTime('26:00:00');
   }, [resources, eventData, currentCalendarDate, privateEvents]);
@@ -385,6 +422,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       console.log('[Drop Triggered] Raw info:', info);
       console.log('[Touch Device]', isTouchDeviceState);
       console.log('[Mobile]', isMobile);
+  
+      // Prevent drag and drop for blocking events
+      if (info.event.extendedProps.is_blocking) {
+        console.log('Blocking event drop prevented');
+        if (info.revert) info.revert();
+        return;
+      }
   
       if (!info.event || !info.event.id || !info.oldEvent) {
         console.warn('Missing event, event.id, or oldEvent in drop info:', info);
@@ -471,6 +515,14 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   async function handleEventResize(info: any) {
     if (viewOnly) return;
+    
+    // Prevent resizing of blocking events
+    if (info.event.extendedProps.is_blocking) {
+      console.log('Blocking event resize prevented');
+      if (info.revert) info.revert();
+      return;
+    }
+    
     const { event } = info;
 
     try {
@@ -541,6 +593,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     console.log('Event title:', info.event.title);
     console.log('Event extendedProps:', info.event.extendedProps);
     
+    // Prevent interaction with blocking events
+    if (info.event.extendedProps.is_blocking) {
+      console.log('Blocking event clicked - no action taken');
+      return;
+    }
+    
     if (onReservationClick) {
       onReservationClick(info.event.id);
     } else {
@@ -558,6 +616,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const handleSlotClick = (info: any) => {
     console.log('🎯 Slot clicked!', info);
     console.log('viewOnly:', viewOnly);
+    console.log('Full info object:', JSON.stringify(info, null, 2));
     
     if (viewOnly) {
       console.log('❌ Slot click blocked - viewOnly is true');
@@ -577,6 +636,41 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     // If still no date, use the current calendar date
     if (!clickedDate) {
       clickedDate = currentCalendarDate;
+    }
+    
+    // Check if this slot is blocked by a private event
+    if (clickedDate && resourceId) {
+      const currentDayPrivateEvents = getCurrentDayPrivateEvents();
+      const isBlocked = currentDayPrivateEvents.some((privateEvent: any) => {
+        const eventStart = fromUTC(privateEvent.start_time, settings.timezone);
+        const eventEnd = fromUTC(privateEvent.end_time, settings.timezone);
+        
+        // Extract just the time portion from the clicked date for comparison
+        const clickedTime = DateTime.fromJSDate(clickedDate, { zone: settings.timezone });
+        const clickedTimeOnly = clickedTime.set({ year: eventStart.year, month: eventStart.month, day: eventStart.day });
+        
+        console.log('🔍 Blocking check:', {
+          eventTitle: privateEvent.title,
+          eventStart: eventStart.toISO(),
+          eventEnd: eventEnd.toISO(),
+          clickedTime: clickedTime.toISO(),
+          clickedTimeOnly: clickedTimeOnly.toISO(),
+          isBlocked: clickedTimeOnly >= eventStart && clickedTimeOnly < eventEnd
+        });
+        
+        return clickedTimeOnly >= eventStart && clickedTimeOnly < eventEnd;
+      });
+      
+      if (isBlocked) {
+        console.log('❌ Slot click blocked - private event in progress');
+        toast({
+          title: 'Private Event',
+          description: 'This time slot is blocked due to a private event.',
+          status: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
     }
     
     console.log('📅 Clicked date:', clickedDate);
@@ -1190,6 +1284,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
               touchAction: 'manipulation',
             },
           }),
+          
+          // Private event blocking styles
+          '.private-event-blocking': {
+            backgroundColor: '#6b7280 !important',
+            borderColor: '#6b7280 !important',
+            color: '#ffffff !important',
+            opacity: 0.8,
+            '&:hover': {
+              opacity: 0.9,
+            },
+          },
+          '.fc-event.private-event-blocking': {
+            backgroundColor: '#6b7280 !important',
+            borderColor: '#6b7280 !important',
+            color: '#ffffff !important',
+            opacity: 0.8,
+            cursor: 'not-allowed',
+            '&:hover': {
+              opacity: 0.9,
+            },
+          },
         }}
       >
         <FullCalendar
@@ -1208,7 +1323,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
           resources={resources}
           events={events}
-          editable={true}
+          editable={(info) => {
+            // Prevent editing of blocking events
+            return !info.event.extendedProps.is_blocking;
+          }}
           droppable={true}
           selectable={!viewOnly && !isPhone()}
           eventDrop={handleEventDrop}
@@ -1250,7 +1368,40 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           
                    // Adjust the details of the reservations on the calendar
           eventContent={(arg) => {
-            // Determine colors based on check-in status
+            // Handle blocking events differently
+            if (arg.event.extendedProps.is_blocking) {
+              return (
+                <div
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    whiteSpace: 'normal',
+                    margin: '0px',
+                    display: 'center',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: isMobile ? '28px' : '24px',
+                    fontSize: isMobile ? '12px' : '14px',
+                    background: '#6b7280',
+                    color: '#ffffff',
+                    borderRadius: '4px',
+                    padding: isMobile ? '0 4px' : '0 2px',
+                    border: '1px solid #6b7280',
+                    cursor: 'not-allowed',
+                    userSelect: 'none',
+                    touchAction: 'manipulation',
+                    opacity: 0.8,
+                    // Additional touch optimizations
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {arg.event.title}
+                </div>
+              );
+            }
+            
+            // Determine colors based on check-in status for regular events
             const isCheckedIn = arg.event.extendedProps.checked_in;
             const backgroundColor = isCheckedIn ? '#a59480' : '#353535';
             const textColor = isCheckedIn ? '#353535' : '#ecede8';

@@ -89,6 +89,12 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
       const startTime = initialDate ? new Date(initialDate) : new Date();
       const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
       
+      console.log('NewReservationDrawer - initialDate:', initialDate);
+      console.log('NewReservationDrawer - startTime:', startTime);
+      console.log('NewReservationDrawer - endTime:', endTime);
+      console.log('NewReservationDrawer - startTime ISO:', startTime.toISOString().slice(0, 16));
+      console.log('NewReservationDrawer - endTime ISO:', endTime.toISOString().slice(0, 16));
+      
       setFormData({
         first_name: '',
         last_name: '',
@@ -428,7 +434,10 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
                         fontFamily="Montserrat, sans-serif" 
                         type="datetime-local" 
                         value={formData.start_time} 
-                        onChange={(e) => handleInputChange('start_time', e.target.value)} 
+                        onChange={(e) => {
+                          console.log('Start time changed:', e.target.value);
+                          handleInputChange('start_time', e.target.value);
+                        }} 
                         size="sm" 
                       />
                     </FormControl>
@@ -440,7 +449,10 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
                         fontFamily="Montserrat, sans-serif" 
                         type="datetime-local" 
                         value={formData.end_time} 
-                        onChange={(e) => handleInputChange('end_time', e.target.value)} 
+                        onChange={(e) => {
+                          console.log('End time changed:', e.target.value);
+                          handleInputChange('end_time', e.target.value);
+                        }} 
                         size="sm" 
                       />
                     </FormControl>
