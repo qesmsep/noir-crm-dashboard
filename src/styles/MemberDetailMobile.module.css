@@ -625,6 +625,54 @@
   margin-top: 4px;
 }
 
+.mobileLedgerRunningBalance {
+  font-size: 12px;
+  color: #718096;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Mobile attachment button styles */
+.mobileAttachmentButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #A59480;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.mobileAttachmentButton:hover {
+  background-color: #f0f0f0;
+}
+
+/* Mobile send message form styles */
+.mobileSendMessageForm {
+  margin-bottom: 16px;
+}
+
+.mobileSendMessageButton {
+  background-color: #A59480;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.mobileSendMessageButton:hover {
+  background-color: #8B7B68;
+}
+
 .mobileLedgerTransactionActions {
   display: flex;
   gap: 8px;
