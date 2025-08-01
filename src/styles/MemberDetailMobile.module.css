@@ -1,0 +1,436 @@
+/* Mobile-specific styles for member detail page */
+.mobileView {
+  display: none;
+}
+
+.desktopView {
+  display: block;
+}
+
+/* Show mobile view on screens smaller than 768px */
+@media (max-width: 767px) {
+  .mobileView {
+    display: block;
+  }
+  
+  .desktopView {
+    display: none;
+  }
+}
+
+/* Mobile container */
+.mobileContainer {
+  padding: 16px;
+  padding-top: 60px;
+  background: #353535;
+  min-height: 100vh;
+}
+
+/* Mobile header */
+.mobileHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.mobileBackButton {
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mobileBackButton:hover {
+  background: #8B7B68;
+}
+
+.mobileAddButton {
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mobileAddButton:hover {
+  background: #8B7B68;
+}
+
+/* Mobile member card */
+.mobileMemberCard {
+  background: white;
+  border: 2px solid #a59480;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+}
+
+.mobileMemberCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.mobileMemberHeader {
+  background: #a59480;
+  padding: 0px;
+  color: #ecede8;
+  text-align: center;
+  position: relative;
+}
+
+.mobileMemberPhoto {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  border: 3px solid #F7FAFC;
+  background: #F7FAFC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: #A59480;
+}
+
+.mobileMemberName {
+  font-size: 24px;
+  font-weight: normal;
+  font-family: 'IvyJournalThin', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.0em;
+  margin: 0;
+  color: #ecede8;
+}
+
+.mobileMemberInfo {
+  padding: 20px;
+  background: white;
+}
+
+.mobileInfoRow {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+}
+
+.mobileInfoRow:last-child {
+  margin-bottom: 0;
+}
+
+.mobileInfoIcon {
+  margin-right: 12px;
+  color: #a59480;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.mobileInfoLabel {
+  font-weight: 600;
+  margin-right: 8px;
+  min-width: 80px;
+}
+
+.mobileInfoValue {
+  color: #666;
+  flex: 1;
+}
+
+/* Mobile attributes section */
+.mobileAttributesSection {
+  background: white;
+  border: 2px solid #a59480;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.mobileSectionHeader {
+  background: #a59480;
+  padding: 16px;
+  color: #ecede8;
+  font-size: 18px;
+  font-weight: bold;
+  font-family: 'Montserrat Bold', sans-serif;
+}
+
+.mobileSectionContent {
+  padding: 16px;
+}
+
+.mobileAttributeItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.mobileAttributeItem:last-child {
+  border-bottom: none;
+}
+
+.mobileAttributeKey {
+  font-weight: 600;
+  color: #353535;
+  margin-right: 12px;
+}
+
+.mobileAttributeValue {
+  color: #666;
+  flex: 1;
+}
+
+.mobileAttributeActions {
+  display: flex;
+  gap: 8px;
+}
+
+.mobileEditButton {
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mobileDeleteButton {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Mobile notes section */
+.mobileNotesSection {
+  background: white;
+  border: 2px solid #a59480;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.mobileNoteItem {
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.mobileNoteItem:last-child {
+  border-bottom: none;
+}
+
+.mobileNoteText {
+  font-size: 14px;
+  color: #353535;
+  margin-bottom: 4px;
+}
+
+.mobileNoteDate {
+  font-size: 12px;
+  color: #999;
+}
+
+.mobileNoteActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Mobile form inputs */
+.mobileFormRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mobileInput {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileInput:focus {
+  outline: none;
+  border-color: #A59480;
+  box-shadow: 0 0 0 2px rgba(165, 148, 128, 0.2);
+}
+
+.mobileAddButton {
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mobileAddButton:hover {
+  background: #8B7B68;
+}
+
+/* Mobile ledger section */
+.mobileLedgerSection {
+  background: white;
+  border: 2px solid #a59480;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.mobileLedgerHeader {
+  background: #a59480;
+  padding: 16px;
+  color: #ecede8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mobileLedgerTitle {
+  font-size: 20px;
+  font-weight: bold;
+  font-family: 'IvyJournalThin', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.mobilePdfButton {
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Mobile message section */
+.mobileMessageSection {
+  background: white;
+  border: 2px solid #a59480;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.mobileMessageHeader {
+  background: #a59480;
+  padding: 16px;
+  color: #ecede8;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.mobileMessageContent {
+  padding: 16px;
+}
+
+.mobileMessageHistory {
+  margin-top: 16px;
+}
+
+.mobileMessageItem {
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.mobileMessageItem:last-child {
+  border-bottom: none;
+}
+
+.mobileMessageText {
+  font-size: 14px;
+  color: #353535;
+  margin-bottom: 4px;
+}
+
+.mobileMessageMeta {
+  font-size: 12px;
+  color: #999;
+}
+
+/* Mobile delete section */
+.mobileDeleteSection {
+  text-align: center;
+  padding: 20px;
+  border-top: 1px solid #eee;
+}
+
+.mobileDeleteButton {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  opacity: 0.7;
+}
+
+.mobileDeleteButton:hover {
+  background: #b91c1c;
+  opacity: 1;
+}
+
+.mobileDeleteButton.confirm {
+  background: #dc2626;
+  opacity: 1;
+}
+
+/* Mobile loading and error states */
+.mobileLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  color: #666;
+}
+
+.mobileError {
+  text-align: center;
+  padding: 40px;
+  color: #dc2626;
+}
+
+.mobileNoMembers {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+} 

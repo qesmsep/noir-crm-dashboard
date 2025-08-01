@@ -18,6 +18,7 @@ import Image from "next/image";
 import { getSupabaseClient } from "../api/supabaseClient";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import AddMemberModal from '../../components/members/AddMemberModal';
+import styles from '../../styles/MembersMobile.module.css';
 
 interface Member {
   member_id: string;
@@ -161,186 +162,275 @@ export default function MembersAdmin() {
 
   return (
     <AdminLayout>
-      <Box p={8} bg="#353535" minH="100vh">
-        <VStack spacing={8} align="stretch">
-          <HStack justify="space-between" align="center" mb={8}>
-            <Box flex={1}>
-              <Input
-                placeholder="Search by name, email, or phone"
-                value={lookupQuery}
-                onChange={(e) => setLookupQuery(e.target.value)}
-                width="100%"
-                maxW="600px"
-                bg="white"
-                color="#353535"
-                borderRadius="12px"
-                border="1px solid #E2E8F0"
-                _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+      {/* Desktop View - Unchanged */}
+      <div className={styles.desktopView}>
+        <Box p={8} bg="#353535" minH="100vh">
+          <VStack spacing={8} align="stretch">
+            <HStack justify="space-between" align="center" mb={8}>
+              <Box flex={1}>
+                <Input
+                  placeholder="Search by name, email, or phone"
+                  value={lookupQuery}
+                  onChange={(e) => setLookupQuery(e.target.value)}
+                  width="100%"
+                  maxW="600px"
+                  bg="white"
+                  color="#353535"
+                  borderRadius="12px"
+                  border="1px solid #E2E8F0"
+                  _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                  height="48px"
+                  fontSize="md"
+                  _placeholder={{ color: '#718096' }}
+                />
+              </Box>
+              <Button    
+                bg="#A59480"
+                color="white"
+                _hover={{ bg: '#8B7B68' }}
                 height="48px"
+                minW="180px"
+                borderRadius="12px"
+                fontWeight="semibold"
                 fontSize="md"
-                _placeholder={{ color: '#718096' }}
-              />
-            </Box>
-            <Button    
-              bg="#A59480"
-              color="white"
-              _hover={{ bg: '#8B7B68' }}
-              height="48px"
-              minW="180px"
-              borderRadius="12px"
-              fontWeight="semibold"
-              fontSize="md"
-              transition="all 0.2s"
+                transition="all 0.2s"
+                onClick={() => setIsAddModalOpen(true)}
+                isLoading={saving}
+                loadingText="Adding..."
+              >
+                Add Member
+              </Button>
+            </HStack>
+
+            {Object.entries(membersByAccount).length === 0 ? (
+              <Box textAlign="center" py={12}>
+                <Text fontSize="xl" color="gray.400">No members found</Text>
+              </Box>
+            ) : (
+              <SimpleGrid columns={3} spacing={18}>
+                {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
+                  <Box 
+                    key={accountId}
+                    onClick={() => router.push(`/admin/members/${accountId}`)}
+                    cursor="pointer"
+                    bg="white"
+                    border="3px solid #a59480"
+                    borderRadius="12px"
+                    overflow="hidden"
+                    boxShadow="0 8px 32px rgba(0,0,0,0.5)"
+                    transition="all 0.2s"
+                    height="100%"
+                    p={0}
+                    _hover={{
+                      transform: 'scale(1.01)',
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.5)'
+                    }}
+                  ><Box p={1} bg="gray.50" display="flex" justifyContent="flex-end" alignItems="flex-end">
+                  <Text color="gray.600" fontSize="xs" m="0" pt="10" pr="10" textAlign="right">
+                    Member Since {formatDateLong(accountMembers[0].join_date)}
+                  </Text>
+                </Box>
+                    <Box
+                      color="#353535"
+                      display="flex"
+                      flexDirection="column"
+                      w="100%"
+                      h="100%"
+                      position="relative"
+                      zIndex={1}
+                      mt="0"
+                      style={{
+                        borderRadius: '12px',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <VStack align="flex-start" spacing={14} w="100%" p={14} pb="30">
+                        {[...accountMembers]
+                          .sort((a, b) => a.primary === b.primary ? 0 : a.primary ? -1 : 1)
+                          .map(member => (
+                            <Box
+                              key={member.member_id}
+                              w="100%"
+                              bg="#a59480"
+                              borderRadius="10px"
+                              boxShadow="0 4px 16px rgba(53,53,53,0.5)"
+                              p={16}
+                              
+                              mb={2}
+                            >
+                              <HStack align="flex-start" spacing={4} w="100%">
+                                {member.photo ? (
+                                  <Box 
+                                    style={{
+                                      borderRadius: '50%',
+                                      overflow: 'hidden',
+                                      width: '100px',
+                                      height: '100px',
+                                      flexShrink: 0,
+                                      boxShadow: '5px  5px 10px #353535',
+                                      border: '2px solid #F7FAFC',
+                                      position: 'relative'
+                                    }}
+                                  >
+                                    <Image
+                                      src={member.photo}
+                                      alt={`${member.first_name} ${member.last_name}`}
+                                      width={100}
+                                      height={100}
+                                      style={{
+                                        objectFit: 'cover',
+                                        borderRadius: '50%'
+                                      }}
+                                      loading="lazy"
+                                      placeholder="blur"
+                                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+                                    />
+                                  </Box>
+                                ) : (
+                                  <Box
+                                    style={{
+                                      width: '100px',
+                                      height: '100px',
+                                      borderRadius: '50%',
+                                      backgroundColor: '#F7FAFC',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                      border: '2px solid #F7FAFC'
+                                    }}
+                                  >
+                                    <Text fontSize="3xl" color="#AECEDE8" fontWeight="bold">
+                                      {member.first_name?.[0]}{member.last_name?.[0]}
+                                    </Text>
+                                  </Box>
+                                )}
+                                <VStack align="flex-start" spacing={1} flex={1}>
+                                  <Text 
+                                    fontSize="24px" 
+                                    fontWeight="normal" 
+                                    color="#ecede8" 
+                                    mt="10"
+                                    fontFamily="IvyJournalThin, serif"
+                                    textTransform="uppercase"
+                                    letterSpacing="0.0em"
+                                    mb={0}
+                                  >
+                                    {member.first_name} {member.last_name}
+                                  </Text>
+                                  <VStack align="flex-start" p="1" spacing={0} color="#353535" w="100%">
+                                    <HStack spacing={1} >
+                                      <PhoneIcon boxSize={16} />
+                                      <Text fontSize="16px" p="0" m="5" fontFamily="Montserrat Regular, sans-serif">{formatPhone(member.phone)}</Text>
+                                    </HStack>
+                                    <HStack spacing={1}>
+                                      <EmailIcon boxSize={16} />
+                                      <Text fontSize="16px" p="0" m="5" fontFamily="Montserrat Regular, sans-serif">{member.email}</Text>
+                                    </HStack>
+                                    
+                                  </VStack>
+                                </VStack>
+                              </HStack>
+                            </Box>
+                          ))}
+                      </VStack>
+                     
+                      
+                    </Box>
+                  </Box>
+                ))}
+              </SimpleGrid>
+            )}
+          </VStack>
+        </Box>
+      </div>
+
+      {/* Mobile View - Single Column Layout */}
+      <div className={styles.mobileView}>
+        <div className={styles.mobileContainer}>
+          <div className={styles.mobileSearchContainer}>
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone"
+              value={lookupQuery}
+              onChange={(e) => setLookupQuery(e.target.value)}
+              className={styles.mobileSearchInput}
+            />
+            <button
+              className={styles.mobileAddButton}
               onClick={() => setIsAddModalOpen(true)}
-              isLoading={saving}
-              loadingText="Adding..."
+              disabled={saving}
             >
-              Add Member
-            </Button>
-          </HStack>
+              {saving ? 'Adding...' : 'Add Member'}
+            </button>
+          </div>
 
           {Object.entries(membersByAccount).length === 0 ? (
-            <Box textAlign="center" py={12}>
-              <Text fontSize="xl" color="gray.400">No members found</Text>
-            </Box>
+            <div className={styles.mobileNoMembers}>
+              No members found
+            </div>
           ) : (
-            <SimpleGrid columns={3} spacing={18}>
+            <div>
               {Object.entries(membersByAccount).map(([accountId, accountMembers]) => (
-                <Box 
+                <div
                   key={accountId}
+                  className={styles.mobileMemberCard}
                   onClick={() => router.push(`/admin/members/${accountId}`)}
-                  cursor="pointer"
-                  bg="white"
-                  border="3px solid #a59480"
-                  borderRadius="12px"
-                  overflow="hidden"
-                  boxShadow="0 8px 32px rgba(0,0,0,0.5)"
-                  transition="all 0.2s"
-                  height="100%"
-                  p={0}
-                  _hover={{
-                    transform: 'scale(1.01)',
-                    boxShadow: '0 12px 40px rgba(0,0,0,0.5)'
-                  }}
-                ><Box p={1} bg="gray.50" display="flex" justifyContent="flex-end" alignItems="flex-end">
-                <Text color="gray.600" fontSize="xs" m="0" pt="10" pr="10" textAlign="right">
-                  Member Since {formatDateLong(accountMembers[0].join_date)}
-                </Text>
-              </Box>
-                  <Box
-                    color="#353535"
-                    display="flex"
-                    flexDirection="column"
-                    w="100%"
-                    h="100%"
-                    position="relative"
-                    zIndex={1}
-                    mt="0"
-                    style={{
-                      borderRadius: '12px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    <VStack align="flex-start" spacing={14} w="100%" p={14} pb="30">
-                      {[...accountMembers]
-                        .sort((a, b) => a.primary === b.primary ? 0 : a.primary ? -1 : 1)
-                        .map(member => (
-                          <Box
-                            key={member.member_id}
-                            w="100%"
-                            bg="#a59480"
-                            borderRadius="10px"
-                            boxShadow="0 4px 16px rgba(53,53,53,0.5)"
-                            p={16}
-                            
-                            mb={2}
-                          >
-                            <HStack align="flex-start" spacing={4} w="100%">
-                              {member.photo ? (
-                                <Box 
-                                  style={{
-                                    borderRadius: '50%',
-                                    overflow: 'hidden',
-                                    width: '100px',
-                                    height: '100px',
-                                    flexShrink: 0,
-                                    boxShadow: '5px  5px 10px #353535',
-                                    border: '2px solid #F7FAFC',
-                                    position: 'relative'
-                                  }}
-                                >
-                                  <Image
-                                    src={member.photo}
-                                    alt={`${member.first_name} ${member.last_name}`}
-                                    width={100}
-                                    height={100}
-                                    style={{
-                                      objectFit: 'cover',
-                                      borderRadius: '50%'
-                                    }}
-                                    loading="lazy"
-                                    placeholder="blur"
-                                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-                                  />
-                                </Box>
-                              ) : (
-                                <Box
-                                  style={{
-                                    width: '100px',
-                                    height: '100px',
-                                    borderRadius: '50%',
-                                    backgroundColor: '#F7FAFC',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0,
-                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                    border: '2px solid #F7FAFC'
-                                  }}
-                                >
-                                  <Text fontSize="3xl" color="#AECEDE8" fontWeight="bold">
-                                    {member.first_name?.[0]}{member.last_name?.[0]}
-                                  </Text>
-                                </Box>
-                              )}
-                              <VStack align="flex-start" spacing={1} flex={1}>
-                                <Text 
-                                  fontSize="24px" 
-                                  fontWeight="normal" 
-                                  color="#ecede8" 
-                                  mt="10"
-                                  fontFamily="IvyJournalThin, serif"
-                                  textTransform="uppercase"
-                                  letterSpacing="0.0em"
-                                  mb={0}
-                                >
-                                  {member.first_name} {member.last_name}
-                                </Text>
-                                <VStack align="flex-start" p="1" spacing={0} color="#353535" w="100%">
-                                  <HStack spacing={1} >
-                                    <PhoneIcon boxSize={16} />
-                                    <Text fontSize="16px" p="0" m="5" fontFamily="Montserrat Regular, sans-serif">{formatPhone(member.phone)}</Text>
-                                  </HStack>
-                                  <HStack spacing={1}>
-                                    <EmailIcon boxSize={16} />
-                                    <Text fontSize="16px" p="0" m="5" fontFamily="Montserrat Regular, sans-serif">{member.email}</Text>
-                                  </HStack>
-                                  
-                                </VStack>
-                              </VStack>
-                            </HStack>
-                          </Box>
-                        ))}
-                    </VStack>
-                   
-                    
-                  </Box>
-                </Box>
+                >
+                                     {[...accountMembers]
+                     .sort((a, b) => a.primary === b.primary ? 0 : a.primary ? -1 : 1)
+                     .map(member => (
+                       <div key={member.member_id}>
+                         <div className={styles.mobileMemberHeader}>
+                           <div className={styles.mobileMemberHeaderContent}>
+                             {member.photo ? (
+                               <div className={styles.mobileMemberPhoto}>
+                                 <Image
+                                   src={member.photo}
+                                   alt={`${member.first_name} ${member.last_name}`}
+                                   width={60}
+                                   height={60}
+                                   style={{
+                                     objectFit: 'cover',
+                                     borderRadius: '50%'
+                                   }}
+                                   loading="lazy"
+                                   placeholder="blur"
+                                   blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+                                 />
+                               </div>
+                             ) : (
+                               <div className={styles.mobileMemberPhotoPlaceholder}>
+                                 <span>{member.first_name?.[0]}{member.last_name?.[0]}</span>
+                               </div>
+                             )}
+                             <h3 className={styles.mobileMemberName}>
+                               {member.first_name} {member.last_name}
+                             </h3>
+                           </div>
+                         </div>
+                         <div className={styles.mobileMemberInfo}>
+                           <div className={styles.mobileContactItem}>
+                             <PhoneIcon className={styles.mobileContactIcon} />
+                             <span>{formatPhone(member.phone)}</span>
+                           </div>
+                           <div className={styles.mobileContactItem}>
+                             <EmailIcon className={styles.mobileContactIcon} />
+                             <span>{member.email}</span>
+                           </div>
+                         </div>
+                         <div className={styles.mobileJoinDate}>
+                           Member Since {formatDateLong(member.join_date)}
+                         </div>
+                       </div>
+                     ))}
+                </div>
               ))}
-            </SimpleGrid>
+            </div>
           )}
-        </VStack>
-      </Box>
+        </div>
+      </div>
       
       <AddMemberModal
         isOpen={isAddModalOpen}

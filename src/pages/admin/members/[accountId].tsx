@@ -9,6 +9,7 @@ const MemberLedger = require("../../../components/pages/MemberLedger").default;
 import AddMemberModal from '../../../components/members/AddMemberModal';
 import SendMessageForm from '../../../components/messages/SendMessageForm';
 import AdminLayout from '../../../components/layouts/AdminLayout';
+import styles from '../../../styles/MemberDetailMobile.module.css';
 
 import { EmailIcon, PhoneIcon, CalendarIcon } from "@chakra-ui/icons";
 import { FaBriefcase, FaUser } from 'react-icons/fa';
@@ -872,7 +873,9 @@ export default function MemberDetailAdmin() {
 
   return (
     <AdminLayout>
-      <Box p={8}>
+      {/* Desktop View - Unchanged */}
+      <div className={styles.desktopView}>
+        <Box p={8}>
         <HStack spacing={4} mb={6}>
           <Button 
             mb={6} 
@@ -1725,6 +1728,440 @@ export default function MemberDetailAdmin() {
           </Box>
         </Drawer>
       </Box>
+      </div>
+
+      {/* Mobile View - Single Column Layout */}
+      <div className={styles.mobileView}>
+        <div className={styles.mobileContainer}>
+          {/* Mobile Header */}
+          <div className={styles.mobileHeader}>
+            <button 
+              className={styles.mobileBackButton}
+              onClick={() => router.push('/admin/members')}
+            >
+              ← Back
+            </button>
+            <button 
+              className={styles.mobileAddButton}
+              onClick={() => setAddMemberOpen(true)}
+            >
+              Add Member
+            </button>
+          </div>
+
+          {loading ? (
+            <div className={styles.mobileLoading}>
+              Loading...
+            </div>
+          ) : error ? (
+            <div className={styles.mobileError}>
+              Error: {error}
+            </div>
+          ) : !members.length ? (
+            <div className={styles.mobileNoMembers}>
+              No members found for this account.
+            </div>
+          ) : (
+            <div>
+              {members.map(member => (
+                <div key={member.member_id} className={styles.mobileMemberCard}>
+                  {/* Member Header */}
+                  <div className={styles.mobileMemberHeader}>
+                    {member.photo ? (
+                      <img 
+                        src={member.photo} 
+                        alt={`${member.first_name} ${member.last_name}`}
+                        className={styles.mobileMemberPhoto}
+                        style={{ objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div className={styles.mobileMemberPhoto}>
+                        {member.first_name?.[0]}{member.last_name?.[0]}
+                      </div>
+                    )}
+                    <h2 className={styles.mobileMemberName}>
+                      {member.first_name} {member.last_name}
+                    </h2>
+                  </div>
+
+                  {/* Member Info */}
+                  <div className={styles.mobileMemberInfo}>
+                    <div className={styles.mobileInfoRow}>
+                      <PhoneIcon className={styles.mobileInfoIcon} />
+                      <span className={styles.mobileInfoLabel}>Phone:</span>
+                      <span className={styles.mobileInfoValue}>{formatPhone(member.phone) || '—'}</span>
+                    </div>
+                    <div className={styles.mobileInfoRow}>
+                      <EmailIcon className={styles.mobileInfoIcon} />
+                      <span className={styles.mobileInfoLabel}>Email:</span>
+                      <span className={styles.mobileInfoValue}>{member.email || '—'}</span>
+                    </div>
+                    <div className={styles.mobileInfoRow}>
+                      <FaBriefcase className={styles.mobileInfoIcon} />
+                      <span className={styles.mobileInfoLabel}>Company:</span>
+                      <span className={styles.mobileInfoValue}>{member.company || '—'}</span>
+                    </div>
+                    {member.dob && (
+                      <div className={styles.mobileInfoRow}>
+                        <CalendarIcon className={styles.mobileInfoIcon} />
+                        <span className={styles.mobileInfoLabel}>Birthdate:</span>
+                        <span className={styles.mobileInfoValue}>
+                          {new Date(member.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                    {member.join_date && (
+                      <div className={styles.mobileInfoRow}>
+                        <CalendarIcon className={styles.mobileInfoIcon} />
+                        <span className={styles.mobileInfoLabel}>Member Since:</span>
+                        <span className={styles.mobileInfoValue}>
+                          {new Date(member.join_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    <div className={styles.mobileInfoRow}>
+                      <FaUser className={styles.mobileInfoIcon} />
+                      <span className={styles.mobileInfoLabel}>Referred by:</span>
+                      <span className={styles.mobileInfoValue}>{member.referred_by || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* Attributes Section */}
+                  <div className={styles.mobileAttributesSection}>
+                    <div className={styles.mobileSectionHeader}>
+                      Attributes
+                    </div>
+                    <div className={styles.mobileSectionContent}>
+                      {(memberAttributes[member.member_id] || []).map(attr => (
+                        <div key={attr.id} className={styles.mobileAttributeItem}>
+                          <div>
+                            <span className={styles.mobileAttributeKey}>{attr.key}:</span>
+                            <span className={styles.mobileAttributeValue}>{attr.value}</span>
+                          </div>
+                          <div className={styles.mobileAttributeActions}>
+                            <button className={styles.mobileEditButton}>Edit</button>
+                            <button className={styles.mobileDeleteButton}>Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className={styles.mobileFormRow}>
+                        <input 
+                          type="text" 
+                          placeholder="Attribute Type" 
+                          className={styles.mobileInput}
+                          value={attrInputs[member.member_id]?.type || ''}
+                          onChange={e => setAttrInputs(inputs => ({ ...inputs, [member.member_id]: { ...inputs[member.member_id], type: e.target.value } }))}
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="Attribute Detail" 
+                          className={styles.mobileInput}
+                          value={attrInputs[member.member_id]?.value || ''}
+                          onChange={e => setAttrInputs(inputs => ({ ...inputs, [member.member_id]: { ...inputs[member.member_id], value: e.target.value } }))}
+                        />
+                        <button 
+                          className={styles.mobileAddButton}
+                          onClick={() => handleAddAttribute(member.member_id)}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes Section */}
+                  <div className={styles.mobileNotesSection}>
+                    <div className={styles.mobileSectionHeader}>
+                      Notes History
+                    </div>
+                    <div className={styles.mobileSectionContent}>
+                      {(memberNotes[member.member_id] || []).map(note => (
+                        <div key={note.id} className={styles.mobileNoteItem}>
+                          <div className={styles.mobileNoteText}>{note.note}</div>
+                          <div className={styles.mobileNoteDate}>
+                            {(() => {
+                              const d = new Date(note.created_at);
+                              const mm = String(d.getMonth() + 1).padStart(2, '0');
+                              const dd = String(d.getDate()).padStart(2, '0');
+                              const yy = String(d.getFullYear()).slice(-2);
+                              const hh = String(d.getHours()).padStart(2, '0');
+                              const min = String(d.getMinutes()).padStart(2, '0');
+                              return `${mm}/${dd}/${yy} ${hh}:${min}`;
+                            })()}
+                          </div>
+                          <div className={styles.mobileNoteActions}>
+                            <button className={styles.mobileEditButton}>Edit</button>
+                            <button className={styles.mobileDeleteButton}>Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className={styles.mobileFormRow}>
+                        <input 
+                          type="text" 
+                          placeholder="New note..." 
+                          className={styles.mobileInput}
+                          value={noteInputs[member.member_id] || ''}
+                          onChange={e => setNoteInputs(inputs => ({ ...inputs, [member.member_id]: e.target.value }))}
+                        />
+                        <button 
+                          className={styles.mobileAddButton}
+                          onClick={() => handleAddNote(member.member_id)}
+                        >
+                          Add Note
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ledger Section */}
+                  <div className={styles.mobileLedgerSection}>
+                    <div className={styles.mobileLedgerHeader}>
+                      <h3 className={styles.mobileLedgerTitle}>Ledger</h3>
+                      <button 
+                        className={styles.mobilePdfButton}
+                        onClick={() => setIsTextPdfModalOpen(true)}
+                      >
+                        📄 PDF
+                      </button>
+                    </div>
+                    <div className={styles.mobileSectionContent}>
+                      {ledgerLoading ? (
+                        <div className={styles.mobileLoading}>Loading ledger...</div>
+                      ) : (
+                        <div>
+                          {/* Simplified ledger view for mobile */}
+                          <p>Ledger transactions will be displayed here in a mobile-optimized format.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Message Section */}
+                  <div className={styles.mobileMessageSection}>
+                    <div className={styles.mobileMessageHeader}>
+                      Messages
+                    </div>
+                    <div className={styles.mobileMessageContent}>
+                      <div className={styles.mobileMessageHistory}>
+                        {messagesLoading ? (
+                          <div className={styles.mobileLoading}>Loading messages...</div>
+                        ) : messages.length === 0 ? (
+                          <p>No messages found for this account.</p>
+                        ) : (
+                          messages.map((msg: any) => {
+                            const member = members.find(m => m.member_id === msg.member_id);
+                            const memberName = member ? `${member.first_name} ${member.last_name}` : 'Unknown';
+                            
+                            return (
+                              <div key={msg.id} className={styles.mobileMessageItem}>
+                                <div className={styles.mobileMessageText}>{msg.content}</div>
+                                <div className={styles.mobileMessageMeta}>
+                                  {new Date(msg.timestamp).toLocaleString('en-US', {
+                                    month: 'numeric',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: 'numeric',
+                                    minute: 'numeric'
+                                  })} • {memberName} • {msg.sent_by || 'System'}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modals - Shared between desktop and mobile */}
+      <AddMemberModal isOpen={isAddMemberOpen} onClose={() => setAddMemberOpen(false)} onSave={async (memberData: any) => {
+        setAddMemberOpen(false);
+      }} />
+      <AddMemberModal
+        isOpen={isEditModalOpen}
+        onClose={() => { setIsEditModalOpen(false); setEditMember(null); }}
+        onSave={handleSaveEditMember}
+      />
+      
+      {/* Text PDF Drawer */}
+      <Drawer 
+        isOpen={isTextPdfModalOpen} 
+        placement="right" 
+        onClose={() => {
+          setIsTextPdfModalOpen(false);
+          setSelectedMemberForPdf(null);
+          setPdfDateRange('current_month');
+          setCustomStartDate('');
+          setCustomEndDate('');
+        }} 
+        size="sm"
+        closeOnOverlayClick={true}
+        closeOnEsc={true}
+      >
+        <Box zIndex="2000" position="relative">
+          <DrawerOverlay bg="blackAlpha.600" onClick={() => {
+            setIsTextPdfModalOpen(false);
+            setSelectedMemberForPdf(null);
+            setPdfDateRange('current_month');
+            setCustomStartDate('');
+            setCustomEndDate('');
+          }} />
+                  <DrawerContent 
+        border="2px solid #353535" 
+        borderRadius="10px"  
+        fontFamily="Montserrat, sans-serif" 
+        maxW="400px" 
+        w="40vw" 
+        boxShadow="xl" 
+        mt="80px" 
+        mb="25px" 
+        paddingRight="40px" 
+        paddingLeft="40px" 
+        backgroundColor="#ecede8"
+        position="fixed"
+        top="0"
+        right="0"
+        style={{
+          transform: isTextPdfModalOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}
+      >
+            <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
+              Send Ledger PDF via SMS
+            </DrawerHeader>
+            <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
+              <VStack spacing={4}>
+                <FormControl>
+                  <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">Select Member</FormLabel>
+                  <Select
+                    value={selectedMemberForPdf?.member_id || ''}
+                    onChange={(e) => {
+                      if (e.target.value === 'both') {
+                        setSelectedMemberForPdf({ member_id: 'both', first_name: 'Both', last_name: 'Members', phone: 'both' } as any);
+                      } else {
+                        const selectedMember = members.find(m => m.member_id === e.target.value);
+                        setSelectedMemberForPdf(selectedMember || null);
+                      }
+                    }}
+                    fontFamily="Montserrat, sans-serif"
+                    size="sm"
+                    placeholder="Choose a member"
+                  >
+                    {members.length > 1 && (
+                      <option value="both">Both Members</option>
+                    )}
+                    {members.map((member) => (
+                      <option key={member.member_id} value={member.member_id}>
+                        {member.first_name} {member.last_name} {member.phone ? `(${member.phone})` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {selectedMemberForPdf && (
+                  <Box>
+                    <Text fontSize="lg" fontWeight="bold" fontFamily="IvyJournal, sans-serif" color="#353535">
+                      {selectedMemberForPdf.member_id === 'both' 
+                        ? 'Both Members' 
+                        : `${selectedMemberForPdf.first_name} ${selectedMemberForPdf.last_name}`
+                      }
+                    </Text>
+                    <Text fontSize="sm" color="gray.600" fontFamily="Montserrat, sans-serif">
+                      {selectedMemberForPdf.member_id === 'both' 
+                        ? `Will send to ${members.filter(m => m.phone).length} member(s) with phone numbers`
+                        : `Phone: ${selectedMemberForPdf.phone || 'No phone number'}`
+                      }
+                    </Text>
+                  </Box>
+                )}
+                
+                <FormControl>
+                  <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">Date Range</FormLabel>
+                  <Select
+                    value={pdfDateRange}
+                    onChange={(e) => setPdfDateRange(e.target.value)}
+                    fontFamily="Montserrat, sans-serif"
+                    size="sm"
+                  >
+                    <option value="current_month">Current Month</option>
+                    <option value="last_month">Last Month</option>
+                    <option value="last_3_months">Last 3 Months</option>
+                    {showPreviousMembershipPeriod && (
+                      <option value="previous_membership_period">Previous Membership Period</option>
+                    )}
+                    <option value="custom">Custom Range</option>
+                  </Select>
+                </FormControl>
+
+                {pdfDateRange === 'custom' && (
+                  <VStack spacing={3} w="100%">
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">Start Date</FormLabel>
+                      <Input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        fontFamily="Montserrat, sans-serif"
+                        size="sm"
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1} fontFamily="Montserrat, sans-serif">End Date</FormLabel>
+                      <Input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        fontFamily="Montserrat, sans-serif"
+                        size="sm"
+                      />
+                    </FormControl>
+                  </VStack>
+                )}
+
+                <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
+                  <Text fontSize="sm" color="gray.600" fontFamily="Montserrat, sans-serif">
+                    The PDF will include all ledger transactions for the selected period.
+                  </Text>
+                </Box>
+              </VStack>
+            </DrawerBody>
+            <DrawerFooter borderTopWidth="1px" justifyContent="space-between" className="drawer-footer-content">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsTextPdfModalOpen(false);
+                  setSelectedMemberForPdf(null);
+                  setPdfDateRange('current_month');
+                  setCustomStartDate('');
+                  setCustomEndDate('');
+                }}
+                fontFamily="Montserrat, sans-serif"
+              >
+                Cancel
+              </Button>
+              <Button
+                bg="#353535"
+                color="#ecede8"
+                onClick={handleTextPdf}
+                isLoading={sendingPdf}
+                loadingText="Sending..."
+                fontFamily="Montserrat, sans-serif"
+                fontWeight="semibold"
+                _hover={{ bg: '#2a2a2a' }}
+              >
+                Send PDF
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Box>
+      </Drawer>
     </AdminLayout>
   );
 } 
