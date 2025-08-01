@@ -80,6 +80,37 @@ function getNextBirthday(dob?: string) {
   return next;
 }
 
+// Utility: Get ISO week number (Monday as first day of week)
+function getISOWeek(date: Date) {
+  const temp = new Date(date.valueOf());
+  const dayNum = (date.getDay() + 6) % 7;
+  temp.setDate(temp.getDate() - dayNum + 3);
+  const firstThursday = temp.valueOf();
+  temp.setMonth(0, 1);
+  if (temp.getDay() !== 4) {
+    temp.setMonth(0, 1 + ((4 - temp.getDay()) + 7) % 7);
+  }
+  return 1 + Math.ceil((firstThursday - temp.valueOf()) / 604800000);
+}
+
+// Utility: Get Thursday/Friday/Saturday dates for a given ISO week
+function getWeekDates(year: number, week: number) {
+  const simple = new Date(year, 0, 1 + (week - 1) * 7);
+  const dow = simple.getDay();
+  const monday = new Date(simple);
+  if (dow <= 4) {
+    monday.setDate(simple.getDate() - simple.getDay() + 1);
+  } else {
+    monday.setDate(simple.getDate() + 8 - simple.getDay());
+  }
+  // Thursday = monday + 3, Friday = monday + 4, Saturday = monday + 5
+  return [3, 4, 5].map(offset => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + offset);
+    return d;
+  });
+}
+
 // Utility to get the next occurrence of a weekday (0=Sunday, 1=Monday, ...)
 function getNextWeekdayDate(weekday: number) {
   const today = new Date();
@@ -235,9 +266,19 @@ export default function Dashboard() {
   })).filter(m => m.nextRenewal).sort((a, b) => (a.nextRenewal as Date).getTime() - (b.nextRenewal as Date).getTime()).slice(0, 5);
 
   // Calculate seat totals for next Thursday (4), Friday (5), Saturday (6)
-  const nextThursday = getNextWeekdayDate(4);
-  const nextFriday = getNextWeekdayDate(5);
-  const nextSaturday = getNextWeekdayDate(6);
+  // Use ISO week logic for "Reservations for Noir" component
+  const today = new Date();
+  let year = today.getFullYear();
+  let week = getISOWeek(today);
+  if (today.getDay() === 0) { // Sunday
+    week += 1;
+    // Handle year rollover
+    if (week > getISOWeek(new Date(year, 11, 31))) {
+      week = 1;
+      year += 1;
+    }
+  }
+  const [nextThursday, nextFriday, nextSaturday] = getWeekDates(year, week);
 
   function isSameDay(date1: Date, date2: Date) {
     return date1.getFullYear() === date2.getFullYear() &&
