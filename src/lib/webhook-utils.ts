@@ -5,24 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export interface ToastWebhookPayload {
-  eventType: string;
-  transaction: {
-    id: string;
-    orderId: string;
-    amount: number;
-    customerPhone: string;
-    items: any[];
-    paymentMethod: string;
-    serverName: string;
-    tableNumber: string;
-    transactionDate: string;
-  };
-  customer: {
-    phone: string;
-    name?: string;
-  };
-}
+
 
 export async function findMemberByPhone(phone: string) {
   try {
@@ -78,47 +61,7 @@ export async function createLedgerEntry(data: {
   }
 }
 
-export async function storeToastTransaction(data: {
-  member_id: string;
-  account_id: string;
-  toast_transaction_id: string;
-  toast_order_id?: string;
-  amount: number;
-  transaction_date: string;
-  items?: any[];
-  payment_method?: string;
-  server_name?: string;
-  table_number?: string;
-}) {
-  try {
-    const { data: transaction, error } = await supabase
-      .from('toast_transactions')
-      .insert({
-        member_id: data.member_id,
-        account_id: data.account_id,
-        toast_transaction_id: data.toast_transaction_id,
-        toast_order_id: data.toast_order_id,
-        amount: data.amount,
-        transaction_date: data.transaction_date,
-        items: data.items,
-        payment_method: data.payment_method,
-        server_name: data.server_name,
-        table_number: data.table_number
-      })
-      .select()
-      .single();
 
-    if (error) {
-      console.error('Error storing Toast transaction:', error);
-      throw error;
-    }
-
-    return transaction;
-  } catch (error) {
-    console.error('Error in storeToastTransaction:', error);
-    throw error;
-  }
-}
 
 export async function sendErrorNotification(error: string) {
   try {

@@ -201,31 +201,30 @@
 /* iPhone and mobile optimizations */
 @media (max-width: 428px) {
   .card {
-    padding: 0.75rem;
+    padding: 1rem;
     min-width: 0;
     border-radius: 8px;
-   
   }
   
   .value {
-    font-size: 1.25rem;
-    margin-bottom: 0.25rem;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
   }
   
   .label {
-    font-size: 0.7rem;
-    margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
   }
   
   .description {
-    top: 0.25rem;
-    right: 0.25rem;
-    font-size: 0.6rem;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 0.7rem;
   }
   
   .extra {
-    font-size: 0.6rem;
-    margin-top: 0.25rem;
+    font-size: 0.7rem;
+    margin-top: 0.5rem;
   }
   
   .breakdown {
@@ -252,22 +251,22 @@
 /* iPhone SE and smaller screens */
 @media (max-width: 375px) {
   .card {
-    padding: 0.5rem;
+    padding: 0.75rem;
   }
   
   .value {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
   }
   
   .label {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }
   
   .description {
-    font-size: 0.55rem;
+    font-size: 0.65rem;
   }
   
   .extra {
-    font-size: 0.55rem;
+    font-size: 0.65rem;
   }
 }
