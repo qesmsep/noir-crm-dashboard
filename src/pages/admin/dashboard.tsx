@@ -192,11 +192,26 @@ export default function Dashboard() {
   const purchases = stats.ledger.filter(tx => tx.type === 'purchase' && isThisMonth(tx.date)).reduce((sum, tx) => sum + Number(tx.amount), 0);
   const ar = Math.abs(purchases) - payments;
 
-  // Next 5 Birthdays
+  // Next 5 Birthdays (including today's birthdays)
   const membersWithBirthday = stats.members.filter(m => m.dob).map(m => ({
     ...m,
     nextBirthday: getNextBirthday(m.dob)
-  })).filter(m => m.nextBirthday).sort((a, b) => (a.nextBirthday as Date).getTime() - (b.nextBirthday as Date).getTime()).slice(0, 5);
+  })).filter(m => m.nextBirthday).sort((a, b) => {
+    const aDate = a.nextBirthday as Date;
+    const bDate = b.nextBirthday as Date;
+    const today = new Date();
+    
+    // Check if either birthday is today
+    const aIsToday = aDate.getMonth() === today.getMonth() && aDate.getDate() === today.getDate();
+    const bIsToday = bDate.getMonth() === today.getMonth() && bDate.getDate() === today.getDate();
+    
+    // Today's birthdays come first
+    if (aIsToday && !bIsToday) return -1;
+    if (!aIsToday && bIsToday) return 1;
+    
+    // Then sort by date
+    return aDate.getTime() - bDate.getTime();
+  }).slice(0, 5);
 
   // Next 5 Payments Due (Upcoming Renewals)
   const getNextRenewal = (member: Member) => {
@@ -312,7 +327,7 @@ export default function Dashboard() {
         
         {/* Multi-data cards stacked below */}
         <div className={styles.listsGrid}>
-          <DashboardListCard label="Upcoming Week">
+          <DashboardListCard label="Reservations for Noir">
             <div className={styles.reservationList}>
               <div className={styles.weekDayItem}>
                 <div className={styles.weekDayHeader}>
@@ -358,19 +373,26 @@ export default function Dashboard() {
               </div>
             </div>
           </DashboardListCard>
-          <DashboardListCard label="Next 5 Birthdays">
+          <DashboardListCard label="Upcoming Birthdays">
             {membersWithBirthday.length === 0 ? <div className={styles.noReservations}>No upcoming birthdays.</div> : (
               <div className={styles.reservationList}>
-                {membersWithBirthday.map(m => (
-                  <div key={m.member_id} className={styles.weekDayItem}>
-                    <div className={styles.weekDayHeader}>
-                      <strong>{m.first_name} {m.last_name}</strong>
+                {membersWithBirthday.map(m => {
+                  const birthdayDate = m.nextBirthday as Date;
+                  const today = new Date();
+                  const isToday = birthdayDate.getMonth() === today.getMonth() && birthdayDate.getDate() === today.getDate();
+                  
+                  return (
+                    <div key={m.member_id} className={styles.weekDayItem}>
+                      <div className={styles.weekDayHeader}>
+                        <strong>{m.first_name} {m.last_name}</strong>
+                        {isToday && <span style={{ color: '#BCA892', fontWeight: 'bold' }}> 🎉 TODAY!</span>}
+                      </div>
+                      <div className={styles.reservationSummary}>
+                        🎂 {birthdayDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                      </div>
                     </div>
-                    <div className={styles.reservationSummary}>
-                      🎂 {(m.nextBirthday as Date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </DashboardListCard>
