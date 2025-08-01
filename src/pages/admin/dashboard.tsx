@@ -5,6 +5,7 @@ import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 import DashboardCard from '../../components/dashboard/DashboardCard';
 import DashboardListCard from '../../components/dashboard/DashboardListCard';
 import styles from '../../styles/Dashboard.module.css';
+import Link from 'next/link';
 
 interface Member {
   member_id: string;
@@ -377,9 +378,11 @@ export default function Dashboard() {
                 {thursdayPrivateEvent ? (
                   <div className={styles.privateEventName}>🔒 {thursdayPrivateEvent.title}</div>
                 ) : thursdayReservations.length > 0 ? (
-                  <div className={styles.reservationSummary}>
-                    {thursdayReservations.length} Reservation{thursdayReservations.length !== 1 ? 's' : ''} & {thursdaySeats} Cover{thursdaySeats !== 1 ? 's' : ''}
-                  </div>
+                  <Link href={`/admin/calendar?date=${nextThursday.toISOString().split('T')[0]}`} className={styles.weekDayItem}>
+                    <div className={styles.reservationSummary}>
+                      {thursdayReservations.length} Reservation{thursdayReservations.length !== 1 ? 's' : ''} & {thursdaySeats} Cover{thursdaySeats !== 1 ? 's' : ''}
+                    </div>
+                  </Link>
                 ) : (
                   <div className={styles.noReservations}>No reservations</div>
                 )}
@@ -391,9 +394,11 @@ export default function Dashboard() {
                 {fridayPrivateEvent ? (
                   <div className={styles.privateEventName}>🔒 {fridayPrivateEvent.title}</div>
                 ) : fridayReservations.length > 0 ? (
-                  <div className={styles.reservationSummary}>
-                    {fridayReservations.length} Reservation{fridayReservations.length !== 1 ? 's' : ''} & {fridaySeats} Cover{fridaySeats !== 1 ? 's' : ''}
-                  </div>
+                  <Link href={`/admin/calendar?date=${nextFriday.toISOString().split('T')[0]}`} className={styles.weekDayItem}>
+                    <div className={styles.reservationSummary}>
+                      {fridayReservations.length} Reservation{fridayReservations.length !== 1 ? 's' : ''} & {fridaySeats} Cover{fridaySeats !== 1 ? 's' : ''}
+                    </div>
+                  </Link>
                 ) : (
                   <div className={styles.noReservations}>No reservations</div>
                 )}
@@ -405,9 +410,11 @@ export default function Dashboard() {
                 {saturdayPrivateEvent ? (
                   <div className={styles.privateEventName}>🔒 {saturdayPrivateEvent.title}</div>
                 ) : saturdayReservations.length > 0 ? (
-                  <div className={styles.reservationSummary}>
-                    {saturdayReservations.length} Reservation{saturdayReservations.length !== 1 ? 's' : ''} & {saturdaySeats} Cover{saturdaySeats !== 1 ? 's' : ''}
-                  </div>
+                  <Link href={`/admin/calendar?date=${nextSaturday.toISOString().split('T')[0]}`} className={styles.weekDayItem}>
+                    <div className={styles.reservationSummary}>
+                      {saturdayReservations.length} Reservation{saturdayReservations.length !== 1 ? 's' : ''} & {saturdaySeats} Cover{saturdaySeats !== 1 ? 's' : ''}
+                    </div>
+                  </Link>
                 ) : (
                   <div className={styles.noReservations}>No reservations</div>
                 )}
@@ -423,7 +430,7 @@ export default function Dashboard() {
                   const isToday = birthdayDate.getMonth() === today.getMonth() && birthdayDate.getDate() === today.getDate();
                   
                   return (
-                    <div key={m.member_id} className={styles.weekDayItem}>
+                    <Link key={m.member_id} href={`/admin/members/${m.member_id}`} className={styles.weekDayItem}>
                       <div className={styles.weekDayHeader}>
                         <strong>{m.first_name} {m.last_name}</strong>
                         {isToday && <span style={{ color: '#BCA892', fontWeight: 'bold' }}> 🎉 TODAY!</span>}
@@ -431,7 +438,7 @@ export default function Dashboard() {
                       <div className={styles.reservationSummary}>
                         🎂 {birthdayDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -441,14 +448,14 @@ export default function Dashboard() {
             {membersWithRenewal.length === 0 ? <div className={styles.noReservations}>No upcoming payments.</div> : (
               <div className={styles.reservationList}>
                 {membersWithRenewal.map(m => (
-                  <div key={m.member_id} className={styles.weekDayItem}>
+                  <Link key={m.member_id} href={`/admin/members/${m.member_id}`} className={styles.weekDayItem}>
                     <div className={styles.weekDayHeader}>
                       <strong>{m.first_name} {m.last_name}</strong>
                     </div>
                     <div className={styles.reservationSummary}>
                       💳 {(m.nextRenewal as Date).toLocaleDateString()} - <span className={styles.paymentAmount}>${(m.monthly_dues || 0).toFixed(2)}</span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -459,21 +466,46 @@ export default function Dashboard() {
             ) : (
               <div className={styles.reservationList}>
                 {stats.invitationRequests.slice(0, 5).map((entry: any) => (
-                  <div key={entry.id} className={styles.weekDayItem}>
+                  <Link key={entry.id} href="/admin/waitlist?status=review" className={styles.weekDayItem}>
                     <div className={styles.weekDayHeader}>
                       <strong>{entry.first_name} {entry.last_name}</strong>
                     </div>
                     <div className={styles.reservationSummary}>
                       📝 {new Date(entry.submitted_at).toLocaleDateString()}
                     </div>
-                  </div>
+                  </Link>
                 ))}
                 {stats.invitationRequests.length > 5 && (
-                  <div className={styles.weekDayItem}>
+                  <Link href="/admin/waitlist?status=review" className={styles.weekDayItem}>
                     <div className={styles.reservationSummary}>
                       +{stats.invitationRequests.length - 5} more requests
                     </div>
-                  </div>
+                  </Link>
+                )}
+              </div>
+            )}
+          </DashboardListCard>
+          <DashboardListCard label="Waitlist">
+            {stats.waitlistEntries.length === 0 ? (
+              <div className={styles.noReservations}>No waitlist entries.</div>
+            ) : (
+              <div className={styles.reservationList}>
+                {stats.waitlistEntries.slice(0, 5).map((entry: any) => (
+                  <Link key={entry.id} href="/admin/waitlist?status=waitlisted" className={styles.weekDayItem}>
+                    <div className={styles.weekDayHeader}>
+                      <strong>{entry.first_name} {entry.last_name}</strong>
+                    </div>
+                    <div className={styles.reservationSummary}>
+                      ⏳ {new Date(entry.submitted_at).toLocaleDateString()}
+                    </div>
+                  </Link>
+                ))}
+                {stats.waitlistEntries.length > 5 && (
+                  <Link href="/admin/waitlist?status=waitlisted" className={styles.weekDayItem}>
+                    <div className={styles.reservationSummary}>
+                      +{stats.waitlistEntries.length - 5} more entries
+                    </div>
+                  </Link>
                 )}
               </div>
             )}

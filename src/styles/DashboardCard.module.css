@@ -233,6 +233,8 @@
     border-radius: 0;
     height: 100vh;
     max-height: none;
+    top: 75%;
+    transform: translate(-50%, -75%);
   }
   
   .breakdownHeader {

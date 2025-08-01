@@ -32,6 +32,8 @@
   font-family: 'Montserrat', sans-serif;
   font-weight: 400;
   overflow-x: hidden;
+  margin: 0;
+  padding: 0;
   width: 100%;
   max-width: 100vw;
 }
@@ -81,7 +83,8 @@
 }
 .pageTitleContainer {
   margin-top: 6rem;
-  padding: 0rem 1.5rem;
+  padding: 0rem;
+  width: 100%;
   background-color: #353535;
 }
 .title {
@@ -400,6 +403,9 @@
   }
   .container {
     background-color: #FFF;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 }
 
@@ -432,11 +438,14 @@
 @media (max-width: 768px) {
   .container {
     flex-direction: column;
+    width: 100%;
+    margin-right: 0;
+    padding-right: 0px;
   }
 
   .sidebar {
     width: 100%;
-    padding: 1rem;
+    padding: 0px;
   }
 
   .main {

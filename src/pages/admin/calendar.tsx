@@ -1,5 +1,6 @@
 import { Box, useColorModeValue, HStack, Button, IconButton, Text, useDisclosure } from "@chakra-ui/react";
 import React, { useState, useEffect } from "react";
+import { useRouter } from 'next/router';
 import FullCalendarTimeline from "../../components/FullCalendarTimeline";
 import ReservationEditDrawer from "../../components/ReservationEditDrawer";
 import AdminLayout from '../../components/layouts/AdminLayout';
@@ -11,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 type ViewType = 'day' | 'week' | 'month' | 'all';
 
 export default function Calendar() {
+  const router = useRouter();
   const [reloadKey, setReloadKey] = useState(0);
   const [currentView, setCurrentView] = useState<ViewType>('day');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -25,6 +27,17 @@ export default function Calendar() {
   // Drawer state at page level
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
+
+  // Handle URL parameters for date
+  useEffect(() => {
+    if (router.isReady && router.query.date) {
+      const dateParam = router.query.date as string;
+      const parsedDate = new Date(dateParam);
+      if (!isNaN(parsedDate.getTime())) {
+        setCurrentDate(parsedDate);
+      }
+    }
+  }, [router.isReady, router.query.date]);
 
   const handleReservationClick = (reservationId: string) => {
     setSelectedReservationId(reservationId);
