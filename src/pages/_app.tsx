@@ -5,6 +5,7 @@ import MainNav from '../components/MainNav';
 import { Analytics } from '@vercel/analytics/react';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
