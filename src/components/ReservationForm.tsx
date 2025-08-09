@@ -279,6 +279,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       // Format date as YYYY-MM-DD using Luxon
       const dateStr = date.toFormat('yyyy-MM-dd');
       
+      console.log('🔍 ReservationForm: Fetching available slots for', dateStr, 'party size', form.party_size);
       const res = await fetch('/api/available-slots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -291,7 +292,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         return;
       }
 
-      const { slots } = await res.json();
+      const responseData = await res.json();
+      console.log('🔍 ReservationForm: API response received', responseData);
+      const { slots } = responseData;
       setAvailableTimes(Array.isArray(slots) ? slots : []);
     }
     fetchAvailableTimes();
