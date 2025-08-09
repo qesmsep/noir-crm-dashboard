@@ -413,19 +413,13 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     });
 
     // 1. Check Booking Window (settings table)
-    const { data: startSetting } = await supabase
+    const { data: settingsData } = await supabase
       .from('settings')
-      .select('value')
-      .eq('key', 'booking_start_date')
-      .single();
-    const { data: endSetting } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'booking_end_date')
+      .select('booking_start_date, booking_end_date')
       .single();
     
-    const bookingStart = startSetting?.value ? new Date(startSetting.value) : null;
-    const bookingEnd = endSetting?.value ? new Date(endSetting.value) : null;
+    const bookingStart = settingsData?.booking_start_date ? new Date(settingsData.booking_start_date) : null;
+    const bookingEnd = settingsData?.booking_end_date ? new Date(settingsData.booking_end_date) : null;
     const reqDate = new Date(dateStr);
     
     if ((bookingStart && reqDate < bookingStart) || (bookingEnd && reqDate > bookingEnd)) {

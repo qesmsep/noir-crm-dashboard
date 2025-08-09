@@ -180,15 +180,9 @@ export default function Home() {
       setLoading(true);
       // Fetch booking window from settings
       const supabase = getSupabaseClient();
-      const { data: startData } = await supabase
+      const { data: settingsData } = await supabase
         .from('settings')
-        .select('value')
-        .eq('key', 'booking_start_date')
-        .single();
-      const { data: endData } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'booking_end_date')
+        .select('booking_start_date, booking_end_date')
         .single();
       // Fetch baseDays from venue_hours
       const { data: baseData } = await supabase
@@ -196,8 +190,8 @@ export default function Home() {
         .select('day_of_week')
         .eq('type', 'base')
         .gte('time_ranges', '[]');
-      setBookingStartDate(startData && startData.value ? new Date(startData.value) : new Date());
-      setBookingEndDate(endData && endData.value ? new Date(endData.value) : (() => { const d = new Date(); d.setDate(d.getDate() + 60); return d; })());
+      setBookingStartDate(settingsData && settingsData.booking_start_date ? new Date(settingsData.booking_start_date) : new Date());
+      setBookingEndDate(settingsData && settingsData.booking_end_date ? new Date(settingsData.booking_end_date) : (() => { const d = new Date(); d.setDate(d.getDate() + 60); return d; })());
       setBaseDays(Array.isArray(baseData) ? baseData.map(r => typeof r.day_of_week === 'string' ? Number(r.day_of_week) : r.day_of_week) : [1,2,3,4,5,6,0]);
       setLoading(false);
     }
