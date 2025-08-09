@@ -82,18 +82,26 @@ export async function POST(request: Request) {
     
     console.log('🎉 PRIVATE EVENTS QUERY RESULT:', { privateEvents, error: privateEventsError });
     
-    if (privateEventsError) {
-      console.error('🚨 PRIVATE EVENTS QUERY ERROR:', privateEventsError);
-    }
-    
-    if (privateEvents && privateEvents.length > 0) {
-      console.log('🎉 EVENTS FOUND - DETAILS:', privateEvents.map(ev => ({
+    // Store debug info for API response
+    const debugInfo = {
+      privateEventsQuery: privateEventQuery,
+      privateEventsFound: privateEvents ? privateEvents.length : 0,
+      privateEventsError: privateEventsError,
+      privateEventsDetails: privateEvents ? privateEvents.map(ev => ({
         title: ev.title,
         start: ev.start_time,
         end: ev.end_time,
         full_day: ev.full_day,
         status: ev.status
-      })));
+      })) : []
+    };
+    
+    if (privateEventsError) {
+      console.error('🚨 PRIVATE EVENTS QUERY ERROR:', privateEventsError);
+    }
+    
+    if (privateEvents && privateEvents.length > 0) {
+      console.log('🎉 EVENTS FOUND - DETAILS:', debugInfo.privateEventsDetails);
     } else {
       console.log('❌ NO PRIVATE EVENTS FOUND FOR', dateStr);
     }
@@ -290,7 +298,8 @@ export async function POST(request: Request) {
       timestamp: new Date().toISOString(),
       debugMessage: 'NEW_CODE_DEPLOYED_SUCCESSFULLY',
       totalSlots: availableSlots.length,
-      requestedDate: date
+      requestedDate: date,
+      debugInfo: debugInfo
     });
   } catch (error) {
     console.error('Error in available-slots API:', error);
