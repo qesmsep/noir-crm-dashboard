@@ -43,9 +43,11 @@ export async function POST(request: Request) {
     
     // IMMEDIATE FIX: If this is August 23rd, 2025, force return limited slots for testing
     if (date === '2025-08-23') {
-      console.log('🚨 AUGUST 23rd DETECTED - APPLYING EMERGENCY PRIVATE EVENT BLOCKING');
+      console.log('🚨🚨🚨 AUGUST 23rd DETECTED - EMERGENCY PRIVATE EVENT BLOCKING ACTIVE 🚨🚨🚨');
+      console.log('🚨 DEPLOYMENT CHECK: This message confirms the latest code is deployed');
       return NextResponse.json({ 
-        slots: ['5:00pm', '5:15pm', '5:30pm', '9:30pm', '9:45pm', '10:00pm', '10:15pm', '10:30pm'] 
+        slots: ['5:00pm', '5:15pm', '5:30pm', '9:30pm', '9:45pm', '10:00pm', '10:15pm', '10:30pm'],
+        debug: 'EMERGENCY_FIX_ACTIVE_v2'
       });
     }
     
