@@ -38,7 +38,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing date or party_size' }, { status: 400 });
     }
     
-    console.log('Available slots API called with:', { date, party_size });
+    console.log('🚨 AVAILABLE SLOTS API CALLED:', { date, party_size });
+    console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
     
     const supabase = getSupabaseClient();
     
@@ -74,7 +75,14 @@ export async function POST(request: Request) {
       .eq('status', 'active')
       .or(`and(start_time.gte.${dateStr}T00:00:00Z,start_time.lte.${dateStr}T23:59:59Z),and(end_time.gte.${dateStr}T00:00:00Z,end_time.lte.${dateStr}T23:59:59Z),and(start_time.lte.${dateStr}T00:00:00Z,end_time.gte.${dateStr}T23:59:59Z)`);
     
-    console.log('Private events found:', privateEvents);
+    console.log('🎉 PRIVATE EVENTS FOUND:', privateEvents);
+    if (privateEvents && privateEvents.length > 0) {
+      console.log('🎉 EVENT DETAILS:', privateEvents.map(ev => ({
+        start: ev.start_time,
+        end: ev.end_time,
+        full_day: ev.full_day
+      })));
+    }
     
     if (privateEvents && privateEvents.length > 0) {
       // If there's a full-day private event, return no slots
@@ -238,7 +246,7 @@ export async function POST(request: Request) {
       });
       
       if (hasPrivateEventOverlap) {
-        console.log(`Slot ${slot} blocked by private event`);
+        console.log(`🚫 SLOT ${slot} BLOCKED BY PRIVATE EVENT`);
         continue; // Skip this slot
       }
       
@@ -259,7 +267,8 @@ export async function POST(request: Request) {
       }
     }
     
-    console.log('Available slots:', availableSlots);
+    console.log('✅ FINAL AVAILABLE SLOTS:', availableSlots);
+    console.log('✅ TOTAL SLOTS RETURNED:', availableSlots.length);
     return NextResponse.json({ slots: availableSlots });
   } catch (error) {
     console.error('Error in available-slots API:', error);
