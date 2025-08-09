@@ -983,35 +983,16 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       {isMobile && (
         <Box 
           bg="#fff" 
-          p={3} 
+          p={1} 
           borderBottom="0px solid #a59480"
           position="sticky"
           top={0}
           zIndex={10}
         >
-          {/* Top Row: All Reservations Button, Nav Arrows, Today Button */}
-          <HStack justify="space-between" align="center" mb={2}>
-            {/* Left: All Reservations Button */}
-            <Button
-              onClick={() => {
-                setSelectedDate(currentCalendarDate);
-                setIsDayReservationsDrawerOpen(true);
-              }}
-              leftIcon={<CalendarIcon />}
-              bg="#ecede8"
-              color="#353535"
-              marginLeft="10px"
-              _hover={{ bg: '#4f4f4f' }}
-              fontFamily="Montserrat, sans-serif"
-              fontWeight="semibold"
-              size="md"
-              borderRadius="10px"
-            >
-              All Reservations
-            </Button>
-
-            {/* Center: Navigation Arrows */}
-            <HStack spacing={10}>
+          {/* Top Row: Day Navigation and Today Button */}
+          <HStack justify="space-between" align="center" mb={1}>
+            {/* Left: Navigation Arrows */}
+            <HStack spacing={4}>
               <IconButton
                 aria-label="Previous day"
                 icon={<ChevronLeftIcon />}
@@ -1058,9 +1039,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           </HStack>
 
           {/* Bottom Row: Centered Date */}
-          <Box textAlign="center">
+          <Box textAlign="center" mt={1}>
             <Text
-              fontSize="lg"
+              fontSize="sm"
               fontWeight="semibold"
               color="#353535"
               fontFamily="Montserrat, sans-serif"
@@ -1075,27 +1056,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         </Box>
       )}
 
-      {/* Desktop Button (unchanged) */}
-      {!isMobile && (
-        <Box mb={4} display="flex" justifyContent="flex-end">
-          <Button
-            onClick={() => {
-              setSelectedDate(currentCalendarDate);
-              setIsDayReservationsDrawerOpen(true);
-            }}
-            leftIcon={<CalendarIcon />}
-            bg="#353535"
-            color="#ecede8"
-            _hover={{ bg: '#4f4f4f' }}
-            fontFamily="Montserrat, sans-serif"
-            fontWeight="semibold"
-            size="md"
-            borderRadius="md"
-          >
-            All Reservations
-          </Button>
-        </Box>
-      )}
+
 
       <Box
         style={{
@@ -1104,7 +1065,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'auto',
           width: '100%',
-          height: isMobile ? 'calc(100vh - 260px)' : 'auto',
+          height: isMobile ? 'calc(100vh - 160px)' : 'auto',
           overflow: isMobile ? 'auto' : 'visible',
           // Mobile-specific adjustments
           ...(isMobile && {
@@ -1767,6 +1728,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         onClose={handleDayReservationsClose}
         selectedDate={selectedDate}
         onReservationClick={onReservationClick || handleReservationFromListClick}
+        onDateChange={(newDate) => {
+          setSelectedDate(newDate);
+          setCurrentCalendarDate(newDate);
+          if (onDateChange) {
+            onDateChange(newDate);
+          }
+        }}
       />
 
       {/* New Reservation Drawer */}

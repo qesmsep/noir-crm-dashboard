@@ -1,0 +1,484 @@
+/* Mobile-specific styles for reservations view */
+.mobileView {
+  display: none;
+}
+
+.desktopView {
+  display: block;
+}
+
+/* Show mobile view on screens smaller than 768px */
+@media (max-width: 767px) {
+  .mobileView {
+    display: block;
+  }
+  
+  .desktopView {
+    display: none;
+  }
+}
+
+/* Mobile container */
+.mobileContainer {
+  padding: 16px;
+  padding-top: 20px;
+  background: #f8f9fa;
+  min-height: 100%;
+  height: auto;
+}
+
+/* Mobile header */
+.mobileHeader {
+  margin-bottom: 20px;
+}
+
+.mobileTitle {
+  font-size: 24px;
+  font-weight: bold;
+  font-family: 'Montserrat', sans-serif;
+  color: #353535;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+/* Mobile filters and search */
+.mobileFiltersContainer {
+  margin-bottom: 20px;
+}
+
+.mobileSearchContainer {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.mobileSearchInput {
+  width: 100%;
+  padding: 12px 16px 12px 44px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+}
+
+.mobileSearchInput::placeholder {
+  color: #9ca3af;
+}
+
+.mobileSearchInput:focus {
+  outline: none;
+  border-color: #a59480;
+  box-shadow: 0 0 0 2px rgba(165, 148, 128, 0.2);
+}
+
+.mobileSearchIcon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a59480;
+}
+
+.mobileFilterRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mobileSelect {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+}
+
+.mobileSelect:focus {
+  outline: none;
+  border-color: #a59480;
+  box-shadow: 0 0 0 2px rgba(165, 148, 128, 0.2);
+}
+
+.mobileRefreshButton {
+  width: 100%;
+  padding: 12px 16px;
+  background: #a59480;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mobileRefreshButton:hover {
+  background: #8b7b68;
+}
+
+/* Mobile reservation entries */
+.mobileReservationsContainer {
+  margin-bottom: 20px;
+}
+
+.mobileReservationCard {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.mobileReservationCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  border-color: #a59480;
+}
+
+.mobileReservationHeader {
+  background: linear-gradient(135deg, #a59480 0%, #8b7b68 100%);
+  padding: 16px;
+  color: white;
+  position: relative;
+}
+
+.mobileReservationName {
+  font-size: 18px;
+  font-weight: bold;
+  font-family: 'Montserrat', sans-serif;
+  margin: 0 0 8px 0;
+}
+
+.mobileReservationHeaderInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobileReservationDate {
+  font-size: 14px;
+  color: white;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+.mobileReservationTime {
+  font-size: 14px;
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.mobileReservationInfo {
+  padding: 16px;
+  background: white;
+}
+
+.mobileInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mobileInfoItem {
+  display: flex;
+  align-items: center;
+  color: #4b5563;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+}
+
+.mobileInfoIcon {
+  margin-right: 8px;
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.mobileInfoText {
+  flex: 1;
+  font-weight: 500;
+}
+
+.mobileEventTypeContainer {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.mobileEventIcon {
+  font-size: 24px;
+  margin-right: 8px;
+}
+
+.mobileEventType {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.mobileSourceBadge {
+  display: inline-block;
+  background: #e5e7eb;
+  color: #4b5563;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+
+/* Mobile loading state */
+.mobileLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.mobileLoadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top: 3px solid #a59480;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile empty state */
+.mobileEmpty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+}
+
+.mobileEmptyIcon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+/* Mobile stats */
+.mobileStatsContainer {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.mobileStatCard {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.mobileStatNumber {
+  font-size: 24px;
+  font-weight: bold;
+  color: #a59480;
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileStatLabel {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+/* Mobile sort controls */
+.mobileSortContainer {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mobileSortButton {
+  flex: 1;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mobileSortButton.active {
+  background: #a59480;
+  color: white;
+  border-color: #a59480;
+}
+
+.mobileSortButton:hover:not(.active) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* Mobile today indicator */
+.mobileTodayIndicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #10b981;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Mobile upcoming indicator */
+.mobileUpcomingIndicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #3b82f6;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Mobile past indicator */
+.mobilePastIndicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #6b7280;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Touch-friendly adjustments */
+@media (max-width: 480px) {
+  .mobileContainer {
+    padding: 12px;
+    padding-top: 16px;
+  }
+  
+  .mobileReservationCard {
+    margin-bottom: 12px;
+  }
+  
+  .mobileReservationHeader,
+  .mobileReservationInfo {
+    padding: 12px;
+  }
+  
+  .mobileInfoGrid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .mobileStatsContainer {
+    gap: 8px;
+  }
+  
+  .mobileStatCard {
+    padding: 12px;
+  }
+  
+  .mobileReservationName {
+    font-size: 16px;
+  }
+}
+
+/* Special status indicators */
+.mobileStatusIndicator {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.mobileStatusConfirmed {
+  background: #10b981;
+}
+
+.mobileStatusPending {
+  background: #f59e0b;
+}
+
+.mobileStatusCancelled {
+  background: #ef4444;
+}
+
+/* Mobile filter chips */
+.mobileFilterChips {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.mobileFilterChip {
+  display: flex;
+  align-items: center;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mobileFilterChip.active {
+  background: #a59480;
+  color: white;
+}
+
+.mobileFilterChip:hover:not(.active) {
+  background: #e5e7eb;
+}

@@ -29,6 +29,7 @@ import {
 import { SearchIcon, LinkIcon, CopyIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
+import styles from '../../styles/WaitlistMobile.module.css';
 
 interface WaitlistEntry {
   id: string;
@@ -230,201 +231,390 @@ export default function WaitlistPage() {
 
   return (
     <AdminLayout>
-      <Box p={4} minH="100vh" bg="#353535" color="#ECEDE8">
-        <Box position="relative" ml={10} mr={10} zIndex={1} pt={28}>
-          <Heading mb={6} fontFamily="'Montserrat', sans-serif" color="#a59480">
-            Waitlist Management
-          </Heading>
+      {/* Desktop View */}
+      <div className={styles.desktopView}>
+        <Box p={4} minH="100vh" bg="#353535" color="#ECEDE8">
+          <Box position="relative" ml={10} mr={10} zIndex={1} pt={28}>
+            <Heading mb={6} fontFamily="'Montserrat', sans-serif" color="#a59480">
+              Waitlist Management
+            </Heading>
 
-          {/* Status Summary */}
-          <SimpleGrid columns={3} spacing={6} mb={8}>
-            {statusCounts.map((statusCount) => (
-              <Stat key={statusCount.status} bg="#a59480" p={6} borderRadius="lg" border="1px solid #ecede8">
-                <StatLabel fontSize="lg" fontFamily="'Montserrat', sans-serif" fontWeight="bold">
-                  {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
-                </StatLabel>
-                <StatNumber fontSize="3xl" fontFamily="'Montserrat', sans-serif">
-                  {statusCount.count}
-                </StatNumber>
-              </Stat>
-            ))}
-          </SimpleGrid>
+            {/* Status Summary */}
+            <SimpleGrid columns={3} spacing={6} mb={8}>
+              {statusCounts.map((statusCount) => (
+                <Stat key={statusCount.status} bg="#a59480" p={6} borderRadius="lg" border="1px solid #ecede8">
+                  <StatLabel fontSize="lg" fontFamily="'Montserrat', sans-serif" fontWeight="bold">
+                    {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
+                  </StatLabel>
+                  <StatNumber fontSize="3xl" fontFamily="'Montserrat', sans-serif">
+                    {statusCount.count}
+                  </StatNumber>
+                </Stat>
+              ))}
+            </SimpleGrid>
 
-          {/* Filters */}
-          <HStack spacing={4} mb={6}>
-            <Select
+            {/* Filters */}
+            <HStack spacing={4} mb={6}>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                bg="#2a2a2a"
+                borderColor="#a59480"
+                color="#ECEDE8"
+                fontFamily="'Montserrat', sans-serif"
+                w="200px"
+              >
+                <option value="">All Statuses</option>
+                <option value="review">Review</option>
+                <option value="approved">Approved</option>
+                <option value="waitlisted">Waitlisted</option>
+                <option value="denied">Denied</option>
+              </Select>
+
+              <InputGroup w="300px">
+                <InputLeftElement>
+                  <SearchIcon color="#a59480" />
+                </InputLeftElement>
+                <Input
+                  placeholder="Search by name, email, company..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  bg="#2a2a2a"
+                  borderColor="#a59480"
+                  color="#ECEDE8"
+                  fontFamily="'Montserrat', sans-serif"
+                  _focus={{ borderColor: "#a59480", boxShadow: "0 0 0 1px #a59480" }}
+                />
+              </InputGroup>
+
+              <Button
+                onClick={fetchWaitlist}
+                bg="#a59480"
+                color="#353535"
+                _hover={{ bg: "#bca892" }}
+                fontFamily="'Montserrat', sans-serif"
+              >
+                Refresh
+              </Button>
+            </HStack>
+
+            {/* Waitlist Table */}
+            <Box bg="#2a2a2a" borderRadius="lg" overflow="hidden" border="1px solid #a59480">
+              {loading ? (
+                <Flex justify="center" align="center" p={8}>
+                  <Spinner size="xl" color="#a59480" />
+                </Flex>
+              ) : (
+                <>
+                  <Table variant="simple">
+                    <Thead bg="#a59480">
+                      <Tr>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Name</Th>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Email</Th>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Phone</Th>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Company</Th>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Location</Th>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Status</Th>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Submitted</Th>
+                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Actions</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {filteredEntries.map((entry) => (
+                        <Tr key={entry.id} _hover={{ bg: "#3a3a3a" }}>
+                          <Td fontFamily="'Montserrat', sans-serif">
+                            {entry.first_name} {entry.last_name}
+                          </Td>
+                          <Td fontFamily="'Montserrat', sans-serif">{entry.email}</Td>
+                          <Td fontFamily="'Montserrat', sans-serif">{formatPhone(entry.phone)}</Td>
+                          <Td fontFamily="'Montserrat', sans-serif">{entry.company || '-'}</Td>
+                          <Td fontFamily="'Montserrat', sans-serif">{entry.city_state || '-'}</Td>
+                          <Td>
+                            <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
+                              {entry.status.toUpperCase()}
+                            </Badge>
+                          </Td>
+                          <Td fontFamily="'Montserrat', sans-serif">{formatDate(entry.submitted_at)}</Td>
+                          <Td>
+                            <HStack spacing={2}>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedEntry(entry);
+                                  onModalOpen();
+                                }}
+                                bg="#a59480"
+                                color="#353535"
+                                _hover={{ bg: "#bca892" }}
+                                fontFamily="'Montserrat', sans-serif"
+                              >
+                                Review
+                              </Button>
+                              {!entry.application_token ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => generateInvitationLink(entry.id)}
+                                  isLoading={generatingLink === entry.id}
+                                  leftIcon={<LinkIcon />}
+                                  bg="#2a2a2a"
+                                  color="#a59480"
+                                  borderColor="#a59480"
+                                  borderWidth="1px"
+                                  _hover={{ bg: "#3a3a3a" }}
+                                  fontFamily="'Montserrat', sans-serif"
+                                >
+                                  Generate Link
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => copyInvitationLink(entry.application_token!)}
+                                  leftIcon={<CopyIcon />}
+                                  bg="#2a2a2a"
+                                  color="#a59480"
+                                  borderColor="#a59480"
+                                  borderWidth="1px"
+                                  _hover={{ bg: "#3a3a3a" }}
+                                  fontFamily="'Montserrat', sans-serif"
+                                >
+                                  Copy Link
+                                </Button>
+                              )}
+                            </HStack>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+
+                  {filteredEntries.length === 0 && (
+                    <Box p={8} textAlign="center">
+                      <Text fontFamily="'Montserrat', sans-serif" color="#a59480">
+                        No waitlist entries found
+                      </Text>
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <HStack justify="center" mt={6} spacing={2}>
+                <Button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  bg="#a59480"
+                  color="#353535"
+                  _hover={{ bg: "#bca892" }}
+                  fontFamily="'Montserrat', sans-serif"
+                >
+                  Previous
+                </Button>
+                <Text fontFamily="'Montserrat', sans-serif">
+                  Page {currentPage} of {totalPages}
+                </Text>
+                <Button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  bg="#a59480"
+                  color="#353535"
+                  _hover={{ bg: "#bca892" }}
+                  fontFamily="'Montserrat', sans-serif"
+                >
+                  Next
+                </Button>
+              </HStack>
+            )}
+          </Box>
+        </Box>
+      </div>
+
+      {/* Mobile View */}
+      <div className={styles.mobileView}>
+        <div className={styles.mobileContainer}>
+          <div className={styles.mobileHeader}>
+            <h1 className={styles.mobileTitle}>Waitlist Management</h1>
+            
+            {/* Mobile Status Summary */}
+            <div className={styles.mobileStatusGrid}>
+              {statusCounts.map((statusCount) => (
+                <div key={statusCount.status} className={styles.mobileStatusCard}>
+                  <div className={styles.mobileStatusLabel}>
+                    {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
+                  </div>
+                  <div className={styles.mobileStatusNumber}>
+                    {statusCount.count}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Mobile Filters */}
+          <div className={styles.mobileFiltersContainer}>
+            <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              bg="#2a2a2a"
-              borderColor="#a59480"
-              color="#ECEDE8"
-              fontFamily="'Montserrat', sans-serif"
-              w="200px"
+              className={styles.mobileSelect}
             >
               <option value="">All Statuses</option>
               <option value="review">Review</option>
               <option value="approved">Approved</option>
               <option value="waitlisted">Waitlisted</option>
               <option value="denied">Denied</option>
-            </Select>
+            </select>
 
-            <InputGroup w="300px">
-              <InputLeftElement>
-                <SearchIcon color="#a59480" />
-              </InputLeftElement>
-              <Input
+            <div className={styles.mobileSearchContainer}>
+              <SearchIcon className={styles.mobileSearchIcon} />
+              <input
+                type="text"
                 placeholder="Search by name, email, company..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                bg="#2a2a2a"
-                borderColor="#a59480"
-                color="#ECEDE8"
-                fontFamily="'Montserrat', sans-serif"
-                _focus={{ borderColor: "#a59480", boxShadow: "0 0 0 1px #a59480" }}
+                className={styles.mobileSearchInput}
               />
-            </InputGroup>
+            </div>
 
-            <Button
+            <button
               onClick={fetchWaitlist}
-              bg="#a59480"
-              color="#353535"
-              _hover={{ bg: "#bca892" }}
-              fontFamily="'Montserrat', sans-serif"
+              className={styles.mobileRefreshButton}
             >
               Refresh
-            </Button>
-          </HStack>
+            </button>
+          </div>
 
-          {/* Waitlist Table */}
-          <Box bg="#2a2a2a" borderRadius="lg" overflow="hidden" border="1px solid #a59480">
+          {/* Mobile Waitlist Entries */}
+          <div className={styles.mobileEntriesContainer}>
             {loading ? (
-              <Flex justify="center" align="center" p={8}>
-                <Spinner size="xl" color="#a59480" />
-              </Flex>
+              <div className={styles.mobileLoading}>
+                <div className={styles.mobileLoadingSpinner}></div>
+              </div>
+            ) : filteredEntries.length === 0 ? (
+              <div className={styles.mobileEmpty}>
+                No waitlist entries found
+              </div>
             ) : (
-              <>
-                <Table variant="simple">
-                  <Thead bg="#a59480">
-                    <Tr>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Name</Th>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Email</Th>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Phone</Th>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Company</Th>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Location</Th>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Status</Th>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Submitted</Th>
-                      <Th color="#353535" fontFamily="'Montserrat', sans-serif">Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {filteredEntries.map((entry) => (
-                      <Tr key={entry.id} _hover={{ bg: "#3a3a3a" }}>
-                        <Td fontFamily="'Montserrat', sans-serif">
-                          {entry.first_name} {entry.last_name}
-                        </Td>
-                        <Td fontFamily="'Montserrat', sans-serif">{entry.email}</Td>
-                        <Td fontFamily="'Montserrat', sans-serif">{formatPhone(entry.phone)}</Td>
-                        <Td fontFamily="'Montserrat', sans-serif">{entry.company || '-'}</Td>
-                        <Td fontFamily="'Montserrat', sans-serif">{entry.city_state || '-'}</Td>
-                        <Td>
-                          <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
-                            {entry.status.toUpperCase()}
-                          </Badge>
-                        </Td>
-                        <Td fontFamily="'Montserrat', sans-serif">{formatDate(entry.submitted_at)}</Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedEntry(entry);
-                                onModalOpen();
-                              }}
-                              bg="#a59480"
-                              color="#353535"
-                              _hover={{ bg: "#bca892" }}
-                              fontFamily="'Montserrat', sans-serif"
-                            >
-                              Review
-                            </Button>
-                            {!entry.application_token ? (
-                              <Button
-                                size="sm"
-                                onClick={() => generateInvitationLink(entry.id)}
-                                isLoading={generatingLink === entry.id}
-                                leftIcon={<LinkIcon />}
-                                bg="#2a2a2a"
-                                color="#a59480"
-                                borderColor="#a59480"
-                                borderWidth="1px"
-                                _hover={{ bg: "#3a3a3a" }}
-                                fontFamily="'Montserrat', sans-serif"
-                              >
-                                Generate Link
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => copyInvitationLink(entry.application_token!)}
-                                leftIcon={<CopyIcon />}
-                                bg="#2a2a2a"
-                                color="#a59480"
-                                borderColor="#a59480"
-                                borderWidth="1px"
-                                _hover={{ bg: "#3a3a3a" }}
-                                fontFamily="'Montserrat', sans-serif"
-                              >
-                                Copy Link
-                              </Button>
-                            )}
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
+              filteredEntries.map((entry) => (
+                <div key={entry.id} className={styles.mobileEntryCard}>
+                  <div className={styles.mobileEntryHeader}>
+                    <div className={styles.mobileEntryName}>
+                      {entry.first_name} {entry.last_name}
+                    </div>
+                    <div className={styles.mobileEntryHeaderInfo}>
+                      <span className={`${styles.mobileEntryStatus} ${styles[entry.status]}`}>
+                        {entry.status.toUpperCase()}
+                      </span>
+                      <div className={styles.mobileEntryDate}>
+                        {formatDate(entry.submitted_at)}
+                      </div>
+                    </div>
+                  </div>
 
-                {filteredEntries.length === 0 && (
-                  <Box p={8} textAlign="center">
-                    <Text fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      No waitlist entries found
-                    </Text>
-                  </Box>
-                )}
-              </>
+                  <div className={styles.mobileEntryInfo}>
+                    <div className={styles.mobileInfoRow}>
+                      <span className={styles.mobileInfoIcon}>✉️</span>
+                      <span className={styles.mobileInfoText}>{entry.email}</span>
+                    </div>
+                    <div className={styles.mobileInfoRow}>
+                      <span className={styles.mobileInfoIcon}>📞</span>
+                      <span className={styles.mobileInfoText}>{formatPhone(entry.phone)}</span>
+                    </div>
+                    {(entry.company || entry.city_state) && (
+                      <div className={styles.mobileInfoRow}>
+                        <span className={styles.mobileInfoIcon}>🏢</span>
+                        <div className={styles.mobileInfoText}>
+                          {entry.company || '-'}
+                          {entry.company && entry.city_state && (
+                            <div className={styles.mobileCompanyLocation}>
+                              {entry.city_state}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Additional details - expandable section */}
+                    {(entry.why_noir || entry.occupation || entry.how_did_you_hear) && (
+                      <div className={styles.mobileExpandedDetails}>
+                        {entry.why_noir && (
+                          <div className={styles.mobileDetailSection}>
+                            <div className={styles.mobileDetailLabel}>Why Noir?</div>
+                            <div className={styles.mobileDetailValue}>{entry.why_noir}</div>
+                          </div>
+                        )}
+                        {entry.occupation && (
+                          <div className={styles.mobileDetailSection}>
+                            <div className={styles.mobileDetailLabel}>Occupation</div>
+                            <div className={styles.mobileDetailValue}>{entry.occupation}</div>
+                          </div>
+                        )}
+                        {entry.how_did_you_hear && (
+                          <div className={styles.mobileDetailSection}>
+                            <div className={styles.mobileDetailLabel}>How did you hear about us?</div>
+                            <div className={styles.mobileDetailValue}>{entry.how_did_you_hear}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={styles.mobileEntryActions}>
+                    <button
+                      onClick={() => {
+                        setSelectedEntry(entry);
+                        onModalOpen();
+                      }}
+                      className={`${styles.mobileActionButton} ${styles.mobileReviewButton}`}
+                    >
+                      Review
+                    </button>
+                    {!entry.application_token ? (
+                      <button
+                        onClick={() => generateInvitationLink(entry.id)}
+                        disabled={generatingLink === entry.id}
+                        className={`${styles.mobileActionButton} ${styles.mobileGenerateButton}`}
+                      >
+                        {generatingLink === entry.id ? '⏳' : '🔗'} Generate Link
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => copyInvitationLink(entry.application_token!)}
+                        className={`${styles.mobileActionButton} ${styles.mobileCopyButton}`}
+                      >
+                        📋 Copy Link
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
             )}
-          </Box>
+          </div>
 
-          {/* Pagination */}
+          {/* Mobile Pagination */}
           {totalPages > 1 && (
-            <HStack justify="center" mt={6} spacing={2}>
-              <Button
+            <div className={styles.mobilePagination}>
+              <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                bg="#a59480"
-                color="#353535"
-                _hover={{ bg: "#bca892" }}
-                fontFamily="'Montserrat', sans-serif"
+                className={styles.mobilePaginationButton}
               >
                 Previous
-              </Button>
-              <Text fontFamily="'Montserrat', sans-serif">
+              </button>
+              <span className={styles.mobilePaginationText}>
                 Page {currentPage} of {totalPages}
-              </Text>
-              <Button
+              </span>
+              <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                bg="#a59480"
-                color="#353535"
-                _hover={{ bg: "#bca892" }}
-                fontFamily="'Montserrat', sans-serif"
+                className={styles.mobilePaginationButton}
               >
                 Next
-              </Button>
-            </HStack>
+              </button>
+            </div>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       {/* Waitlist Review Drawer */}
       <WaitlistReviewDrawer

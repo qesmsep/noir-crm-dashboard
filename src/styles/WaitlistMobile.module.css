@@ -1,0 +1,442 @@
+/* Mobile-specific styles for waitlist page */
+.mobileView {
+  display: none;
+}
+
+.desktopView {
+  display: block;
+}
+
+/* Show mobile view on screens smaller than 768px */
+@media (max-width: 767px) {
+  .mobileView {
+    display: block;
+  }
+  
+  .desktopView {
+    display: none;
+  }
+}
+
+/* Mobile container */
+.mobileContainer {
+  padding: 16px;
+  padding-top: 60px;
+  background: #353535;
+  min-height: 100vh;
+}
+
+/* Mobile header */
+.mobileHeader {
+  margin-bottom: 20px;
+}
+
+.mobileTitle {
+  font-size: 24px;
+  font-weight: normal;
+  font-family: 'Montserrat', sans-serif;
+  color: #a59480;
+  margin: 0 0 20px 0;
+  text-align: center;
+}
+
+/* Mobile status summary */
+.mobileStatusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.mobileStatusCard {
+  background: #a59480;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #ecede8;
+  text-align: center;
+}
+
+.mobileStatusLabel {
+  font-size: 14px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: bold;
+  color: #353535;
+  margin-bottom: 8px;
+}
+
+.mobileStatusNumber {
+  font-size: 24px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: bold;
+  color: #353535;
+  margin: 0;
+}
+
+/* Mobile filters */
+.mobileFiltersContainer {
+  margin-bottom: 20px;
+}
+
+.mobileSelect {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #a59480;
+  border-radius: 8px;
+  background: #2a2a2a;
+  color: #ECEDE8;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.mobileSelect:focus {
+  outline: none;
+  border-color: #a59480;
+  box-shadow: 0 0 0 2px rgba(165, 148, 128, 0.2);
+}
+
+.mobileSearchContainer {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.mobileSearchInput {
+  width: 100%;
+  padding: 12px 16px 12px 44px;
+  border: 1px solid #a59480;
+  border-radius: 8px;
+  background: #2a2a2a;
+  color: #ECEDE8;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+}
+
+.mobileSearchInput::placeholder {
+  color: #999;
+}
+
+.mobileSearchInput:focus {
+  outline: none;
+  border-color: #a59480;
+  box-shadow: 0 0 0 2px rgba(165, 148, 128, 0.2);
+}
+
+.mobileSearchIcon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a59480;
+}
+
+.mobileRefreshButton {
+  width: 100%;
+  padding: 12px 16px;
+  background: #a59480;
+  color: #353535;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mobileRefreshButton:hover {
+  background: #bca892;
+}
+
+/* Mobile waitlist entries */
+.mobileEntriesContainer {
+  margin-bottom: 20px;
+}
+
+.mobileEntryCard {
+  background: white;
+  border: 2px solid #a59480;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+}
+
+.mobileEntryCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.mobileEntryHeader {
+  background: #a59480;
+  padding: 16px;
+  color: #ecede8;
+}
+
+.mobileEntryName {
+  font-size: 18px;
+  font-weight: normal;
+  font-family: 'IvyJournalThin', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.0em;
+  margin: 0 0 8px 0;
+}
+
+.mobileEntryHeaderInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mobileEntryStatus {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.mobileEntryStatus.review {
+  background: #fbbf24;
+  color: #92400e;
+}
+
+.mobileEntryStatus.approved {
+  background: #34d399;
+  color: #065f46;
+}
+
+.mobileEntryStatus.waitlisted {
+  background: #a78bfa;
+  color: #5b21b6;
+}
+
+.mobileEntryStatus.denied {
+  background: #f87171;
+  color: #991b1b;
+}
+
+.mobileEntryDate {
+  font-size: 12px;
+  color: #ecede8;
+  opacity: 0.8;
+}
+
+.mobileEntryInfo {
+  padding: 16px;
+  background: white;
+}
+
+.mobileInfoRow {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+}
+
+.mobileInfoRow:last-child {
+  margin-bottom: 0;
+}
+
+.mobileInfoIcon {
+  margin-right: 8px;
+  color: #a59480;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.mobileInfoText {
+  flex: 1;
+}
+
+.mobileEntryActions {
+  padding: 16px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 8px;
+}
+
+.mobileActionButton {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.mobileReviewButton {
+  background: #a59480;
+  color: #353535;
+}
+
+.mobileReviewButton:hover {
+  background: #bca892;
+}
+
+.mobileGenerateButton {
+  background: #2a2a2a;
+  color: #a59480;
+  border: 1px solid #a59480;
+}
+
+.mobileGenerateButton:hover {
+  background: #3a3a3a;
+}
+
+.mobileCopyButton {
+  background: #2a2a2a;
+  color: #a59480;
+  border: 1px solid #a59480;
+}
+
+.mobileCopyButton:hover {
+  background: #3a3a3a;
+}
+
+/* Mobile pagination */
+.mobilePagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.mobilePaginationButton {
+  padding: 8px 16px;
+  background: #a59480;
+  color: #353535;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.mobilePaginationButton:hover:not(:disabled) {
+  background: #bca892;
+}
+
+.mobilePaginationButton:disabled {
+  background: #666;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.mobilePaginationText {
+  font-family: 'Montserrat', sans-serif;
+  color: #ECEDE8;
+  font-size: 14px;
+}
+
+/* Mobile loading state */
+.mobileLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+  color: #a59480;
+}
+
+.mobileLoadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #666;
+  border-top: 3px solid #a59480;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile empty state */
+.mobileEmpty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #a59480;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 16px;
+}
+
+/* Mobile company and location styling */
+.mobileCompanyLocation {
+  color: #666;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* Mobile expanded details */
+.mobileExpandedDetails {
+  padding: 16px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.mobileDetailSection {
+  margin-bottom: 12px;
+}
+
+.mobileDetailSection:last-child {
+  margin-bottom: 0;
+}
+
+.mobileDetailLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mobileDetailValue {
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+/* Touch-friendly adjustments */
+@media (max-width: 480px) {
+  .mobileContainer {
+    padding: 12px;
+    padding-top: 60px;
+  }
+  
+  .mobileEntryCard {
+    margin-bottom: 12px;
+  }
+  
+  .mobileEntryHeader,
+  .mobileEntryInfo,
+  .mobileEntryActions {
+    padding: 12px;
+  }
+  
+  .mobileStatusGrid {
+    gap: 8px;
+  }
+  
+  .mobileStatusCard {
+    padding: 12px;
+  }
+  
+  .mobileActionButton {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+}

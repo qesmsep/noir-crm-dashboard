@@ -21,12 +21,14 @@ import {
 import { ChevronRightIcon, CalendarIcon } from '@chakra-ui/icons';
 import { formatDateTime } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
+import styles from '../styles/ReservationsMobile.module.css';
 
 interface DayReservationsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   selectedDate: Date | null;
   onReservationClick: (reservationId: string) => void;
+  onDateChange?: (date: Date) => void;
 }
 
 const eventTypeEmojis: Record<string, string> = {
@@ -51,6 +53,7 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
   onClose,
   selectedDate,
   onReservationClick,
+  onDateChange,
 }) => {
   const [reservations, setReservations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -127,6 +130,272 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
     return eventTypeEmojis[eventType?.toLowerCase()] || '';
   };
 
+  const navigateDay = (direction: 'prev' | 'next') => {
+    if (!selectedDate || !onDateChange) return;
+    
+    const newDate = new Date(selectedDate);
+    if (direction === 'prev') {
+      newDate.setDate(selectedDate.getDate() - 1);
+    } else {
+      newDate.setDate(selectedDate.getDate() + 1);
+    }
+    
+    onDateChange(newDate);
+  };
+
+  const getEventTypeIcon = (eventType: string) => {
+    const icons: Record<string, string> = {
+      birthday: '🎂',
+      engagement: '💍',
+      anniversary: '🥂',
+      party: '🎉',
+      graduation: '🎓',
+      corporate: '🧑‍💼',
+      holiday: '❄️',
+      networking: '🤝',
+      fundraiser: '🎗️',
+      bachelor: '🥳',
+      bachelorette: '🥳',
+      private_event: '🔒',
+      fun: '🍸',
+      date: '💕',
+    };
+    return icons[eventType] || '📅';
+  };
+
+  const formatDateLong = (date: Date) => {
+    return formatDateTime(date, undefined, { 
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  // Check if it's mobile (screen width < 768px)
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Mobile view
+  if (isMobile) {
+    return (
+      <>
+        {/* Mobile overlay */}
+        {isOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1999,
+            }}
+            onClick={onClose}
+          />
+        )}
+        
+        {/* Mobile content */}
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#f8f9fa',
+            zIndex: 2000,
+            transform: `translateX(${isOpen ? '0' : '100%'})`,
+            transition: 'transform 0.3s ease-in-out',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div 
+            className={styles.mobileContainer}
+            style={{
+              flex: 1,
+              overflow: 'auto',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            <div className={styles.mobileHeader}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h1 className={styles.mobileTitle}>
+                  Day Reservations
+                </h1>
+                <button
+                  onClick={onClose}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '24px',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                    padding: '8px',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              {/* Date Navigation */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '16px',
+                padding: '12px 16px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <button
+                  onClick={() => navigateDay('prev')}
+                  style={{
+                    background: '#a59480',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontFamily: 'Montserrat, sans-serif',
+                  }}
+                >
+                  ← Previous
+                </button>
+                
+                <div style={{ textAlign: 'center', flex: 1, margin: '0 16px' }}>
+                  <div style={{ 
+                    fontSize: '16px', 
+                    fontWeight: 'bold', 
+                    color: '#353535',
+                    fontFamily: 'Montserrat, sans-serif'
+                  }}>
+                    {selectedDate ? formatDateLong(selectedDate) : 'Select a Date'}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => navigateDay('next')}
+                  style={{
+                    background: '#a59480',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontFamily: 'Montserrat, sans-serif',
+                  }}
+                >
+                  Next →
+                </button>
+              </div>
+              
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <div className={styles.mobileStatCard} style={{ display: 'inline-block', minWidth: '120px' }}>
+                  <div className={styles.mobileStatNumber}>{reservations.length}</div>
+                  <div className={styles.mobileStatLabel}>
+                    Reservation{reservations.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.mobileReservationsContainer}>
+              {isLoading ? (
+                <div className={styles.mobileLoading}>
+                  <div className={styles.mobileLoadingSpinner}></div>
+                </div>
+              ) : reservations.length === 0 ? (
+                <div className={styles.mobileEmpty}>
+                  <div className={styles.mobileEmptyIcon}>📅</div>
+                  No reservations for this day
+                  <div style={{ fontSize: '14px', color: '#9ca3af', marginTop: '8px' }}>
+                    Select a different date or create a new reservation
+                  </div>
+                </div>
+              ) : (
+                reservations.map((reservation) => {
+                  const emoji = getEventTypeIcon(reservation.event_type);
+                  const tableNumber = reservation.tables?.table_number || 'TBD';
+                  
+                  return (
+                    <div 
+                      key={reservation.id} 
+                      className={styles.mobileReservationCard}
+                      onClick={() => onReservationClick(reservation.id)}
+                    >
+                      <div className={styles.mobileReservationHeader}>
+                        <div className={styles.mobileReservationName}>
+                          {reservation.first_name} {reservation.last_name}
+                          {reservation.membership_type === 'member' && ' 🖤'}
+                        </div>
+                        <div className={styles.mobileReservationHeaderInfo}>
+                          <div className={styles.mobileReservationTime}>
+                            {formatTime(reservation.start_time)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={styles.mobileReservationInfo}>
+                        <div className={styles.mobileInfoGrid}>
+                          <div className={styles.mobileInfoItem}>
+                            <span className={styles.mobileInfoIcon}>🪑</span>
+                            <span className={styles.mobileInfoText}>
+                              Table {tableNumber}
+                            </span>
+                          </div>
+                          <div className={styles.mobileInfoItem}>
+                            <span className={styles.mobileInfoIcon}>👥</span>
+                            <span className={styles.mobileInfoText}>
+                              {reservation.party_size} {reservation.party_size === 1 ? 'Guest' : 'Guests'}
+                            </span>
+                          </div>
+                          
+                          <div className={styles.mobileEventTypeContainer}>
+                            <span className={styles.mobileEventIcon}>
+                              {emoji}
+                            </span>
+                            <span className={styles.mobileEventType}>
+                              {reservation.event_type?.replace('_', ' ') || 'Standard Reservation'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {reservation.source && reservation.source !== '' && (
+                          <div className={styles.mobileSourceBadge}>
+                            {reservation.source}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Desktop view (original)
   return (
     <Drawer
       isOpen={isOpen}
