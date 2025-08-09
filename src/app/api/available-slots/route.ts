@@ -285,7 +285,13 @@ export async function POST(request: Request) {
     
     console.log('✅ FINAL AVAILABLE SLOTS:', availableSlots);
     console.log('✅ TOTAL SLOTS RETURNED:', availableSlots.length);
-    return NextResponse.json({ slots: availableSlots });
+    return NextResponse.json({ 
+      slots: availableSlots,
+      timestamp: new Date().toISOString(),
+      debugMessage: 'NEW_CODE_DEPLOYED_SUCCESSFULLY',
+      totalSlots: availableSlots.length,
+      requestedDate: date
+    });
   } catch (error) {
     console.error('Error in available-slots API:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
