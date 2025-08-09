@@ -42,17 +42,6 @@ export async function POST(request: Request) {
     console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
     console.log('🚨 DEPLOYMENT TIMESTAMP:', new Date().toISOString());
     
-    // IMMEDIATE FIX: If this is August 23rd, 2025, force return limited slots for testing
-    if (date === '2025-08-23') {
-      console.log('🚨🚨🚨 AUGUST 23rd DETECTED - EMERGENCY PRIVATE EVENT BLOCKING ACTIVE 🚨🚨🚨');
-      console.log('🚨 DEPLOYMENT CHECK: This message confirms the latest code is deployed');
-      return NextResponse.json({ 
-        slots: ['9:30pm', '9:45pm', '10:00pm', '10:15pm', '10:30pm'],
-        debug: 'EMERGENCY_FIX_ACTIVE_v4_CORRECT_HOURS',
-        deploymentTime: new Date().toISOString()
-      });
-    }
-    
     const supabase = getSupabaseClient();
     
     // 0. Check if the venue is open on this date
@@ -81,19 +70,32 @@ export async function POST(request: Request) {
     }
     
     // Check for private events that block this date
-    const { data: privateEvents } = await supabase
-      .from('private_events')
-      .select('start_time, end_time, full_day')
-      .eq('status', 'active')
-      .or(`and(start_time.gte.${dateStr}T00:00:00Z,start_time.lte.${dateStr}T23:59:59Z),and(end_time.gte.${dateStr}T00:00:00Z,end_time.lte.${dateStr}T23:59:59Z),and(start_time.lte.${dateStr}T00:00:00Z,end_time.gte.${dateStr}T23:59:59Z)`);
+    console.log('🔍 QUERYING PRIVATE EVENTS FOR DATE:', dateStr);
+    const privateEventQuery = `and(start_time.gte.${dateStr}T00:00:00Z,start_time.lte.${dateStr}T23:59:59Z),and(end_time.gte.${dateStr}T00:00:00Z,end_time.lte.${dateStr}T23:59:59Z),and(start_time.lte.${dateStr}T00:00:00Z,end_time.gte.${dateStr}T23:59:59Z)`;
+    console.log('🔍 QUERY STRING:', privateEventQuery);
     
-    console.log('🎉 PRIVATE EVENTS FOUND:', privateEvents);
+    const { data: privateEvents, error: privateEventsError } = await supabase
+      .from('private_events')
+      .select('start_time, end_time, full_day, title, status')
+      .eq('status', 'active')
+      .or(privateEventQuery);
+    
+    console.log('🎉 PRIVATE EVENTS QUERY RESULT:', { privateEvents, error: privateEventsError });
+    
+    if (privateEventsError) {
+      console.error('🚨 PRIVATE EVENTS QUERY ERROR:', privateEventsError);
+    }
+    
     if (privateEvents && privateEvents.length > 0) {
-      console.log('🎉 EVENT DETAILS:', privateEvents.map(ev => ({
+      console.log('🎉 EVENTS FOUND - DETAILS:', privateEvents.map(ev => ({
+        title: ev.title,
         start: ev.start_time,
         end: ev.end_time,
-        full_day: ev.full_day
+        full_day: ev.full_day,
+        status: ev.status
       })));
+    } else {
+      console.log('❌ NO PRIVATE EVENTS FOUND FOR', dateStr);
     }
     
     if (privateEvents && privateEvents.length > 0) {
@@ -235,24 +237,24 @@ export async function POST(request: Request) {
       const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
       
       // Check if this slot overlaps with any private event
+      console.log(`🔍 CHECKING SLOT ${slot} (${slotStart.toISOString()} - ${slotEnd.toISOString()})`);
+      
       const hasPrivateEventOverlap = privateEvents && privateEvents.some(ev => {
-        if (ev.full_day) return true; // Full day events block everything
+        if (ev.full_day) {
+          console.log(`📅 SLOT ${slot} BLOCKED BY FULL-DAY EVENT: ${ev.title}`);
+          return true;
+        }
+        
         const evStart = new Date(ev.start_time);
         const evEnd = new Date(ev.end_time);
         const overlap = (slotStart < evEnd) && (slotEnd > evStart);
         
-        if (overlap) {
-          console.log(`Slot ${slot} overlaps with private event:`, {
-            slotStart: slotStart.toISOString(),
-            slotEnd: slotEnd.toISOString(),
-            eventStart: evStart.toISOString(),
-            eventEnd: evEnd.toISOString(),
-            slotStartLocal: slotStart.toString(),
-            slotEndLocal: slotEnd.toString(),
-            eventStartLocal: evStart.toString(),
-            eventEndLocal: evEnd.toString()
-          });
-        }
+        console.log(`🔍 OVERLAP CHECK FOR ${slot} vs "${ev.title}":`, {
+          slotTime: `${slotStart.toLocaleTimeString()} - ${slotEnd.toLocaleTimeString()}`,
+          eventTime: `${evStart.toLocaleTimeString()} - ${evEnd.toLocaleTimeString()}`,
+          overlap: overlap,
+          calculation: `(${slotStart.toISOString()} < ${evEnd.toISOString()}) && (${slotEnd.toISOString()} > ${evStart.toISOString()}) = ${overlap}`
+        });
         
         return overlap;
       });
@@ -260,6 +262,8 @@ export async function POST(request: Request) {
       if (hasPrivateEventOverlap) {
         console.log(`🚫 SLOT ${slot} BLOCKED BY PRIVATE EVENT`);
         continue; // Skip this slot
+      } else {
+        console.log(`✅ SLOT ${slot} AVAILABLE (no private event conflict)`);
       }
       
       // For each table, check if it's free for this slot
