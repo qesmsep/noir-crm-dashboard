@@ -2428,21 +2428,26 @@ function MobilePrivateEventsView({
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    return events.filter(event => {
-      const eventDate = new Date(event.start_time);
-      
-      switch (eventFilter) {
-        case 'upcoming':
-          return eventDate >= now;
-        case 'past':
-          return eventDate < now;
-        case 'thisMonth':
-          return eventDate >= startOfMonth && eventDate <= endOfMonth;
-        case 'all':
-        default:
-          return true;
-      }
-    });
+    return events
+      .filter(event => {
+        const eventDate = new Date(event.start_time);
+        
+        switch (eventFilter) {
+          case 'upcoming':
+            return eventDate >= now;
+          case 'past':
+            return eventDate < now;
+          case 'thisMonth':
+            return eventDate >= startOfMonth && eventDate <= endOfMonth;
+          case 'all':
+          default:
+            return true;
+        }
+      })
+      .sort((a, b) => {
+        // Sort by start_time in chronological order (earliest first)
+        return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+      });
   };
 
   if (loading) {
@@ -2596,9 +2601,7 @@ function MobilePrivateEventsView({
             <div className={styles.mobileEmptyText}>No events found. Create your first event above.</div>
           </div>
         ) : (
-          getFilteredEvents()
-            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
-            .map((event) => (
+          getFilteredEvents().map((event) => (
               <div key={event.id} className={styles.mobileEventCard}>
                 <div className={styles.mobileEventHeader}>
                   <div>
