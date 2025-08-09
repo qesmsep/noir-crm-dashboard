@@ -47,8 +47,8 @@ export async function POST(request: Request) {
       console.log('🚨🚨🚨 AUGUST 23rd DETECTED - EMERGENCY PRIVATE EVENT BLOCKING ACTIVE 🚨🚨🚨');
       console.log('🚨 DEPLOYMENT CHECK: This message confirms the latest code is deployed');
       return NextResponse.json({ 
-        slots: ['5:00pm', '5:15pm', '5:30pm', '9:30pm', '9:45pm', '10:00pm', '10:15pm', '10:30pm'],
-        debug: 'EMERGENCY_FIX_ACTIVE_v3',
+        slots: ['9:30pm', '9:45pm', '10:00pm', '10:15pm', '10:30pm'],
+        debug: 'EMERGENCY_FIX_ACTIVE_v4_CORRECT_HOURS',
         deploymentTime: new Date().toISOString()
       });
     }
