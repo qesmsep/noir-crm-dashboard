@@ -248,6 +248,9 @@ export async function POST(request: Request) {
       console.log(`🔍 CHECKING SLOT ${slot} (${slotStart.toISOString()} - ${slotEnd.toISOString()})`);
       
       const hasPrivateEventOverlap = privateEvents && privateEvents.some(ev => {
+        console.log(`🔍 PROCESSING EVENT: "${ev.title}" | Status: ${ev.status} | Full Day: ${ev.full_day}`);
+        console.log(`🔍 RAW EVENT TIMES: start="${ev.start_time}" end="${ev.end_time}"`);
+        
         if (ev.full_day) {
           console.log(`📅 SLOT ${slot} BLOCKED BY FULL-DAY EVENT: ${ev.title}`);
           return true;
@@ -255,13 +258,31 @@ export async function POST(request: Request) {
         
         const evStart = new Date(ev.start_time);
         const evEnd = new Date(ev.end_time);
-        const overlap = (slotStart < evEnd) && (slotEnd > evStart);
         
-        console.log(`🔍 OVERLAP CHECK FOR ${slot} vs "${ev.title}":`, {
-          slotTime: `${slotStart.toLocaleTimeString()} - ${slotEnd.toLocaleTimeString()}`,
-          eventTime: `${evStart.toLocaleTimeString()} - ${evEnd.toLocaleTimeString()}`,
-          overlap: overlap,
-          calculation: `(${slotStart.toISOString()} < ${evEnd.toISOString()}) && (${slotEnd.toISOString()} > ${evStart.toISOString()}) = ${overlap}`
+        console.log(`🔍 PARSED EVENT TIMES:`, {
+          evStartISO: evStart.toISOString(),
+          evEndISO: evEnd.toISOString(),
+          evStartLocal: evStart.toLocaleString(),
+          evEndLocal: evEnd.toLocaleString()
+        });
+        
+        console.log(`🔍 SLOT TIMES:`, {
+          slotStartISO: slotStart.toISOString(),
+          slotEndISO: slotEnd.toISOString(),
+          slotStartLocal: slotStart.toLocaleString(),
+          slotEndLocal: slotEnd.toLocaleString()
+        });
+        
+        // Check each condition separately for debugging
+        const condition1 = slotStart < evEnd;
+        const condition2 = slotEnd > evStart;
+        const overlap = condition1 && condition2;
+        
+        console.log(`🔍 DETAILED OVERLAP CHECK FOR ${slot} vs "${ev.title}":`, {
+          'slotStart < evEnd': `${slotStart.toISOString()} < ${evEnd.toISOString()} = ${condition1}`,
+          'slotEnd > evStart': `${slotEnd.toISOString()} > ${evStart.toISOString()} = ${condition2}`,
+          'FINAL OVERLAP': overlap,
+          'Expected for 6pm-9:15pm event': 'Should be TRUE for slots 6:00pm-9:00pm'
         });
         
         return overlap;
