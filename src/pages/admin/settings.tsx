@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import { supabaseAdmin } from '../../lib/supabase';
 import styles from '../../styles/Settings.module.css';
+import mobileStyles from '../../styles/SettingsMobile.module.css';
 import CalendarAvailabilityControl from '../../components/CalendarAvailabilityControl';
 import PrivateEventsManager from '../../components/PrivateEventsManager';
 import { Box, Heading, VStack, useColorModeValue, Text, Input, Button, Switch, FormControl, FormLabel, NumberInput, NumberInputField, NumberInputStepper, NumberIncrementStepper, NumberDecrementStepper, HStack } from "@chakra-ui/react";
@@ -191,7 +192,9 @@ export default function Settings() {
 
   return (
     <AdminLayout>
-      <Box p={{ base: 4, md: 8 }} bg="weddingDay" minH="100vh">
+      {/* Desktop View */}
+      <div className={mobileStyles.desktopView}>
+        <Box p={{ base: 4, md: 8 }} pt={{ base: "95px", md: "95px" }} bg="weddingDay" minH="100vh">
         <Heading mb={8} fontSize="2xl" fontWeight="bold" color="nightSky">Settings</Heading>
         
         {message && (
@@ -458,7 +461,338 @@ export default function Settings() {
             </VStack>
           </Box>
         </VStack>
-      </Box>
+        </Box>
+      </div>
+
+      {/* Mobile View */}
+      <div className={mobileStyles.mobileView}>
+        <MobileSettingsView 
+          settings={settings}
+          loading={loading}
+          saving={saving}
+          message={message}
+          holdFeeMessage={holdFeeMessage}
+          holdFeeSaving={holdFeeSaving}
+          onInputChange={handleInputChange}
+          onSave={handleSave}
+          onHoldFeeSave={handleHoldFeeSave}
+        />
+      </div>
     </AdminLayout>
+  );
+}
+
+// Mobile Settings View Component
+function MobileSettingsView({
+  settings,
+  loading,
+  saving,
+  message,
+  holdFeeMessage,
+  holdFeeSaving,
+  onInputChange,
+  onSave,
+  onHoldFeeSave
+}: {
+  settings: Settings;
+  loading: boolean;
+  saving: boolean;
+  message: any;
+  holdFeeMessage: any;
+  holdFeeSaving: boolean;
+  onInputChange: (field: string, nested: string, value: any) => void;
+  onSave: () => void;
+  onHoldFeeSave: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className={mobileStyles.mobileLoading}>
+        <div className={mobileStyles.mobileLoadingSpinner}></div>
+        <div className={mobileStyles.mobileLoadingText}>Loading settings...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={mobileStyles.mobileContainer}>
+      <div className={mobileStyles.mobileHeader}>
+        <h1 className={mobileStyles.mobileTitle}>Settings</h1>
+        <p className={mobileStyles.mobileSubtitle}>Manage your business settings</p>
+      </div>
+
+      {message && (
+        <div className={`${mobileStyles.mobileAlert} ${mobileStyles[message.type]}`}>
+          {message.text}
+        </div>
+      )}
+
+      {/* Business Information */}
+      <div className={mobileStyles.mobileSection}>
+        <div className={mobileStyles.mobileSectionTitle}>
+          <span className={mobileStyles.mobileSectionIcon}>🏢</span>
+          Business Information
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Business Name *</label>
+          <input
+            className={mobileStyles.mobileFormInput}
+            value={settings.business_name}
+            onChange={(e) => onInputChange('business_name', '', e.target.value)}
+            placeholder="Enter business name"
+          />
+        </div>
+
+        <div className={mobileStyles.mobileFormRow}>
+          <div className={mobileStyles.mobileFormGroup}>
+            <label className={mobileStyles.mobileFormLabel}>Email</label>
+            <input
+              className={mobileStyles.mobileFormInput}
+              type="email"
+              value={settings.business_email}
+              onChange={(e) => onInputChange('business_email', '', e.target.value)}
+              placeholder="business@example.com"
+            />
+          </div>
+          <div className={mobileStyles.mobileFormGroup}>
+            <label className={mobileStyles.mobileFormLabel}>Phone</label>
+            <input
+              className={mobileStyles.mobileFormInput}
+              type="tel"
+              value={settings.business_phone}
+              onChange={(e) => onInputChange('business_phone', '', e.target.value)}
+              placeholder="(555) 123-4567"
+            />
+          </div>
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Address</label>
+          <input
+            className={mobileStyles.mobileFormInput}
+            value={settings.address}
+            onChange={(e) => onInputChange('address', '', e.target.value)}
+            placeholder="Enter business address"
+          />
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Timezone</label>
+          <select
+            className={mobileStyles.mobileFormSelect}
+            value={settings.timezone}
+            onChange={(e) => onInputChange('timezone', '', e.target.value)}
+          >
+            <option value="UTC">UTC</option>
+            <option value="America/New_York">Eastern Time</option>
+            <option value="America/Chicago">Central Time</option>
+            <option value="America/Denver">Mountain Time</option>
+            <option value="America/Los_Angeles">Pacific Time</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Reservation Settings */}
+      <div className={mobileStyles.mobileSection}>
+        <div className={mobileStyles.mobileSectionTitle}>
+          <span className={mobileStyles.mobileSectionIcon}>📋</span>
+          Reservation Settings
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Max Guests per Reservation</label>
+          <div className={mobileStyles.mobileNumberInput}>
+            <button
+              className={mobileStyles.mobileNumberButton}
+              onClick={() => onInputChange('reservation_settings', 'max_guests', Math.max(1, settings.reservation_settings.max_guests - 1))}
+            >
+              -
+            </button>
+            <input
+              value={settings.reservation_settings.max_guests}
+              onChange={(e) => onInputChange('reservation_settings', 'max_guests', parseInt(e.target.value) || 1)}
+              type="number"
+              min="1"
+            />
+            <button
+              className={mobileStyles.mobileNumberButton}
+              onClick={() => onInputChange('reservation_settings', 'max_guests', settings.reservation_settings.max_guests + 1)}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Minimum Notice (hours)</label>
+          <div className={mobileStyles.mobileNumberInput}>
+            <button
+              className={mobileStyles.mobileNumberButton}
+              onClick={() => onInputChange('reservation_settings', 'min_notice_hours', Math.max(0, settings.reservation_settings.min_notice_hours - 1))}
+            >
+              -
+            </button>
+            <input
+              value={settings.reservation_settings.min_notice_hours}
+              onChange={(e) => onInputChange('reservation_settings', 'min_notice_hours', parseInt(e.target.value) || 0)}
+              type="number"
+              min="0"
+            />
+            <button
+              className={mobileStyles.mobileNumberButton}
+              onClick={() => onInputChange('reservation_settings', 'min_notice_hours', settings.reservation_settings.min_notice_hours + 1)}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Max Advance Days</label>
+          <div className={mobileStyles.mobileNumberInput}>
+            <button
+              className={mobileStyles.mobileNumberButton}
+              onClick={() => onInputChange('reservation_settings', 'max_advance_days', Math.max(1, settings.reservation_settings.max_advance_days - 1))}
+            >
+              -
+            </button>
+            <input
+              value={settings.reservation_settings.max_advance_days}
+              onChange={(e) => onInputChange('reservation_settings', 'max_advance_days', parseInt(e.target.value) || 1)}
+              type="number"
+              min="1"
+            />
+            <button
+              className={mobileStyles.mobileNumberButton}
+              onClick={() => onInputChange('reservation_settings', 'max_advance_days', settings.reservation_settings.max_advance_days + 1)}
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Notification Settings */}
+      <div className={mobileStyles.mobileSection}>
+        <div className={mobileStyles.mobileSectionTitle}>
+          <span className={mobileStyles.mobileSectionIcon}>🔔</span>
+          Notifications
+        </div>
+
+        <div className={mobileStyles.mobileSwitchGroup}>
+          <span className={mobileStyles.mobileSwitchLabel}>Email Notifications</span>
+          <div
+            className={`${mobileStyles.mobileSwitch} ${settings.notification_settings.email_notifications ? mobileStyles.active : ''}`}
+            onClick={() => onInputChange('notification_settings', 'email_notifications', !settings.notification_settings.email_notifications)}
+          >
+            <div className={mobileStyles.mobileSwitchThumb}></div>
+          </div>
+        </div>
+
+        <div className={mobileStyles.mobileSwitchGroup}>
+          <span className={mobileStyles.mobileSwitchLabel}>SMS Notifications</span>
+          <div
+            className={`${mobileStyles.mobileSwitch} ${settings.notification_settings.sms_notifications ? mobileStyles.active : ''}`}
+            onClick={() => onInputChange('notification_settings', 'sms_notifications', !settings.notification_settings.sms_notifications)}
+          >
+            <div className={mobileStyles.mobileSwitchThumb}></div>
+          </div>
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Notification Email</label>
+          <input
+            className={mobileStyles.mobileFormInput}
+            type="email"
+            value={settings.notification_settings.notification_email}
+            onChange={(e) => onInputChange('notification_settings', 'notification_email', e.target.value)}
+            placeholder="notifications@example.com"
+          />
+        </div>
+
+        <div className={mobileStyles.mobileFormGroup}>
+          <label className={mobileStyles.mobileFormLabel}>Admin Notification Phone</label>
+          <input
+            className={mobileStyles.mobileFormInput}
+            type="tel"
+            value={settings.admin_notification_phone}
+            onChange={(e) => onInputChange('admin_notification_phone', '', e.target.value)}
+            placeholder="+1234567890"
+          />
+        </div>
+      </div>
+
+      {/* Hold Fee Settings */}
+      <div className={mobileStyles.mobileSection}>
+        <div className={mobileStyles.mobileSectionTitle}>
+          <span className={mobileStyles.mobileSectionIcon}>💳</span>
+          Hold Fee Settings
+        </div>
+
+        {holdFeeMessage && (
+          <div className={`${mobileStyles.mobileAlert} ${mobileStyles[holdFeeMessage.type]}`}>
+            {holdFeeMessage.text}
+          </div>
+        )}
+
+        <div className={mobileStyles.mobileSwitchGroup}>
+          <span className={mobileStyles.mobileSwitchLabel}>Enable Hold Fee</span>
+          <div
+            className={`${mobileStyles.mobileSwitch} ${settings.hold_fee_enabled ? mobileStyles.active : ''}`}
+            onClick={() => onInputChange('hold_fee_enabled', '', !settings.hold_fee_enabled)}
+          >
+            <div className={mobileStyles.mobileSwitchThumb}></div>
+          </div>
+        </div>
+
+        {settings.hold_fee_enabled && (
+          <div className={mobileStyles.mobileFormGroup}>
+            <label className={mobileStyles.mobileFormLabel}>Hold Fee Amount ($)</label>
+            <div className={mobileStyles.mobileNumberInput}>
+              <button
+                className={mobileStyles.mobileNumberButton}
+                onClick={() => onInputChange('hold_fee_amount', '', Math.max(0, settings.hold_fee_amount - 1))}
+              >
+                -
+              </button>
+              <input
+                value={settings.hold_fee_amount}
+                onChange={(e) => onInputChange('hold_fee_amount', '', parseFloat(e.target.value) || 0)}
+                type="number"
+                min="0"
+                step="0.01"
+              />
+              <button
+                className={mobileStyles.mobileNumberButton}
+                onClick={() => onInputChange('hold_fee_amount', '', settings.hold_fee_amount + 1)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className={mobileStyles.mobileActionButtons}>
+          <button
+            className={`${mobileStyles.mobileButton} ${mobileStyles.primary}`}
+            onClick={onHoldFeeSave}
+            disabled={holdFeeSaving}
+          >
+            {holdFeeSaving ? 'Saving...' : 'Save Hold Fee'}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Save Button */}
+      <div className={mobileStyles.mobileActionButtons}>
+        <button
+          className={`${mobileStyles.mobileButton} ${mobileStyles.primary}`}
+          onClick={onSave}
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save All Settings'}
+        </button>
+      </div>
+    </div>
   );
 } 

@@ -1,0 +1,682 @@
+/* Mobile-specific styles for event calendar view */
+.mobileView {
+  display: none;
+}
+
+.desktopView {
+  display: block;
+}
+
+/* Show mobile view on screens smaller than 768px */
+@media (max-width: 767px) {
+  .mobileView {
+    display: block;
+  }
+  
+  .desktopView {
+    display: none;
+  }
+}
+
+/* Mobile container */
+.mobileContainer {
+  padding: 12px;
+  padding-top: 95px; /* 75px + 20px for header space */
+  background: #f8f9fa;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Mobile header */
+.mobileHeader {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.mobileTitle {
+  font-size: 24px;
+  font-weight: bold;
+  color: #353535;
+  margin-bottom: 16px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Mobile navigation tabs */
+.mobileNavTabs {
+  display: flex;
+  background: white;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileNavTab {
+  flex: 1;
+  padding: 12px 8px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileNavTab.active {
+  background: #a59480;
+  color: white;
+  box-shadow: 0 2px 4px rgba(165, 148, 128, 0.3);
+}
+
+/* Create event button */
+.mobileCreateButton {
+  width: 100%;
+  padding: 16px;
+  background: #a59480;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 2px 8px rgba(165, 148, 128, 0.3);
+}
+
+.mobileCreateButton:hover {
+  background: #947d65;
+  transform: translateY(-1px);
+}
+
+/* Mobile filters */
+.mobileFiltersContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileFiltersTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #353535;
+  margin-bottom: 12px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileFilterGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mobileFilterItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.mobileFilterCheckbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid #d1d5db;
+  accent-color: #a59480;
+}
+
+/* Month navigation */
+.mobileMonthNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileMonthButton {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+.mobileMonthButton:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.mobileMonthTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Mobile calendar grid */
+.mobileCalendarContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileDayHeaders {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.mobileDayHeader {
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.mobileCalendarDay {
+  aspect-ratio: 1;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobileCalendarDay:hover {
+  background: #f9fafb;
+  border-color: #a59480;
+}
+
+.mobileCalendarDay.otherMonth {
+  opacity: 0.4;
+  background: #f9fafb;
+}
+
+.mobileCalendarDay.closed {
+  opacity: 0.6;
+  background: #f3f4f6;
+}
+
+.mobileDayNumber {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 2px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileCalendarDay.otherMonth .mobileDayNumber {
+  color: #9ca3af;
+}
+
+.mobileCalendarDay.closed .mobileDayNumber {
+  color: #6b7280;
+}
+
+.mobileEventDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.mobileEventDot.private {
+  background: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+.mobileEventDot.member {
+  background: #059669;
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.2);
+}
+
+.mobileEventCount {
+  font-size: 9px;
+  color: #6b7280;
+  text-align: center;
+  margin-top: auto;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Mobile events list */
+.mobileEventsContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileEventsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.mobileEventsTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileEventCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.mobileEventCard:hover {
+  border-color: #a59480;
+  box-shadow: 0 2px 8px rgba(165, 148, 128, 0.2);
+}
+
+.mobileEventHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.mobileEventTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileEventType {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.mobileEventTypeIcon {
+  font-size: 16px;
+}
+
+.mobileEventActions {
+  display: flex;
+  gap: 8px;
+}
+
+.mobileEventActionButton {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.mobileEventActionButton.edit {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.mobileEventActionButton.delete {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.mobileEventActionButton.rsvp {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.mobileEventInfo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mobileEventInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobileEventInfoLabel {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileEventInfoValue {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.mobileEventDescription {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.mobileEventReservations {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+/* Mobile form styles */
+.mobileFormContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileFormTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #353535;
+  margin-bottom: 16px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileFormGroup {
+  margin-bottom: 16px;
+}
+
+.mobileFormLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileFormInput,
+.mobileFormSelect,
+.mobileFormTextarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #374151;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.mobileFormInput:focus,
+.mobileFormSelect:focus,
+.mobileFormTextarea:focus {
+  outline: none;
+  border-color: #a59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.mobileFormTextarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.mobileFormRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mobileFormCheckboxGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobileFormCheckboxItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobileFormCheckbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid #d1d5db;
+  accent-color: #a59480;
+}
+
+.mobileFormActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.mobileFormButton {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileFormButton.primary {
+  background: #a59480;
+  color: white;
+}
+
+.mobileFormButton.primary:hover {
+  background: #947d65;
+}
+
+.mobileFormButton.secondary {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+.mobileFormButton.secondary:hover {
+  background: #e5e7eb;
+}
+
+/* Mobile loading */
+.mobileLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.mobileLoadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #a59480;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.mobileLoadingText {
+  font-size: 14px;
+  color: #6b7280;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Mobile empty state */
+.mobileEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.mobileEmptyIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.mobileEmptyText {
+  font-size: 16px;
+  color: #6b7280;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Mobile table styles */
+.mobileTable {
+  width: 100%;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileTableRow {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mobileTableRow:last-child {
+  border-bottom: none;
+}
+
+.mobileTableCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobileTableCellLabel {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileTableCellValue {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+/* Image preview */
+.mobileImagePreview {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 100px;
+  height: 60px;
+  object-fit: cover;
+}
+
+/* Badge styles */
+.mobileBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileBadge.green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.mobileBadge.red {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.mobileBadge.blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .mobileContainer {
+    padding: 12px;
+  }
+  
+  .mobileFormRow {
+    grid-template-columns: 1fr;
+  }
+  
+  .mobileEventInfo {
+    grid-template-columns: 1fr;
+  }
+  
+  .mobileFilterGrid {
+    grid-template-columns: 1fr;
+  }
+}

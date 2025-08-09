@@ -1019,6 +1019,22 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
               />
             </HStack>
 
+            {/* Center: Date */}
+            <Text
+              fontSize="sm"
+              fontWeight="semibold"
+              color="#353535"
+              fontFamily="Montserrat, sans-serif"
+              textAlign="center"
+              flex="1"
+            >
+              {currentCalendarDate.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </Text>
+
             {/* Right: Today Button */}
             <Button
               size="sm"
@@ -1037,22 +1053,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
               today
             </Button>
           </HStack>
-
-          {/* Bottom Row: Centered Date */}
-          <Box textAlign="center" mt={1}>
-            <Text
-              fontSize="sm"
-              fontWeight="semibold"
-              color="#353535"
-              fontFamily="Montserrat, sans-serif"
-            >
-              {currentCalendarDate.toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </Text>
-          </Box>
         </Box>
       )}
 

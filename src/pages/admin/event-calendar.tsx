@@ -38,6 +38,7 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import { useSettings } from '../../context/SettingsContext';
 import { fromUTC, isSameDay, localInputToUTC, utcToLocalInput, formatDateTime } from '../../utils/dateUtils';
 import { supabase } from '../../lib/supabase';
+import styles from '../../styles/EventCalendarMobile.module.css';
 
 interface EventFilter {
   privateEvents: boolean;
@@ -99,8 +100,7 @@ export default function EventCalendar() {
         .from('private_events')
         .select('*')
         .gte('start_time', calendarStart.toISOString())
-        .lte('start_time', calendarEnd.toISOString())
-        .eq('status', 'active');
+        .lte('start_time', calendarEnd.toISOString());
 
       // Fetch venue hours for the entire month
       const { data: venueHoursData } = await supabase
@@ -128,8 +128,10 @@ export default function EventCalendar() {
       
       while (current <= calendarEnd) {
         const dayPrivateEvents = privateEvents?.filter((pe: any) => {
-          const eventDate = fromUTC(pe.start_time, settings.timezone);
-          return isSameDay(eventDate, current, settings.timezone);
+          const eventDate = new Date(pe.start_time);
+          const currentDateStr = current.toISOString().split('T')[0];
+          const eventDateStr = eventDate.toISOString().split('T')[0];
+          return currentDateStr === eventDateStr;
         }) || [];
 
         // Check if the day is open for reservations
@@ -205,12 +207,18 @@ export default function EventCalendar() {
   };
 
   const getFilteredCalendarData = () => {
-    return calendarData.filter(day => {
-      if (!filters.privateEvents && day.privateEvents.length > 0) return false;
-      if (!filters.noirMemberEvents && day.noirMemberEvents.length > 0) return false;
-      if (!filters.closedDays && !day.isOpen) return false;
-      if (!filters.openDays && day.isOpen) return false;
-      return true;
+    return calendarData.map(day => {
+      // Always show the day, but filter events based on filters
+      const filteredDay = {
+        ...day,
+        privateEvents: filters.privateEvents ? day.privateEvents : [],
+        noirMemberEvents: filters.noirMemberEvents ? day.noirMemberEvents : [],
+        totalEvents: (filters.privateEvents ? day.privateEvents.length : 0) + 
+                    (filters.noirMemberEvents ? day.noirMemberEvents.length : 0)
+      };
+      
+      // Always return the filtered day - the open/closed filters just affect visual styling, not event display
+      return filteredDay;
     });
   };
 
@@ -349,22 +357,22 @@ export default function EventCalendar() {
                       
                       {/* Events */}
                       <VStack spacing={1} align="stretch" maxH="60px" overflow="hidden">
-                        {day.privateEvents.slice(0, 2).map((event, eventIndex) => (
-                          <Badge
-                            key={eventIndex}
-                            colorScheme="blue"
-                            fontSize="10px"
-                            p={1}
-                            borderRadius="sm"
-                            maxW="100%"
-                            whiteSpace="normal"
-                            textAlign="left"
-                            lineHeight="1.2"
-                            wordBreak="break-word"
-                          >
-                            {event.title.length > 15 ? `${event.title.substring(0, 15)}...` : event.title}
-                          </Badge>
-                        ))}
+                                          {day.privateEvents.slice(0, 2).map((event, eventIndex) => (
+                    <Badge
+                      key={eventIndex}
+                      colorScheme="blue"
+                      fontSize="10px"
+                      p={1}
+                      borderRadius="sm"
+                      maxW="100%"
+                      whiteSpace="normal"
+                      textAlign="left"
+                      lineHeight="1.2"
+                      wordBreak="break-word"
+                    >
+                      {event.title && event.title.length > 15 ? `${event.title.substring(0, 15)}...` : event.title || 'Event'}
+                    </Badge>
+                  ))}
                         {day.noirMemberEvents.slice(0, 2).map((event, eventIndex) => (
                           <Badge
                             key={eventIndex}
@@ -403,85 +411,154 @@ export default function EventCalendar() {
     }
   };
 
+  const renderMobileView = () => {
+    switch (currentView) {
+      case 'month':
+        return <MobileMonthView 
+          currentDate={currentDate}
+          onDateChange={handleDateChange}
+          navigateMonth={navigateMonth}
+          calendarData={filteredData}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          loading={loading}
+        />;
+      case 'private-events':
+        return <MobilePrivateEventsView 
+          shouldOpenNewEventForm={shouldOpenNewEventForm} 
+          onFormOpened={() => setShouldOpenNewEventForm(false)} 
+        />;
+      case 'custom-days':
+        return <MobileCustomDaysView />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <AdminLayout>
-      <Box p={6} maxW="1400px" mx="auto" bg="white" minH="100vh">
-        {/* Header */}
-        <Flex justify="space-between" align="center" mb={8}>
-          <Heading size="2xl" color="nightSky" fontWeight="bold">Event Calendar</Heading>
-          <HStack spacing={4}>
-            <Button
-              leftIcon={<AddIcon />}
-              colorScheme="blue"
-              size="lg"
-              borderRadius="10px"
-              px={8}
-              py={4}
-              fontSize="lg"
-              fontWeight="semibold"
+      {/* Desktop View */}
+      <div className={styles.desktopView}>
+        <Box p={6} pt="95px" maxW="1400px" mx="auto" bg="white" minH="100vh">
+          {/* Header */}
+          <Flex justify="space-between" align="center" mb={8}>
+            <Heading size="2xl" color="nightSky" fontWeight="bold">Event Calendar</Heading>
+            <HStack spacing={4}>
+              <Button
+                leftIcon={<AddIcon />}
+                colorScheme="blue"
+                size="lg"
+                borderRadius="10px"
+                px={8}
+                py={4}
+                fontSize="lg"
+                fontWeight="semibold"
+                onClick={() => handleCreateEvent()}
+              >
+                + Create Event
+              </Button>
+            </HStack>
+          </Flex>
+
+          {/* Top Navigation */}
+          <Box 
+            bg="white" 
+            borderRadius="10px" 
+            p={6} 
+            mb={8}
+            border="2px solid"
+            borderColor="gray.200"
+            boxShadow="md"
+          >
+            <HStack spacing={6} justify="center">
+              <Button
+                variant={currentView === 'month' ? 'solid' : 'outline'}
+                colorScheme="blue"
+                size="lg"
+                borderRadius="10px"
+                px={8}
+                py={4}
+                fontSize="lg"
+                fontWeight="semibold"
+                onClick={() => setCurrentView('month')}
+              >
+                Monthly Calendar
+              </Button>
+              <Button
+                variant={currentView === 'private-events' ? 'solid' : 'outline'}
+                colorScheme="blue"
+                size="lg"
+                borderRadius="10px"
+                px={8}
+                py={4}
+                fontSize="lg"
+                fontWeight="semibold"
+                onClick={() => setCurrentView('private-events')}
+              >
+                Private Events
+              </Button>
+              <Button
+                variant={currentView === 'custom-days' ? 'solid' : 'outline'}
+                colorScheme="blue"
+                size="lg"
+                borderRadius="10px"
+                px={8}
+                py={4}
+                fontSize="lg"
+                fontWeight="semibold"
+                onClick={() => setCurrentView('custom-days')}
+              >
+                Custom Days
+              </Button>
+            </HStack>
+          </Box>
+
+          {/* View Content */}
+          {renderView()}
+        </Box>
+      </div>
+
+      {/* Mobile View */}
+      <div className={styles.mobileView}>
+        <div className={styles.mobileContainer}>
+          <div className={styles.mobileHeader}>
+            <h1 className={styles.mobileTitle}>Event Calendar</h1>
+            
+            {/* Mobile navigation tabs */}
+            <div className={styles.mobileNavTabs}>
+              <button
+                className={`${styles.mobileNavTab} ${currentView === 'month' ? styles.active : ''}`}
+                onClick={() => setCurrentView('month')}
+              >
+                📅 Calendar
+              </button>
+              <button
+                className={`${styles.mobileNavTab} ${currentView === 'private-events' ? styles.active : ''}`}
+                onClick={() => setCurrentView('private-events')}
+              >
+                🎉 Events
+              </button>
+              <button
+                className={`${styles.mobileNavTab} ${currentView === 'custom-days' ? styles.active : ''}`}
+                onClick={() => setCurrentView('custom-days')}
+              >
+                ⚙️ Days
+              </button>
+            </div>
+
+            {/* Create event button */}
+            <button
+              className={styles.mobileCreateButton}
               onClick={() => handleCreateEvent()}
             >
               + Create Event
-            </Button>
-          </HStack>
-        </Flex>
+            </button>
+          </div>
 
-        {/* Top Navigation */}
-        <Box 
-          bg="white" 
-          borderRadius="10px" 
-          p={6} 
-          mb={8}
-          border="2px solid"
-          borderColor="gray.200"
-          boxShadow="md"
-        >
-          <HStack spacing={6} justify="center">
-            <Button
-              variant={currentView === 'month' ? 'solid' : 'outline'}
-              colorScheme="blue"
-              size="lg"
-              borderRadius="10px"
-              px={8}
-              py={4}
-              fontSize="lg"
-              fontWeight="semibold"
-              onClick={() => setCurrentView('month')}
-            >
-              Monthly Calendar
-            </Button>
-            <Button
-              variant={currentView === 'private-events' ? 'solid' : 'outline'}
-              colorScheme="blue"
-              size="lg"
-              borderRadius="10px"
-              px={8}
-              py={4}
-              fontSize="lg"
-              fontWeight="semibold"
-              onClick={() => setCurrentView('private-events')}
-            >
-              Private Events
-            </Button>
-            <Button
-              variant={currentView === 'custom-days' ? 'solid' : 'outline'}
-              colorScheme="blue"
-              size="lg"
-              borderRadius="10px"
-              px={8}
-              py={4}
-              fontSize="lg"
-              fontWeight="semibold"
-              onClick={() => setCurrentView('custom-days')}
-            >
-              Custom Days
-            </Button>
-          </HStack>
-        </Box>
-
-        {/* View Content */}
-        {renderView()}
-      </Box>
+          {/* Mobile view content */}
+          {renderMobileView()}
+        </div>
+      </div>
     </AdminLayout>
   );
 }
@@ -2002,5 +2079,827 @@ function CustomDaysView() {
         </Box>
       )}
     </Box>
+  );
+}
+
+// Mobile Month View Component
+function MobileMonthView({ 
+  currentDate, 
+  onDateChange, 
+  navigateMonth, 
+  calendarData, 
+  filters, 
+  onFilterChange, 
+  loading 
+}: {
+  currentDate: Date;
+  onDateChange: (date: Date) => void;
+  navigateMonth: (direction: 'prev' | 'next') => void;
+  calendarData: CalendarDay[];
+  filters: EventFilter;
+  onFilterChange: (filterKey: keyof EventFilter, value: boolean) => void;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className={styles.mobileLoading}>
+        <div className={styles.mobileLoadingSpinner}></div>
+        <div className={styles.mobileLoadingText}>Loading calendar...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Mobile filters */}
+      <div className={styles.mobileFiltersContainer}>
+        <div className={styles.mobileFiltersTitle}>Filters</div>
+        <div className={styles.mobileFilterGrid}>
+          <label className={styles.mobileFilterItem}>
+            <input
+              type="checkbox"
+              className={styles.mobileFilterCheckbox}
+              checked={filters.privateEvents}
+              onChange={(e) => onFilterChange('privateEvents', e.target.checked)}
+            />
+            Private Events
+          </label>
+          <label className={styles.mobileFilterItem}>
+            <input
+              type="checkbox"
+              className={styles.mobileFilterCheckbox}
+              checked={filters.noirMemberEvents}
+              onChange={(e) => onFilterChange('noirMemberEvents', e.target.checked)}
+            />
+            Member Events
+          </label>
+          <label className={styles.mobileFilterItem}>
+            <input
+              type="checkbox"
+              className={styles.mobileFilterCheckbox}
+              checked={filters.closedDays}
+              onChange={(e) => onFilterChange('closedDays', e.target.checked)}
+            />
+            Closed Days
+          </label>
+          <label className={styles.mobileFilterItem}>
+            <input
+              type="checkbox"
+              className={styles.mobileFilterCheckbox}
+              checked={filters.openDays}
+              onChange={(e) => onFilterChange('openDays', e.target.checked)}
+            />
+            Open Days
+          </label>
+        </div>
+      </div>
+
+      {/* Mobile month navigation */}
+      <div className={styles.mobileMonthNav}>
+        <button
+          className={styles.mobileMonthButton}
+          onClick={() => navigateMonth('prev')}
+        >
+          ‹
+        </button>
+        <div className={styles.mobileMonthTitle}>
+          {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </div>
+        <button
+          className={styles.mobileMonthButton}
+          onClick={() => navigateMonth('next')}
+        >
+          ›
+        </button>
+      </div>
+
+      {/* Mobile calendar */}
+      <div className={styles.mobileCalendarContainer}>
+        <div className={styles.mobileDayHeaders}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className={styles.mobileDayHeader}>
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        <div className={styles.mobileCalendarGrid}>
+          {calendarData.map((day, index) => (
+            <div
+              key={index}
+              className={`${styles.mobileCalendarDay} ${
+                !day.isCurrentMonth ? styles.otherMonth : ''
+              } ${!day.isOpen ? styles.closed : ''}`}
+              onClick={() => onDateChange(day.date)}
+            >
+              <div className={styles.mobileDayNumber}>
+                {day.date.getDate()}
+              </div>
+              
+              {/* Event dots */}
+              {day.privateEvents && day.privateEvents.slice(0, 3).map((_, eventIndex) => (
+                <div
+                  key={eventIndex}
+                  className={`${styles.mobileEventDot} ${styles.private}`}
+                />
+              ))}
+              {day.noirMemberEvents && day.noirMemberEvents.slice(0, 3).map((_, eventIndex) => (
+                <div
+                  key={eventIndex}
+                  className={`${styles.mobileEventDot} ${styles.member}`}
+                />
+              ))}
+              
+              {day.totalEvents > 3 && (
+                <div className={styles.mobileEventCount}>
+                  +{day.totalEvents - 3}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Mobile Private Events View Component
+function MobilePrivateEventsView({ 
+  shouldOpenNewEventForm, 
+  onFormOpened 
+}: { 
+  shouldOpenNewEventForm: boolean; 
+  onFormOpened: () => void; 
+}) {
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [eventReservations, setEventReservations] = useState<{[key: string]: number}>({});
+  const [eventFilter, setEventFilter] = useState<'all' | 'upcoming' | 'past' | 'thisMonth'>('upcoming');
+  const toast = useToast();
+
+  const [formData, setFormData] = useState({
+    title: '',
+    event_type: 'Birthday',
+    start_time: '',
+    end_time: '',
+    max_guests: 10,
+    deposit_required: 0,
+    event_description: '',
+    rsvp_enabled: false,
+    require_time_selection: false,
+    total_attendees_maximum: 500,
+    full_day: true
+  });
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  useEffect(() => {
+    if (shouldOpenNewEventForm) {
+      openNewEvent();
+      onFormOpened();
+    }
+  }, [shouldOpenNewEventForm, onFormOpened]);
+
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('private_events')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching events:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load private events',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+      
+      setEvents(data || []);
+
+      // Fetch reservation counts for each event
+      if (data && data.length > 0) {
+        const eventIds = data.map(event => event.id);
+        const { data: reservationCounts, error: countError } = await supabase
+          .from('reservations')
+          .select('private_event_id')
+          .in('private_event_id', eventIds);
+
+        if (!countError && reservationCounts) {
+          const counts: {[key: string]: number} = {};
+          reservationCounts.forEach(reservation => {
+            if (reservation.private_event_id) {
+              counts[reservation.private_event_id] = (counts[reservation.private_event_id] || 0) + 1;
+            }
+          });
+          setEventReservations(counts);
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      event_type: 'Birthday',
+      start_time: '',
+      end_time: '',
+      max_guests: 10,
+      deposit_required: 0,
+      event_description: '',
+      rsvp_enabled: false,
+      require_time_selection: false,
+      total_attendees_maximum: 500,
+      full_day: true
+    });
+    setEditingId(null);
+  };
+
+  const openNewEvent = () => {
+    resetForm();
+    setEditingId('new');
+  };
+
+  const handleEdit = (event: any) => {
+    setEditingId(event.id);
+    setFormData({
+      title: event.title,
+      event_type: event.event_type,
+      start_time: event.start_time ? event.start_time.slice(0, 16) : '',
+      end_time: event.end_time ? event.end_time.slice(0, 16) : '',
+      max_guests: event.max_guests,
+      total_attendees_maximum: event.total_attendees_maximum,
+      deposit_required: event.deposit_required,
+      event_description: event.event_description || '',
+      rsvp_enabled: event.rsvp_enabled,
+      require_time_selection: event.require_time_selection,
+      full_day: event.full_day
+    });
+  };
+
+  const handleCancelEdit = () => {
+    resetForm();
+  };
+
+  const handleDelete = async (eventId: string) => {
+    if (!confirm('Are you sure you want to delete this event?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('private_events')
+        .delete()
+        .eq('id', eventId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Event deleted successfully',
+        status: 'success',
+        duration: 3000,
+      });
+
+      fetchEvents();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete event',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const getEventTypeIcon = (eventType: string) => {
+    const icons: Record<string, string> = {
+      'Birthday': '🎂',
+      'Anniversary': '💍',
+      'Corporate Event': '🧑‍💼',
+      'Wedding Reception': '💒',
+      'Graduation': '🎓',
+      'Holiday Party': '❄️',
+      'Party': '🎉',
+      'Wind Down Party': '🍸',
+      'After Party': '🥳',
+      'Rehearsal Dinner': '🍽️',
+      'Noir Member Event': '⭐',
+      'Other': '📅'
+    };
+    return icons[eventType] || '📅';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  const getFilteredEvents = () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    return events.filter(event => {
+      const eventDate = new Date(event.start_time);
+      
+      switch (eventFilter) {
+        case 'upcoming':
+          return eventDate >= now;
+        case 'past':
+          return eventDate < now;
+        case 'thisMonth':
+          return eventDate >= startOfMonth && eventDate <= endOfMonth;
+        case 'all':
+        default:
+          return true;
+      }
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className={styles.mobileLoading}>
+        <div className={styles.mobileLoadingSpinner}></div>
+        <div className={styles.mobileLoadingText}>Loading events...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Event Form */}
+      {(editingId === 'new' || editingId) && (
+        <div className={styles.mobileFormContainer}>
+          <div className={styles.mobileFormTitle}>
+            {editingId === 'new' ? 'Create New Event' : 'Edit Event'}
+          </div>
+          
+          <div className={styles.mobileFormGroup}>
+            <label className={styles.mobileFormLabel}>Event Title *</label>
+            <input
+              className={styles.mobileFormInput}
+              value={formData.title}
+              onChange={(e) => handleInputChange('title', e.target.value)}
+              placeholder="Enter event title"
+            />
+          </div>
+
+          <div className={styles.mobileFormRow}>
+            <div className={styles.mobileFormGroup}>
+              <label className={styles.mobileFormLabel}>Event Type *</label>
+              <select
+                className={styles.mobileFormSelect}
+                value={formData.event_type}
+                onChange={(e) => handleInputChange('event_type', e.target.value)}
+              >
+                <option value="Birthday">Birthday</option>
+                <option value="Anniversary">Anniversary</option>
+                <option value="Corporate Event">Corporate Event</option>
+                <option value="Wedding Reception">Wedding Reception</option>
+                <option value="Graduation">Graduation</option>
+                <option value="Holiday Party">Holiday Party</option>
+                <option value="Party">Party</option>
+                <option value="Wind Down Party">Wind Down Party</option>
+                <option value="After Party">After Party</option>
+                <option value="Rehearsal Dinner">Rehearsal Dinner</option>
+                <option value="Noir Member Event">Noir Member Event</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className={styles.mobileFormRow}>
+            <div className={styles.mobileFormGroup}>
+              <label className={styles.mobileFormLabel}>Start Date & Time *</label>
+              <input
+                className={styles.mobileFormInput}
+                type="datetime-local"
+                value={formData.start_time}
+                onChange={(e) => handleInputChange('start_time', e.target.value)}
+              />
+            </div>
+            <div className={styles.mobileFormGroup}>
+              <label className={styles.mobileFormLabel}>End Date & Time *</label>
+              <input
+                className={styles.mobileFormInput}
+                type="datetime-local"
+                value={formData.end_time}
+                onChange={(e) => handleInputChange('end_time', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className={styles.mobileFormGroup}>
+            <label className={styles.mobileFormLabel}>Event Description</label>
+            <textarea
+              className={styles.mobileFormTextarea}
+              value={formData.event_description}
+              onChange={(e) => handleInputChange('event_description', e.target.value)}
+              placeholder="Enter event description..."
+            />
+          </div>
+
+          <div className={styles.mobileFormActions}>
+            <button className={`${styles.mobileFormButton} ${styles.primary}`}>
+              {editingId === 'new' ? 'Create Event' : 'Update Event'}
+            </button>
+            <button 
+              className={`${styles.mobileFormButton} ${styles.secondary}`}
+              onClick={handleCancelEdit}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Event Filters */}
+      <div className={styles.mobileFiltersContainer}>
+        <div className={styles.mobileFiltersTitle}>Filter Events</div>
+        <div className={styles.mobileNavTabs} style={{ marginBottom: 0 }}>
+          <button
+            className={`${styles.mobileNavTab} ${eventFilter === 'upcoming' ? styles.active : ''}`}
+            onClick={() => setEventFilter('upcoming')}
+          >
+            Upcoming
+          </button>
+          <button
+            className={`${styles.mobileNavTab} ${eventFilter === 'thisMonth' ? styles.active : ''}`}
+            onClick={() => setEventFilter('thisMonth')}
+          >
+            This Month
+          </button>
+          <button
+            className={`${styles.mobileNavTab} ${eventFilter === 'past' ? styles.active : ''}`}
+            onClick={() => setEventFilter('past')}
+          >
+            Past
+          </button>
+          <button
+            className={`${styles.mobileNavTab} ${eventFilter === 'all' ? styles.active : ''}`}
+            onClick={() => setEventFilter('all')}
+          >
+            All
+          </button>
+        </div>
+      </div>
+
+      {/* Events List */}
+      <div className={styles.mobileEventsContainer}>
+        <div className={styles.mobileEventsHeader}>
+          <div className={styles.mobileEventsTitle}>
+            {eventFilter === 'all' ? 'All Events' : 
+             eventFilter === 'upcoming' ? 'Upcoming Events' :
+             eventFilter === 'past' ? 'Past Events' : 'This Month\'s Events'}
+          </div>
+          <button
+            className={styles.mobileCreateButton}
+            onClick={openNewEvent}
+            style={{ padding: '8px 12px', fontSize: '14px', marginBottom: 0 }}
+          >
+            + Add Event
+          </button>
+        </div>
+
+        {getFilteredEvents().length === 0 ? (
+          <div className={styles.mobileEmpty}>
+            <div className={styles.mobileEmptyIcon}>🎉</div>
+            <div className={styles.mobileEmptyText}>No events found. Create your first event above.</div>
+          </div>
+        ) : (
+          getFilteredEvents()
+            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+            .map((event) => (
+              <div key={event.id} className={styles.mobileEventCard}>
+                <div className={styles.mobileEventHeader}>
+                  <div>
+                    <div className={styles.mobileEventTitle}>{event.title}</div>
+                    <div className={styles.mobileEventType}>
+                      <span className={styles.mobileEventTypeIcon}>
+                        {getEventTypeIcon(event.event_type)}
+                      </span>
+                      {event.event_type} • {formatDate(event.start_time)} • {formatTime(event.start_time)}-{formatTime(event.end_time)}
+                    </div>
+                  </div>
+                  <div className={styles.mobileEventActions}>
+                    {event.rsvp_enabled && event.rsvp_url && (
+                      <button
+                        className={`${styles.mobileEventActionButton} ${styles.rsvp}`}
+                        onClick={() => window.open(`/rsvp/${event.rsvp_url}`, '_blank')}
+                      >
+                        🔗
+                      </button>
+                    )}
+                    <button
+                      className={`${styles.mobileEventActionButton} ${styles.edit}`}
+                      onClick={() => handleEdit(event)}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className={`${styles.mobileEventActionButton} ${styles.delete}`}
+                      onClick={() => handleDelete(event.id)}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.mobileEventReservations}>
+                  👥 {eventReservations[event.id] || 0} reservations
+                  {event.event_description && (
+                    <span style={{ marginLeft: '12px', color: '#6b7280', fontSize: '12px' }}>
+                      {event.event_description.length > 50 ? `${event.event_description.substring(0, 50)}...` : event.event_description}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+        )}
+      </div>
+    </>
+  );
+}
+
+// Mobile Custom Days View Component
+function MobileCustomDaysView() {
+  const [customDays, setCustomDays] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const toast = useToast();
+
+  const [formData, setFormData] = useState({
+    date: '',
+    type: 'exceptional_open' as 'exceptional_open' | 'exceptional_closure',
+    full_day: true,
+    time_ranges: [{ start_time: '09:00', end_time: '17:00' }]
+  });
+
+  useEffect(() => {
+    fetchCustomDays();
+  }, []);
+
+  const fetchCustomDays = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .in('type', ['exceptional_open', 'exceptional_closure'])
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      setCustomDays(data || []);
+    } catch (error) {
+      console.error('Error fetching custom days:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load custom days',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const resetForm = () => {
+    setFormData({
+      date: '',
+      type: 'exceptional_open',
+      full_day: true,
+      time_ranges: [{ start_time: '09:00', end_time: '17:00' }]
+    });
+    setEditingId(null);
+  };
+
+  const openNewCustomDay = () => {
+    resetForm();
+    setEditingId('new');
+  };
+
+  const handleEdit = (customDay: any) => {
+    setEditingId(customDay.id);
+    setFormData({
+      date: customDay.date,
+      type: customDay.type,
+      full_day: customDay.full_day,
+      time_ranges: customDay.time_ranges || [{ start_time: '09:00', end_time: '17:00' }]
+    });
+  };
+
+  const handleCancelEdit = () => {
+    resetForm();
+  };
+
+  const handleDelete = async (customDayId: string) => {
+    if (!confirm('Are you sure you want to delete this custom day?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('venue_hours')
+        .delete()
+        .eq('id', customDayId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Custom day deleted successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      fetchCustomDays();
+    } catch (error) {
+      console.error('Error deleting custom day:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete custom day',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getTypeColor = (type: string) => {
+    return type === 'exceptional_open' ? 'green' : 'red';
+  };
+
+  const getTypeLabel = (type: string) => {
+    return type === 'exceptional_open' ? 'Open Day' : 'Closed Day';
+  };
+
+  const getTypeIcon = (type: string) => {
+    return type === 'exceptional_open' ? '✅' : '❌';
+  };
+
+  if (loading) {
+    return (
+      <div className={styles.mobileLoading}>
+        <div className={styles.mobileLoadingSpinner}></div>
+        <div className={styles.mobileLoadingText}>Loading custom days...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Custom Day Form */}
+      {(editingId === 'new' || editingId) && (
+        <div className={styles.mobileFormContainer}>
+          <div className={styles.mobileFormTitle}>
+            {editingId === 'new' ? 'Add Custom Day' : 'Edit Custom Day'}
+          </div>
+          
+          <div className={styles.mobileFormRow}>
+            <div className={styles.mobileFormGroup}>
+              <label className={styles.mobileFormLabel}>Date *</label>
+              <input
+                className={styles.mobileFormInput}
+                type="date"
+                value={formData.date}
+                onChange={(e) => handleInputChange('date', e.target.value)}
+              />
+            </div>
+            <div className={styles.mobileFormGroup}>
+              <label className={styles.mobileFormLabel}>Type *</label>
+              <select
+                className={styles.mobileFormSelect}
+                value={formData.type}
+                onChange={(e) => handleInputChange('type', e.target.value)}
+              >
+                <option value="exceptional_open">Open Day</option>
+                <option value="exceptional_closure">Closed Day</option>
+              </select>
+            </div>
+          </div>
+
+          <div className={styles.mobileFormCheckboxGroup}>
+            <label className={styles.mobileFormCheckboxItem}>
+              <input
+                type="checkbox"
+                className={styles.mobileFormCheckbox}
+                checked={formData.full_day}
+                onChange={(e) => handleInputChange('full_day', e.target.checked)}
+              />
+              Full Day
+            </label>
+          </div>
+
+          <div className={styles.mobileFormActions}>
+            <button className={`${styles.mobileFormButton} ${styles.primary}`}>
+              {editingId === 'new' ? 'Add Custom Day' : 'Update Custom Day'}
+            </button>
+            <button 
+              className={`${styles.mobileFormButton} ${styles.secondary}`}
+              onClick={handleCancelEdit}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Days List */}
+      <div className={styles.mobileEventsContainer}>
+        <div className={styles.mobileEventsHeader}>
+          <div className={styles.mobileEventsTitle}>All Custom Days</div>
+          <button
+            className={styles.mobileCreateButton}
+            onClick={openNewCustomDay}
+            style={{ padding: '8px 12px', fontSize: '14px', marginBottom: 0 }}
+          >
+            + Add Day
+          </button>
+        </div>
+
+        {customDays.length === 0 ? (
+          <div className={styles.mobileEmpty}>
+            <div className={styles.mobileEmptyIcon}>📅</div>
+            <div className={styles.mobileEmptyText}>No custom days found. Add your first custom day above.</div>
+          </div>
+        ) : (
+          customDays.map((customDay) => (
+            <div key={customDay.id} className={styles.mobileEventCard}>
+              <div className={styles.mobileEventHeader}>
+                <div>
+                  <div className={styles.mobileEventTitle}>{formatDate(customDay.date)}</div>
+                  <div className={styles.mobileEventType}>
+                    <span className={styles.mobileEventTypeIcon}>
+                      {getTypeIcon(customDay.type)}
+                    </span>
+                    {getTypeLabel(customDay.type)} • {customDay.full_day ? 'Full Day' : customDay.time_ranges?.map((range: any) => `${range.start_time}-${range.end_time}`).join(', ')}
+                  </div>
+                </div>
+                <div className={styles.mobileEventActions}>
+                  <button
+                    className={`${styles.mobileEventActionButton} ${styles.edit}`}
+                    onClick={() => handleEdit(customDay)}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    className={`${styles.mobileEventActionButton} ${styles.delete}`}
+                    onClick={() => handleDelete(customDay.id)}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </>
   );
 } 

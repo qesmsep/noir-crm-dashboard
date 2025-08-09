@@ -24,6 +24,7 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import CampaignDrawer from '../../components/CampaignDrawer';
 import CampaignTemplateDrawer from '../../components/CampaignTemplateDrawer';
 import { sortCampaignTemplates } from '../../utils/campaignSorting';
+import mobileStyles from '../../styles/CommunicationMobile.module.css';
 
 interface Campaign {
   id: string;
@@ -574,7 +575,9 @@ export default function CommunicationPage() {
   // Show campaigns list
   return (
     <AdminLayout>
-      <Box p={8} bg="#f8f9fa" minH="100vh">
+      {/* Desktop View */}
+      <div className={mobileStyles.desktopView}>
+        <Box p={8} pt="95px" bg="#f8f9fa" minH="100vh">
         <VStack spacing={6} align="stretch">
           {/* Header */}
           <Text
@@ -740,7 +743,240 @@ export default function CommunicationPage() {
           isCreateMode={isCampaignCreateMode}
           onCampaignUpdated={handleCampaignUpdated}
         />
-      </Box>
+        </Box>
+      </div>
+
+      {/* Mobile View */}
+      <div className={mobileStyles.mobileView}>
+        <MobileCommunicationView 
+          campaigns={campaigns}
+          campaignTemplates={campaignTemplates}
+          loading={loading}
+          onCreateCampaign={handleCreateCampaign}
+          onCreateTemplate={handleCreateTemplate}
+          onEditCampaign={handleEditCampaign}
+          onEditTemplate={handleEditTemplate}
+          onDeleteCampaign={handleDeleteCampaign}
+          onDeleteTemplate={handleDeleteTemplate}
+          onToggleCampaign={(campaignId: string, isActive: boolean) => {
+            const campaign = campaigns.find(c => c.id === campaignId);
+            if (campaign) {
+              handleToggleCampaignActive({ ...campaign, is_active: isActive });
+            }
+          }}
+          onViewCampaign={handleEditCampaign}
+        />
+      </div>
     </AdminLayout>
+  );
+}
+
+// Mobile Communication View Component
+function MobileCommunicationView({
+  campaigns,
+  campaignTemplates,
+  loading,
+  onCreateCampaign,
+  onCreateTemplate,
+  onEditCampaign,
+  onEditTemplate,
+  onDeleteCampaign,
+  onDeleteTemplate,
+  onToggleCampaign,
+  onViewCampaign
+}: {
+  campaigns: Campaign[];
+  campaignTemplates: any[];
+  loading: boolean;
+  onCreateCampaign: () => void;
+  onCreateTemplate: () => void;
+  onEditCampaign: (campaign: Campaign) => void;
+  onEditTemplate: (template: any) => void;
+  onDeleteCampaign: (campaignId: string) => void;
+  onDeleteTemplate: (templateId: string) => void;
+  onToggleCampaign: (campaignId: string, isActive: boolean) => void;
+  onViewCampaign: (campaign: Campaign) => void;
+}) {
+  if (loading) {
+    return (
+      <div className={mobileStyles.mobileLoading}>
+        <div className={mobileStyles.mobileLoadingSpinner}></div>
+        <div className={mobileStyles.mobileLoadingText}>Loading campaigns...</div>
+      </div>
+    );
+  }
+
+  const getTriggerTypeLabel = (triggerType: string) => {
+    const labels: Record<string, string> = {
+      'member_signup': 'Member Signup',
+      'member_birthday': 'Member Birthday',
+      'member_renewal': 'Member Renewal',
+      'reservation_time': 'Reservation Time',
+      'reservation_created': 'Reservation Created',
+      'reservation': 'Reservation',
+      'recurring': 'Recurring',
+      'reservation_range': 'Reservation Range',
+      'private_event': 'Private Event',
+      'all_members': 'All Members'
+    };
+    return labels[triggerType] || triggerType;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  return (
+    <div className={mobileStyles.mobileContainer}>
+      <div className={mobileStyles.mobileHeader}>
+        <h1 className={mobileStyles.mobileTitle}>Campaigns</h1>
+      </div>
+
+      {/* Create campaign button */}
+      <button
+        className={mobileStyles.mobileCreateButton}
+        onClick={onCreateCampaign}
+      >
+        + Create Campaign
+      </button>
+
+      {/* Campaigns List */}
+      <div className={mobileStyles.mobileCampaignsContainer}>
+        <div className={mobileStyles.mobileCampaignsHeader}>
+          <div className={mobileStyles.mobileCampaignsTitle}>Active Campaigns</div>
+        </div>
+
+        {campaigns.length === 0 ? (
+          <div className={mobileStyles.mobileEmpty}>
+            <div className={mobileStyles.mobileEmptyIcon}>📧</div>
+            <div className={mobileStyles.mobileEmptyText}>No campaigns found. Create your first campaign above.</div>
+          </div>
+        ) : (
+          campaigns.map((campaign) => (
+            <div key={campaign.id} className={mobileStyles.mobileCampaignCard}>
+              {/* Campaign Title */}
+              <div className={mobileStyles.mobileCampaignTitle}>{campaign.name}</div>
+
+              {/* Campaign Details */}
+              <div className={mobileStyles.mobileCampaignDetails}>
+                <div className={mobileStyles.mobileCampaignTrigger}>
+                  {getTriggerTypeLabel(campaign.trigger_type)}
+                </div>
+                <div className={mobileStyles.mobileCampaignMessages}>
+                  📧 {campaign.message_count || 0} messages
+                </div>
+                <div className={mobileStyles.mobileCampaignCreated}>
+                  📅 Created {formatDate(campaign.created_at)}
+                </div>
+                {campaign.description && (
+                  <div className={mobileStyles.mobileCampaignDescription}>
+                    {campaign.description.length > 80 ? 
+                      `${campaign.description.substring(0, 80)}...` : 
+                      campaign.description
+                    }
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons Row */}
+              <div className={mobileStyles.mobileCampaignActionsRow}>
+                <button
+                  className={`${mobileStyles.mobileCampaignActionButton} ${mobileStyles.view}`}
+                  onClick={() => onViewCampaign(campaign)}
+                >
+                  👁️ View
+                </button>
+                <button
+                  className={`${mobileStyles.mobileCampaignActionButton} ${mobileStyles.edit}`}
+                  onClick={() => onEditCampaign(campaign)}
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  className={`${mobileStyles.mobileCampaignActionButton} ${mobileStyles.delete}`}
+                  onClick={() => onDeleteCampaign(campaign.id)}
+                >
+                  🗑️ Delete
+                </button>
+                <div className={mobileStyles.mobileCampaignToggleButton}>
+                  <span>Active</span>
+                  <div
+                    className={`${mobileStyles.mobileCampaignSwitch} ${campaign.is_active ? mobileStyles.active : ''}`}
+                    onClick={() => onToggleCampaign(campaign.id, !campaign.is_active)}
+                  >
+                    <div className={mobileStyles.mobileCampaignSwitchThumb}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Templates Section */}
+      <div className={mobileStyles.mobileTemplatesContainer}>
+        <div className={mobileStyles.mobileTemplatesHeader}>
+          <div className={mobileStyles.mobileTemplatesTitle}>Message Templates</div>
+          <button
+            className={mobileStyles.mobileCreateButton}
+            onClick={onCreateTemplate}
+            style={{ padding: '8px 12px', fontSize: '14px', marginBottom: 0 }}
+          >
+            + Add Template
+          </button>
+        </div>
+
+        {campaignTemplates.length === 0 ? (
+          <div className={mobileStyles.mobileEmpty}>
+            <div className={mobileStyles.mobileEmptyIcon}>📝</div>
+            <div className={mobileStyles.mobileEmptyText}>No templates found. Create your first template above.</div>
+          </div>
+        ) : (
+          campaignTemplates.map((template) => (
+            <div key={template.id} className={mobileStyles.mobileTemplateCard}>
+              <div className={mobileStyles.mobileTemplateHeader}>
+                <div className={mobileStyles.mobileTemplateName}>{template.name}</div>
+                <div className={mobileStyles.mobileCampaignActions}>
+                  <button
+                    className={`${mobileStyles.mobileCampaignActionButton} ${mobileStyles.edit}`}
+                    onClick={() => onEditTemplate(template)}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    className={`${mobileStyles.mobileCampaignActionButton} ${mobileStyles.delete}`}
+                    onClick={() => onDeleteTemplate(template.id)}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+
+              <div className={mobileStyles.mobileTemplateSubject}>
+                Subject: {template.subject || 'No subject'}
+              </div>
+
+              <div className={mobileStyles.mobileTemplatePreview}>
+                {template.body ? 
+                  (template.body.length > 100 ? 
+                    `${template.body.substring(0, 100)}...` : 
+                    template.body
+                  ) : 'No content'
+                }
+              </div>
+
+              <div className={mobileStyles.mobileTemplateFooter}>
+                <span>Created {formatDate(template.created_at)}</span>
+                <span>{template.message_type || 'SMS'}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 } 

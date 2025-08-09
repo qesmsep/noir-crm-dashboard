@@ -1,0 +1,427 @@
+/* Mobile-specific styles for communication page */
+.mobileView {
+  display: none;
+}
+
+.desktopView {
+  display: block;
+}
+
+/* Show mobile view on screens smaller than 768px */
+@media (max-width: 767px) {
+  .mobileView {
+    display: block;
+  }
+  
+  .desktopView {
+    display: none;
+  }
+}
+
+/* Mobile container */
+.mobileContainer {
+  padding: 12px;
+  padding-top: 95px; /* 75px + 20px for header space */
+  background: #f8f9fa;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Mobile header */
+.mobileHeader {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.mobileTitle {
+  font-size: 24px;
+  font-weight: bold;
+  color: #353535;
+  margin-bottom: 16px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Create campaign button */
+.mobileCreateButton {
+  width: 100%;
+  padding: 16px;
+  background: #a59480;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Montserrat', sans-serif;
+  box-shadow: 0 2px 8px rgba(165, 148, 128, 0.3);
+}
+
+.mobileCreateButton:hover {
+  background: #947d65;
+  transform: translateY(-1px);
+}
+
+/* Campaign cards container */
+.mobileCampaignsContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileCampaignsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.mobileCampaignsTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Individual campaign cards */
+.mobileCampaignCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.mobileCampaignCard:hover {
+  border-color: #a59480;
+  box-shadow: 0 2px 8px rgba(165, 148, 128, 0.2);
+}
+
+.mobileCampaignCard:last-child {
+  margin-bottom: 0;
+}
+
+/* Campaign title - now standalone */
+.mobileCampaignTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  font-family: 'Montserrat', sans-serif;
+  line-height: 1.3;
+}
+
+/* Campaign details section */
+.mobileCampaignDetails {
+  margin-bottom: 12px;
+}
+
+.mobileCampaignTrigger {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  margin-bottom: 4px;
+}
+
+.mobileCampaignMessages {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.mobileCampaignCreated {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+/* Action buttons row */
+.mobileCampaignActionsRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.mobileCampaignActionButton {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  gap: 4px;
+}
+
+.mobileCampaignToggleButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #6b7280;
+  font-family: 'Montserrat', sans-serif;
+  margin-left: 8px;
+}
+
+.mobileCampaignActionButton.view {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.mobileCampaignActionButton.edit {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.mobileCampaignActionButton.delete {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.mobileCampaignActionButton:hover {
+  transform: scale(1.05);
+}
+
+/* Campaign info sections */
+.mobileCampaignInfo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mobileCampaignInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mobileCampaignInfoLabel {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileCampaignInfoValue {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+/* Campaign description */
+.mobileCampaignDescription {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+  margin-top: 6px;
+  padding: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+/* Removed old status section - now integrated into actions row */
+
+/* Switch component for campaigns */
+.mobileCampaignSwitch {
+  width: 32px;
+  height: 18px;
+  background: #d1d5db;
+  border-radius: 9px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.mobileCampaignSwitch.active {
+  background: #a59480;
+}
+
+.mobileCampaignSwitchThumb {
+  width: 14px;
+  height: 14px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.mobileCampaignSwitch.active .mobileCampaignSwitchThumb {
+  transform: translateX(14px);
+}
+
+/* Message count - defined above in condensed section */
+
+/* Loading and empty states */
+.mobileLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.mobileLoadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #a59480;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.mobileLoadingText {
+  font-size: 14px;
+  color: #6b7280;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.mobileEmptyIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.mobileEmptyText {
+  font-size: 16px;
+  color: #6b7280;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Templates section */
+.mobileTemplatesContainer {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobileTemplatesHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.mobileTemplatesTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #353535;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.mobileTemplateCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.mobileTemplateCard:hover {
+  border-color: #a59480;
+  box-shadow: 0 2px 8px rgba(165, 148, 128, 0.2);
+}
+
+.mobileTemplateCard:last-child {
+  margin-bottom: 0;
+}
+
+.mobileTemplateHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.mobileTemplateName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  font-family: 'Montserrat', sans-serif;
+  flex: 1;
+  padding-right: 12px;
+}
+
+.mobileTemplateSubject {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+
+.mobileTemplatePreview {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+  background: #f3f4f6;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.mobileTemplateFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .mobileContainer {
+    padding: 12px;
+  }
+  
+  .mobileCampaignInfo {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .mobileCampaignActions {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .mobileCampaignStatus {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
