@@ -242,9 +242,13 @@ export async function POST(request: Request) {
       if (ampm === 'pm' && hour !== 12) hour += 12;
       if (ampm === 'am' && hour === 12) hour = 0;
       
-      // CRITICAL FIX: Convert local venue time to UTC for comparison with private events
-      // Private events are stored in UTC, so we need slots in UTC too
-      const slotStart = new Date(`${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00-05:00`); // CDT offset
+      // CRITICAL FIX: Create slot times in the same timezone context as private events
+      // Private events are stored in UTC, so we need to convert local venue hours to UTC for comparison
+      // 6:00 PM CDT = 23:00 UTC (CDT is UTC-5)
+      const localTime = `${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+      const slotStart = new Date(localTime);
+      // Convert to UTC by adding the timezone offset (CDT is UTC-5, so add 5 hours)
+      slotStart.setHours(slotStart.getHours() + 5); // Convert CDT to UTC
       const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
       
       // Check if this slot overlaps with any private event
