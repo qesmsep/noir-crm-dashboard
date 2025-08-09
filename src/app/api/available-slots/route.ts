@@ -219,7 +219,22 @@ export async function POST(request: Request) {
         if (ev.full_day) return true; // Full day events block everything
         const evStart = new Date(ev.start_time);
         const evEnd = new Date(ev.end_time);
-        return (slotStart < evEnd) && (slotEnd > evStart);
+        const overlap = (slotStart < evEnd) && (slotEnd > evStart);
+        
+        if (overlap) {
+          console.log(`Slot ${slot} overlaps with private event:`, {
+            slotStart: slotStart.toISOString(),
+            slotEnd: slotEnd.toISOString(),
+            eventStart: evStart.toISOString(),
+            eventEnd: evEnd.toISOString(),
+            slotStartLocal: slotStart.toString(),
+            slotEndLocal: slotEnd.toString(),
+            eventStartLocal: evStart.toString(),
+            eventEndLocal: evEnd.toString()
+          });
+        }
+        
+        return overlap;
       });
       
       if (hasPrivateEventOverlap) {

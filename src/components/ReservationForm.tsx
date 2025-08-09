@@ -358,23 +358,25 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
           const eventDate = date.toFormat('yyyy-MM-dd');
           eventDates.add(eventDate);
         } else {
-          // For partial day events, we don't block the entire day
-          // Instead, we'll handle time-specific blocking in the time selection
-          // Only block if the event spans multiple days
+          // For partial day events, add all dates that the event touches
           const d0 = DateTime.fromISO(ev.start_time);
           const d1 = DateTime.fromISO(ev.end_time);
           
-          // If the event spans multiple days, block those days
+          // Add the start date
+          eventDates.add(d0.toFormat('yyyy-MM-dd'));
+          
+          // If the event spans multiple days, add all affected dates
           if (d0.toFormat('yyyy-MM-dd') !== d1.toFormat('yyyy-MM-dd')) {
-            let current = d0;
+            let current = d0.plus({ days: 1 });
             while (current <= d1) {
               const dateStr = current.toFormat('yyyy-MM-dd');
               eventDates.add(dateStr);
               current = current.plus({ days: 1 });
             }
           }
-          // For single-day partial events, we don't block the date entirely
-          // The time-specific blocking will be handled elsewhere
+          
+          // NOTE: We now block dates with private events entirely at the date level
+          // The available-slots API will handle the detailed time-based blocking
         }
       });
       
