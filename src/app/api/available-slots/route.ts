@@ -236,12 +236,15 @@ export async function POST(request: Request) {
     const slotDuration = party_size <= 2 ? 90 : 120; // minutes
     const availableSlots: string[] = [];
     for (const slot of slots) {
-      // Build slot start/end
+      // Build slot start/end - FIXED: Create times in UTC to match private event times
       const [time, ampm] = slot.split(/(am|pm)/);
       let [hour, minute] = time.split(':').map(Number);
       if (ampm === 'pm' && hour !== 12) hour += 12;
       if (ampm === 'am' && hour === 12) hour = 0;
-      const slotStart = new Date(dateStr + `T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`);
+      
+      // CRITICAL FIX: Convert local venue time to UTC for comparison with private events
+      // Private events are stored in UTC, so we need slots in UTC too
+      const slotStart = new Date(`${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00-05:00`); // CDT offset
       const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
       
       // Check if this slot overlaps with any private event
