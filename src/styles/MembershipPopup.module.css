@@ -1,0 +1,207 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1000000;
+  padding: 16px;
+}
+
+.card {
+  width: 100%;
+  max-width: 640px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #23201C 0%, #2B2723 100%);
+  color: #ECEDE8;
+  border: 1px solid rgba(166, 148, 128, 0.45);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.cardEnter {
+  animation: slideIn 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cardExit {
+  animation: slideOut 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slideOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+.logoWrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 18px;
+}
+
+.logo {
+  width: 120px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: rgba(53, 53, 53, 0.8);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.close:hover { transform: scale(1.05); background: rgba(53, 53, 53, 0.95); }
+
+.eyebrow {
+  font-family: 'Montserrat, sans-serif';
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #BCA892;
+  padding: 18px 20px 0 20px;
+  text-align: center;
+}
+
+.headline {
+  font-family: 'IvyJournalThin, IvyJournal, serif';
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.1;
+  color: #ECEDE8;
+  padding: 8px 20px 0 20px;
+  text-align: center;
+}
+
+.accent {
+  color: #BCA892;
+}
+
+.subline {
+  font-family: 'Montserrat, sans-serif';
+  color: #CFCBC6;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 20px 0 20px;
+  text-align: center;
+}
+
+.body {
+  padding: 16px 20px 0 20px;
+  font-family: 'Montserrat, sans-serif';
+  font-weight: 400;
+  line-height: 1.5;
+  color: #ECEDE8;
+  text-align: center;
+}
+
+.body p { margin: 0 0 12px 0; }
+
+.infoLine {
+  margin-top: 6px;
+  margin-bottom: 4px;
+  color: #CFCBC6;
+  font-size: 13px;
+}
+
+.ctaLine {
+  font-family: 'Montserrat, sans-serif';
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.ctaLine a {
+  font-weight: 900;
+  text-decoration: underline;
+}
+
+.keyline {
+  font-size: 15px;
+}
+
+.highlight {
+  color: #ECEDE8;
+  background: linear-gradient(90deg, rgba(188,168,146,0.25), rgba(188,168,146,0));
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+.muted {
+  color: #B3AFAA;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px 20px 20px;
+  justify-content: center;
+}
+
+.cta {
+  background: #BCA892;
+  color: #23201C;
+  border-radius: 9999px;
+  padding: 10px 18px;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  transition: transform 120ms ease, background 120ms ease;
+  font-size: 18px;
+}
+
+.cta:hover { transform: translateY(-1px); background: #ECEDE8; }
+
+.secondary {
+  background: transparent;
+  color: #BCA892;
+  border: 1px solid #BCA892;
+  border-radius: 9999px;
+  padding: 10px 16px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.link {
+  color: #BCA892;
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .card { border-radius: 14px; }
+  .headline { font-size: 22px; }
+  .subline { font-size: 12px; }
+  .body { font-size: 0.95rem; }
+  .actions { flex-direction: column; align-items: stretch; }
+  .cta, .secondary { width: 100%; text-align: center; }
+  .cta { font-size: 16px; }
+  .logo { width: 100px; }
+  .ctaLine { font-size: 16px; }
+}
+
+

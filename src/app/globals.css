@@ -137,6 +137,11 @@ html {
   padding: 0;
 }
 
+/* Subtle text blur utility for teaser content */
+.text-blur {
+  filter: blur(3px);
+}
+
 /* Enhanced drawer modal fixes for iPad and mobile */
 /* High specificity to override any component-specific styles */
 .chakra-drawer__content,
