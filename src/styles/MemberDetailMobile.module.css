@@ -179,8 +179,9 @@
 
 .mobileAttributeItem {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   padding: 8px 0;
   border-bottom: 1px solid #eee;
   font-size: 14px;
@@ -193,17 +194,23 @@
 .mobileAttributeKey {
   font-weight: 600;
   color: #353535;
-  margin-right: 12px;
+  margin-right: 0;
+  margin-bottom: 2px;
+  display: block;
 }
 
 .mobileAttributeValue {
   color: #666;
   flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  width: 100%;
 }
 
 .mobileAttributeActions {
   display: flex;
   gap: 8px;
+  margin-top: 6px;
 }
 
 .mobileEditButton {

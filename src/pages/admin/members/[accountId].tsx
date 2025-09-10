@@ -928,13 +928,13 @@ export default function MemberDetailAdmin() {
                   borderRadius="100%"
                   border="2px solid white"
                   overflow="hidden"
-                  width="35%"
-                  height="35%"
+                  width="180px"
+                  height="180px"
                   boxShadow="0 2px 8px rgba(0,0,0,0.50)"
                   bg="#fff"
                 >
                   {member.photo ? (
-                    <img src={member.photo} alt={`${member.first_name} ${member.last_name}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={member.photo} alt={`${member.first_name} ${member.last_name}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }} />
                   ) : (
                     <Box width="100%"  height="100%" display="flex" alignItems="bottom" justifyContent="bottom" bg="#F7FAFC" >
                       
@@ -1249,13 +1249,13 @@ export default function MemberDetailAdmin() {
                           )}
                         </Flex>
                       ) : (
-                        <Flex key={attr.id} align="center" justify="space-between" mb={2} width="100%">
-                          <Flex w="75%" gap={50}>
-                            <Box minW="150px">
+                        <Flex key={attr.id} align="flex-start" justify="space-between" mb={2} width="100%">
+                          <Flex flex="1" gap={6} align="flex-start" minW={0}>
+                            <Box minW="150px" flexShrink={0}>
                               <Text fontWeight="semibold" color="#353535" fontSize="14px">{attr.key}</Text>
                             </Box>
-                            <Box>
-                              <Text fontSize="14px" color="#353535">{attr.value}</Text>
+                            <Box flex="1" minW={0}>
+                              <Text fontSize="14px" color="#353535" whiteSpace="pre-wrap" wordBreak="break-word">{attr.value}</Text>
                             </Box>
                           </Flex>
                           <Button
@@ -1774,7 +1774,7 @@ export default function MemberDetailAdmin() {
                         src={member.photo} 
                         alt={`${member.first_name} ${member.last_name}`}
                         className={styles.mobileMemberPhoto}
-                        style={{ objectFit: 'cover' }}
+                        style={{ objectFit: 'contain', objectPosition: 'center' }}
                       />
                     ) : (
                       <div className={styles.mobileMemberPhoto}>
