@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { supabaseAdmin } from '../../lib/supabase';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,21 +12,39 @@ export default async function handler(req, res) {
 
   try {
     console.log('Saving booking window:', { start, end });
-    
-    // Update the settings table with the new booking window dates
-    const { error } = await supabase
+
+    // Find existing settings row (there should be at most one)
+    const { data: existing, error: fetchError } = await supabaseAdmin
       .from('settings')
-      .update({ 
-        booking_start_date: start, 
-        booking_end_date: end 
-      })
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all records
-    
-    if (error) {
-      console.error('Supabase error:', error);
+      .select('id')
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error fetching settings:', fetchError);
       return res.status(500).json({ error: 'Failed to save booking window' });
     }
-    
+
+    if (fetchError && fetchError.code === 'PGRST116') {
+      // No settings row exists; create one with the booking window
+      const { error: insertError } = await supabaseAdmin
+        .from('settings')
+        .insert([{ booking_start_date: start, booking_end_date: end }]);
+      if (insertError) {
+        console.error('Error inserting settings:', insertError);
+        return res.status(500).json({ error: 'Failed to save booking window' });
+      }
+    } else {
+      // Update existing row by id
+      const { error: updateError } = await supabaseAdmin
+        .from('settings')
+        .update({ booking_start_date: start, booking_end_date: end })
+        .eq('id', existing.id);
+      if (updateError) {
+        console.error('Error updating settings:', updateError);
+        return res.status(500).json({ error: 'Failed to save booking window' });
+      }
+    }
+
     console.log('Booking window saved successfully');
     res.status(200).json({ success: true });
   } catch (error) {

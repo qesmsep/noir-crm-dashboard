@@ -141,6 +141,73 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
   }
 }
 
+// Function to send admin notification on reservation attempt (before creation)
+async function sendAdminAttemptNotification(attempt: {
+  start_time: string;
+  party_size: number;
+  event_type?: string;
+  notes?: string;
+  first_name?: string;
+  last_name?: string;
+  is_member?: boolean;
+}) {
+  try {
+    // Get admin notification phone and timezone from settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('settings')
+      .select('admin_notification_phone, timezone')
+      .single();
+
+    if (settingsError || !settings?.admin_notification_phone) {
+      return;
+    }
+
+    let adminPhone = settings.admin_notification_phone as string;
+    if (!adminPhone.startsWith('+')) {
+      adminPhone = '+1' + adminPhone;
+    }
+
+    const timezone = settings.timezone || 'America/Chicago';
+    const startDate = DateTime.fromISO(attempt.start_time, { zone: 'utc' }).setZone(timezone);
+    const formattedDate = startDate.toLocaleString({ month: '2-digit', day: '2-digit', year: 'numeric' });
+    const formattedTime = startDate.toLocaleString({ hour: 'numeric', minute: '2-digit', hour12: true });
+
+    const eventType = eventTypeLabels[attempt.event_type || ''] || attempt.event_type || 'Dining';
+    const memberStatus = attempt.is_member ? 'Yes' : 'No';
+
+    let namePart = 'Guest';
+    if (attempt.first_name || attempt.last_name) {
+      namePart = `${attempt.first_name || ''} ${attempt.last_name || ''}`.trim() || 'Guest';
+    }
+
+    let messageContent = `Noir Reservation attempt: ${namePart}, ${formattedDate} at ${formattedTime}, ${attempt.party_size} guests, ${eventType}, Member: ${memberStatus}`;
+    if (attempt.notes && attempt.notes.trim()) {
+      messageContent += `\nNotes: ${attempt.notes.trim()}`;
+    }
+
+    if (!process.env.OPENPHONE_API_KEY || !process.env.OPENPHONE_PHONE_NUMBER_ID) {
+      return;
+    }
+
+    await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY!,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: [adminPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: messageContent
+      })
+    });
+  } catch (error) {
+    // Non-blocking
+    console.error('Error sending admin attempt notification:', error);
+  }
+}
+
 
 
 // Helper function to calculate hold amount based on party size and settings
@@ -232,6 +299,21 @@ export async function POST(request: Request) {
         body.email = member.email;
         body.phone = member.phone;
       }
+    }
+
+    // Send admin attempt notification (non-blocking) before assigning a table or creating the reservation
+    try {
+      await sendAdminAttemptNotification({
+        start_time,
+        party_size,
+        event_type,
+        notes,
+        first_name: body.first_name,
+        last_name: body.last_name,
+        is_member
+      });
+    } catch (e) {
+      // ignore
     }
 
     // Handle table assignment
