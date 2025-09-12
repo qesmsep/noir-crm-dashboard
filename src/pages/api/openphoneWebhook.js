@@ -231,7 +231,7 @@ Requirements:
 - Accept synonyms: "for 2", "2 guests", "2 people", "party of 2", "- 2 guests", "2 guests", "2 people".
 - Handle dates in formats: MM/DD, M/D, MM/DD/YY, MM/DD/YYYY, Month Day (e.g., "July 4th"), Month Day Year, as well as relative dates ("today", "tomorrow", "this Friday", "next Monday"). Default missing year to 2025.
 - Handle times in 12‑hour or 24‑hour formats, with or without colon, with or without "at" (e.g., "6pm", "6:30 pm", "19:00").
-- Assum all times requested are PM. 
+- Assume all times requested are PM. 
 - Normalize output: date must be ISO (YYYY-MM-DD), time must be 24‑hour HH:MM.
 - Interpret all times in America/Chicago.
 - Handle mixed case and extra punctuation gracefully.

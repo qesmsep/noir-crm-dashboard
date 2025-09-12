@@ -183,6 +183,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     after: string | null;
   } | null>(null);
   const [showAlternativeTimesModal, setShowAlternativeTimesModal] = useState(false);
+  const isAutoAdvancingRef = React.useRef(false);
+  const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, boolean>>({});
 
   const cardElementRef = React.useRef<HTMLDivElement>(null);
 
@@ -267,9 +269,46 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     const isClosed = exceptionalClosures.includes(dateStr);
     const isPrivateEvent = privateEventDates.includes(dateStr);
     
-    // Only fetch if the date is available (base day OR exceptional open) AND not closed/private event
+    // Helper: Find next date with available slots via API
+    async function findNextDateWithAvailableSlots(start: DateTime, partySize: number) {
+      const maxDaysToCheck = 60;
+      for (let i = 1; i <= maxDaysToCheck; i++) {
+        const candidate = start.plus({ days: i });
+        const candidateStr = candidate.toFormat('yyyy-MM-dd');
+        try {
+          const res = await fetch('/api/available-slots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: candidateStr, party_size: partySize })
+          });
+          if (!res.ok) continue;
+          const data = await res.json();
+          const slots: string[] = Array.isArray(data?.slots) ? data.slots : [];
+          if (slots.length > 0) {
+            return { date: candidate, slots };
+          }
+        } catch (e) {
+          // ignore and continue
+        }
+      }
+      return null;
+    }
+
+    // If the current date is not selectable, auto-advance to the next date with available slots
     if (!date || (!isBaseDay && !isExceptionalOpen) || isClosed || isPrivateEvent) {
       setAvailableTimes([]);
+      if (form.party_size && form.party_size > 0 && !isAutoAdvancingRef.current) {
+        (async () => {
+          isAutoAdvancingRef.current = true;
+          const result = await findNextDateWithAvailableSlots(date || DateTime.now(), form.party_size!);
+          isAutoAdvancingRef.current = false;
+          if (result) {
+            setDate(result.date);
+            setAvailableTimes(result.slots);
+            setTime(result.slots[0] || '');
+          }
+        })();
+      }
       return;
     }
     
@@ -295,10 +334,71 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       const responseData = await res.json();
       console.log('🔍 ReservationForm: API response received', responseData);
       const { slots } = responseData;
-      setAvailableTimes(Array.isArray(slots) ? slots : []);
+      const normalizedSlots: string[] = Array.isArray(slots) ? slots : [];
+      if (normalizedSlots.length === 0 && !isAutoAdvancingRef.current) {
+        // Auto-advance to the next date with availability
+        isAutoAdvancingRef.current = true;
+        const result = await findNextDateWithAvailableSlots(date, form.party_size!);
+        isAutoAdvancingRef.current = false;
+        if (result) {
+          setDate(result.date);
+          setAvailableTimes(result.slots);
+          setTime(result.slots[0] || '');
+          return;
+        }
+      }
+      setAvailableTimes(normalizedSlots);
     }
     fetchAvailableTimes();
   }, [date, form.party_size, baseDays, internalBaseDays, exceptionalOpens, exceptionalClosures, privateEventDates]);
+
+  // Prefetch availability map for the booking window to gray out dates with no availability
+  useEffect(() => {
+    async function prefetchAvailability() {
+      if (!form.party_size || form.party_size < 1) return;
+      const start = bookingStartDate ? DateTime.fromJSDate(bookingStartDate) : DateTime.now();
+      const defaultEnd = DateTime.now().plus({ days: 60 });
+      const end = bookingEndDate ? DateTime.fromJSDate(bookingEndDate) : defaultEnd;
+      const maxEnd = DateTime.min(end, start.plus({ days: 60 }));
+      const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
+
+      const newMap: Record<string, boolean> = {};
+      let cursor = start.startOf('day');
+      while (cursor <= maxEnd) {
+        const dateStr = cursor.toFormat('yyyy-MM-dd');
+        const isExceptionalOpen = exceptionalOpens.includes(dateStr);
+        const isBaseDay = effectiveBaseDays.includes(cursor.weekday % 7);
+        const isClosed = exceptionalClosures.includes(dateStr);
+        const isPrivateEvent = privateEventDates.includes(dateStr);
+
+        if (!((isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent)) {
+          newMap[dateStr] = false;
+        } else {
+          try {
+            const res = await fetch('/api/available-slots', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ date: dateStr, party_size: form.party_size })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const slots: string[] = Array.isArray(data?.slots) ? data.slots : [];
+              newMap[dateStr] = slots.length > 0;
+            } else {
+              // If API fails, don't block date purely due to error
+              newMap[dateStr] = true;
+            }
+          } catch (e) {
+            newMap[dateStr] = true;
+          }
+        }
+        cursor = cursor.plus({ days: 1 });
+      }
+      setAvailabilityByDate(newMap);
+    }
+    prefetchAvailability();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.party_size, bookingStartDate, bookingEndDate, baseDays, internalBaseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
 
   // Set default time only when availableTimes changes and current time is not in slots
   useEffect(() => {
@@ -898,6 +998,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     // - on a base open day or exceptional open
                     // - not in exceptional closures (full day)
                     // - not in private event dates
+                    // - have availability for the selected party size
                     // Use Luxon for date formatting
                     const dateStr = DateTime.fromJSDate(d).toFormat('yyyy-MM-dd');
                     const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
@@ -905,8 +1006,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     const isBaseDay = effectiveBaseDays.includes(d.getDay());
                     const isClosed = exceptionalClosures.includes(dateStr);
                     const isPrivateEvent = privateEventDates.includes(dateStr);
-                    
-                    return (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent;
+                    const hasAvailability = availabilityByDate[dateStr] !== false; // default to true unless known false
+                    return (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent && hasAvailability;
                   }}
                   customInput={
                     <Input

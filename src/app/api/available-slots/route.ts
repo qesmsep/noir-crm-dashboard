@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseClient } from '../../../pages/api/supabaseClient';
+import { DateTime } from 'luxon';
+
+const DEBUG = process.env.DEBUG_AVAILABLE_SLOTS === '1' || process.env.NEXT_PUBLIC_DEBUG_AVAILABLE_SLOTS === '1';
+const DEBUG_SLOTS = process.env.DEBUG_SLOTS === '1';
 
 // Helper: generate time slots based on venue hours
 function generateTimeSlots(timeRanges: any[] = [{ start: '18:00', end: '23:00' }]) {
@@ -38,9 +42,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing date or party_size' }, { status: 400 });
     }
     
-    console.log('🚨 AVAILABLE SLOTS API CALLED:', { date, party_size });
-    console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
-    console.log('🚨 DEPLOYMENT TIMESTAMP:', new Date().toISOString());
+    if (DEBUG) console.log('🚨 AVAILABLE SLOTS API CALLED:', { date, party_size });
+    if (DEBUG) console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
+    if (DEBUG) console.log('🚨 DEPLOYMENT TIMESTAMP:', new Date().toISOString());
     
     const supabase = getSupabaseClient();
     
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
     const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);
     const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
     
-    console.log('Checking venue hours for:', { dateStr, dayOfWeek });
+    if (DEBUG) console.log('Checking venue hours for:', { dateStr, dayOfWeek });
     
     // Check for exceptional closure
     const { data: exceptionalClosure } = await supabase
@@ -59,41 +63,47 @@ export async function POST(request: Request) {
       .eq('date', dateStr)
       .maybeSingle();
     
-    console.log('Exceptional closure found:', exceptionalClosure);
+    if (DEBUG) console.log('Exceptional closure found:', exceptionalClosure);
     
     if (exceptionalClosure) {
       // If it's a full-day closure, return no slots
       if (exceptionalClosure.full_day || !exceptionalClosure.time_ranges) {
-        console.log('Full day exceptional closure, returning no slots');
+        if (DEBUG) console.log('Full day exceptional closure, returning no slots');
         return NextResponse.json({ slots: [] });
       }
     }
     
     // Check for private events that block this date
-    console.log('🔍 QUERYING PRIVATE EVENTS FOR DATE:', dateStr);
-    const privateEventQuery = `and(start_time.gte.${dateStr}T00:00:00Z,start_time.lte.${dateStr}T23:59:59Z),and(end_time.gte.${dateStr}T00:00:00Z,end_time.lte.${dateStr}T23:59:59Z),and(start_time.lte.${dateStr}T00:00:00Z,end_time.gte.${dateStr}T23:59:59Z)`;
-    console.log('🔍 QUERY STRING:', privateEventQuery);
+    if (DEBUG) console.log('🔍 QUERYING PRIVATE EVENTS FOR DATE (America/Chicago local day):', dateStr);
+    // Compute the local day's UTC window for America/Chicago
+    const startOfDayLocal = DateTime.fromISO(`${dateStr}T00:00:00`, { zone: 'America/Chicago' }).startOf('day');
+    const endOfDayLocal = startOfDayLocal.endOf('day');
+    const startOfDayUtc = startOfDayLocal.toUTC().toISO({ suppressMilliseconds: true });
+    const endOfDayUtc = endOfDayLocal.toUTC().toISO({ suppressMilliseconds: true });
+    if (DEBUG) console.log('🔍 UTC WINDOW FOR LOCAL DAY:', { startOfDayUtc, endOfDayUtc });
     
+    // Fetch events that overlap the local day (start < endOfDayUtc AND end > startOfDayUtc)
     const { data: privateEvents, error: privateEventsError } = await supabase
       .from('private_events')
       .select('start_time, end_time, full_day, title, status')
       .eq('status', 'active')
-      .or(privateEventQuery);
+      .lt('start_time', endOfDayUtc)
+      .gt('end_time', startOfDayUtc);
     
-    console.log('🎉 PRIVATE EVENTS QUERY RESULT:', { privateEvents, error: privateEventsError });
+    if (DEBUG) console.log('🎉 PRIVATE EVENTS QUERY RESULT:', { privateEvents, error: privateEventsError });
     
-    // Store debug info for API response
+    // Store debug info for API response (avoid referencing undefined variables)
     const debugInfo = {
-      privateEventsQuery: privateEventQuery,
+      privateEventsQueryWindow: { startOfDayUtc, endOfDayUtc },
       privateEventsFound: privateEvents ? privateEvents.length : 0,
       privateEventsError: privateEventsError,
-      privateEventsDetails: privateEvents ? privateEvents.map(ev => ({
+      privateEventsDetails: (privateEvents || []).map(ev => ({
         title: ev.title,
         start: ev.start_time,
         end: ev.end_time,
         full_day: ev.full_day,
         status: ev.status
-      })) : []
+      }))
     };
     
     if (privateEventsError) {
@@ -101,21 +111,21 @@ export async function POST(request: Request) {
     }
     
     if (privateEvents && privateEvents.length > 0) {
-      console.log('🎉 EVENTS FOUND - DETAILS:', debugInfo.privateEventsDetails);
+      if (DEBUG) console.log('🎉 EVENTS FOUND - DETAILS:', debugInfo.privateEventsDetails);
     } else {
-      console.log('❌ NO PRIVATE EVENTS FOUND FOR', dateStr);
+      if (DEBUG) console.log('❌ NO PRIVATE EVENTS FOUND FOR', dateStr);
     }
     
     if (privateEvents && privateEvents.length > 0) {
       // If there's a full-day private event, return no slots
       const fullDayEvent = privateEvents.find(ev => ev.full_day);
       if (fullDayEvent) {
-        console.log('Full day private event, returning no slots');
+        if (DEBUG) console.log('Full day private event, returning no slots');
         return NextResponse.json({ slots: [] });
       }
       
       // Store private events for later time slot filtering
-      console.log('Partial day private events found, will filter time slots');
+      if (DEBUG) console.log('Partial day private events found, will filter time slots');
     }
     
     // Check if it's a base day or exceptional open
@@ -132,12 +142,12 @@ export async function POST(request: Request) {
       .eq('date', dateStr)
       .maybeSingle();
     
-    console.log('Base hours found:', baseHours);
-    console.log('Exceptional open found:', exceptionalOpen);
+    if (DEBUG) console.log('Base hours found:', baseHours);
+    if (DEBUG) console.log('Exceptional open found:', exceptionalOpen);
     
     // If it's neither a base day nor an exceptional open, return no slots
     if ((!baseHours || baseHours.length === 0) && !exceptionalOpen) {
-      console.log('No venue hours configured for this day, returning no slots');
+      if (DEBUG) console.log('No venue hours configured for this day, returning no slots');
       return NextResponse.json({ slots: [] });
     }
     
@@ -151,11 +161,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error fetching tables' }, { status: 500 });
     }
     if (!tables || tables.length === 0) {
-      console.log('No tables available for party size:', party_size);
+      if (DEBUG) console.log('No tables available for party size:', party_size);
       return NextResponse.json({ slots: [] });
     }
     
-    console.log('Tables found:', tables);
+    if (DEBUG) console.log('Tables found:', tables);
     
     // Map to id, number, seats for frontend
     const mappedTables = (tables || []).map(t => ({
@@ -176,7 +186,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error fetching reservations' }, { status: 500 });
     }
     
-    console.log('Reservations found:', reservations);
+    if (DEBUG) console.log('Reservations found:', reservations);
     
     // 3. Generate time slots based on venue hours
     let timeRanges = [{ start: '18:00', end: '23:00' }]; // default
@@ -213,7 +223,7 @@ export async function POST(request: Request) {
       timeRanges = allRanges;
     }
     
-    console.log('Time ranges to use:', timeRanges);
+    if (DEBUG) console.log('Time ranges to use:', timeRanges);
     
     // Apply partial closures if they exist
     if (exceptionalClosure && exceptionalClosure.time_ranges) {
@@ -231,49 +241,45 @@ export async function POST(request: Request) {
     }
     
     const slots = generateTimeSlots(timeRanges);
-    console.log('Generated slots:', slots);
+    if (DEBUG) console.log('Generated slots:', slots);
     
     const slotDuration = party_size <= 2 ? 90 : 120; // minutes
     const availableSlots: string[] = [];
     for (const slot of slots) {
-      // Build slot start/end - FIXED: Create times in UTC to match private event times
+      // Build slot start/end in America/Chicago then convert to UTC for comparison
       const [time, ampm] = slot.split(/(am|pm)/);
       let [hour, minute] = time.split(':').map(Number);
       if (ampm === 'pm' && hour !== 12) hour += 12;
       if (ampm === 'am' && hour === 12) hour = 0;
-      
-      // CRITICAL FIX: Create slot times in the same timezone context as private events
-      // Private events are stored in UTC, so we need to convert local venue hours to UTC for comparison
-      // 6:00 PM CDT = 23:00 UTC (CDT is UTC-5)
-      const localTime = `${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-      const slotStart = new Date(localTime);
-      // Convert to UTC by adding the timezone offset (CDT is UTC-5, so add 5 hours)
-      slotStart.setHours(slotStart.getHours() + 5); // Convert CDT to UTC
+      const hourStr = hour.toString().padStart(2, '0');
+      const minuteStr = minute.toString().padStart(2, '0');
+      const slotLocal = DateTime.fromISO(`${dateStr}T${hourStr}:${minuteStr}:00`, { zone: 'America/Chicago' });
+      const slotStart = slotLocal.toUTC().toJSDate();
       const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
       
       // Check if this slot overlaps with any private event
-      console.log(`🔍 CHECKING SLOT ${slot} (${slotStart.toISOString()} - ${slotEnd.toISOString()})`);
+      if (DEBUG_SLOTS) console.log(`🔍 CHECKING SLOT ${slot} (${slotStart.toISOString()} - ${slotEnd.toISOString()})`);
       
       const hasPrivateEventOverlap = privateEvents && privateEvents.some(ev => {
-        console.log(`🔍 PROCESSING EVENT: "${ev.title}" | Status: ${ev.status} | Full Day: ${ev.full_day}`);
-        console.log(`🔍 RAW EVENT TIMES: start="${ev.start_time}" end="${ev.end_time}"`);
+        if (DEBUG_SLOTS) console.log(`🔍 PROCESSING EVENT: "${ev.title}" | Status: ${ev.status} | Full Day: ${ev.full_day}`);
+        if (DEBUG_SLOTS) console.log(`🔍 RAW EVENT TIMES: start="${ev.start_time}" end="${ev.end_time}"`);
         
         if (ev.full_day) {
-          console.log(`📅 SLOT ${slot} BLOCKED BY FULL-DAY EVENT: ${ev.title}`);
+          if (DEBUG_SLOTS) console.log(`📅 SLOT ${slot} BLOCKED BY FULL-DAY EVENT: ${ev.title}`);
           return true;
         }
         
         const evStart = new Date(ev.start_time);
         const evEnd = new Date(ev.end_time);
         
-        console.log(`🔍 PARSED EVENT TIMES:`, {
+        if (DEBUG_SLOTS) console.log(`🔍 PARSED EVENT TIMES:`, {
           evStartISO: evStart.toISOString(),
           evEndISO: evEnd.toISOString(),
           evStartLocal: evStart.toLocaleString(),
           evEndLocal: evEnd.toLocaleString()
         });
         
-        console.log(`🔍 SLOT TIMES:`, {
+        if (DEBUG_SLOTS) console.log(`🔍 SLOT TIMES:`, {
           slotStartISO: slotStart.toISOString(),
           slotEndISO: slotEnd.toISOString(),
           slotStartLocal: slotStart.toLocaleString(),
@@ -285,7 +291,7 @@ export async function POST(request: Request) {
         const condition2 = slotEnd > evStart;
         const overlap = condition1 && condition2;
         
-        console.log(`🔍 DETAILED OVERLAP CHECK FOR ${slot} vs "${ev.title}":`, {
+        if (DEBUG_SLOTS) console.log(`🔍 DETAILED OVERLAP CHECK FOR ${slot} vs "${ev.title}":`, {
           'slotStart < evEnd': `${slotStart.toISOString()} < ${evEnd.toISOString()} = ${condition1}`,
           'slotEnd > evStart': `${slotEnd.toISOString()} > ${evStart.toISOString()} = ${condition2}`,
           'FINAL OVERLAP': overlap,
@@ -296,10 +302,10 @@ export async function POST(request: Request) {
       });
       
       if (hasPrivateEventOverlap) {
-        console.log(`🚫 SLOT ${slot} BLOCKED BY PRIVATE EVENT`);
+        if (DEBUG_SLOTS) console.log(`🚫 SLOT ${slot} BLOCKED BY PRIVATE EVENT`);
         continue; // Skip this slot
       } else {
-        console.log(`✅ SLOT ${slot} AVAILABLE (no private event conflict)`);
+        if (DEBUG_SLOTS) console.log(`✅ SLOT ${slot} AVAILABLE (no private event conflict)`);
       }
       
       // For each table, check if it's free for this slot
@@ -319,8 +325,8 @@ export async function POST(request: Request) {
       }
     }
     
-    console.log('✅ FINAL AVAILABLE SLOTS:', availableSlots);
-    console.log('✅ TOTAL SLOTS RETURNED:', availableSlots.length);
+    if (DEBUG) console.log('✅ FINAL AVAILABLE SLOTS:', availableSlots);
+    if (DEBUG) console.log('✅ TOTAL SLOTS RETURNED:', availableSlots.length);
     return NextResponse.json({ 
       slots: availableSlots,
       timestamp: new Date().toISOString(),
