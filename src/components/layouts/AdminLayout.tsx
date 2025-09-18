@@ -53,6 +53,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/calendar', label: 'Reservations', icon: '📅' },
     { href: '/admin/event-calendar', label: 'Event Calendar', icon: '🎯' },
     { href: '/admin/communication', label: 'Communication', icon: '📝' },
+    { href: '/admin/website', label: 'Website', icon: '🌐' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
     { href: '/admin/admins', label: 'Admins', icon: '👑' },
   ];
