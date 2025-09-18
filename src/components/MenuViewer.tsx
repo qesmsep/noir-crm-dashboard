@@ -1,17 +1,8 @@
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { RefObject } from 'react';
 import Slider from 'react-slick';
-
-const menuImages = [
-  '/menu/Noir Menu - 01.png',
-  '/menu/Noir Menu - 02.png',
-  '/menu/Noir Menu - 03.png',
-  '/menu/Noir Menu - 04.png',
-  '/menu/Noir Menu - 05.png',
-  '/menu/Noir Menu - 06.png',
-];
 
 function Arrow({ direction, onClick }) {
   return (
@@ -32,9 +23,51 @@ function Arrow({ direction, onClick }) {
 }
 
 const MenuViewer: React.FC = () => {
-  const [loaded, setLoaded] = useState(Array(menuImages.length).fill(false));
+  const [menuImages, setMenuImages] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState<boolean[]>([]);
   const sliderRef = useRef<Slider>(null);
   const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    // Fetch all images from the menu directory
+    const fetchMenuImages = async () => {
+      try {
+        const response = await fetch('/api/menu-images');
+        if (response.ok) {
+          const images = await response.json();
+          setMenuImages(images);
+          setLoaded(Array(images.length).fill(false));
+        } else {
+          // Fallback to hardcoded list if API fails
+          const fallbackImages = [
+            '/menu/Noir Menu - 01.png',
+            '/menu/Noir Menu - 02.png',
+            '/menu/Noir Menu - 03.png',
+            '/menu/Noir Menu - 04.png',
+            '/menu/Noir Menu - 05.png',
+            '/menu/Noir Menu - 06.png',
+          ];
+          setMenuImages(fallbackImages);
+          setLoaded(Array(fallbackImages.length).fill(false));
+        }
+      } catch (error) {
+        console.error('Error fetching menu images:', error);
+        // Fallback to hardcoded list
+        const fallbackImages = [
+          '/menu/Noir Menu - 01.png',
+          '/menu/Noir Menu - 02.png',
+          '/menu/Noir Menu - 03.png',
+          '/menu/Noir Menu - 04.png',
+          '/menu/Noir Menu - 05.png',
+          '/menu/Noir Menu - 06.png',
+        ];
+        setMenuImages(fallbackImages);
+        setLoaded(Array(fallbackImages.length).fill(false));
+      }
+    };
+
+    fetchMenuImages();
+  }, []);
 
   const settings = {
     dots: true,
@@ -56,6 +89,15 @@ const MenuViewer: React.FC = () => {
       },
     ],
   };
+
+  // Show loading state while fetching images
+  if (menuImages.length === 0) {
+    return (
+      <div className="w-full flex flex-col items-center justify-center relative">
+        <div className="text-[#ECEDE8] text-lg">Loading menu...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col items-center justify-center relative">
