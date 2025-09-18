@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../../components/layouts/AdminLayout';
 import { Box, VStack, HStack, Text, Button, Heading, Divider, Alert, AlertIcon, useToast, Spinner, Image, Grid, GridItem } from '@chakra-ui/react';
-import { UploadIcon, DeleteIcon, ViewIcon } from '@chakra-ui/icons';
+import { DeleteIcon } from '@chakra-ui/icons';
 
 interface MenuFile {
   name: string;
