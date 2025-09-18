@@ -310,12 +310,12 @@ export default function Home() {
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center justify-center gap-8 sm:gap-12">
           <div className="flex-shrink-0 w-full max-w-sm sm:max-w-md lg:max-w-lg">
             <Image 
-              src="/images/LPR69138.JPG" 
+              src="/images/002-20250911-noir-fall-25-©LoveProjectPhotography.jpg" 
               alt="Cocktails" 
               width={450} 
               height={350} 
               className="rounded-2xl object-cover w-full h-64 sm:h-80 lg:h-96 shadow-xl"
-              style={{ objectPosition: 'bottom center' }}
+              style={{ objectPosition: 'center 65%' }}
             />
           </div>
           <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
