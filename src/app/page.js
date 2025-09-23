@@ -341,7 +341,7 @@ export default function Home() {
               106 W. 11th St, Kansas City, MO 64105
             </a>
             <div className="mb-4 sm:mb-6 text-[#353535] text-base sm:text-lg space-y-1">
-              <div>Thursday – 6pm-11pm</div>
+              <div>Thursday – 4pm-10pm</div>
               <div>Friday – 6pm-12am</div>
               <div>Saturday – 6pm-12am</div>
             </div>
