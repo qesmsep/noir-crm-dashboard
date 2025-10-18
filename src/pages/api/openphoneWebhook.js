@@ -873,6 +873,22 @@ export async function handler(req, res) {
     return res.status(200).json({ message: 'Sent waitlist invitation message' });
   }
 
+  // Handle "INVITATION" messages for membership signup
+  if (text.toLowerCase().trim() === 'invitation') {
+    console.log('Processing INVITATION message for membership signup');
+    const invitationMessage = `Thank you for requesting an invitation to join Noir and we are excited to formally invite you to become a member of Noir.
+
+To officially join, please complete the following:
+
+https://skylineandco.typeform.com/noirkc-signup#auth_code=tw
+
+The link expires in 24 hours, so please respond to this text with any questions.
+
+Thank you.`;
+    await sendSMS(from, invitationMessage);
+    return res.status(200).json({ message: 'Sent invitation signup message' });
+  }
+
   // Handle "BALANCE" messages for ledger PDF
   if (text.toLowerCase().trim() === 'balance') {
     console.log('Processing BALANCE message for ledger PDF');
