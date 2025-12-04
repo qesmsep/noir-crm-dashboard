@@ -39,11 +39,23 @@
   align-items: center;
 }
 
+.brandLink :global(img) {
+  width: 72px !important;
+  height: 36px !important;
+  max-width: 72px !important;
+  max-height: 36px !important;
+}
+
+.logoImage {
+  max-width: 100%;
+  height: auto;
+}
+
 .navIcons {
   flex: 1;
   display: flex;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   overflow-x: auto;
   padding: 0 1rem;
 }
@@ -53,17 +65,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  min-width: 64px;
-  height: 54px;
-  border-radius: 16px;
+  width: 48px;
+  min-width: 48px;
+  height: 44px;
+  border-radius: 10px;
   border: 1px solid transparent;
   background: #F7F6F2;
   color: #353535;
   text-decoration: none;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  gap: 0.15rem;
+  gap: 0.08rem;
   transition: all 0.2s ease;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
 }
@@ -79,16 +91,19 @@
 }
 
 .navIcon {
-  font-size: 1.15rem;
+  font-size: 0.95rem;
 }
 
 .navLabel {
-  font-size: 0.65rem;
+  font-size: 0.55rem;
   letter-spacing: 0.02em;
 }
 
 .userControls {
-  position: relative;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
   display: flex;
   align-items: center;
 }
@@ -101,8 +116,8 @@
 }
 
 .userAvatar {
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: #353535;
   color: #F7F6F2;
@@ -110,12 +125,19 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  font-size: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.userAvatar:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
 }
 
 .userMenu {
   position: absolute;
-  top: 52px;
+  bottom: 72px;
   right: 0;
   background: #fff;
   border-radius: 14px;
@@ -123,6 +145,7 @@
   border: 1px solid rgba(0, 0, 0, 0.04);
   min-width: 160px;
   overflow: hidden;
+  z-index: 1000;
 }
 
 .userMenuItem {
@@ -165,22 +188,120 @@
 
 @media (max-width: 768px) {
   .topNav {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.5rem;
+    min-height: auto;
+    max-height: 56px;
+  }
+
+  .brand {
+    flex-shrink: 0;
+  }
+
+  .brandLink {
+    display: inline-flex;
+  }
+
+  .brandLink :global(img) {
+    width: 56px !important;
+    height: 28px !important;
+    max-width: 56px !important;
+    max-height: 28px !important;
   }
 
   .navIcons {
-    order: 2;
-    justify-content: flex-start;
+    flex: 1;
+    min-width: 0;
+    gap: 0.3rem;
+    padding: 0 0.4rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+  }
+
+  .navIcons::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navIconButton {
+    width: 50px;
+    min-width: 50px;
+    height: 46px;
+    border-radius: 10px;
+    gap: 0.08rem;
+    flex-shrink: 0;
+  }
+
+  .navIcon {
+    font-size: 0.95rem;
+  }
+
+  .navLabel {
+    font-size: 0.58rem;
+    line-height: 1;
+    white-space: nowrap;
   }
 
   .userControls {
-    order: 1;
-    align-self: flex-end;
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .userAvatar {
+    width: 48px;
+    height: 48px;
+    font-size: 1.1rem;
+  }
+
+  .userMenu {
+    bottom: 64px;
   }
 
   .main {
     padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .topNav {
+    padding: 0.35rem 0.4rem;
+    gap: 0.3rem;
+    max-height: 52px;
+  }
+
+  .brandLink :global(img) {
+    width: 48px !important;
+    height: 24px !important;
+    max-width: 48px !important;
+    max-height: 24px !important;
+  }
+
+  .navIconButton {
+    width: 46px;
+    min-width: 46px;
+    height: 42px;
+    gap: 0.05rem;
+  }
+
+  .navIcon {
+    font-size: 0.9rem;
+  }
+
+  .navLabel {
+    font-size: 0.55rem;
+  }
+
+  .userAvatar {
+    width: 44px;
+    height: 44px;
+    font-size: 1rem;
+  }
+
+  .userMenu {
+    bottom: 60px;
   }
 }

@@ -147,7 +147,14 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
       <header className={styles.topNav}>
         <div className={styles.brand}>
           <Link href="/admin/dashboard-v2" className={styles.brandLink}>
-            <Image src="/images/noir-wedding-day.png" alt="Noir Logo" width={96} height={48} priority style={{ objectFit: 'contain' }} />
+            <Image 
+              src="/images/noir-wedding-day.png" 
+              alt="Noir Logo" 
+              width={72} 
+              height={36} 
+              priority 
+              style={{ objectFit: 'contain' }}
+            />
           </Link>
         </div>
 
@@ -178,30 +185,30 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
             </Link>
           ))}
         </nav>
-
-        <div className={styles.userControls}>
-          <button
-            className={styles.userButton}
-            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-          >
-            <span className={styles.userAvatar}>{initials}</span>
-          </button>
-          {isUserMenuOpen && (
-            <div className={styles.userMenu}>
-              <Link href="/admin/profile" className={styles.userMenuItem}>
-                Profile
-              </Link>
-              <button onClick={handleSignOut} className={styles.userMenuItem}>
-                Sign Out
-              </button>
-            </div>
-          )}
-        </div>
       </header>
 
       <main className={`${styles.main} ${isFullScreen ? styles.fullScreen : ''}`}>
         <div className={styles.content}>{children}</div>
       </main>
+
+      <div className={styles.userControls}>
+        <button
+          className={styles.userButton}
+          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+        >
+          <span className={styles.userAvatar}>{initials}</span>
+        </button>
+        {isUserMenuOpen && (
+          <div className={styles.userMenu}>
+            <Link href="/admin/profile" className={styles.userMenuItem}>
+              Profile
+            </Link>
+            <button onClick={handleSignOut} className={styles.userMenuItem}>
+              Sign Out
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

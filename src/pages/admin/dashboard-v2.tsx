@@ -320,16 +320,6 @@ export default function DashboardV2() {
   const saturdaySeats = saturdayReservations.reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
   const saturdayPrivateEvent = getPrivateEventForDay(nextSaturday);
 
-  const navIcons = [
-    { icon: '📊', label: 'Dashboard', href: '/admin/dashboard-v2' },
-    { icon: '📅', label: 'Calendar', href: '/admin/calendar' },
-    { icon: '📇', label: 'Contacts', href: '/admin/members' },
-    { icon: '📑', label: 'Reports', href: '/admin/analytics' },
-    { icon: '🧭', label: 'Funnel', href: '/admin/waitlist' },
-    { icon: '👥', label: 'Staff', href: '/admin/members' },
-    { icon: '⚙️', label: 'Settings', href: '/admin/settings' },
-  ];
-
   const quickActions = [
     { icon: '➕', label: 'New Lead', href: '/admin/waitlist' },
     { icon: '🎉', label: 'Add Event', href: '/admin/calendar' },
@@ -412,23 +402,6 @@ export default function DashboardV2() {
   return (
     <AdminLayout>
       <div className={styles.dashboardContainer}>
-        <div className={styles.topNavBar}>
-          <div className={styles.brandMark}>
-            <span>✦</span>
-            <span>Noir</span>
-          </div>
-          <div className={styles.navIcons}>
-            {navIcons.map((item) => (
-              <Link key={item.label} href={item.href} className={styles.navIconButton} title={item.label}>
-                {item.icon}
-              </Link>
-            ))}
-          </div>
-          <div className={styles.profileChip}>
-            {stats.members[0]?.first_name?.[0]?.toUpperCase() || 'N'}
-          </div>
-        </div>
-
         <div className={styles.searchActionsRow}>
           <div className={styles.searchInputWrapper}>
             <span className={styles.searchIcon}>🔎</span>
