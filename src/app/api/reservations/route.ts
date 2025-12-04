@@ -4,6 +4,8 @@ import { formatDateTime } from '../../../utils/dateUtils';
 import Stripe from 'stripe';
 import { getHoldFeeConfig, getHoldAmount } from '../../../utils/holdFeeUtils';
 import { DateTime } from 'luxon';
+import { Logger } from '../../../lib/logger';
+import { reservationSchema, validateWithSchema } from '../../../lib/validations';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -26,9 +28,7 @@ const eventTypeLabels: Record<string, string> = {
 // Function to send admin notification
 async function sendAdminNotification(reservationId: string, action: 'created' | 'modified') {
   try {
-    console.log('=== ADMIN NOTIFICATION DEBUG ===');
-    console.log('Reservation ID:', reservationId);
-    console.log('Action:', action);
+    Logger.info('Sending admin notification', { reservationId, action });
     
     // Get reservation details
     const { data: reservation, error: reservationError } = await supabase
@@ -43,11 +43,11 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       .single();
 
     if (reservationError || !reservation) {
-      console.error('Error fetching reservation for admin notification:', reservationError);
+      Logger.error('Error fetching reservation for admin notification', reservationError, { reservationId });
       return;
     }
 
-    console.log('Reservation found:', reservation);
+    Logger.debug('Reservation found for admin notification', { reservationId });
 
     // Get admin notification phone and timezone from settings
     const { data: settings, error: settingsError } = await supabase
@@ -55,17 +55,12 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       .select('admin_notification_phone, timezone')
       .single();
 
-    console.log('Settings found:', settings);
-    console.log('Settings error:', settingsError);
-
     if (settingsError || !settings?.admin_notification_phone) {
-      console.log('❌ Admin notification phone not configured');
-      console.log('Settings data:', settings);
-      console.log('Settings error:', settingsError);
+      Logger.warn('Admin notification phone not configured', { settingsError, settings });
       return;
     }
 
-    console.log('✅ Admin notification phone configured:', settings.admin_notification_phone);
+    Logger.debug('Admin notification phone configured', { phone: settings.admin_notification_phone });
 
     // Format admin phone number (add +1 if not present)
     let adminPhone = settings.admin_notification_phone;
@@ -104,10 +99,11 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       messageContent += `\nSpecial Requests: ${reservation.notes.trim()}`;
     }
 
-    console.log('Message content:', messageContent);
-    console.log('Admin phone:', adminPhone);
-    console.log('OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
-    console.log('OpenPhone Phone Number ID exists:', !!process.env.OPENPHONE_PHONE_NUMBER_ID);
+    Logger.debug('Sending admin notification SMS', {
+      adminPhone,
+      hasApiKey: !!process.env.OPENPHONE_API_KEY,
+      hasPhoneNumberId: !!process.env.OPENPHONE_PHONE_NUMBER_ID
+    });
 
     // Send SMS using OpenPhone API (same as existing sendText.js)
     const response = await fetch('https://api.openphone.com/v1/messages', {
@@ -124,20 +120,19 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       })
     });
 
-    console.log('OpenPhone response status:', response.status);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Failed to send admin notification SMS:', errorText);
+      Logger.error('Failed to send admin notification SMS', new Error(errorText), {
+        status: response.status,
+        reservationId
+      });
       return;
     }
 
     const responseData = await response.json();
-    console.log('✅ Admin notification sent successfully');
-    console.log('OpenPhone response:', responseData);
-    console.log('=== END ADMIN NOTIFICATION DEBUG ===');
+    Logger.info('Admin notification sent successfully', { reservationId, messageId: responseData.id });
   } catch (error) {
-    console.error('Error in sendAdminNotification:', error);
+    Logger.error('Error in sendAdminNotification', error, { reservationId, action });
   }
 }
 
@@ -217,6 +212,8 @@ async function getHoldAmountFromSettings(partySize: number): Promise<number> {
 }
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get('x-request-id') || 'unknown';
+
   try {
     const body = await request.json();
     const {
@@ -239,8 +236,29 @@ export async function POST(request: Request) {
       send_confirmation
     } = body;
 
+    Logger.info('Creating new reservation', { requestId, party_size, is_member });
+
+    // Validate reservation data with Zod (only core fields for now)
+    const coreReservationData = {
+      start_time,
+      end_time,
+      party_size,
+      event_type,
+      notes,
+    };
+
+    const validation = validateWithSchema(reservationSchema.partial(), coreReservationData);
+    if (!validation.success) {
+      Logger.warn('Reservation validation failed', { requestId, errors: validation.errors });
+      return NextResponse.json(
+        { error: 'Invalid reservation data', details: validation.errors },
+        { status: 400 }
+      );
+    }
+
     // Validate required fields
     if (!start_time || !end_time || !party_size || !phone) {
+      Logger.warn('Missing required fields for reservation', { requestId });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

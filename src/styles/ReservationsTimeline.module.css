@@ -1,0 +1,115 @@
+/* Reservations Timeline Styles */
+
+.timelineWrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.calendarContainer {
+  width: 100%;
+  height: 100%;
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* FullCalendar overrides */
+.calendarContainer :global(.fc) {
+  font-family: 'Montserrat', sans-serif;
+}
+
+.calendarContainer :global(.fc-resource-area) {
+  background-color: #ecede8;
+  color: white;
+  vertical-align: middle;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  min-width: 80px;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.calendarContainer :global(.fc-resource-area .fc-resource-title) {
+  color: white;
+  vertical-align: middle;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  padding: 8px 2px;
+  text-align: center;
+}
+
+.calendarContainer :global(.fc-timeline-header),
+.calendarContainer :global(.fc-timeline-body) {
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: #ecede8;
+}
+
+.calendarContainer :global(.fc-event) {
+  border: 0 !important;
+  outline: 0 !important;
+  padding: 0px !important;
+  border-radius: 5px !important;
+  box-shadow: 5px 5px 15px 0.5px !important;
+  margin: 0px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.reservationEvent {
+  font-family: 'Montserrat', sans-serif;
+  white-space: normal;
+  margin: 0px;
+  display: center;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  font-size: 14px;
+  border-radius: 4px;
+  padding: 0 2px;
+  border: 1px solid #353535;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.blockingEvent {
+  font-family: 'Montserrat', sans-serif;
+  white-space: normal;
+  margin: 0px;
+  display: center;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  font-size: 14px;
+  background: #6b7280;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 0 2px;
+  border: 1px solid #6b7280;
+  cursor: not-allowed;
+  user-select: none;
+  touch-action: manipulation;
+  opacity: 0.8;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .reservationEvent {
+    min-height: 28px;
+    font-size: 12px;
+    padding: 0 4px;
+  }
+
+  .blockingEvent {
+    min-height: 28px;
+    font-size: 12px;
+    padding: 0 4px;
+  }
+
+  .calendarContainer :global(.fc-resource-area) {
+    min-width: 40px;
+    width: 40px;
+  }
+}
+
+

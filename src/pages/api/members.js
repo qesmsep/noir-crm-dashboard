@@ -1,4 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { ApiResponse } from '../../lib/api-response';
+import { memberSchema, updateMemberSchema, validateWithSchema } from '../../lib/validations';
+import { Logger } from '../../lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -36,29 +39,41 @@ function getMonthlyDues(membership) {
 }
 
 export default async function handler(req, res) {
+  const requestId = req.headers['x-request-id'] || 'unknown';
+
   if (req.method === 'GET') {
     try {
+      Logger.info('Fetching all members', { requestId });
       const { data, error } = await supabase
         .from('members')
         .select('*');
       if (error) throw error;
-      return res.status(200).json({ data });
+      return ApiResponse.success(res, data, 'Members retrieved successfully');
     } catch (error) {
-      return res.status(500).json({ error: error.message });
+      Logger.error('Error fetching members', error, { requestId });
+      return ApiResponse.error(res, error, requestId);
     }
   }
   
   if (req.method === 'PUT') {
     try {
       const { member_id, ...updateData } = req.body;
-      
+
       if (!member_id) {
-        return res.status(400).json({ error: 'Missing required field: member_id' });
+        return ApiResponse.badRequest(res, 'Missing required field: member_id', requestId);
+      }
+
+      // Validate update data with Zod
+      const validation = validateWithSchema(updateMemberSchema, updateData);
+      if (!validation.success) {
+        return ApiResponse.validationError(res, validation.errors, 'Invalid member data', requestId);
       }
 
       // Clean the update data to only include allowed fields
-      const cleanedData = cleanMemberObject(updateData);
-      
+      const cleanedData = cleanMemberObject(validation.data);
+
+      Logger.info('Updating member', { requestId, member_id, fields: Object.keys(cleanedData) });
+
       const { data, error } = await supabase
         .from('members')
         .update(cleanedData)
@@ -67,14 +82,14 @@ export default async function handler(req, res) {
         .single();
 
       if (error) {
-        console.error('Error updating member:', error);
+        Logger.error('Error updating member', error, { requestId, member_id });
         throw error;
       }
 
-      return res.status(200).json({ success: true, data });
+      return ApiResponse.success(res, data, 'Member updated successfully');
     } catch (error) {
-      console.error('Error updating member:', error);
-      return res.status(500).json({ error: error.message });
+      Logger.error('Error updating member', error, { requestId });
+      return ApiResponse.error(res, error, requestId);
     }
   }
 
@@ -82,10 +97,12 @@ export default async function handler(req, res) {
     try {
       // Extract member_id from the URL path
       const member_id = req.url.split('/').pop();
-      
+
       if (!member_id) {
-        return res.status(400).json({ error: 'Missing required field: member_id' });
+        return ApiResponse.badRequest(res, 'Missing required field: member_id', requestId);
       }
+
+      Logger.info('Deactivating member', { requestId, member_id });
 
       // Instead of deleting, set a deactivated flag
       const { error } = await supabase
@@ -94,56 +111,76 @@ export default async function handler(req, res) {
         .eq('member_id', member_id);
 
       if (error) {
-        console.error('Error deactivating member:', error);
+        Logger.error('Error deactivating member', error, { requestId, member_id });
         throw error;
       }
 
-      return res.status(200).json({ success: true, message: 'Member deactivated successfully' });
+      return ApiResponse.success(res, { member_id }, 'Member deactivated successfully');
     } catch (error) {
-      console.error('Error deactivating member:', error);
-      return res.status(500).json({ error: error.message });
+      Logger.error('Error deactivating member', error, { requestId });
+      return ApiResponse.error(res, error, requestId);
     }
   }
   
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return ApiResponse.methodNotAllowed(res, ['GET', 'POST', 'PUT', 'DELETE'], requestId);
   }
 
   try {
     const { account_id, primary_member, secondary_member } = req.body;
 
     if (!account_id || !primary_member) {
-      return res.status(400).json({ error: 'Missing required fields: account_id and primary_member' });
+      return ApiResponse.badRequest(res, 'Missing required fields: account_id and primary_member', requestId);
     }
 
-    // The AddMemberModal already cleans and structures the data
-    // We just need to insert it into the database
+    // Validate primary member data with Zod
+    const primaryValidation = validateWithSchema(memberSchema, primary_member);
+    if (!primaryValidation.success) {
+      return ApiResponse.validationError(res, primaryValidation.errors, 'Invalid primary member data', requestId);
+    }
+
+    // Validate secondary member if provided
+    if (secondary_member) {
+      const secondaryValidation = validateWithSchema(memberSchema, secondary_member);
+      if (!secondaryValidation.success) {
+        return ApiResponse.validationError(res, secondaryValidation.errors, 'Invalid secondary member data', requestId);
+      }
+    }
+
+    Logger.info('Creating new member(s)', {
+      requestId,
+      account_id,
+      has_secondary: !!secondary_member
+    });
+
+    // Insert primary member
     const { data: primaryMemberData, error: primaryError } = await supabase
       .from('members')
-      .insert([primary_member])
+      .insert([primaryValidation.data])
       .select()
       .single();
 
     if (primaryError) {
-      console.error('Error inserting primary member:', primaryError);
+      Logger.error('Error inserting primary member', primaryError, { requestId, account_id });
       throw primaryError;
     }
 
     // If there's a secondary member, add them too
     if (secondary_member) {
+      const secondaryValidation = validateWithSchema(memberSchema, secondary_member);
       const { error: secondaryError } = await supabase
         .from('members')
-        .insert([secondary_member]);
+        .insert([secondaryValidation.data]);
 
       if (secondaryError) {
-        console.error('Error inserting secondary member:', secondaryError);
+        Logger.error('Error inserting secondary member', secondaryError, { requestId, account_id });
         throw secondaryError;
       }
     }
 
-    return res.status(200).json({ success: true, data: primaryMemberData });
+    return ApiResponse.success(res, primaryMemberData, 'Member created successfully');
   } catch (error) {
-    console.error('Error creating member:', error);
-    return res.status(500).json({ error: error.message });
+    Logger.error('Error creating member', error, { requestId });
+    return ApiResponse.error(res, error, requestId);
   }
 } 

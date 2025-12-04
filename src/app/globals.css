@@ -887,6 +887,22 @@ button:hover {
   z-index: 999999 !important;
 }
 
+/* Match drawer approach - simple, direct CSS rules for modals */
+.chakra-modal__overlay {
+  z-index: 99999998 !important;
+  position: fixed !important;
+}
+
+.chakra-modal__content-container {
+  z-index: 99999999 !important;
+  position: fixed !important;
+}
+
+.chakra-modal__content {
+  z-index: 99999999 !important;
+  position: relative !important;
+}
+
 /* Force the drawer to be above everything */
 [data-overlay] {
   z-index: 999998 !important;
@@ -926,6 +942,261 @@ button:hover {
   will-change: transform !important;
   transform-style: preserve-3d !important;
   backface-visibility: hidden !important;
+}
+
+/* CRITICAL: Ensure Chakra UI modals appear above ALL content */
+/* Match drawer z-index (999999) to ensure consistent stacking */
+/* Calendar header z-index: 10, AdminLayout topNav z-index: 100 */
+[data-overlay]:not(.chakra-drawer__overlay),
+[data-overlay][aria-hidden="false"]:not(.chakra-drawer__overlay),
+div[data-overlay]:not(.chakra-drawer__overlay),
+.chakra-modal__overlay,
+.chakra-modal__overlay[data-state="open"],
+[data-chakra-modal="true"] > [data-overlay] {
+  z-index: 99999998 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* Modal content container - must be centered */
+/* Target all possible Chakra Modal container structures */
+[role="dialog"]:not(.chakra-drawer__content),
+[role="dialog"][data-state="open"]:not(.chakra-drawer__content),
+.chakra-modal__content-container,
+.chakra-modal__content-container[data-state="open"],
+[data-chakra-modal="true"] [role="dialog"],
+[data-chakra-modal="true"] > div:last-child,
+div[class*="chakra-modal__content-container"] {
+  z-index: 99999999 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.chakra-modal__content-container > *,
+[role="dialog"]:not(.chakra-drawer__content) > *,
+div[class*="chakra-modal__content-container"] > * {
+  pointer-events: auto !important;
+}
+
+.chakra-modal__content,
+.chakra-modal__content[data-state="open"],
+[role="dialog"]:not(.chakra-drawer__content) > div:first-child,
+div[class*="chakra-modal__content"]:not([class*="container"]) {
+  z-index: 99999999 !important;
+  position: relative !important;
+  margin: 0 !important;
+  max-width: 500px !important;
+  width: 90vw !important;
+  transform: none !important;
+  top: auto !important;
+  left: auto !important;
+  pointer-events: auto !important;
+}
+
+/* Force calendar header and nav to stay below modals */
+header.header {
+  z-index: 10 !important;
+}
+
+nav.nav {
+  z-index: 10 !important;
+}
+
+/* Ensure modal portal containers appear above everything */
+/* CRITICAL: Use position: fixed to escape stacking contexts, just like drawers! */
+body > div[data-overlay],
+body > div:has([role="dialog"]),
+body > div[id*="chakra-modal"],
+body > div[class*="chakra-modal"],
+body > div:has([data-chakra-modal]),
+body > div[id^="chakra-portal"] {
+  z-index: 99999999 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  pointer-events: none !important;
+}
+
+/* AGGRESSIVE: Force ALL modal portal roots to appear above everything */
+body > div:last-child:has([data-overlay]),
+body > div:last-child:has([role="dialog"]),
+body > div[id*="portal"]:has([role="dialog"]),
+body > div[id="reservation-modal-portal-root"] {
+  z-index: 99999999 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  pointer-events: none !important;
+}
+
+/* Force modal overlay to highest z-index */
+body > div[id="reservation-modal-portal-root"] [data-overlay],
+body > div[id="reservation-modal-portal-root"] .chakra-modal__overlay {
+  z-index: 99999998 !important;
+  pointer-events: auto !important;
+}
+
+/* Force modal content to highest z-index */
+body > div[id="reservation-modal-portal-root"] [role="dialog"],
+body > div[id="reservation-modal-portal-root"] .chakra-modal__content {
+  z-index: 99999999 !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure AdminLayout topNav stays below modals */
+.topNav,
+header.topNav,
+.topNav[class*="topNav"] {
+  z-index: 100 !important;
+  position: sticky !important;
+}
+
+/* CRITICAL: Ensure calendar header and nav stay below modals */
+/* Calendar header should be below modal (z-index: 10) */
+.calendar-container,
+.header,
+.nav,
+.viewButtons {
+  position: relative;
+  z-index: 1 !important;
+}
+
+/* FullCalendar elements should stay below modals - AGGRESSIVE */
+.fc,
+.fc-timeline-header,
+.fc-scrollgrid,
+.fc-timegrid,
+.fc-sticky,
+[class*="fc-sticky"],
+[class*="fc-scroller"],
+[class*="fc-timeline"],
+[class*="fc-timeline"] *,
+[class*="fc-resource"],
+[class*="fc-event"] {
+  z-index: 1 !important;
+  position: relative !important;
+}
+
+.fc *,
+.fc-timeline *,
+.fc-timeline-body *,
+.fc-timeline-header * {
+  z-index: auto !important;
+  isolation: auto !important;
+}
+
+/* Prevent FullCalendar from creating stacking contexts */
+.fc,
+.fc-scrollgrid,
+.fc-timeline,
+.fc-timeline-body,
+.fc-timeline-header {
+  isolation: auto !important;
+  contain: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* FullCalendar sticky headers - limit their z-index */
+.fc-timeline-header,
+.fc-sticky,
+[class*="fc-sticky"] {
+  position: sticky !important;
+  z-index: 10 !important;
+}
+
+/* CRITICAL: FullCalendar drag/drop elements must stay below modals */
+.fc-event-dragging,
+.fc-event-selected,
+.fc-event.fc-event-dragging,
+.fc-event[style*="z-index"],
+.fc-event[style*="zIndex"],
+.fc-event[style*="z-index"] * {
+  z-index: 999 !important; /* Below modals (999999) */
+}
+
+/* Prevent FullCalendar from creating stacking contexts above modal */
+.fc,
+.fc *,
+.fc-scrollgrid,
+.fc-timeline,
+.fc-timeline-body,
+.fc-timeline-header {
+  isolation: auto !important;
+  contain: none !important;
+}
+
+/* AGGRESSIVE: Force timeline containers to stay below modals */
+[class*="timelineWrapper"],
+[class*="calendarContainer"],
+[class*="timelineContainer"] {
+  position: relative !important;
+  z-index: 1 !important;
+  isolation: auto !important;
+  contain: none !important;
+}
+
+/* Ensure timeline containers don't create stacking contexts */
+.reservationsTimeline,
+.reservationsTimeline *:not([role="dialog"]):not([data-overlay]) {
+  z-index: auto !important;
+  isolation: auto !important;
+}
+
+/* NUCLEAR OPTION: Force reservation modal to highest z-index */
+.reservation-modal-overlay,
+.reservation-modal-overlay[data-state="open"] {
+  z-index: 99999998 !important;
+  position: fixed !important;
+}
+
+.reservation-modal-content,
+.reservation-modal-content[data-state="open"] {
+  z-index: 99999999 !important;
+  position: relative !important;
+}
+
+/* Force the modal container to appear above everything */
+body > div:has(.reservation-modal-overlay),
+body > div:has(.reservation-modal-content) {
+  z-index: 99999999 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* FullCalendar drag mirror/preview elements */
+.fc-event-mirror,
+[class*="fc-event-mirror"],
+[class*="fc-drag-mirror"] {
+  z-index: 999 !important; /* Below modals */
+}
+
+/* Force calendar header to stay below modals */
+header.header,
+nav.nav {
+  z-index: 10 !important;
+  position: sticky !important;
 }
 
 /* Overlay fade animation */

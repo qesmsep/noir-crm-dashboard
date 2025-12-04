@@ -4,7 +4,7 @@ import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
 import DayReservationsDrawer from './DayReservationsDrawer';
-import NewReservationDrawer from './NewReservationDrawer';
+import NewReservationModal from './NewReservationModal';
 import { fromUTC, toUTC, formatDateTime, formatTime, formatDate, isSameDay } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
@@ -61,6 +61,7 @@ interface FullCalendarTimelineProps {
   onReservationClick?: (reservationId: string) => void;
   currentDate?: Date;
   onDateChange?: (date: Date) => void;
+  onSlotClick?: (slotInfo: { date: Date; resourceId: string }) => void;
 }
 
 
@@ -106,7 +107,7 @@ const isPhone = () => {
   return isMobile && !isTablet;
 };
 
-const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick, currentDate: propCurrentDate, onDateChange }) => {
+const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick, currentDate: propCurrentDate, onDateChange, onSlotClick }) => {
   // Private Event Table expand/collapse state
   const [expandedId, setExpandedId] = useState<string | null>(null);
   function toggleExpand(id: string) {
@@ -193,10 +194,33 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         const startDate = now.toISOString();
         const endDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString();
         
-        const res = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
-        if (!res.ok) throw new Error('Failed to fetch private events');
-        const privateEventsData = await res.json();
-        setPrivateEvents(privateEventsData.data || []);
+        // Fetch both private events and Minaka events
+        const [privateEventsRes, minakaEventsRes] = await Promise.all([
+          fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`),
+          fetch('/api/minaka-events').catch(() => null), // Don't fail if Minaka fetch fails
+        ]);
+        
+        let allEvents: any[] = [];
+        
+        if (privateEventsRes.ok) {
+          const privateEventsData = await privateEventsRes.json();
+          const localEvents = (privateEventsData.data || []).map((e: any) => ({
+            ...e,
+            source: 'local',
+          }));
+          allEvents = [...allEvents, ...localEvents];
+        }
+        
+        if (minakaEventsRes && minakaEventsRes.ok) {
+          const minakaEventsData = await minakaEventsRes.json();
+          const minakaEvents = (minakaEventsData.data || []).map((e: any) => ({
+            ...e,
+            source: 'minaka',
+          }));
+          allEvents = [...allEvents, ...minakaEvents];
+        }
+        
+        setPrivateEvents(allEvents);
       } catch (error) {
         console.error('Error fetching private events:', error);
       }
@@ -359,8 +383,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     
     console.log('Final mapped events:', allEvents);
     setEvents(allEvents);
-    setSlotMinTime('18:00:00');
-    setSlotMaxTime('26:00:00');
+
+    const isThursday = currentCalendarDate.getDay() === 4;
+    setSlotMinTime(isThursday ? '16:00:00' : '18:00:00');
+    setSlotMaxTime(isThursday ? '24:00:00' : '26:00:00');
   }, [resources, eventData, currentCalendarDate, privateEvents]);
 
   // Get private events for the current calendar date
@@ -678,17 +704,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     console.log('📊 Full info object:', JSON.stringify(info, null, 2));
     
     if (clickedDate && resourceId) {
-      console.log('✅ Opening new reservation drawer...');
-      setSelectedSlot({
-        date: clickedDate,
-        resourceId: resourceId
-      });
-      setIsNewReservationDrawerOpen(true);
+      console.log('✅ Opening new reservation modal...');
       
       // Clear the FullCalendar selection to remove the blue box
       if (calendarRef.current) {
         const calendarApi = calendarRef.current.getApi();
         calendarApi.unselect();
+      }
+      
+      // Call the parent callback if provided
+      if (onSlotClick) {
+        onSlotClick({
+          date: clickedDate,
+          resourceId: resourceId
+        });
+      } else {
+        // Fallback to internal state (for backwards compatibility)
+        setSelectedSlot({
+          date: clickedDate,
+          resourceId: resourceId
+        });
+        setIsNewReservationDrawerOpen(true);
       }
     } else {
       console.log('❌ Missing date or resource ID');
@@ -759,7 +795,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       if (eventEl) {
         eventEl.style.opacity = '0.8';
         eventEl.style.transform = 'scale(1.05)';
-        eventEl.style.zIndex = '1000';
+        eventEl.style.zIndex = '999'; // Keep below modals (999999)
       }
     }
   };
@@ -964,13 +1000,14 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   return (
+    <>
     <Box
       className={isMobile ? styles.mobileCalendarContainer : ''}
       style={{
         // Mobile-specific container styles with pinch zoom support
         touchAction: 'manipulation',
         WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'contain',
+        // Removed overscrollBehavior: 'contain' to prevent stacking context isolation
         // Enable pinch zoom
         ...(isMobile && {
           touchAction: 'pinch-zoom',
@@ -1736,24 +1773,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           }
         }}
       />
-
-      {/* New Reservation Drawer */}
-      <NewReservationDrawer
+    </Box>
+    
+    {/* RSVP Edit Modal - rendered outside calendar container */}
+    <RSVPEditModal
+      isOpen={isEditModalOpen}
+      onClose={() => setIsEditModalOpen(false)}
+      reservation={editingRSVP}
+      onUpdate={handleRSVPUpdated}
+    />
+    
+    {/* New Reservation Modal - only render if onSlotClick not provided (backwards compatibility) */}
+    {!onSlotClick && (
+      <NewReservationModal
         isOpen={isNewReservationDrawerOpen}
         onClose={handleNewReservationClose}
         initialDate={selectedSlot?.date}
         initialTableId={selectedSlot?.resourceId}
         onReservationCreated={handleNewReservationCreated}
       />
-
-      {/* RSVP Edit Modal */}
-      <RSVPEditModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        reservation={editingRSVP}
-        onUpdate={handleRSVPUpdated}
-      />
-    </Box>
+    )}
+    </>
   );
 };
 

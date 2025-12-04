@@ -1,0 +1,621 @@
+import { useEffect, useState } from "react";
+import AdminLayout from '../../components/layouts/AdminLayout';
+import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
+import Link from 'next/link';
+import styles from '../../styles/DashboardV2.module.css';
+
+interface ChartLineProps {
+  data: number[];
+  stroke: string;
+}
+
+const ChartLine = ({ data, stroke }: ChartLineProps) => {
+  if (!data.length) return null;
+  const maxValue = Math.max(...data, 1);
+  const minValue = Math.min(...data, 0);
+  const normalizedMax = maxValue === minValue ? maxValue + 1 : maxValue;
+  const points = data.map((value, index) => {
+    const x = (index / (data.length - 1)) * 100;
+    const y = 100 - ((value - minValue) / (normalizedMax - minValue)) * 100;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg viewBox="0 0 100 100" className={styles.miniChartSvg} preserveAspectRatio="none">
+      <polyline
+        fill="none"
+        stroke={stroke}
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        points={points}
+      />
+    </svg>
+  );
+};
+
+interface Member {
+  member_id: string;
+  first_name: string;
+  last_name: string;
+  dob?: string;
+  join_date?: string;
+  monthly_dues?: number;
+}
+
+interface LedgerEntry {
+  type: string;
+  date: string;
+  amount: number;
+}
+
+interface FinancialMetrics {
+  monthlyRecurringRevenue: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+  julyPaymentsReceived: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+  julyRevenue: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+  julyAR: {
+    total: number;
+    description: string;
+    breakdown?: any[];
+  };
+  outstandingBalances: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
+}
+
+interface Stats {
+  members: Member[];
+  ledger: LedgerEntry[];
+  reservations: number;
+  outstanding: number;
+  loading: boolean;
+  waitlistCount: number;
+  waitlistEntries: any[];
+  invitationRequestsCount: number;
+  invitationRequests: any[];
+  financialMetrics?: FinancialMetrics;
+  privateEvents?: any[];
+}
+
+function getNextBirthday(dob?: string) {
+  if (!dob) return null;
+  const today = new Date();
+  const [year, month, day] = dob.split('-').map(Number);
+  let next = new Date(today.getFullYear(), month - 1, day);
+  
+  if (next.getMonth() === today.getMonth() && next.getDate() === today.getDate()) {
+    return today;
+  }
+  
+  if (next < today) {
+    next = new Date(today.getFullYear() + 1, month - 1, day);
+  }
+  return next;
+}
+
+function getISOWeek(date: Date) {
+  const temp = new Date(date.valueOf());
+  const dayNum = (date.getDay() + 6) % 7;
+  temp.setDate(temp.getDate() - dayNum + 3);
+  const firstThursday = temp.valueOf();
+  temp.setMonth(0, 1);
+  if (temp.getDay() !== 4) {
+    temp.setMonth(0, 1 + ((4 - temp.getDay()) + 7) % 7);
+  }
+  return 1 + Math.ceil((firstThursday - temp.valueOf()) / 604800000);
+}
+
+function getWeekDates(year: number, week: number) {
+  const simple = new Date(year, 0, 1 + (week - 1) * 7);
+  const dow = simple.getDay();
+  const monday = new Date(simple);
+  if (dow <= 4) {
+    monday.setDate(simple.getDate() - simple.getDay() + 1);
+  } else {
+    monday.setDate(simple.getDate() + 8 - simple.getDay());
+  }
+  return [3, 4, 5].map(offset => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + offset);
+    return d;
+  });
+}
+
+function getNextWeekdayDate(weekday: number) {
+  const today = new Date();
+  const result = new Date(today);
+  result.setHours(0, 0, 0, 0);
+  const diff = (weekday + 7 - today.getDay()) % 7 || 7;
+  result.setDate(today.getDate() + diff);
+  return result;
+}
+
+export default function DashboardV2() {
+  const [stats, setStats] = useState<Stats>({
+    members: [],
+    ledger: [],
+    reservations: 0,
+    outstanding: 0,
+    loading: true,
+    waitlistCount: 0,
+    waitlistEntries: [],
+    invitationRequestsCount: 0,
+    invitationRequests: [],
+    privateEvents: [],
+  });
+  const [reservationDetails, setReservationDetails] = useState<any[]>([]);
+  const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<any>(null);
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
+
+  const fetchStats = async () => {
+    setStats(s => ({ ...s, loading: true }));
+    try {
+      const membersRes = await fetch("/api/members");
+      const membersData = await membersRes.json();
+      
+      const ledgerRes = await fetch("/api/ledger");
+      const ledgerData = await ledgerRes.json();
+      
+      const reservationsRes = await fetch("/api/reservations?upcoming=1");
+      const reservationsData = await reservationsRes.json();
+      
+      const outstandingRes = await fetch("/api/ledger?outstanding=1");
+      const outstandingData = await outstandingRes.json();
+
+      const financialRes = await fetch("/api/financial-metrics");
+      const financialData = await financialRes.json();
+
+      const waitlistRes = await fetch("/api/waitlist?status=review&limit=5");
+      const waitlistData = await waitlistRes.json();
+      
+      const waitlistedRes = await fetch("/api/waitlist?status=waitlisted&limit=5");
+      const waitlistedData = await waitlistedRes.json();
+
+      const now = new Date();
+      const startDate = now.toISOString();
+      const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const privateEventsRes = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
+      const privateEventsData = await privateEventsRes.json();
+      
+      setStats({
+        members: membersData.data || [],
+        ledger: ledgerData.data || [],
+        reservations: reservationsData.count || 0,
+        outstanding: outstandingData.total || 0,
+        loading: false,
+        waitlistCount: waitlistedData.count || 0,
+        waitlistEntries: waitlistedData.data || [],
+        invitationRequestsCount: waitlistData.count || 0,
+        invitationRequests: waitlistData.data || [],
+        financialMetrics: financialData,
+        privateEvents: privateEventsData.data || [],
+      });
+      setReservationDetails(reservationsData.data || []);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [], invitationRequestsCount: 0, invitationRequests: [], privateEvents: [] });
+      setReservationDetails([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  if (stats.loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-[#353535]">Loading...</div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  // Calculations (same as original)
+  const totalMembers = stats.members.length;
+  const totalDues = stats.members.reduce((sum, m) => sum + (m.monthly_dues || 0), 0);
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+  const isThisMonth = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  };
+  const payments = stats.ledger.filter(tx => tx.type === 'payment' && isThisMonth(tx.date)).reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const purchases = stats.ledger.filter(tx => tx.type === 'purchase' && isThisMonth(tx.date)).reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const ar = Math.abs(purchases) - payments;
+
+  const membersWithBirthday = stats.members.filter(m => m.dob).map(m => ({
+    ...m,
+    nextBirthday: getNextBirthday(m.dob)
+  })).filter(m => m.nextBirthday).sort((a, b) => {
+    const aDate = a.nextBirthday as Date;
+    const bDate = b.nextBirthday as Date;
+    const today = new Date();
+    const aIsToday = aDate.getMonth() === today.getMonth() && aDate.getDate() === today.getDate();
+    const bIsToday = bDate.getMonth() === today.getMonth() && bDate.getDate() === today.getDate();
+    if (aIsToday && !bIsToday) return -1;
+    if (!aIsToday && bIsToday) return 1;
+    return aDate.getTime() - bDate.getTime();
+  }).slice(0, 5);
+
+  const getNextRenewal = (member: Member) => {
+    if (!member.join_date) return null;
+    const jd = new Date(member.join_date);
+    const today = new Date();
+    let year = today.getFullYear();
+    let month = today.getMonth();
+    const day = jd.getDate();
+    let candidate = new Date(year, month, day);
+    if (candidate < today) {
+      if (month === 11) { year += 1; month = 0; }
+      else { month += 1; }
+      candidate = new Date(year, month, day);
+    }
+    return candidate;
+  };
+  const membersWithRenewal = stats.members.map(m => ({
+    ...m,
+    nextRenewal: getNextRenewal(m)
+  })).filter(m => m.nextRenewal).sort((a, b) => (a.nextRenewal as Date).getTime() - (b.nextRenewal as Date).getTime()).slice(0, 5);
+
+  const today = new Date();
+  let year = today.getFullYear();
+  let week = getISOWeek(today);
+  if (today.getDay() === 0) {
+    week += 1;
+    if (week > getISOWeek(new Date(year, 11, 31))) {
+      week = 1;
+      year += 1;
+    }
+  }
+  const [nextThursday, nextFriday, nextSaturday] = getWeekDates(year, week);
+
+  function isSameDay(date1: Date, date2: Date) {
+    return date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate();
+  }
+
+  const getPrivateEventForDay = (date: Date) => {
+    return stats.privateEvents?.find(event => {
+      const eventDate = new Date(event.start_time);
+      return isSameDay(eventDate, date);
+    });
+  };
+
+  const thursdayReservations = reservationDetails.filter(r => {
+    const d = new Date(r.start_time);
+    return isSameDay(d, nextThursday);
+  });
+  const thursdaySeats = thursdayReservations.reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  const thursdayPrivateEvent = getPrivateEventForDay(nextThursday);
+
+  const fridayReservations = reservationDetails.filter(r => {
+    const d = new Date(r.start_time);
+    return isSameDay(d, nextFriday);
+  });
+  const fridaySeats = fridayReservations.reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  const fridayPrivateEvent = getPrivateEventForDay(nextFriday);
+
+  const saturdayReservations = reservationDetails.filter(r => {
+    const d = new Date(r.start_time);
+    return isSameDay(d, nextSaturday);
+  });
+  const saturdaySeats = saturdayReservations.reduce((sum, r) => sum + (Number(r.party_size) || 0), 0);
+  const saturdayPrivateEvent = getPrivateEventForDay(nextSaturday);
+
+  const navIcons = [
+    { icon: '📊', label: 'Dashboard', href: '/admin/dashboard-v2' },
+    { icon: '📅', label: 'Calendar', href: '/admin/calendar' },
+    { icon: '📇', label: 'Contacts', href: '/admin/members' },
+    { icon: '📑', label: 'Reports', href: '/admin/analytics' },
+    { icon: '🧭', label: 'Funnel', href: '/admin/waitlist' },
+    { icon: '👥', label: 'Staff', href: '/admin/members' },
+    { icon: '⚙️', label: 'Settings', href: '/admin/settings' },
+  ];
+
+  const quickActions = [
+    { icon: '➕', label: 'New Lead', href: '/admin/waitlist' },
+    { icon: '🎉', label: 'Add Event', href: '/admin/calendar' },
+    { icon: '👤', label: 'Add Contact', href: '/admin/members' },
+    { icon: '📅', label: 'Add Meeting', href: '/admin/calendar' },
+  ];
+
+  const weatherSnapshot = {
+    temperature: '26°F',
+    condition: 'Snow',
+    precipitation: '0.29%',
+    humidity: '82%',
+    wind: '6 mph',
+    sunrise: '6:17 pm',
+  };
+
+  const weatherForecast = [
+    { label: 'Now', hi: '28°', lo: '22°' },
+    { label: 'Tue', hi: '35°', lo: '25°' },
+    { label: 'Wed', hi: '40°', lo: '27°' },
+    { label: 'Thu', hi: '42°', lo: '29°' },
+    { label: 'Fri', hi: '37°', lo: '28°' },
+  ];
+
+  const upcomingEventsList = reservationDetails
+    .map((reservation: any) => {
+      const date = new Date(reservation.start_time);
+      return {
+        id: reservation.id,
+        label: reservation.event_type || reservation.notes || 'Reservation',
+        date,
+        detail: reservation.party_size ? `${reservation.party_size} guests` : 'No party size',
+      };
+    })
+    .filter(item => item.date >= today)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .slice(0, 3);
+
+  const upcomingPaymentsList = membersWithRenewal.slice(0, 3).map(member => ({
+    id: member.member_id,
+    label: `${member.first_name} ${member.last_name}`,
+    amount: member.monthly_dues || 0,
+    date: member.nextRenewal as Date,
+  }));
+
+  const monthlyRevenueSeries = (() => {
+    const totals = Array(12).fill(0);
+    const paymentsLedger = stats.ledger.filter(tx => tx.type === 'payment');
+    paymentsLedger.forEach(tx => {
+      const entryDate = new Date(tx.date);
+      const monthsDiff = (now.getFullYear() - entryDate.getFullYear()) * 12 + (now.getMonth() - entryDate.getMonth());
+      if (monthsDiff >= 0 && monthsDiff < 12) {
+        const index = 11 - monthsDiff;
+        totals[index] += Number(tx.amount) || 0;
+      }
+    });
+    if (totals.every(value => value === 0)) {
+      return Array.from({ length: 12 }, (_, idx) => 8000 + idx * 450);
+    }
+    return totals;
+  })();
+
+  const membershipSeries = monthlyRevenueSeries.map((value, idx) => {
+    const base = Math.max(totalMembers * 30, 1200);
+    return Math.max(value * 0.65, base + idx * 40);
+  });
+
+  const monthLabels = monthlyRevenueSeries.map((_, idx) => {
+    const dateRef = new Date(now.getFullYear(), now.getMonth() - (11 - idx), 1);
+    return dateRef.toLocaleString('default', { month: 'short' });
+  });
+
+  const ytdRevenue = stats.ledger
+    .filter(tx => tx.type === 'payment' && new Date(tx.date).getFullYear() === now.getFullYear())
+    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+  const annualRevenueGoal = Math.max(120000, ytdRevenue * 1.2 + 10000);
+  const progressPercent = Math.min((ytdRevenue / annualRevenueGoal) * 100, 100);
+
+  return (
+    <AdminLayout>
+      <div className={styles.dashboardContainer}>
+        <div className={styles.topNavBar}>
+          <div className={styles.brandMark}>
+            <span>✦</span>
+            <span>Noir</span>
+          </div>
+          <div className={styles.navIcons}>
+            {navIcons.map((item) => (
+              <Link key={item.label} href={item.href} className={styles.navIconButton} title={item.label}>
+                {item.icon}
+              </Link>
+            ))}
+          </div>
+          <div className={styles.profileChip}>
+            {stats.members[0]?.first_name?.[0]?.toUpperCase() || 'N'}
+          </div>
+        </div>
+
+        <div className={styles.searchActionsRow}>
+          <div className={styles.searchInputWrapper}>
+            <span className={styles.searchIcon}>🔎</span>
+            <input
+              className={styles.searchInput}
+              placeholder="Search events, contacts, vendors, dates..."
+            />
+          </div>
+          <div className={styles.actionButtonsRow}>
+            {quickActions.map(action => (
+              <Link key={action.label} href={action.href} className={styles.actionButton}>
+                <span>{action.icon}</span>
+                {action.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.primaryHighlights}>
+          <div className={styles.weatherCard}>
+            <div className={styles.weatherHeader}>
+              <div>
+                <div className={styles.weatherTemp}>{weatherSnapshot.temperature}</div>
+                <div style={{ color: '#6e6e73', fontWeight: 600 }}>{weatherSnapshot.condition}</div>
+              </div>
+              <div style={{ fontSize: '2rem' }}>🌨</div>
+            </div>
+            <div className={styles.weatherMeta}>
+              <span>Precip {weatherSnapshot.precipitation}</span>
+              <span>Humidity {weatherSnapshot.humidity}</span>
+              <span>Wind {weatherSnapshot.wind}</span>
+              <span>Sunset {weatherSnapshot.sunrise}</span>
+            </div>
+            <div className={styles.forecastRow}>
+              {weatherForecast.map((item) => (
+                <div key={item.label} className={styles.forecastItem}>
+                  <div style={{ fontWeight: 600 }}>{item.label}</div>
+                  <div>{item.hi}</div>
+                  <div style={{ color: '#A59480' }}>{item.lo}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.metricCard}>
+            <div className={styles.metricHeader}>
+              <span>Revenue Overview</span>
+              <div className={styles.toggleGroup}>
+                <button className={`${styles.toggleButton} ${styles.toggleButtonActive}`}>Accrual</button>
+                <button className={styles.toggleButton}>Cash</button>
+              </div>
+            </div>
+            <div className={styles.metricValueLarge}>
+              ${stats.financialMetrics?.monthlyRecurringRevenue?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}
+            </div>
+            <div className={styles.metricSubtitle}>
+              ${Math.round(stats.financialMetrics?.monthlyRecurringRevenue?.total ? stats.financialMetrics.monthlyRecurringRevenue.total / (stats.members.length || 1) : totalDues / (stats.members.length || 1)).toLocaleString()} avg / client
+            </div>
+            <div className={styles.metricStatRow}>
+              <span>Open Invoices</span>
+              <strong>${stats.financialMetrics?.outstandingBalances?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}</strong>
+            </div>
+          </div>
+
+          <div className={styles.metricCard}>
+            <div className={styles.metricHeader}>
+              <span>Current Month Revenue</span>
+              <div className={styles.toggleGroup}>
+                <button className={`${styles.toggleButton} ${styles.toggleButtonActive}`}>Accrual</button>
+                <button className={styles.toggleButton}>Cash</button>
+              </div>
+            </div>
+            <div className={styles.metricValueLarge} style={{ color: '#0c5ca8' }}>
+              ${stats.financialMetrics?.julyRevenue?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || Math.abs(purchases).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </div>
+            <div className={styles.metricStatRow}>
+              <span>Events</span>
+              <strong>{reservationDetails.length}</strong>
+            </div>
+            <div className={styles.metricStatRow}>
+              <span>Per Event</span>
+              <strong>${reservationDetails.length ? Math.round((stats.financialMetrics?.julyRevenue?.total || Math.abs(purchases)) / reservationDetails.length).toLocaleString() : '0'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.focusGrid}>
+          <div className={styles.listCard}>
+            <h3 className={styles.listCardTitle}>Upcoming Events</h3>
+            {upcomingEventsList.length === 0 ? (
+              <div className={styles.emptyState}>No upcoming events this week.</div>
+            ) : (
+              <div className={styles.listContent}>
+                {upcomingEventsList.map(event => (
+                  <Link key={event.id || event.label} href="/admin/calendar" className={styles.listItemLink}>
+                    <div className={styles.listItemHeader}>{event.label}</div>
+                    <div className={styles.listItemText}>
+                      {event.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · {event.detail}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.listCard}>
+            <h3 className={styles.listCardTitle}>Upcoming Payments</h3>
+            {upcomingPaymentsList.length === 0 ? (
+              <div className={styles.emptyState}>No scheduled payments.</div>
+            ) : (
+              <div className={styles.listContent}>
+                {upcomingPaymentsList.map(payment => (
+                  <Link key={payment.id} href={`/admin/members/${payment.id}`} className={styles.listItemLink}>
+                    <div className={styles.listItemHeader}>{payment.label}</div>
+                    <div className={styles.listItemText}>
+                      {payment.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — <span style={{ color: '#C45252', fontWeight: 600 }}>${payment.amount.toFixed(2)}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.chartGrid}>
+          <div className={styles.chartCard}>
+            <div className={styles.chartHeader}>
+              <span>Monthly Revenue by Stream</span>
+              <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', color: '#6e6e73' }}>
+                <span>{monthLabels[0]} — {monthLabels[monthLabels.length - 1]}</span>
+              </div>
+            </div>
+            <div className={styles.chartLegend}>
+              <div className={styles.chartLegendItem}>
+                <span className={styles.legendDot} style={{ background: '#1a4b2e' }}></span> Total
+              </div>
+              <div className={styles.chartLegendItem}>
+                <span className={styles.legendDot} style={{ background: '#5b6aa8' }}></span> Noir
+              </div>
+            </div>
+            <ChartLine data={monthlyRevenueSeries} stroke="#1a4b2e" />
+            <ChartLine data={membershipSeries} stroke="#5b6aa8" />
+          </div>
+
+          <div className={styles.chartCard}>
+            <div className={styles.chartHeader}>
+              <span>Revenue Progress</span>
+              <span style={{ fontSize: '0.8rem' }}>{now.getFullYear()}</span>
+            </div>
+            <div className={styles.metricValueLarge} style={{ color: '#1a4b2e' }}>
+              ${ytdRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </div>
+            <div className={styles.metricSubtitle}>
+              Goal ${annualRevenueGoal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </div>
+            <div className={styles.barStack}>
+              <div className={styles.barRow}>
+                <div className={styles.barLabel}>
+                  <span>Through {now.toLocaleString('default', { month: 'short' })}</span>
+                  <span>{progressPercent.toFixed(0)}%</span>
+                </div>
+                <div className={styles.barTrack}>
+                  <div className={styles.barFill} style={{ width: `${progressPercent}%` }}></div>
+                </div>
+              </div>
+              <div className={styles.barRow}>
+                <div className={styles.barLabel}>
+                  <span>Remaining</span>
+                  <span>${Math.max(annualRevenueGoal - ytdRevenue, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                </div>
+                <div className={styles.barTrack}>
+                  <div className={styles.barFill} style={{ width: `${100 - progressPercent}%`, background: '#BCA892' }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <WaitlistReviewDrawer
+          isOpen={isWaitlistModalOpen}
+          onClose={() => setIsWaitlistModalOpen(false)}
+          entry={selectedWaitlistEntry}
+          onStatusUpdate={fetchStats}
+        />
+      </div>
+    </AdminLayout>
+  );
+}
+
+

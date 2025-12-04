@@ -1,470 +1,186 @@
-@font-face {
-  font-family: 'Montserrat';
-  src: url('/fonts/Montserrat-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Montserrat Bold';
-  src: url('/fonts/Montserrat-Bold.otf') format('opentype');
-  font-weight: bold;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Montserrat Light';
-  src: url('/fonts/Montserrat-Light.ttf') format('truetype');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-
-.memberCardText {
-  font-family: 'Montserrat Bold', sans-serif;
-}
-.container {
-  display: flex;
+.root {
   min-height: 100vh;
-  background-color: #353535;
+  background: #ECEDE8;
+  color: #1A1A1A;
   font-family: 'Montserrat', sans-serif;
-  font-weight: 400;
-  overflow-x: hidden;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  max-width: 100vw;
 }
 
-.sidebar {
-  width: flex;
-  background-color: #a59480;
-  color: white;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  margin-top: 0rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin-bottom: 2rem;
-  cursor: pointer;
-}
-
-.logo a {
-  color: white;
-  text-decoration: none;
-}
-
-.main {
-  flex: 1;
-  padding: 0;
-  overflow-y: auto;
-  background: none;
-  box-shadow: none;
-  border: none;
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100vw;
-}
-
-.header {
-  display: flex;
-  background: #353535;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0rem;
-}
-.pageTitleContainer {
-  margin-top: 6rem;
-  padding: 0rem;
-  width: 100%;
-  background-color: #353535;
-}
-.title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #333;
-}
-
-.nav {
-  margin-top: 25px;
-}
-
-.navItem {
-  display: flex;
-  width: 100%;
-  align-items: left;
-  padding: 10px;
-  color: #ecede8;
-  text-decoration: none;
-  border-radius: 0.5rem;
-  margin-bottom: 4px;
-  transition: background-color 0.2s;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.075em;
-  font-weight: 600;
-}
-
-.navItem:hover {
-  background-color: #333;
-}
-
-.navItem.active {
-  background-color: #353535;
-  color: white;
-}
-
-.navIcon {
-  margin-right: 1rem;
-  width: 32px;
-  height: 32px;
-  font-size: 2rem;
-  color: #a59480;
-}
-
-.userSection {
-  margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid #333;
-}
-
-.userInfo {
-  display: flex;
-  align-items: center;
-  padding: 0.25rem;
-  color: #e0e0e0;
-}
-
-.userButton {
-  display: flex;
-  align-items: center;
-  background: none;
-  border: none;
-  color: #ecede8;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  transition: background-color 0.2s;
-  width: 100%;
-  text-align: left;
-}
-
-.userButton:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.userAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: #353535;
+.loadingState {
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 0.75rem;
-  font-weight: bold;
-  color: #ecede8;
+  color: #353535;
 }
 
-.userEmail {
-  font-size: 14px;
-  font-weight: 500;
-  color: #ecede8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.topNav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brandLink {
+  display: inline-flex;
+  align-items: center;
+}
+
+.navIcons {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0 1rem;
+}
+
+.navIconButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  min-width: 64px;
+  height: 54px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: #F7F6F2;
+  color: #353535;
+  text-decoration: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  gap: 0.15rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
+}
+
+.navIconButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.navIconButtonActive {
+  background: #353535;
+  color: #F7F6F2;
+}
+
+.navIcon {
+  font-size: 1.15rem;
+}
+
+.navLabel {
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+}
+
+.userControls {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.userButton {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.userAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #353535;
+  color: #F7F6F2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
 .userMenu {
-  margin-top: 0.5rem;
-  background-color: #353535;
-  border-radius: 0.5rem;
+  position: absolute;
+  top: 52px;
+  right: 0;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  min-width: 160px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.menuItem {
+.userMenuItem {
   display: block;
   width: 100%;
   padding: 0.75rem 1rem;
-  color: #ecede8;
-  text-decoration: none;
-  background: none;
   border: none;
-  cursor: pointer;
-  font-size: 14px;
+  background: transparent;
   text-align: left;
-  transition: background-color 0.2s;
-}
-
-.menuItem:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.logoutButton {
-  width: 100%;
-  padding: 0.75rem;
-  margin-top: 0.5rem;
-  background-color: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  color: #353535;
   cursor: pointer;
-  transition: background-color 0.2s;
+  text-decoration: none;
 }
 
-.logoutButton:hover {
-  background-color: #b91c1c;
+.userMenuItem:hover {
+  background: #F7F6F2;
 }
 
-.menuButton {
-  display: none;
-  background: none;
-  border: none;
-  color: #1a1a1a;
-  cursor: pointer;
-  padding: 0.5rem;
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 1200;
+.main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 2rem;
 }
 
-.menuIcon {
-  font-size: 1.5rem;
-}
-
-.pageTitle {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #ECEDE8;
+.fullScreen {
+  max-width: 100%;
+  padding: 0;
 }
 
 .content {
-  background: none;
-  border-radius: 0;
-  padding: 0;
-  box-shadow: none;
   width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
 }
 
-.mobileMenu {
-  display: none;
-}
-
-.mobileHeader {
-  display: none;
-}
-
-.mobileLogo {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .mobileHeader {
-    display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 60px;
-    background: rgba(165, 148, 128, 0.9);
-    z-index: 2100;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem;
-    box-sizing: border-box;
-    backdrop-filter: blur(6px);
-  }
-  
-  .mobileLogo {
-    display: flex;
-    align-items: center;
-    height: 40px;
-  }
-  
-  .mobileMenu {
-    display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(30, 30, 30, 0.92);
-    z-index: 2000;
-    box-shadow: 2px 0 16px rgba(0,0,0,0.18);
-    transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
-    padding: 0;
-    margin: 0;
-    flex-direction: column;
+@media (max-width: 1024px) {
+  .navIcons {
     justify-content: flex-start;
-    align-items: center;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .open {
-    transform: translateX(0) !important;
-  }
-  .mobileNavLinks {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0rem;
-    margin-top: 3rem;
-    padding: 1rem;
-  }
-  .mobileNavItem {
-    color: #ECEDE8;
-    font-size: 1rem;
-    font-family: 'Montserrat', sans-serif;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 0.1rem;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    transition: background 0.2s;
-    width: 90%;
-    justify-content: flex-start;
-  }
-  .mobileNavItem:hover, .mobileNavItem.active {
-    background: rgba(255,255,255,0.08);
-    color: #BCA892;
-  }
-  .sidebar {
-    display: none !important;
-  }
-  .menuButton {
-    display: block;
-    background: none;
-    border: none;
-    color: #fff;
-    cursor: pointer;
-    padding: 0.5rem;
-    z-index: 2200;
-    font-size: 2rem;
-    position: absolute;
-    right: 1.2rem;
-    top: 0.7rem;
-  }
-  .main {
-    padding-top: 60px;
-  }
-}
-
-/* iPhone-specific mobile header optimizations */
-@media (max-width: 428px) {
-  .mobileHeader {
-    height: 56px;
-    padding: 0 0.75rem;
-    padding-left: calc(0.75rem + env(safe-area-inset-left, 0));
-    padding-right: calc(0.75rem + env(safe-area-inset-right, 0));
-  }
-  
-  .mobileLogo {
-    height: 36px;
-  }
-  
-  .menuButton {
-    right: 0.75rem;
-    top: 0.5rem;
-    font-size: 1.75rem;
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .main {
-    padding-top: 56px;
-  }
-  
-  .mobileNavItem {
-    font-size: 1.0rem;
-    padding: 0rem 1.0rem;
-    min-height: 48px;
-    width: 90%;
-    justify-content: center;
-    gap: 0.75rem;
-  }
-  .container {
-    background-color: #FFF;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-  }
-}
-
-/* iPhone SE and smaller screens */
-@media (max-width: 375px) {
-  .mobileHeader {
-    height: 52px;
-    padding: 0 0.5rem;
-  }
-  
-  .mobileLogo {
-    height: 32px;
-  }
-  
-  .menuButton {
-    right: 0.5rem;
-    font-size: 1.5rem;
-  }
-  
-  .main {
-    padding-top: 52px;
-  }
-  
-  .mobileNavItem {
-    font-size: 1.1rem;
-    padding: 0.875rem 1.25rem;
   }
 }
 
 @media (max-width: 768px) {
-  .container {
+  .topNav {
     flex-direction: column;
-    width: 100%;
-    margin-right: 0;
-    padding-right: 0px;
+    align-items: stretch;
+    gap: 0.75rem;
   }
 
-  .sidebar {
-    width: 100%;
-    padding: 0px;
+  .navIcons {
+    order: 2;
+    justify-content: flex-start;
+  }
+
+  .userControls {
+    order: 1;
+    align-self: flex-end;
   }
 
   .main {
-    padding: 0;
-  }
-
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .menuButton {
-    display: block;
-  }
-
-  .mobileMenu {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    padding: 1rem;
   }
 }

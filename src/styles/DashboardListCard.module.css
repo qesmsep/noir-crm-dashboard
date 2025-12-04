@@ -1,103 +1,155 @@
+/* ============================================
+   APPLE-INSPIRED LIST CARD - MOBILE FIRST
+   Clean, elevated surface for list content
+   ============================================ */
+
 .listCard {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  padding: 2rem 1.5rem;
-  min-width: 0;
-  min-height: 180px;
+  /* Layout - Mobile First */
+  width: 100%;
+  max-width: 100%;
+  min-height: 120px;
+  padding: 1.25rem 1rem;
+  box-sizing: border-box;
+  overflow: hidden;
+
+  /* Flexbox for content */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
+  gap: 0.75rem;
+
+  /* Apple Design - Elevated Surface */
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* Smooth animations */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Typography rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Margin for spacing in grid */
   margin: 0.5rem 0;
-  transition: box-shadow 0.2s, transform 0.2s;
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-  box-sizing: border-box;
 }
 
-.listCard:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-  transform: translateY(-2px) scale(1.01);
+/* Desktop hover effect */
+@media (hover: hover) and (pointer: fine) {
+  .listCard:hover {
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.06),
+      0 4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+  }
 }
 
+/* Apple-style Label/Title */
 .label {
-  font-size: 1.25rem;
-  color: #666;
-  font-family: 'Montserrat', sans-serif;
+  /* Typography - Apple's section header style */
+  font-size: 1.0625rem; /* 17px - iOS standard */
   font-weight: 600;
-  margin-bottom: 1rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+
+  /* Color - Apple's primary text */
+  color: #1d1d1f;
+
+  /* Layout */
+  width: 100%;
+  margin-bottom: 0;
   text-align: left;
-  letter-spacing: 0.04em;
-  width: 100%;
+
+  /* Text handling */
   word-wrap: break-word;
   overflow-wrap: break-word;
+
+  /* No Montserrat - use system fonts for Apple aesthetic */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Content area */
 .content {
+  /* Layout */
   width: 100%;
-  font-size: 1.05rem;
-  color: #23201C;
-  font-family: 'Montserrat', sans-serif;
+  flex: 1;
+
+  /* Typography - readable body text */
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+
+  /* Color - slightly softer than label */
+  color: #1d1d1f;
+
+  /* Text handling */
   word-wrap: break-word;
   overflow-wrap: break-word;
+
+  /* System fonts for consistency */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-@media (max-width: 900px) {
-  .listCard {
-    padding: 1.25rem 0.75rem;
-    min-height: 140px;
-  }
-  .label {
-    font-size: 1.1rem;
-  }
-}
+/* ============================================
+   RESPONSIVE ENHANCEMENTS
+   ============================================ */
 
-@media (max-width: 600px) {
+/* Tablet: Scale up */
+@media (min-width: 768px) {
   .listCard {
-    padding: 1rem 0.5rem;
-    min-height: 120px;
+    padding: 1.5rem 1.25rem;
+    min-height: 160px;
+    gap: 1rem;
   }
+
   .label {
-    font-size: 1rem;
+    font-size: 1.125rem; /* 18px */
   }
+
   .content {
-    font-size: 0.98rem;
+    font-size: 1rem; /* 16px */
   }
 }
 
-/* iPhone and mobile optimizations */
-@media (max-width: 428px) {
+/* Desktop: Maximum comfortable size */
+@media (min-width: 1024px) {
   .listCard {
-    padding: 0.75rem 0.5rem;
-    min-height: 100px;
-    border-radius: 8px;
+    padding: 2rem 1.5rem;
+    min-height: 180px;
+    border-radius: 18px;
   }
-  
+
   .label {
-    font-size: 0.9rem;
-    margin-bottom: 0.75rem;
+    font-size: 1.25rem; /* 20px */
+    margin-bottom: 0.25rem;
   }
-  
+
   .content {
-    font-size: 0.85rem;
+    font-size: 1.0625rem; /* 17px */
   }
 }
 
-/* iPhone SE and smaller screens */
-@media (max-width: 375px) {
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
   .listCard {
-    padding: 0.5rem 0.375rem;
-    min-height: 90px;
+    transition: none !important;
   }
-  
-  .label {
-    font-size: 0.8rem;
-    margin-bottom: 0.5rem;
-  }
-  
-  .content {
-    font-size: 0.8rem;
+}
+
+/* Print styles */
+@media print {
+  .listCard {
+    box-shadow: none;
+    border: 1px solid #e5e5e7;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

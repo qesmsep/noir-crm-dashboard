@@ -1,140 +1,413 @@
+/* ============================================
+   APPLE-INSPIRED MEMBERS PAGE - MOBILE FIRST
+   Clean, unified layout for all screen sizes
+   ============================================ */
+
+.container {
+  /* Layout - Mobile First */
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem 1rem 2rem;
+  background: #f5f5f7;
+  box-sizing: border-box;
+  overflow-x: hidden;
+
+  /* Safe area for iOS devices */
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0));
+}
+
+/* Header Section */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+/* Search Input - Apple Style */
+.searchInput {
+  width: 100%;
+  height: 48px;
+  padding: 0 1rem;
+
+  /* Apple design */
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+
+  /* Typography */
+  font-size: 1rem;
+  font-weight: 400;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Smooth transitions */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Remove default styles */
+  outline: none;
+  box-sizing: border-box;
+}
+
+.searchInput::placeholder {
+  color: #86868b;
+}
+
+.searchInput:focus {
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+/* Add Button - Apple Style */
+.addButton {
+  width: 100%;
+  height: 48px;
+  padding: 0 1.5rem;
+
+  /* Apple blue button */
+  background: #007aff;
+  border: none;
+  border-radius: 12px;
+
+  /* Typography */
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Interaction */
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Remove default */
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .addButton:hover {
+    background: #0051d5;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+  }
+}
+
+.addButton:active {
+  transform: scale(0.98);
+}
+
+.addButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Members Grid */
+.membersGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Member Card - Apple Style */
+.memberCard {
+  /* Layout */
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+
+  /* Apple elevation */
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* Interaction */
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Prevent text selection */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .memberCard:hover {
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.06),
+      0 4px 16px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+}
+
+.memberCard:active {
+  transform: scale(0.98);
+}
+
+/* Card Content */
+.cardContent {
+  padding: 1.25rem;
+}
+
+/* Member Header (Photo + Name) */
+.memberHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Photo */
+.memberPhoto {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+
+  /* Subtle shadow */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #f5f5f7;
+}
+
+.memberPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photoPlaceholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  /* Apple gray background */
+  background: linear-gradient(135deg, #f5f5f7 0%, #e5e5e7 100%);
+
+  /* Center initials */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Typography */
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #86868b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Subtle shadow */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Member Name */
+.memberName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  margin: 0;
+  flex: 1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Contact Info */
+.contactInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.contactItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  /* Typography */
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: #6e6e73;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.contactIcon {
+  width: 18px;
+  height: 18px;
+  color: #007aff;
+  flex-shrink: 0;
+}
+
+/* Member Badge (Primary/Secondary) */
+.memberBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  margin-bottom: 0.75rem;
+
+  /* Apple pill style */
+  background: rgba(0, 122, 255, 0.1);
+  border-radius: 12px;
+
+  /* Typography */
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #007aff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Join Date Footer */
+.joinDate {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+
+  /* Typography */
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #86868b;
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Empty State */
+.emptyState {
+  text-align: center;
+  padding: 4rem 2rem;
+
+  /* Typography */
+  font-size: 1.125rem;
+  line-height: 1.5;
+  color: #86868b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Loading State */
 .loading {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 200px;
-  font-size: 1.1rem;
-  color: #666;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-}
+/* ============================================
+   RESPONSIVE ENHANCEMENTS
+   ============================================ */
 
-.header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: #1a1a1a;
-}
+/* Tablet: 2 columns, side-by-side header */
+@media (min-width: 768px) {
+  .container {
+    padding: 2rem 1.5rem 3rem;
+  }
 
-.controls {
-  display: flex;
-  gap: 1rem;
-}
-
-.searchInput,
-.statusFilter {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
-  min-width: 200px;
-}
-
-.searchInput:focus,
-.statusFilter:focus {
-  outline: none;
-  border-color: #666;
-}
-
-.tableContainer {
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.table th,
-.table td {
-  padding: 1rem;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-.table th {
-  background-color: #f8f8f8;
-  font-weight: 500;
-  color: #666;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-
-.table th:hover {
-  background-color: #f0f0f0;
-}
-
-.table tbody tr:hover {
-  background-color: #f8f8f8;
-}
-
-.status {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 1rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: capitalize;
-}
-
-.active {
-  background-color: #e6f4ea;
-  color: #1e7e34;
-}
-
-.inactive {
-  background-color: #fbe9e7;
-  color: #d32f2f;
-}
-
-.pending {
-  background-color: #fff3e0;
-  color: #f57c00;
-}
-
-.actionButton {
-  padding: 0.25rem 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 0.25rem;
-  background-color: white;
-  color: #666;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.actionButton:hover {
-  background-color: #f8f8f8;
-  border-color: #666;
-}
-
-@media (max-width: 768px) {
   .header {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: 1rem;
-    align-items: stretch;
   }
 
-  .controls {
-    flex-direction: column;
+  .searchInput {
+    flex: 1;
+    max-width: 500px;
   }
 
-  .searchInput,
-  .statusFilter {
-    width: 100%;
+  .addButton {
+    width: auto;
+    min-width: 140px;
   }
 
-  .table th,
-  .table td {
-    padding: 0.75rem;
+  .membersGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
   }
-} 
+
+  .memberPhoto,
+  .photoPlaceholder {
+    width: 72px;
+    height: 72px;
+  }
+
+  .photoPlaceholder {
+    font-size: 1.75rem;
+  }
+}
+
+/* Desktop: 3 columns, larger cards */
+@media (min-width: 1024px) {
+  .container {
+    padding: 3rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .searchInput {
+    max-width: 600px;
+  }
+
+  .membersGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .cardContent {
+    padding: 1.5rem;
+  }
+
+  .memberPhoto,
+  .photoPlaceholder {
+    width: 80px;
+    height: 80px;
+  }
+
+  .photoPlaceholder {
+    font-size: 2rem;
+  }
+
+  .memberName {
+    font-size: 1.375rem;
+  }
+}
+
+/* Wide Desktop: 4 columns */
+@media (min-width: 1440px) {
+  .membersGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .memberCard,
+  .addButton,
+  .searchInput {
+    transition: none !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .container {
+    background: white;
+  }
+
+  .addButton {
+    display: none;
+  }
+
+  .memberCard {
+    box-shadow: none;
+    border: 1px solid #e5e5e7;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

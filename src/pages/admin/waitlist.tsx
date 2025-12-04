@@ -1,35 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Heading,
-  VStack,
-  HStack,
-  Text,
-  Badge,
-  Button,
-  useToast,
-  Spinner,
-  Select,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Flex,
-  Stat,
-  StatLabel,
-  StatNumber,
-  SimpleGrid,
-  useDisclosure
-} from '@chakra-ui/react';
-import { SearchIcon, LinkIcon, CopyIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
-import styles from '../../styles/WaitlistMobile.module.css';
+import styles from '../../styles/Waitlist.module.css';
 
 interface WaitlistEntry {
   id: string;
@@ -62,20 +34,30 @@ interface StatusCounts {
   count: number;
 }
 
+interface ToastState {
+  show: boolean;
+  message: string;
+  type: 'success' | 'error';
+}
+
 export default function WaitlistPage() {
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const [statusCounts, setStatusCounts] = useState<StatusCounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<WaitlistEntry | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [generatingLink, setGeneratingLink] = useState<string | null>(null);
-  const { isOpen: isModalOpen, onOpen: onModalOpen, onClose: onModalClose } = useDisclosure();
-  const toast = useToast();
+  const [toast, setToast] = useState<ToastState>({ show: false, message: '', type: 'success' });
 
   const ITEMS_PER_PAGE = 20;
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
 
   const fetchWaitlist = async () => {
     setLoading(true);
@@ -85,9 +67,7 @@ export default function WaitlistPage() {
         offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString()
       });
 
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
+      if (statusFilter) params.append('status', statusFilter);
 
       const response = await fetch(`/api/waitlist?${params}`);
       const data = await response.json();
@@ -101,12 +81,7 @@ export default function WaitlistPage() {
       }
     } catch (error) {
       console.error('Error fetching waitlist:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch waitlist entries',
-        status: 'error',
-        duration: 3000,
-      });
+      showToast('Failed to fetch waitlist entries', 'error');
     } finally {
       setLoading(false);
     }
@@ -118,12 +93,7 @@ export default function WaitlistPage() {
 
   const handleStatusUpdate = () => {
     fetchWaitlist();
-    toast({
-      title: 'Success',
-      description: 'Waitlist updated successfully',
-      status: 'success',
-      duration: 3000,
-    });
+    showToast('Waitlist updated successfully', 'success');
   };
 
   const formatDate = (dateString: string) => {
@@ -146,11 +116,11 @@ export default function WaitlistPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'review': return 'yellow';
-      case 'approved': return 'green';
-      case 'waitlisted': return 'purple';
-      case 'denied': return 'red';
-      default: return 'gray';
+      case 'review': return styles.statusReview;
+      case 'approved': return styles.statusApproved;
+      case 'waitlisted': return styles.statusWaitlisted;
+      case 'denied': return styles.statusDenied;
+      default: return '';
     }
   };
 
@@ -170,459 +140,186 @@ export default function WaitlistPage() {
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  const generateInvitationLink = async (waitlistId: string) => {
-    setGeneratingLink(waitlistId);
-    try {
-      const response = await fetch('/api/invitation/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ waitlistId }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Copy to clipboard
-        await navigator.clipboard.writeText(data.invitationUrl);
-        toast({
-          title: 'Invitation Link Generated',
-          description: 'Link copied to clipboard',
-          status: 'success',
-          duration: 3000,
-        });
-        fetchWaitlist(); // Refresh to show the new link
-      } else {
-        throw new Error(data.error || 'Failed to generate invitation link');
-      }
-    } catch (error) {
-      console.error('Error generating invitation link:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate invitation link',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setGeneratingLink(null);
-    }
-  };
-
-  const copyInvitationLink = async (token: string) => {
-    const invitationUrl = `${window.location.origin}/invitation?token=${token}`;
-    try {
-      await navigator.clipboard.writeText(invitationUrl);
-      toast({
-        title: 'Link Copied',
-        description: 'Invitation link copied to clipboard',
-        status: 'success',
-        duration: 2000,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to copy link',
-        status: 'error',
-        duration: 2000,
-      });
-    }
-  };
-
   return (
     <AdminLayout>
-      {/* Desktop View */}
-      <div className={styles.desktopView}>
-        <Box p={4} minH="100vh" bg="#353535" color="#ECEDE8">
-          <Box position="relative" ml={10} mr={10} zIndex={1} pt={28}>
-            <Heading mb={6} fontFamily="'Montserrat', sans-serif" color="#a59480">
-              Waitlist Management
-            </Heading>
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <h1 className={styles.title}>Waitlist</h1>
+          <button onClick={fetchWaitlist} className={styles.refreshButton}>
+            <svg className={styles.refreshIcon} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
 
-            {/* Status Summary */}
-            <SimpleGrid columns={3} spacing={6} mb={8}>
-              {statusCounts.map((statusCount) => (
-                <Stat key={statusCount.status} bg="#a59480" p={6} borderRadius="lg" border="1px solid #ecede8">
-                  <StatLabel fontSize="lg" fontFamily="'Montserrat', sans-serif" fontWeight="bold">
-                    {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
-                  </StatLabel>
-                  <StatNumber fontSize="3xl" fontFamily="'Montserrat', sans-serif">
-                    {statusCount.count}
-                  </StatNumber>
-                </Stat>
-              ))}
-            </SimpleGrid>
-
-            {/* Filters */}
-            <HStack spacing={4} mb={6}>
-              <Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                bg="#2a2a2a"
-                borderColor="#a59480"
-                color="#ECEDE8"
-                fontFamily="'Montserrat', sans-serif"
-                w="200px"
-              >
-                <option value="">All Statuses</option>
-                <option value="review">Review</option>
-                <option value="approved">Approved</option>
-                <option value="waitlisted">Waitlisted</option>
-                <option value="denied">Denied</option>
-              </Select>
-
-              <InputGroup w="300px">
-                <InputLeftElement>
-                  <SearchIcon color="#a59480" />
-                </InputLeftElement>
-                <Input
-                  placeholder="Search by name, email, company..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  bg="#2a2a2a"
-                  borderColor="#a59480"
-                  color="#ECEDE8"
-                  fontFamily="'Montserrat', sans-serif"
-                  _focus={{ borderColor: "#a59480", boxShadow: "0 0 0 1px #a59480" }}
-                />
-              </InputGroup>
-
-              <Button
-                onClick={fetchWaitlist}
-                bg="#a59480"
-                color="#353535"
-                _hover={{ bg: "#bca892" }}
-                fontFamily="'Montserrat', sans-serif"
-              >
-                Refresh
-              </Button>
-            </HStack>
-
-            {/* Waitlist Table */}
-            <Box bg="#2a2a2a" borderRadius="lg" overflow="hidden" border="1px solid #a59480">
-              {loading ? (
-                <Flex justify="center" align="center" p={8}>
-                  <Spinner size="xl" color="#a59480" />
-                </Flex>
-              ) : (
-                <>
-                  <Table variant="simple">
-                    <Thead bg="#a59480">
-                      <Tr>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Name</Th>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Email</Th>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Phone</Th>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Company</Th>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Location</Th>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Status</Th>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Submitted</Th>
-                        <Th color="#353535" fontFamily="'Montserrat', sans-serif">Actions</Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {filteredEntries.map((entry) => (
-                        <Tr key={entry.id} _hover={{ bg: "#3a3a3a" }}>
-                          <Td fontFamily="'Montserrat', sans-serif">
-                            {entry.first_name} {entry.last_name}
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif">{entry.email}</Td>
-                          <Td fontFamily="'Montserrat', sans-serif">{formatPhone(entry.phone)}</Td>
-                          <Td fontFamily="'Montserrat', sans-serif">{entry.company || '-'}</Td>
-                          <Td fontFamily="'Montserrat', sans-serif">{entry.city_state || '-'}</Td>
-                          <Td>
-                            <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
-                              {entry.status.toUpperCase()}
-                            </Badge>
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif">{formatDate(entry.submitted_at)}</Td>
-                          <Td>
-                            <HStack spacing={2}>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedEntry(entry);
-                                  onModalOpen();
-                                }}
-                                bg="#a59480"
-                                color="#353535"
-                                _hover={{ bg: "#bca892" }}
-                                fontFamily="'Montserrat', sans-serif"
-                              >
-                                Review
-                              </Button>
-                              {!entry.application_token ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => generateInvitationLink(entry.id)}
-                                  isLoading={generatingLink === entry.id}
-                                  leftIcon={<LinkIcon />}
-                                  bg="#2a2a2a"
-                                  color="#a59480"
-                                  borderColor="#a59480"
-                                  borderWidth="1px"
-                                  _hover={{ bg: "#3a3a3a" }}
-                                  fontFamily="'Montserrat', sans-serif"
-                                >
-                                  Generate Link
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  onClick={() => copyInvitationLink(entry.application_token!)}
-                                  leftIcon={<CopyIcon />}
-                                  bg="#2a2a2a"
-                                  color="#a59480"
-                                  borderColor="#a59480"
-                                  borderWidth="1px"
-                                  _hover={{ bg: "#3a3a3a" }}
-                                  fontFamily="'Montserrat', sans-serif"
-                                >
-                                  Copy Link
-                                </Button>
-                              )}
-                            </HStack>
-                          </Td>
-                        </Tr>
-                      ))}
-                    </Tbody>
-                  </Table>
-
-                  {filteredEntries.length === 0 && (
-                    <Box p={8} textAlign="center">
-                      <Text fontFamily="'Montserrat', sans-serif" color="#a59480">
-                        No waitlist entries found
-                      </Text>
-                    </Box>
-                  )}
-                </>
-              )}
-            </Box>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <HStack justify="center" mt={6} spacing={2}>
-                <Button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  bg="#a59480"
-                  color="#353535"
-                  _hover={{ bg: "#bca892" }}
-                  fontFamily="'Montserrat', sans-serif"
-                >
-                  Previous
-                </Button>
-                <Text fontFamily="'Montserrat', sans-serif">
-                  Page {currentPage} of {totalPages}
-                </Text>
-                <Button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  bg="#a59480"
-                  color="#353535"
-                  _hover={{ bg: "#bca892" }}
-                  fontFamily="'Montserrat', sans-serif"
-                >
-                  Next
-                </Button>
-              </HStack>
-            )}
-          </Box>
-        </Box>
-      </div>
-
-      {/* Mobile View */}
-      <div className={styles.mobileView}>
-        <div className={styles.mobileContainer}>
-          <div className={styles.mobileHeader}>
-            <h1 className={styles.mobileTitle}>Waitlist Management</h1>
-            
-            {/* Mobile Status Summary */}
-            <div className={styles.mobileStatusGrid}>
-              {statusCounts.map((statusCount) => (
-                <div key={statusCount.status} className={styles.mobileStatusCard}>
-                  <div className={styles.mobileStatusLabel}>
-                    {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
-                  </div>
-                  <div className={styles.mobileStatusNumber}>
-                    {statusCount.count}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Mobile Filters */}
-          <div className={styles.mobileFiltersContainer}>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className={styles.mobileSelect}
-            >
-              <option value="">All Statuses</option>
-              <option value="review">Review</option>
-              <option value="approved">Approved</option>
-              <option value="waitlisted">Waitlisted</option>
-              <option value="denied">Denied</option>
-            </select>
-
-            <div className={styles.mobileSearchContainer}>
-              <SearchIcon className={styles.mobileSearchIcon} />
-              <input
-                type="text"
-                placeholder="Search by name, email, company..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={styles.mobileSearchInput}
-              />
-            </div>
-
-            <button
-              onClick={fetchWaitlist}
-              className={styles.mobileRefreshButton}
-            >
-              Refresh
-            </button>
-          </div>
-
-          {/* Mobile Waitlist Entries */}
-          <div className={styles.mobileEntriesContainer}>
-            {loading ? (
-              <div className={styles.mobileLoading}>
-                <div className={styles.mobileLoadingSpinner}></div>
+        <div className={styles.statusGrid}>
+          {statusCounts.map((statusCount) => (
+            <div key={statusCount.status} className={styles.statusCard}>
+              <div className={styles.statusLabel}>
+                {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
               </div>
-            ) : filteredEntries.length === 0 ? (
-              <div className={styles.mobileEmpty}>
-                No waitlist entries found
-              </div>
-            ) : (
-              filteredEntries.map((entry) => (
-                <div key={entry.id} className={styles.mobileEntryCard}>
-                  <div className={styles.mobileEntryHeader}>
-                    <div className={styles.mobileEntryName}>
-                      {entry.first_name} {entry.last_name}
-                    </div>
-                    <div className={styles.mobileEntryHeaderInfo}>
-                      <span className={`${styles.mobileEntryStatus} ${styles[entry.status]}`}>
+              <div className={styles.statusNumber}>{statusCount.count}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.filters}>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={styles.select}
+          >
+            <option value="">All Statuses</option>
+            <option value="review">Review</option>
+            <option value="approved">Approved</option>
+            <option value="waitlisted">Waitlisted</option>
+            <option value="denied">Denied</option>
+          </select>
+
+          <div className={styles.searchContainer}>
+            <svg className={styles.searchIcon} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+        </div>
+
+        <div className={styles.content}>
+          {loading ? (
+            <div className={styles.loading}>
+              <div className={styles.spinner} />
+            </div>
+          ) : filteredEntries.length === 0 ? (
+            <div className={styles.empty}>No waitlist entries found</div>
+          ) : (
+            <div className={styles.entriesList}>
+              {filteredEntries.map((entry) => (
+                <div key={entry.id} className={styles.entryCard}>
+                  <div className={styles.entryHeader}>
+                    <div>
+                      <h3 className={styles.entryName}>
+                        {entry.first_name} {entry.last_name}
+                      </h3>
+                      <span className={`${styles.statusBadge} ${getStatusColor(entry.status)}`}>
                         {entry.status.toUpperCase()}
                       </span>
-                      <div className={styles.mobileEntryDate}>
-                        {formatDate(entry.submitted_at)}
-                      </div>
                     </div>
+                    <div className={styles.entryDate}>{formatDate(entry.submitted_at)}</div>
                   </div>
 
-                  <div className={styles.mobileEntryInfo}>
-                    <div className={styles.mobileInfoRow}>
-                      <span className={styles.mobileInfoIcon}>✉️</span>
-                      <span className={styles.mobileInfoText}>{entry.email}</span>
+                  <div className={styles.entryInfo}>
+                    <div className={styles.infoRow}>
+                      <svg className={styles.infoIcon} viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                        <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                      </svg>
+                      <span className={styles.infoText}>{entry.email}</span>
                     </div>
-                    <div className={styles.mobileInfoRow}>
-                      <span className={styles.mobileInfoIcon}>📞</span>
-                      <span className={styles.mobileInfoText}>{formatPhone(entry.phone)}</span>
+                    <div className={styles.infoRow}>
+                      <svg className={styles.infoIcon} viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                      </svg>
+                      <span className={styles.infoText}>{formatPhone(entry.phone)}</span>
                     </div>
                     {(entry.company || entry.city_state) && (
-                      <div className={styles.mobileInfoRow}>
-                        <span className={styles.mobileInfoIcon}>🏢</span>
-                        <div className={styles.mobileInfoText}>
+                      <div className={styles.infoRow}>
+                        <svg className={styles.infoIcon} viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                        </svg>
+                        <div className={styles.infoText}>
                           {entry.company || '-'}
                           {entry.company && entry.city_state && (
-                            <div className={styles.mobileCompanyLocation}>
-                              {entry.city_state}
-                            </div>
+                            <span className={styles.infoSubtext}>{entry.city_state}</span>
                           )}
                         </div>
                       </div>
                     )}
-                    
-                    {/* Additional details - expandable section */}
-                    {(entry.why_noir || entry.occupation || entry.how_did_you_hear) && (
-                      <div className={styles.mobileExpandedDetails}>
+                  </div>
+
+                  {(entry.why_noir || entry.occupation || entry.how_did_you_hear) && (
+                    <details className={styles.details}>
+                      <summary className={styles.detailsToggle}>More Details</summary>
+                      <div className={styles.detailsContent}>
                         {entry.why_noir && (
-                          <div className={styles.mobileDetailSection}>
-                            <div className={styles.mobileDetailLabel}>Why Noir?</div>
-                            <div className={styles.mobileDetailValue}>{entry.why_noir}</div>
+                          <div className={styles.detailItem}>
+                            <div className={styles.detailLabel}>Why Noir?</div>
+                            <div className={styles.detailValue}>{entry.why_noir}</div>
                           </div>
                         )}
                         {entry.occupation && (
-                          <div className={styles.mobileDetailSection}>
-                            <div className={styles.mobileDetailLabel}>Occupation</div>
-                            <div className={styles.mobileDetailValue}>{entry.occupation}</div>
+                          <div className={styles.detailItem}>
+                            <div className={styles.detailLabel}>Occupation</div>
+                            <div className={styles.detailValue}>{entry.occupation}</div>
                           </div>
                         )}
                         {entry.how_did_you_hear && (
-                          <div className={styles.mobileDetailSection}>
-                            <div className={styles.mobileDetailLabel}>How did you hear about us?</div>
-                            <div className={styles.mobileDetailValue}>{entry.how_did_you_hear}</div>
+                          <div className={styles.detailItem}>
+                            <div className={styles.detailLabel}>How did you hear about us?</div>
+                            <div className={styles.detailValue}>{entry.how_did_you_hear}</div>
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </details>
+                  )}
 
-                  <div className={styles.mobileEntryActions}>
+                  <div className={styles.entryActions}>
                     <button
                       onClick={() => {
                         setSelectedEntry(entry);
-                        onModalOpen();
+                        setIsModalOpen(true);
                       }}
-                      className={`${styles.mobileActionButton} ${styles.mobileReviewButton}`}
+                      className={styles.primaryButton}
                     >
                       Review
                     </button>
-                    {!entry.application_token ? (
-                      <button
-                        onClick={() => generateInvitationLink(entry.id)}
-                        disabled={generatingLink === entry.id}
-                        className={`${styles.mobileActionButton} ${styles.mobileGenerateButton}`}
-                      >
-                        {generatingLink === entry.id ? '⏳' : '🔗'} Generate Link
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => copyInvitationLink(entry.application_token!)}
-                        className={`${styles.mobileActionButton} ${styles.mobileCopyButton}`}
-                      >
-                        📋 Copy Link
-                      </button>
-                    )}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-
-          {/* Mobile Pagination */}
-          {totalPages > 1 && (
-            <div className={styles.mobilePagination}>
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className={styles.mobilePaginationButton}
-              >
-                Previous
-              </button>
-              <span className={styles.mobilePaginationText}>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className={styles.mobilePaginationButton}
-              >
-                Next
-              </button>
+              ))}
             </div>
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className={styles.pagination}>
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={styles.paginationButton}
+            >
+              Previous
+            </button>
+            <span className={styles.paginationText}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={styles.paginationButton}
+            >
+              Next
+            </button>
+          </div>
+        )}
+
+        {toast.show && (
+          <div className={`${styles.toast} ${styles[toast.type]}`}>
+            {toast.message}
+          </div>
+        )}
       </div>
 
-      {/* Waitlist Review Drawer */}
       <WaitlistReviewDrawer
         isOpen={isModalOpen}
-        onClose={onModalClose}
+        onClose={() => setIsModalOpen(false)}
         entry={selectedEntry}
         onStatusUpdate={handleStatusUpdate}
       />
     </AdminLayout>
   );
-} 
+}

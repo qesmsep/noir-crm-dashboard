@@ -1,182 +1,74 @@
-.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  font-size: 1.1rem;
-  color: #666;
+/* New Reservations Page Styles */
+
+.container {
+  width: 100%;
+  min-height: 100vh;
+  background: #f5f5f7;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.fullScreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: #f5f5f7;
+  overflow: auto;
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
+  background: #ffffff;
+  border-bottom: 1px solid #d2d2d7;
+  padding: 16px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.header h1 {
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1d1d1f;
   margin: 0;
-  font-size: 1.5rem;
-  color: #1a1a1a;
+  font-family: 'IvyJournal', serif;
 }
 
-.controls {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
+.subtitle {
+  font-size: 14px;
+  color: #86868b;
+  margin: 4px 0 0 0;
 }
 
-.viewToggle {
-  display: flex;
-  background-color: #f0f0f0;
-  border-radius: 0.25rem;
-  padding: 0.25rem;
+.content {
+  max-width: 100%;
+  padding: 24px;
 }
 
-.viewButton {
-  padding: 0.5rem 1rem;
-  border: none;
-  background: none;
-  color: #666;
-  font-size: 0.875rem;
-  cursor: pointer;
-  border-radius: 0.25rem;
-  transition: all 0.2s;
-}
-
-.viewButton:hover {
-  color: #1a1a1a;
-}
-
-.viewButton.active {
-  background-color: white;
-  color: #1a1a1a;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.dateFilter,
-.statusFilter {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
-  min-width: 150px;
-}
-
-.dateFilter:focus,
-.statusFilter:focus {
-  outline: none;
-  border-color: #666;
-}
-
-.tableContainer {
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.table th,
-.table td {
-  padding: 1rem;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-.table th {
-  background-color: #f8f8f8;
-  font-weight: 500;
-  color: #666;
-  white-space: nowrap;
-}
-
-.table tbody tr:hover {
-  background-color: #f8f8f8;
-}
-
-.status {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 1rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: capitalize;
-}
-
-.confirmed {
-  background-color: #e6f4ea;
-  color: #1e7e34;
-}
-
-.pending {
-  background-color: #fff3e0;
-  color: #f57c00;
-}
-
-.cancelled {
-  background-color: #fbe9e7;
-  color: #d32f2f;
-}
-
-.statusSelect {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  background-color: white;
-  color: #666;
-  cursor: pointer;
-}
-
-.statusSelect:focus {
-  outline: none;
-  border-color: #666;
-}
-
-.calendarContainer {
-  background-color: white;
-  border-radius: 0.5rem;
-  padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.timelineContainer {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   min-height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
+  /* DO NOT create stacking contexts - allow modals to escape */
+  position: relative;
+  z-index: 1;
 }
 
+/* Responsive */
 @media (max-width: 768px) {
   .header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
+    padding: 12px 16px;
   }
 
-  .controls {
-    flex-direction: column;
+  .title {
+    font-size: 20px;
   }
 
-  .viewToggle {
-    width: 100%;
+  .content {
+    padding: 16px;
   }
-
-  .viewButton {
-    flex: 1;
-  }
-
-  .dateFilter,
-  .statusFilter {
-    width: 100%;
-  }
-
-  .table th,
-  .table td {
-    padding: 0.75rem;
-  }
-} 
+}

@@ -65,3 +65,8 @@ Thumbs.db
 /checkpoints/
 /Ω_historic/
 .next/
+logs/
+
+# Local development-only documentation and external project snapshot
+/venue-management-crm-12012025/
+HOWTO.md

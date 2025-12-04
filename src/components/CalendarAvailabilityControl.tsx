@@ -30,6 +30,13 @@ import {
   ModalCloseButton,
   Spinner,
   Badge,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  IconButton,
 } from '@chakra-ui/react';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -673,85 +680,354 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         );
       case 'custom_closed':
         return (
-          <Box className="availability-section" p={4} borderRadius="8px" border="1px solid #ececec" maxW={"600px"}>
-            <Heading size="md" mb={4}>Custom Closed Days</Heading>
+          <Box className="availability-section" p={0} borderRadius="12px" border="none" maxW="100%">
             <VStack align="stretch" spacing={4}>
-              <HStack>
-                <DatePicker
-                  selected={newClosureDate}
-                  onChange={date => setNewClosureDate(date)}
-                  placeholderText="Select date"
-                  minDate={new Date()}
-                  className="chakra-input"
-                />
-                <Input value={newClosureReason} onChange={e => setNewClosureReason(e.target.value)} placeholder="Reason for closure (optional)" w="200px" />
-                <Input value={newClosureSmsNotification} onChange={e => setNewClosureSmsNotification(e.target.value)} placeholder="SMS message for reservations (optional)" w="250px" />
-                <Checkbox isChecked={newClosureFullDay} onChange={e => setNewClosureFullDay(e.target.checked)}>Full Day</Checkbox>
-                {!newClosureFullDay && (
-                  <HStack>
-                    {newClosureTimeRanges.map((range, index) => (
-                      <HStack key={index} spacing={1}>
-                        <Input type="time" value={range.start} onChange={e => {
-                          const newRanges = [...newClosureTimeRanges];
-                          newRanges[index].start = e.target.value;
-                          setNewClosureTimeRanges(newRanges);
-                        }} w="110px" />
-                        <Text>to</Text>
-                        <Input type="time" value={range.end} onChange={e => {
-                          const newRanges = [...newClosureTimeRanges];
-                          newRanges[index].end = e.target.value;
-                          setNewClosureTimeRanges(newRanges);
-                        }} w="110px" />
-                      </HStack>
-                    ))}
-                    <Button size="xs" colorScheme="blue" onClick={() => setNewClosureTimeRanges([...newClosureTimeRanges, { start: '18:00', end: '23:00' }])}>+ Add Time Range</Button>
+              {/* Add Form */}
+              <Box p={4} bg="#ffffff" borderRadius="12px" boxShadow="0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.06)">
+                <Heading size="sm" mb={4} fontSize="1.25rem" fontWeight={600} letterSpacing="-0.02em" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Add Custom Closed Day</Heading>
+                <VStack align="stretch" spacing={4}>
+                  {/* All Fields in One Row */}
+                  <HStack spacing={3} align="flex-end" flexWrap="wrap">
+                    <Box flex="0 0 180px">
+                      <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Date *</Text>
+                      <DatePicker
+                        selected={newClosureDate}
+                        onChange={date => setNewClosureDate(date)}
+                        placeholderText="Select date"
+                        minDate={new Date()}
+                        className="chakra-input"
+                        style={{
+                          width: '100%',
+                          height: '44px',
+                          padding: '0 1rem',
+                          background: '#f5f5f7',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '10px',
+                          fontSize: '1rem',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}
+                      />
+                    </Box>
+                    <Box flex="1" minW="200px">
+                      <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Reason (optional)</Text>
+                      <Input 
+                        value={newClosureReason} 
+                        onChange={e => setNewClosureReason(e.target.value)} 
+                        placeholder="Reason for closure" 
+                        h="44px"
+                        bg="#f5f5f7"
+                        borderColor="rgba(0, 0, 0, 0.08)"
+                        borderRadius="10px"
+                        fontSize="1rem"
+                        _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                      />
+                    </Box>
+                    <Box flex="1" minW="200px">
+                      <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">SMS Message (optional)</Text>
+                      <Input 
+                        value={newClosureSmsNotification} 
+                        onChange={e => setNewClosureSmsNotification(e.target.value)} 
+                        placeholder="SMS message for reservations" 
+                        h="44px"
+                        bg="#f5f5f7"
+                        borderColor="rgba(0, 0, 0, 0.08)"
+                        borderRadius="10px"
+                        fontSize="1rem"
+                        _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                      />
+                    </Box>
+                    <Box flex="0 0 140px">
+                      <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Type</Text>
+                      <Checkbox 
+                        isChecked={newClosureFullDay} 
+                        onChange={e => setNewClosureFullDay(e.target.checked)}
+                        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                        fontSize="0.9375rem"
+                        pt={1}
+                      >
+                        Full Day
+                      </Checkbox>
+                    </Box>
+                    <Box flex="0 0 auto" pb={0}>
+                      <Text fontSize="0.875rem" fontWeight={600} color="transparent" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Action</Text>
+                      <Button 
+                        onClick={addExceptionalClosure}
+                        h="44px"
+                        px="1rem"
+                        fontSize="0.8125rem"
+                        fontWeight={500}
+                        bg="transparent"
+                        color="#6e6e73"
+                        border="1px solid rgba(0, 0, 0, 0.12)"
+                        borderRadius="6px"
+                        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                        _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                      >
+                        Add
+                      </Button>
+                    </Box>
                   </HStack>
-                )}
-                <Button colorScheme="green" onClick={addExceptionalClosure}>Add Custom Closed Day</Button>
-              </HStack>
-              <VStack align="stretch" spacing={2}>
-                {exceptionalClosures.map(closure => (
-                  <Box key={closure.id} p={2} borderWidth={1} borderRadius={6} display="flex" alignItems="center" gap={2}>
-                    {editingClosureId === closure.id ? (
-                      <>
-                        <DatePicker
-                          selected={editingClosure?.date ? new Date(editingClosure.date) : null}
-                          onChange={date => setEditingClosure((e: any) => ({ ...e, date }))}
-                          minDate={new Date()}
-                          className="chakra-input"
-                        />
-                        <Input value={editingClosure?.reason} onChange={e => setEditingClosure((ed: any) => ({ ...ed, reason: e.target.value }))} placeholder="Reason for closure (optional)" w="200px" />
-                        <Input value={editingClosure?.sms_notification} onChange={e => setEditingClosure((ed: any) => ({ ...ed, sms_notification: e.target.value }))} placeholder="SMS message for reservations (optional)" w="250px" />
-                        <Checkbox isChecked={editingClosure?.full_day} onChange={e => setEditingClosure((ed: any) => ({ ...ed, full_day: e.target.checked }))}>Full Day</Checkbox>
-                        {!editingClosure?.full_day && (
-                          <HStack>
-                            {editingClosure?.time_ranges.map((range: TimeRange, index: number) => (
-                              <HStack key={index} spacing={1}>
-                                <Input type="time" value={range.start} onChange={e => setEditingClosure((ed: any) => ({ ...ed, time_ranges: ed.time_ranges.map((r: TimeRange, i: number) => i === index ? { ...r, start: e.target.value } : r) }))} w="110px" />
-                                <Text>to</Text>
-                                <Input type="time" value={range.end} onChange={e => setEditingClosure((ed: any) => ({ ...ed, time_ranges: ed.time_ranges.map((r: TimeRange, i: number) => i === index ? { ...r, end: e.target.value } : r) }))} w="110px" />
-                              </HStack>
-                            ))}
-                            <Button size="xs" colorScheme="blue" onClick={() => setEditingClosure((e: any) => ({ ...e, time_ranges: [...e.time_ranges, { start: '18:00', end: '23:00' }] }))}>+ Add Time Range</Button>
+
+                  {/* Time Ranges (only shown when not full day) */}
+                  {!newClosureFullDay && (
+                    <Box>
+                      <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Time Ranges</Text>
+                      <VStack align="stretch" spacing={2}>
+                        {newClosureTimeRanges.map((range, index) => (
+                          <HStack key={index} spacing={2}>
+                            <Input 
+                              type="time" 
+                              value={range.start} 
+                              onChange={e => {
+                                const newRanges = [...newClosureTimeRanges];
+                                newRanges[index].start = e.target.value;
+                                setNewClosureTimeRanges(newRanges);
+                              }} 
+                              flex="0 0 140px"
+                              h="44px"
+                              bg="#f5f5f7"
+                              borderColor="rgba(0, 0, 0, 0.08)"
+                              borderRadius="10px"
+                              fontSize="1rem"
+                              _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                            />
+                            <Text fontSize="0.875rem" color="#6e6e73" alignSelf="center">to</Text>
+                            <Input 
+                              type="time" 
+                              value={range.end} 
+                              onChange={e => {
+                                const newRanges = [...newClosureTimeRanges];
+                                newRanges[index].end = e.target.value;
+                                setNewClosureTimeRanges(newRanges);
+                              }} 
+                              flex="0 0 140px"
+                              h="44px"
+                              bg="#f5f5f7"
+                              borderColor="rgba(0, 0, 0, 0.08)"
+                              borderRadius="10px"
+                              fontSize="1rem"
+                              _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                            />
+                            {newClosureTimeRanges.length > 1 && (
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  const newRanges = newClosureTimeRanges.filter((_, i) => i !== index);
+                                  setNewClosureTimeRanges(newRanges);
+                                }}
+                                h="32px"
+                                w="32px"
+                                fontSize="0.875rem"
+                                bg="transparent"
+                                color="#6e6e73"
+                                border="1px solid rgba(0, 0, 0, 0.12)"
+                                borderRadius="6px"
+                                _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                              >
+                                ×
+                              </Button>
+                            )}
                           </HStack>
-                        )}
-                        <Button colorScheme="blue" onClick={handleSaveEditClosure}>Save</Button>
-                        <Button colorScheme="gray" onClick={handleCancelEditClosure}>Cancel</Button>
-                      </>
-                    ) : (
-                      <>
-                        <Text>{closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date) ? (() => { const [y, m, d] = closure.date.split('-'); return `${Number(m)}/${Number(d)}/${y}`; })() : formatDate(new Date(closure.date), 'America/Chicago')}</Text>
-                        <Text>{closure.full_day ? 'Full Day' : closure.time_ranges?.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ')}</Text>
-                        {closure.reason && <Badge colorScheme="red">{closure.reason}</Badge>}
-                        {closure.sms_notification && <Badge colorScheme="blue">SMS: {closure.sms_notification}</Badge>}
-                        <Button size="xs" colorScheme="blue" onClick={() => handleEditClosure(closure)}>Edit</Button>
-                        <Button size="xs" colorScheme="red" onClick={() => deleteExceptionalClosure(closure.id)}>Delete</Button>
-                      </>
-                    )}
-                  </Box>
-                ))}
-              </VStack>
-              {error && <Text color="red.500">{error}</Text>}
+                        ))}
+                        <Button 
+                          size="sm" 
+                          onClick={() => setNewClosureTimeRanges([...newClosureTimeRanges, { start: '18:00', end: '23:00' }])}
+                          h="32px"
+                          px="0.75rem"
+                          fontSize="0.8125rem"
+                          bg="transparent"
+                          color="#6e6e73"
+                          border="1px solid rgba(0, 0, 0, 0.12)"
+                          borderRadius="6px"
+                          alignSelf="flex-start"
+                          _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                        >
+                          + Add Time Range
+                        </Button>
+                      </VStack>
+                    </Box>
+                  )}
+                </VStack>
+              </Box>
+
+              {/* Table */}
+              <Box p={4} bg="#ffffff" borderRadius="12px" boxShadow="0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.06)" overflowX="auto" w="100%">
+                {exceptionalClosures.length === 0 ? (
+                  <Text textAlign="center" py={8} color="#6e6e73" fontSize="0.875rem" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">No custom closed days</Text>
+                ) : (
+                  <Table variant="simple" size="sm" w="100%">
+                    <Thead>
+                      <Tr>
+                        <Th fontSize="0.8125rem" fontWeight={600} color="#1d1d1f" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" py={3} borderBottom="1px solid rgba(0, 0, 0, 0.08)" w="12%">Date</Th>
+                        <Th fontSize="0.8125rem" fontWeight={600} color="#1d1d1f" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" py={3} borderBottom="1px solid rgba(0, 0, 0, 0.08)" w="12%">Type</Th>
+                        <Th fontSize="0.8125rem" fontWeight={600} color="#1d1d1f" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" py={3} borderBottom="1px solid rgba(0, 0, 0, 0.08)">Description</Th>
+                        <Th fontSize="0.8125rem" fontWeight={600} color="#1d1d1f" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" py={3} borderBottom="1px solid rgba(0, 0, 0, 0.08)" textAlign="right" w="10%">Actions</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {exceptionalClosures.map(closure => (
+                        <Tr key={closure.id} _hover={{ bg: 'rgba(0, 0, 0, 0.02)' }}>
+                          {editingClosureId === closure.id ? (
+                            <>
+                              <Td py={2}>
+                                <DatePicker
+                                  selected={editingClosure?.date ? new Date(editingClosure.date) : null}
+                                  onChange={date => setEditingClosure((e: any) => ({ ...e, date }))}
+                                  minDate={new Date()}
+                                  className="chakra-input"
+                                  style={{
+                                    width: '100%',
+                                    height: '40px',
+                                    padding: '0 0.75rem',
+                                    background: '#f5f5f7',
+                                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                                    borderRadius: '8px',
+                                    fontSize: '0.9375rem',
+                                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                                  }}
+                                />
+                              </Td>
+                              <Td py={2}>
+                                <Checkbox 
+                                  isChecked={editingClosure?.full_day} 
+                                  onChange={e => setEditingClosure((ed: any) => ({ ...ed, full_day: e.target.checked }))}
+                                  fontSize="0.875rem"
+                                  fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                                >
+                                  Full Day
+                                </Checkbox>
+                              </Td>
+                              <Td py={2}>
+                                <VStack align="stretch" spacing={2}>
+                                  <Input 
+                                    value={editingClosure?.reason || ''} 
+                                    onChange={e => setEditingClosure((ed: any) => ({ ...ed, reason: e.target.value }))} 
+                                    placeholder="Reason" 
+                                    size="sm"
+                                    h="36px"
+                                    bg="#f5f5f7"
+                                    borderColor="rgba(0, 0, 0, 0.08)"
+                                    borderRadius="8px"
+                                    fontSize="0.875rem"
+                                    _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                                  />
+                                  <Input 
+                                    value={editingClosure?.sms_notification || ''} 
+                                    onChange={e => setEditingClosure((ed: any) => ({ ...ed, sms_notification: e.target.value }))} 
+                                    placeholder="SMS message" 
+                                    size="sm"
+                                    h="36px"
+                                    bg="#f5f5f7"
+                                    borderColor="rgba(0, 0, 0, 0.08)"
+                                    borderRadius="8px"
+                                    fontSize="0.875rem"
+                                    _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                                  />
+                                </VStack>
+                              </Td>
+                              <Td py={2} textAlign="right">
+                                <HStack spacing={2} justify="flex-end">
+                                  <Button 
+                                    size="sm"
+                                    onClick={handleSaveEditClosure}
+                                    h="28px"
+                                    px="0.75rem"
+                                    fontSize="0.75rem"
+                                    bg="transparent"
+                                    color="#6e6e73"
+                                    border="1px solid rgba(0, 0, 0, 0.12)"
+                                    borderRadius="6px"
+                                    _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button 
+                                    size="sm"
+                                    onClick={handleCancelEditClosure}
+                                    h="28px"
+                                    px="0.75rem"
+                                    fontSize="0.75rem"
+                                    bg="transparent"
+                                    color="#6e6e73"
+                                    border="1px solid rgba(0, 0, 0, 0.12)"
+                                    borderRadius="6px"
+                                    _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </HStack>
+                              </Td>
+                            </>
+                          ) : (
+                            <>
+                              <Td py={3} fontSize="0.875rem" color="#1d1d1f" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+                                {closure.date && /^\d{4}-\d{2}-\d{2}$/.test(closure.date) 
+                                  ? (() => { 
+                                      const [y, m, d] = closure.date.split('-'); 
+                                      return `${Number(m)}/${Number(d)}/${y}`; 
+                                    })() 
+                                  : formatDate(new Date(closure.date), 'America/Chicago')
+                                }
+                              </Td>
+                              <Td py={3} fontSize="0.875rem" color="#6e6e73" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+                                {closure.full_day ? 'Full Day' : closure.time_ranges?.map(range => `${formatTime12h(range.start)} - ${formatTime12h(range.end)}`).join(', ') || '—'}
+                              </Td>
+                              <Td py={3} fontSize="0.875rem" color="#1d1d1f" fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+                                <VStack align="stretch" spacing={1}>
+                                  {closure.reason && (
+                                    <Text fontSize="0.8125rem" color="#1d1d1f" noOfLines={2}>{closure.reason}</Text>
+                                  )}
+                                  {closure.sms_notification && (
+                                    <Text fontSize="0.75rem" color="#6e6e73" noOfLines={3}>{closure.sms_notification}</Text>
+                                  )}
+                                  {!closure.reason && !closure.sms_notification && (
+                                    <Text fontSize="0.8125rem" color="#6e6e73">—</Text>
+                                  )}
+                                </VStack>
+                              </Td>
+                              <Td py={3} textAlign="right">
+                                <HStack spacing={1} justify="flex-end">
+                                  <IconButton
+                                    aria-label="Edit"
+                                    icon={<Text>✎</Text>}
+                                    size="sm"
+                                    h="28px"
+                                    w="28px"
+                                    bg="transparent"
+                                    color="#6e6e73"
+                                    border="1px solid rgba(0, 0, 0, 0.08)"
+                                    borderRadius="6px"
+                                    fontSize="0.875rem"
+                                    onClick={() => handleEditClosure(closure)}
+                                    _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                                  />
+                                  <IconButton
+                                    aria-label="Delete"
+                                    icon={<Text>🗑</Text>}
+                                    size="sm"
+                                    h="28px"
+                                    w="28px"
+                                    bg="transparent"
+                                    color="#6e6e73"
+                                    border="1px solid rgba(0, 0, 0, 0.08)"
+                                    borderRadius="6px"
+                                    fontSize="0.875rem"
+                                    onClick={() => deleteExceptionalClosure(closure.id)}
+                                    _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                                  />
+                                </HStack>
+                              </Td>
+                            </>
+                          )}
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                )}
+                {error && (
+                  <Text color="#ff3b30" fontSize="0.875rem" mt={3} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">{error}</Text>
+                )}
+              </Box>
             </VStack>
           </Box>
         );
