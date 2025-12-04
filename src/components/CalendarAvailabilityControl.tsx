@@ -690,23 +690,16 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                   <HStack spacing={3} align="flex-end" flexWrap="wrap">
                     <Box flex="0 0 180px">
                       <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Date *</Text>
-                      <DatePicker
-                        selected={newClosureDate}
-                        onChange={date => setNewClosureDate(date)}
-                        placeholderText="Select date"
-                        minDate={new Date()}
-                        className="chakra-input"
-                        style={{
-                          width: '100%',
-                          height: '44px',
-                          padding: '0 1rem',
-                          background: '#f5f5f7',
-                          border: '1px solid rgba(0, 0, 0, 0.08)',
-                          borderRadius: '10px',
-                          fontSize: '1rem',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                        }}
-                      />
+                      <Box width="100%">
+                        <DatePicker
+                          selected={newClosureDate}
+                          onChange={date => setNewClosureDate(date)}
+                          placeholderText="Select date"
+                          minDate={new Date()}
+                          className="chakra-input"
+                          wrapperClassName="closure-datepicker-wrapper"
+                        />
+                      </Box>
                     </Box>
                     <Box flex="1" minW="200px">
                       <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Reason (optional)</Text>
@@ -870,22 +863,15 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                           {editingClosureId === closure.id ? (
                             <>
                               <Td py={2}>
-                                <DatePicker
-                                  selected={editingClosure?.date ? new Date(editingClosure.date) : null}
-                                  onChange={date => setEditingClosure((e: any) => ({ ...e, date }))}
-                                  minDate={new Date()}
-                                  className="chakra-input"
-                                  style={{
-                                    width: '100%',
-                                    height: '40px',
-                                    padding: '0 0.75rem',
-                                    background: '#f5f5f7',
-                                    border: '1px solid rgba(0, 0, 0, 0.08)',
-                                    borderRadius: '8px',
-                                    fontSize: '0.9375rem',
-                                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                                  }}
-                                />
+                                <Box width="100%">
+                                  <DatePicker
+                                    selected={editingClosure?.date ? new Date(editingClosure.date) : null}
+                                    onChange={date => setEditingClosure((e: any) => ({ ...e, date }))}
+                                    minDate={new Date()}
+                                    className="chakra-input"
+                                    wrapperClassName="closure-datepicker-wrapper-edit"
+                                  />
+                                </Box>
                               </Td>
                               <Td py={2}>
                                 <Checkbox 

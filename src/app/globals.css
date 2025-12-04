@@ -740,6 +740,46 @@ button:focus, a:focus, input:focus, select:focus, textarea:focus {
   border-color: #A59480;
 }
 
+/* Closure datepicker wrapper styling */
+.closure-datepicker-wrapper {
+  width: 100%;
+}
+
+.closure-datepicker-wrapper .react-datepicker__input-container {
+  width: 100%;
+}
+
+.closure-datepicker-wrapper .react-datepicker__input-container input {
+  width: 100%;
+  height: 44px;
+  padding: 0 1rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Closure datepicker wrapper styling for edit mode */
+.closure-datepicker-wrapper-edit {
+  width: 100%;
+}
+
+.closure-datepicker-wrapper-edit .react-datepicker__input-container {
+  width: 100%;
+}
+
+.closure-datepicker-wrapper-edit .react-datepicker__input-container input {
+  width: 100%;
+  height: 40px;
+  padding: 0 0.75rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
 /* Select improvements */
 select {
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
