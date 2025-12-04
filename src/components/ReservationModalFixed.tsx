@@ -83,6 +83,30 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
   const { settings } = useSettings();
   const timezone = settings?.timezone || 'America/Chicago';
 
+  const handleClose = useCallback(() => {
+    // Unlock body scroll immediately
+    document.body.style.overflow = '';
+
+    setFormData({
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      party_size: 2,
+      event_type: '',
+      notes: '',
+      table_id: '',
+      start_time: '',
+      end_time: '',
+      is_checked_in: false,
+      send_access_instructions: false,
+      send_reminder: false,
+      send_confirmation: false,
+    });
+
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
     setMounted(true);
     return () => {
@@ -271,30 +295,6 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
       setIsSaving(false);
     }
   };
-
-  const handleClose = useCallback(() => {
-    // Unlock body scroll immediately
-    document.body.style.overflow = '';
-    
-    setFormData({
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      party_size: 2,
-      event_type: '',
-      notes: '',
-      table_id: '',
-      start_time: '',
-      end_time: '',
-      is_checked_in: false,
-      send_access_instructions: false,
-      send_reminder: false,
-      send_confirmation: false,
-    });
-    onClose();
-  }, [onClose]);
-
 
   // Don't render portal if not open or not mounted
   if (!mounted) return null;
