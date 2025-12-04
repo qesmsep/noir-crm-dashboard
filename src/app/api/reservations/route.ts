@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { formatDateTime } from '../../../utils/dateUtils';
 import Stripe from 'stripe';
 import { getHoldFeeConfig, getHoldAmount } from '../../../utils/holdFeeUtils';
@@ -647,7 +647,9 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    let query = supabase
+    const db = supabaseAdmin || supabase;
+
+    let query = db
       .from('reservations')
       .select(`
         *,
