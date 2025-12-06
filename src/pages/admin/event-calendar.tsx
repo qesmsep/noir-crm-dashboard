@@ -35,7 +35,7 @@ import {
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon, AddIcon, CalendarIcon, SettingsIcon, DownloadIcon, CloseIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, parseISO, isToday, startOfYear, endOfYear } from 'date-fns';
 import styles from '../../styles/EventCalendar.module.css';
 
@@ -56,9 +56,15 @@ interface PrivateEvent {
 
 interface Reservation {
   id: string;
-  reservation_date: string;
-  reservation_time: string;
-  party_size: number;
+  start_time: string;
+  end_time?: string;
+  party_size?: number;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  status?: string;
+  membership_type?: string;
   status: string;
 }
 
@@ -147,12 +153,34 @@ export default function EventCalendarNew() {
         ...minakaEvents,
       ];
 
-      // Fetch reservations
-      const { data: reservations } = await supabase
+      // Fetch reservations - use start_time instead of reservation_date
+      // Use admin client to bypass RLS for admin calendar view
+      const client = supabaseAdmin || supabase;
+      console.log('Fetching reservations for calendar:', {
+        start: calendarStart.toISOString(),
+        end: calendarEnd.toISOString(),
+        usingAdmin: !!supabaseAdmin
+      });
+      
+      const { data: reservations, error: reservationsError } = await client
         .from('reservations')
         .select('*')
-        .gte('reservation_date', format(calendarStart, 'yyyy-MM-dd'))
-        .lte('reservation_date', format(calendarEnd, 'yyyy-MM-dd'));
+        .gte('start_time', calendarStart.toISOString())
+        .lte('start_time', calendarEnd.toISOString());
+      
+      if (reservationsError) {
+        console.error('Error fetching reservations for calendar:', reservationsError);
+      } else {
+        console.log(`Fetched ${reservations?.length || 0} reservations for calendar`);
+        if (reservations && reservations.length > 0) {
+          console.log('Sample reservation:', {
+            id: reservations[0].id,
+            start_time: reservations[0].start_time,
+            phone: reservations[0].phone,
+            party_size: reservations[0].party_size
+          });
+        }
+      }
 
       // Fetch venue hours
       const { data: baseHours } = await supabase
@@ -187,13 +215,16 @@ export default function EventCalendarNew() {
           new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
         );
 
-        const dayReservations = (reservations?.filter(r =>
-          r.reservation_date === dateStr
-        ) || []).sort((a, b) => {
-          // Sort reservations by time
-          const timeA = a.reservation_time || '';
-          const timeB = b.reservation_time || '';
-          return timeA.localeCompare(timeB);
+        const dayReservations = (reservations?.filter(r => {
+          // Filter by start_time instead of reservation_date
+          if (!r.start_time) return false;
+          const resDate = parseISO(r.start_time);
+          return format(resDate, 'yyyy-MM-dd') === dateStr;
+        }) || []).sort((a, b) => {
+          // Sort reservations by start_time
+          const timeA = a.start_time ? new Date(a.start_time).getTime() : 0;
+          const timeB = b.start_time ? new Date(b.start_time).getTime() : 0;
+          return timeA - timeB;
         });
 
         // Calculate covers and revenue
@@ -591,16 +622,22 @@ export default function EventCalendarNew() {
                           {day.reservations.length > 0 && (
                             <>
                               {day.reservations.length <= 3 ? (
-                                day.reservations.map((res, idx) => (
-                                  <div
-                                    key={`res-${idx}`}
-                                    className={`${styles.eventItem} ${styles.eventReservation}`}
-                                    title={`${res.reservation_time} - Party of ${res.party_size}`}
-                                  >
-                                    <div className={styles.eventNameText}>{res.reservation_time}</div>
-                                    <div className={styles.eventTimeText}>Party of {res.party_size}</div>
-                                  </div>
-                                ))
+                                day.reservations.map((res, idx) => {
+                                  // Format time from start_time
+                                  const resTime = res.start_time 
+                                    ? format(parseISO(res.start_time), 'h:mm a')
+                                    : 'Time TBD';
+                                  return (
+                                    <div
+                                      key={`res-${res.id || idx}`}
+                                      className={`${styles.eventItem} ${styles.eventReservation}`}
+                                      title={`${resTime} - Party of ${res.party_size || 0}`}
+                                    >
+                                      <div className={styles.eventNameText}>{resTime}</div>
+                                      <div className={styles.eventTimeText}>Party of {res.party_size || 0}</div>
+                                    </div>
+                                  );
+                                })
                               ) : (
                                 <div
                                   className={`${styles.eventItem} ${styles.eventReservation}`}
@@ -735,14 +772,25 @@ export default function EventCalendarNew() {
                     {selectedDay.reservations.length > 0 && (
                       <div className={styles.eventsSection}>
                         <div className={styles.sectionTitle}>Reservations ({selectedDay.reservations.length})</div>
-                        {selectedDay.reservations.map(res => (
-                          <div key={res.id} className={`${styles.eventCard} ${styles.eventCardReservation}`}>
-                            <div className={styles.eventName}>{res.reservation_time}</div>
-                            <div className={styles.eventDetails}>
-                              <div>Party of {res.party_size}</div>
+                        {selectedDay.reservations.map(res => {
+                          const resTime = res.start_time 
+                            ? format(parseISO(res.start_time), 'h:mm a')
+                            : 'Time TBD';
+                          return (
+                            <div key={res.id} className={`${styles.eventCard} ${styles.eventCardReservation}`}>
+                              <div className={styles.eventName}>{resTime}</div>
+                              <div className={styles.eventDetails}>
+                                <div>Party of {res.party_size || 0}</div>
+                                {res.first_name && (
+                                  <div>{res.first_name} {res.last_name || ''}</div>
+                                )}
+                                {res.phone && (
+                                  <div>{res.phone}</div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -1297,15 +1345,16 @@ function AnalyticsView({ currentDate }: { currentDate: Date }) {
       const { data: reservations } = await supabase
         .from('reservations')
         .select('*')
-        .gte('reservation_date', format(startDate, 'yyyy-MM-dd'))
-        .lte('reservation_date', format(endDate, 'yyyy-MM-dd'))
-        .order('reservation_date');
+        .gte('start_time', startDate.toISOString())
+        .lte('start_time', endDate.toISOString())
+        .order('start_time');
 
       // Group by date
       const dailyMap = new Map<string, { covers: number; revenue: number; reservations: number }>();
 
       reservations?.forEach((res: any) => {
-        const dateKey = res.reservation_date;
+        // Extract date from start_time instead of reservation_date
+        const dateKey = format(parseISO(res.start_time), 'yyyy-MM-dd');
         const existing = dailyMap.get(dateKey) || { covers: 0, revenue: 0, reservations: 0 };
         dailyMap.set(dateKey, {
           covers: existing.covers + (res.party_size || 0),

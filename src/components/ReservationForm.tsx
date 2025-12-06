@@ -185,6 +185,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const [showAlternativeTimesModal, setShowAlternativeTimesModal] = useState(false);
   const isAutoAdvancingRef = React.useRef(false);
   const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, boolean>>({});
+  const [verifiedMember, setVerifiedMember] = useState<any>(null);
 
   const cardElementRef = React.useRef<HTMLDivElement>(null);
 
@@ -749,6 +750,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
         console.log('Member found:', member);
         console.log('Preparing reservation data:', reservationData);
+        
+        // Store member data for use in confirmation modal
+        setVerifiedMember(member);
 
         // Send reservation data to backend for members
         try {
@@ -779,11 +783,22 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               setIsSubmitting(false);
               return;
             }
-            throw new Error(data.error || 'Failed to create reservation');
+            // Include detailed error information
+            const errorMessage = data.details 
+              ? `${data.error || 'Failed to create reservation'}: ${data.details}`
+              : (data.error || 'Failed to create reservation');
+            console.error('Reservation creation failed:', errorMessage, data);
+            throw new Error(errorMessage);
           }
           
-          const confirmedReservation = data;
+          const confirmedReservation = data.data || data; // Handle both {data: {...}} and direct object
           console.log('Reservation confirmed:', confirmedReservation);
+          
+          // For members, ensure we have the name from the member object if not in reservation
+          if (isMember && verifiedMember && !confirmedReservation.first_name) {
+            confirmedReservation.first_name = verifiedMember.first_name;
+            confirmedReservation.last_name = verifiedMember.last_name;
+          }
           
           setConfirmationData(confirmedReservation);
           setShowConfirmationModal(true);
@@ -876,7 +891,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
           }
           throw new Error(data.error || 'Failed to create reservation');
         }
-        const confirmedReservation = data;
+        const confirmedReservation = data.data || data; // Handle both {data: {...}} and direct object
         setConfirmationData(confirmedReservation);
         setShowConfirmationModal(true);
         if (onSave) {
@@ -1347,7 +1362,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               <VStack spacing={6} align="stretch">
                 <Box textAlign="center" bg="weddingDay" p={6} borderRadius="lg">
                   <Text fontSize="xl" fontWeight="medium" color="nightSky" mb={4}>
-                    Thank you, {confirmationData?.first_name}!
+                    Thank you, {confirmationData?.first_name || verifiedMember?.first_name || 'Guest'}!
                   </Text>
                   <Text fontSize="lg" color="nightSky">
                     Your reservation has been confirmed for:
@@ -1360,8 +1375,19 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                       <Text fontWeight="bold" color="nightSky">Date & Time</Text>
                       <Text>
                         {confirmationData?.start_time
-                          ? DateTime.fromISO(confirmationData.start_time).setZone(settings?.timezone || 'America/Chicago').toLocaleString(DateTime.DATETIME_FULL)
-                          : ''}
+                          ? (() => {
+                              try {
+                                const dt = DateTime.fromISO(confirmationData.start_time);
+                                if (dt.isValid) {
+                                  return dt.setZone(settings?.timezone || 'America/Chicago').toLocaleString(DateTime.DATETIME_FULL);
+                                }
+                                return confirmationData.start_time;
+                              } catch (e) {
+                                console.error('Error formatting date:', e);
+                                return confirmationData.start_time;
+                              }
+                            })()
+                          : 'Not available'}
                       </Text>
                     </Box>
                     

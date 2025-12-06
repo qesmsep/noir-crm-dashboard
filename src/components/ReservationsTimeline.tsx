@@ -158,9 +158,21 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   useEffect(() => {
     const fetchReservations = async () => {
       try {
+        console.log('Fetching reservations from /api/reservations...');
         const res = await fetch('/api/reservations');
-        if (!res.ok) throw new Error('Failed to fetch reservations');
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('Failed to fetch reservations:', res.status, errorText);
+          throw new Error(`Failed to fetch reservations: ${res.status}`);
+        }
         const reservationsData = await res.json();
+        console.log('Reservations API response:', {
+          hasData: !!reservationsData.data,
+          dataLength: reservationsData.data?.length,
+          isArray: Array.isArray(reservationsData),
+          keys: Object.keys(reservationsData),
+          sample: reservationsData.data?.[0]
+        });
         setEventData({ resRes: reservationsData });
       } catch (error) {
         console.error('Error fetching reservations:', error);
@@ -196,90 +208,162 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
   // Map reservations to FullCalendar events
   useEffect(() => {
-    if (!resources.length || !eventData.resRes) return;
+    if (!resources.length || !eventData.resRes) {
+      console.log('Skipping event mapping:', {
+        hasResources: !!resources.length,
+        hasEventData: !!eventData.resRes,
+        resourcesCount: resources.length
+      });
+      return;
+    }
     
     const rawReservations = Array.isArray(eventData.resRes)
       ? eventData.resRes
       : eventData.resRes.data || [];
     
-    const mapped = rawReservations.map((r: Record<string, any>) => {
-      const heart = r.membership_type === 'member' ? '🖤 ' : '';
-      let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
+    console.log('Mapping reservations to events:', {
+      rawReservationsCount: rawReservations.length,
+      firstReservation: rawReservations[0]
+    });
+    
+    // Fetch member data for reservations missing names and then map to events
+    const fetchMemberNamesAndMap = async () => {
+      const reservationsNeedingNames = rawReservations.filter((r: any) => 
+        !r.first_name && r.phone
+      );
       
-      // Handle private event reservations
-      let resourceId, startTime, endTime;
-      if (r.table_id === null && r.private_event_id) {
-        resourceId = 'private-events';
-        emoji = '🔒';
-        const privateEvent = privateEvents.find((pe: any) => pe.id === r.private_event_id);
-        if (privateEvent && !privateEvent.require_time_selection) {
-          startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-          endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+      if (reservationsNeedingNames.length > 0) {
+        const phoneNumbers = reservationsNeedingNames.map((r: any) => r.phone);
+        const { data: members } = await supabase
+          .from('members')
+          .select('phone, first_name, last_name, email')
+          .in('phone', phoneNumbers);
+        
+        // Create a map of phone -> member data
+        const memberMap = new Map();
+        members?.forEach((m: any) => {
+          // Try multiple phone formats
+          const phoneDigits = m.phone?.replace(/\D/g, '') || '';
+          memberMap.set(m.phone, m);
+          memberMap.set(phoneDigits, m);
+          if (phoneDigits.length === 10) {
+            memberMap.set('+1' + phoneDigits, m);
+          }
+          if (phoneDigits.length === 11 && phoneDigits.startsWith('1')) {
+            memberMap.set('+' + phoneDigits, m);
+          }
+        });
+        
+        // Update reservations with member data
+        rawReservations.forEach((r: any) => {
+          if (!r.first_name && r.phone) {
+            const member = memberMap.get(r.phone) || 
+                          memberMap.get(r.phone.replace(/\D/g, '')) ||
+                          memberMap.get('+1' + r.phone.replace(/\D/g, '').slice(-10));
+            if (member) {
+              r.first_name = member.first_name;
+              r.last_name = member.last_name;
+              if (!r.email && member.email) {
+                r.email = member.email;
+              }
+            }
+          }
+        });
+      }
+      
+      // Map reservations to events
+      const mapped = rawReservations.map((r: Record<string, any>) => {
+        const heart = r.membership_type === 'member' ? '🖤 ' : '';
+        let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
+        
+        // Get display name
+        const displayName = r.first_name 
+          ? `${r.first_name}${r.last_name ? ' ' + r.last_name : ''}`
+          : (r.phone ? `Guest (${r.phone.slice(-4)})` : 'Guest');
+        
+        // Handle private event reservations
+        let resourceId, startTime, endTime;
+        if (r.table_id === null && r.private_event_id) {
+          resourceId = 'private-events';
+          emoji = '🔒';
+          const privateEvent = privateEvents.find((pe: any) => pe.id === r.private_event_id);
+          if (privateEvent && !privateEvent.require_time_selection) {
+            startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+            endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+          } else {
+            startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+            endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+          }
         } else {
+          // Handle reservations with or without table_id
+          if (r.table_id) {
+            const tableResource = resources.find(res => res.id === String(r.table_id));
+            resourceId = String(r.table_id);
+          } else {
+            // If no table_id, assign to first available table or a default
+            resourceId = resources.length > 0 ? resources[0].id : 'unassigned';
+          }
           startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
           endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
         }
-      } else {
-        const tableResource = resources.find(res => res.id === String(r.table_id));
-        resourceId = String(r.table_id);
-        startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-        endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-      }
-      
-      return {
-        id: String(r.id),
-        title: `${heart}${r.first_name || ''} ${r.last_name || ''} | Party Size: ${r.party_size}${emoji ? ' ' + emoji : ''}`,
-        extendedProps: {
-          created_at: r.created_at ? formatDateTime(new Date(r.created_at), settings.timezone, {
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-          }) : null,
-          ...r
-        },
-        start: startTime,
-        end: endTime,
-        resourceId: resourceId,
-        type: 'reservation',
-      };
-    });
-    
-    // Add blocking events for private events
-    const blockingEvents: any[] = [];
-    const currentDayPrivateEvents = getCurrentDayPrivateEvents();
-    
-    currentDayPrivateEvents.forEach((privateEvent: any) => {
-      resources.forEach((resource: Resource) => {
-        const startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-        const endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
         
-        const blockingEvent = {
-          id: `blocking-${privateEvent.id}-${resource.id}`,
-          title: `🔒 ${privateEvent.title} - Private Event`,
+        return {
+          id: String(r.id),
+          title: `${heart}${displayName} | Party Size: ${r.party_size}${emoji ? ' ' + emoji : ''}`,
           extendedProps: {
-            private_event_id: privateEvent.id,
-            is_blocking: true,
-            event_type: 'private_event',
-            ...privateEvent
+            created_at: r.created_at ? formatDateTime(new Date(r.created_at), settings.timezone, {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit'
+            }) : null,
+            ...r
           },
           start: startTime,
           end: endTime,
-          resourceId: resource.id,
-          type: 'blocking',
-          backgroundColor: '#6b7280',
-          borderColor: '#6b7280',
-          textColor: '#ffffff',
-          display: 'background',
-          classNames: ['private-event-blocking']
+          resourceId: resourceId,
+          type: 'reservation',
         };
-        
-        blockingEvents.push(blockingEvent);
       });
-    });
+      
+      // Add blocking events for private events
+      const blockingEvents: any[] = [];
+      const currentDayPrivateEvents = getCurrentDayPrivateEvents();
+      
+      currentDayPrivateEvents.forEach((privateEvent: any) => {
+        resources.forEach((resource: Resource) => {
+          const startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+          const endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+          
+          const blockingEvent = {
+            id: `blocking-${privateEvent.id}-${resource.id}`,
+            title: `🔒 ${privateEvent.title} - Private Event`,
+            extendedProps: {
+              private_event_id: privateEvent.id,
+              is_blocking: true,
+              event_type: 'private_event',
+              ...privateEvent
+            },
+            start: startTime,
+            end: endTime,
+            resourceId: resource.id,
+            type: 'blocking',
+            backgroundColor: '#6b7280',
+            borderColor: '#6b7280',
+            textColor: '#ffffff',
+            display: 'background',
+            classNames: ['private-event-blocking']
+          };
+          
+          blockingEvents.push(blockingEvent);
+        });
+      });
+      
+      const allEvents = [...mapped, ...blockingEvents];
+      setEvents(allEvents);
+    };
     
-    const allEvents = [...mapped, ...blockingEvents];
-    setEvents(allEvents);
+    fetchMemberNamesAndMap();
 
     const isThursday = currentCalendarDate.getDay() === 4;
     setSlotMinTime(isThursday ? '16:00:00' : '18:00:00');
