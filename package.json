@@ -35,7 +35,7 @@
     "moment": "^2.30.1",
     "multer": "^2.0.2",
     "mysql2": "^3.14.1",
-    "next": "^15.3.3",
+    "next": "^16.0.7",
     "node-fetch": "^2.7.0",
     "node-ical": "^0.22.1",
     "nodemailer": "^7.0.3",
