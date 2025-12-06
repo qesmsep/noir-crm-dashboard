@@ -1102,10 +1102,8 @@ body > div[id^="chakra-portal"]:not(:has(.react-datepicker)):not(:has(.react-dat
 } */
 
 /* AGGRESSIVE: Force ALL modal portal roots to appear above everything */
-/* EXCLUDE react-datepicker to prevent it from being affected */
-body > div:last-child:has([data-overlay]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
-body > div:last-child:has([role="dialog"]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
-body > div[id*="portal"]:has([role="dialog"]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+/* EXCLUDE react-datepicker and chakra-modal to prevent breaking them */
+body > div:last-child:has([data-overlay]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)):not(:has(.chakra-modal__content)),
 body > div[id="reservation-modal-portal-root"] {
   z-index: 99999999 !important;
   position: fixed !important;
