@@ -1036,11 +1036,9 @@ div[data-overlay]:not(.chakra-drawer__overlay),
 
 /* Modal content container - must be centered */
 /* Target all possible Chakra Modal container structures */
-[role="dialog"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker),
-[role="dialog"][data-state="open"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker),
+/* EXCLUDE: .chakra-modal__content (the actual modal), react-datepicker, chakra-drawer */
 .chakra-modal__content-container,
 .chakra-modal__content-container[data-state="open"],
-[data-chakra-modal="true"] [role="dialog"]:not(.react-datepicker__tab-loop):not(.react-datepicker),
 [data-chakra-modal="true"] > div:last-child,
 div[class*="chakra-modal__content-container"] {
   z-index: 99999999 !important;
@@ -1058,14 +1056,12 @@ div[class*="chakra-modal__content-container"] {
 }
 
 .chakra-modal__content-container > *,
-[role="dialog"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker) > *,
 div[class*="chakra-modal__content-container"] > * {
   pointer-events: auto !important;
 }
 
 .chakra-modal__content,
 .chakra-modal__content[data-state="open"],
-[role="dialog"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker) > div:first-child,
 div[class*="chakra-modal__content"]:not([class*="container"]) {
   z-index: 99999999 !important;
   position: relative !important;
