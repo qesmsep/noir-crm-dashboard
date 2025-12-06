@@ -138,8 +138,8 @@ export async function PATCH(request: Request) {
 
       // Update OpenPhone contact and send personalized message
       const result = await updateContactAndSendPersonalizedMessage(
-        waitlistEntry.phone, 
-        contactData, 
+        waitlistEntry.phone,
+        contactData,
         smsMessage
       );
 
@@ -160,4 +160,14 @@ export async function PATCH(request: Request) {
     console.error('Error in waitlist PATCH:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+// Default export required for Next.js 16 compatibility in pages directory
+export default async function handler(req: Request) {
+  if (req.method === 'GET') {
+    return GET(req);
+  } else if (req.method === 'PATCH') {
+    return PATCH(req);
+  }
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
 } 
