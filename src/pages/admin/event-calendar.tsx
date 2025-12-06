@@ -84,6 +84,18 @@ export default function EventCalendarNew() {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
+  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<PrivateEvent | null>(null);
+  const [eventFormData, setEventFormData] = useState({
+    title: '',
+    start_time: '',
+    end_time: '',
+    description: '',
+    guest_count: '',
+    client_name: '',
+    client_email: '',
+    location: '',
+  });
   const [monthStats, setMonthStats] = useState({
     totalReservations: 0,
     totalCovers: 0,
@@ -253,6 +265,142 @@ export default function EventCalendarNew() {
   const handleDayClick = (day: DayData) => {
     setSelectedDay(day);
     setIsDayModalOpen(true);
+  };
+
+  const handleEventClick = (event: PrivateEvent, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Don't allow editing Minaka events
+    if (event.source === 'minaka') {
+      toast({
+        title: 'Cannot edit Minaka event',
+        description: 'Minaka events can only be edited in Minaka.',
+        status: 'info',
+        duration: 3000,
+      });
+      return;
+    }
+
+    setEditingEvent(event);
+
+    // Convert ISO datetime strings to datetime-local format
+    const formatForInput = (isoString: string) => {
+      if (!isoString) return '';
+      const date = new Date(isoString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    setEventFormData({
+      title: event.title || event.name || '',
+      start_time: formatForInput(event.start_time),
+      end_time: formatForInput(event.end_time),
+      description: event.description || '',
+      guest_count: event.guest_count?.toString() || '',
+      client_name: event.client_name || '',
+      client_email: event.client_email || '',
+      location: event.location || '',
+    });
+
+    setIsEditEventModalOpen(true);
+    setIsDayModalOpen(false);
+  };
+
+  const handleSaveEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingEvent) return;
+
+    try {
+      const eventData = {
+        title: eventFormData.title,
+        start_time: eventFormData.start_time,
+        end_time: eventFormData.end_time,
+        event_description: eventFormData.description || null,
+        guest_count: eventFormData.guest_count ? parseInt(eventFormData.guest_count) : null,
+        client_name: eventFormData.client_name || null,
+        client_email: eventFormData.client_email || null,
+        location: eventFormData.location || null,
+      };
+
+      const { error } = await supabase
+        .from('private_events')
+        .update(eventData)
+        .eq('id', editingEvent.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Event updated successfully',
+        status: 'success',
+        duration: 3000,
+      });
+
+      setIsEditEventModalOpen(false);
+      setEditingEvent(null);
+      fetchCalendarData();
+    } catch (error) {
+      console.error('Error updating event:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update event',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!editingEvent) return;
+    if (!confirm('Are you sure you want to delete this event?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('private_events')
+        .delete()
+        .eq('id', editingEvent.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Event deleted successfully',
+        status: 'success',
+        duration: 3000,
+      });
+
+      setIsEditEventModalOpen(false);
+      setEditingEvent(null);
+      fetchCalendarData();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete event',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleCloseEventModal = () => {
+    setIsEditEventModalOpen(false);
+    setEditingEvent(null);
+    setEventFormData({
+      title: '',
+      start_time: '',
+      end_time: '',
+      description: '',
+      guest_count: '',
+      client_name: '',
+      client_email: '',
+      location: '',
+    });
   };
 
   const getDayColor = (day: DayData) => {
@@ -545,7 +693,12 @@ export default function EventCalendarNew() {
                           const eventName = event.title || event.name || 'Untitled Event';
                           const isMinaka = event.source === 'minaka';
                           return (
-                            <div key={event.id} className={`${styles.eventCard} ${styles.eventCardPrivate} ${isMinaka ? styles.eventCardMinaka : ''}`}>
+                            <div
+                              key={event.id}
+                              className={`${styles.eventCard} ${styles.eventCardPrivate} ${isMinaka ? styles.eventCardMinaka : ''}`}
+                              onClick={(e) => handleEventClick(event, e)}
+                              style={{ cursor: 'pointer' }}
+                            >
                               <div className={styles.eventName}>
                                 {eventName}
                                 {isMinaka && <Badge colorScheme="blue" ml={2} fontSize="xs">Minaka</Badge>}
@@ -601,6 +754,125 @@ export default function EventCalendarNew() {
                   </div>
                 </div>
               )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+
+        {/* Edit Event Modal */}
+        <Modal isOpen={isEditEventModalOpen} onClose={handleCloseEventModal} isCentered>
+          <ModalOverlay
+            bg="blackAlpha.600"
+            backdropFilter="blur(4px)"
+          />
+          <ModalContent
+            bg="white"
+            borderRadius="16px"
+            boxShadow="xl"
+            maxW="600px"
+            w="90%"
+            fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+          >
+            <ModalHeader fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
+              Edit Event
+            </ModalHeader>
+            <ModalCloseButton />
+            <ModalBody pb={6}>
+              <form onSubmit={handleSaveEvent}>
+                <VStack spacing={4}>
+                  <FormControl isRequired>
+                    <FormLabel>Event Name</FormLabel>
+                    <Input
+                      value={eventFormData.title}
+                      onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
+                      placeholder="e.g., Holiday Party"
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>Start Time</FormLabel>
+                    <Input
+                      type="datetime-local"
+                      value={eventFormData.start_time}
+                      onChange={(e) => setEventFormData({ ...eventFormData, start_time: e.target.value })}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel>End Time</FormLabel>
+                    <Input
+                      type="datetime-local"
+                      value={eventFormData.end_time}
+                      onChange={(e) => setEventFormData({ ...eventFormData, end_time: e.target.value })}
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Guest Count</FormLabel>
+                    <Input
+                      type="number"
+                      value={eventFormData.guest_count}
+                      onChange={(e) => setEventFormData({ ...eventFormData, guest_count: e.target.value })}
+                      placeholder="Number of guests"
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Client Name</FormLabel>
+                    <Input
+                      value={eventFormData.client_name}
+                      onChange={(e) => setEventFormData({ ...eventFormData, client_name: e.target.value })}
+                      placeholder="Client name"
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Client Email</FormLabel>
+                    <Input
+                      type="email"
+                      value={eventFormData.client_email}
+                      onChange={(e) => setEventFormData({ ...eventFormData, client_email: e.target.value })}
+                      placeholder="client@example.com"
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Location</FormLabel>
+                    <Input
+                      value={eventFormData.location}
+                      onChange={(e) => setEventFormData({ ...eventFormData, location: e.target.value })}
+                      placeholder="Event location"
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Description</FormLabel>
+                    <Textarea
+                      value={eventFormData.description}
+                      onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
+                      placeholder="Event details..."
+                      rows={4}
+                    />
+                  </FormControl>
+
+                  <HStack w="full" justify="space-between" pt={4}>
+                    <Button
+                      colorScheme="red"
+                      variant="outline"
+                      onClick={handleDeleteEvent}
+                    >
+                      Delete Event
+                    </Button>
+                    <HStack spacing={3}>
+                      <Button onClick={handleCloseEventModal}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" colorScheme="blue">
+                        Save Changes
+                      </Button>
+                    </HStack>
+                  </HStack>
+                </VStack>
+              </form>
             </ModalBody>
           </ModalContent>
         </Modal>
