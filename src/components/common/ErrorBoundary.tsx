@@ -75,8 +75,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <Box
               fontSize="6xl"
               fontWeight="bold"
-              bgGradient="linear(to-r, red.400, red.600)"
-              bgClip="text"
+              color="nightSky"
             >
               Oops!
             </Box>
@@ -91,17 +90,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <Box
                 mt={6}
                 p={4}
-                bg="red.50"
+                bg="gray.50"
                 borderRadius="md"
                 border="1px"
-                borderColor="red.200"
+                borderColor="gray.200"
                 width="100%"
                 textAlign="left"
               >
-                <Text fontWeight="bold" color="red.600" mb={2}>
+                <Text fontWeight="bold" color="nightSky" mb={2}>
                   Error Details (Development Only):
                 </Text>
-                <Text fontSize="sm" fontFamily="mono" color="red.600" whiteSpace="pre-wrap">
+                <Text fontSize="sm" fontFamily="mono" color="nightSky" whiteSpace="pre-wrap">
                   {this.state.error.toString()}
                 </Text>
                 {this.state.errorInfo && (
@@ -188,18 +187,18 @@ export class InlineErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoun
       return (
         <Box
           p={4}
-          bg="red.50"
+          bg="gray.50"
           borderRadius="md"
           border="1px"
-          borderColor="red.200"
+          borderColor="gray.200"
         >
-          <Text fontWeight="bold" color="red.600" mb={2}>
+          <Text fontWeight="bold" color="nightSky" mb={2}>
             Component Error
           </Text>
-          <Text fontSize="sm" color="red.600" mb={3}>
+          <Text fontSize="sm" color="nightSky" mb={3}>
             This component failed to load. Please try again.
           </Text>
-          <Button size="sm" colorScheme="red" variant="outline" onClick={this.handleReset}>
+          <Button size="sm" colorScheme="gray" variant="outline" onClick={this.handleReset}>
             Retry
           </Button>
         </Box>

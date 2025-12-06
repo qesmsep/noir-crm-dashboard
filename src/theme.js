@@ -1,7 +1,8 @@
 'use client';
 import { extendTheme } from "@chakra-ui/react";
 
-const colors = {
+// Custom colors that extend the default Chakra theme
+const customColors = {
   weddingDay: "#ECEDE8",
   cork: "#A59480",
   daybreak: "#CAC2B9",
@@ -10,7 +11,9 @@ const colors = {
 };
 
 const theme = extendTheme({
-  colors,
+  // Don't override colors - let extendTheme merge with defaults
+  // Only add our custom colors
+  colors: customColors,
   config: {
     initialColorMode: "light",
     useSystemColorMode: false,

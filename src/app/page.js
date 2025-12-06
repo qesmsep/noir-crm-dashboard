@@ -12,6 +12,7 @@ import { CardNumberElement, CardExpiryElement, CardCvcElement } from '@stripe/re
 import { getSupabaseClient } from '../pages/api/supabaseClient';
 import ReservationForm from '../components/ReservationForm';
 import ReservationSection from '../components/ReservationSection';
+import TestReservationModal from '../components/TestReservationModal';
 import Modal from 'react-modal';
 import dynamic from 'next/dynamic';
 import { useSettings } from '../context/SettingsContext';
@@ -214,6 +215,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#ECEDE8]">
+      <TestReservationModal />
       {/** Membership announcement popup (client-only; dynamic import handles SSR=false) */}
       {(() => {
         const MembershipPopup = dynamic(() => import('../components/MembershipPopup'), { ssr: false });
@@ -264,23 +266,23 @@ export default function Home() {
           <div style={{ background: 'rgba(165, 148, 128, 0.2)', position: 'absolute', inset: 0, zIndex: 2 }} />
           {/* Mobile-optimized text and button */}
           <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center text-center text-[#ECEDE8] px-4 sm:px-8">
-            <h1 
+            <h1
               className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl mb-4 sm:mb-6 leading-tight"
-              style={{ 
-                fontFamily: 'IvyJournal-Thin, serif', 
-                letterSpacing: '0.08em', 
-                fontWeight: 400, 
+              style={{
+                fontFamily: 'IvyJournal-Thin, serif',
+                letterSpacing: '0.08em',
+                fontWeight: 400,
                 textTransform: 'uppercase',
                 lineHeight: 1.1
               }}
             >
               ELEVATED SPIRITS.<br />UNFORGETTABLE SPACE.
             </h1>
-            <p 
+            <p
               className="mobile-text font-sans text-base sm:text-lg md:text-xl lg:text-2xl max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl mx-auto mb-6 sm:mb-8 md:mb-10 px-2"
-              style={{ 
-                fontFamily: 'Montserrat, sans-serif', 
-                color: '#ECEDE8', 
+              style={{
+                fontFamily: 'Montserrat, sans-serif',
+                color: '#ECEDE8',
                 fontWeight: 400,
                 lineHeight: 1.4
               }}

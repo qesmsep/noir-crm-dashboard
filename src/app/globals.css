@@ -193,14 +193,14 @@ html {
   
   /* Add padding to prevent content from being hidden behind footer */
   padding-bottom: 80px !important;
-  
+
   /* Better scrolling on mobile */
   -webkit-overflow-scrolling: touch !important;
-  scroll-behavior: smooth !important;
-  
+  /* scroll-behavior: smooth !important; */ /* DISABLED: Causes date picker scroll issues */
+
   /* Ensure content doesn't get cut off */
   min-height: 0 !important;
-  
+
   /* Override any conflicting styles */
   height: auto !important;
   max-height: none !important;
@@ -270,11 +270,11 @@ html {
   
   /* Add padding to prevent content from being hidden behind footer */
   padding-bottom: 80px !important;
-  
+
   /* Better scrolling on mobile */
   -webkit-overflow-scrolling: touch !important;
-  scroll-behavior: smooth !important;
-  
+  /* scroll-behavior: smooth !important; */ /* DISABLED: Causes date picker scroll issues */
+
   /* Ensure content doesn't get cut off */
   min-height: 0 !important;
 }
@@ -360,7 +360,7 @@ html {
   
   /* Better scrolling */
   html {
-    scroll-behavior: smooth;
+    /* scroll-behavior: smooth; */ /* DISABLED: Causes date picker scroll issues */
     -webkit-overflow-scrolling: touch;
   }
   
@@ -549,7 +549,7 @@ html {
   /* Better scrolling on iPhone */
   .chakra-drawer__body {
     -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
+    /* scroll-behavior: smooth; */ /* DISABLED: Causes date picker scroll issues */
   }
   
   /* Calendar-specific mobile optimizations */
@@ -690,9 +690,10 @@ html {
 }
 
 /* Smooth scrolling for all devices */
-html {
+/* DISABLED: This was causing the reservation form date picker to scroll to top when clicked */
+/* html {
   scroll-behavior: smooth;
-}
+} */
 
 /* Better focus states for accessibility */
 button:focus, a:focus, input:focus, select:focus, textarea:focus {
@@ -984,6 +985,36 @@ button:hover {
   backface-visibility: hidden !important;
 }
 
+/* CRITICAL: Prevent react-datepicker from being affected by modal rules */
+/* Target the wrapper div that contains the datepicker */
+body > div:has(.react-datepicker__tab-loop) {
+  position: static !important;
+  z-index: auto !important;
+  width: auto !important;
+  height: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  display: block !important;
+  pointer-events: auto !important;
+  background: transparent !important;
+}
+
+.react-datepicker-popper {
+  position: absolute !important;
+  z-index: 999999 !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+  pointer-events: auto !important;
+}
+
+.react-datepicker {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  border-radius: 8px !important;
+}
+
 /* CRITICAL: Ensure Chakra UI modals appear above ALL content */
 /* Match drawer z-index (999999) to ensure consistent stacking */
 /* Calendar header z-index: 10, AdminLayout topNav z-index: 100 */
@@ -1005,11 +1036,11 @@ div[data-overlay]:not(.chakra-drawer__overlay),
 
 /* Modal content container - must be centered */
 /* Target all possible Chakra Modal container structures */
-[role="dialog"]:not(.chakra-drawer__content),
-[role="dialog"][data-state="open"]:not(.chakra-drawer__content),
+[role="dialog"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker),
+[role="dialog"][data-state="open"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker),
 .chakra-modal__content-container,
 .chakra-modal__content-container[data-state="open"],
-[data-chakra-modal="true"] [role="dialog"],
+[data-chakra-modal="true"] [role="dialog"]:not(.react-datepicker__tab-loop):not(.react-datepicker),
 [data-chakra-modal="true"] > div:last-child,
 div[class*="chakra-modal__content-container"] {
   z-index: 99999999 !important;
@@ -1027,14 +1058,14 @@ div[class*="chakra-modal__content-container"] {
 }
 
 .chakra-modal__content-container > *,
-[role="dialog"]:not(.chakra-drawer__content) > *,
+[role="dialog"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker) > *,
 div[class*="chakra-modal__content-container"] > * {
   pointer-events: auto !important;
 }
 
 .chakra-modal__content,
 .chakra-modal__content[data-state="open"],
-[role="dialog"]:not(.chakra-drawer__content) > div:first-child,
+[role="dialog"]:not(.chakra-drawer__content):not(.react-datepicker__tab-loop):not(.react-datepicker) > div:first-child,
 div[class*="chakra-modal__content"]:not([class*="container"]) {
   z-index: 99999999 !important;
   position: relative !important;
@@ -1058,12 +1089,13 @@ nav.nav {
 
 /* Ensure modal portal containers appear above everything */
 /* CRITICAL: Use position: fixed to escape stacking contexts, just like drawers! */
-body > div[data-overlay],
-body > div:has([role="dialog"]),
-body > div[id*="chakra-modal"],
-body > div[class*="chakra-modal"],
-body > div:has([data-chakra-modal]),
-body > div[id^="chakra-portal"] {
+/* DISABLED: These rules break react-datepicker positioning */
+/* body > div[data-overlay]:not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div:has([role="dialog"]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div[id*="chakra-modal"]:not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div[class*="chakra-modal"]:not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div:has([data-chakra-modal]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div[id^="chakra-portal"]:not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)) {
   z-index: 99999999 !important;
   position: fixed !important;
   top: 0 !important;
@@ -1071,12 +1103,13 @@ body > div[id^="chakra-portal"] {
   width: 100vw !important;
   height: 100vh !important;
   pointer-events: none !important;
-}
+} */
 
 /* AGGRESSIVE: Force ALL modal portal roots to appear above everything */
-body > div:last-child:has([data-overlay]),
-body > div:last-child:has([role="dialog"]),
-body > div[id*="portal"]:has([role="dialog"]),
+/* EXCLUDE react-datepicker to prevent it from being affected */
+body > div:last-child:has([data-overlay]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div:last-child:has([role="dialog"]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div[id*="portal"]:has([role="dialog"]):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
 body > div[id="reservation-modal-portal-root"] {
   z-index: 99999999 !important;
   position: fixed !important;
@@ -1215,8 +1248,9 @@ header.topNav,
 }
 
 /* Force the modal container to appear above everything */
-body > div:has(.reservation-modal-overlay),
-body > div:has(.reservation-modal-content) {
+/* EXCLUDE react-datepicker to prevent it from being affected */
+body > div:has(.reservation-modal-overlay):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div:has(.reservation-modal-content):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)) {
   z-index: 99999999 !important;
   position: fixed !important;
   top: 0 !important;
@@ -1251,4 +1285,58 @@ nav.nav {
   animation-delay: 0s !important;
 }
 
-/* Dynamic viewport height updates handled by JavaScript in layout.js */ 
+/* Dynamic viewport height updates handled by JavaScript in layout.js */
+
+/* OVERRIDE: react-datepicker portal styling */
+#datepicker-portal,
+.react-datepicker__portal {
+  position: fixed !important;
+  z-index: 999999 !important;
+  width: auto !important;
+  height: auto !important;
+  background: transparent !important;
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.react-datepicker__portal .react-datepicker {
+  margin: 0 !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3) !important;
+  transform: scale(0.7) !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.react-datepicker__portal .react-datepicker__day,
+.react-datepicker__portal .react-datepicker__day-name {
+  font-size: 1.1rem !important;
+  font-weight: 500 !important;
+  width: 2.5rem !important;
+  line-height: 2.5rem !important;
+}
+
+/* TEST DATEPICKER - NUCLEAR OVERRIDE */
+body > div:has(.test-datepicker-popper) {
+  position: static !important;
+  z-index: auto !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  display: contents !important;
+  background: transparent !important;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}
+
+.test-datepicker-popper {
+  position: absolute !important;
+  z-index: 999999 !important;
+} 

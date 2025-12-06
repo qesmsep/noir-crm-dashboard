@@ -992,6 +992,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   minDate={effectiveStartDate}
                   maxDate={bookingEndDate}
                   dateFormat="MMMM d, yyyy"
+                  popperPlacement="bottom-start"
                   filterDate={d => {
                     // Only allow dates that are:
                     // - within booking window (handled by minDate/maxDate)
@@ -1021,6 +1022,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                       bg="white"
                       placeholder="Select date"
                       readOnly
+                      className="datepicker-input-no-scroll"
                     />
                   }
                   wrapperClassName="datepicker-wrapper"
