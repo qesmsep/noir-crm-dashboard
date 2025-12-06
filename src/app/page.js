@@ -12,7 +12,6 @@ import { CardNumberElement, CardExpiryElement, CardCvcElement } from '@stripe/re
 import { getSupabaseClient } from '../pages/api/supabaseClient';
 import ReservationForm from '../components/ReservationForm';
 import ReservationSection from '../components/ReservationSection';
-import TestReservationModal from '../components/TestReservationModal';
 import Modal from 'react-modal';
 import dynamic from 'next/dynamic';
 import { useSettings } from '../context/SettingsContext';
@@ -215,7 +214,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#ECEDE8]">
-      <TestReservationModal />
       {/** Membership announcement popup (client-only; dynamic import handles SSR=false) */}
       {(() => {
         const MembershipPopup = dynamic(() => import('../components/MembershipPopup'), { ssr: false });

@@ -1027,7 +1027,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   }
                   wrapperClassName="datepicker-wrapper"
                   popperClassName="datepicker-popper"
-                  popperPlacement="bottom-start"
                 />
               </Box>
             </FormControl>
