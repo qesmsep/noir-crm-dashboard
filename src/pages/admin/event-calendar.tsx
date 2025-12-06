@@ -65,7 +65,6 @@ interface Reservation {
   email?: string;
   status?: string;
   membership_type?: string;
-  status: string;
 }
 
 interface CustomDay {
