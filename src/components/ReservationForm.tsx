@@ -712,16 +712,18 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       if (isMember) {
         console.log('Verifying member with phone:', form.phone);
         console.log('Form data:', form);
-        
-        const { data: member, error: memberError } = await supabase
+
+        const { data: members, error: memberError } = await supabase
           .from('members')
           .select('member_id, first_name, last_name, phone')
           .eq('phone', form.phone)
-          .single();
+          .limit(1);
+
+        const member = members && members.length > 0 ? members[0] : null;
 
         console.log('Member verification response:', { member, memberError });
 
-        if (memberError) {
+        if (memberError || !member) {
           console.error('Member verification error:', memberError);
           toast({
             title: 'Invalid member',
