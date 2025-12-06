@@ -642,7 +642,7 @@ export default function EventCalendarNew() {
         </div>
 
         {/* Day Details Modal */}
-        <Modal isOpen={isDayModalOpen} onClose={() => setIsDayModalOpen(false)} isCentered>
+        <Modal isOpen={isDayModalOpen} onClose={() => setIsDayModalOpen(false)} isCentered useInert={false}>
           <ModalOverlay 
             bg="blackAlpha.600" 
             backdropFilter="blur(4px)"
@@ -759,10 +759,11 @@ export default function EventCalendarNew() {
         </Modal>
 
         {/* Edit Event Modal */}
-        <Modal isOpen={isEditEventModalOpen} onClose={handleCloseEventModal} isCentered>
+        <Modal isOpen={isEditEventModalOpen} onClose={handleCloseEventModal} isCentered useInert={false}>
           <ModalOverlay
             bg="blackAlpha.600"
             backdropFilter="blur(4px)"
+            className="event-edit-modal-overlay"
           />
           <ModalContent
             bg="white"
@@ -771,6 +772,7 @@ export default function EventCalendarNew() {
             maxW="600px"
             w="90%"
             fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+            className="event-edit-modal-content"
           >
             <ModalHeader fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
               Edit Event
