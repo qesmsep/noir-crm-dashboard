@@ -33,10 +33,12 @@ import {
   Textarea,
   Select,
 } from '@chakra-ui/react';
-import { ChevronLeftIcon, ChevronRightIcon, AddIcon, CalendarIcon, SettingsIcon, DownloadIcon, CloseIcon } from '@chakra-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon, AddIcon, CalendarIcon, SettingsIcon, DownloadIcon, CloseIcon, EditIcon } from '@chakra-ui/icons';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, parseISO, isToday, startOfYear, endOfYear } from 'date-fns';
+import { localInputToUTC } from '../../utils/dateUtils';
+import { useSettings } from '../../context/SettingsContext';
 import styles from '../../styles/EventCalendar.module.css';
 
 interface PrivateEvent {
@@ -84,6 +86,8 @@ interface DayData {
 }
 
 export default function EventCalendarNew() {
+  const { settings } = useSettings();
+  const timezone = settings?.timezone || 'America/Chicago';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -342,27 +346,93 @@ export default function EventCalendarNew() {
 
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
 
-    if (!editingEvent) return;
+    console.log('handleSaveEvent called', { editingEvent, eventFormData });
+
+    if (!editingEvent) {
+      console.error('No editing event');
+      toast({
+        title: 'Error',
+        description: 'No event selected for editing',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
 
     try {
+      // Validate required fields
+      if (!eventFormData.title || !eventFormData.title.trim()) {
+        toast({
+          title: 'Error',
+          description: 'Event name is required',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+
+      if (!eventFormData.start_time || !eventFormData.end_time) {
+        toast({
+          title: 'Error',
+          description: 'Start time and end time are required',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Convert datetime-local inputs to UTC ISO strings
+      let startTimeUTC: string;
+      let endTimeUTC: string;
+      
+      try {
+        startTimeUTC = localInputToUTC(eventFormData.start_time, timezone);
+        endTimeUTC = localInputToUTC(eventFormData.end_time, timezone);
+        console.log('Converted times:', { startTimeUTC, endTimeUTC });
+      } catch (conversionError) {
+        console.error('Error converting times:', conversionError);
+        toast({
+          title: 'Error',
+          description: `Invalid date/time format: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`,
+          status: 'error',
+          duration: 5000,
+        });
+        return;
+      }
+
+      if (!startTimeUTC || !endTimeUTC) {
+        toast({
+          title: 'Error',
+          description: 'Failed to convert date/time values',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+
       const eventData = {
         title: eventFormData.title,
-        start_time: eventFormData.start_time,
-        end_time: eventFormData.end_time,
+        start_time: startTimeUTC,
+        end_time: endTimeUTC,
         event_description: eventFormData.description || null,
-        guest_count: eventFormData.guest_count ? parseInt(eventFormData.guest_count) : null,
-        client_name: eventFormData.client_name || null,
-        client_email: eventFormData.client_email || null,
-        location: eventFormData.location || null,
       };
 
-      const { error } = await supabase
+      console.log('Updating event with data:', eventData);
+
+      const { error, data } = await supabase
         .from('private_events')
         .update(eventData)
-        .eq('id', editingEvent.id);
+        .eq('id', editingEvent.id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Update successful:', data);
 
       toast({
         title: 'Success',
@@ -378,9 +448,9 @@ export default function EventCalendarNew() {
       console.error('Error updating event:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update event',
+        description: error instanceof Error ? error.message : 'Failed to update event',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
       });
     }
   };
@@ -806,10 +876,20 @@ export default function EventCalendarNew() {
         </Modal>
 
         {/* Edit Event Modal */}
-        <Modal isOpen={isEditEventModalOpen} onClose={handleCloseEventModal} isCentered useInert={false}>
+        <Modal 
+          isOpen={isEditEventModalOpen} 
+          onClose={handleCloseEventModal}
+          size="md"
+          isCentered
+          closeOnOverlayClick={true}
+          closeOnEsc={true}
+          blockScrollOnMount={true}
+          motionPreset="scale"
+          portalProps={{ appendToParentPortal: false }}
+        >
           <ModalOverlay
-            bg="blackAlpha.600"
-            backdropFilter="blur(4px)"
+            bg="blackAlpha.700"
+            style={{ zIndex: 99999998 }}
             className="event-edit-modal-overlay"
           />
           <ModalContent
@@ -820,13 +900,14 @@ export default function EventCalendarNew() {
             w="90%"
             fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
             className="event-edit-modal-content"
+            style={{ zIndex: 99999999 }}
           >
             <ModalHeader fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
               Edit Event
             </ModalHeader>
             <ModalCloseButton />
             <ModalBody pb={6}>
-              <form onSubmit={handleSaveEvent}>
+              <form onSubmit={handleSaveEvent} noValidate>
                 <VStack spacing={4}>
                   <FormControl isRequired>
                     <FormLabel>Event Name</FormLabel>
@@ -912,11 +993,17 @@ export default function EventCalendarNew() {
                       Delete Event
                     </Button>
                     <HStack spacing={3}>
-                      <Button onClick={handleCloseEventModal}>
+                      <Button 
+                        type="button"
+                        onClick={handleCloseEventModal}
+                      >
                         Cancel
                       </Button>
-                      <Button type="submit" colorScheme="blue">
-                        Save Changes
+                      <Button 
+                        type="submit" 
+                        colorScheme="blue"
+                      >
+                        Update Event
                       </Button>
                     </HStack>
                   </HStack>
@@ -932,6 +1019,8 @@ export default function EventCalendarNew() {
 
 // Private Events Manager Component
 function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) {
+  const { settings } = useSettings();
+  const timezone = settings?.timezone || 'America/Chicago';
   const [events, setEvents] = useState<PrivateEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -956,10 +1045,31 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
       const { data, error } = await supabase
         .from('private_events')
         .select('*')
-        .order('start_time', { ascending: true });
+        .order('start_time', { ascending: false });
 
       if (error) throw error;
-      setEvents(data || []);
+      
+      // Separate past and future events, then sort each group
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const futureEvents: PrivateEvent[] = [];
+      const pastEvents: PrivateEvent[] = [];
+      
+      (data || []).forEach(event => {
+        const eventDate = new Date(event.start_time);
+        eventDate.setHours(0, 0, 0, 0);
+        
+        if (eventDate >= today) {
+          futureEvents.push(event);
+        } else {
+          pastEvents.push(event);
+        }
+      });
+      
+      // Sort future events: newest first (already descending from query)
+      // Sort past events: newest first (already descending from query)
+      setEvents([...futureEvents, ...pastEvents]);
     } catch (error) {
       console.error('Error fetching events:', error);
       toast({
@@ -976,12 +1086,25 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Convert datetime-local inputs to UTC ISO strings
+      if (!formData.start_time || !formData.end_time) {
+        toast({
+          title: 'Error',
+          description: 'Start time and end time are required',
+          status: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+
+      const startTimeUTC = localInputToUTC(formData.start_time, timezone);
+      const endTimeUTC = localInputToUTC(formData.end_time, timezone);
+
       const eventData = {
         title: formData.title || formData.name,
-        start_time: formData.start_time,
-        end_time: formData.end_time,
+        start_time: startTimeUTC,
+        end_time: endTimeUTC,
         event_description: formData.description || null,
-        guest_count: formData.guest_count ? parseInt(formData.guest_count) : null,
       };
 
       if (editingEvent) {
@@ -1122,60 +1245,117 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
             Create Event
           </Button>
         </Box>
-      ) : (
-        <VStack spacing={4} align="stretch">
-          {events.map(event => (
-            <Box key={event.id} bg="white" p={6} borderRadius="xl" shadow="sm" border="1px" borderColor="gray.200">
-              <HStack justify="space-between" align="start" mb={3}>
-                <VStack align="start" spacing={1} flex={1}>
-                  <Text fontSize="xl" fontWeight="bold" color="gray.800">{event.title || event.name || 'Untitled Event'}</Text>
-                  <HStack spacing={4}>
-                    <Badge colorScheme="blue" fontSize="sm">
-                      📅 {format(parseISO(event.start_time), 'MMM d, yyyy')}
+      ) : (() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const futureEvents = events.filter(e => {
+          const eventDate = new Date(e.start_time);
+          eventDate.setHours(0, 0, 0, 0);
+          return eventDate >= today;
+        });
+        
+        const pastEvents = events.filter(e => {
+          const eventDate = new Date(e.start_time);
+          eventDate.setHours(0, 0, 0, 0);
+          return eventDate < today;
+        });
+        
+        const renderEvent = (event: PrivateEvent, isPast: boolean = false) => (
+          <Box 
+            key={event.id} 
+            bg="white" 
+            p={6} 
+            borderRadius="xl" 
+            shadow="sm" 
+            border="1px" 
+            borderColor="gray.200"
+            opacity={isPast ? 0.7 : 1}
+          >
+            <HStack justify="space-between" align="start" mb={3}>
+              <VStack align="start" spacing={1} flex={1}>
+                <Text fontSize="xl" fontWeight="bold" color="gray.800">{event.title || event.name || 'Untitled Event'}</Text>
+                <HStack spacing={4}>
+                  <Badge colorScheme={isPast ? "gray" : "blue"} fontSize="sm">
+                    📅 {format(parseISO(event.start_time), 'MMM d, yyyy')}
+                  </Badge>
+                  <Badge colorScheme={isPast ? "gray" : "purple"} fontSize="sm">
+                    🕐 {format(parseISO(event.start_time), 'h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}
+                  </Badge>
+                  {event.guest_count && (
+                    <Badge colorScheme={isPast ? "gray" : "green"} fontSize="sm">
+                      👥 {event.guest_count} guests
                     </Badge>
-                    <Badge colorScheme="purple" fontSize="sm">
-                      🕐 {format(parseISO(event.start_time), 'h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}
-                    </Badge>
-                    {event.guest_count && (
-                      <Badge colorScheme="green" fontSize="sm">
-                        👥 {event.guest_count} guests
-                      </Badge>
-                    )}
-                  </HStack>
-                </VStack>
-                <HStack>
-                  <IconButton
-                    icon={<AddIcon />}
-                    aria-label="Edit event"
-                    size="sm"
-                    colorScheme="blue"
-                    variant="ghost"
-                    onClick={() => handleEdit(event)}
-                  />
-                  <IconButton
-                    icon={<CloseIcon />}
-                    aria-label="Delete event"
-                    size="sm"
-                    colorScheme="red"
-                    variant="ghost"
-                    onClick={() => handleDelete(event.id)}
-                  />
+                  )}
                 </HStack>
+              </VStack>
+              <HStack>
+                <IconButton
+                  icon={<EditIcon />}
+                  aria-label="Edit event"
+                  size="sm"
+                  colorScheme="blue"
+                  variant="ghost"
+                  onClick={() => handleEdit(event)}
+                />
+                <IconButton
+                  icon={<CloseIcon />}
+                  aria-label="Delete event"
+                  size="sm"
+                  colorScheme="red"
+                  variant="ghost"
+                  onClick={() => handleDelete(event.id)}
+                />
               </HStack>
+            </HStack>
 
-              {event.description && (
-                <Text color="gray.600" mt={2}>{event.description}</Text>
-              )}
-            </Box>
-          ))}
-        </VStack>
-      )}
+            {event.description && (
+              <Text color="gray.600" mt={2}>{event.description}</Text>
+            )}
+          </Box>
+        );
+        
+        return (
+          <VStack spacing={4} align="stretch">
+            {/* Future Events Section */}
+            {futureEvents.length > 0 && (
+              <>
+                <Text fontSize="lg" fontWeight="semibold" color="gray.700" mt={2} mb={2}>
+                  Upcoming Events
+                </Text>
+                {futureEvents.map(event => renderEvent(event, false))}
+              </>
+            )}
+            
+            {/* Past Events Section */}
+            {pastEvents.length > 0 && (
+              <>
+                <Text fontSize="lg" fontWeight="semibold" color="gray.500" mt={4} mb={2}>
+                  Past Events
+                </Text>
+                {pastEvents.map(event => renderEvent(event, true))}
+              </>
+            )}
+          </VStack>
+        );
+      })()}
 
       {/* Create/Edit Modal */}
-      <Modal isOpen={isCreateModalOpen} onClose={handleCloseModal} isCentered>
+      <Modal 
+        isOpen={isCreateModalOpen} 
+        onClose={handleCloseModal}
+        size="md"
+        isCentered
+        closeOnOverlayClick={true}
+        closeOnEsc={true}
+        blockScrollOnMount={true}
+        motionPreset="scale"
+        portalProps={{ appendToParentPortal: false }}
+      >
         <ModalOverlay 
-          bg="blackAlpha.600" 
-          backdropFilter="blur(4px)"
+          bg="blackAlpha.700"
+          style={{ zIndex: 99999998 }}
+          className="private-event-modal-overlay"
         />
         <ModalContent 
           bg="white" 
@@ -1183,7 +1363,15 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
           boxShadow="xl"
           maxW="600px"
           w="90%"
+          maxH="90vh"
+          overflowY="auto"
           fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+          className="private-event-modal-content"
+          style={{ 
+            zIndex: 99999999,
+            margin: '20vh auto auto auto',
+            position: 'relative',
+          }}
           sx={{
             '& input, & textarea, & select': {
               fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif !important",
@@ -1202,7 +1390,6 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
           <ModalHeader fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
             {editingEvent ? 'Edit Private Event' : 'Create Private Event'}
           </ModalHeader>
-          <ModalCloseButton />
           <ModalBody pb={6}>
             <form onSubmit={handleSubmit}>
               <VStack spacing={4}>

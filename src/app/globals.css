@@ -1065,13 +1065,87 @@ div[class*="chakra-modal__content-container"] > * {
 div[class*="chakra-modal__content"]:not([class*="container"]) {
   z-index: 99999999 !important;
   position: relative !important;
-  margin: 0 !important;
+  margin: auto !important;
   max-width: 500px !important;
   width: 90vw !important;
   transform: none !important;
   top: auto !important;
   left: auto !important;
   pointer-events: auto !important;
+}
+
+/* Event edit modal - same pattern as reservation modal */
+.event-edit-modal-overlay,
+.event-edit-modal-overlay[data-state="open"] {
+  z-index: 99999998 !important;
+  position: fixed !important;
+}
+
+.event-edit-modal-content,
+.event-edit-modal-content[data-state="open"] {
+  z-index: 99999999 !important;
+  position: relative !important;
+}
+
+/* Private event modal (Create/Edit in Private Events tab) - same pattern as reservation modal */
+.private-event-modal-overlay,
+.private-event-modal-overlay[data-state="open"] {
+  z-index: 99999998 !important;
+  position: fixed !important;
+}
+
+.private-event-modal-content,
+.private-event-modal-content[data-state="open"] {
+  z-index: 99999999 !important;
+  position: relative !important;
+}
+
+/* Force the modal container to appear above everything and be centered */
+/* EXCLUDE react-datepicker to prevent it from being affected */
+body > div:has(.event-edit-modal-overlay):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div:has(.event-edit-modal-content):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div:has(.private-event-modal-overlay):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)),
+body > div:has(.private-event-modal-content):not(:has(.react-datepicker)):not(:has(.react-datepicker__tab-loop)) {
+  z-index: 99999999 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: 20vh !important;
+}
+
+/* Also target the chakra modal container specifically for private event modal */
+.chakra-modal__content-container:has(.private-event-modal-content),
+div[class*="chakra-modal__content-container"]:has(.private-event-modal-content),
+[data-chakra-modal="true"]:has(.private-event-modal-content) > div:last-child {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding-top: 20vh !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: visible !important;
+}
+
+/* Ensure private event modal content is properly positioned */
+.private-event-modal-content {
+  position: relative !important;
+  margin: 0 auto !important;
+  transform: none !important;
+  top: 20vh !important;
+  left: auto !important;
+  right: auto !important;
 }
 
 /* Force calendar header and nav to stay below modals */
