@@ -1323,8 +1323,9 @@ nav.nav {
 /* Dynamic viewport height updates handled by JavaScript in layout.js */
 
 /* OVERRIDE: react-datepicker portal styling */
-#datepicker-portal,
-.react-datepicker__portal {
+/* Only apply when portal is actually being used */
+#datepicker-portal:not(:empty),
+.react-datepicker__portal:not(:empty) {
   position: fixed !important;
   z-index: 999999 !important;
   width: auto !important;
@@ -1333,6 +1334,13 @@ nav.nav {
   display: block !important;
   padding: 0 !important;
   margin: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Enable pointer events only on the datepicker itself within the portal */
+#datepicker-portal .react-datepicker,
+.react-datepicker__portal .react-datepicker {
+  pointer-events: auto !important;
 }
 
 .react-datepicker__portal .react-datepicker {

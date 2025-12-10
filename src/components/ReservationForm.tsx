@@ -1,7 +1,7 @@
 import { useDisclosure, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalCloseButton, Input, Select, Button, HStack, Box, Text, VStack, FormControl, FormLabel, useToast, Divider, Flex, useTheme } from '@chakra-ui/react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createDateTimeFromTimeString, toUTC } from '../utils/dateUtils';
 import { DateTime } from 'luxon';
 import { supabase } from '../lib/supabase';
@@ -136,8 +136,85 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const { settings, refreshHoldFeeSettings } = useSettings();
   
   // Booking window logic: today or bookingStartDate (if in future)
-  const today = DateTime.now();
-  const effectiveStartDate = bookingStartDate && DateTime.fromJSDate(bookingStartDate) > today ? bookingStartDate : today.toJSDate();
+  // Use a ref to track the current day to avoid recalculating on every render
+  const todayRef = useRef<Date>(DateTime.now().toJSDate());
+  const todayDateStr = useRef<string>(DateTime.now().toFormat('yyyy-MM-dd'));
+  
+  // Update today ref only once per day (check on mount and when bookingStartDate changes)
+  useEffect(() => {
+    const now = DateTime.now();
+    const currentDateStr = now.toFormat('yyyy-MM-dd');
+    if (currentDateStr !== todayDateStr.current) {
+      todayRef.current = now.toJSDate();
+      todayDateStr.current = currentDateStr;
+    }
+  }, [bookingStartDate]); // Re-check when bookingStartDate changes
+  
+  const effectiveStartDate = useMemo(() => {
+    const today = DateTime.fromJSDate(todayRef.current);
+    const result = bookingStartDate && DateTime.fromJSDate(bookingStartDate) > today 
+      ? bookingStartDate 
+      : todayRef.current;
+    return result;
+  }, [bookingStartDate]);
+  
+  // For non-members, cap booking window at December 31, 2025
+  // For members, use the bookingEndDate from settings (can go into 2026)
+  // Use refs to track previous values to prevent unnecessary recreations
+  const prevBookingEndDateRef = useRef<Date | undefined>(bookingEndDate);
+  const prevEffectiveMaxDateRef = useRef<Date | null>(null);
+  
+  const effectiveMaxDate = useMemo(() => {
+    const timezone = settings?.timezone || 'America/Chicago';
+    const nonMemberMaxDate = DateTime.fromObject({ year: 2025, month: 12, day: 31 }, { zone: timezone }).endOf('day').toJSDate();
+    
+    let result: Date;
+    if (isMember) {
+      result = bookingEndDate || nonMemberMaxDate;
+    } else {
+      // For non-members, use the minimum of bookingEndDate and December 31, 2025
+      result = bookingEndDate 
+        ? (new Date(Math.min(bookingEndDate.getTime(), nonMemberMaxDate.getTime()))) 
+        : nonMemberMaxDate;
+    }
+    
+    // Only return a new Date if the timestamp actually changed
+    if (prevEffectiveMaxDateRef.current && prevEffectiveMaxDateRef.current.getTime() === result.getTime()) {
+      return prevEffectiveMaxDateRef.current;
+    }
+    
+    prevEffectiveMaxDateRef.current = result;
+    prevBookingEndDateRef.current = bookingEndDate;
+    return result;
+  }, [isMember, bookingEndDate, settings?.timezone]);
+
+  // Calculate January 1, 2026 for members-only indicator
+  const membersOnlyStartDate = useMemo(() => {
+    const timezone = settings?.timezone || 'America/Chicago';
+    return DateTime.fromObject({ year: 2026, month: 1, day: 1 }, { zone: timezone }).startOf('day').toJSDate();
+  }, [settings?.timezone]);
+
+  // For non-members, show dates up to bookingEndDate (to display "members only" dates)
+  // but selection is capped at December 31, 2025 via effectiveMaxDate
+  const prevCalendarMaxDateRef = useRef<Date | null>(null);
+  const calendarMaxDate = useMemo(() => {
+    let result: Date;
+    if (isMember) {
+      result = effectiveMaxDate;
+    } else {
+      // Show dates up to bookingEndDate to display "members only" dates, but selection is still capped
+      result = bookingEndDate || effectiveMaxDate;
+    }
+    
+    // Only return a new Date if the timestamp actually changed
+    if (prevCalendarMaxDateRef.current && prevCalendarMaxDateRef.current.getTime() === result.getTime()) {
+      return prevCalendarMaxDateRef.current;
+    }
+    
+    prevCalendarMaxDateRef.current = result;
+    return result;
+  }, [isMember, bookingEndDate, effectiveMaxDate]);
+  
   const safeInitialStart = initialStart ? DateTime.fromISO(initialStart).toJSDate() : DateTime.now().toJSDate();
   const safeInitialEnd = initialEnd ? DateTime.fromISO(initialEnd).toJSDate() : DateTime.now().toJSDate();
   const [form, setForm] = useState<FormData>({
@@ -186,8 +263,15 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const isAutoAdvancingRef = React.useRef(false);
   const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, boolean>>({});
   const [verifiedMember, setVerifiedMember] = useState<any>(null);
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState<Date | null>(null);
 
   const cardElementRef = React.useRef<HTMLDivElement>(null);
+  
+  // Performance optimization: Cache for API responses
+  const slotsCacheRef = useRef<Map<string, { slots: string[]; timestamp: number }>>(new Map());
+  const inFlightRequestsRef = useRef<Map<string, Promise<{ slots: string[] }>>>(new Map());
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 
   // Initialize Stripe on client side only
   useEffect(() => {
@@ -256,6 +340,55 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     loadBaseDays();
   }, []);
 
+  // Optimized fetch function with caching and request deduplication
+  const fetchAvailableSlotsCached = useCallback(async (dateStr: string, partySize: number): Promise<{ slots: string[] }> => {
+    const cacheKey = `${dateStr}-${partySize}`;
+    const now = Date.now();
+    
+    // Check cache first
+    const cached = slotsCacheRef.current.get(cacheKey);
+    if (cached && (now - cached.timestamp) < CACHE_TTL) {
+      return { slots: cached.slots };
+    }
+    
+    // Check if request is already in flight
+    const inFlight = inFlightRequestsRef.current.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+    
+    // Make new request
+    const requestPromise = (async () => {
+      try {
+        const res = await fetch('/api/available-slots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr, party_size: partySize })
+        });
+        
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        const slots: string[] = Array.isArray(data?.slots) ? data.slots : [];
+        
+        // Cache the result
+        slotsCacheRef.current.set(cacheKey, { slots, timestamp: now });
+        
+        return { slots };
+      } finally {
+        // Remove from in-flight requests
+        inFlightRequestsRef.current.delete(cacheKey);
+      }
+    })();
+    
+    // Track in-flight request
+    inFlightRequestsRef.current.set(cacheKey, requestPromise);
+    
+    return requestPromise;
+  }, []);
+
   // Fetch available times when date or party_size changes
   useEffect(() => {
     // Check if the selected date is allowed (either base day or exceptional open)
@@ -270,21 +403,14 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     const isClosed = exceptionalClosures.includes(dateStr);
     const isPrivateEvent = privateEventDates.includes(dateStr);
     
-    // Helper: Find next date with available slots via API
+    // Helper: Find next date with available slots via API (using cached fetch)
     async function findNextDateWithAvailableSlots(start: DateTime, partySize: number) {
       const maxDaysToCheck = 60;
       for (let i = 1; i <= maxDaysToCheck; i++) {
         const candidate = start.plus({ days: i });
         const candidateStr = candidate.toFormat('yyyy-MM-dd');
         try {
-          const res = await fetch('/api/available-slots', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: candidateStr, party_size: partySize })
-          });
-          if (!res.ok) continue;
-          const data = await res.json();
-          const slots: string[] = Array.isArray(data?.slots) ? data.slots : [];
+          const { slots } = await fetchAvailableSlotsCached(candidateStr, partySize);
           if (slots.length > 0) {
             return { date: candidate, slots };
           }
@@ -313,60 +439,73 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       return;
     }
     
-    async function fetchAvailableTimes() {
-      if (!date || !form.party_size || form.party_size < 1) return;
-      
-      // Format date as YYYY-MM-DD using Luxon
-      const dateStr = date.toFormat('yyyy-MM-dd');
-      
-      console.log('🔍 ReservationForm: Fetching available slots for', dateStr, 'party size', form.party_size);
-      const res = await fetch('/api/available-slots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, party_size: form.party_size })
-      });
-
-      if (!res.ok) {
-        console.error('Error fetching available slots:', await res.text());
-        setAvailableTimes([]);
-        return;
-      }
-
-      const responseData = await res.json();
-      console.log('🔍 ReservationForm: API response received', responseData);
-      const { slots } = responseData;
-      const normalizedSlots: string[] = Array.isArray(slots) ? slots : [];
-      if (normalizedSlots.length === 0 && !isAutoAdvancingRef.current) {
-        // Auto-advance to the next date with availability
-        isAutoAdvancingRef.current = true;
-        const result = await findNextDateWithAvailableSlots(date, form.party_size!);
-        isAutoAdvancingRef.current = false;
-        if (result) {
-          setDate(result.date);
-          setAvailableTimes(result.slots);
-          setTime(result.slots[0] || '');
-          return;
+    // Clear any existing debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Debounce the API call to avoid excessive requests
+    debounceTimerRef.current = setTimeout(async () => {
+      async function fetchAvailableTimes() {
+        if (!date || !form.party_size || form.party_size < 1) return;
+        
+        // Format date as YYYY-MM-DD using Luxon
+        const dateStr = date.toFormat('yyyy-MM-dd');
+        
+        try {
+          const { slots } = await fetchAvailableSlotsCached(dateStr, form.party_size);
+          const normalizedSlots: string[] = Array.isArray(slots) ? slots : [];
+          
+          if (normalizedSlots.length === 0 && !isAutoAdvancingRef.current) {
+            // Auto-advance to the next date with availability
+            isAutoAdvancingRef.current = true;
+            const result = await findNextDateWithAvailableSlots(date, form.party_size!);
+            isAutoAdvancingRef.current = false;
+            if (result) {
+              setDate(result.date);
+              setAvailableTimes(result.slots);
+              setTime(result.slots[0] || '');
+              return;
+            }
+          }
+          setAvailableTimes(normalizedSlots);
+        } catch (error) {
+          console.error('Error fetching available slots:', error);
+          setAvailableTimes([]);
         }
       }
-      setAvailableTimes(normalizedSlots);
-    }
-    fetchAvailableTimes();
+      fetchAvailableTimes();
+    }, 300); // 300ms debounce delay
+    
+    // Cleanup function
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, form.party_size, baseDays, internalBaseDays, exceptionalOpens, exceptionalClosures, privateEventDates]);
 
   // Prefetch availability map for the booking window to gray out dates with no availability
+  // Optimized: batches requests and limits concurrency
   useEffect(() => {
+    let cancelled = false;
+    
     async function prefetchAvailability() {
       if (!form.party_size || form.party_size < 1) return;
-      const start = bookingStartDate ? DateTime.fromJSDate(bookingStartDate) : DateTime.now();
-      const defaultEnd = DateTime.now().plus({ days: 60 });
-      const end = bookingEndDate ? DateTime.fromJSDate(bookingEndDate) : defaultEnd;
-      const maxEnd = DateTime.min(end, start.plus({ days: 60 }));
+      // Use effectiveStartDate and effectiveMaxDate (not calendarMaxDate) since we're hiding 2026 dates for non-members
+      const start = DateTime.fromJSDate(effectiveStartDate).startOf('day');
+      const end = effectiveMaxDate ? DateTime.fromJSDate(effectiveMaxDate).endOf('day') : DateTime.now().plus({ days: 60 });
       const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
 
       const newMap: Record<string, boolean> = {};
-      let cursor = start.startOf('day');
-      while (cursor <= maxEnd) {
+      const datesToCheck: string[] = [];
+      
+      // First pass: identify dates that need checking (only within booking window)
+      let cursor = start;
+      while (cursor <= end) {
         const dateStr = cursor.toFormat('yyyy-MM-dd');
+        
         const isExceptionalOpen = exceptionalOpens.includes(dateStr);
         const isBaseDay = effectiveBaseDays.includes(cursor.weekday % 7);
         const isClosed = exceptionalClosures.includes(dateStr);
@@ -375,31 +514,45 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         if (!((isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent)) {
           newMap[dateStr] = false;
         } else {
-          try {
-            const res = await fetch('/api/available-slots', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ date: dateStr, party_size: form.party_size })
-            });
-            if (res.ok) {
-              const data = await res.json();
-              const slots: string[] = Array.isArray(data?.slots) ? data.slots : [];
-              newMap[dateStr] = slots.length > 0;
-            } else {
-              // If API fails, don't block date purely due to error
-              newMap[dateStr] = true;
-            }
-          } catch (e) {
-            newMap[dateStr] = true;
-          }
+          datesToCheck.push(dateStr);
         }
         cursor = cursor.plus({ days: 1 });
       }
-      setAvailabilityByDate(newMap);
+      
+      // Batch requests with concurrency limit (process 5 at a time)
+      const CONCURRENT_LIMIT = 5;
+      for (let i = 0; i < datesToCheck.length; i += CONCURRENT_LIMIT) {
+        if (cancelled) break;
+        
+        const batch = datesToCheck.slice(i, i + CONCURRENT_LIMIT);
+        const promises = batch.map(async (dateStr) => {
+          try {
+            const { slots } = await fetchAvailableSlotsCached(dateStr, form.party_size!);
+            return { dateStr, hasSlots: slots.length > 0 };
+          } catch (e) {
+            // If API fails, don't block date purely due to error
+            return { dateStr, hasSlots: true };
+          }
+        });
+        
+        const results = await Promise.all(promises);
+        results.forEach(({ dateStr, hasSlots }) => {
+          newMap[dateStr] = hasSlots;
+        });
+      }
+      
+      if (!cancelled) {
+        setAvailabilityByDate(newMap);
+      }
     }
+    
     prefetchAvailability();
+    
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.party_size, bookingStartDate, bookingEndDate, baseDays, internalBaseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
+  }, [form.party_size, effectiveStartDate, effectiveMaxDate, baseDays, internalBaseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
 
   // Set default time only when availableTimes changes and current time is not in slots
   useEffect(() => {
@@ -414,10 +567,12 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
   // Fetch exceptional closures, opens, and private events for the booking window
   useEffect(() => {
+    let cancelled = false;
+    
     async function fetchBlockedDates() {
-      // Get booking window range
+      // Get booking window range - use effectiveMaxDate since we're hiding 2026 dates for non-members
       const start = bookingStartDate ? DateTime.fromJSDate(bookingStartDate) : DateTime.now();
-      const end = bookingEndDate ? DateTime.fromJSDate(bookingEndDate) : DateTime.now().plus({ days: 60 });
+      const end = effectiveMaxDate ? DateTime.fromJSDate(effectiveMaxDate) : DateTime.now().plus({ days: 60 });
       
       // Exceptional Closures (full day)
       const { data: closures } = await supabase
@@ -482,10 +637,16 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         }
       });
       
-      setPrivateEventDates(Array.from(eventDates));
+      if (!cancelled) {
+        setPrivateEventDates(Array.from(eventDates));
+      }
     }
     fetchBlockedDates();
-  }, [bookingStartDate, bookingEndDate]);
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingStartDate, effectiveMaxDate]);
 
   // Update date to first available date when data is loaded
   useEffect(() => {
@@ -593,11 +754,123 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       setIsSubmitting(false);
       return;
     }
+
+    // Validate that the selected date is actually available
+    const dateStr = date.toFormat('yyyy-MM-dd');
+    const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
+    const isBaseDay = effectiveBaseDays.includes(date.weekday % 7);
+    const isExceptionalOpen = exceptionalOpens.includes(dateStr);
+    const isClosed = exceptionalClosures.includes(dateStr);
+    const isPrivateEvent = privateEventDates.includes(dateStr);
+    const hasAvailability = availabilityByDate[dateStr] === true;
+
+    if (!isBaseDay && !isExceptionalOpen) {
+      toast({
+        title: 'Date not available',
+        description: 'The selected date is not available for reservations.',
+        status: 'error',
+        duration: 3000,
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (isClosed || isPrivateEvent) {
+      toast({
+        title: 'Date not available',
+        description: 'The selected date is closed or has a private event.',
+        status: 'error',
+        duration: 3000,
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Check availability - if not in map yet, verify it now
+    if (availabilityByDate[dateStr] === undefined) {
+      // Availability hasn't been checked yet, verify it now
+      try {
+        const res = await fetch('/api/available-slots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: dateStr, party_size: form.party_size })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const slots: string[] = Array.isArray(data?.slots) ? data.slots : [];
+          const dateHasAvailability = slots.length > 0;
+          // Update the availability map
+          setAvailabilityByDate(prev => ({ ...prev, [dateStr]: dateHasAvailability }));
+          
+          if (!dateHasAvailability) {
+            toast({
+              title: 'No availability',
+              description: 'The selected date does not have availability for your party size. Please select a different date.',
+              status: 'error',
+              duration: 3000,
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          // Verify the selected time is in the available slots
+          if (!slots.includes(time)) {
+            toast({
+              title: 'Time not available',
+              description: 'The selected time is no longer available. Please select a different time.',
+              status: 'error',
+              duration: 3000,
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        } else {
+          toast({
+            title: 'Availability check failed',
+            description: 'Unable to verify availability. Please try again.',
+            status: 'error',
+            duration: 3000,
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking availability:', error);
+        toast({
+          title: 'Availability check failed',
+          description: 'Unable to verify availability. Please try again.',
+          status: 'error',
+          duration: 3000,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    } else if (!hasAvailability) {
+      toast({
+        title: 'No availability',
+        description: 'The selected date does not have availability for your party size. Please select a different date.',
+        status: 'error',
+        duration: 3000,
+      });
+      setIsSubmitting(false);
+      return;
+    }
     // Validate time
     if (!time) {
       toast({
         title: 'Time required',
         description: 'Please select a reservation time.',
+        status: 'error',
+        duration: 3000,
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate that the selected time is actually available
+    if (availableTimes.length === 0 || !availableTimes.includes(time)) {
+      toast({
+        title: 'Time not available',
+        description: 'The selected time is no longer available. Please select a different time or date.',
         status: 'error',
         duration: 3000,
       });
@@ -678,6 +951,19 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     
     const durationMinutes = form.party_size <= 2 ? 90 : 120;
     const end = start.plus({ minutes: durationMinutes });
+
+    // Validate that end time is valid
+    if (!end || !end.isValid) {
+      console.error('Invalid end time calculated:', end);
+      toast({
+        title: 'Date calculation error',
+        description: 'Unable to calculate reservation end time. Please try again.',
+        status: 'error',
+        duration: 3000,
+      });
+      setIsSubmitting(false);
+      return;
+    }
 
     // Prepare reservation data
     const reservationData = {
@@ -1007,10 +1293,68 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   selected={date.toJSDate()}
                   onChange={handleDateChange}
                   minDate={effectiveStartDate}
-                  maxDate={bookingEndDate}
+                  maxDate={calendarMaxDate}
                   dateFormat="MMMM d, yyyy"
                   popperPlacement="bottom-start"
+                  dayClassName={(d: Date) => {
+                    const dateStr = DateTime.fromJSDate(d).toFormat('yyyy-MM-dd');
+                    const availabilityStatus = availabilityByDate[dateStr];
+                    const isUnavailable = availabilityStatus === false;
+                    
+                    // Check if date is outside the selectable window
+                    // Normalize both dates to start of day for proper comparison (consistent with filterDate)
+                    const dateDateTime = DateTime.fromJSDate(d).startOf('day');
+                    const maxSelectableDate = effectiveMaxDate ? DateTime.fromJSDate(effectiveMaxDate).startOf('day') : null;
+                    const isOutsideSelectableWindow = maxSelectableDate && dateDateTime > maxSelectableDate;
+                    
+                    // Add unavailable class for dates that are unavailable or outside selectable window
+                    if (isUnavailable || isOutsideSelectableWindow) {
+                      return 'react-datepicker__day--unavailable';
+                    }
+                    
+                    return '';
+                  }}
+                  renderCustomHeader={({ date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => {
+                    const currentMonth = DateTime.fromJSDate(date);
+                    
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={decreaseMonth}
+                          disabled={prevMonthButtonDisabled}
+                          style={{ background: 'none', border: 'none', cursor: prevMonthButtonDisabled ? 'not-allowed' : 'pointer', padding: '4px 8px' }}
+                        >
+                          {'<'}
+                        </button>
+                        <span style={{ fontWeight: 'bold' }}>
+                          {currentMonth.toFormat('MMMM yyyy')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={increaseMonth}
+                          disabled={nextMonthButtonDisabled}
+                          style={{ background: 'none', border: 'none', cursor: nextMonthButtonDisabled ? 'not-allowed' : 'pointer', padding: '4px 8px' }}
+                        >
+                          {'>'}
+                        </button>
+                      </div>
+                    );
+                  }}
+                  onMonthChange={(date: Date) => {
+                    setCurrentCalendarMonth(date);
+                  }}
+                  onCalendarOpen={() => {
+                    setCurrentCalendarMonth(date.toJSDate());
+                  }}
+                  renderDayContents={(dayOfMonth: number) => dayOfMonth}
                   filterDate={d => {
+                    // For non-members, prevent selection of dates after December 31, 2025
+                    // This is already handled by maxDate, but keep as safety check
+                    if (!isMember && d >= membersOnlyStartDate) {
+                      return false;
+                    }
+                    
                     // Only allow dates that are:
                     // - within booking window (handled by minDate/maxDate)
                     // - on a base open day or exceptional open
@@ -1024,8 +1368,18 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     const isBaseDay = effectiveBaseDays.includes(d.getDay());
                     const isClosed = exceptionalClosures.includes(dateStr);
                     const isPrivateEvent = privateEventDates.includes(dateStr);
-                    const hasAvailability = availabilityByDate[dateStr] !== false; // default to true unless known false
-                    return (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent && hasAvailability;
+                    
+                    // Check availability: block if explicitly false
+                    const availabilityStatus = availabilityByDate[dateStr];
+                    const isUnavailable = availabilityStatus === false;
+                    
+                    // If unavailable, prevent selection
+                    if (isUnavailable) {
+                      return false;
+                    }
+                    
+                    // Allow dates that meet all criteria
+                    return (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent;
                   }}
                   customInput={
                     <Input
@@ -1043,7 +1397,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     />
                   }
                   wrapperClassName="datepicker-wrapper"
-                  popperClassName="datepicker-popper"
+                  popperClassName={`datepicker-popper ${!isMember && currentCalendarMonth && DateTime.fromJSDate(currentCalendarMonth) >= DateTime.fromObject({ year: 2026, month: 1, day: 1 }) ? 'members-only-month' : ''}`}
+                  portalId="react-datepicker-portal"
+                  withPortal={false}
                 />
               </Box>
             </FormControl>

@@ -4,6 +4,128 @@
   border-radius: 0.3rem;
 }
 
+/* Members only dates - disabled style with indicator */
+.react-datepicker__day--members-only {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  background-color: #f8f8f8 !important;
+  color: #888 !important;
+  position: relative;
+}
+
+/* Prevent clicking on members-only days */
+.react-datepicker__day--members-only {
+  pointer-events: none !important;
+}
+
+/* Ensure the datepicker container, input, and calendar dropdown are clickable */
+.react-datepicker-wrapper,
+.react-datepicker__input-container,
+.react-datepicker__input-container input {
+  pointer-events: auto !important;
+}
+
+/* Ensure the datepicker popper (dropdown calendar) is clickable and above modals */
+/* Only when the popper is actually rendered and visible */
+.react-datepicker-popper.datepicker-popper {
+  pointer-events: auto !important;
+  z-index: 100000000 !important; /* Higher than modal z-index (99999999) */
+}
+
+/* Don't block interactions when datepicker is hidden/closed */
+.react-datepicker-popper.datepicker-popper[aria-hidden="true"],
+.react-datepicker-popper.datepicker-popper.hidden {
+  pointer-events: none !important;
+  z-index: -1 !important;
+  display: none !important;
+}
+
+.react-datepicker-popper.datepicker-popper .react-datepicker {
+  pointer-events: auto !important;
+}
+
+.react-datepicker-popper.datepicker-popper .react-datepicker__month-container,
+.react-datepicker-popper.datepicker-popper .react-datepicker__header,
+.react-datepicker-popper.datepicker-popper .react-datepicker__day-names,
+.react-datepicker-popper.datepicker-popper .react-datepicker__week {
+  pointer-events: auto !important;
+}
+
+/* Only disable pointer events on specific day cells, not the entire calendar */
+.react-datepicker-popper.datepicker-popper .react-datepicker__day {
+  pointer-events: auto;
+}
+
+.react-datepicker-popper.datepicker-popper .react-datepicker__day--members-only,
+.react-datepicker-popper.datepicker-popper .react-datepicker__day--unavailable {
+  pointer-events: none !important;
+}
+
+.react-datepicker__day--members-only:hover {
+  background-color: #f8f8f8 !important;
+  color: #888 !important;
+  cursor: not-allowed !important;
+}
+
+.react-datepicker__day--members-only.react-datepicker__day--selected {
+  background-color: #f8f8f8 !important;
+  color: #888 !important;
+}
+
+.react-datepicker__day--members-only.react-datepicker__day--keyboard-selected {
+  background-color: #f8f8f8 !important;
+  color: #888 !important;
+}
+
+/* Unavailable dates - grayed out style */
+.react-datepicker__day--unavailable {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  background-color: #f0f0f0 !important;
+  color: #999 !important;
+  text-decoration: line-through;
+}
+
+.react-datepicker__day--unavailable:hover {
+  background-color: #f0f0f0 !important;
+  color: #999 !important;
+  cursor: not-allowed !important;
+}
+
+.react-datepicker__day--unavailable.react-datepicker__day--selected {
+  background-color: #f0f0f0 !important;
+  color: #999 !important;
+}
+
+.react-datepicker__day--unavailable.react-datepicker__day--keyboard-selected {
+  background-color: #f0f0f0 !important;
+  color: #999 !important;
+}
+
+/* Members Only overlay - show in calendar when viewing January 2026+ */
+.datepicker-popper.members-only-month .react-datepicker__month-container {
+  position: relative;
+}
+
+.datepicker-popper.members-only-month .react-datepicker__month-container::after {
+  content: 'Members Only';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  background-color: rgba(255, 255, 255, 0.98);
+  padding: 20px 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #666;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 /* Mobile-specific styles for reservation form expansion */
 @media (max-width: 768px) {
   .reservation-form-container {
