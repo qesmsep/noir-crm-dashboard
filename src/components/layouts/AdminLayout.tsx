@@ -131,7 +131,6 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
 
   const navItems = [
     { href: '/admin/dashboard-v2', label: 'Dashboard', icon: '📊' },
-    { href: '/admin/calendar', label: 'Calendar', icon: '📅' },
     { href: '/admin/reservations', label: 'Reservations', icon: '📋' },
     { href: '/admin/members', label: 'Members', icon: '👥' },
     { href: '/admin/waitlist', label: 'Waitlist', icon: '🧭' },

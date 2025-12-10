@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Box,
   VStack,
@@ -95,6 +96,7 @@ export default function EventCalendarNew() {
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PrivateEvent | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [eventFormData, setEventFormData] = useState({
     title: '',
     start_time: '',
@@ -287,6 +289,44 @@ export default function EventCalendarNew() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setMounted(true);
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+    };
+  }, []);
+
+  // Handle escape key and body scroll lock for edit modal
+  useEffect(() => {
+    if (!isEditEventModalOpen) {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+      return;
+    }
+    
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+    }
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleCloseEventModal();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [isEditEventModalOpen]);
 
   useEffect(() => {
     fetchCalendarData();
@@ -747,271 +787,409 @@ export default function EventCalendarNew() {
           )}
         </div>
 
-        {/* Day Details Modal */}
-        <Modal isOpen={isDayModalOpen} onClose={() => setIsDayModalOpen(false)} isCentered useInert={false}>
-          <ModalOverlay 
-            bg="blackAlpha.600" 
-            backdropFilter="blur(4px)"
-          />
-          <ModalContent 
-            className={styles.modalContent} 
-            bg="white" 
-            borderRadius="16px" 
-            boxShadow="xl"
-            maxW="700px"
-            w="90%"
-            fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        {/* Day Details Modal - Custom Portal */}
+        {mounted && isDayModalOpen && typeof document !== 'undefined' && createPortal(
+          <Box
+            position="fixed"
+            top="0"
+            left="0"
+            width="100vw"
+            height="100vh"
+            zIndex={99999999}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            pointerEvents="none"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setIsDayModalOpen(false);
+              }
+            }}
           >
-            <ModalHeader className={styles.modalHeader}>
-              {selectedDay && format(selectedDay.date, 'EEEE, MMMM d, yyyy')}
-            </ModalHeader>
-            <ModalCloseButton />
-            <ModalBody className={styles.modalBody}>
-              {selectedDay && (
-                <div>
-                  {/* Day Stats */}
-                  <div className={styles.modalStats}>
-                    <div className={styles.modalStat}>
-                      <div className={styles.modalStatLabel}>Covers</div>
-                      <div className={styles.modalStatValue}>{selectedDay.covers}</div>
-                    </div>
-                    <div className={styles.modalStat}>
-                      <div className={styles.modalStatLabel}>Revenue</div>
-                      <div className={styles.modalStatValue}>${selectedDay.revenue.toLocaleString()}</div>
-                    </div>
-                    <div className={styles.modalStat}>
-                      <div className={styles.modalStatLabel}>Status</div>
-                      <div className={styles.modalStatValue}>
-                        <Badge colorScheme={selectedDay.isOpen ? 'green' : 'red'}>
+            {/* Overlay */}
+            <Box
+              position="fixed"
+              top="0"
+              left="0"
+              width="100vw"
+              height="100vh"
+              bg="blackAlpha.700"
+              zIndex={99999998}
+              pointerEvents="auto"
+              onClick={() => setIsDayModalOpen(false)}
+              cursor="pointer"
+            />
+            
+            {/* Modal Content */}
+            <Box
+              position="relative"
+              zIndex={99999999}
+              pointerEvents="auto"
+              maxW="500px"
+              w="90vw"
+              maxH="85vh"
+              bg="white"
+              borderRadius="16px"
+              boxShadow="xl"
+              fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+              overflowY="auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <Box
+                borderBottomWidth="1px"
+                borderColor="gray.200"
+                p={3}
+                pb={2}
+                pt={3}
+                fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                position="relative"
+              >
+                <Text fontSize="md" fontWeight="600" color="#1A1A1A">
+                  {selectedDay && format(selectedDay.date, 'EEEE, MMMM d, yyyy')}
+                </Text>
+                <Button
+                  position="absolute"
+                  top={1}
+                  right={1}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsDayModalOpen(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </Button>
+              </Box>
+
+              {/* Body */}
+              <Box p={3}>
+                {selectedDay && (
+                  <VStack spacing={3} align="stretch">
+                    {/* Day Stats - Compact */}
+                    <SimpleGrid columns={3} spacing={2} pb={3} borderBottomWidth="1px" borderColor="gray.200">
+                      <Box>
+                        <Text fontSize="xs" color="gray.600" mb={0.5}>Covers</Text>
+                        <Text fontSize="lg" fontWeight="600">{selectedDay.covers}</Text>
+                      </Box>
+                      <Box>
+                        <Text fontSize="xs" color="gray.600" mb={0.5}>Revenue</Text>
+                        <Text fontSize="lg" fontWeight="600">${selectedDay.revenue.toLocaleString()}</Text>
+                      </Box>
+                      <Box>
+                        <Text fontSize="xs" color="gray.600" mb={0.5}>Status</Text>
+                        <Badge colorScheme={selectedDay.isOpen ? 'green' : 'red'} fontSize="xs">
                           {selectedDay.isOpen ? 'Open' : 'Closed'}
                         </Badge>
-                      </div>
-                    </div>
-                  </div>
+                      </Box>
+                    </SimpleGrid>
 
-                  {/* Events List */}
-                  <div className={styles.eventsList}>
-                    {/* Private Events */}
-                    {selectedDay.privateEvents.length > 0 && (
-                      <div className={styles.eventsSection}>
-                        <div className={styles.sectionTitle}>Private Events</div>
-                        {selectedDay.privateEvents.map(event => {
-                          const eventName = event.title || event.name || 'Untitled Event';
-                          const isMinaka = event.source === 'minaka';
-                          return (
-                            <div
-                              key={event.id}
-                              className={`${styles.eventCard} ${styles.eventCardPrivate} ${isMinaka ? styles.eventCardMinaka : ''}`}
-                              onClick={(e) => handleEventClick(event, e)}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <div className={styles.eventName}>
-                                {eventName}
-                                {isMinaka && <Badge colorScheme="blue" ml={2} fontSize="xs">Minaka</Badge>}
-                              </div>
-                              <div className={styles.eventDetails}>
-                                <div>{format(parseISO(event.start_time), 'h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}</div>
-                                {event.guest_count && (
-                                  <div>Guests: {event.guest_count}</div>
-                                )}
-                                {event.client_name && (
-                                  <div>Client: {event.client_name}</div>
-                                )}
-                                {event.client_email && (
-                                  <div>Email: {event.client_email}</div>
-                                )}
-                                {event.location && (
-                                  <div>Location: {event.location}</div>
-                                )}
-                                {event.minaka_url && (
-                                  <div>
-                                    <a href={event.minaka_url} target="_blank" rel="noopener noreferrer" style={{ color: '#3182CE', textDecoration: 'underline' }}>
-                                      View in Minaka
-                                    </a>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                    {/* Events List */}
+                    <VStack spacing={2} align="stretch">
+                      {/* Private Events */}
+                      {selectedDay.privateEvents.length > 0 && (
+                        <Box>
+                          <Text fontSize="sm" fontWeight="600" color="#1A1A1A" mb={2}>
+                            Private Events
+                          </Text>
+                          <VStack spacing={1.5} align="stretch">
+                            {selectedDay.privateEvents.map(event => {
+                              const eventName = event.title || event.name || 'Untitled Event';
+                              const isMinaka = event.source === 'minaka';
+                              return (
+                                <Box
+                                  key={event.id}
+                                  bg={isMinaka ? "#F3E5F5" : "#E3F2FD"}
+                                  p={2}
+                                  borderRadius="8px"
+                                  borderWidth="1px"
+                                  borderColor={isMinaka ? "#7B1FA2" : "#1E88E5"}
+                                  cursor="pointer"
+                                  onClick={(e) => handleEventClick(event, e)}
+                                >
+                                  <HStack justify="space-between" mb={1}>
+                                    <Text fontSize="sm" fontWeight="600" color="#1A1A1A">
+                                      {eventName}
+                                    </Text>
+                                    {isMinaka && <Badge colorScheme="blue" fontSize="2xs">Minaka</Badge>}
+                                  </HStack>
+                                  <VStack spacing={0.5} align="start">
+                                    <Text fontSize="xs" color="gray.600">
+                                      {format(parseISO(event.start_time), 'h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}
+                                    </Text>
+                                    {event.guest_count && (
+                                      <Text fontSize="xs" color="gray.600">Guests: {event.guest_count}</Text>
+                                    )}
+                                    {event.client_name && (
+                                      <Text fontSize="xs" color="gray.600">Client: {event.client_name}</Text>
+                                    )}
+                                    {event.client_email && (
+                                      <Text fontSize="xs" color="gray.600">Email: {event.client_email}</Text>
+                                    )}
+                                    {event.location && (
+                                      <Text fontSize="xs" color="gray.600">Location: {event.location}</Text>
+                                    )}
+                                    {event.minaka_url && (
+                                      <Text fontSize="xs">
+                                        <a href={event.minaka_url} target="_blank" rel="noopener noreferrer" style={{ color: '#3182CE', textDecoration: 'underline' }}>
+                                          View in Minaka
+                                        </a>
+                                      </Text>
+                                    )}
+                                  </VStack>
+                                </Box>
+                              );
+                            })}
+                          </VStack>
+                        </Box>
+                      )}
 
-                    {/* Reservations */}
-                    {selectedDay.reservations.length > 0 && (
-                      <div className={styles.eventsSection}>
-                        <div className={styles.sectionTitle}>Reservations ({selectedDay.reservations.length})</div>
-                        {selectedDay.reservations.map(res => {
-                          const resTime = res.start_time 
-                            ? format(parseISO(res.start_time), 'h:mm a')
-                            : 'Time TBD';
-                          return (
-                            <div key={res.id} className={`${styles.eventCard} ${styles.eventCardReservation}`}>
-                              <div className={styles.eventName}>{resTime}</div>
-                              <div className={styles.eventDetails}>
-                                <div>Party of {res.party_size || 0}</div>
-                                {res.first_name && (
-                                  <div>{res.first_name} {res.last_name || ''}</div>
-                                )}
-                                {res.phone && (
-                                  <div>{res.phone}</div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                      {/* Reservations */}
+                      {selectedDay.reservations.length > 0 && (
+                        <Box>
+                          <Text fontSize="sm" fontWeight="600" color="#1A1A1A" mb={2}>
+                            Reservations ({selectedDay.reservations.length})
+                          </Text>
+                          <VStack spacing={1.5} align="stretch">
+                            {selectedDay.reservations.map(res => {
+                              const resTime = res.start_time 
+                                ? format(parseISO(res.start_time), 'h:mm a')
+                                : 'Time TBD';
+                              return (
+                                <Box
+                                  key={res.id}
+                                  bg="#E8F5E9"
+                                  p={2}
+                                  borderRadius="8px"
+                                  borderWidth="1px"
+                                  borderColor="#43A047"
+                                >
+                                  <Text fontSize="sm" fontWeight="600" color="#1A1A1A" mb={1}>
+                                    {resTime}
+                                  </Text>
+                                  <VStack spacing={0.5} align="start">
+                                    <Text fontSize="xs" color="gray.600">Party of {res.party_size || 0}</Text>
+                                    {res.first_name && (
+                                      <Text fontSize="xs" color="gray.600">{res.first_name} {res.last_name || ''}</Text>
+                                    )}
+                                    {res.phone && (
+                                      <Text fontSize="xs" color="gray.600">{res.phone}</Text>
+                                    )}
+                                  </VStack>
+                                </Box>
+                              );
+                            })}
+                          </VStack>
+                        </Box>
+                      )}
 
-                    {selectedDay.privateEvents.length === 0 && selectedDay.reservations.length === 0 && (
-                      <div className={styles.emptyState}>
-                        No events or reservations for this day
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                      {selectedDay.privateEvents.length === 0 && selectedDay.reservations.length === 0 && (
+                        <Text textAlign="center" py={4} color="gray.500" fontSize="sm">
+                          No events or reservations for this day
+                        </Text>
+                      )}
+                    </VStack>
+                  </VStack>
+                )}
+              </Box>
+            </Box>
+          </Box>,
+          document.body
+        )}
 
-        {/* Edit Event Modal */}
-        <Modal 
-          isOpen={isEditEventModalOpen} 
-          onClose={handleCloseEventModal}
-          size="md"
-          isCentered
-          closeOnOverlayClick={true}
-          closeOnEsc={true}
-          blockScrollOnMount={true}
-          motionPreset="scale"
-          portalProps={{ appendToParentPortal: false }}
-        >
-          <ModalOverlay
-            bg="blackAlpha.700"
-            style={{ zIndex: 99999998 }}
-            className="event-edit-modal-overlay"
-          />
-          <ModalContent
-            bg="white"
-            borderRadius="16px"
-            boxShadow="xl"
-            maxW="600px"
-            w="90%"
-            fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-            className="event-edit-modal-content"
-            style={{ zIndex: 99999999 }}
+        {/* Edit Event Modal - Custom Portal */}
+        {mounted && isEditEventModalOpen && typeof document !== 'undefined' && createPortal(
+          <Box
+            position="fixed"
+            top="0"
+            left="0"
+            width="100vw"
+            height="100vh"
+            zIndex={99999999}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            pointerEvents="none"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                handleCloseEventModal();
+              }
+            }}
           >
-            <ModalHeader fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
-              Edit Event
-            </ModalHeader>
-            <ModalCloseButton />
-            <ModalBody pb={6}>
-              <form onSubmit={handleSaveEvent} noValidate>
-                <VStack spacing={4}>
-                  <FormControl isRequired>
-                    <FormLabel>Event Name</FormLabel>
-                    <Input
-                      value={eventFormData.title}
-                      onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
-                      placeholder="e.g., Holiday Party"
-                    />
-                  </FormControl>
+            {/* Overlay */}
+            <Box
+              position="fixed"
+              top="0"
+              left="0"
+              width="100vw"
+              height="100vh"
+              bg="blackAlpha.700"
+              zIndex={99999998}
+              pointerEvents="auto"
+              onClick={handleCloseEventModal}
+              cursor="pointer"
+            />
+            
+            {/* Modal Content */}
+            <Box
+              position="relative"
+              zIndex={99999999}
+              pointerEvents="auto"
+              maxW="500px"
+              w="90vw"
+              maxH="90vh"
+              bg="white"
+              borderRadius="16px"
+              boxShadow="xl"
+              fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+              overflowY="auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <Box
+                borderBottomWidth="1px"
+                borderColor="gray.200"
+                p={4}
+                pb={3}
+                pt={4}
+                fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                position="relative"
+              >
+                <Text fontSize="lg" fontWeight="bold" color="#1A1A1A">
+                  Edit Event
+                </Text>
+                <Button
+                  position="absolute"
+                  top={2}
+                  right={2}
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCloseEventModal}
+                  aria-label="Close"
+                >
+                  ×
+                </Button>
+              </Box>
 
-                  <FormControl isRequired>
-                    <FormLabel>Start Time</FormLabel>
-                    <Input
-                      type="datetime-local"
-                      value={eventFormData.start_time}
-                      onChange={(e) => setEventFormData({ ...eventFormData, start_time: e.target.value })}
-                    />
-                  </FormControl>
+              {/* Body */}
+              <Box p={4}>
+                <form onSubmit={handleSaveEvent} noValidate>
+                  <VStack spacing={3}>
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm" mb={1}>Event Name</FormLabel>
+                      <Input
+                        size="sm"
+                        value={eventFormData.title}
+                        onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
+                        placeholder="e.g., Holiday Party"
+                      />
+                    </FormControl>
 
-                  <FormControl isRequired>
-                    <FormLabel>End Time</FormLabel>
-                    <Input
-                      type="datetime-local"
-                      value={eventFormData.end_time}
-                      onChange={(e) => setEventFormData({ ...eventFormData, end_time: e.target.value })}
-                    />
-                  </FormControl>
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm" mb={1}>Start Time</FormLabel>
+                      <Input
+                        size="sm"
+                        type="datetime-local"
+                        value={eventFormData.start_time}
+                        onChange={(e) => setEventFormData({ ...eventFormData, start_time: e.target.value })}
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Guest Count</FormLabel>
-                    <Input
-                      type="number"
-                      value={eventFormData.guest_count}
-                      onChange={(e) => setEventFormData({ ...eventFormData, guest_count: e.target.value })}
-                      placeholder="Number of guests"
-                    />
-                  </FormControl>
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm" mb={1}>End Time</FormLabel>
+                      <Input
+                        size="sm"
+                        type="datetime-local"
+                        value={eventFormData.end_time}
+                        onChange={(e) => setEventFormData({ ...eventFormData, end_time: e.target.value })}
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Client Name</FormLabel>
-                    <Input
-                      value={eventFormData.client_name}
-                      onChange={(e) => setEventFormData({ ...eventFormData, client_name: e.target.value })}
-                      placeholder="Client name"
-                    />
-                  </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1}>Guest Count</FormLabel>
+                      <Input
+                        size="sm"
+                        type="number"
+                        value={eventFormData.guest_count}
+                        onChange={(e) => setEventFormData({ ...eventFormData, guest_count: e.target.value })}
+                        placeholder="Number of guests"
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Client Email</FormLabel>
-                    <Input
-                      type="email"
-                      value={eventFormData.client_email}
-                      onChange={(e) => setEventFormData({ ...eventFormData, client_email: e.target.value })}
-                      placeholder="client@example.com"
-                    />
-                  </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1}>Client Name</FormLabel>
+                      <Input
+                        size="sm"
+                        value={eventFormData.client_name}
+                        onChange={(e) => setEventFormData({ ...eventFormData, client_name: e.target.value })}
+                        placeholder="Client name"
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Location</FormLabel>
-                    <Input
-                      value={eventFormData.location}
-                      onChange={(e) => setEventFormData({ ...eventFormData, location: e.target.value })}
-                      placeholder="Event location"
-                    />
-                  </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1}>Client Email</FormLabel>
+                      <Input
+                        size="sm"
+                        type="email"
+                        value={eventFormData.client_email}
+                        onChange={(e) => setEventFormData({ ...eventFormData, client_email: e.target.value })}
+                        placeholder="client@example.com"
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Description</FormLabel>
-                    <Textarea
-                      value={eventFormData.description}
-                      onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
-                      placeholder="Event details..."
-                      rows={4}
-                    />
-                  </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1}>Location</FormLabel>
+                      <Input
+                        size="sm"
+                        value={eventFormData.location}
+                        onChange={(e) => setEventFormData({ ...eventFormData, location: e.target.value })}
+                        placeholder="Event location"
+                      />
+                    </FormControl>
 
-                  <HStack w="full" justify="space-between" pt={4}>
-                    <Button
-                      colorScheme="red"
-                      variant="outline"
-                      onClick={handleDeleteEvent}
-                    >
-                      Delete Event
-                    </Button>
-                    <HStack spacing={3}>
-                      <Button 
-                        type="button"
-                        onClick={handleCloseEventModal}
+                    <FormControl>
+                      <FormLabel fontSize="sm" mb={1}>Description</FormLabel>
+                      <Textarea
+                        size="sm"
+                        value={eventFormData.description}
+                        onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
+                        placeholder="Event details..."
+                        rows={3}
+                      />
+                    </FormControl>
+
+                    <HStack w="full" justify="space-between" pt={2}>
+                      <Button
+                        size="sm"
+                        colorScheme="red"
+                        variant="outline"
+                        onClick={handleDeleteEvent}
                       >
-                        Cancel
+                        Delete
                       </Button>
-                      <Button 
-                        type="submit" 
-                        colorScheme="blue"
-                      >
-                        Update Event
-                      </Button>
+                      <HStack spacing={2}>
+                        <Button 
+                          size="sm"
+                          type="button"
+                          onClick={handleCloseEventModal}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          size="sm"
+                          type="submit" 
+                          colorScheme="blue"
+                        >
+                          Update
+                        </Button>
+                      </HStack>
                     </HStack>
-                  </HStack>
-                </VStack>
-              </form>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                  </VStack>
+                </form>
+              </Box>
+            </Box>
+          </Box>,
+          document.body
+        )}
       </div>
     </AdminLayout>
   );
@@ -1033,11 +1211,52 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
     description: '',
     guest_count: '',
   });
+  const [mounted, setMounted] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    setMounted(true);
+    return () => {
+      // Cleanup: ensure body scroll is unlocked
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  // Handle escape key and body scroll lock
+  useEffect(() => {
+    if (!isCreateModalOpen) {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+      return;
+    }
+    
+    // Lock body scroll when modal is open
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+    }
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleCloseModal();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [isCreateModalOpen]);
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -1340,134 +1559,162 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
         );
       })()}
 
-      {/* Create/Edit Modal */}
-      <Modal 
-        isOpen={isCreateModalOpen} 
-        onClose={handleCloseModal}
-        size="md"
-        isCentered
-        closeOnOverlayClick={true}
-        closeOnEsc={true}
-        blockScrollOnMount={true}
-        motionPreset="scale"
-        portalProps={{ appendToParentPortal: false }}
-      >
-        <ModalOverlay 
-          bg="blackAlpha.700"
-          style={{ zIndex: 99999998 }}
-          className="private-event-modal-overlay"
-        />
-        <ModalContent 
-          bg="white" 
-          borderRadius="16px" 
-          boxShadow="xl"
-          maxW="600px"
-          w="90%"
-          maxH="90vh"
-          overflowY="auto"
-          fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-          className="private-event-modal-content"
-          style={{ 
-            zIndex: 99999999,
-            margin: '20vh auto auto auto',
-            position: 'relative',
-          }}
-          sx={{
-            '& input, & textarea, & select': {
-              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif !important",
-            },
-            '& input::placeholder, & textarea::placeholder': {
-              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif !important",
-            },
-            '& label': {
-              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif !important",
-            },
-            '& button': {
-              fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif !important",
+      {/* Create/Edit Modal - Custom Portal */}
+      {mounted && isCreateModalOpen && typeof document !== 'undefined' && createPortal(
+        <Box
+          position="fixed"
+          top="0"
+          left="0"
+          width="100vw"
+          height="100vh"
+          zIndex={99999999}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          pointerEvents="none"
+          onClick={(e) => {
+            // Close if clicking on the backdrop (the container itself)
+            if (e.target === e.currentTarget) {
+              handleCloseModal();
             }
           }}
         >
-          <ModalHeader fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
-            {editingEvent ? 'Edit Private Event' : 'Create Private Event'}
-          </ModalHeader>
-          <ModalBody pb={6}>
-            <form onSubmit={handleSubmit}>
-              <VStack spacing={4}>
-                <FormControl isRequired>
-                  <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Event Name</FormLabel>
-                  <Input
-                    value={formData.title || formData.name}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value, name: e.target.value })}
-                    placeholder="e.g., Holiday Party"
-                    fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-                    _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-                  />
-                </FormControl>
+          {/* Overlay */}
+          <Box
+            position="fixed"
+            top="0"
+            left="0"
+            width="100vw"
+            height="100vh"
+            bg="blackAlpha.700"
+            zIndex={99999998}
+            pointerEvents="auto"
+            onClick={handleCloseModal}
+            cursor="pointer"
+          />
+          
+          {/* Modal Content */}
+          <Box
+            position="relative"
+            zIndex={99999999}
+            pointerEvents="auto"
+            maxW="600px"
+            w="90vw"
+            maxH="90vh"
+            bg="white"
+            borderRadius="16px"
+            boxShadow="xl"
+            fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+            overflowY="auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <Box
+              borderBottomWidth="1px"
+              borderColor="gray.200"
+              p={6}
+              pb={4}
+              pt={5}
+              fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+              position="relative"
+            >
+              <Text fontSize="xl" fontWeight="bold" color="#1A1A1A">
+                {editingEvent ? 'Edit Private Event' : 'Create Private Event'}
+              </Text>
+              <Button
+                position="absolute"
+                top={2}
+                right={2}
+                variant="ghost"
+                size="sm"
+                onClick={handleCloseModal}
+                aria-label="Close"
+              >
+                ×
+              </Button>
+            </Box>
 
-                <FormControl isRequired>
-                  <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Start Time</FormLabel>
-                  <Input
-                    type="datetime-local"
-                    value={formData.start_time}
-                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                    fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-                  />
-                </FormControl>
+            {/* Body */}
+            <Box p={6} pb={6}>
+              <form onSubmit={handleSubmit}>
+                <VStack spacing={4}>
+                  <FormControl isRequired>
+                    <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Event Name</FormLabel>
+                    <Input
+                      value={formData.title || formData.name}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value, name: e.target.value })}
+                      placeholder="e.g., Holiday Party"
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                      _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+                    />
+                  </FormControl>
 
-                <FormControl isRequired>
-                  <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">End Time</FormLabel>
-                  <Input
-                    type="datetime-local"
-                    value={formData.end_time}
-                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                    fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-                  />
-                </FormControl>
+                  <FormControl isRequired>
+                    <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Start Time</FormLabel>
+                    <Input
+                      type="datetime-local"
+                      value={formData.start_time}
+                      onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                    />
+                  </FormControl>
 
-                <FormControl>
-                  <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Guest Count</FormLabel>
-                  <Input
-                    type="number"
-                    value={formData.guest_count}
-                    onChange={(e) => setFormData({ ...formData, guest_count: e.target.value })}
-                    placeholder="Number of guests"
-                    fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-                    _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-                  />
-                </FormControl>
+                  <FormControl isRequired>
+                    <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">End Time</FormLabel>
+                    <Input
+                      type="datetime-local"
+                      value={formData.end_time}
+                      onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                    />
+                  </FormControl>
 
-                <FormControl>
-                  <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Description</FormLabel>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Event details..."
-                    rows={4}
-                    fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-                    _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-                  />
-                </FormControl>
+                  <FormControl>
+                    <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Guest Count</FormLabel>
+                    <Input
+                      type="number"
+                      value={formData.guest_count}
+                      onChange={(e) => setFormData({ ...formData, guest_count: e.target.value })}
+                      placeholder="Number of guests"
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                      _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+                    />
+                  </FormControl>
 
-                <HStack w="full" justify="flex-end" spacing={3} pt={4}>
-                  <Button 
-                    onClick={handleCloseModal}
-                    fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    colorScheme="blue"
-                    fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
-                  >
-                    {editingEvent ? 'Update Event' : 'Create Event'}
-                  </Button>
-                </HStack>
-              </VStack>
-            </form>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+                  <FormControl>
+                    <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Description</FormLabel>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Event details..."
+                      rows={4}
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                      _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+                    />
+                  </FormControl>
+
+                  <HStack w="full" justify="flex-end" spacing={3} pt={4}>
+                    <Button 
+                      onClick={handleCloseModal}
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      colorScheme="blue"
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                    >
+                      {editingEvent ? 'Update Event' : 'Create Event'}
+                    </Button>
+                  </HStack>
+                </VStack>
+              </form>
+            </Box>
+          </Box>
+        </Box>,
+        document.body
+      )}
     </Box>
   );
 }
