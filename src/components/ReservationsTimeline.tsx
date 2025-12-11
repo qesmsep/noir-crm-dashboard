@@ -56,9 +56,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const [resources, setResources] = useState<Resource[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [localReloadKey, setLocalReloadKey] = useState(0);
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(propCurrentDate || new Date());
   const [slotMinTime, setSlotMinTime] = useState<string>('18:00:00');
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
+  const [scrollTime, setScrollTime] = useState<string>('18:00:00');
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const { settings } = useSettings();
   const toast = useToast();
@@ -145,6 +146,16 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         if (calendarRef.current) {
           const calendarApi = calendarRef.current.getApi();
           calendarApi.gotoDate(propCurrentDate);
+          // Scroll to correct time based on day of week
+          const isThursday = propCurrentDate.getDay() === 4;
+          const scrollToTime = isThursday ? '16:00:00' : (isMobile ? '18:00:00' : '18:00:00');
+          // Use scrollToTime method if available, otherwise set scrollTime via options
+          try {
+            calendarRef.current.getApi().scrollToTime(scrollToTime);
+          } catch (e) {
+            // Fallback: update scrollTime state
+            setScrollTime(scrollToTime);
+          }
         }
         // Reset flag after a short delay
         setTimeout(() => {
@@ -152,7 +163,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         }, 100);
       }
     }
-  }, [propCurrentDate]);
+  }, [propCurrentDate, isMobile]);
 
   // Fetch reservations and set up real-time subscription
   useEffect(() => {
@@ -368,7 +379,21 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     const isThursday = currentCalendarDate.getDay() === 4;
     setSlotMinTime(isThursday ? '16:00:00' : '18:00:00');
     setSlotMaxTime(isThursday ? '24:00:00' : '26:00:00');
-  }, [resources, eventData, currentCalendarDate, privateEvents, settings.timezone]);
+    // Scroll to 4pm on Thursdays, otherwise use default scroll time
+    const newScrollTime = isThursday ? '16:00:00' : (isMobile ? '18:00:00' : '18:00:00');
+    setScrollTime(newScrollTime);
+    
+    // Programmatically scroll to the correct time when date changes
+    if (calendarRef.current) {
+      try {
+        const calendarApi = calendarRef.current.getApi();
+        calendarApi.scrollToTime(newScrollTime);
+      } catch (e) {
+        // scrollToTime might not be available, that's okay
+        console.debug('scrollToTime not available:', e);
+      }
+    }
+  }, [resources, eventData, currentCalendarDate, privateEvents, settings.timezone, isMobile]);
 
   // Get private events for the current calendar date
   const getCurrentDayPrivateEvents = () => {
@@ -578,6 +603,38 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     
     const newDate = new Date(info.startStr);
     setCurrentCalendarDate(newDate);
+    
+    // Scroll to correct time based on day of week
+    const isThursday = newDate.getDay() === 4;
+    const scrollToTime = isThursday ? '16:00:00' : (isMobile ? '18:00:00' : '18:00:00');
+    setScrollTime(scrollToTime);
+    
+    // Programmatically scroll after a short delay to ensure calendar is rendered
+    if (calendarRef.current) {
+      setTimeout(() => {
+        try {
+          const calendarApi = calendarRef.current?.getApi();
+          if (calendarApi) {
+            // Use scrollToTime if available
+            if (typeof calendarApi.scrollToTime === 'function') {
+              calendarApi.scrollToTime(scrollToTime);
+            } else {
+              // Fallback: manually scroll the timeline element
+              const timelineEl = calendarRef.current?.getApi().el?.querySelector('.fc-timeline-body');
+              if (timelineEl) {
+                const hours = parseInt(scrollToTime.split(':')[0]);
+                const minutes = parseInt(scrollToTime.split(':')[1]);
+                const scrollPosition = (hours * 60 + minutes) * 2; // Approximate pixels per minute
+                timelineEl.scrollTop = scrollPosition;
+              }
+            }
+          }
+        } catch (e) {
+          console.debug('Error scrolling to time:', e);
+        }
+      }, 100);
+    }
+    
     if (onDateChange) {
       onDateChange(newDate);
     }
@@ -606,8 +663,86 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     }
   };
 
+  // Mobile navigation handlers
+  const handlePrevDay = () => {
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      const currentDate = calendarApi.getDate();
+      const prevDate = new Date(currentDate);
+      prevDate.setDate(prevDate.getDate() - 1);
+      calendarApi.gotoDate(prevDate);
+      setCurrentCalendarDate(prevDate);
+      if (onDateChange) {
+        onDateChange(prevDate);
+      }
+    }
+  };
+
+  const handleNextDay = () => {
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      const currentDate = calendarApi.getDate();
+      const nextDate = new Date(currentDate);
+      nextDate.setDate(nextDate.getDate() + 1);
+      calendarApi.gotoDate(nextDate);
+      setCurrentCalendarDate(nextDate);
+      if (onDateChange) {
+        onDateChange(nextDate);
+      }
+    }
+  };
+
+  const handleToday = () => {
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      const today = new Date();
+      calendarApi.gotoDate(today);
+      setCurrentCalendarDate(today);
+      if (onDateChange) {
+        onDateChange(today);
+      }
+    }
+  };
+
+  // Format date for mobile header
+  const formatMobileDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   return (
     <Box className={styles.timelineWrapper}>
+      {isMobile && (
+        <div className={styles.mobileNavBar}>
+          <button 
+            className={styles.mobileNavButton}
+            onClick={handlePrevDay}
+            aria-label="Previous day"
+          >
+            ‹
+          </button>
+          <div className={styles.mobileNavTitle}>
+            {formatMobileDate(currentCalendarDate)}
+          </div>
+          <button 
+            className={styles.mobileNavButton}
+            onClick={handleNextDay}
+            aria-label="Next day"
+          >
+            ›
+          </button>
+          <button 
+            className={styles.mobileNavToday}
+            onClick={handleToday}
+            aria-label="Today"
+          >
+            Today
+          </button>
+        </div>
+      )}
       <Box className={styles.calendarContainer}>
         <FullCalendar
           ref={calendarRef}
@@ -632,9 +767,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           eventResize={handleEventResize}
           eventClick={handleEventClick}
           select={handleSlotClick}
-          height={isMobile ? 'calc(100vh - 180px)' : 'auto'}
+          height={isMobile ? 'calc(100vh - 80px)' : 'auto'}
           
-          scrollTime={isMobile ? '01:00:00' : '08:00:00'}
+          scrollTime={scrollTime}
           scrollTimeReset={false}
           handleWindowResize={true}
           

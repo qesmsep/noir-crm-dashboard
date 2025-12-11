@@ -4,6 +4,8 @@
   width: 100%;
   height: 100%;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .calendarContainer {
@@ -92,23 +94,143 @@
   opacity: 0.8;
 }
 
-/* Mobile optimizations */
+/* Mobile Navigation Bar */
+.mobileNavBar {
+  display: none;
+}
+
 @media (max-width: 768px) {
+  .mobileNavBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: #ffffff;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .mobileNavButton {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f7;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1d1d1f;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .mobileNavButton:active {
+    background: #e5e5e7;
+    transform: scale(0.95);
+  }
+
+  .mobileNavTitle {
+    flex: 1;
+    text-align: center;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #1d1d1f;
+    padding: 0 0.5rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .mobileNavToday {
+    padding: 0.375rem 0.75rem;
+    background: #007aff;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    white-space: nowrap;
+  }
+
+  .mobileNavToday:active {
+    background: #0051d5;
+    transform: scale(0.95);
+  }
+
+  .timelineWrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .calendarContainer {
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   .reservationEvent {
-    min-height: 28px;
-    font-size: 12px;
-    padding: 0 4px;
+    min-height: 24px;
+    font-size: 10px;
+    padding: 0 3px;
   }
 
   .blockingEvent {
-    min-height: 28px;
-    font-size: 12px;
-    padding: 0 4px;
+    min-height: 24px;
+    font-size: 10px;
+    padding: 0 3px;
   }
 
   .calendarContainer :global(.fc-resource-area) {
     min-width: 40px;
     width: 40px;
+  }
+
+  .calendarContainer :global(.fc) {
+    height: 100% !important;
+  }
+
+  .calendarContainer :global(.fc-view-harness) {
+    height: 100% !important;
+  }
+
+  /* Smaller fonts for timeline elements */
+  .calendarContainer :global(.fc-timeline-slot-label) {
+    font-size: 10px !important;
+  }
+
+  .calendarContainer :global(.fc-timeline-slot) {
+    font-size: 10px !important;
+  }
+
+  .calendarContainer :global(.fc-timegrid-slot-label) {
+    font-size: 10px !important;
+  }
+
+  .calendarContainer :global(.fc-resource-area .fc-resource-title) {
+    font-size: 10px !important;
+    padding: 4px 2px !important;
+  }
+
+  .calendarContainer :global(.fc-timeline-header-cell) {
+    font-size: 10px !important;
+  }
+
+  .calendarContainer :global(.fc-col-header-cell) {
+    font-size: 10px !important;
   }
 }
 

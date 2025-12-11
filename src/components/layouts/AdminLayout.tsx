@@ -135,7 +135,6 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/members', label: 'Members', icon: '👥' },
     { href: '/admin/waitlist', label: 'Waitlist', icon: '🧭' },
     { href: '/admin/event-calendar', label: 'Events', icon: '🎯' },
-    { href: '/admin/communication', label: 'Comm', icon: '💬' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
   ];
 
