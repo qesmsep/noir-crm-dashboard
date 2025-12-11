@@ -151,7 +151,12 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           const scrollToTime = isThursday ? '16:00:00' : (isMobile ? '18:00:00' : '18:00:00');
           // Use scrollToTime method if available, otherwise set scrollTime via options
           try {
-            calendarRef.current.getApi().scrollToTime(scrollToTime);
+            const calendarApi = calendarRef.current?.getApi();
+            if (calendarApi && typeof calendarApi.scrollToTime === 'function') {
+              calendarApi.scrollToTime(scrollToTime);
+            } else {
+              setScrollTime(scrollToTime);
+            }
           } catch (e) {
             // Fallback: update scrollTime state
             setScrollTime(scrollToTime);
@@ -620,12 +625,16 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
               calendarApi.scrollToTime(scrollToTime);
             } else {
               // Fallback: manually scroll the timeline element
-              const timelineEl = calendarRef.current?.getApi().el?.querySelector('.fc-timeline-body');
-              if (timelineEl) {
-                const hours = parseInt(scrollToTime.split(':')[0]);
-                const minutes = parseInt(scrollToTime.split(':')[1]);
-                const scrollPosition = (hours * 60 + minutes) * 2; // Approximate pixels per minute
-                timelineEl.scrollTop = scrollPosition;
+              // Access the DOM element through the ref's current element
+              const calendarEl = calendarRef.current?.el;
+              if (calendarEl) {
+                const timelineEl = calendarEl.querySelector('.fc-timeline-body') as HTMLElement;
+                if (timelineEl) {
+                  const hours = parseInt(scrollToTime.split(':')[0]);
+                  const minutes = parseInt(scrollToTime.split(':')[1]);
+                  const scrollPosition = (hours * 60 + minutes) * 2; // Approximate pixels per minute
+                  timelineEl.scrollTop = scrollPosition;
+                }
               }
             }
           }
