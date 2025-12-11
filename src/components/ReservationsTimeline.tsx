@@ -619,25 +619,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       setTimeout(() => {
         try {
           const calendarApi = calendarRef.current?.getApi();
-          if (calendarApi) {
-            // Use scrollToTime if available
-            if (typeof calendarApi.scrollToTime === 'function') {
-              calendarApi.scrollToTime(scrollToTime);
-            } else {
-              // Fallback: manually scroll the timeline element
-              // Access the DOM element through the ref's current element
-              const calendarEl = calendarRef.current?.el;
-              if (calendarEl) {
-                const timelineEl = calendarEl.querySelector('.fc-timeline-body') as HTMLElement;
-                if (timelineEl) {
-                  const hours = parseInt(scrollToTime.split(':')[0]);
-                  const minutes = parseInt(scrollToTime.split(':')[1]);
-                  const scrollPosition = (hours * 60 + minutes) * 2; // Approximate pixels per minute
-                  timelineEl.scrollTop = scrollPosition;
-                }
-              }
-            }
+          if (calendarApi && typeof calendarApi.scrollToTime === 'function') {
+            calendarApi.scrollToTime(scrollToTime);
           }
+          // If scrollToTime is not available, the scrollTime prop will handle it
         } catch (e) {
           console.debug('Error scrolling to time:', e);
         }
