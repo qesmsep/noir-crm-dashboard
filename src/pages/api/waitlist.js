@@ -1,10 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import { updateContactAndSendPersonalizedMessage } from '../../utils/openphoneUtils';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Initialize Supabase client with error handling
+let supabase;
+try {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('Missing Supabase environment variables');
+  }
+  supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+} catch (error) {
+  console.error('Error initializing Supabase client:', error);
+  // Will be handled in handler
+}
 
 // Function to send SMS using OpenPhone (legacy function for backward compatibility)
 async function sendSMS(to, message) {
@@ -40,57 +50,62 @@ export default async function handler(req, res) {
   // Set JSON content type early to prevent HTML error pages
   res.setHeader('Content-Type', 'application/json');
   
-  if (req.method === 'GET') {
-    try {
-      const { status, limit = '10', offset = '0' } = req.query;
-      const limitNum = parseInt(limit);
-      const offsetNum = parseInt(offset);
-
-      let query = supabase
-        .from('waitlist')
-        .select('*')
-        .order('submitted_at', { ascending: false });
-
-      if (status) {
-        query = query.eq('status', status);
-      }
-
-      const { data: waitlistEntries, error, count } = await query
-        .range(offsetNum, offsetNum + limitNum - 1);
-
-      if (error) {
-        console.error('Error fetching waitlist:', error);
-        return res.status(500).json({ error: 'Failed to fetch waitlist' });
-      }
-
-      // Get count by status - handle RPC errors gracefully
-      let statusCounts = [];
+  // Wrap entire handler in try-catch to ensure JSON errors
+  try {
+    if (req.method === 'GET') {
       try {
-        const { data: counts, error: rpcError } = await supabase
-          .rpc('get_waitlist_count_by_status');
-        
-        if (rpcError) {
-          console.error('Error fetching status counts:', rpcError);
-          // Continue without status counts rather than failing
-        } else {
-          statusCounts = counts || [];
+        const { status, limit = '10', offset = '0' } = req.query;
+        const limitNum = parseInt(limit);
+        const offsetNum = parseInt(offset);
+
+        let query = supabase
+          .from('waitlist')
+          .select('*')
+          .order('submitted_at', { ascending: false });
+
+        if (status) {
+          query = query.eq('status', status);
         }
-      } catch (rpcErr) {
-        console.error('Exception in RPC call:', rpcErr);
-        // Continue without status counts
+
+        const { data: waitlistEntries, error, count } = await query
+          .range(offsetNum, offsetNum + limitNum - 1);
+
+        if (error) {
+          console.error('Error fetching waitlist:', error);
+          return res.status(500).json({ error: 'Failed to fetch waitlist', details: error.message });
+        }
+
+        // Get count by status - handle RPC errors gracefully
+        let statusCounts = [];
+        try {
+          const { data: counts, error: rpcError } = await supabase
+            .rpc('get_waitlist_count_by_status');
+          
+          if (rpcError) {
+            console.error('Error fetching status counts:', rpcError);
+            // Continue without status counts rather than failing
+          } else {
+            statusCounts = counts || [];
+          }
+        } catch (rpcErr) {
+          console.error('Exception in RPC call:', rpcErr);
+          // Continue without status counts
+        }
+
+        return res.status(200).json({
+          data: waitlistEntries || [],
+          count: count || 0,
+          statusCounts: statusCounts
+        });
+
+      } catch (error) {
+        console.error('Error in waitlist GET:', error);
+        return res.status(500).json({ 
+          error: 'Internal server error',
+          message: error.message || 'Unknown error'
+        });
       }
-
-      return res.status(200).json({
-        data: waitlistEntries || [],
-        count: count || 0,
-        statusCounts: statusCounts
-      });
-
-    } catch (error) {
-      console.error('Error in waitlist GET:', error);
-      return res.status(500).json({ error: 'Internal server error' });
     }
-  }
 
   if (req.method === 'PATCH') {
     try {
@@ -176,6 +191,15 @@ export default async function handler(req, res) {
     }
   }
 
-  res.setHeader('Allow', ['GET', 'PATCH']);
-  return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    res.setHeader('Allow', ['GET', 'PATCH']);
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  } catch (error) {
+    // Catch any unhandled errors (like Supabase initialization failures)
+    console.error('Unhandled error in waitlist handler:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message || 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 } 
