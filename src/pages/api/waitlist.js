@@ -37,6 +37,9 @@ async function sendSMS(to, message) {
 }
 
 export default async function handler(req, res) {
+  // Set JSON content type early to prevent HTML error pages
+  res.setHeader('Content-Type', 'application/json');
+  
   if (req.method === 'GET') {
     try {
       const { status, limit = '10', offset = '0' } = req.query;
@@ -60,14 +63,27 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to fetch waitlist' });
       }
 
-      // Get count by status
-      const { data: statusCounts } = await supabase
-        .rpc('get_waitlist_count_by_status');
+      // Get count by status - handle RPC errors gracefully
+      let statusCounts = [];
+      try {
+        const { data: counts, error: rpcError } = await supabase
+          .rpc('get_waitlist_count_by_status');
+        
+        if (rpcError) {
+          console.error('Error fetching status counts:', rpcError);
+          // Continue without status counts rather than failing
+        } else {
+          statusCounts = counts || [];
+        }
+      } catch (rpcErr) {
+        console.error('Exception in RPC call:', rpcErr);
+        // Continue without status counts
+      }
 
       return res.status(200).json({
-        data: waitlistEntries,
+        data: waitlistEntries || [],
         count: count || 0,
-        statusCounts: statusCounts || []
+        statusCounts: statusCounts
       });
 
     } catch (error) {

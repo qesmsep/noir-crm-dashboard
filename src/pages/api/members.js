@@ -39,6 +39,9 @@ function getMonthlyDues(membership) {
 }
 
 export default async function handler(req, res) {
+  // Set JSON content type early to prevent HTML error pages
+  res.setHeader('Content-Type', 'application/json');
+  
   const requestId = req.headers['x-request-id'] || 'unknown';
 
   if (req.method === 'GET') {
@@ -46,9 +49,13 @@ export default async function handler(req, res) {
       Logger.info('Fetching all members', { requestId });
       const { data, error } = await supabase
         .from('members')
-        .select('*');
-      if (error) throw error;
-      return ApiResponse.success(res, data, 'Members retrieved successfully');
+        .select('*')
+        .eq('deactivated', false);
+      if (error) {
+        Logger.error('Supabase error fetching members', error, { requestId });
+        throw error;
+      }
+      return ApiResponse.success(res, data || [], 'Members retrieved successfully');
     } catch (error) {
       Logger.error('Error fetching members', error, { requestId });
       return ApiResponse.error(res, error, requestId);
