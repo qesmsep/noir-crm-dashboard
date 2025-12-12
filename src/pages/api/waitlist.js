@@ -50,6 +50,15 @@ export default async function handler(req, res) {
   // Set JSON content type early to prevent HTML error pages
   res.setHeader('Content-Type', 'application/json');
   
+  // Check if Supabase is properly initialized
+  if (!supabase) {
+    console.error('Supabase client not initialized');
+    return res.status(500).json({ 
+      error: 'Server configuration error',
+      message: 'Database connection not available'
+    });
+  }
+  
   // Wrap entire handler in try-catch to ensure JSON errors
   try {
     if (req.method === 'GET') {
