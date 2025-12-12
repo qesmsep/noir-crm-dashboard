@@ -213,32 +213,62 @@ export default function DashboardV2() {
         })()
       ]);
 
+      // Debug: Log API responses to understand format
+      console.log('API Responses:', {
+        members: { hasError: !!membersResult.error, hasSuccess: membersResult.success !== undefined, hasData: !!membersResult.data },
+        ledger: { hasError: !!ledgerResult.error, hasSuccess: ledgerResult.success !== undefined, hasData: !!ledgerResult.data },
+        reservations: { hasError: !!reservationsResult.error, hasSuccess: reservationsResult.success !== undefined, hasData: !!reservationsResult.data }
+      });
+
       // Extract data, using empty defaults if there was an error
-      // Handle ApiResponse format: { success: true, data: ... } or { success: false, error: ... }
-      const membersData = membersResult.error || !membersResult.success 
-        ? { data: [] } 
-        : membersResult;
-      const ledgerData = ledgerResult.error || !ledgerResult.success 
-        ? { data: [] } 
-        : ledgerResult;
-      const reservationsData = reservationsResult.error || !reservationsResult.success
-        ? { data: [], count: 0 } 
-        : reservationsResult;
-      const outstandingData = outstandingResult.error || !outstandingResult.success
-        ? { total: 0 } 
-        : outstandingResult;
-      const financialData = financialResult.error || !financialResult.success
-        ? {} 
+      // Handle both ApiResponse format ({ success: true, data }) and direct format ({ data })
+      const membersData = membersResult.error || membersResult.success === false
+        ? { data: [] }
+        : membersResult.success === true
+        ? membersResult  // ApiResponse format: { success: true, data: [...] }
+        : { data: membersResult.data || membersResult || [] };  // Direct format: { data: [...] } or just array
+      
+      const ledgerData = ledgerResult.error || ledgerResult.success === false
+        ? { data: [] }
+        : ledgerResult.success === true
+        ? ledgerResult
+        : { data: ledgerResult.data || ledgerResult || [] };
+      
+      const reservationsData = reservationsResult.error || reservationsResult.success === false
+        ? { data: [], count: 0 }
+        : reservationsResult.success === true
+        ? reservationsResult
+        : { data: reservationsResult.data || [], count: reservationsResult.count || 0 };
+      
+      const outstandingData = outstandingResult.error || outstandingResult.success === false
+        ? { total: 0 }
+        : outstandingResult.success === true
+        ? outstandingResult
+        : { total: outstandingResult.total || 0 };
+      
+      const financialData = financialResult.error || financialResult.success === false
+        ? {}
+        : financialResult.success === true
+        ? (financialResult.data || financialResult)
         : financialResult;
-      const waitlistData = waitlistResult.error || !waitlistResult.success
-        ? { data: [], count: 0 } 
-        : waitlistResult;
-      const waitlistedData = waitlistedResult.error || !waitlistedResult.success
-        ? { data: [], count: 0 } 
-        : waitlistedResult;
-      const privateEventsData = privateEventsResult.error || !privateEventsResult.success
-        ? { data: [] } 
-        : privateEventsResult;
+      
+      const waitlistData = waitlistResult.error || waitlistResult.success === false
+        ? { data: [], count: 0 }
+        : waitlistResult.success === true
+        ? waitlistResult
+        : { data: waitlistResult.data || [], count: waitlistResult.count || 0 };
+      
+      const waitlistedData = waitlistedResult.error || waitlistedResult.success === false
+        ? { data: [], count: 0 }
+        : waitlistedResult.success === true
+        ? waitlistedResult
+        : { data: waitlistedResult.data || [], count: waitlistedResult.count || 0 };
+      
+      const privateEventsData = privateEventsResult.error || privateEventsResult.success === false
+        ? { data: [] }
+        : privateEventsResult.success === true
+        ? privateEventsResult
+        : { data: privateEventsResult.data || privateEventsResult || [] };
       
       setStats({
         members: membersData.data || [],
