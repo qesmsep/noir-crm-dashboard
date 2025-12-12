@@ -51,6 +51,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       const body = req.body;
 
+      // Log incoming request data for debugging
+      console.log('=== RESERVATION API REQUEST ===');
+      console.log('Request body keys:', Object.keys(body));
+      console.log('start_time:', body.start_time);
+      console.log('end_time:', body.end_time);
+      console.log('party_size:', body.party_size);
+      console.log('=== END REQUEST LOG ===');
+
       // Fetch member profile if phone is provided and name/email are missing
       let memberData: any = null;
       if (body.phone && (!body.first_name || !body.email)) {
@@ -139,12 +147,85 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      // Validate required fields
+      if (!body.start_time) {
+        console.error('start_time is required but missing from request body');
+        return res.status(400).json({ error: 'start_time is required' });
+      }
+      if (!body.end_time) {
+        console.error('end_time is required but missing from request body');
+        return res.status(400).json({ error: 'end_time is required' });
+      }
+      if (!body.party_size) {
+        console.error('party_size is required but missing from request body');
+        return res.status(400).json({ error: 'party_size is required' });
+      }
+
+      // Validate against private events that block the date/time
+      try {
+        const reservationStart = DateTime.fromISO(body.start_time);
+        const reservationEnd = DateTime.fromISO(body.end_time);
+        
+        // Get the local date in America/Chicago timezone
+        const localDate = reservationStart.setZone('America/Chicago');
+        const dateStr = localDate.toFormat('yyyy-MM-dd');
+        const startOfDayLocal = localDate.startOf('day');
+        const endOfDayLocal = startOfDayLocal.endOf('day');
+        const startOfDayUtc = startOfDayLocal.toUTC().toISO({ suppressMilliseconds: true });
+        const endOfDayUtc = endOfDayLocal.toUTC().toISO({ suppressMilliseconds: true });
+        
+        // Query for private events that overlap with this date
+        const { data: privateEvents, error: privateEventsError } = await client
+          .from('private_events')
+          .select('start_time, end_time, full_day, title, status')
+          .eq('status', 'active')
+          .lt('start_time', endOfDayUtc)
+          .gt('end_time', startOfDayUtc);
+        
+        if (privateEventsError) {
+          console.error('Error checking private events:', privateEventsError);
+          // Don't block reservation if we can't check - log and continue
+        } else if (privateEvents && privateEvents.length > 0) {
+          // Check for full-day events
+          const fullDayEvent = privateEvents.find(ev => ev.full_day);
+          if (fullDayEvent) {
+            console.log(`Reservation blocked by full-day private event: ${fullDayEvent.title}`);
+            return res.status(400).json({ 
+              error: `This date is blocked by a private event: ${fullDayEvent.title}` 
+            });
+          }
+          
+          // Check for partial-day events that overlap with reservation time
+          const reservationStartUtc = reservationStart.toUTC();
+          const reservationEndUtc = reservationEnd.toUTC();
+          
+          const overlappingEvent = privateEvents.find(ev => {
+            if (ev.full_day) return false; // Already checked above
+            const evStart = DateTime.fromISO(ev.start_time);
+            const evEnd = DateTime.fromISO(ev.end_time);
+            // Check if reservation overlaps with event
+            return (reservationStartUtc < evEnd) && (reservationEndUtc > evStart);
+          });
+          
+          if (overlappingEvent) {
+            console.log(`Reservation blocked by private event: ${overlappingEvent.title}`);
+            return res.status(400).json({ 
+              error: `This time slot conflicts with a private event: ${overlappingEvent.title}` 
+            });
+          }
+        }
+      } catch (privateEventCheckError) {
+        console.error('Error validating against private events:', privateEventCheckError);
+        // Don't block reservation if validation fails - log and continue
+        // This is a safety check, not a hard requirement
+      }
+
       // Extract only the fields that exist in the reservations table
       // The trigger function validates these columns exist, so they must be in the schema
       // Note: Some columns may not be in PostgREST schema cache - retry logic handles this
       const reservationData: any = {
         start_time: body.start_time,
-        end_time: body.end_time,
+        end_time: body.end_time, // Ensure end_time is always included
         party_size: body.party_size,
         event_type: nullIfEmpty(body.event_type),
         notes: nullIfEmpty(body.notes),
@@ -164,6 +245,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));
+      console.log('end_time in reservationData:', reservationData.end_time);
+      console.log('end_time type:', typeof reservationData.end_time);
+      console.log('end_time valid date?', reservationData.end_time ? !isNaN(new Date(reservationData.end_time).getTime()) : 'MISSING');
       
       let { data, error } = await client
         .from('reservations')
@@ -180,10 +264,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const columnMatch = errorMessage.match(/'(\w+)'/);
         if (columnMatch && columnMatch[1]) {
           const problematicColumn = columnMatch[1];
+          
+          // Never remove required fields (start_time, end_time, party_size)
+          const requiredFields = ['start_time', 'end_time', 'party_size'];
+          if (requiredFields.includes(problematicColumn)) {
+            console.error(`ERROR: Required field ${problematicColumn} is causing schema cache error. This is a Supabase configuration issue.`);
+            console.error('Please refresh the schema cache in Supabase dashboard: Settings → API → Reload schema');
+            return res.status(500).json({ 
+              error: 'Database schema cache error', 
+              details: `Required field ${problematicColumn} not recognized. Please contact support.` 
+            });
+          }
+          
           console.warn(`Retrying without ${problematicColumn} column`);
           
           // Remove the problematic column and retry
           const { [problematicColumn]: removed, ...reservationDataWithoutColumn } = reservationData;
+          
+          // Ensure required fields are still present
+          if (!reservationDataWithoutColumn.start_time || !reservationDataWithoutColumn.end_time || !reservationDataWithoutColumn.party_size) {
+            console.error('ERROR: Required fields would be removed by retry logic');
+            return res.status(500).json({ 
+              error: 'Database error', 
+              details: 'Cannot remove required reservation fields' 
+            });
+          }
           console.log('Retrying with data:', JSON.stringify(reservationDataWithoutColumn, null, 2));
           
           const retryResult = await client

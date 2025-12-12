@@ -475,6 +475,22 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
     setEditMember((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Calculate LTV (Lifetime Value) - sum of all payment transactions
+  const calculateLTV = () => {
+    if (!ledger || ledger.length === 0) return 0;
+    return ledger
+      .filter(tx => tx.type === 'payment' && tx.amount > 0)
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  };
+
+  const ltv = calculateLTV();
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
   return (
     <Box p={6} maxW="1200px" mx="auto">
       <VStack spacing={6} align="stretch">
@@ -615,6 +631,9 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
                   </HStack>
                   <Text color="gray.600" fontSize="xs">
                     Member since {formatDateLong(member.join_date)}
+                  </Text>
+                  <Text color="gray.600" fontSize="sm" fontWeight="semibold" mt={2}>
+                    LTV: {formatCurrency(ltv)}
                   </Text>
                 </>
               )}

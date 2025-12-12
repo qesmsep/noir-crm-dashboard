@@ -291,15 +291,6 @@ export default async function handler(req, res) {
           return res.json({ success: true, message: 'Ledger entry already exists' });
         }
 
-        // Check for duplicate payment by amount and date
-        const paymentAmount = invoice.amount_paid / 100;
-        const paymentDate = new Date().toISOString().split('T')[0];
-        const duplicateExists = await checkDuplicatePayment(account.account_id, paymentAmount, paymentDate);
-        if (duplicateExists) {
-          console.log('Duplicate payment detected for account:', account.account_id, 'amount:', paymentAmount, 'date:', paymentDate);
-          return res.json({ success: true, message: 'Duplicate payment detected' });
-        }
-
         // Get the customer ID from the invoice
         const customerId = invoice.customer;
         
@@ -314,6 +305,15 @@ export default async function handler(req, res) {
         if (accountError || !account) {
           console.log('No account found for customer ID:', customerId, accountError);
           return res.json({ received: true });
+        }
+
+        // Check for duplicate payment by amount and date
+        const paymentAmount = invoice.amount_paid / 100;
+        const paymentDate = new Date().toISOString().split('T')[0];
+        const duplicateExists = await checkDuplicatePayment(account.account_id, paymentAmount, paymentDate);
+        if (duplicateExists) {
+          console.log('Duplicate payment detected for account:', account.account_id, 'amount:', paymentAmount, 'date:', paymentDate);
+          return res.json({ success: true, message: 'Duplicate payment detected' });
         }
 
         // Get the primary member for this account to associate with the payment
@@ -368,15 +368,6 @@ export default async function handler(req, res) {
         console.log('Ledger entry already exists for payment intent:', paymentIntent.id);
         return res.json({ success: true, message: 'Ledger entry already exists' });
       }
-
-      // Check for duplicate payment by amount and date
-      const paymentAmount = paymentIntent.amount / 100;
-      const paymentDate = new Date().toISOString().split('T')[0];
-      const duplicateExists = await checkDuplicatePayment(account.account_id, paymentAmount, paymentDate);
-      if (duplicateExists) {
-        console.log('Duplicate payment detected for account:', account.account_id, 'amount:', paymentAmount, 'date:', paymentDate);
-        return res.json({ success: true, message: 'Duplicate payment detected' });
-      }
       
       // Get the customer ID from the payment intent
       const customerId = paymentIntent.customer;
@@ -399,6 +390,15 @@ export default async function handler(req, res) {
       if (accountError || !account) {
         console.log('No account found for customer ID:', customerId, accountError);
         return res.json({ received: true });
+      }
+
+      // Check for duplicate payment by amount and date
+      const paymentAmount = paymentIntent.amount / 100;
+      const paymentDate = new Date().toISOString().split('T')[0];
+      const duplicateExists = await checkDuplicatePayment(account.account_id, paymentAmount, paymentDate);
+      if (duplicateExists) {
+        console.log('Duplicate payment detected for account:', account.account_id, 'amount:', paymentAmount, 'date:', paymentDate);
+        return res.json({ success: true, message: 'Duplicate payment detected' });
       }
 
       // Get the primary member for this account to associate with the payment

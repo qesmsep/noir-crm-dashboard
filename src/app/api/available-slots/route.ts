@@ -48,9 +48,27 @@ export async function POST(request: Request) {
     
     const supabase = getSupabaseClient();
     
-    // 0. Check if the venue is open on this date
     // date should already be in YYYY-MM-DD format from frontend
     const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);
+    
+    // 0. Check if date is within booking window
+    const { data: settingsData } = await supabase
+      .from('settings')
+      .select('booking_start_date, booking_end_date')
+      .single();
+    
+    if (settingsData) {
+      const bookingStart = settingsData.booking_start_date ? new Date(settingsData.booking_start_date) : null;
+      const bookingEnd = settingsData.booking_end_date ? new Date(settingsData.booking_end_date) : null;
+      const reqDate = new Date(dateStr + 'T00:00:00');
+      
+      if ((bookingStart && reqDate < bookingStart) || (bookingEnd && reqDate > bookingEnd)) {
+        if (DEBUG) console.log('Date outside booking window:', { dateStr, bookingStart, bookingEnd });
+        return NextResponse.json({ slots: [] });
+      }
+    }
+    
+    // 1. Check if the venue is open on this date
     const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
     
     if (DEBUG) console.log('Checking venue hours for:', { dateStr, dayOfWeek });

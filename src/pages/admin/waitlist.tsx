@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 import styles from '../../styles/Waitlist.module.css';
@@ -59,7 +59,7 @@ export default function WaitlistPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  const fetchWaitlist = async () => {
+  const fetchWaitlist = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -69,27 +69,52 @@ export default function WaitlistPage() {
 
       if (statusFilter) params.append('status', statusFilter);
 
-      const response = await fetch(`/api/waitlist?${params}`);
+      const response = await fetch(`/api/waitlist?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Add cache control for mobile
+        cache: 'no-cache',
+      });
+
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Failed to fetch waitlist' };
+        }
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch waitlist`);
+      }
+
       const data = await response.json();
 
-      if (response.ok) {
-        setWaitlistEntries(data.data || []);
-        setTotalCount(data.count || 0);
-        setStatusCounts(data.statusCounts || []);
-      } else {
-        throw new Error(data.error || 'Failed to fetch waitlist');
+      if (data.error) {
+        throw new Error(data.error);
       }
+
+      setWaitlistEntries(data.data || []);
+      setTotalCount(data.count || 0);
+      setStatusCounts(data.statusCounts || []);
     } catch (error) {
       console.error('Error fetching waitlist:', error);
-      showToast('Failed to fetch waitlist entries', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch waitlist entries';
+      showToast(errorMessage, 'error');
+      // Set empty state on error to prevent infinite loading
+      setWaitlistEntries([]);
+      setTotalCount(0);
+      setStatusCounts([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, statusFilter, ITEMS_PER_PAGE]);
 
   useEffect(() => {
     fetchWaitlist();
-  }, [currentPage, statusFilter]);
+  }, [fetchWaitlist]);
 
   const handleStatusUpdate = () => {
     fetchWaitlist();
