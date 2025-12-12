@@ -69,7 +69,7 @@ export default async function handler(req, res) {
 
         let query = supabase
           .from('waitlist')
-          .select('*')
+          .select('*', { count: 'exact' })
           .order('submitted_at', { ascending: false });
 
         if (status) {
