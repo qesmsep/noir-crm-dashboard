@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 import Link from 'next/link';
@@ -161,35 +161,84 @@ export default function DashboardV2() {
   const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<any>(null);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     setStats(s => ({ ...s, loading: true }));
+    
+    // Helper function to safely fetch and parse JSON
+    const safeFetch = async (url: string, options: RequestInit = {}) => {
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || `HTTP ${response.status}` };
+          }
+          console.error(`API error for ${url}:`, errorData);
+          return { error: errorData.error || `Failed to fetch ${url}` };
+        }
+        return await response.json();
+      } catch (error) {
+        console.error(`Network error for ${url}:`, error);
+        return { error: error instanceof Error ? error.message : 'Network error' };
+      }
+    };
+
     try {
-      const membersRes = await fetch("/api/members");
-      const membersData = await membersRes.json();
-      
-      const ledgerRes = await fetch("/api/ledger");
-      const ledgerData = await ledgerRes.json();
-      
-      const reservationsRes = await fetch("/api/reservations?upcoming=1");
-      const reservationsData = await reservationsRes.json();
-      
-      const outstandingRes = await fetch("/api/ledger?outstanding=1");
-      const outstandingData = await outstandingRes.json();
+      // Fetch all APIs in parallel with individual error handling
+      const [
+        membersResult,
+        ledgerResult,
+        reservationsResult,
+        outstandingResult,
+        financialResult,
+        waitlistResult,
+        waitlistedResult,
+        privateEventsResult
+      ] = await Promise.all([
+        safeFetch("/api/members"),
+        safeFetch("/api/ledger"),
+        safeFetch("/api/reservations?upcoming=1"),
+        safeFetch("/api/ledger?outstanding=1"),
+        safeFetch("/api/financial-metrics"),
+        safeFetch("/api/waitlist?status=review&limit=5"),
+        safeFetch("/api/waitlist?status=waitlisted&limit=5"),
+        (async () => {
+          const now = new Date();
+          const startDate = now.toISOString();
+          const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          return safeFetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
+        })()
+      ]);
 
-      const financialRes = await fetch("/api/financial-metrics");
-      const financialData = await financialRes.json();
-
-      const waitlistRes = await fetch("/api/waitlist?status=review&limit=5");
-      const waitlistData = await waitlistRes.json();
-      
-      const waitlistedRes = await fetch("/api/waitlist?status=waitlisted&limit=5");
-      const waitlistedData = await waitlistedRes.json();
-
-      const now = new Date();
-      const startDate = now.toISOString();
-      const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const privateEventsRes = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
-      const privateEventsData = await privateEventsRes.json();
+      // Extract data, using empty defaults if there was an error
+      // Handle ApiResponse format: { success: true, data: ... } or { success: false, error: ... }
+      const membersData = membersResult.error || !membersResult.success 
+        ? { data: [] } 
+        : membersResult;
+      const ledgerData = ledgerResult.error || !ledgerResult.success 
+        ? { data: [] } 
+        : ledgerResult;
+      const reservationsData = reservationsResult.error || !reservationsResult.success
+        ? { data: [], count: 0 } 
+        : reservationsResult;
+      const outstandingData = outstandingResult.error || !outstandingResult.success
+        ? { total: 0 } 
+        : outstandingResult;
+      const financialData = financialResult.error || !financialResult.success
+        ? {} 
+        : financialResult;
+      const waitlistData = waitlistResult.error || !waitlistResult.success
+        ? { data: [], count: 0 } 
+        : waitlistResult;
+      const waitlistedData = waitlistedResult.error || !waitlistedResult.success
+        ? { data: [], count: 0 } 
+        : waitlistedResult;
+      const privateEventsData = privateEventsResult.error || !privateEventsResult.success
+        ? { data: [] } 
+        : privateEventsResult;
       
       setStats({
         members: membersData.data || [],
@@ -210,7 +259,7 @@ export default function DashboardV2() {
       setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [], invitationRequestsCount: 0, invitationRequests: [], privateEvents: [] });
       setReservationDetails([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStats();

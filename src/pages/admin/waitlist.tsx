@@ -110,7 +110,7 @@ export default function WaitlistPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter, ITEMS_PER_PAGE]);
+  }, [currentPage, statusFilter]);
 
   useEffect(() => {
     fetchWaitlist();
