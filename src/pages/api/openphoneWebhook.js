@@ -686,6 +686,18 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
       console.log('No tables available for party size:', partySize);
       return { available: false, message: 'No tables available for this party size' };
     }
+    
+    // Filter out tables 4, 8, and 12 (not available for reservations)
+    const excludedTableNumbers = [4, 8, 12];
+    const availableTables = (tables || []).filter((t) => {
+      const tableNumber = parseInt(t.table_number || t.tableNumber || 0, 10);
+      return !excludedTableNumbers.includes(tableNumber);
+    });
+    
+    if (!availableTables || availableTables.length === 0) {
+      console.log('No tables available after filtering (tables 4, 8, 12 excluded)');
+      return { available: false, message: 'No tables available for this party size' };
+    }
 
     // Get all reservations and events for the date to check conflicts
     const startOfDay = new Date(startTime);
@@ -718,7 +730,7 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     }
 
     // Check for conflicting reservations and events
-    const availableTable = tables
+    const availableTable = availableTables
       .sort((a, b) => a.capacity - b.capacity)
       .find(table => {
         // Check for conflicting reservations

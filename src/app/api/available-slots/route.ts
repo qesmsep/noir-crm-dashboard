@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSupabaseClient } from '../../../pages/api/supabaseClient';
 import { DateTime } from 'luxon';
 
-const DEBUG = process.env.DEBUG_AVAILABLE_SLOTS === '1' || process.env.NEXT_PUBLIC_DEBUG_AVAILABLE_SLOTS === '1';
-const DEBUG_SLOTS = process.env.DEBUG_SLOTS === '1';
+// Enable debug by default to help diagnose issues
+const DEBUG = process.env.DEBUG_AVAILABLE_SLOTS === '1' || process.env.NEXT_PUBLIC_DEBUG_AVAILABLE_SLOTS === '1' || true;
+const DEBUG_SLOTS = process.env.DEBUG_SLOTS === '1' || true;
 
 // Helper: generate time slots based on venue hours
 function generateTimeSlots(timeRanges: any[] = [{ start: '18:00', end: '23:00' }]) {
@@ -165,8 +166,19 @@ export async function POST(request: Request) {
     
     // If it's neither a base day nor an exceptional open, return no slots
     if ((!baseHours || baseHours.length === 0) && !exceptionalOpen) {
-      if (DEBUG) console.log('No venue hours configured for this day, returning no slots');
-      return NextResponse.json({ slots: [] });
+      console.warn(`⚠️ No venue hours configured for ${dateStr} (day of week: ${dayOfWeek}). This might indicate missing venue hours configuration.`);
+      // Return helpful error message instead of empty slots
+      return NextResponse.json({ 
+        slots: [],
+        error: 'Venue hours not configured for this day',
+        debug: {
+          dateStr,
+          dayOfWeek,
+          hasBaseHours: !!(baseHours && baseHours.length > 0),
+          hasExceptionalOpen: !!exceptionalOpen,
+          message: 'Please configure venue hours in the admin panel'
+        }
+      });
     }
     
     // 1. Get all tables that fit the party size
@@ -176,35 +188,133 @@ export async function POST(request: Request) {
       .gte('seats', party_size);
     if (tablesError) {
       console.error('Error fetching tables:', tablesError);
-      return NextResponse.json({ error: 'Error fetching tables' }, { status: 500 });
-    }
-    if (!tables || tables.length === 0) {
-      if (DEBUG) console.log('No tables available for party size:', party_size);
-      return NextResponse.json({ slots: [] });
+      return NextResponse.json({ 
+        error: 'Error fetching tables',
+        details: tablesError 
+      }, { status: 500 });
     }
     
-    if (DEBUG) console.log('Tables found:', tables);
+    // Filter out tables 4, 8, and 12 (not available for reservations)
+    const excludedTableNumbers = [4, 8, 12];
+    const availableTables = (tables || []).filter((t: any) => 
+      !excludedTableNumbers.includes(parseInt(t.table_number, 10))
+    );
+    
+    if (!availableTables || availableTables.length === 0) {
+      console.warn(`⚠️ No tables found that can accommodate ${party_size} guests (after excluding tables 4, 8, 12)`);
+      // Get all tables to show what's available
+      const { data: allTables } = await supabase
+        .from('tables')
+        .select('id, table_number, seats')
+        .order('seats', { ascending: true });
+      
+      return NextResponse.json({ 
+        slots: [],
+        error: `No tables available for ${party_size} guests`,
+        debug: {
+          requestedPartySize: party_size,
+          allTables: allTables || [],
+          maxTableCapacity: allTables && allTables.length > 0 
+            ? Math.max(...allTables.map((t: any) => parseInt(t.seats) || 0))
+            : 0,
+          message: allTables && allTables.length === 0
+            ? 'No tables configured in the system'
+            : `Largest table capacity is ${allTables && allTables.length > 0 ? Math.max(...allTables.map((t: any) => parseInt(t.seats) || 0)) : 0} guests`
+        }
+      });
+    }
+    
+    if (DEBUG) console.log('Tables found (after filtering):', availableTables);
     
     // Map to id, number, seats for frontend
-    const mappedTables = (tables || []).map(t => ({
+    const mappedTables = (availableTables || []).map(t => ({
       id: t.id,
       number: t.table_number,
       seats: parseInt(t.seats, 10)
     }));
-    // 2. Get all reservations for that date
-    const startOfDay = new Date(dateStr + 'T00:00:00');
-    const endOfDay = new Date(dateStr + 'T23:59:59.999');
-    const { data: reservations, error: resError } = await supabase
+    // 2. Get all reservations that overlap with this date (exclude cancelled reservations and private events)
+    // We need reservations that: start_time < endOfDay AND end_time > startOfDay
+    // Reuse the startOfDayLocal and endOfDayLocal variables already calculated above for private events
+    
+    if (DEBUG) {
+      console.log(`Fetching reservations for date ${dateStr}:`);
+      console.log(`  Local day: ${startOfDayLocal.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ')} to ${endOfDayLocal.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ')}`);
+      console.log(`  UTC range: ${startOfDayUtc} to ${endOfDayUtc}`);
+    }
+    
+    // Fetch reservations that overlap with this day (in UTC)
+    // Try with status column first, fall back without it if column doesn't exist
+    let allReservations: any[] = [];
+    let resError: any = null;
+    
+    // First attempt: try with status column
+    const resultWithStatus = await supabase
       .from('reservations')
-      .select('table_id, start_time, end_time')
-      .gte('start_time', startOfDay.toISOString())
-      .lte('end_time', endOfDay.toISOString());
+      .select('id, table_id, start_time, end_time, status, party_size')
+      .lt('start_time', endOfDayUtc)
+      .gt('end_time', startOfDayUtc);
+    
+    if (resultWithStatus.error) {
+      // If error is about missing column, try without status
+      if (resultWithStatus.error.code === '42703' || resultWithStatus.error.message?.includes('column') || resultWithStatus.error.message?.includes('does not exist')) {
+        if (DEBUG) console.log('Status column not found, querying without it...');
+        const resultWithoutStatus = await supabase
+          .from('reservations')
+          .select('id, table_id, start_time, end_time, party_size')
+          .lt('start_time', endOfDayUtc)
+          .gt('end_time', startOfDayUtc);
+        
+        allReservations = resultWithoutStatus.data || [];
+        resError = resultWithoutStatus.error;
+      } else {
+        // Other error, use it
+        allReservations = resultWithStatus.data || [];
+        resError = resultWithStatus.error;
+      }
+    } else {
+      // Success with status column
+      allReservations = resultWithStatus.data || [];
+    }
+    
     if (resError) {
       console.error('Error fetching reservations:', resError);
       return NextResponse.json({ error: 'Error fetching reservations' }, { status: 500 });
     }
     
-    if (DEBUG) console.log('Reservations found:', reservations);
+    // Filter out:
+    // 1. Private events (null table_id)
+    // 2. Cancelled reservations (if status column exists)
+    const reservations = (allReservations || []).filter((res: any) => {
+      // Must have a table_id (exclude private events)
+      if (!res.table_id) {
+        if (DEBUG) console.log(`  Filtering out reservation ${res.id} - no table_id (private event)`);
+        return false;
+      }
+      // Must not be cancelled (check if status exists and is cancelled)
+      if (res.status && res.status === 'cancelled') {
+        if (DEBUG) console.log(`  Filtering out reservation ${res.id} - cancelled`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (DEBUG) {
+      console.log(`\n📊 RESERVATION SUMMARY:`);
+      console.log(`  Total reservations fetched: ${allReservations?.length || 0}`);
+      console.log(`  Active reservations (with table_id, not cancelled): ${reservations.length}`);
+      console.log(`  Tables that fit party size ${party_size}: ${mappedTables.length}`);
+      
+      if (reservations.length > 0) {
+        console.log('\n  Active reservations:');
+        reservations.forEach((res: any, idx: number) => {
+          const resStartLocal = DateTime.fromISO(res.start_time).setZone('America/Chicago');
+          const resEndLocal = DateTime.fromISO(res.end_time).setZone('America/Chicago');
+          console.log(`    ${idx + 1}. Table ${res.table_id}, ${resStartLocal.toFormat('HH:mm')}-${resEndLocal.toFormat('HH:mm')}, ${res.party_size} guests`);
+        });
+      } else {
+        console.log('  ✅ No active reservations found - all slots should be available');
+      }
+    }
     
     // 3. Generate time slots based on venue hours
     let timeRanges = [{ start: '18:00', end: '23:00' }]; // default
@@ -259,10 +369,22 @@ export async function POST(request: Request) {
     }
     
     const slots = generateTimeSlots(timeRanges);
-    if (DEBUG) console.log('Generated slots:', slots);
+    if (DEBUG) {
+      console.log(`\n⏰ GENERATED ${slots.length} TIME SLOTS:`, slots);
+      console.log(`📋 Checking availability for party size: ${party_size}`);
+      console.log(`📋 Slot duration: ${party_size <= 2 ? 90 : 120} minutes`);
+    }
     
     const slotDuration = party_size <= 2 ? 90 : 120; // minutes
     const availableSlots: string[] = [];
+    
+    if (DEBUG) {
+      console.log(`\n🔍 STARTING SLOT AVAILABILITY CHECK...`);
+      console.log(`  Total slots to check: ${slots.length}`);
+      console.log(`  Tables to check: ${mappedTables.length}`);
+      console.log(`  Active reservations: ${reservations.length}`);
+    }
+    
     for (const slot of slots) {
       // Build slot start/end in America/Chicago then convert to UTC for comparison
       const [time, ampm] = slot.split(/(am|pm)/);
@@ -327,31 +449,227 @@ export async function POST(request: Request) {
       }
       
       // For each table, check if it's free for this slot
+      // A slot is available if at least ONE table is free for that slot
       const availableTable = mappedTables.find(table => {
-        const tableReservations = reservations.filter(r => r.table_id === table.id);
-        // Check for overlap
-        return !tableReservations.some(r => {
+        // Filter reservations for this specific table (exclude null table_ids from private events)
+        const tableReservations = reservations.filter(r => {
+          if (!r.table_id) {
+            if (DEBUG_SLOTS) console.log(`  Skipping reservation with null table_id (private event)`);
+            return false;
+          }
+          const tableIdMatch = String(r.table_id) === String(table.id);
+          if (DEBUG_SLOTS && !tableIdMatch) {
+            console.log(`  Reservation table_id ${r.table_id} doesn't match table ${table.id}`);
+          }
+          return tableIdMatch;
+        });
+        
+        if (DEBUG_SLOTS) {
+          console.log(`\n🔍 Checking table ${table.id} (${table.number}, ${table.seats} seats) for slot ${slot}`);
+          console.log(`  Slot time: ${slotStart.toISOString()} to ${slotEnd.toISOString()}`);
+          console.log(`  Table has ${tableReservations.length} reservations for this day`);
+        }
+        
+        // If no reservations for this table, it's available
+        if (tableReservations.length === 0) {
+          if (DEBUG || DEBUG_SLOTS) {
+            console.log(`  ✅ Table ${table.id} (${table.number}) has no reservations - AVAILABLE`);
+          }
+          return true;
+        }
+        
+        // Check for overlap - a slot is available if NO reservations overlap with it
+        // Overlap means: reservation and slot time periods intersect
+        // Two time periods overlap if: (period1_start < period2_end) AND (period1_end > period2_start)
+        let hasOverlap = false;
+        let overlapDetails: any[] = [];
+        
+        for (const r of tableReservations) {
           const resStart = new Date(r.start_time);
           const resEnd = new Date(r.end_time);
-          return (
-            (slotStart < resEnd) && (slotEnd > resStart)
-          );
-        });
+          
+          // Ensure dates are valid
+          if (isNaN(resStart.getTime()) || isNaN(resEnd.getTime())) {
+            console.warn(`  ⚠️ Invalid reservation times: ${r.start_time} to ${r.end_time}`);
+            continue;
+          }
+          
+          // Overlap check: (slotStart < resEnd) && (slotEnd > resStart)
+          // This correctly detects if two time periods overlap
+          const condition1 = slotStart.getTime() < resEnd.getTime();
+          const condition2 = slotEnd.getTime() > resStart.getTime();
+          const overlaps = condition1 && condition2;
+          
+          if (DEBUG || DEBUG_SLOTS) {
+            const resStartLocal = DateTime.fromISO(r.start_time).setZone('America/Chicago');
+            const resEndLocal = DateTime.fromISO(r.end_time).setZone('America/Chicago');
+            const slotStartLocal = DateTime.fromJSDate(slotStart).setZone('America/Chicago');
+            const slotEndLocal = DateTime.fromJSDate(slotEnd).setZone('America/Chicago');
+            
+            console.log(`  Checking reservation ${r.id}: ${resStartLocal.toFormat('HH:mm')}-${resEndLocal.toFormat('HH:mm')} (${r.party_size} guests)`);
+            console.log(`    Slot: ${slotStartLocal.toFormat('HH:mm')}-${slotEndLocal.toFormat('HH:mm')}`);
+            console.log(`    Slot UTC: ${slotStart.toISOString()} to ${slotEnd.toISOString()}`);
+            console.log(`    Res UTC: ${resStart.toISOString()} to ${resEnd.toISOString()}`);
+            console.log(`    Condition 1 (slotStart < resEnd): ${slotStart.getTime()} < ${resEnd.getTime()} = ${condition1}`);
+            console.log(`    Condition 2 (slotEnd > resStart): ${slotEnd.getTime()} > ${resStart.getTime()} = ${condition2}`);
+            console.log(`    OVERLAP: ${overlaps}`);
+          }
+          
+          if (overlaps) {
+            hasOverlap = true;
+            overlapDetails.push({
+              reservationId: r.id,
+              reservationTime: `${DateTime.fromISO(r.start_time).setZone('America/Chicago').toFormat('HH:mm')}-${DateTime.fromISO(r.end_time).setZone('America/Chicago').toFormat('HH:mm')}`,
+              slotTime: `${DateTime.fromJSDate(slotStart).setZone('America/Chicago').toFormat('HH:mm')}-${DateTime.fromJSDate(slotEnd).setZone('America/Chicago').toFormat('HH:mm')}`
+            });
+            if (DEBUG || DEBUG_SLOTS) {
+              console.log(`  ⚠️ OVERLAP DETECTED: Reservation ${r.start_time} - ${r.end_time} overlaps with slot ${slot}`);
+            }
+            break; // Found an overlap, no need to check more
+          }
+        }
+        
+        const isAvailable = !hasOverlap;
+        if (DEBUG || DEBUG_SLOTS) {
+          if (isAvailable) {
+            console.log(`  ✅ Table ${table.id} (${table.number}) AVAILABLE for slot ${slot} - no overlapping reservations`);
+          } else {
+            console.log(`  ❌ Table ${table.id} (${table.number}) NOT AVAILABLE for slot ${slot} - ${overlapDetails.length} overlapping reservation(s)`);
+            overlapDetails.forEach(detail => {
+              console.log(`    - Reservation ${detail.reservationId}: ${detail.reservationTime} conflicts with slot ${detail.slotTime}`);
+            });
+          }
+        }
+        
+        return isAvailable;
       });
+      
+      if (DEBUG_SLOTS && !availableTable) {
+        console.log(`❌ NO TABLE AVAILABLE for slot ${slot} - all tables are booked`);
+      }
       if (availableTable) {
         availableSlots.push(slot);
+        if (DEBUG || DEBUG_SLOTS) {
+          console.log(`✅ SLOT ${slot} AVAILABLE (table ${availableTable.number || availableTable.id} is free)`);
+        }
+      } else {
+        if (DEBUG || DEBUG_SLOTS) {
+          // Find out why no table is available
+          const reasons = mappedTables.map((table: any) => {
+            const tableRes = reservations.filter((r: any) => 
+              r.table_id && String(r.table_id) === String(table.id)
+            );
+            if (tableRes.length === 0) {
+              return `Table ${table.number}: No reservations (should be available!)`;
+            }
+            const conflicts = tableRes.filter((r: any) => {
+              const resStart = new Date(r.start_time);
+              const resEnd = new Date(r.end_time);
+              return (slotStart.getTime() < resEnd.getTime()) && (slotEnd.getTime() > resStart.getTime());
+            });
+            if (conflicts.length > 0) {
+              return `Table ${table.number}: ${conflicts.length} conflicting reservation(s)`;
+            }
+            return `Table ${table.number}: Has reservations but none conflict (should be available!)`;
+          });
+          console.log(`❌ SLOT ${slot} NOT AVAILABLE. Reasons:`, reasons);
+        }
       }
     }
     
-    if (DEBUG) console.log('✅ FINAL AVAILABLE SLOTS:', availableSlots);
-    if (DEBUG) console.log('✅ TOTAL SLOTS RETURNED:', availableSlots.length);
+    // Final summary
+    console.log('\n📊 FINAL AVAILABILITY SUMMARY:');
+    console.log(`  Date: ${dateStr}`);
+    console.log(`  Party size: ${party_size}`);
+    console.log(`  Total slots generated: ${slots.length}`);
+    console.log(`  Available slots: ${availableSlots.length}`);
+    console.log(`  Unavailable slots: ${slots.length - availableSlots.length}`);
+    console.log(`  Active reservations: ${reservations.length}`);
+    console.log(`  Tables that fit party size: ${mappedTables.length}`);
+    
+    if (availableSlots.length === 0 && reservations.length === 0 && mappedTables.length > 0) {
+      console.warn('\n⚠️ WARNING: No slots available but no reservations found!');
+      console.warn('  This suggests a logic error. Checking each table...');
+      mappedTables.forEach((table: any) => {
+        const tableRes = reservations.filter((r: any) => 
+          r.table_id && String(r.table_id) === String(table.id)
+        );
+        console.warn(`  Table ${table.number} (${table.id}): ${tableRes.length} reservations`);
+      });
+    }
+    
+    if (availableSlots.length > 0) {
+      console.log(`\n✅ AVAILABLE SLOTS: ${availableSlots.join(', ')}`);
+    } else {
+      console.log(`\n❌ NO AVAILABLE SLOTS`);
+      if (mappedTables.length === 0) {
+        console.log('  Reason: No tables available for this party size');
+      } else if (reservations.length > 0) {
+        console.log('  Reason: All slots are blocked by reservations');
+        // Show which reservations are blocking
+        const blockingReservations = reservations.map((r: any) => {
+          const start = DateTime.fromISO(r.start_time).setZone('America/Chicago');
+          const end = DateTime.fromISO(r.end_time).setZone('America/Chicago');
+          return `Table ${r.table_id}: ${start.toFormat('HH:mm')}-${end.toFormat('HH:mm')}`;
+        });
+        console.log('  Blocking reservations:', blockingReservations);
+      } else {
+        console.log('  Reason: Unknown - no reservations found but no slots available');
+      }
+    }
+    
+    // If no slots are available, provide helpful debug info
+    if (availableSlots.length === 0) {
+      console.warn(`⚠️ No available slots for ${dateStr} with party size ${party_size}`);
+      console.warn(`  - Total slots generated: ${slots.length}`);
+      console.warn(`  - Active reservations: ${reservations.length}`);
+      console.warn(`  - Tables that fit party size: ${mappedTables.length}`);
+      
+      // Check if it's because all slots are blocked by reservations
+      if (reservations.length > 0 && mappedTables.length > 0) {
+        const reservationsByTable = mappedTables.map((table: any) => {
+          const tableRes = reservations.filter((r: any) => 
+            r.table_id && String(r.table_id) === String(table.id)
+          );
+          return {
+            table: table.number,
+            reservations: tableRes.length,
+            times: tableRes.map((r: any) => ({
+              start: DateTime.fromISO(r.start_time).setZone('America/Chicago').toFormat('HH:mm'),
+              end: DateTime.fromISO(r.end_time).setZone('America/Chicago').toFormat('HH:mm'),
+            }))
+          };
+        });
+        
+        return NextResponse.json({ 
+          slots: [],
+          error: 'No available time slots',
+          debug: {
+            totalSlotsGenerated: slots.length,
+            activeReservations: reservations.length,
+            tablesAvailable: mappedTables.length,
+            reservationsByTable,
+            message: 'All time slots are currently booked. Try a different date or time.'
+          }
+        });
+      }
+    }
+    
     return NextResponse.json({ 
       slots: availableSlots,
       timestamp: new Date().toISOString(),
       debugMessage: 'NEW_CODE_DEPLOYED_SUCCESSFULLY',
       totalSlots: availableSlots.length,
       requestedDate: date,
-      debugInfo: debugInfo
+      debugInfo: debugInfo,
+      // Include helpful debug info in response
+      ...(DEBUG && {
+        debugDetails: {
+          slotsGenerated: slots.length,
+          activeReservations: reservations.length,
+          tablesAvailable: mappedTables.length,
+        }
+      })
     });
   } catch (error) {
     console.error('Error in available-slots API:', error);

@@ -104,6 +104,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Find available table if not provided
       let tableId = body.table_id;
+      
+      // If table_id is provided, validate it first
+      if (tableId && body.start_time && body.end_time && body.party_size && !body.private_event_id) {
+        const startTime = new Date(body.start_time);
+        const endTime = new Date(body.end_time);
+        
+        // Check if table exists and can accommodate party size
+        const { data: tableInfo, error: tableInfoError } = await client
+          .from('tables')
+          .select('id, table_number, seats')
+          .eq('id', tableId)
+          .single();
+        
+        if (tableInfoError || !tableInfo) {
+          console.error('Provided table_id not found:', tableId);
+          return res.status(400).json({ 
+            error: 'The selected table is not available.' 
+          });
+        }
+        
+        if (tableInfo.seats < body.party_size) {
+          return res.status(400).json({ 
+            error: `The selected table cannot accommodate ${body.party_size} guests. Maximum capacity is ${tableInfo.seats}.` 
+          });
+        }
+        
+        // Check if table is already booked for this time (exclude cancelled reservations)
+        const { data: allReservations, error: reservationsError } = await client
+          .from('reservations')
+          .select('id, start_time, end_time, status')
+          .eq('table_id', tableId)
+          .lt('start_time', endTime.toISOString())
+          .gt('end_time', startTime.toISOString());
+        
+        if (reservationsError) {
+          console.error('Error checking table availability:', reservationsError);
+          return res.status(500).json({ 
+            error: 'Error checking table availability. Please try again.' 
+          });
+        }
+        
+        // Filter out cancelled reservations
+        const existingReservations = (allReservations || []).filter(
+          (res: any) => !res.status || res.status !== 'cancelled'
+        );
+        
+        if (existingReservations && existingReservations.length > 0) {
+          console.warn(`Table ${tableId} is already booked for this time slot`);
+          return res.status(400).json({ 
+            error: 'This time slot is no longer available. The table has been booked by another party. Please select a different time.' 
+          });
+        }
+        
+        console.log(`Validated provided table ${tableInfo.table_number} (ID: ${tableId})`);
+      }
+      
       if (!tableId && body.start_time && body.end_time && body.party_size) {
         console.log('Finding available table for reservation...');
         try {
@@ -114,37 +170,118 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .gte('seats', body.party_size)
             .order('seats', { ascending: true }); // Prefer smaller tables that fit
           
-          if (tables && tables.length > 0) {
-            // Get existing reservations for the time slot
-            const { data: existingReservations } = await client
-              .from('reservations')
-              .select('table_id, start_time, end_time')
-              .gte('start_time', new Date(body.start_time).toISOString())
-              .lte('end_time', new Date(body.end_time).toISOString());
-            
-            // Find first available table
+          // Filter out tables 4, 8, and 12 (not available for reservations)
+          const excludedTableNumbers = [4, 8, 12];
+          const availableTables = (tables || []).filter((t: any) => 
+            !excludedTableNumbers.includes(parseInt(t.table_number, 10))
+          );
+          
+          if (availableTables && availableTables.length > 0) {
+            // Get existing reservations that could overlap with the requested time slot
+            // We need to check for ANY overlap: (start_time < requested_end) AND (end_time > requested_start)
+            // Since Supabase doesn't support complex AND conditions directly, we fetch a wider range
+            // and filter in code, or use OR conditions
             const startTime = new Date(body.start_time);
             const endTime = new Date(body.end_time);
             
-            for (const table of tables) {
-              const hasConflict = existingReservations?.some((res: any) => {
-                if (res.table_id !== table.id) return false;
+            // Fetch reservations that start before the requested end time and end after the requested start time
+            // This covers all possible overlaps. We'll filter cancelled ones in JavaScript.
+            // Try with status column first, fall back without it if column doesn't exist
+            let allReservations: any[] = [];
+            let reservationsError: any = null;
+            
+            const resultWithStatus = await client
+              .from('reservations')
+              .select('table_id, start_time, end_time, status')
+              .not('table_id', 'is', null) // Exclude private events
+              .lt('start_time', endTime.toISOString())
+              .gt('end_time', startTime.toISOString());
+            
+            if (resultWithStatus.error) {
+              // If error is about missing column, try without status
+              if (resultWithStatus.error.code === '42703' || resultWithStatus.error.message?.includes('column') || resultWithStatus.error.message?.includes('does not exist')) {
+                console.log('Status column not found, querying without it...');
+                const resultWithoutStatus = await client
+                  .from('reservations')
+                  .select('table_id, start_time, end_time')
+                  .not('table_id', 'is', null) // Exclude private events
+                  .lt('start_time', endTime.toISOString())
+                  .gt('end_time', startTime.toISOString());
+                
+                allReservations = resultWithoutStatus.data || [];
+                reservationsError = resultWithoutStatus.error;
+              } else {
+                allReservations = resultWithStatus.data || [];
+                reservationsError = resultWithStatus.error;
+              }
+            } else {
+              allReservations = resultWithStatus.data || [];
+            }
+            
+            if (reservationsError) {
+              console.error('Error fetching reservations:', reservationsError);
+              return res.status(500).json({ 
+                error: 'Error checking table availability. Please try again.' 
+              });
+            }
+            
+            // Filter out cancelled reservations (if status column exists)
+            const existingReservations = (allReservations || []).filter(
+              (res: any) => !res.status || res.status !== 'cancelled'
+            );
+            
+            console.log(`Found ${existingReservations.length} active overlapping reservations (out of ${allReservations?.length || 0} total)`);
+            
+            // Find first available table
+            for (const table of availableTables) {
+              const hasConflict = existingReservations.some((res: any) => {
+                // Ensure table_id matches (using String conversion for type safety)
+                if (!res.table_id || String(res.table_id) !== String(table.id)) return false;
                 const resStart = new Date(res.start_time);
                 const resEnd = new Date(res.end_time);
-                return (startTime < resEnd) && (endTime > resStart);
+                // Check for actual overlap: (startTime < resEnd) && (endTime > resStart)
+                const overlaps = (startTime < resEnd) && (endTime > resStart);
+                if (overlaps) {
+                  console.log(`Conflict found: Table ${table.table_number} has reservation ${res.start_time} - ${res.end_time} overlapping with requested ${body.start_time} - ${body.end_time}`);
+                }
+                return overlaps;
               });
               
               if (!hasConflict) {
                 tableId = table.id;
                 console.log(`Assigned table ${table.table_number} (ID: ${table.id})`);
                 break;
+              } else {
+                console.log(`Table ${table.table_number} (ID: ${table.id}) is already booked for this time slot`);
               }
             }
+            
+            // If no table was found, reject the reservation
+            if (!tableId) {
+              console.warn(`No available tables found for party size ${body.party_size} at ${body.start_time} to ${body.end_time}`);
+              return res.status(400).json({ 
+                error: 'No tables available for the requested time slot. Please select a different time.' 
+              });
+            }
+          } else {
+            // No tables exist that can accommodate this party size
+            return res.status(400).json({ 
+              error: `No tables available that can accommodate ${body.party_size} guests.` 
+            });
           }
         } catch (tableError) {
           console.error('Error finding available table:', tableError);
-          // Continue without table assignment
+          return res.status(500).json({ 
+            error: 'Error checking table availability. Please try again.' 
+          });
         }
+      }
+
+      // If table_id was required but not found/assigned, reject
+      if (!body.table_id && !tableId && !body.private_event_id) {
+        return res.status(400).json({ 
+          error: 'No table available for the requested time slot. Please select a different time.' 
+        });
       }
 
       // Validate required fields
@@ -218,6 +355,186 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.error('Error validating against private events:', privateEventCheckError);
         // Don't block reservation if validation fails - log and continue
         // This is a safety check, not a hard requirement
+      }
+
+      // FINAL VALIDATION: Check table availability one more time right before insert
+      // This prevents race conditions where another reservation was created between our check and insert
+      const finalTableId = tableId || body.table_id;
+      if (finalTableId && !body.private_event_id) {
+        const startTime = new Date(body.start_time);
+        const endTime = new Date(body.end_time);
+        
+        // Check for any overlapping reservations on this table (exclude cancelled reservations)
+        // Only check reservations that actually have this table_id (exclude null table_ids from private events)
+        // Try with status column first, fall back without it if column doesn't exist
+        let allConflictingReservations: any[] = [];
+        let conflictError: any = null;
+        
+        const conflictResultWithStatus = await client
+          .from('reservations')
+          .select('id, start_time, end_time, status, table_id')
+          .eq('table_id', finalTableId)
+          .lt('start_time', endTime.toISOString())
+          .gt('end_time', startTime.toISOString());
+        
+        if (conflictResultWithStatus.error) {
+          // If error is about missing column, try without status
+          if (conflictResultWithStatus.error.code === '42703' || conflictResultWithStatus.error.message?.includes('column') || conflictResultWithStatus.error.message?.includes('does not exist')) {
+            console.log('Status column not found in conflict check, querying without it...');
+            const conflictResultWithoutStatus = await client
+              .from('reservations')
+              .select('id, start_time, end_time, table_id')
+              .eq('table_id', finalTableId)
+              .lt('start_time', endTime.toISOString())
+              .gt('end_time', startTime.toISOString());
+            
+            allConflictingReservations = conflictResultWithoutStatus.data || [];
+            conflictError = conflictResultWithoutStatus.error;
+          } else {
+            allConflictingReservations = conflictResultWithStatus.data || [];
+            conflictError = conflictResultWithStatus.error;
+          }
+        } else {
+          allConflictingReservations = conflictResultWithStatus.data || [];
+        }
+        
+        if (conflictError) {
+          console.error('Error checking for conflicts:', conflictError);
+          return res.status(500).json({ 
+            error: 'Error validating table availability. Please try again.' 
+          });
+        }
+        
+        // Filter out cancelled reservations (if status column exists)
+        const conflictingReservations = (allConflictingReservations || []).filter(
+          (res: any) => !res.status || res.status !== 'cancelled'
+        );
+        
+        if (conflictingReservations && conflictingReservations.length > 0) {
+          console.warn(`Table ${finalTableId} is already booked. Conflicting reservations:`, conflictingReservations);
+          return res.status(400).json({ 
+            error: 'This time slot is no longer available. The table has been booked by another party. Please select a different time.' 
+          });
+        }
+        
+        // Also verify the table exists and can accommodate the party size
+        const { data: tableInfo, error: tableInfoError } = await client
+          .from('tables')
+          .select('id, seats')
+          .eq('id', finalTableId)
+          .single();
+        
+        if (tableInfoError || !tableInfo) {
+          console.error('Table not found:', finalTableId);
+          return res.status(400).json({ 
+            error: 'The selected table is not available.' 
+          });
+        }
+        
+        if (tableInfo.seats < body.party_size) {
+          console.warn(`Table ${finalTableId} has ${tableInfo.seats} seats but party size is ${body.party_size}`);
+          return res.status(400).json({ 
+            error: `The selected table cannot accommodate ${body.party_size} guests. Maximum capacity is ${tableInfo.seats}.` 
+          });
+        }
+      } else if (!finalTableId && !body.private_event_id) {
+        // If no table was assigned and this isn't a private event, we need to find one
+        // This handles the case where table_id wasn't provided initially
+        const startTime = new Date(body.start_time);
+        const endTime = new Date(body.end_time);
+        
+        const { data: allTables } = await client
+          .from('tables')
+          .select('id, table_number, seats')
+          .gte('seats', body.party_size)
+          .order('seats', { ascending: true });
+        
+        // Filter out tables 4, 8, and 12 (not available for reservations)
+        const excludedTableNumbers = [4, 8, 12];
+        const availableTables = (allTables || []).filter((t: any) => 
+          !excludedTableNumbers.includes(parseInt(t.table_number, 10))
+        );
+        
+        if (!availableTables || availableTables.length === 0) {
+          return res.status(400).json({ 
+            error: `No tables available that can accommodate ${body.party_size} guests.` 
+          });
+        }
+        
+        // Get all reservations that could overlap (exclude cancelled reservations)
+        // Filter to only reservations with table_ids (exclude private events)
+        // Try with status column first, fall back without it if column doesn't exist
+        let allReservationsData: any[] = [];
+        let allReservationsError: any = null;
+        
+        const allResResultWithStatus = await client
+          .from('reservations')
+          .select('table_id, start_time, end_time, status')
+          .not('table_id', 'is', null) // Only get reservations with table assignments
+          .lt('start_time', endTime.toISOString())
+          .gt('end_time', startTime.toISOString());
+        
+        if (allResResultWithStatus.error) {
+          // If error is about missing column, try without status
+          if (allResResultWithStatus.error.code === '42703' || allResResultWithStatus.error.message?.includes('column') || allResResultWithStatus.error.message?.includes('does not exist')) {
+            console.log('Status column not found in final check, querying without it...');
+            const allResResultWithoutStatus = await client
+              .from('reservations')
+              .select('table_id, start_time, end_time')
+              .not('table_id', 'is', null) // Only get reservations with table assignments
+              .lt('start_time', endTime.toISOString())
+              .gt('end_time', startTime.toISOString());
+            
+            allReservationsData = allResResultWithoutStatus.data || [];
+            allReservationsError = allResResultWithoutStatus.error;
+          } else {
+            allReservationsData = allResResultWithStatus.data || [];
+            allReservationsError = allResResultWithStatus.error;
+          }
+        } else {
+          allReservationsData = allResResultWithStatus.data || [];
+        }
+        
+        if (allReservationsError) {
+          console.error('Error fetching reservations for final check:', allReservationsError);
+          return res.status(500).json({ 
+            error: 'Error checking table availability. Please try again.' 
+          });
+        }
+        
+        // Filter out cancelled reservations
+        const allReservations = (allReservationsData || []).filter(
+          (res: any) => !res.status || res.status !== 'cancelled'
+        );
+        
+        // Find an available table
+        let foundTable = false;
+        for (const table of availableTables) {
+          const hasConflict = allReservations.some((res: any) => {
+            // Ensure table_id matches (using String conversion for type safety)
+            if (!res.table_id || String(res.table_id) !== String(table.id)) return false;
+            const resStart = new Date(res.start_time);
+            const resEnd = new Date(res.end_time);
+            const overlaps = (startTime < resEnd) && (endTime > resStart);
+            if (overlaps) {
+              console.log(`Final check conflict: Table ${table.table_number} has reservation ${res.start_time} - ${res.end_time} overlapping with requested ${body.start_time} - ${body.end_time}`);
+            }
+            return overlaps;
+          });
+          
+          if (!hasConflict) {
+            tableId = table.id;
+            foundTable = true;
+            console.log(`Found available table ${table.table_number} (ID: ${table.id}) in final check`);
+            break;
+          }
+        }
+        
+        if (!foundTable) {
+          return res.status(400).json({ 
+            error: 'No tables available for the requested time slot. Please select a different time.' 
+          });
+        }
       }
 
       // Extract only the fields that exist in the reservations table

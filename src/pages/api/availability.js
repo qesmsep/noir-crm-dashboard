@@ -20,8 +20,14 @@ export default async function handler(req, res) {
     .gte('capacity', Number(party_size));
   if (tblErr) return res.status(500).json({ error: tblErr.message });
 
+  // Filter out tables 4, 8, and 12 (not available for reservations)
+  const excludedTableNumbers = [4, 8, 12];
+  const availableTables = (tables || []).filter((t) => 
+    !excludedTableNumbers.includes(parseInt(t.table_number, 10))
+  );
+
   // Map to id, number, capacity for frontend
-  const mappedTables = (tables || []).map(t => ({
+  const mappedTables = (availableTables || []).map(t => ({
     id: t.table_id,
     number: t.table_number,
     capacity: parseInt(t.capacity, 10)
