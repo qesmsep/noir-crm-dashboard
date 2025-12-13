@@ -234,7 +234,8 @@ export async function POST(request: Request) {
     }));
     // 2. Get all reservations that overlap with this date (exclude cancelled reservations and private events)
     // We need reservations that: start_time < endOfDay AND end_time > startOfDay
-    // Reuse the startOfDayLocal and endOfDayLocal variables already calculated above for private events
+    // Reuse the startOfDayLocal, endOfDayLocal, startOfDayUtc, and endOfDayUtc variables 
+    // already calculated above for private events (lines 98-101)
     
     if (DEBUG) {
       console.log(`Fetching reservations for date ${dateStr}:`);
