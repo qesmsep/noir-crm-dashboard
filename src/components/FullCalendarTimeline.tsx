@@ -280,7 +280,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   }, [reloadKey, localReloadKey, toast]);
 
   useEffect(() => {
-    if (!resources.length || !eventData.resRes) return;
+    if (!resources.length || !eventData.resRes) {
+      console.log('Skipping event mapping - missing resources or reservations:', {
+        resourcesLength: resources.length,
+        hasReservations: !!eventData.resRes
+      });
+      return;
+    }
     const rawReservations = Array.isArray(eventData.resRes)
       ? eventData.resRes
       : eventData.resRes.data || [];
@@ -404,25 +410,30 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         return false;
       }
       
-      // Convert event start to configured timezone
-      const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
+      // Convert event times to configured timezone
+      const eventStartLocal = fromUTC(pe.start_time, settings.timezone);
+      const eventEndLocal = fromUTC(pe.end_time, settings.timezone);
       
-      // For calendar date, since it's already a Date object, we need to convert it properly
-      // Create a date string in the format that fromUTC expects (YYYY-MM-DDTHH:mm:ss.sssZ)
+      // For calendar date, get the start and end of the day in the configured timezone
       const calendarDateUTC = currentCalendarDate.toISOString();
       const calendarDateLocal = fromUTC(calendarDateUTC, settings.timezone);
+      const dayStart = calendarDateLocal.startOf('day');
+      const dayEnd = calendarDateLocal.endOf('day');
       
       console.log(`Event: ${pe.title}`);
       console.log(`  Event start_time: ${pe.start_time}`);
-      console.log(`  Event date local: ${eventDateLocal}`);
-      console.log(`  Calendar date UTC: ${calendarDateUTC}`);
-      console.log(`  Calendar date local: ${calendarDateLocal}`);
+      console.log(`  Event end_time: ${pe.end_time}`);
+      console.log(`  Event start local: ${eventStartLocal.toFormat('yyyy-MM-dd HH:mm')}`);
+      console.log(`  Event end local: ${eventEndLocal.toFormat('yyyy-MM-dd HH:mm')}`);
+      console.log(`  Calendar date local: ${calendarDateLocal.toFormat('yyyy-MM-dd')}`);
+      console.log(`  Day range: ${dayStart.toFormat('yyyy-MM-dd HH:mm')} to ${dayEnd.toFormat('yyyy-MM-dd HH:mm')}`);
       
-      // Compare by year, month, and day
-      const isSame = isSameDay(eventDateLocal, calendarDateLocal, settings.timezone);
-      console.log(`  Is same day: ${isSame}`);
+      // Check if event overlaps with the current day
+      // Event overlaps if: (eventStart < dayEnd) AND (eventEnd > dayStart)
+      const overlaps = eventStartLocal < dayEnd && eventEndLocal > dayStart;
+      console.log(`  Overlaps current day: ${overlaps}`);
       
-      return isSame;
+      return overlaps;
     });
     
     console.log('Filtered events:', filtered.length);
