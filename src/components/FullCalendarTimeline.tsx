@@ -397,9 +397,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     console.log('Settings timezone:', settings.timezone);
     
     const filtered = privateEvents.filter((pe: any) => {
-      // Only show active events
-      if (pe.status !== 'active') {
-        console.log(`Skipping ${pe.title} - not active`);
+      // Only show active events (if status column exists and is set)
+      // If status doesn't exist or is null, include the event (assume it's active)
+      if (pe.status && pe.status !== 'active') {
+        console.log(`Skipping ${pe.title} - not active (status: ${pe.status})`);
         return false;
       }
       

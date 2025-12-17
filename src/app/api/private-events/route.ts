@@ -108,21 +108,49 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     
+    // Try with status filter first, fall back without it if column doesn't exist
     let query = supabase
       .from('private_events')
       .select('*')
-      .eq('status', 'active')
       .order('start_time', { ascending: true });
+    
+    // Try to filter by status if column exists
+    const queryWithStatus = query.eq('status', 'active');
     
     // Add date filtering if provided
     if (startDate) {
-      query = query.gte('start_time', startDate);
+      queryWithStatus.gte('start_time', startDate);
     }
     if (endDate) {
-      query = query.lte('end_time', endDate);
+      queryWithStatus.lte('end_time', endDate);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await queryWithStatus;
+
+    // If error is about missing column, try without status filter
+    if (error && (error.code === '42703' || error.message?.includes('column') || error.message?.includes('does not exist'))) {
+      console.log('Status column not found in private_events, querying without it...');
+      query = supabase
+        .from('private_events')
+        .select('*')
+        .order('start_time', { ascending: true });
+      
+      if (startDate) {
+        query = query.gte('start_time', startDate);
+      }
+      if (endDate) {
+        query = query.lte('end_time', endDate);
+      }
+      
+      const result = await query;
+      data = result.data;
+      error = result.error;
+      
+      // Filter out cancelled events in JavaScript if status column doesn't exist
+      if (data && Array.isArray(data)) {
+        data = data.filter((event: any) => !event.status || event.status !== 'cancelled');
+      }
+    }
 
     if (error) {
       console.error('Error fetching private events:', error);
