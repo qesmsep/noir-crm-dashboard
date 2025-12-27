@@ -351,6 +351,20 @@ async function checkMemberStatus(phone) {
     const last10Digits = digits.slice(-10);
     console.log('Last 10 digits:', last10Digits);
     
+    // First, let's check what format phones are stored in the database
+    const { data: sampleMembers, error: sampleError } = await supabase
+      .from('members')
+      .select('member_id, first_name, last_name, phone')
+      .not('phone', 'is', null)
+      .limit(5);
+    
+    if (!sampleError && sampleMembers && sampleMembers.length > 0) {
+      console.log('Sample phone formats in database:', sampleMembers.map(m => ({
+        member_id: m.member_id,
+        phone: m.phone
+      })));
+    }
+    
     // Generate all possible phone number formats to check
     const possiblePhones = [
       phone,                      // Original format from OpenPhone (e.g., +18584129797)
@@ -386,45 +400,91 @@ async function checkMemberStatus(phone) {
         return { isMember: true, member };
       }
       
-      // If exact match fails, try LIKE match (handles formatting differences)
-      // This helps if phone is stored with dashes, spaces, parentheses, etc.
-      const { data: memberLike, error: likeError } = await supabase
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = no rows found, which is fine
+        console.log('Error with exact match (non-fatal):', error.message);
+      }
+    }
+    
+    // If exact matches fail, try LIKE searches with just digits
+    // This handles cases where phone might be stored with formatting (dashes, spaces, etc.)
+    const digitVariants = [digits, last10Digits];
+    
+    for (const digitVariant of digitVariants) {
+      console.log(`Trying LIKE search with digits: "${digitVariant}"`);
+      
+      // Use limit(1) instead of maybeSingle() for LIKE queries since they might match multiple
+      const { data: membersLike, error: likeError } = await supabase
         .from('members')
         .select('*')
-        .ilike('phone', `%${phoneFormat.replace(/\D/g, '')}%`)
-        .maybeSingle();
+        .ilike('phone', `%${digitVariant}%`)
+        .limit(1);
       
-      if (memberLike && !likeError) {
+      if (membersLike && membersLike.length > 0 && !likeError) {
+        const memberLike = membersLike[0];
         console.log('✅ Member found with LIKE match:', {
-          format: phoneFormat,
+          digits: digitVariant,
           member_id: memberLike.member_id,
           name: `${memberLike.first_name} ${memberLike.last_name}`,
           phone_in_db: memberLike.phone
         });
         return { isMember: true, member: memberLike };
       }
+      
+      if (likeError && likeError.code !== 'PGRST116') {
+        console.log('Error with LIKE match (non-fatal):', likeError.message);
+      }
     }
     
-    // If no match found, try one more time with just the last 10 digits using LIKE
-    // This catches cases where phone might be stored with formatting
-    console.log('Trying final LIKE search with last 10 digits:', last10Digits);
-    const { data: finalMember, error: finalError } = await supabase
+    // Final attempt: query all members and check in JavaScript
+    // This is a fallback for edge cases
+    console.log('Trying final fallback: fetching all members and checking in code');
+    const { data: allMembers, error: allError } = await supabase
       .from('members')
-      .select('*')
-      .ilike('phone', `%${last10Digits}%`)
-      .maybeSingle();
+      .select('member_id, first_name, last_name, phone')
+      .not('phone', 'is', null);
     
-    if (finalMember && !finalError) {
-      console.log('✅ Member found with final LIKE search:', {
-        member_id: finalMember.member_id,
-        name: `${finalMember.first_name} ${finalMember.last_name}`,
-        phone_in_db: finalMember.phone
-      });
-      return { isMember: true, member: finalMember };
+    if (!allError && allMembers) {
+      // Normalize all phone numbers and compare
+      const normalizedIncoming = digits;
+      const normalizedLast10 = last10Digits;
+      
+      for (const member of allMembers) {
+        if (!member.phone) continue;
+        
+        const memberDigits = member.phone.replace(/\D/g, '');
+        const memberLast10 = memberDigits.slice(-10);
+        
+        // Check if normalized digits match
+        if (memberDigits === normalizedIncoming || 
+            memberDigits === normalizedLast10 ||
+            memberLast10 === normalizedIncoming ||
+            memberLast10 === normalizedLast10) {
+          
+          // Fetch full member record
+          const { data: fullMember, error: fetchError } = await supabase
+            .from('members')
+            .select('*')
+            .eq('member_id', member.member_id)
+            .single();
+          
+          if (fullMember && !fetchError) {
+            console.log('✅ Member found with fallback search:', {
+              member_id: fullMember.member_id,
+              name: `${fullMember.first_name} ${fullMember.last_name}`,
+              phone_in_db: fullMember.phone,
+              normalized_incoming: normalizedIncoming,
+              normalized_member: memberDigits
+            });
+            return { isMember: true, member: fullMember };
+          }
+        }
+      }
     }
     
     console.log('❌ No member found for phone:', phone);
     console.log('Searched formats:', uniquePhones);
+    console.log('Searched digit variants:', [digits, last10Digits]);
     return { isMember: false, member: null };
     
   } catch (error) {
