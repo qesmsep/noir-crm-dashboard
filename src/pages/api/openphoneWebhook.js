@@ -340,56 +340,93 @@ function parseReservationWithRegex(message) {
 // Check member status
 async function checkMemberStatus(phone) {
   try {
-    console.log('Checking member status for phone:', phone);
+    console.log('=== CHECKING MEMBER STATUS ===');
+    console.log('Incoming phone number:', phone);
     
-    // Normalize the incoming phone number
+    // Normalize the incoming phone number - extract just digits
     const digits = phone.replace(/\D/g, '');
+    console.log('Extracted digits:', digits);
+    
+    // Get last 10 digits (US phone number without country code)
+    const last10Digits = digits.slice(-10);
+    console.log('Last 10 digits:', last10Digits);
+    
+    // Generate all possible phone number formats to check
     const possiblePhones = [
-      digits,                    // 8584129797
-      '+1' + digits,            // +18584129797
-      '1' + digits,             // 18584129797
-      '+1' + digits.slice(-10), // +18584129797 (if it's already 11 digits)
-      digits.slice(-10)         // 8584129797 (last 10 digits)
+      phone,                      // Original format from OpenPhone (e.g., +18584129797)
+      digits,                     // All digits (e.g., 18584129797)
+      last10Digits,               // Last 10 digits (e.g., 8584129797)
+      '+1' + last10Digits,       // +1 + 10 digits (e.g., +18584129797)
+      '1' + last10Digits,         // 1 + 10 digits (e.g., 18584129797)
+      '+' + digits,               // + + all digits (e.g., +18584129797)
     ];
     
-    console.log('Phone number formats to check:', possiblePhones);
+    // Remove duplicates
+    const uniquePhones = [...new Set(possiblePhones)];
+    console.log('Phone number formats to check:', uniquePhones);
     
-    // First, let's see what's actually in the members table for debugging
-    const { data: allMembers, error: allMembersError } = await supabase
-      .from('members')
-      .select('member_id, first_name, last_name, phone')
-      .limit(10);
-    
-    if (allMembersError) {
-      console.error('Error fetching all members:', allMembersError);
-    } else {
-      console.log('Sample members in database:', allMembers);
+    // Try each format individually - more reliable than .or() query
+    for (const phoneFormat of uniquePhones) {
+      console.log(`Trying phone format: "${phoneFormat}"`);
+      
+      // Try exact match first
+      const { data: member, error } = await supabase
+        .from('members')
+        .select('*')
+        .eq('phone', phoneFormat)
+        .maybeSingle();
+      
+      if (member && !error) {
+        console.log('✅ Member found with exact match:', {
+          format: phoneFormat,
+          member_id: member.member_id,
+          name: `${member.first_name} ${member.last_name}`,
+          phone_in_db: member.phone
+        });
+        return { isMember: true, member };
+      }
+      
+      // If exact match fails, try LIKE match (handles formatting differences)
+      // This helps if phone is stored with dashes, spaces, parentheses, etc.
+      const { data: memberLike, error: likeError } = await supabase
+        .from('members')
+        .select('*')
+        .ilike('phone', `%${phoneFormat.replace(/\D/g, '')}%`)
+        .maybeSingle();
+      
+      if (memberLike && !likeError) {
+        console.log('✅ Member found with LIKE match:', {
+          format: phoneFormat,
+          member_id: memberLike.member_id,
+          name: `${memberLike.first_name} ${memberLike.last_name}`,
+          phone_in_db: memberLike.phone
+        });
+        return { isMember: true, member: memberLike };
+      }
     }
     
-    // Check phone field with multiple formats (removed phone2 since it no longer exists)
-    const { data: member, error } = await supabase
+    // If no match found, try one more time with just the last 10 digits using LIKE
+    // This catches cases where phone might be stored with formatting
+    console.log('Trying final LIKE search with last 10 digits:', last10Digits);
+    const { data: finalMember, error: finalError } = await supabase
       .from('members')
       .select('*')
-      .or(
-        // Check phone field with all possible formats
-        possiblePhones.map(p => `phone.eq.${p}`).join(',')
-      )
-      .single();
+      .ilike('phone', `%${last10Digits}%`)
+      .maybeSingle();
     
-    console.log('Member lookup result:', { member, error });
-    
-    if (error || !member) {
-      console.log('No member found for phone:', phone);
-      return { isMember: false, member: null };
+    if (finalMember && !finalError) {
+      console.log('✅ Member found with final LIKE search:', {
+        member_id: finalMember.member_id,
+        name: `${finalMember.first_name} ${finalMember.last_name}`,
+        phone_in_db: finalMember.phone
+      });
+      return { isMember: true, member: finalMember };
     }
     
-    console.log('Member found:', { 
-      id: member.member_id, 
-      name: `${member.first_name} ${member.last_name}`,
-      phone: member.phone,
-    });
+    console.log('❌ No member found for phone:', phone);
+    console.log('Searched formats:', uniquePhones);
+    return { isMember: false, member: null };
     
-    return { isMember: true, member };
   } catch (error) {
     console.error('Error checking member status:', error);
     return { isMember: false, member: null };
