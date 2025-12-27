@@ -698,6 +698,12 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     }
   };
 
+  const handleNewReservation = () => {
+    if (onSlotClick) {
+      onSlotClick({ date: currentCalendarDate, resourceId: '' });
+    }
+  };
+
   // Format date for mobile header
   const formatMobileDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
@@ -735,6 +741,13 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           >
             Today
           </button>
+          <button 
+            className={styles.mobileNavNewRez}
+            onClick={handleNewReservation}
+            aria-label="New Reservation"
+          >
+            + rez
+          </button>
         </div>
       )}
       <Box className={styles.calendarContainer}>
@@ -746,10 +759,17 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           timeZone={settings.timezone}
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
           
+          customButtons={{
+            newRez: {
+              text: '+ rez',
+              click: handleNewReservation,
+            },
+          }}
+          
           headerToolbar={isMobile ? false : {
             left: 'prev,next',
             center: 'title',
-            right: 'today',
+            right: 'newRez today',
           }}
           titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
           resources={resources}
