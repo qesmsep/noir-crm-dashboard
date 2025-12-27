@@ -106,21 +106,22 @@
   overflow: auto !important;
 }
 
-/* Phone-specific optimizations - disable touch selection */
+/* Phone-specific optimizations - enable touch selection */
 @media (max-width: 428px) {
   .mobileCalendarContainer :global(.fc-timeline-slot) {
-    touch-action: pinch-zoom !important;
+    touch-action: manipulation !important;
     pointer-events: auto !important;
   }
   
   .mobileCalendarContainer :global(.fc-timeline-body) {
-    touch-action: pinch-zoom !important;
+    touch-action: pan-x pan-y !important;
     -webkit-overflow-scrolling: touch !important;
   }
   
-  /* Disable slot clicking on phones */
+  /* Enable slot clicking on phones and tablets */
   .mobileCalendarContainer :global(.fc-timeline-slot:not(.fc-event)) {
-    pointer-events: none !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
   }
   
   /* Keep event clicking enabled */

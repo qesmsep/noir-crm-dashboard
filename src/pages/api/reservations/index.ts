@@ -131,12 +131,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         
         // Check if table is already booked for this time (exclude cancelled reservations)
-        const { data: allReservations, error: reservationsError } = await client
+        // Try with status column first, fall back without it if column doesn't exist
+        let allReservations: any[] = [];
+        let reservationsError: any = null;
+        
+        const resultWithStatus = await client
           .from('reservations')
           .select('id, start_time, end_time, status')
           .eq('table_id', tableId)
           .lt('start_time', endTime.toISOString())
           .gt('end_time', startTime.toISOString());
+        
+        if (resultWithStatus.error) {
+          // If error is about missing column, try without status
+          if (resultWithStatus.error.code === '42703' || resultWithStatus.error.message?.includes('column') || resultWithStatus.error.message?.includes('does not exist')) {
+            console.log('Status column not found in table availability check, querying without it...');
+            const resultWithoutStatus = await client
+              .from('reservations')
+              .select('id, start_time, end_time')
+              .eq('table_id', tableId)
+              .lt('start_time', endTime.toISOString())
+              .gt('end_time', startTime.toISOString());
+            
+            allReservations = resultWithoutStatus.data || [];
+            reservationsError = resultWithoutStatus.error;
+          } else {
+            allReservations = resultWithStatus.data || [];
+            reservationsError = resultWithStatus.error;
+          }
+        } else {
+          allReservations = resultWithStatus.data || [];
+        }
         
         if (reservationsError) {
           console.error('Error checking table availability:', reservationsError);
@@ -145,7 +170,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }
         
-        // Filter out cancelled reservations
+        // Filter out cancelled reservations (if status column exists)
         const existingReservations = (allReservations || []).filter(
           (res: any) => !res.status || res.status !== 'cancelled'
         );

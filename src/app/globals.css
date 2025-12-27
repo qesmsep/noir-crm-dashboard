@@ -567,9 +567,10 @@ html {
     align-items: center !important;
   }
   
-  /* Disable touch selection on calendar slots for phones */
+  /* Enable touch selection on calendar slots for phones and tablets */
   .fc-timeline-slot:not(.fc-event) {
-    pointer-events: none !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
   }
   
   /* Keep event clicking enabled */
