@@ -1340,7 +1340,7 @@ Thank you.`;
     }
 
     // Send acknowledgment message to member
-    const confirmationMessage = `Thank you ${member.first_name} for your reservation request. It has been received and we will be back with you shortly to confirm. please let us know if you have any questions. Thank you!`;
+    const confirmationMessage = `Thank you ${member.first_name} for your reservation request. It has been received and we will be back with you shortly to confirm. Please let us know if you have any questions. Thank you!`;
 
     await clearConversation(from);
     await sendSMS(from, confirmationMessage);
