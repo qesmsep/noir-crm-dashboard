@@ -1242,16 +1242,8 @@ Thank you.`;
       return res.status(200).json({ message: 'Sent reservation creation error message' });
     }
 
-    // Format date and time from the parsed start_time using Luxon
-    const reservationDate = DateTime.fromISO(start_time, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE);
-    const formattedDate = reservationDate.toLocaleString({
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    const formattedTime = reservationDate.toFormat('h:mm a'); // Always 12-hour format, local time
-    const confirmationMessage = `Hi ${member.first_name}! Your reservation for ${parsed.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
+    // Send acknowledgment message to member
+    const confirmationMessage = `Thank you ${member.first_name} for your reservation request. It has been received and we will be back with you shortly to confirm. please let us know if you have any questions. Thank you!`;
 
     await clearConversation(from);
     await sendSMS(from, confirmationMessage);
