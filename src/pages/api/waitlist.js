@@ -1,5 +1,12 @@
+console.log('[WAITLIST API] Module loading started at', new Date().toISOString());
+
 import { createClient } from '@supabase/supabase-js';
+
+console.log('[WAITLIST API] Supabase imported successfully');
+
 import { updateContactAndSendPersonalizedMessage } from '../../utils/openphoneUtils';
+
+console.log('[WAITLIST API] openphoneUtils imported successfully');
 
 // Initialize Supabase client with error handling
 let supabase;
@@ -51,16 +58,34 @@ async function sendSMS(to, message) {
   }
 }
 
+console.log('[WAITLIST API] Handler function defined');
+
 export default async function handler(req, res) {
+  // CRITICAL: Log immediately when handler is called
+  console.log('[WAITLIST API] ========== HANDLER CALLED ==========');
+  console.log('[WAITLIST API] Handler invoked at:', new Date().toISOString());
+  console.log('[WAITLIST API] Request method:', req?.method);
+  console.log('[WAITLIST API] Request URL:', req?.url);
+  console.log('[WAITLIST API] Request query:', req?.query);
+  console.log('[WAITLIST API] Response object exists:', !!res);
+  console.log('[WAITLIST API] Response methods:', {
+    hasSetHeader: typeof res?.setHeader === 'function',
+    hasStatus: typeof res?.status === 'function',
+    hasJson: typeof res?.json === 'function'
+  });
+
   // Set JSON content type early to prevent HTML error pages
   // This must be done BEFORE any operations that might throw
   try {
+    console.log('[WAITLIST API] Attempting to set Content-Type header...');
     if (!res || typeof res.setHeader !== 'function') {
       console.error('[WAITLIST API] Invalid response object');
       return;
     }
     res.setHeader('Content-Type', 'application/json');
+    console.log('[WAITLIST API] Content-Type header set successfully');
   } catch (headerError) {
+    console.error('[WAITLIST API] ERROR setting Content-Type header:', headerError);
     console.error('[WAITLIST API] Error setting response headers:', headerError);
     // If we can't set headers, return immediately
     try {

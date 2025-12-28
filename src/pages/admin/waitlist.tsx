@@ -62,6 +62,12 @@ export default function WaitlistPage() {
   const fetchWaitlist = useCallback(async () => {
     setLoading(true);
     try {
+      console.log('[WAITLIST PAGE] Starting fetch with params:', {
+        limit: ITEMS_PER_PAGE,
+        offset: (currentPage - 1) * ITEMS_PER_PAGE,
+        statusFilter
+      });
+
       const params = new URLSearchParams({
         limit: ITEMS_PER_PAGE.toString(),
         offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString()
@@ -69,7 +75,10 @@ export default function WaitlistPage() {
 
       if (statusFilter) params.append('status', statusFilter);
 
-      const response = await fetch(`/api/waitlist?${params}`, {
+      const apiUrl = `/api/waitlist?${params}`;
+      console.log('[WAITLIST PAGE] Fetching from:', apiUrl);
+
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -78,21 +87,44 @@ export default function WaitlistPage() {
         cache: 'no-cache',
       });
 
+      console.log('[WAITLIST PAGE] Response received:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type')
+      });
+
       // Check if response is ok before parsing JSON
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[WAITLIST PAGE] Error response body:', {
+          status: response.status,
+          contentType: response.headers.get('content-type'),
+          bodyLength: errorText.length,
+          bodyPreview: errorText.substring(0, 200)
+        });
+        
         let errorData;
         try {
           errorData = JSON.parse(errorText);
-        } catch {
+          console.error('[WAITLIST PAGE] Parsed error data:', errorData);
+        } catch (parseError) {
+          console.error('[WAITLIST PAGE] Failed to parse error as JSON:', parseError);
           errorData = { error: errorText || 'Failed to fetch waitlist' };
         }
         throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch waitlist`);
       }
 
       const data = await response.json();
+      console.log('[WAITLIST PAGE] Success response:', {
+        hasData: !!data.data,
+        dataLength: data.data?.length || 0,
+        count: data.count,
+        hasStatusCounts: !!data.statusCounts
+      });
 
       if (data.error) {
+        console.error('[WAITLIST PAGE] Error in response data:', data.error);
         throw new Error(data.error);
       }
 
@@ -100,7 +132,12 @@ export default function WaitlistPage() {
       setTotalCount(data.count || 0);
       setStatusCounts(data.statusCounts || []);
     } catch (error) {
-      console.error('Error fetching waitlist:', error);
+      console.error('[WAITLIST PAGE] Error fetching waitlist:', error);
+      console.error('[WAITLIST PAGE] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : typeof error
+      });
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch waitlist entries';
       showToast(errorMessage, 'error');
       // Set empty state on error to prevent infinite loading
