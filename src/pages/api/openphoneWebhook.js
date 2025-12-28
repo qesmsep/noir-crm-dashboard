@@ -998,6 +998,22 @@ Thank you.`;
     return res.status(200).json({ message: 'Sent invitation signup message' });
   }
 
+  // Handle "SKYLINE" messages for Skyline membership signup
+  if (text.toLowerCase().trim() === 'skyline') {
+    console.log('Processing SKYLINE message for Skyline membership signup');
+    const skylineMessage = `Thank you for requesting an invitation. We are excited to formally invite you to become a Skyline Member of Noir.
+
+To officially join, please complete the following:
+
+https://skylineandco.typeform.com/noirkc-signup#auth_code=skyline
+
+The link expires in 24 hours, so please respond to this text with any questions.
+
+Thank you.`;
+    await sendSMS(from, skylineMessage);
+    return res.status(200).json({ message: 'Sent Skyline membership signup message' });
+  }
+
   // Handle "BALANCE" messages for ledger PDF
   if (text.toLowerCase().trim() === 'balance') {
     console.log('Processing BALANCE message for ledger PDF');
