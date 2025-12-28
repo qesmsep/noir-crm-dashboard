@@ -78,3 +78,4 @@ if (typeof fetch === 'undefined') {
 testAvailableSlots().catch(console.error);
 
 
+
