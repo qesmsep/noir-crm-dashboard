@@ -48,14 +48,43 @@ async function sendSMS(to, message) {
 
 export default async function handler(req, res) {
   // Set JSON content type early to prevent HTML error pages
-  res.setHeader('Content-Type', 'application/json');
+  // This must be done BEFORE any operations that might throw
+  try {
+    res.setHeader('Content-Type', 'application/json');
+  } catch (headerError) {
+    console.error('Error setting response headers:', headerError);
+    // If we can't set headers, return immediately
+    try {
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        message: 'Failed to set response headers'
+      });
+    } catch (e) {
+      // If even JSON response fails, log and return nothing
+      console.error('Critical: Cannot send JSON response:', e);
+      return;
+    }
+  }
+  
+  // Add request logging for debugging
+  console.log('[WAITLIST API] Request received:', {
+    method: req.method,
+    url: req.url,
+    query: req.query,
+    timestamp: new Date().toISOString()
+  });
   
   // Check if Supabase is properly initialized
   if (!supabase) {
-    console.error('Supabase client not initialized');
+    console.error('[WAITLIST API] Supabase client not initialized');
+    console.error('[WAITLIST API] Env vars check:', {
+      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    });
     return res.status(500).json({ 
       error: 'Server configuration error',
-      message: 'Database connection not available'
+      message: 'Database connection not available',
+      debug: process.env.NODE_ENV === 'development' ? 'Supabase client initialization failed' : undefined
     });
   }
   
@@ -63,18 +92,24 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       try {
+        console.log('[WAITLIST API] Processing GET request');
         const { status, limit = '10', offset = '0' } = req.query;
+        console.log('[WAITLIST API] Query params:', { status, limit, offset });
+        
         const limitNum = parseInt(limit, 10);
         const offsetNum = parseInt(offset, 10);
 
         // Validate parsed values
         if (isNaN(limitNum) || isNaN(offsetNum) || limitNum < 0 || offsetNum < 0) {
+          console.error('[WAITLIST API] Invalid pagination params:', { limitNum, offsetNum });
           return res.status(400).json({ 
             error: 'Invalid pagination parameters',
-            message: 'limit and offset must be valid non-negative numbers'
+            message: 'limit and offset must be valid non-negative numbers',
+            received: { limit, offset, limitNum, offsetNum }
           });
         }
 
+        console.log('[WAITLIST API] Building query with:', { status, limitNum, offsetNum });
         let query = supabase
           .from('waitlist')
           .select('*', { count: 'exact' })
@@ -84,45 +119,72 @@ export default async function handler(req, res) {
           query = query.eq('status', status);
         }
 
-        const { data: waitlistEntries, error, count } = await query
-          .range(offsetNum, offsetNum + limitNum - 1);
+        console.log('[WAITLIST API] Executing database query...');
+        const queryResult = await query.range(offsetNum, offsetNum + limitNum - 1);
+        const { data: waitlistEntries, error, count } = queryResult;
 
         if (error) {
-          console.error('Error fetching waitlist:', error);
+          console.error('[WAITLIST API] Database query error:', error);
+          console.error('[WAITLIST API] Error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
           return res.status(500).json({ 
             error: 'Failed to fetch waitlist', 
-            details: error.message || 'Database query failed'
+            details: error.message || 'Database query failed',
+            code: error.code,
+            debug: process.env.NODE_ENV === 'development' ? {
+              hint: error.hint,
+              details: error.details
+            } : undefined
           });
         }
+
+        console.log('[WAITLIST API] Query successful:', {
+          entriesCount: waitlistEntries?.length || 0,
+          totalCount: count
+        });
 
         // Get count by status - handle RPC errors gracefully
         let statusCounts = [];
         try {
+          console.log('[WAITLIST API] Fetching status counts...');
           const { data: counts, error: rpcError } = await supabase
             .rpc('get_waitlist_count_by_status');
           
           if (rpcError) {
-            console.error('Error fetching status counts:', rpcError);
+            console.error('[WAITLIST API] RPC error (non-fatal):', rpcError);
             // Continue without status counts rather than failing
           } else {
             statusCounts = counts || [];
+            console.log('[WAITLIST API] Status counts retrieved:', statusCounts.length);
           }
         } catch (rpcErr) {
-          console.error('Exception in RPC call:', rpcErr);
+          console.error('[WAITLIST API] Exception in RPC call (non-fatal):', rpcErr);
           // Continue without status counts
         }
 
-        return res.status(200).json({
+        const response = {
           data: waitlistEntries || [],
           count: count || 0,
           statusCounts: statusCounts
-        });
+        };
+        
+        console.log('[WAITLIST API] Sending successful response');
+        return res.status(200).json(response);
 
       } catch (error) {
-        console.error('Error in waitlist GET:', error);
+        console.error('[WAITLIST API] Error in GET handler:', error);
+        console.error('[WAITLIST API] Error stack:', error.stack);
         return res.status(500).json({ 
           error: 'Internal server error',
-          message: error.message || 'Unknown error'
+          message: error.message || 'Unknown error',
+          type: error.constructor?.name || 'Error',
+          debug: process.env.NODE_ENV === 'development' ? {
+            stack: error.stack
+          } : undefined
         });
       }
     }
@@ -216,11 +278,30 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   } catch (error) {
     // Catch any unhandled errors (like Supabase initialization failures)
-    console.error('Unhandled error in waitlist handler:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message || 'Unknown error',
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.error('[WAITLIST API] Unhandled error in handler:', error);
+    console.error('[WAITLIST API] Error type:', error.constructor?.name);
+    console.error('[WAITLIST API] Error message:', error.message);
+    console.error('[WAITLIST API] Error stack:', error.stack);
+    
+    // Try to send JSON response, but if that fails, we're in trouble
+    try {
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        message: error.message || 'Unknown error',
+        type: error.constructor?.name || 'Error',
+        debug: process.env.NODE_ENV === 'development' ? {
+          stack: error.stack,
+          name: error.name
+        } : undefined
+      });
+    } catch (jsonError) {
+      console.error('[WAITLIST API] CRITICAL: Cannot send JSON error response:', jsonError);
+      // Last resort - try to end the response
+      try {
+        res.status(500).end();
+      } catch (e) {
+        console.error('[WAITLIST API] CRITICAL: Cannot end response:', e);
+      }
+    }
   }
 } 
