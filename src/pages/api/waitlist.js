@@ -4,15 +4,20 @@ import { updateContactAndSendPersonalizedMessage } from '../../utils/openphoneUt
 // Initialize Supabase client with error handling
 let supabase;
 try {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('Missing Supabase environment variables');
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[WAITLIST API] Missing Supabase environment variables:', {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseKey
+    });
+  } else {
+    supabase = createClient(supabaseUrl, supabaseKey);
   }
-  supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
 } catch (error) {
-  console.error('Error initializing Supabase client:', error);
+  console.error('[WAITLIST API] Error initializing Supabase client:', error);
+  console.error('[WAITLIST API] Error stack:', error.stack);
   // Will be handled in handler
 }
 
@@ -50,18 +55,24 @@ export default async function handler(req, res) {
   // Set JSON content type early to prevent HTML error pages
   // This must be done BEFORE any operations that might throw
   try {
+    if (!res || typeof res.setHeader !== 'function') {
+      console.error('[WAITLIST API] Invalid response object');
+      return;
+    }
     res.setHeader('Content-Type', 'application/json');
   } catch (headerError) {
-    console.error('Error setting response headers:', headerError);
+    console.error('[WAITLIST API] Error setting response headers:', headerError);
     // If we can't set headers, return immediately
     try {
-      return res.status(500).json({ 
-        error: 'Server configuration error',
-        message: 'Failed to set response headers'
-      });
+      if (res && typeof res.status === 'function') {
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          message: 'Failed to set response headers'
+        });
+      }
     } catch (e) {
       // If even JSON response fails, log and return nothing
-      console.error('Critical: Cannot send JSON response:', e);
+      console.error('[WAITLIST API] Critical: Cannot send JSON response:', e);
       return;
     }
   }
@@ -248,11 +259,17 @@ export default async function handler(req, res) {
         };
 
         // Update OpenPhone contact and send personalized message
-        const result = await updateContactAndSendPersonalizedMessage(
-          waitlistEntry.phone, 
-          contactData, 
-          smsMessage
-        );
+        let result;
+        try {
+          result = await updateContactAndSendPersonalizedMessage(
+            waitlistEntry.phone, 
+            contactData, 
+            smsMessage
+          );
+        } catch (smsError) {
+          console.error('[WAITLIST API] Error calling updateContactAndSendPersonalizedMessage:', smsError);
+          result = { success: false, error: smsError.message };
+        }
 
         if (!result.success) {
           console.error('Failed to send personalized SMS:', result.error);
