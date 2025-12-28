@@ -1,27 +1,9 @@
-// Module initialization - wrap in try-catch to prevent silent failures
-let moduleInitError = null;
-try {
-  console.log('[WAITLIST API] Module loading started at', new Date().toISOString());
-} catch (e) {
-  moduleInitError = e;
-  console.error('[WAITLIST API] Error during module initialization logging:', e);
-}
+console.log('[WAITLIST API] Module loading started at', new Date().toISOString());
 
 import { createClient } from '@supabase/supabase-js';
+import { updateContactAndSendPersonalizedMessage } from '../../utils/openphoneUtils';
 
-let updateContactAndSendPersonalizedMessage;
-try {
-  const openphoneUtils = await import('../../utils/openphoneUtils');
-  updateContactAndSendPersonalizedMessage = openphoneUtils.updateContactAndSendPersonalizedMessage;
-  console.log('[WAITLIST API] openphoneUtils imported successfully');
-} catch (importError) {
-  console.error('[WAITLIST API] Failed to import openphoneUtils:', importError);
-  // Define a fallback function
-  updateContactAndSendPersonalizedMessage = async () => {
-    console.error('[WAITLIST API] updateContactAndSendPersonalizedMessage not available');
-    return { success: false, error: 'Function not available' };
-  };
-}
+console.log('[WAITLIST API] Supabase and openphoneUtils imported successfully');
 
 // Initialize Supabase client with error handling
 let supabase;
@@ -361,4 +343,4 @@ export default async function handler(req, res) {
       }
     }
   }
-} 
+}
