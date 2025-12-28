@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from './supabase';
 import { User } from '@supabase/supabase-js';
 
@@ -34,44 +34,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
     });
     if (error) throw error;
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-  };
+  }, []);
 
-  const verifyMFA = async (userId: string, factorId: string, challengeId: string, code: string) => {
+  const verifyMFA = useCallback(async (userId: string, factorId: string, challengeId: string, code: string) => {
     const { error } = await supabase.auth.mfa.verify({
       factorId,
       challengeId,
       code,
     });
     if (error) throw error;
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     loading,
     signIn,
     signUp,
     signOut,
     verifyMFA,
-  };
+  }), [user, loading, signIn, signUp, signOut, verifyMFA]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

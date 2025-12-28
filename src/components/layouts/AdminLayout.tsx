@@ -29,19 +29,19 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     return () => {
       debugLog.setup('ADMIN LAYOUT', 'Component unmounting');
     };
-  }, [pathname, router.isReady, user, loading]);
+  }, [pathname, router.isReady, user?.id, loading]);
 
   // Prevent redirects during navigation
   useEffect(() => {
     const handleRouteChangeStart = (url: string) => {
-      debugLog.nav('ADMIN LAYOUT', 'Navigation starting', { url, pathname });
+      debugLog.nav('ADMIN LAYOUT', 'Navigation starting', { url, pathname: router.pathname });
       setIsNavigating(true);
     };
     
     const handleRouteChangeComplete = (url: string) => {
       debugLog.info('ADMIN LAYOUT', 'Navigation completed', { 
         url,
-        pathname,
+        pathname: router.pathname,
         newPathname: router.pathname,
         isReady: router.isReady,
         timestamp: new Date().toISOString()
@@ -73,7 +73,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     } else {
       debugLog.warn('ADMIN LAYOUT', 'Router events not available');
     }
-  }, [router, pathname]);
+  }, [router]);
 
   useEffect(() => {
     debugLog.setup('ADMIN LAYOUT', 'Redirect check', { loading, isNavigating, user: !!user, pathname });
