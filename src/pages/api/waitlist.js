@@ -64,8 +64,16 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       try {
         const { status, limit = '10', offset = '0' } = req.query;
-        const limitNum = parseInt(limit);
-        const offsetNum = parseInt(offset);
+        const limitNum = parseInt(limit, 10);
+        const offsetNum = parseInt(offset, 10);
+
+        // Validate parsed values
+        if (isNaN(limitNum) || isNaN(offsetNum) || limitNum < 0 || offsetNum < 0) {
+          return res.status(400).json({ 
+            error: 'Invalid pagination parameters',
+            message: 'limit and offset must be valid non-negative numbers'
+          });
+        }
 
         let query = supabase
           .from('waitlist')
@@ -81,7 +89,10 @@ export default async function handler(req, res) {
 
         if (error) {
           console.error('Error fetching waitlist:', error);
-          return res.status(500).json({ error: 'Failed to fetch waitlist', details: error.message });
+          return res.status(500).json({ 
+            error: 'Failed to fetch waitlist', 
+            details: error.message || 'Database query failed'
+          });
         }
 
         // Get count by status - handle RPC errors gracefully
@@ -200,6 +211,7 @@ export default async function handler(req, res) {
     }
   }
 
+    // Method not allowed
     res.setHeader('Allow', ['GET', 'PATCH']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   } catch (error) {
