@@ -3,10 +3,21 @@ import { ApiResponse } from '../../lib/api-response';
 import { memberSchema, updateMemberSchema, validateWithSchema } from '../../lib/validations';
 import { Logger } from '../../lib/logger';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Initialize Supabase client with validation
+let supabase;
+try {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  
+  supabase = createClient(supabaseUrl, supabaseKey);
+} catch (error) {
+  console.error('Failed to initialize Supabase client:', error);
+  // Will be handled in the handler
+}
 
 const ALLOWED_MEMBER_FIELDS = [
   'account_id', 'first_name', 'last_name', 'email', 'phone', 'stripe_customer_id',
@@ -43,6 +54,17 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   
   const requestId = req.headers['x-request-id'] || 'unknown';
+
+  // Check if Supabase client is initialized
+  if (!supabase) {
+    Logger.error('Supabase client not initialized', null, { requestId });
+    return ApiResponse.internalError(
+      res,
+      'Database connection not configured. Please check environment variables.',
+      new Error('Supabase client not initialized'),
+      requestId
+    );
+  }
 
   if (req.method === 'GET') {
     try {
