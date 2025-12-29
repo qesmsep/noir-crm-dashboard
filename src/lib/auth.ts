@@ -1,12 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
 import { RateLimiter } from 'limiter';
 import React, { useEffect, useState } from 'react';
+import { supabase } from './supabase';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Re-export supabase for backward compatibility
+export { supabase };
 
 // Configure rate limiter
 const limiter = new RateLimiter({

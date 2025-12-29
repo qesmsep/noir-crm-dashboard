@@ -141,41 +141,105 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     setStats(s => ({ ...s, loading: true }));
+    
+    // Helper function to safely fetch and parse JSON
+    const safeFetch = async (url: string, options: RequestInit = {}) => {
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || `HTTP ${response.status}` };
+          }
+          console.error(`API error for ${url}:`, errorData);
+          return { error: errorData.error || `Failed to fetch ${url}` };
+        }
+        return await response.json();
+      } catch (error) {
+        console.error(`Network error for ${url}:`, error);
+        return { error: error instanceof Error ? error.message : 'Network error' };
+      }
+    };
+
     try {
-      // Fetch all members
-      const membersRes = await fetch("/api/members");
-      const membersData = await membersRes.json();
-      
-      // Fetch ledger
-      const ledgerRes = await fetch("/api/ledger");
-      const ledgerData = await ledgerRes.json();
-      
-      // Fetch all upcoming reservations (not just count)
-      const reservationsRes = await fetch("/api/reservations?upcoming=1");
-      const reservationsData = await reservationsRes.json();
-      
-      // Fetch outstanding balances
-      const outstandingRes = await fetch("/api/ledger?outstanding=1");
-      const outstandingData = await outstandingRes.json();
+      // Fetch all APIs in parallel with individual error handling
+      const [
+        membersResult,
+        ledgerResult,
+        reservationsResult,
+        outstandingResult,
+        financialResult,
+        waitlistResult,
+        waitlistedResult,
+        privateEventsResult
+      ] = await Promise.all([
+        safeFetch("/api/members"),
+        safeFetch("/api/ledger"),
+        safeFetch("/api/reservations?upcoming=1"),
+        safeFetch("/api/ledger?outstanding=1"),
+        safeFetch("/api/financial-metrics"),
+        safeFetch("/api/waitlist?status=review&limit=5"),
+        safeFetch("/api/waitlist?status=waitlisted&limit=5"),
+        (async () => {
+          const now = new Date();
+          const startDate = now.toISOString();
+          const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          return safeFetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
+        })()
+      ]);
 
-      // Fetch detailed financial metrics
-      const financialRes = await fetch("/api/financial-metrics");
-      const financialData = await financialRes.json();
-
-      // Fetch waitlist data
-      const waitlistRes = await fetch("/api/waitlist?status=review&limit=5");
-      const waitlistData = await waitlistRes.json();
+      // Extract data, using empty defaults if there was an error
+      // Handle both ApiResponse format ({ success: true, data }) and direct format ({ data })
+      const membersData = membersResult.error || membersResult.success === false
+        ? { data: [] }
+        : membersResult.success === true
+        ? membersResult  // ApiResponse format: { success: true, data: [...] }
+        : { data: membersResult.data || membersResult || [] };  // Direct format: { data: [...] } or just array
       
-      // Fetch waitlisted data (denied but kept on file)
-      const waitlistedRes = await fetch("/api/waitlist?status=waitlisted&limit=5");
-      const waitlistedData = await waitlistedRes.json();
-
-      // Fetch private events for the upcoming week
-      const now = new Date();
-      const startDate = now.toISOString();
-      const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const privateEventsRes = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
-      const privateEventsData = await privateEventsRes.json();
+      const ledgerData = ledgerResult.error || ledgerResult.success === false
+        ? { data: [] }
+        : ledgerResult.success === true
+        ? ledgerResult
+        : { data: ledgerResult.data || ledgerResult || [] };
+      
+      const reservationsData = reservationsResult.error || reservationsResult.success === false
+        ? { count: 0, data: [] }
+        : reservationsResult.success === true
+        ? reservationsResult
+        : { count: reservationsResult.count || 0, data: reservationsResult.data || [] };
+      
+      const outstandingData = outstandingResult.error || outstandingResult.success === false
+        ? { total: 0 }
+        : outstandingResult.success === true
+        ? outstandingResult
+        : { total: outstandingResult.total || 0 };
+      
+      const financialData = financialResult.error || financialResult.success === false
+        ? {}
+        : financialResult.success === true
+        ? financialResult.data || financialResult
+        : financialResult;
+      
+      const waitlistData = waitlistResult.error || waitlistResult.success === false
+        ? { count: 0, data: [] }
+        : waitlistResult.success === true
+        ? waitlistResult
+        : { count: waitlistResult.count || 0, data: waitlistResult.data || [] };
+      
+      const waitlistedData = waitlistedResult.error || waitlistedResult.success === false
+        ? { count: 0, data: [] }
+        : waitlistedResult.success === true
+        ? waitlistedResult
+        : { count: waitlistedResult.count || 0, data: waitlistedResult.data || [] };
+      
+      const privateEventsData = privateEventsResult.error || privateEventsResult.success === false
+        ? { data: [] }
+        : privateEventsResult.success === true
+        ? privateEventsResult
+        : { data: privateEventsResult.data || [] };
       
       setStats({
         members: membersData.data || [],
