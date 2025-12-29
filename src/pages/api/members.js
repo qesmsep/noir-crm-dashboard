@@ -51,7 +51,22 @@ function getMonthlyDues(membership) {
 
 export default async function handler(req, res) {
   // Set JSON content type early to prevent HTML error pages
-  res.setHeader('Content-Type', 'application/json');
+  try {
+    res.setHeader('Content-Type', 'application/json');
+  } catch (headerError) {
+    console.error('[MEMBERS API] Error setting Content-Type header:', headerError);
+    try {
+      if (res && typeof res.status === 'function') {
+        return res.status(500).json({ 
+          error: 'Server configuration error',
+          message: 'Failed to set response headers'
+        });
+      }
+    } catch (e) {
+      console.error('[MEMBERS API] Critical: Cannot send JSON response:', e);
+      return;
+    }
+  }
   
   const requestId = req.headers['x-request-id'] || 'unknown';
 
