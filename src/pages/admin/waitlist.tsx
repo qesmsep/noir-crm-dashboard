@@ -22,7 +22,7 @@ interface WaitlistEntry {
   application_link_sent_at?: string;
   application_expires_at?: string;
   application_link_opened_at?: string;
-  status: 'review' | 'approved' | 'denied' | 'waitlisted';
+  status: 'review' | 'approved' | 'denied' | 'waitlisted' | 'archived';
   submitted_at: string;
   reviewed_at?: string;
   review_notes?: string;
@@ -182,6 +182,7 @@ export default function WaitlistPage() {
       case 'approved': return styles.statusApproved;
       case 'waitlisted': return styles.statusWaitlisted;
       case 'denied': return styles.statusDenied;
+      case 'archived': return styles.statusArchived;
       default: return '';
     }
   };
@@ -236,6 +237,7 @@ export default function WaitlistPage() {
             <option value="approved">Approved</option>
             <option value="waitlisted">Waitlisted</option>
             <option value="denied">Denied</option>
+            <option value="archived">Archived</option>
           </select>
 
           <div className={styles.searchContainer}>
@@ -336,10 +338,58 @@ export default function WaitlistPage() {
                         setSelectedEntry(entry);
                         setIsModalOpen(true);
                       }}
-                      className={styles.primaryButton}
+                      className={styles.iconButton}
+                      title="Review"
+                      aria-label="Review entry"
                     >
-                      Review
+                      <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M10 3.33334C6.66667 3.33334 3.91667 5.41667 2.5 8.33334C3.91667 11.25 6.66667 13.3333 10 13.3333C13.3333 13.3333 16.0833 11.25 17.5 8.33334C16.0833 5.41667 13.3333 3.33334 10 3.33334Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </button>
+                    {entry.status !== 'archived' && (
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Archive ${entry.first_name} ${entry.last_name}? This will archive the inquiry and filter it out from the main view.`)) {
+                            try {
+                              const response = await fetch('/api/waitlist', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  id: entry.id,
+                                  status: 'archived'
+                                }),
+                              });
+
+                              const data = await response.json();
+
+                              if (response.ok) {
+                                showToast('Entry archived successfully', 'success');
+                                fetchWaitlist();
+                              } else {
+                                const errorMessage = data.message || data.error || 'Failed to archive entry';
+                                console.error('Archive error:', data);
+                                throw new Error(errorMessage);
+                              }
+                            } catch (error) {
+                              console.error('Error archiving entry:', error);
+                              const errorMessage = error instanceof Error ? error.message : 'Failed to archive entry';
+                              showToast(errorMessage, 'error');
+                            }
+                          }
+                        }}
+                        className={styles.archiveIconButton}
+                        title="Archive"
+                        aria-label="Archive entry"
+                      >
+                        <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M3.33334 5.83334H16.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M7.5 9.16667H12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M4.16667 5.83334L4.58334 14.1667C4.58334 15.0871 5.32959 15.8333 6.25001 15.8333H13.75C14.6704 15.8333 15.4167 15.0871 15.4167 14.1667L15.8333 5.83334" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M7.5 5.83334V4.16667C7.5 3.70643 7.8731 3.33334 8.33334 3.33334H11.6667C12.1269 3.33334 12.5 3.70643 12.5 4.16667V5.83334" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

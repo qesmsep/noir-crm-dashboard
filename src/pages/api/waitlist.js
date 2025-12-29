@@ -258,11 +258,32 @@ export default async function handler(req, res) {
         .single();
 
       if (updateError) {
-        console.error('Error updating waitlist entry:', updateError);
-        return res.status(500).json({ error: 'Failed to update waitlist entry' });
+        console.error('[WAITLIST API] Error updating waitlist entry:', updateError);
+        console.error('[WAITLIST API] Update error details:', {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code
+        });
+        
+        // Check if it's an invalid enum value error
+        if (updateError.code === '23502' || updateError.message?.includes('invalid input value') || updateError.message?.includes('enum')) {
+          return res.status(400).json({ 
+            error: 'Invalid status value',
+            message: `The status '${status}' is not valid. Please ensure the database migration has been run to add the 'archived' status.`,
+            details: updateError.message
+          });
+        }
+        
+        return res.status(500).json({ 
+          error: 'Failed to update waitlist entry',
+          message: updateError.message || 'Database update failed',
+          details: process.env.NODE_ENV === 'development' ? updateError.details : undefined
+        });
       }
 
       // Send appropriate SMS based on status with personalization
+      // Note: archived status does not send SMS
       let smsMessage = '';
       if (status === 'approved') {
         smsMessage = "Hi {firstName} - We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nTo officially join, please complete the following:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nThe link expires in 24 hours, so please respond to this text with any questions.\n\nThank you.";
@@ -271,6 +292,7 @@ export default async function handler(req, res) {
       } else if (status === 'denied') {
         smsMessage = "Hi {firstName} - Thank you for your interest in Noir. After careful consideration, we are unable to extend an invitation at this time. We wish you the best in your future endeavors.";
       }
+      // archived status intentionally does not send SMS
 
       if (smsMessage) {
         // Prepare contact data for OpenPhone

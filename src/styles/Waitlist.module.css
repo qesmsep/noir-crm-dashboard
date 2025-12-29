@@ -266,6 +266,11 @@
   color: #ff3b30;
 }
 
+.statusArchived {
+  background: rgba(142, 142, 147, 0.1);
+  color: #8e8e93;
+}
+
 .entryDate {
   font-size: 12px;
   color: #86868b;
@@ -363,61 +368,90 @@
 /* Entry Actions */
 .entryActions {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 12px;
-  background: #f5f5f7;
-  border-top: 1px solid #d2d2d7;
+  background: #F7F6F2;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  justify-content: flex-end;
+  align-items: center;
 }
 
-.primaryButton,
-.secondaryButton {
-  flex: 1;
-  padding: 10px 16px;
+.iconButton {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(53, 53, 53, 0.08);
+  border: 1px solid rgba(53, 53, 53, 0.12);
   border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 
-.primaryButton {
-  background: #007aff;
-  color: white;
+.iconButtonIcon {
+  width: 18px;
+  height: 18px;
+  color: #353535;
 }
 
-.primaryButton:hover {
-  background: #0051d5;
-  transform: scale(1.02);
+@media (hover: hover) and (pointer: fine) {
+  .iconButton:hover {
+    background: #353535;
+    border-color: #353535;
+    transform: translateY(-1px);
+  }
+
+  .iconButton:hover .iconButtonIcon {
+    color: #F7F6F2;
+  }
 }
 
-.primaryButton:active {
-  transform: scale(0.98);
+.iconButton:active {
+  transform: translateY(0) scale(0.96);
 }
 
-.secondaryButton {
-  background: white;
-  color: #007aff;
-  border: 1px solid #d2d2d7;
+.archiveIconButton {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(142, 142, 147, 0.08);
+  border: 1px solid rgba(142, 142, 147, 0.15);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 
-.secondaryButton:hover {
-  background: #f5f5f7;
-  transform: scale(1.02);
+.archiveIconButton .iconButtonIcon {
+  color: #8e8e93;
 }
 
-.secondaryButton:active {
-  transform: scale(0.98);
+@media (hover: hover) and (pointer: fine) {
+  .archiveIconButton:hover {
+    background: #8e8e93;
+    border-color: #8e8e93;
+    transform: translateY(-1px);
+  }
+
+  .archiveIconButton:hover .iconButtonIcon {
+    color: #F7F6F2;
+  }
 }
 
-.secondaryButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.archiveIconButton:active {
+  transform: translateY(0) scale(0.96);
 }
 
 .buttonIcon {
@@ -633,23 +667,16 @@
   }
 
   .entryActions {
-    display: table-cell;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
     padding: 16px;
     vertical-align: middle;
     width: 20%;
     background: transparent;
     border: none;
-  }
-
-  .primaryButton,
-  .secondaryButton {
-    flex: initial;
-    padding: 8px 16px;
-    font-size: 13px;
-  }
-
-  .entryActions {
     justify-content: flex-end;
+    align-items: center;
   }
 
   /* Table Header */

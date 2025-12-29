@@ -128,6 +128,11 @@
   color: #ff3b30;
 }
 
+.statusArchived {
+  background: rgba(142, 142, 147, 0.1);
+  color: #8e8e93;
+}
+
 /* Body */
 .body {
   flex: 1;

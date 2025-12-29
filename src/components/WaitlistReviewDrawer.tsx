@@ -12,7 +12,7 @@ interface WaitlistEntry {
   referral?: string;
   visit_frequency?: string;
   go_to_drink?: string;
-  status: 'review' | 'approved' | 'denied' | 'waitlisted';
+  status: 'review' | 'approved' | 'denied' | 'waitlisted' | 'archived';
   submitted_at: string;
   reviewed_at?: string;
   review_notes?: string;
@@ -105,6 +105,7 @@ const WaitlistReviewDrawer: React.FC<WaitlistReviewDrawerProps> = ({
       case 'approved': return styles.statusApproved;
       case 'waitlisted': return styles.statusWaitlisted;
       case 'denied': return styles.statusDenied;
+      case 'archived': return styles.statusArchived;
       default: return '';
     }
   };
