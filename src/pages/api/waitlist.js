@@ -59,13 +59,15 @@ console.log('[WAITLIST API] Handler function defined');
 
 export default async function handler(req, res) {
   // CRITICAL: Log immediately when handler is called
-  console.log('[WAITLIST API] ========== HANDLER CALLED ==========');
-  console.log('[WAITLIST API] Handler invoked at:', new Date().toISOString());
-  console.log('[WAITLIST API] Request method:', req?.method);
-  console.log('[WAITLIST API] Request URL:', req?.url);
-  console.log('[WAITLIST API] Request query:', req?.query);
-  console.log('[WAITLIST API] Response object exists:', !!res);
-  console.log('[WAITLIST API] Response methods:', {
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  console.log(`[WAITLIST API] ========== HANDLER CALLED [${requestId}] ==========`);
+  console.log(`[WAITLIST API] Handler invoked at: ${new Date().toISOString()}`);
+  console.log(`[WAITLIST API] Request method: ${req?.method}`);
+  console.log(`[WAITLIST API] Request URL: ${req?.url}`);
+  console.log(`[WAITLIST API] Request query:`, JSON.stringify(req?.query));
+  console.log(`[WAITLIST API] Environment: ${process.env.NODE_ENV || 'unknown'}`);
+  console.log(`[WAITLIST API] Response object exists: ${!!res}`);
+  console.log(`[WAITLIST API] Response methods:`, {
     hasSetHeader: typeof res?.setHeader === 'function',
     hasStatus: typeof res?.status === 'function',
     hasJson: typeof res?.json === 'function'
@@ -317,29 +319,50 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   } catch (error) {
     // Catch any unhandled errors (like Supabase initialization failures)
-    console.error('[WAITLIST API] Unhandled error in handler:', error);
-    console.error('[WAITLIST API] Error type:', error.constructor?.name);
-    console.error('[WAITLIST API] Error message:', error.message);
-    console.error('[WAITLIST API] Error stack:', error.stack);
+    const errorId = `err-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.error(`[WAITLIST API] [${requestId}] Unhandled error [${errorId}]:`, error);
+    console.error(`[WAITLIST API] [${requestId}] Error type:`, error.constructor?.name);
+    console.error(`[WAITLIST API] [${requestId}] Error message:`, error.message);
+    console.error(`[WAITLIST API] [${requestId}] Error stack:`, error.stack);
+    console.error(`[WAITLIST API] [${requestId}] Error details:`, {
+      name: error.name,
+      code: error.code,
+      errno: error.errno,
+      syscall: error.syscall,
+      path: error.path
+    });
     
     // Try to send JSON response, but if that fails, we're in trouble
     try {
+      // Ensure Content-Type is set before sending response
+      if (res && typeof res.setHeader === 'function' && !res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+      }
+      
       return res.status(500).json({ 
         error: 'Internal server error',
         message: error.message || 'Unknown error',
         type: error.constructor?.name || 'Error',
+        errorId: errorId, // Include error ID for tracking in logs
         debug: process.env.NODE_ENV === 'development' ? {
           stack: error.stack,
-          name: error.name
+          name: error.name,
+          code: error.code,
+          errno: error.errno,
+          syscall: error.syscall,
+          path: error.path
         } : undefined
       });
     } catch (jsonError) {
-      console.error('[WAITLIST API] CRITICAL: Cannot send JSON error response:', jsonError);
+      console.error(`[WAITLIST API] [${requestId}] CRITICAL: Cannot send JSON error response:`, jsonError);
+      console.error(`[WAITLIST API] [${requestId}] JSON error stack:`, jsonError.stack);
       // Last resort - try to end the response
       try {
-        res.status(500).end();
+        if (res && !res.headersSent) {
+          res.status(500).end();
+        }
       } catch (e) {
-        console.error('[WAITLIST API] CRITICAL: Cannot end response:', e);
+        console.error(`[WAITLIST API] [${requestId}] CRITICAL: Cannot end response:`, e);
       }
     }
   }

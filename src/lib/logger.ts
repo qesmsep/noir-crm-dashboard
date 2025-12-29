@@ -1,4 +1,6 @@
 import winston from 'winston';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Centralized logging configuration using Winston
@@ -55,55 +57,84 @@ const format = winston.format.combine(
   })
 );
 
-// Define which transports to use based on environment
-const transports: winston.transport[] = [
-  // Always log errors to a separate file
-  new winston.transports.File({
-    filename: 'logs/error.log',
-    level: 'error',
-    maxsize: 5242880, // 5MB
-    maxFiles: 5,
-  }),
-  // Log all levels to combined file
-  new winston.transports.File({
-    filename: 'logs/combined.log',
-    maxsize: 5242880, // 5MB
-    maxFiles: 5,
-  }),
-];
-
-// In development, also log to console with colors
-if (process.env.NODE_ENV !== 'production') {
-  transports.push(
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize({ all: true }),
-        winston.format.printf((info) => {
-          const { timestamp, level, message, requestId, userId, ...meta } = info;
-
-          let log = `${timestamp} [${level}]`;
-
-          if (requestId) {
-            log += ` [ReqID: ${requestId}]`;
-          }
-
-          if (userId) {
-            log += ` [User: ${userId}]`;
-          }
-
-          log += `: ${message}`;
-
-          // Add metadata in development for easier debugging
-          if (Object.keys(meta).length > 0) {
-            log += `\n${JSON.stringify(meta, null, 2)}`;
-          }
-
-          return log;
-        })
-      ),
-    })
-  );
+// Helper function to safely create logs directory
+function ensureLogsDirectory(): boolean {
+  try {
+    const logsDir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    return true;
+  } catch (error) {
+    // In production/serverless environments (like Vercel), file system writes may not be allowed
+    // This is expected and we'll fall back to console-only logging
+    console.warn('[LOGGER] Cannot create logs directory, using console-only logging:', error instanceof Error ? error.message : String(error));
+    return false;
+  }
 }
+
+// Determine if we should use file transports
+// In production/serverless, skip file logging if directory creation fails
+const canUseFileLogging = process.env.NODE_ENV === 'development' || ensureLogsDirectory();
+
+// Define which transports to use based on environment
+const transports: winston.transport[] = [];
+
+// Only add file transports if we can create the directory
+if (canUseFileLogging) {
+  try {
+    transports.push(
+      // Always log errors to a separate file
+      new winston.transports.File({
+        filename: 'logs/error.log',
+        level: 'error',
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      }),
+      // Log all levels to combined file
+      new winston.transports.File({
+        filename: 'logs/combined.log',
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      })
+    );
+  } catch (error) {
+    console.warn('[LOGGER] Failed to create file transports, using console-only:', error instanceof Error ? error.message : String(error));
+  }
+}
+
+// Always add console transport (works in all environments)
+transports.push(
+  new winston.transports.Console({
+    format: winston.format.combine(
+      process.env.NODE_ENV !== 'production' 
+        ? winston.format.colorize({ all: true })
+        : winston.format.uncolorize(),
+      winston.format.printf((info) => {
+        const { timestamp, level, message, requestId, userId, ...meta } = info;
+
+        let log = `${timestamp} [${level}]`;
+
+        if (requestId) {
+          log += ` [ReqID: ${requestId}]`;
+        }
+
+        if (userId) {
+          log += ` [User: ${userId}]`;
+        }
+
+        log += `: ${message}`;
+
+        // Add metadata in development for easier debugging
+        if (Object.keys(meta).length > 0) {
+          log += `\n${JSON.stringify(meta, null, 2)}`;
+        }
+
+        return log;
+      })
+    ),
+  })
+);
 
 // Determine log level based on environment
 const level = () => {
@@ -112,15 +143,32 @@ const level = () => {
   return isDevelopment ? 'debug' : 'info';
 };
 
-// Create the logger instance
-export const logger = winston.createLogger({
-  level: level(),
-  levels,
-  format,
-  transports,
-  // Don't exit on errors
-  exitOnError: false,
-});
+// Create the logger instance with error handling
+let logger: winston.Logger;
+try {
+  logger = winston.createLogger({
+    level: level(),
+    levels,
+    format,
+    transports,
+    // Don't exit on errors
+    exitOnError: false,
+  });
+} catch (error) {
+  // Fallback to a simple console logger if Winston fails to initialize
+  console.error('[LOGGER] Failed to initialize Winston logger:', error instanceof Error ? error.message : String(error));
+  logger = winston.createLogger({
+    level: 'info',
+    levels,
+    format,
+    transports: [
+      new winston.transports.Console({
+        format: winston.format.simple(),
+      }),
+    ],
+    exitOnError: false,
+  });
+}
 
 /**
  * Structured logging helpers
