@@ -1320,73 +1320,61 @@ Thank you.`;
     console.log('End time (CST):', DateTime.fromISO(end_time, { zone: 'utc' }).setZone(DEFAULT_TIMEZONE).toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'));
     
     console.log('Party size:', parsed.party_size);
+    
+    // Send acknowledgment message to member (always send this, no follow-ups)
+    const confirmationMessage = `Thank you ${member.first_name} for your reservation request. It has been received and we will be back with you shortly to confirm. Please let us know if you have any questions. Thank you!`;
+    await sendSMS(from, confirmationMessage);
+    await clearConversation(from);
+    
+    // Check availability and create reservation if available (but don't send follow-up messages)
     console.log('=== AVAILABILITY CHECK ===');
     const availability = await checkComprehensiveAvailability(start_time, end_time, parsed.party_size);
     console.log('=== AVAILABILITY RESULT ===');
     console.log('Availability result:', availability);
 
-    // If unavailable but suggestion exists, prompt and store suggestion
-    let suggestedSlot = null;
-    // For this example, assume checkComprehensiveAvailability could return {available: false, message, suggestion}
-    if (!availability.available && availability.suggestion) {
-      suggestedSlot = availability.suggestion;
-    }
-    if (!availability.available && suggestedSlot) {
-      await saveConversation(from, { step: 'suggested', data: parsed, suggestion: suggestedSlot });
-      await sendSMS(from, `Sorry, ${availability.message} Would ${suggestedSlot.date} at ${suggestedSlot.time} work?`);
-      return res.status(200).end();
-    }
-    if (!availability.available) {
-      await sendSMS(from, availability.message);
-      return res.status(200).json({ message: 'Sent availability error message' });
-    }
+    // Only create reservation if available, but don't send any messages about availability
+    if (availability.available) {
+      const reservationResult = await createReservation(
+        member,
+        start_time,
+        end_time,
+        parsed.party_size,
+        availability.table.id
+      );
 
-    const reservationResult = await createReservation(
-      member,
-      start_time,
-      end_time,
-      parsed.party_size,
-      availability.table.id
-    );
+      if (reservationResult.success) {
+        // Send notification to 6199713730 for SMS reservation
+        console.log('=== SENDING SMS RESERVATION NOTIFICATION TO 6199713730 ===');
+        try {
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://noir-crm-dashboard.vercel.app';
+          const notificationResponse = await fetch(`${siteUrl}/api/reservation-notifications`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              reservation_id: reservationResult.reservation.id,
+              action: 'created'
+            })
+          });
 
-    if (!reservationResult.success) {
-      const errorMessage = `Sorry, we encountered an error creating your reservation. Please contact us directly.`;
-      await sendSMS(from, errorMessage);
-      return res.status(200).json({ message: 'Sent reservation creation error message' });
-    }
+          if (!notificationResponse.ok) {
+            console.error('Failed to send SMS reservation notification to 6199713730:', await notificationResponse.text());
+          } else {
+            console.log('SMS reservation notification sent successfully to 6199713730');
+          }
+        } catch (error) {
+          console.error('Error sending SMS reservation notification to 6199713730:', error);
+        }
 
-    // Send acknowledgment message to member
-    const confirmationMessage = `Thank you ${member.first_name} for your reservation request. It has been received and we will be back with you shortly to confirm. Please let us know if you have any questions. Thank you!`;
-
-    await clearConversation(from);
-    await sendSMS(from, confirmationMessage);
-
-    // Send notification to 6199713730 for SMS reservation
-    console.log('=== SENDING SMS RESERVATION NOTIFICATION TO 6199713730 ===');
-    try {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://noir-crm-dashboard.vercel.app';
-      const notificationResponse = await fetch(`${siteUrl}/api/reservation-notifications`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reservation_id: reservationResult.reservation.id,
-          action: 'created'
-        })
-      });
-
-      if (!notificationResponse.ok) {
-        console.error('Failed to send SMS reservation notification to 6199713730:', await notificationResponse.text());
+        console.log('Reservation created successfully:', reservationResult.reservation);
       } else {
-        console.log('SMS reservation notification sent successfully to 6199713730');
+        console.error('Failed to create reservation:', reservationResult);
       }
-    } catch (error) {
-      console.error('Error sending SMS reservation notification to 6199713730:', error);
-      // Don't fail the SMS reservation if notification fails
+    } else {
+      console.log('Reservation request received but not available - no follow-up message sent');
     }
 
-    console.log('Reservation created successfully:', reservationResult.reservation);
     return res.status(200).json({ message: 'Reservation processed successfully' });
 
   } catch (error) {

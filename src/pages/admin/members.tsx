@@ -414,11 +414,20 @@ export default function MembersAdmin() {
   return (
     <AdminLayout>
       <div className={styles.container}>
-        {/* Header with Search and Add Button */}
+        {/* Header with Title, Search, and Buttons */}
         <div className={styles.header}>
           <div className={styles.headerTitle}>
             <h1 className={styles.pageTitle}>Members</h1>
             <span className={styles.memberCount}>{members.length} {members.length === 1 ? 'member' : 'members'}</span>
+          </div>
+          <div className={styles.searchContainer}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search by name, email, or phone..."
+              value={lookupQuery}
+              onChange={(e) => setLookupQuery(e.target.value)}
+            />
           </div>
           <div className={styles.headerButtons}>
             <button
@@ -444,17 +453,6 @@ export default function MembersAdmin() {
               </svg>
             </button>
           </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className={styles.searchContainer}>
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Search by name, email, or phone..."
-            value={lookupQuery}
-            onChange={(e) => setLookupQuery(e.target.value)}
-          />
         </div>
 
         {/* Members Table */}
