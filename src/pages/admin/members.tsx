@@ -39,8 +39,20 @@ export default function MembersAdmin() {
   const [lookupQuery, setLookupQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [sortField, setSortField] = useState<SortField>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortField, setSortField] = useState<SortField>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('membersSortField');
+      return (saved === 'name' || saved === 'join_date' || saved === 'renewal_date' || saved === 'ltv') ? saved : null;
+    }
+    return null;
+  });
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('membersSortDirection');
+      return (saved === 'asc' || saved === 'desc') ? saved : 'desc';
+    }
+    return 'desc';
+  });
   const [isBulkMessageModalOpen, setIsBulkMessageModalOpen] = useState(false);
   const [bulkMessageContent, setBulkMessageContent] = useState('');
   const [sendingBulkMessage, setSendingBulkMessage] = useState(false);
@@ -194,11 +206,20 @@ export default function MembersAdmin() {
 
   // Handle sorting
   const handleSort = (field: SortField) => {
+    let newDirection: SortDirection;
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
-      setSortField(field);
-      setSortDirection('asc');
+      newDirection = 'asc';
+    }
+    
+    setSortField(field);
+    setSortDirection(newDirection);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('membersSortField', field || '');
+      localStorage.setItem('membersSortDirection', newDirection);
     }
   };
 
@@ -466,7 +487,7 @@ export default function MembersAdmin() {
               <thead>
                 <tr>
                   <th 
-                    className={`${styles.sortableHeader} ${sortField === 'name' ? styles.activeSort : ''}`}
+                    className={`${styles.sortableHeader} ${styles.nameColumnHeader} ${sortField === 'name' ? styles.activeSort : ''}`}
                     onClick={() => handleSort('name')}
                   >
                     Member 1
@@ -476,7 +497,7 @@ export default function MembersAdmin() {
                       </span>
                     )}
                   </th>
-                  <th className={styles.headerCell}>Member 2</th>
+                  <th className={`${styles.headerCell} ${styles.nameColumnHeader}`}>Member 2</th>
                   <th 
                     className={`${styles.sortableHeader} ${styles.thinColumn} ${sortField === 'join_date' ? styles.activeSort : ''}`}
                     onClick={() => handleSort('join_date')}
@@ -533,11 +554,12 @@ export default function MembersAdmin() {
                                 <Image
                                   src={member1.photo}
                                   alt={`${member1.first_name} ${member1.last_name}`}
-                                  width={96}
-                                  height={96}
+                                  width={64}
+                                  height={64}
                                   style={{
                                     objectFit: 'cover',
-                                    borderRadius: '50%'
+                                    objectPosition: 'center',
+                                    borderRadius: '8px'
                                   }}
                                   loading="lazy"
                                 />
@@ -576,11 +598,12 @@ export default function MembersAdmin() {
                                 <Image
                                   src={member2.photo}
                                   alt={`${member2.first_name} ${member2.last_name}`}
-                                  width={96}
-                                  height={96}
+                                  width={64}
+                                  height={64}
                                   style={{
                                     objectFit: 'cover',
-                                    borderRadius: '50%'
+                                    objectPosition: 'center',
+                                    borderRadius: '8px'
                                   }}
                                   loading="lazy"
                                 />
