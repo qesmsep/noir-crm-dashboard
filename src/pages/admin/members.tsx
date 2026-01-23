@@ -482,8 +482,116 @@ export default function MembersAdmin() {
             No members found
           </div>
         ) : (
-          <div className={styles.tableContainer}>
-            <table className={styles.membersTable}>
+          <>
+            <div className={styles.mobileList}>
+              {sortedAccounts.map((account) => {
+                const sortedMembers = account.allMembers.sort((a, b) => a.primary === b.primary ? 0 : a.primary ? -1 : 1);
+                const member1 = sortedMembers[0];
+                const member2 = sortedMembers[1] || null;
+
+                return (
+                  <div
+                    key={account.account_id}
+                    className={styles.mobileCard}
+                    onClick={() => router.push(`/admin/members/${account.account_id}`)}
+                  >
+                    <div className={styles.mobileCardHeader}>
+                      <div className={styles.mobileMemberRow}>
+                        {member1?.photo ? (
+                          <div className={styles.mobileAvatar}>
+                            <Image
+                              src={member1.photo}
+                              alt={`${member1.first_name} ${member1.last_name}`}
+                              width={48}
+                              height={48}
+                              style={{ objectFit: 'cover', borderRadius: '10px' }}
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <div className={styles.mobileAvatarPlaceholder}>
+                            {member1?.first_name?.[0]}{member1?.last_name?.[0]}
+                          </div>
+                        )}
+                        <div className={styles.mobileMemberInfo}>
+                          <div className={styles.mobileMemberName}>
+                            {member1?.first_name} {member1?.last_name}
+                            {member1?.primary && (
+                              <span className={styles.mobilePrimaryBadge}>Primary</span>
+                            )}
+                          </div>
+                          <div className={styles.mobileContactLine}>
+                            {member1?.email || '—'}
+                          </div>
+                          <div className={styles.mobileContactLine}>
+                            {member1?.phone ? formatPhone(member1.phone) : '—'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={styles.mobileLtv}>
+                        {formatCurrency(account.ltv)}
+                      </div>
+                    </div>
+
+                    {member2 && (
+                      <div className={styles.mobileSecondaryRow}>
+                        {member2.photo ? (
+                          <div className={styles.mobileAvatarSmall}>
+                            <Image
+                              src={member2.photo}
+                              alt={`${member2.first_name} ${member2.last_name}`}
+                              width={36}
+                              height={36}
+                              style={{ objectFit: 'cover', borderRadius: '8px' }}
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <div className={styles.mobileAvatarSmallPlaceholder}>
+                            {member2.first_name?.[0]}{member2.last_name?.[0]}
+                          </div>
+                        )}
+                        <div className={styles.mobileSecondaryInfo}>
+                          <div className={styles.mobileSecondaryName}>
+                            {member2.first_name} {member2.last_name}
+                          </div>
+                          <div className={styles.mobileSecondaryMeta}>
+                            {member2.email || member2.phone ? (
+                              <>
+                                {member2.email && <span>{member2.email}</span>}
+                                {member2.phone && <span>{formatPhone(member2.phone)}</span>}
+                              </>
+                            ) : (
+                              <span>—</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles.mobileMetaRow}>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>Sign Up</span>
+                        <span className={styles.mobileMetaValue}>{formatDateShort(account.join_date)}</span>
+                      </div>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>Renewal</span>
+                        <span className={styles.mobileMetaValue}>
+                          {account.renewal_date ? formatDateShort(account.renewal_date.toISOString()) : 'N/A'}
+                        </span>
+                      </div>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>LTV</span>
+                        <span className={styles.mobileMetaValue}>{formatCurrency(account.ltv)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className={styles.tableContainer}>
+              <table className={styles.membersTable}>
               <thead>
                 <tr>
                   <th 
@@ -650,6 +758,7 @@ export default function MembersAdmin() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

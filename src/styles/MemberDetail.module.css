@@ -1167,6 +1167,42 @@
   }
 }
 
+/* Mobile readability tweaks */
+@media (max-width: 640px) {
+  .memberHeader {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .memberPhoto,
+  .photoPlaceholder {
+    width: 96px;
+    height: 96px;
+  }
+
+  .memberInfo {
+    width: 100%;
+    align-items: center;
+  }
+
+  .memberName {
+    justify-content: center;
+  }
+
+  .contactInfoInline {
+    align-items: center;
+  }
+
+  .detailRow,
+  .detailRowWithAction {
+    justify-content: center;
+    flex-wrap: wrap;
+    text-align: center;
+  }
+}
+
 /* Desktop: 3 equal columns layout */
 @media (min-width: 1024px) {
   .container {
