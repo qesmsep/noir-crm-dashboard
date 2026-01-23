@@ -457,31 +457,6 @@ export default function Home() {
               <div className="text-xs text-[#BCA892] italic mt-auto">Add to existing membership</div>
             </div>
             
-            {/* Daytime Access Upgrade */}
-            <div className="bg-[#353535] rounded-2xl shadow-xl p-4 sm:p-6 flex flex-col items-center border border-[#3A362F] min-h-[140px] sm:min-h-[160px] relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-[#BCA892] text-[#23201C] px-2 sm:px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                UPGRADE
-              </div>
-              <h4 className="font-serif text-lg sm:text-xl text-[#ECEDE8] mb-2 mt-2" 
-                  style={{ 
-                    fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.08em', 
-                    fontWeight: 600 
-                  }}>
-                Coming soon
-              </h4>
-              <div className="text-xl sm:text-2xl text-[#BCA892] font-semibold mb-3">
-                +$500<span className="text-sm sm:text-base font-normal">/mo</span>
-              </div>
-              <ul className="text-[#ECEDE8] text-xs sm:text-sm mb-4 space-y-1 text-center">
-                <li>Access Mon–Friday 10am–5pm</li>
-                <li className="text-blur">Quiet workspace, meeting & entertainment environment</li>
-                <li className="text-blur">Priority booking for daytime hours</li>
-                <li className="text-blur">Based on approval</li>
-              </ul>
-              <div className="text-xs text-[#BCA892] italic mt-auto">Must be a member for consideration.</div>
-            </div>
           </div>
         </div>
         <div className="w-full flex justify-center mt-8 sm:mt-10 px-4">
@@ -500,7 +475,7 @@ export default function Home() {
             }}
             aria-label="Text MEMBERSHIP to 913.777.4488 for membership information"
           >
-            Text MEMBERSHIP to 913.777.4488 for more information
+            Text MEMBERSHIP to 913.777.4488 to get access
           </button>
         </div>
       </section>
@@ -545,7 +520,7 @@ export default function Home() {
               <div><span className="font-semibold">Venue Rental:</span> $500/hr</div>
               <div><span className="font-semibold">Beverage Minimum:</span> $500/hr + sales tax</div>
               <div><span className="font-semibold">Outside catering allowed</span></div>
-              <div><span className="font-semibold">*</span> as of January 1, 2026 only members will be allowed to secure Noir for private events</div>
+              <div><span className="font-semibold">*</span> private events are reserved for members</div>
             </div>
             <a 
               href="sms:9137774488?body=Hi%2C%20I%20am%20interested%20in%20booking%20a%20private%20event%20at%20Noir.%20Can%20you%20share%20availability%3F" 
