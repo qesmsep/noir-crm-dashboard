@@ -50,16 +50,16 @@ export default function MembershipPopup({ initialDelayMs = 5000, reappearDays = 
           <img src="/images/noir-wedding-day.png" alt="Noir KC" className={styles.logo} />
         </div>
         <h2 id="membership-popup-title" className={styles.headline}>
-          <span className={styles.accent}>Exclusive Access</span> is coming
+          <span className={styles.accent}>Exclusive Access</span> is HERE.
         </h2>
         <div className={styles.subline}>
-          Noir will be exclusively for Members on <strong>January 1, 2026</strong> — or once membership capacity is reached.
+          Noir is now exclusively for Members — access is granted while membership capacity remains.
         </div>
         <div className={styles.body}>
           <p className={styles.keyline}>
             <span className={styles.highlight}>Limited memberships available.</span>
           </p>
-          <p className={styles.infoLine}>For more information or to ask questions:</p>
+          <p className={styles.infoLine}>To get access or ask questions:</p>
           <p className={styles.ctaLine}>
             Text <strong>MEMBERSHIP</strong> to <a href="sms:9137774488?body=MEMBERSHIP" className={styles.link} aria-label="Text MEMBERSHIP to 913.777.4488">913.777.4488</a>
           </p>
