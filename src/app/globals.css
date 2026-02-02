@@ -1197,11 +1197,8 @@ header.topNav,
 [class*="fc-sticky"],
 [class*="fc-scroller"],
 [class*="fc-timeline"],
-[class*="fc-timeline"] *,
-[class*="fc-resource"],
-[class*="fc-event"] {
+[class*="fc-resource"] {
   z-index: 1 !important;
-  position: relative !important;
 }
 
 .fc *,

@@ -6,6 +6,16 @@ import Image from 'next/image';
 import { useAuth } from '../../lib/auth-context';
 import { debugLog } from '../../utils/debugLogger';
 import styles from '../../styles/AdminLayout.module.css';
+import {
+  BarChart3,
+  CalendarDays,
+  Users,
+  Clock,
+  Calendar,
+  Home,
+  UserCircle,
+  Settings
+} from 'lucide-react';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -130,13 +140,14 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
   }
 
   const navItems = [
-    { href: '/admin/dashboard-v2', label: 'Dashboard', icon: '📊' },
-    { href: '/admin/reservations', label: 'Reservations', icon: '📋' },
-    { href: '/admin/members', label: 'Members', icon: '👥' },
-    { href: '/admin/waitlist', label: 'Waitlist', icon: '🧭' },
-    { href: '/admin/event-calendar', label: 'Events', icon: '🎯' },
-    { href: '/admin/homepage', label: 'HomePage', icon: '🏠' },
-    { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
+    { href: '/admin/dashboard-v2', label: 'Dashboard', icon: BarChart3 },
+    { href: '/admin/reservations', label: 'Reservations', icon: CalendarDays },
+    { href: '/admin/members', label: 'Members', icon: Users },
+    { href: '/admin/waitlist', label: 'Waitlist', icon: Clock },
+    { href: '/admin/event-calendar', label: 'Events', icon: Calendar },
+    { href: '/admin/homepage', label: 'HomePage', icon: Home },
+    { href: '/member/login', label: 'Member Portal', icon: UserCircle },
+    { href: '/admin/settings', label: 'Settings', icon: Settings },
   ];
 
   const initials = user?.email?.[0]?.toUpperCase() || 'N';
@@ -158,31 +169,34 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
         </div>
 
         <nav className={styles.navIcons}>
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`${styles.navIconButton} ${pathname === item.href ? styles.navIconButtonActive : ''}`}
-              title={item.label}
-              onClick={(e) => {
-                debugLog.nav('ADMIN LAYOUT', 'Link clicked', { 
-                  href: item.href, 
-                  pathname, 
-                  isNavigating, 
-                  loading, 
-                  user: !!user 
-                });
-                // Ensure body scroll is unlocked before navigation
-                if (typeof document !== 'undefined') {
-                  document.body.style.overflow = '';
-                  document.body.style.pointerEvents = '';
-                }
-              }}
-            >
-              <span className={styles.navIcon}>{item.icon}</span>
-              <span className={styles.navLabel}>{item.label}</span>
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`${styles.navIconButton} ${pathname === item.href ? styles.navIconButtonActive : ''}`}
+                title={item.label}
+                onClick={(e) => {
+                  debugLog.nav('ADMIN LAYOUT', 'Link clicked', {
+                    href: item.href,
+                    pathname,
+                    isNavigating,
+                    loading,
+                    user: !!user
+                  });
+                  // Ensure body scroll is unlocked before navigation
+                  if (typeof document !== 'undefined') {
+                    document.body.style.overflow = '';
+                    document.body.style.pointerEvents = '';
+                  }
+                }}
+              >
+                <IconComponent className={styles.navIcon} size={18} strokeWidth={2} />
+                <span className={styles.navLabel}>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </header>
 

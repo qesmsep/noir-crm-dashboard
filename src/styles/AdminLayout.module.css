@@ -54,10 +54,10 @@
 .navIcons {
   flex: 1;
   display: flex;
-  justify-content: center;
-  gap: 0.4rem;
+  justify-content: space-between;
+  gap: 0.5rem;
   overflow-x: auto;
-  padding: 0 1rem;
+  padding: 0 0.5rem;
 }
 
 .navIconButton {
@@ -65,9 +65,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  min-width: 48px;
-  height: 44px;
+  flex: 1;
+  max-width: 90px;
+  min-width: 60px;
+  height: 52px;
   border-radius: 10px;
   border: 1px solid transparent;
   background: #F7F6F2;
@@ -75,7 +76,7 @@
   text-decoration: none;
   font-size: 0.6rem;
   font-weight: 600;
-  gap: 0.08rem;
+  gap: 0.15rem;
   transition: all 0.2s ease;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
 }
@@ -91,7 +92,9 @@
 }
 
 .navIcon {
-  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .navLabel {
@@ -218,11 +221,11 @@
     flex: 1;
     min-width: 0;
     gap: 0.25rem;
-    padding: 0;
+    padding: 0 0.25rem;
     display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    overflow-x: visible;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     overflow-y: visible;
   }
 
@@ -231,19 +234,21 @@
   }
 
   .navIconButton {
-    width: calc((100% - 1.5rem) / 6);
-    min-width: 0;
-    max-width: 48px;
-    height: 40px;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 42px;
+    max-width: 54px;
+    height: 42px;
     border-radius: 8px;
-    gap: 0.05rem;
-    flex-shrink: 1;
-    flex-grow: 0;
-    padding: 0.25rem 0.1rem;
+    gap: 0.1rem;
+    flex-shrink: 0;
+    flex-grow: 1;
+    padding: 0.3rem 0.15rem;
   }
 
   .navIcon {
-    font-size: 0.85rem;
+    width: 16px;
+    height: 16px;
   }
 
   .navLabel {
@@ -288,19 +293,24 @@
 
   .navIcons {
     gap: 0.2rem;
+    padding: 0 0.2rem;
   }
 
   .navIconButton {
-    width: calc((100% - 1.2rem) / 6);
-    min-width: 0;
-    max-width: 42px;
-    height: 36px;
-    gap: 0.03rem;
-    padding: 0.2rem 0.05rem;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 38px;
+    max-width: 48px;
+    height: 38px;
+    gap: 0.08rem;
+    flex-shrink: 0;
+    flex-grow: 1;
+    padding: 0.25rem 0.1rem;
   }
 
   .navIcon {
-    font-size: 0.8rem;
+    width: 14px;
+    height: 14px;
   }
 
   .navLabel {
