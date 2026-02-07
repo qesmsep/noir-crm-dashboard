@@ -3,33 +3,48 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 import Link from 'next/link';
 import styles from '../../styles/DashboardV2.module.css';
+import { UserPlus, PartyPopper, Users, Calendar, CloudSnow, CalendarDays, DollarSign, Loader2, Cake, RefreshCw } from 'lucide-react';
 
-interface ChartLineProps {
-  data: number[];
-  stroke: string;
+interface LineChartProps {
+  datasets: {
+    data: number[];
+    stroke: string;
+    strokeWidth?: number;
+    opacity?: number;
+  }[];
 }
 
-const ChartLine = ({ data, stroke }: ChartLineProps) => {
-  if (!data.length) return null;
-  const maxValue = Math.max(...data, 1);
-  const minValue = Math.min(...data, 0);
+const LineChart = ({ datasets }: LineChartProps) => {
+  if (!datasets.length || !datasets[0].data.length) return null;
+
+  // Find global min/max across all datasets
+  const allValues = datasets.flatMap(d => d.data);
+  const maxValue = Math.max(...allValues, 1);
+  const minValue = Math.min(...allValues, 0);
   const normalizedMax = maxValue === minValue ? maxValue + 1 : maxValue;
-  const points = data.map((value, index) => {
-    const x = (index / (data.length - 1)) * 100;
-    const y = 100 - ((value - minValue) / (normalizedMax - minValue)) * 100;
-    return `${x},${y}`;
-  }).join(' ');
+
+  const createPoints = (data: number[]) => {
+    return data.map((value, index) => {
+      const x = (index / (data.length - 1)) * 100;
+      const y = 100 - ((value - minValue) / (normalizedMax - minValue)) * 100;
+      return `${x},${y}`;
+    }).join(' ');
+  };
 
   return (
     <svg viewBox="0 0 100 100" className={styles.miniChartSvg} preserveAspectRatio="none">
-      <polyline
-        fill="none"
-        stroke={stroke}
-        strokeWidth="2.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        points={points}
-      />
+      {datasets.map((dataset, idx) => (
+        <polyline
+          key={idx}
+          fill="none"
+          stroke={dataset.stroke}
+          strokeWidth={dataset.strokeWidth || 2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          points={createPoints(dataset.data)}
+          opacity={dataset.opacity || 1}
+        />
+      ))}
     </svg>
   );
 };
@@ -298,8 +313,19 @@ export default function DashboardV2() {
   if (stats.loading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-[#353535]">Loading...</div>
+        <div className={styles.dashboardContainer}>
+          <div className={styles.searchActionsRow}>
+            <div className={styles.skeletonText} style={{ height: '48px' }}></div>
+          </div>
+          <div className={styles.primaryHighlights}>
+            <div className={styles.skeletonCard}></div>
+            <div className={styles.skeletonCard}></div>
+            <div className={styles.skeletonCard}></div>
+          </div>
+          <div className={styles.focusGrid}>
+            <div className={styles.skeletonCard} style={{ height: '240px' }}></div>
+            <div className={styles.skeletonCard} style={{ height: '240px' }}></div>
+          </div>
         </div>
       </AdminLayout>
     );
@@ -400,10 +426,10 @@ export default function DashboardV2() {
   const saturdayPrivateEvent = getPrivateEventForDay(nextSaturday);
 
   const quickActions = [
-    { icon: '➕', label: 'New Lead', href: '/admin/waitlist' },
-    { icon: '🎉', label: 'Add Event', href: '/admin/calendar' },
-    { icon: '👤', label: 'Add Contact', href: '/admin/members' },
-    { icon: '📅', label: 'Add Meeting', href: '/admin/calendar' },
+    { icon: UserPlus, label: 'New Lead', href: '/admin/waitlist' },
+    { icon: PartyPopper, label: 'Add Event', href: '/admin/calendar' },
+    { icon: Users, label: 'Add Contact', href: '/admin/members' },
+    { icon: Calendar, label: 'Add Meeting', href: '/admin/calendar' },
   ];
 
   const weatherSnapshot = {
@@ -435,12 +461,24 @@ export default function DashboardV2() {
     })
     .filter(item => item.date >= today)
     .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .slice(0, 3);
+    .slice(0, 5);
 
-  const upcomingPaymentsList = membersWithRenewal.slice(0, 3).map(member => ({
+  const upcomingPaymentsList = membersWithRenewal.slice(0, 5).map(member => ({
     id: member.member_id,
     label: `${member.first_name} ${member.last_name}`,
     amount: member.monthly_dues || 0,
+    date: member.nextRenewal as Date,
+  }));
+
+  const upcomingBirthdaysList = membersWithBirthday.slice(0, 5).map(member => ({
+    id: member.member_id,
+    label: `${member.first_name} ${member.last_name}`,
+    date: member.nextBirthday as Date,
+  }));
+
+  const upcomingRenewalsList = membersWithRenewal.slice(0, 5).map(member => ({
+    id: member.member_id,
+    label: `${member.first_name} ${member.last_name}`,
     date: member.nextRenewal as Date,
   }));
 
@@ -490,12 +528,15 @@ export default function DashboardV2() {
             />
           </div>
           <div className={styles.actionButtonsRow}>
-            {quickActions.map(action => (
-              <Link key={action.label} href={action.href} className={styles.actionButton}>
-                <span>{action.icon}</span>
-                {action.label}
-              </Link>
-            ))}
+            {quickActions.map(action => {
+              const IconComponent = action.icon;
+              return (
+                <Link key={action.label} href={action.href} className={styles.actionButton}>
+                  <IconComponent size={16} />
+                  {action.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
@@ -506,7 +547,7 @@ export default function DashboardV2() {
                 <div className={styles.weatherTemp}>{weatherSnapshot.temperature}</div>
                 <div style={{ color: '#6e6e73', fontWeight: 600 }}>{weatherSnapshot.condition}</div>
               </div>
-              <div style={{ fontSize: '2rem' }}>🌨</div>
+              <CloudSnow size={48} color="#A59480" strokeWidth={1.5} />
             </div>
             <div className={styles.weatherMeta}>
               <span>Precip {weatherSnapshot.precipitation}</span>
@@ -553,7 +594,7 @@ export default function DashboardV2() {
                 <button className={styles.toggleButton}>Cash</button>
               </div>
             </div>
-            <div className={styles.metricValueLarge} style={{ color: '#0c5ca8' }}>
+            <div className={styles.metricValueLarge}>
               ${stats.financialMetrics?.julyRevenue?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || Math.abs(purchases).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </div>
             <div className={styles.metricStatRow}>
@@ -571,7 +612,15 @@ export default function DashboardV2() {
           <div className={styles.listCard}>
             <h3 className={styles.listCardTitle}>Upcoming Events</h3>
             {upcomingEventsList.length === 0 ? (
-              <div className={styles.emptyState}>No upcoming events this week.</div>
+              <div className={styles.emptyStateEnhanced}>
+                <CalendarDays className={styles.emptyIcon} />
+                <h4 className={styles.emptyTitle}>No upcoming events</h4>
+                <p className={styles.emptyText}>Your calendar is clear this week</p>
+                <Link href="/admin/calendar" className={styles.emptyAction}>
+                  <Calendar size={16} />
+                  Schedule an Event
+                </Link>
+              </div>
             ) : (
               <div className={styles.listContent}>
                 {upcomingEventsList.map(event => (
@@ -589,14 +638,62 @@ export default function DashboardV2() {
           <div className={styles.listCard}>
             <h3 className={styles.listCardTitle}>Upcoming Payments</h3>
             {upcomingPaymentsList.length === 0 ? (
-              <div className={styles.emptyState}>No scheduled payments.</div>
+              <div className={styles.emptyStateEnhanced}>
+                <DollarSign className={styles.emptyIcon} />
+                <h4 className={styles.emptyTitle}>No scheduled payments</h4>
+                <p className={styles.emptyText}>All payments are up to date</p>
+              </div>
             ) : (
               <div className={styles.listContent}>
                 {upcomingPaymentsList.map(payment => (
                   <Link key={payment.id} href={`/admin/members/${payment.id}`} className={styles.listItemLink}>
                     <div className={styles.listItemHeader}>{payment.label}</div>
                     <div className={styles.listItemText}>
-                      {payment.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — <span style={{ color: '#C45252', fontWeight: 600 }}>${payment.amount.toFixed(2)}</span>
+                      {payment.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — <span style={{ color: '#8B4A4A', fontWeight: 600 }}>${payment.amount.toFixed(2)}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.listCard}>
+            <h3 className={styles.listCardTitle}>Upcoming Birthdays</h3>
+            {upcomingBirthdaysList.length === 0 ? (
+              <div className={styles.emptyStateEnhanced}>
+                <Cake className={styles.emptyIcon} />
+                <h4 className={styles.emptyTitle}>No birthdays this month</h4>
+                <p className={styles.emptyText}>Check back next month</p>
+              </div>
+            ) : (
+              <div className={styles.listContent}>
+                {upcomingBirthdaysList.map(member => (
+                  <Link key={member.id} href={`/admin/members/${member.id}`} className={styles.listItemLink}>
+                    <div className={styles.listItemHeader}>{member.label}</div>
+                    <div className={styles.listItemText}>
+                      {member.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.listCard}>
+            <h3 className={styles.listCardTitle}>Upcoming Renewals</h3>
+            {upcomingRenewalsList.length === 0 ? (
+              <div className={styles.emptyStateEnhanced}>
+                <RefreshCw className={styles.emptyIcon} />
+                <h4 className={styles.emptyTitle}>No renewals this month</h4>
+                <p className={styles.emptyText}>All memberships are current</p>
+              </div>
+            ) : (
+              <div className={styles.listContent}>
+                {upcomingRenewalsList.map(renewal => (
+                  <Link key={renewal.id} href={`/admin/members/${renewal.id}`} className={styles.listItemLink}>
+                    <div className={styles.listItemHeader}>{renewal.label}</div>
+                    <div className={styles.listItemText}>
+                      {renewal.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </div>
                   </Link>
                 ))}
@@ -615,14 +712,25 @@ export default function DashboardV2() {
             </div>
             <div className={styles.chartLegend}>
               <div className={styles.chartLegendItem}>
-                <span className={styles.legendDot} style={{ background: '#1a4b2e' }}></span> Total
+                <span className={styles.legendDot} style={{ background: '#A59480' }}></span> Total Revenue
               </div>
               <div className={styles.chartLegendItem}>
-                <span className={styles.legendDot} style={{ background: '#5b6aa8' }}></span> Noir
+                <span className={styles.legendDot} style={{ background: '#8C7C6D' }}></span> Membership Revenue
               </div>
             </div>
-            <ChartLine data={monthlyRevenueSeries} stroke="#1a4b2e" />
-            <ChartLine data={membershipSeries} stroke="#5b6aa8" />
+            <div className={styles.chartContainer}>
+              <LineChart
+                datasets={[
+                  { data: monthlyRevenueSeries, stroke: '#A59480', strokeWidth: 2.5, opacity: 1 },
+                  { data: membershipSeries, stroke: '#8C7C6D', strokeWidth: 2, opacity: 0.75 }
+                ]}
+              />
+              <div className={styles.chartLabels}>
+                {monthLabels.map((label, idx) => (
+                  idx % 2 === 0 || monthLabels.length <= 6 ? <span key={idx}>{label}</span> : <span key={idx}></span>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className={styles.chartCard}>
@@ -630,7 +738,7 @@ export default function DashboardV2() {
               <span>Revenue Progress</span>
               <span style={{ fontSize: '0.8rem' }}>{now.getFullYear()}</span>
             </div>
-            <div className={styles.metricValueLarge} style={{ color: '#1a4b2e' }}>
+            <div className={styles.metricValueLarge}>
               ${ytdRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </div>
             <div className={styles.metricSubtitle}>

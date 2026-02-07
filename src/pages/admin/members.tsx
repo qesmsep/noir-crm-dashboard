@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import React from "react";
-import { Spinner, useToast } from "@chakra-ui/react";
+import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/hooks/useToast";
 import { useRouter } from "next/router";
 import Image from "next/image";
 import { getSupabaseClient } from "../api/supabaseClient";
@@ -61,7 +62,7 @@ export default function MembersAdmin() {
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(true);
   const router = useRouter();
-  const toast = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchMembers();
@@ -298,7 +299,6 @@ export default function MembersAdmin() {
         description: "Please enter a message",
         status: "error",
         duration: 3000,
-        isClosable: true,
       });
       return;
     }
@@ -309,7 +309,6 @@ export default function MembersAdmin() {
         description: "Please select at least one member",
         status: "error",
         duration: 3000,
-        isClosable: true,
       });
       return;
     }
@@ -352,7 +351,6 @@ export default function MembersAdmin() {
         description: `Sent to ${result.sent} members${result.failed > 0 ? `, ${result.failed} failed` : ''}`,
         status: "success",
         duration: 5000,
-        isClosable: true,
       });
     } catch (error: any) {
       console.error('Error sending bulk message:', error);
@@ -361,7 +359,6 @@ export default function MembersAdmin() {
         description: error.message || "Failed to send bulk message",
         status: "error",
         duration: 5000,
-        isClosable: true,
       });
     } finally {
       setSendingBulkMessage(false);
@@ -391,7 +388,6 @@ export default function MembersAdmin() {
         description: "Member created successfully",
         status: "success",
         duration: 3000,
-        isClosable: true,
       });
 
       setIsAddModalOpen(false);
@@ -402,7 +398,6 @@ export default function MembersAdmin() {
         description: error.message || "Failed to create member",
         status: "error",
         duration: 5000,
-        isClosable: true,
       });
     } finally {
       setSaving(false);
@@ -414,7 +409,7 @@ export default function MembersAdmin() {
     return (
       <AdminLayout>
         <div className={styles.loading}>
-          <Spinner size="xl" color="#007aff" />
+          <Spinner size="xl" />
         </div>
       </AdminLayout>
     );
@@ -930,7 +925,7 @@ export default function MembersAdmin() {
                       >
                         {sendingBulkMessage ? (
                           <>
-                            <Spinner size="sm" mr={2} />
+                            <Spinner size="sm" className="mr-2" />
                             Sending...
                           </>
                         ) : (

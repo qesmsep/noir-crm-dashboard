@@ -1,28 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  Button,
-  VStack,
-  HStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Textarea,
-  Text,
-  Grid,
-  GridItem,
-  Checkbox,
-  useToast,
-  Box,
-} from '@chakra-ui/react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/useToast';
 import { localInputToUTC } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
 
@@ -79,7 +61,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
   const [tables, setTables] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const toast = useToast();
+  const { toast } = useToast();
   const { settings } = useSettings();
   const timezone = settings?.timezone || 'America/Chicago';
 
@@ -315,17 +297,9 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
 
   // Create portal content directly - similar to how drawer works
   const portalContent = (
-    <Box
-      position="fixed"
-      top="0"
-      left="0"
-      width="100vw"
-      height="100vh"
-      zIndex={99999999}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      pointerEvents="none"
+    <div
+      className="fixed top-0 left-0 w-screen h-screen flex items-center justify-center pointer-events-none"
+      style={{ zIndex: 99999999 }}
       onClick={(e) => {
         // Close if clicking on the backdrop (the container itself)
         if (e.target === e.currentTarget) {
@@ -334,275 +308,244 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
       }}
     >
       {/* Overlay */}
-      <Box
-        position="fixed"
-        top="0"
-        left="0"
-        width="100vw"
-        height="100vh"
-        bg="blackAlpha.700"
-        zIndex={99999998}
-        pointerEvents="auto"
+      <div
+        className="fixed top-0 left-0 w-screen h-screen bg-black/70 pointer-events-auto cursor-pointer"
+        style={{ zIndex: 99999998 }}
         onClick={handleClose}
-        cursor="pointer"
       />
-      
+
       {/* Modal Content */}
-      <Box
-        position="relative"
-        zIndex={99999999}
-        pointerEvents="auto"
-        maxW="500px"
-        w="90vw"
-        maxH="85vh"
-        bg="#ecede8"
-        borderRadius="10px"
-        border="2px solid #353535"
-        fontFamily="Montserrat, sans-serif"
-        overflowY="auto"
-        boxShadow="2xl"
+      <div
+        className="relative pointer-events-auto max-w-[500px] w-[90vw] max-h-[85vh] overflow-y-auto shadow-2xl"
+        style={{
+          zIndex: 99999999,
+          backgroundColor: '#ecede8',
+          borderRadius: '10px',
+          border: '2px solid #353535',
+          fontFamily: 'Montserrat, sans-serif'
+        }}
       >
         {/* Header */}
-        <Box
-          borderBottomWidth="1px"
-          p={4}
-          pb={2}
-          pt={3}
-          fontFamily="IvyJournal, sans-serif"
-        >
-          <Text fontSize="20px" fontWeight="bold" color="#353535">
+        <div className="border-b p-4 pb-2 pt-3" style={{ fontFamily: 'IvyJournal, sans-serif' }}>
+          <h2 className="text-xl font-bold" style={{ color: '#353535' }}>
             New Reservation
-          </Text>
+          </h2>
           <Button
-            position="absolute"
-            top={2}
-            right={2}
             variant="ghost"
             size="sm"
             onClick={handleClose}
             aria-label="Close"
+            className="absolute top-2 right-2"
           >
             ×
           </Button>
-        </Box>
+        </div>
 
         {/* Body */}
-        <Box p={3} overflowY="auto">
-          <VStack spacing={2} align="stretch">
-            <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-              <GridItem>
-                <FormControl isRequired>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">First Name</FormLabel>
-                  <Input 
-                    fontFamily="Montserrat, sans-serif" 
-                    value={formData.first_name} 
-                    onChange={(e) => handleInputChange('first_name', e.target.value)} 
-                    size="sm" 
-                    h="32px"
+        <div className="p-3 overflow-y-auto">
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">First Name *</label>
+                  <Input
+                    className="h-8"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    value={formData.first_name}
+                    onChange={(e) => handleInputChange('first_name', e.target.value)}
+                    required
                   />
-                </FormControl>
-              </GridItem>
-              <GridItem>
-                <FormControl isRequired>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Last Name</FormLabel>
-                  <Input 
-                    fontFamily="Montserrat, sans-serif" 
-                    value={formData.last_name} 
-                    onChange={(e) => handleInputChange('last_name', e.target.value)} 
-                    size="sm" 
-                    h="32px"
+                </div>
+              </div>
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">Last Name *</label>
+                  <Input
+                    className="h-8"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    value={formData.last_name}
+                    onChange={(e) => handleInputChange('last_name', e.target.value)}
+                    required
                   />
-                </FormControl>
-              </GridItem>
-              <GridItem>
-                <FormControl>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Email</FormLabel>
-                  <Input 
-                    fontFamily="Montserrat, sans-serif" 
-                    type="email" 
-                    value={formData.email} 
-                    onChange={(e) => handleInputChange('email', e.target.value)} 
-                    size="sm" 
-                    h="32px"
+                </div>
+              </div>
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">Email</label>
+                  <Input
+                    className="h-8"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
                   />
-                </FormControl>
-              </GridItem>
-              <GridItem>
-                <FormControl isRequired>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Phone</FormLabel>
-                  <Input 
-                    fontFamily="Montserrat, sans-serif" 
-                    value={formData.phone} 
-                    onChange={(e) => handleInputChange('phone', e.target.value)} 
-                    placeholder="+1 (555) 123-4567" 
-                    size="sm" 
-                    h="32px"
+                </div>
+              </div>
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">Phone *</label>
+                  <Input
+                    className="h-8"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    placeholder="+1 (555) 123-4567"
+                    required
                   />
-                </FormControl>
-              </GridItem>
-            </Grid>
+                </div>
+              </div>
+            </div>
 
-            <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-              <GridItem>
-                <FormControl isRequired>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Party Size</FormLabel>
-                  <Select 
-                    fontFamily="Montserrat, sans-serif" 
-                    value={formData.party_size} 
-                    onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))} 
-                    size="sm"
-                    h="32px"
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">Party Size *</label>
+                  <select
+                    className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    value={formData.party_size}
+                    onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))}
+                    required
                   >
                     {Array.from({ length: 15 }, (_, i) => i + 1).map(num => (
                       <option key={num} value={num}>{num}</option>
                     ))}
-                  </Select>
-                </FormControl>
-              </GridItem>
-              <GridItem>
-                <FormControl>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Event Type</FormLabel>
-                  <Select 
-                    fontFamily="Montserrat, sans-serif" 
-                    value={formData.event_type} 
-                    onChange={(e) => handleInputChange('event_type', e.target.value)} 
-                    size="sm"
-                    h="32px"
+                  </select>
+                </div>
+              </div>
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">Event Type</label>
+                  <select
+                    className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    value={formData.event_type}
+                    onChange={(e) => handleInputChange('event_type', e.target.value)}
                   >
                     <option value="">Select</option>
                     {eventTypes.map(type => (
                       <option key={type.value} value={type.value}>{type.label}</option>
                     ))}
-                  </Select>
-                </FormControl>
-              </GridItem>
-            </Grid>
+                  </select>
+                </div>
+              </div>
+            </div>
 
-            <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-              <GridItem>
-                <FormControl isRequired>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Start Time</FormLabel>
-                  <Input 
-                    fontFamily="Montserrat, sans-serif" 
-                    type="datetime-local" 
-                    value={formData.start_time} 
-                    onChange={(e) => handleInputChange('start_time', e.target.value)} 
-                    size="sm" 
-                    h="32px"
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">Start Time *</label>
+                  <Input
+                    className="h-8"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    type="datetime-local"
+                    value={formData.start_time}
+                    onChange={(e) => handleInputChange('start_time', e.target.value)}
+                    required
                   />
-                </FormControl>
-              </GridItem>
-              <GridItem>
-                <FormControl isRequired>
-                  <FormLabel fontSize="xs" mb={0.5} fontWeight="600">End Time</FormLabel>
-                  <Input 
-                    fontFamily="Montserrat, sans-serif" 
-                    type="datetime-local" 
-                    value={formData.end_time} 
-                    onChange={(e) => handleInputChange('end_time', e.target.value)} 
-                    size="sm" 
-                    h="32px"
+                </div>
+              </div>
+              <div>
+                <div className="mb-2">
+                  <label className="text-xs font-semibold mb-0.5 block">End Time *</label>
+                  <Input
+                    className="h-8"
+                    style={{ fontFamily: 'Montserrat, sans-serif' }}
+                    type="datetime-local"
+                    value={formData.end_time}
+                    onChange={(e) => handleInputChange('end_time', e.target.value)}
+                    required
                   />
-                </FormControl>
-              </GridItem>
-            </Grid>
+                </div>
+              </div>
+            </div>
 
-            <FormControl>
-              <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Table</FormLabel>
-              <Select 
-                fontFamily="Montserrat, sans-serif" 
-                value={formData.table_id} 
-                onChange={(e) => handleInputChange('table_id', e.target.value)} 
-                size="sm"
-                h="32px"
+            <div className="mb-2">
+              <label className="text-xs font-semibold mb-0.5 block">Table</label>
+              <select
+                className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                style={{ fontFamily: 'Montserrat, sans-serif' }}
+                value={formData.table_id}
+                onChange={(e) => handleInputChange('table_id', e.target.value)}
               >
                 <option value="">Select table</option>
                 {tables.map(table => (
                   <option key={table.id} value={table.id}>Table {table.table_number}</option>
                 ))}
-              </Select>
-            </FormControl>
+              </select>
+            </div>
 
-            <FormControl>
-              <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Notes</FormLabel>
-              <Textarea 
-                fontFamily="Montserrat, sans-serif" 
-                value={formData.notes} 
-                onChange={(e) => handleInputChange('notes', e.target.value)} 
-                size="sm" 
+            <div className="mb-2">
+              <label className="text-xs font-semibold mb-0.5 block">Notes</label>
+              <Textarea
+                style={{ fontFamily: 'Montserrat, sans-serif' }}
+                value={formData.notes}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
                 rows={2}
                 placeholder="Special requests..."
+                className="text-sm"
               />
-            </FormControl>
+            </div>
 
-            <Grid templateColumns="repeat(2, 1fr)" gap={1}>
-              <GridItem>
-                <Checkbox 
-                  fontFamily="Montserrat, sans-serif"
-                  isChecked={formData.is_checked_in}
-                  onChange={(e) => handleInputChange('is_checked_in', e.target.checked)}
-                  size="sm"
-                >
-                  <Text fontSize="xs">Check in</Text>
-                </Checkbox>
-              </GridItem>
-              <GridItem>
-                <Checkbox 
-                  fontFamily="Montserrat, sans-serif"
-                  isChecked={formData.send_confirmation}
-                  onChange={(e) => handleInputChange('send_confirmation', e.target.checked)}
-                  size="sm"
-                >
-                  <Text fontSize="xs">Send confirmation</Text>
-                </Checkbox>
-              </GridItem>
-              <GridItem>
-                <Checkbox 
-                  fontFamily="Montserrat, sans-serif"
-                  isChecked={formData.send_access_instructions}
-                  onChange={(e) => handleInputChange('send_access_instructions', e.target.checked)}
-                  size="sm"
-                >
-                  <Text fontSize="xs">Send access instructions</Text>
-                </Checkbox>
-              </GridItem>
-              <GridItem>
-                <Checkbox 
-                  fontFamily="Montserrat, sans-serif"
-                  isChecked={formData.send_reminder}
-                  onChange={(e) => handleInputChange('send_reminder', e.target.checked)}
-                  size="sm"
-                >
-                  <Text fontSize="xs">Send reminder</Text>
-                </Checkbox>
-              </GridItem>
-            </Grid>
-          </VStack>
-        </Box>
+            <div className="grid grid-cols-2 gap-1">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={formData.is_checked_in}
+                  onCheckedChange={(checked) => handleInputChange('is_checked_in', checked)}
+                />
+                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  Check in
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={formData.send_confirmation}
+                  onCheckedChange={(checked) => handleInputChange('send_confirmation', checked)}
+                />
+                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  Send confirmation
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={formData.send_access_instructions}
+                  onCheckedChange={(checked) => handleInputChange('send_access_instructions', checked)}
+                />
+                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  Send access instructions
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={formData.send_reminder}
+                  onCheckedChange={(checked) => handleInputChange('send_reminder', checked)}
+                />
+                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                  Send reminder
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Footer */}
-        <Box
-          borderTopWidth="1px"
-          p={3}
-          display="flex"
-          justifyContent="flex-end"
-        >
-          <HStack spacing={2}>
-            <Button variant="outline" onClick={handleClose} size="sm" h="32px">Cancel</Button>
-            <Button 
-              colorScheme="blue" 
-              onClick={handleSave} 
-              isLoading={isSaving} 
-              loadingText="Creating..."
-              size="sm"
-              h="32px"
-            >
-              Create
+        <div className="border-t p-3 flex justify-end">
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleClose} size="sm" className="h-8">
+              Cancel
             </Button>
-          </HStack>
-        </Box>
-      </Box>
-    </Box>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              size="sm"
+              className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isSaving ? 'Creating...' : 'Create'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   return typeof document !== 'undefined'

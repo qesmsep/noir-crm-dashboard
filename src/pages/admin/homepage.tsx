@@ -1,22 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
-import {
-  Badge,
-  Box,
-  Button,
-  Divider,
-  Grid,
-  GridItem,
-  Heading,
-  HStack,
-  Image,
-  Spinner,
-  Stack,
-  Text,
-  VStack,
-  useToast,
-} from '@chakra-ui/react';
-import { DeleteIcon } from '@chakra-ui/icons';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/hooks/useToast';
+import { Trash2 } from 'lucide-react';
 
 interface MenuFile {
   name: string;
@@ -28,7 +16,7 @@ export default function HomePageAdmin() {
   const [menuFiles, setMenuFiles] = useState<MenuFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const toast = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchMenuFiles();
@@ -48,8 +36,7 @@ export default function HomePageAdmin() {
       toast({
         title: 'Error loading menu images',
         description: 'Failed to load menu images',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -79,8 +66,6 @@ export default function HomePageAdmin() {
       toast({
         title: 'Menu images uploaded',
         description: 'New images are now available on the homepage menu.',
-        status: 'success',
-        duration: 3000,
       });
       fetchMenuFiles();
     } catch (error) {
@@ -88,8 +73,7 @@ export default function HomePageAdmin() {
       toast({
         title: 'Upload failed',
         description: 'Failed to upload menu images',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     } finally {
       setUploading(false);
@@ -112,8 +96,6 @@ export default function HomePageAdmin() {
 
       toast({
         title: 'Image deleted',
-        status: 'success',
-        duration: 3000,
       });
       fetchMenuFiles();
     } catch (error) {
@@ -121,153 +103,133 @@ export default function HomePageAdmin() {
       toast({
         title: 'Delete failed',
         description: 'Failed to delete menu image',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     }
   };
 
   return (
     <AdminLayout>
-      <Box bg="#F6F5F2" minH="100vh" py={{ base: 6, md: 10 }}>
-        <Box maxW="1100px" mx="auto" px={{ base: 4, md: 8 }}>
-          <VStack align="stretch" spacing={{ base: 6, md: 8 }}>
-            <Stack
-              direction={{ base: 'column', md: 'row' }}
-              justify="space-between"
-              align={{ base: 'flex-start', md: 'center' }}
-              spacing={{ base: 3, md: 6 }}
-            >
-              <Box>
-                <Heading size="lg" fontWeight={700} color="#1F1F1F">HomePage</Heading>
-                <Text mt={2} color="gray.600" fontSize="sm">
+      <div className="bg-[#F6F5F2] min-h-screen py-6 md:py-10">
+        <div className="max-w-[1100px] mx-auto px-4 md:px-8">
+          <div className="flex flex-col gap-6 md:gap-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-6">
+              <div>
+                <h1 className="text-2xl font-bold text-[#1F1F1F]" style={{ fontFamily: 'IvyJournal, serif' }}>
+                  HomePage
+                </h1>
+                <p className="mt-2 text-gray-600 text-sm">
                   Manage the menu images shown on the homepage carousel.
-                </Text>
-              </Box>
-              <HStack spacing={3}>
+                </p>
+              </div>
+              <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  color="#2C2C2C"
-                  borderColor="#DAD7D0"
-                  _hover={{ bg: 'white' }}
                   onClick={fetchMenuFiles}
-                  isLoading={loading}
+                  disabled={loading}
+                  className="border-[#DAD7D0] text-[#2C2C2C] hover:bg-white"
                 >
+                  {loading && <Spinner size="sm" className="mr-2" />}
                   Refresh
                 </Button>
                 <Button
-                  as="label"
-                  htmlFor="menu-upload"
-                  bg="#1F1F1F"
-                  color="white"
-                  _hover={{ bg: '#2A2A2A' }}
-                  isLoading={uploading}
+                  asChild
+                  disabled={uploading}
+                  className="bg-[#1F1F1F] text-white hover:bg-[#2A2A2A]"
                 >
-                  Upload Images
-                  <input
-                    id="menu-upload"
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.gif,.webp"
-                    multiple
-                    hidden
-                    onChange={handleMenuUpload}
-                  />
+                  <label htmlFor="menu-upload" className="cursor-pointer">
+                    {uploading && <Spinner size="sm" className="mr-2" />}
+                    Upload Images
+                    <input
+                      id="menu-upload"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.gif,.webp"
+                      multiple
+                      className="hidden"
+                      onChange={handleMenuUpload}
+                    />
+                  </label>
                 </Button>
-              </HStack>
-            </Stack>
+              </div>
+            </div>
 
-            <Box bg="white" borderRadius="xl" border="1px solid #ECEAE5" boxShadow="sm">
-              <Box px={{ base: 4, md: 6 }} pt={{ base: 4, md: 6 }} pb={4}>
-                <HStack justify="space-between" align="center">
-                  <Heading size="md" color="#1F1F1F">Homepage Menu Images</Heading>
-                  <Badge
-                    color="#8C7C6D"
-                    bg="#F3F1EC"
-                    border="1px solid #E6E0D8"
-                    px={2}
-                    py={1}
-                    borderRadius="full"
-                    fontWeight={600}
-                  >
+            <div className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm">
+              <div className="px-4 md:px-6 pt-4 md:pt-6 pb-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold text-[#1F1F1F]">Homepage Menu Images</h2>
+                  <Badge className="bg-[#F3F1EC] text-[#8C7C6D] border border-[#E6E0D8] px-2 py-1 font-semibold">
                     {menuFiles.length} images
                   </Badge>
-                </HStack>
-              </Box>
-              <Divider borderColor="#ECEAE5" />
-              <Box px={{ base: 4, md: 6 }} py={{ base: 4, md: 6 }}>
+                </div>
+              </div>
+              <div className="border-t border-[#ECEAE5]" />
+              <div className="px-4 md:px-6 py-4 md:py-6">
                 {loading ? (
-                  <HStack spacing={3} color="gray.600">
+                  <div className="flex items-center gap-3 text-gray-600">
                     <Spinner size="sm" />
-                    <Text>Loading images...</Text>
-                  </HStack>
+                    <span>Loading images...</span>
+                  </div>
                 ) : (
-                  <Grid
-                    templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' }}
-                    gap={{ base: 4, md: 6 }}
-                  >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     {menuFiles.length === 0 && (
-                      <GridItem>
-                        <Text color="gray.600">No menu images uploaded yet.</Text>
-                      </GridItem>
+                      <div>
+                        <p className="text-gray-600">No menu images uploaded yet.</p>
+                      </div>
                     )}
                     {menuFiles.map((file) => (
-                      <GridItem
+                      <div
                         key={file.name}
-                        border="1px solid #EFEDE8"
-                        borderRadius="lg"
-                        overflow="hidden"
-                        bg="#FBFBFA"
+                        className="border border-[#EFEDE8] rounded-lg overflow-hidden bg-[#FBFBFA]"
                       >
-                        <Box bg="white" borderBottom="1px solid #EFEDE8" px={4} py={3}>
-                          <Text fontWeight={600} color="#1F1F1F" noOfLines={1}>
+                        <div className="bg-white border-b border-[#EFEDE8] px-4 py-3">
+                          <p className="font-semibold text-[#1F1F1F] truncate">
                             {file.name}
-                          </Text>
-                          <Text fontSize="sm" color="gray.500">
+                          </p>
+                          <p className="text-sm text-gray-500">
                             {(file.size / 1024).toFixed(1)} KB
-                          </Text>
-                        </Box>
-                        <Box bg="#F7F6F3" px={4} py={3} display="flex" justifyContent="center">
-                          <Image
+                          </p>
+                        </div>
+                        <div className="bg-[#F7F6F3] px-4 py-3 flex justify-center">
+                          <img
                             src={file.path}
                             alt={file.name}
-                            width="100%"
-                            maxH={{ base: '120px', md: '140px' }}
-                            objectFit="contain"
+                            className="w-full max-h-[120px] md:max-h-[140px] object-contain"
                           />
-                        </Box>
-                        <HStack px={4} py={3} spacing={2} justify="space-between">
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-3 gap-2">
                           <Button
-                            as="a"
-                            href={file.path}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            asChild
                             size="sm"
                             variant="ghost"
-                            color="#5A5A5A"
-                            _hover={{ bg: '#F0EEE9' }}
+                            className="text-[#5A5A5A] hover:bg-[#F0EEE9]"
                           >
-                            View
+                            <a
+                              href={file.path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              View
+                            </a>
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            color="#8B4A4A"
-                            leftIcon={<DeleteIcon />}
-                            _hover={{ bg: '#F3E7E7' }}
+                            className="text-[#8B4A4A] hover:bg-[#F3E7E7]"
                             onClick={() => handleDeleteMenuFile(file.name)}
                           >
+                            <Trash2 className="w-4 h-4 mr-1" />
                             Delete
                           </Button>
-                        </HStack>
-                      </GridItem>
+                        </div>
+                      </div>
                     ))}
-                  </Grid>
+                  </div>
                 )}
-              </Box>
-            </Box>
-          </VStack>
-        </Box>
-      </Box>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </AdminLayout>
   );
 }

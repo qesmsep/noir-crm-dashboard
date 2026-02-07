@@ -1143,12 +1143,12 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             verticalAlign: 'middle',
             justifyContent: 'center',
             fontFamily: 'Montserrat, sans-serif',
-            minWidth: isMobile ? '80px' : '100px',
-            width: isMobile ? '80px' : '100px',
+            minWidth: isMobile ? '32px' : '80px',
+            width: isMobile ? '32px' : '80px',
             flexShrink: 0,
-          
+
             textAlign: 'center',
-            
+
           },
           '.fc-resource-area .fc-resource-title': {
             color: 'white',
@@ -1254,8 +1254,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             userSelect: 'none',
             // Mobile-specific adjustments
             ...(isMobile && {
-              minHeight: '28px',
-              fontSize: '12px',
+              minHeight: '30px',
+              fontSize: '11px',
             }),
           },
           '.fc .fc-button-primary': {
@@ -1369,29 +1369,51 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             { hour: 'numeric', hour12: true },
           ]}
           nowIndicator
-          resourceAreaWidth={isMobile ? "40px" : "80px"}
+          resourceAreaWidth={isMobile ? "32px" : "80px"}
           
           resourceAreaHeaderContent=""
           
                    // Adjust the details of the reservations on the calendar
           eventContent={(arg) => {
+            console.log('🔍 EVENT RENDER DEBUG:', {
+              title: arg.event.title,
+              isMobile,
+              timeText: arg.timeText,
+              view: arg.view.type,
+              isStart: arg.isStart,
+              isEnd: arg.isEnd,
+              event: arg.event.toPlainObject()
+            });
+
             // Handle blocking events differently
             if (arg.event.extendedProps.is_blocking) {
+              console.log('🚫 Rendering BLOCKING event:', arg.event.title);
               return (
                 <div
+                  ref={(el) => {
+                    if (el) {
+                      console.log('📏 Blocking event dimensions:', {
+                        width: el.offsetWidth,
+                        height: el.offsetHeight,
+                        parentWidth: el.parentElement?.offsetWidth,
+                        computedStyle: window.getComputedStyle(el).width
+                      });
+                    }
+                  }}
                   style={{
                     fontFamily: 'Montserrat, sans-serif',
                     whiteSpace: 'normal',
-                    margin: '0px',
-                    display: 'center',
+                    margin: '1px 0',
+                    display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    height: isMobile ? '28px' : '24px',
-                    fontSize: isMobile ? '12px' : '14px',
+                    justifyContent: 'flex-start',
+                    width: '100%',
+                    height: isMobile ? '30px' : '20px',
+                    fontSize: isMobile ? '11px' : '12px',
                     background: '#6b7280',
                     color: '#ffffff',
                     borderRadius: '4px',
-                    padding: isMobile ? '0 4px' : '0 2px',
+                    padding: isMobile ? '0 3px' : '0 4px',
                     border: '1px solid #6b7280',
                     cursor: 'not-allowed',
                     userSelect: 'none',
@@ -1407,27 +1429,47 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
                 </div>
               );
             }
-            
+
             // Determine colors based on check-in status for regular events
             const isCheckedIn = arg.event.extendedProps.checked_in;
             const backgroundColor = isCheckedIn ? '#a59480' : '#353535';
             const textColor = isCheckedIn ? '#353535' : '#ecede8';
-            
+
+            console.log('✅ Rendering REGULAR event:', {
+              title: arg.event.title,
+              isCheckedIn,
+              backgroundColor,
+              textColor
+            });
+
             return (
               <div
+                ref={(el) => {
+                  if (el) {
+                    console.log('📏 Regular event dimensions:', {
+                      title: arg.event.title,
+                      width: el.offsetWidth,
+                      height: el.offsetHeight,
+                      parentWidth: el.parentElement?.offsetWidth,
+                      computedStyle: window.getComputedStyle(el).width,
+                      display: window.getComputedStyle(el).display
+                    });
+                  }
+                }}
                 style={{
                   fontFamily: 'Montserrat, sans-serif',
                   whiteSpace: 'normal',
-                  margin: '0px',
-                  display: 'center',
+                  margin: '1px 0',
+                  display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  height: isMobile ? '28px' : '24px',
-                  fontSize: isMobile ? '12px' : '14px',
+                  justifyContent: 'flex-start',
+                  width: '100%',
+                  height: isMobile ? '30px' : '20px',
+                  fontSize: isMobile ? '11px' : '12px',
                   background: backgroundColor,
                   color: textColor,
                   borderRadius: '4px',
-                  padding: isMobile ? '0 4px' : '0 2px',
+                  padding: isMobile ? '0 3px' : '0 4px',
                   border: '1px solid #353535',
                   cursor: isTouchDeviceState ? 'grab' : 'pointer',
                   userSelect: 'none',

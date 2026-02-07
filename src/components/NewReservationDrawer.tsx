@@ -1,31 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  Button,
-  VStack,
-  HStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Textarea,
-  Text,
-  Box,
-  Divider,
-  useToast,
-  Spinner,
-  Grid,
-  GridItem,
-  Alert,
-  AlertIcon,
-  Checkbox,
-} from '@chakra-ui/react';
-import { CloseIcon } from '@chakra-ui/icons';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/useToast';
 import { localInputToUTC } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
 
@@ -78,7 +65,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
   const [tables, setTables] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const toast = useToast();
+  const { toast } = useToast();
   const { settings } = useSettings();
   const timezone = settings?.timezone || 'America/Chicago';
 
@@ -175,8 +162,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
         toast({
           title: 'Required fields missing',
           description: 'Please fill in first name, last name, and phone number.',
-          status: 'error',
-          duration: 3000,
+          variant: 'error',
         });
         return;
       }
@@ -185,8 +171,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
         toast({
           title: 'Time required',
           description: 'Please select start and end times.',
-          status: 'error',
-          duration: 3000,
+          variant: 'error',
         });
         return;
       }
@@ -238,24 +223,22 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
 
       const result = await response.json();
 
-      
+
       toast({
         title: 'Success',
         description: 'Reservation created successfully!',
-        status: 'success',
-        duration: 3000,
+        variant: 'success',
       });
 
       onReservationCreated();
       onClose();
-      
+
     } catch (error: any) {
       console.error('Error creating reservation:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to create reservation',
-        status: 'error',
-        duration: 5000,
+        variant: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -284,282 +267,238 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
   };
 
 
-  
+
   return (
-    <Drawer 
-      isOpen={isOpen} 
-      placement="right" 
-      onClose={handleClose} 
-      size="sm"
-      closeOnOverlayClick={true}
-      closeOnEsc={true}
-    >
-      <Box zIndex="2000" position="relative">
-        <DrawerOverlay bg="blackAlpha.600" onClick={handleClose} />
-        <DrawerContent 
-          border="2px solid #353535" 
-          borderRadius="10px"  
-          fontFamily="Montserrat, sans-serif" 
-          maxW="350px" 
-          w="50vw" 
-          boxShadow="xl" 
-          mt="80px" 
-          mb="25px" 
-          paddingRight="40px" 
-          paddingLeft="40px" 
-          backgroundColor="#ecede8"
-          position="fixed"
-          top="0"
-          right="0"
-          style={{
-            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            willChange: 'transform',
-            transformStyle: 'preserve-3d',
-            backfaceVisibility: 'hidden'
-          }}
-        >
-          <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="0px" fontFamily="IvyJournal, sans-serif" color="#353535">
-            
-          </DrawerHeader>
-          <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
-            <VStack spacing={1} align="stretch">
-              <Box>
-                <VStack align="start" spacing={0} borderRadius="10px" marginTop="0px">
-                  <Text mb="0px" fontSize="24px" fontWeight="bold" fontFamily="IvyJournal, sans-serif">
-                    New Reservation
-                  </Text>
-                  <Text margin="0px" fontSize="sm" color="gray.600">
-                    Create a new reservation
-                  </Text>
-                </VStack>
-              </Box>
-              
-              <VStack spacing={1} as="section" align="stretch">
-                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-                  <GridItem>
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm" mb={1}>First Name</FormLabel>
-                      <Input 
-                        fontFamily="Montserrat, sans-serif" 
-                        value={formData.first_name} 
-                        onChange={(e) => handleInputChange('first_name', e.target.value)} 
-                        size="sm" 
-                      />
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm" mb={1}>Last Name</FormLabel>
-                      <Input 
-                        fontFamily="Montserrat, sans-serif" 
-                        value={formData.last_name} 
-                        onChange={(e) => handleInputChange('last_name', e.target.value)} 
-                        size="sm" 
-                      />
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontSize="sm" mb={1}>Email</FormLabel>
-                      <Input 
-                        fontFamily="Montserrat, sans-serif" 
-                        type="email" 
-                        value={formData.email} 
-                        onChange={(e) => handleInputChange('email', e.target.value)} 
-                        size="sm" 
-                      />
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm" mb={1}>Phone</FormLabel>
-                      <Input 
-                        fontFamily="Montserrat, sans-serif" 
-                        value={formData.phone} 
-                        onChange={(e) => handleInputChange('phone', e.target.value)} 
-                        placeholder="+1 (555) 123-4567" 
-                        size="sm" 
-                      />
-                    </FormControl>
-                  </GridItem>
-                </Grid>
-              </VStack>
+    <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <SheetContent
+        side="right"
+        className="w-[350px] max-w-[50vw] bg-[#ecede8] border-2 border-[#353535] rounded-[10px] shadow-xl mt-20 mb-6 px-10 py-0 font-montserrat z-[2000]"
+      >
+        <SheetHeader className="border-b border-[#ECEAE5] pb-0 pt-0 mb-4">
+          <SheetTitle className="text-left pt-4">
+            <div className="flex flex-col gap-0">
+              <div className="text-2xl font-bold font-ivyjournal text-[#353535] mb-0">
+                New Reservation
+              </div>
+              <p className="text-sm text-gray-600 font-montserrat font-normal m-0">
+                Create a new reservation
+              </p>
+            </div>
+          </SheetTitle>
+        </SheetHeader>
 
-              <VStack spacing={1} as="section" align="stretch">
-                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-                  <GridItem>
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm" mb={1}>Party Size</FormLabel>
-                      <Select 
-                        fontFamily="Montserrat, sans-serif" 
-                        value={formData.party_size} 
-                        onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))} 
-                        size="sm"
-                      >
-                        {Array.from({ length: 15 }, (_, i) => i + 1).map(num => (
-                          <option key={num} value={num}>{num}</option>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl>
-                      <FormLabel fontSize="sm" mb={1}>Event Type</FormLabel>
-                      <Select 
-                        fontFamily="Montserrat, sans-serif" 
-                        value={formData.event_type} 
-                        onChange={(e) => handleInputChange('event_type', e.target.value)} 
-                        size="sm"
-                      >
-                        <option value="">Select event type</option>
-                        {eventTypes.map(type => (
-                          <option key={type.value} value={type.value}>{type.label}</option>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </GridItem>
-                </Grid>
-              </VStack>
+        <div className="p-4 overflow-y-auto drawer-body-content flex-1">
+          <div className="flex flex-col gap-1">{/* VStack replacement */}
 
-              <VStack spacing={1} as="section" align="stretch">
-                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-                  <GridItem>
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm" mb={1}>Start Time</FormLabel>
-                      <Input 
-                        fontFamily="Montserrat, sans-serif" 
-                        type="datetime-local" 
-                        value={formData.start_time} 
-                        onChange={(e) => {
-                          console.log('Start time changed:', e.target.value);
-                          handleInputChange('start_time', e.target.value);
-                        }} 
-                        size="sm" 
-                      />
-                    </FormControl>
-                  </GridItem>
-                  <GridItem>
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm" mb={1}>End Time</FormLabel>
-                      <Input 
-                        fontFamily="Montserrat, sans-serif" 
-                        type="datetime-local" 
-                        value={formData.end_time} 
-                        onChange={(e) => {
-                          console.log('End time changed:', e.target.value);
-                          handleInputChange('end_time', e.target.value);
-                        }} 
-                        size="sm" 
-                      />
-                    </FormControl>
-                  </GridItem>
-                </Grid>
-              </VStack>
 
-              <VStack spacing={1} as="section" align="stretch">
-                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                <FormControl>
-                  <FormLabel fontSize="sm" mb={1}>Table</FormLabel>
-                  <Select 
-                    fontFamily="Montserrat, sans-serif" 
-                    value={formData.table_id} 
-                    onChange={(e) => handleInputChange('table_id', e.target.value)} 
-                    size="sm"
-                  >
-                    <option value="">Select table</option>
-                    {tables.map(table => (
-                      <option key={table.id} value={table.id}>Table {table.table_number}</option>
-                    ))}
-                  </Select>
+            {/* Guest Information */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="first_name" className="text-sm mb-1">First Name *</Label>
+                <Input
+                  id="first_name"
+                  className="font-montserrat h-9"
+                  value={formData.first_name}
+                  onChange={(e) => handleInputChange('first_name', e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="last_name" className="text-sm mb-1">Last Name *</Label>
+                <Input
+                  id="last_name"
+                  className="font-montserrat h-9"
+                  value={formData.last_name}
+                  onChange={(e) => handleInputChange('last_name', e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="email" className="text-sm mb-1">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  className="font-montserrat h-9"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone" className="text-sm mb-1">Phone *</Label>
+                <Input
+                  id="phone"
+                  className="font-montserrat h-9"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  placeholder="+1 (555) 123-4567"
+                  required
+                />
+              </div>
+            </div>
 
-                </FormControl>
-              </VStack>
 
-              <VStack spacing={1} as="section" align="stretch">
-                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                <FormControl>
-                  <FormLabel fontSize="sm" mb={1}>Notes</FormLabel>
-                  <Textarea 
-                    fontFamily="Montserrat, sans-serif" 
-                    value={formData.notes} 
-                    onChange={(e) => handleInputChange('notes', e.target.value)} 
-                    size="sm" 
-                    rows={3}
-                    placeholder="Special requests, dietary restrictions, etc."
-                  />
-                </FormControl>
-              </VStack>
+            {/* Reservation Details */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="party_size" className="text-sm mb-1">Party Size *</Label>
+                <Select
+                  id="party_size"
+                  className="font-montserrat h-9"
+                  value={formData.party_size}
+                  onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))}
+                >
+                  {Array.from({ length: 15 }, (_, i) => i + 1).map(num => (
+                    <option key={num} value={num}>{num}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="event_type" className="text-sm mb-1">Event Type</Label>
+                <Select
+                  id="event_type"
+                  className="font-montserrat h-9"
+                  value={formData.event_type}
+                  onChange={(e) => handleInputChange('event_type', e.target.value)}
+                >
+                  <option value="">Select event type</option>
+                  {eventTypes.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
 
-              <VStack spacing={1} as="section" align="stretch">
-                <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                <VStack spacing={2} align="stretch">
-                  <FormControl>
-                    <Checkbox 
-                      fontFamily="Montserrat, sans-serif"
-                      isChecked={formData.is_checked_in}
-                      onChange={(e) => handleInputChange('is_checked_in', e.target.checked)}
-                      size="sm"
-                    >
-                      Check in reservation
-                    </Checkbox>
-                  </FormControl>
-                  
-                  <FormControl>
-                    <Checkbox 
-                      fontFamily="Montserrat, sans-serif"
-                      isChecked={formData.send_confirmation}
-                      onChange={(e) => handleInputChange('send_confirmation', e.target.checked)}
-                      size="sm"
-                    >
-                      Send reservation confirmation text
-                    </Checkbox>
-                  </FormControl>
-                  
-                  <FormControl>
-                    <Checkbox 
-                      fontFamily="Montserrat, sans-serif"
-                      isChecked={formData.send_access_instructions}
-                      onChange={(e) => handleInputChange('send_access_instructions', e.target.checked)}
-                      size="sm"
-                    >
-                      Send access instructions
-                    </Checkbox>
-                  </FormControl>
-                  
-                  <FormControl>
-                    <Checkbox 
-                      fontFamily="Montserrat, sans-serif"
-                      isChecked={formData.send_reminder}
-                      onChange={(e) => handleInputChange('send_reminder', e.target.checked)}
-                      size="sm"
-                    >
-                      Send 1-hour reminder
-                    </Checkbox>
-                  </FormControl>
-                </VStack>
-              </VStack>
-            </VStack>
-          </DrawerBody>
-          <DrawerFooter borderTopWidth="1px" justifyContent="space-between" className="drawer-footer-content">
-            <HStack spacing={3} mb={"10px"}>
-              <Button variant="outline" onClick={handleClose}>Cancel</Button>
-              <Button 
-                colorScheme="blue" 
-                onClick={handleSave} 
-                isLoading={isSaving} 
-                loadingText="Creating..."
+
+            {/* Time Selection */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="start_time" className="text-sm mb-1">Start Time *</Label>
+                <Input
+                  id="start_time"
+                  type="datetime-local"
+                  className="font-montserrat h-9"
+                  value={formData.start_time}
+                  onChange={(e) => {
+                    console.log('Start time changed:', e.target.value);
+                    handleInputChange('start_time', e.target.value);
+                  }}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="end_time" className="text-sm mb-1">End Time *</Label>
+                <Input
+                  id="end_time"
+                  type="datetime-local"
+                  className="font-montserrat h-9"
+                  value={formData.end_time}
+                  onChange={(e) => {
+                    console.log('End time changed:', e.target.value);
+                    handleInputChange('end_time', e.target.value);
+                  }}
+                  required
+                />
+              </div>
+            </div>
+
+
+            {/* Table Selection */}
+            <div>
+              <Label htmlFor="table_id" className="text-sm mb-1">Table</Label>
+              <Select
+                id="table_id"
+                className="font-montserrat h-9"
+                value={formData.table_id}
+                onChange={(e) => handleInputChange('table_id', e.target.value)}
               >
-                Create Reservation
-              </Button>
-            </HStack>
-          </DrawerFooter>
-        </DrawerContent>
-      </Box>
-    </Drawer>
+                <option value="">Select table</option>
+                {tables.map(table => (
+                  <option key={table.id} value={table.id}>Table {table.table_number}</option>
+                ))}
+              </Select>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label htmlFor="notes" className="text-sm mb-1">Notes</Label>
+              <Textarea
+                id="notes"
+                className="font-montserrat"
+                value={formData.notes}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                rows={3}
+                placeholder="Special requests, dietary restrictions, etc."
+              />
+            </div>
+
+
+            {/* Options */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_checked_in"
+                  checked={formData.is_checked_in}
+                  onCheckedChange={(checked) => handleInputChange('is_checked_in', checked)}
+                  className="font-montserrat"
+                />
+                <label htmlFor="is_checked_in" className="text-sm font-montserrat cursor-pointer">
+                  Check in reservation
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="send_confirmation"
+                  checked={formData.send_confirmation}
+                  onCheckedChange={(checked) => handleInputChange('send_confirmation', checked)}
+                  className="font-montserrat"
+                />
+                <label htmlFor="send_confirmation" className="text-sm font-montserrat cursor-pointer">
+                  Send reservation confirmation text
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="send_access_instructions"
+                  checked={formData.send_access_instructions}
+                  onCheckedChange={(checked) => handleInputChange('send_access_instructions', checked)}
+                  className="font-montserrat"
+                />
+                <label htmlFor="send_access_instructions" className="text-sm font-montserrat cursor-pointer">
+                  Send access instructions
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="send_reminder"
+                  checked={formData.send_reminder}
+                  onCheckedChange={(checked) => handleInputChange('send_reminder', checked)}
+                  className="font-montserrat"
+                />
+                <label htmlFor="send_reminder" className="text-sm font-montserrat cursor-pointer">
+                  Send 1-hour reminder
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <SheetFooter className="border-t border-[#ECEAE5] justify-between drawer-footer-content pt-4">
+          <div className="flex gap-3 mb-2">
+            <Button variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isSaving ? 'Creating...' : 'Create Reservation'}
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 };
 

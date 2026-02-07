@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { Spinner, useToast } from "@chakra-ui/react";
+import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/hooks/useToast";
 import Image from "next/image";
 import { getSupabaseClient } from "../../api/supabaseClient";
 import AdminLayout from '../../../components/layouts/AdminLayout';
@@ -63,7 +64,7 @@ interface Note {
 export default function MemberDetailAdmin() {
   const router = useRouter();
   const { accountId } = router.query;
-  const toast = useToast();
+  const { toast } = useToast();
 
   // Data states
   const [members, setMembers] = useState<Member[]>([]);
@@ -97,6 +98,9 @@ export default function MemberDetailAdmin() {
   const [newNote, setNewNote] = useState<Record<string, string>>({});
   const [editingNoteId, setEditingNoteId] = useState<Record<string, string | null>>({});
   const [editingNoteData, setEditingNoteData] = useState<Record<string, string>>({});
+
+  // Send login info state
+  const [sendingLoginInfo, setSendingLoginInfo] = useState(false);
 
   // Payment states
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -296,6 +300,53 @@ export default function MemberDetailAdmin() {
         status: 'error',
         duration: 5000,
       });
+    }
+  };
+
+  // Send login info handler
+  const handleSendLoginInfo = async (memberId: string) => {
+    const member = members.find(m => m.member_id === memberId);
+    if (!member) return;
+
+    const confirmed = window.confirm(
+      `Send login information to ${member.first_name} ${member.last_name} at ${member.phone}?\n\nThis will generate a temporary password and send it via SMS.`
+    );
+
+    if (!confirmed) return;
+
+    setSendingLoginInfo(true);
+
+    try {
+      const response = await fetch('/api/admin/send-login-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId,
+          generateTemporaryPassword: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send login information');
+      }
+
+      toast({
+        title: 'Login information sent',
+        description: data.message,
+        status: 'success',
+        duration: 5000,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error sending login info',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setSendingLoginInfo(false);
     }
   };
 
@@ -722,7 +773,7 @@ export default function MemberDetailAdmin() {
     return (
       <AdminLayout>
         <div className={styles.loading}>
-          <Spinner size="xl" color="#007aff" />
+          <Spinner size="xl" />
         </div>
       </AdminLayout>
     );
@@ -887,18 +938,32 @@ export default function MemberDetailAdmin() {
                                 <span>LTV: {formatCurrency(calculateMemberLTV(member.member_id))}</span>
                               </div>
                               {editingMemberId !== member.member_id && (
-                                <button
-                                  onClick={() => {
-                                    setEditingMemberId(member.member_id);
-                                    setEditingMemberData(member);
-                                  }}
-                                  className={styles.iconButton}
-                                  title="Edit Member"
-                                >
-                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                  </svg>
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleSendLoginInfo(member.member_id)}
+                                    className={styles.iconButton}
+                                    title="Send Login Info"
+                                    disabled={sendingLoginInfo || !member.phone}
+                                    style={{ marginRight: '8px' }}
+                                  >
+                                    <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingMemberId(member.member_id);
+                                      setEditingMemberData(member);
+                                    }}
+                                    className={styles.iconButton}
+                                    title="Edit Member"
+                                  >
+                                    <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                    </svg>
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -1116,7 +1181,7 @@ export default function MemberDetailAdmin() {
 
               {ledgerLoading ? (
             <div className={styles.sectionLoading}>
-              <Spinner size="md" color="#007aff" />
+              <Spinner size="md" />
             </div>
           ) : (
             <>
@@ -1311,7 +1376,7 @@ export default function MemberDetailAdmin() {
               <h2 className={styles.sectionTitle}>Messages</h2>
               {messagesLoading ? (
                 <div className={styles.sectionLoading}>
-                  <Spinner size="md" color="#007aff" />
+                  <Spinner size="md" />
                 </div>
               ) : (
                 <div className={styles.messagesList}>

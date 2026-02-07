@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useToast } from '@chakra-ui/react';
+import { useToast } from '@/hooks/useToast';
 import styles from '../styles/InlineAttachments.module.css';
 
 interface InlineAttachmentsProps {
@@ -23,7 +23,7 @@ const InlineAttachments: React.FC<InlineAttachmentsProps> = ({ ledgerId, memberI
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toast = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchAttachments();

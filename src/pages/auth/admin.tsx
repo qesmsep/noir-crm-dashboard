@@ -40,7 +40,7 @@ function AdminAuth() {
 
       if (data.user) {
         // TEMPORARY: Skip MFA setup and go straight to dashboard
-        router.push('/admin/dashboard');
+        router.push('/admin/dashboard-v2');
         return;
         // --- Original MFA logic below (commented out) ---
         // const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -81,7 +81,7 @@ function AdminAuth() {
 
       if (error) throw error;
 
-      router.push('/admin/dashboard');
+      router.push('/admin/dashboard-v2');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -111,7 +111,7 @@ function AdminAuth() {
 
       if (error) throw error;
 
-      router.push('/admin/dashboard');
+      router.push('/admin/dashboard-v2');
     } catch (err: any) {
       setError(err.message);
     } finally {

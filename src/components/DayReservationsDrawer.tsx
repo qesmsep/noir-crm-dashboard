@@ -1,24 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  VStack,
-  HStack,
-  Text,
-  Box,
-  Divider,
-  useToast,
-  Spinner,
-  Badge,
-  IconButton,
-  Button,
-  DrawerFooter,
-} from '@chakra-ui/react';
-import { ChevronRightIcon, CalendarIcon } from '@chakra-ui/icons';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/hooks/useToast';
+import { ChevronRight } from 'lucide-react';
 import { formatDateTime } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import styles from '../styles/ReservationsMobile.module.css';
@@ -57,7 +49,7 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
 }) => {
   const [reservations, setReservations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const toast = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && selectedDate) {
@@ -101,8 +93,7 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to load reservations for this day',
-        status: 'error',
-        duration: 5000,
+        variant: 'error',
       });
     } finally {
       setIsLoading(false);
@@ -397,191 +388,109 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
 
   // Desktop view (original)
   return (
-    <Drawer
-      isOpen={isOpen}
-      placement="left"
-      onClose={onClose}
-      size="sm"
-    >
-      <Box zIndex="2000" position="relative">
-        <DrawerOverlay bg="blackAlpha.600" />
-        <DrawerContent 
-          border="2px solid #353535" 
-          borderRadius="10px" 
-          fontFamily="Montserrat, sans-serif" 
-          maxW="350px" 
-          w="50vw" 
-          boxShadow="xl" 
-          mt="80px" 
-          mb="25px" 
-          paddingRight="40px" 
-          paddingLeft="40px" 
-          backgroundColor="#ecede8"
-        >
-          <DrawerHeader 
-            borderBottomWidth="1px" 
-            borderColor="#A59480"
-            margin="0" 
-            fontWeight="bold" 
-            paddingTop="0px" 
-            fontSize="24px" 
-            fontFamily="IvyJournal, sans-serif" 
-            color="#353535"
-          >
-            <HStack spacing={1}>
-              
-              <VStack align="start" spacing={0}>
-                <Text fontSize="lg" fontFamily="IvyJournal, sans-serif">
-                  {selectedDate ? formatDate(selectedDate) : 'Select a Date'}
-                </Text>
-                <Text fontSize="18px" color="#A59480" fontFamily="Montserrat, sans-serif">
-                  {reservations.length} reservation{reservations.length !== 1 ? 's' : ''}
-                </Text>
-              </VStack>
-            </HStack>
-          </DrawerHeader>
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        side="left"
+        className="w-[350px] max-w-[50vw] bg-[#ecede8] border-2 border-[#353535] rounded-[10px] shadow-xl mt-20 mb-6 px-10 py-0 font-montserrat z-[2000]"
+      >
+        <SheetHeader className="border-b border-[#A59480] pb-4 pt-0">
+          <SheetTitle className="text-left">
+            <div className="flex flex-col gap-0">
+              <div className="text-lg font-ivyjournal text-[#353535]">
+                {selectedDate ? formatDate(selectedDate) : 'Select a Date'}
+              </div>
+              <div className="text-[18px] text-[#A59480] font-montserrat font-normal">
+                {reservations.length} reservation{reservations.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </SheetTitle>
+        </SheetHeader>
 
-          <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
-            {isLoading ? (
-              <VStack justify="center" align="center" h="100%">
-                <Spinner size="xl" color="#353535" />
-              </VStack>
-            ) : reservations.length === 0 ? (
-              <Box 
-                display="flex" 
-                flexDirection="column" 
-                justifyContent="center" 
-                alignItems="center" 
-                width="100%"
-                h="200px"
-                textAlign="center"
-                p={6}
-              >
-                <Text fontSize="lg" color="#353535" fontFamily="Montserrat, sans-serif">
-                  No reservations for this day
-                </Text>
-                <Text fontSize="sm" color="#666" mt={2} fontFamily="Montserrat, sans-serif">
-                  Select a different date or create a new reservation
-                </Text>
-              </Box>
-            ) : (
-              <VStack spacing={0} align="stretch">
-                {reservations.map((reservation, index) => {
-                  const heart = reservation.membership_type === 'member' ? '🖤 ' : '';
-                  const emoji = getEventTypeEmoji(reservation.event_type);
-                  const tableNumber = reservation.tables?.table_number || 'N/A';
-                  
-                  return (
-                    <Box key={reservation.id}>
-                      <Button
-                        
-                        h="auto"
-                        width="100%"
-                        p={4}
-                        bg="transparent"
-                        _hover={{ bg: 'rgba(165, 148, 128, 0.1)' }}
-                        _active={{ bg: 'rgba(165, 148, 128, 0.2)' }}
-                        borderRadius={0}
-                        borderBottom="1px solid rgba(165, 148, 128, 0.2)"
-                        onClick={() => onReservationClick(reservation.id)}
-                        display="flex"
-                        flexDirection="column"
-                        alignItems="stretch"
-                        textAlign="left"
-                        fontFamily="Montserrat, sans-serif"
-                      >
-                        <HStack justify="space-between" align="start" w="full">
-                          <VStack align="start" spacing={1} flex={1}>
-                            <HStack margin="0" spacing={2} align="center">
-                              <Text 
-                                fontSize="sm" 
-                                fontWeight="bold" 
-                                color="#353535"
-                                fontFamily="Montserrat, sans-serif"
-                              >
-                                {formatTime(reservation.start_time)}
-                              </Text>
-                              <Badge 
-                                size="sm" 
-                                colorScheme={reservation.membership_type === 'member' ? 'purple' : 'gray'}
-                                fontFamily="Montserrat, sans-serif"
-                              >
-                                {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
-                              </Badge>
-                              <Text 
-                              fontSize="md" 
-                              fontWeight="semibold" 
-                              color="#353535"
-                              fontFamily="Montserrat, sans-serif"
-                              lineHeight="1.2"
+        <div className="p-4 overflow-y-auto drawer-body-content flex-1">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-full">
+              <Spinner className="w-12 h-12 text-[#353535]" />
+            </div>
+          ) : reservations.length === 0 ? (
+            <div className="flex flex-col justify-center items-center w-full h-[200px] text-center p-6">
+              <p className="text-lg text-[#353535] font-montserrat">
+                No reservations for this day
+              </p>
+              <p className="text-sm text-[#666] mt-2 font-montserrat">
+                Select a different date or create a new reservation
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {reservations.map((reservation, index) => {
+                const heart = reservation.membership_type === 'member' ? '🖤 ' : '';
+                const emoji = getEventTypeEmoji(reservation.event_type);
+                const tableNumber = reservation.tables?.table_number || 'N/A';
+
+                return (
+                  <div key={reservation.id}>
+                    <button
+                      className="w-full p-4 bg-transparent hover:bg-[rgba(165,148,128,0.1)] active:bg-[rgba(165,148,128,0.2)] rounded-none border-b border-[rgba(165,148,128,0.2)] flex flex-col items-stretch text-left font-montserrat transition-colors"
+                      onClick={() => onReservationClick(reservation.id)}
+                    >
+                      <div className="flex justify-between items-start w-full">
+                        <div className="flex flex-col items-start gap-1 flex-1">
+                          <div className="flex items-center gap-2 m-0 flex-wrap">
+                            <span className="text-sm font-bold text-[#353535] font-montserrat">
+                              {formatTime(reservation.start_time)}
+                            </span>
+                            <Badge
+                              variant={reservation.membership_type === 'member' ? 'default' : 'secondary'}
+                              className="text-xs font-montserrat"
                             >
+                              {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
+                            </Badge>
+                            <span className="text-base font-semibold text-[#353535] font-montserrat leading-tight">
                               {reservation.first_name} {reservation.last_name}
-                            </Text>
-                            <Text 
-                                fontSize="sm" 
-                                color="#666"
-                                fontFamily="Montserrat, sans-serif"
-                              >
-                                Party of {reservation.party_size}
-                              </Text>
-                              <Badge size="sm" colorScheme="blue" fontFamily="Montserrat, sans-serif">
-                                {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
-                              </Badge>
-                              <Text 
-                                fontSize="sm" 
-                                color="#666"
-                                fontFamily="Montserrat, sans-serif"
-                              >
-                                Table {tableNumber}
-                              </Text>
-                              {emoji && (
-                                <Text fontSize="sm">{emoji}</Text>
-                              )}
-                            </HStack>
-                            
-                          
-                            
-                             
-                            
-                            {reservation.event_type && (
-                              <Text 
-                                fontSize="xs" 
-                                color="#A59480"
-                                fontFamily="Montserrat, sans-serif"
-                                textTransform="capitalize"
-                              >
-                                {reservation.event_type.replace('_', ' ')}
-                              </Text>
+                            </span>
+                            <span className="text-sm text-[#666] font-montserrat">
+                              Party of {reservation.party_size}
+                            </span>
+                            <Badge variant="outline" className="text-xs font-montserrat">
+                              {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
+                            </Badge>
+                            <span className="text-sm text-[#666] font-montserrat">
+                              Table {tableNumber}
+                            </span>
+                            {emoji && (
+                              <span className="text-sm">{emoji}</span>
                             )}
-                          </VStack>
-                          
-                          <ChevronRightIcon color="#A59480" />
-                        </HStack>
-                      </Button>
-                    </Box>
-                  );
-                })}
-              </VStack>
-            )}
-          </DrawerBody>
+                          </div>
 
-          <DrawerFooter borderTopWidth="1px" borderColor="#A59480" justifyContent="center" className="drawer-footer-content">
-            <Button
-              onClick={onClose}
-              variant="outline"
-              size="md"
-              fontFamily="Montserrat, sans-serif"
-              fontWeight="semibold"
-              color="#353535"
-              borderColor="#353535"
-              _hover={{ bg: 'rgba(53, 53, 53, 0.1)' }}
-            >
-              Close
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Box>
-    </Drawer>
+                          {reservation.event_type && (
+                            <p className="text-xs text-[#A59480] font-montserrat capitalize">
+                              {reservation.event_type.replace('_', ' ')}
+                            </p>
+                          )}
+                        </div>
+
+                        <ChevronRight className="text-[#A59480]" size={20} />
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <SheetFooter className="border-t border-[#A59480] justify-center drawer-footer-content pt-4">
+          <Button
+            onClick={onClose}
+            variant="outline"
+            size="default"
+            className="font-montserrat font-semibold text-[#353535] border-[#353535] hover:bg-[rgba(53,53,53,0.1)]"
+          >
+            Close
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 };
 
