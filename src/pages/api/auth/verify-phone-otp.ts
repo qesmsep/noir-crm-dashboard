@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { z } from 'zod';
+import { serialize } from 'cookie';
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
@@ -8,6 +9,7 @@ const requestSchema = z.object({
 });
 
 const MAX_ATTEMPTS = 5;
+const SESSION_DURATION_DAYS = 7;
 
 export default async function handler(
   req: NextApiRequest,
@@ -138,7 +140,7 @@ export default async function handler(
 
     // Generate session token for member
     const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
 
     // Create member portal session
     const { error: sessionError } = await supabaseAdmin
@@ -154,9 +156,19 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to create session' });
     }
 
+    // Set httpOnly cookie for session (secure in production)
+    res.setHeader('Set-Cookie', [
+      serialize('member_session', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
+        path: '/',
+      }),
+    ]);
+
     res.status(200).json({
       success: true,
-      sessionToken,
       member: {
         id: member.member_id,
         email: member.email,

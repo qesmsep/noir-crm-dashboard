@@ -28,45 +28,75 @@ const UserIcon = ({ ...props }) => (
   </svg>
 );
 
+const WalletIcon = ({ ...props }) => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+  </svg>
+);
+
 interface NavItem {
   label: string;
   icon: React.ComponentType<any>;
-  path: string;
+  path?: string;
+  action?: () => void;
 }
 
-const navItems: NavItem[] = [
-  { label: 'Dashboard', icon: HomeIcon, path: '/member/dashboard' },
-  { label: 'Book', icon: BookIcon, path: '/member/book' },
-  { label: 'Reservations', icon: ListIcon, path: '/member/reservations' },
-  { label: 'Profile', icon: UserIcon, path: '/member/profile' },
-];
+interface MemberNavProps {
+  onBookClick?: () => void;
+}
 
-export default function MemberNav() {
+export default function MemberNav({ onBookClick }: MemberNavProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const navItems: NavItem[] = [
+    { label: 'Dashboard', icon: HomeIcon, path: '/member/dashboard' },
+    { label: 'Book', icon: BookIcon, action: onBookClick },
+    { label: 'Reservations', icon: ListIcon, path: '/member/reservations' },
+    { label: 'Balance', icon: WalletIcon, path: '/member/balance' },
+    { label: 'Profile', icon: UserIcon, path: '/member/profile' },
+  ];
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#ECEAE5] shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-[1000]">
-      <div className="flex justify-around items-center h-[70px] max-w-7xl mx-auto">
-        {navItems.map((item) => {
-          const isActive = pathname === item.path;
-          const Icon = item.icon;
+      <div className="flex items-center h-[70px] max-w-7xl mx-auto px-4">
+        {/* Logo */}
+        <div className="flex-shrink-0 mr-2">
+          <img
+            src="/images/noir-wedding-day.png"
+            alt="Noir"
+            className="h-6"
+          />
+        </div>
 
-          return (
-            <div
-              key={item.path}
-              className={`flex flex-col items-center gap-1 cursor-pointer flex-1 py-2 transition-colors duration-200 ${
-                isActive ? 'text-[#A59480]' : 'text-[#5A5A5A]'
-              } hover:text-[#A59480]`}
-              onClick={() => router.push(item.path)}
-            >
-              <Icon />
-              <span className={`text-xs ${isActive ? 'font-medium' : 'font-normal'}`}>
-                {item.label}
-              </span>
-            </div>
-          );
-        })}
+        {/* Nav Items */}
+        <div className="flex justify-around items-center flex-1">
+          {navItems.map((item, index) => {
+            const isActive = item.path ? pathname === item.path : false;
+            const Icon = item.icon;
+
+            return (
+              <div
+                key={item.path || index}
+                className={`flex flex-col items-center gap-1 cursor-pointer py-2 transition-colors duration-200 ${
+                  isActive ? 'text-[#A59480]' : 'text-[#5A5A5A]'
+                } hover:text-[#A59480]`}
+                onClick={() => {
+                  if (item.action) {
+                    item.action();
+                  } else if (item.path) {
+                    router.push(item.path);
+                  }
+                }}
+              >
+                <Icon />
+                <span className={`text-xs ${isActive ? 'font-medium' : 'font-normal'}`}>
+                  {item.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

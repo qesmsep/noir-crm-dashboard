@@ -75,10 +75,10 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to send verification code' });
     }
 
-    // Send SMS via OpenPhone
+    // Send SMS via OpenPhone (requires E.164 format: +1XXXXXXXXXX)
     try {
       await sendPersonalizedSMS(
-        normalizedPhone,
+        `+1${normalizedPhone}`,
         `Your Noir verification code is: ${code}\n\nThis code expires in 10 minutes.`,
         member.first_name
       );

@@ -14,11 +14,12 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/useToast';
 import { Separator } from '@/components/ui/separator';
+import { LogOut } from 'lucide-react';
 
 export default function MemberProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { member, loading, refreshMember } = useMemberAuth();
+  const { member, loading, refreshMember, signOut } = useMemberAuth();
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -97,6 +98,24 @@ export default function MemberProfilePage() {
     setEditing(false);
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: 'Logged out',
+        description: 'You have been signed out successfully',
+        variant: 'success',
+      });
+      router.push('/member/login');
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to log out',
+        variant: 'error',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#ECEDE8]">
@@ -111,8 +130,8 @@ export default function MemberProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#ECEDE8] pb-20">
-      {/* Header */}
-      <div className="bg-white border-b border-[#ECEAE5] sticky top-0 z-10">
+      {/* Header - Hidden on mobile */}
+      <div className="bg-white border-b border-[#ECEAE5] sticky top-0 z-10 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             <img
@@ -128,14 +147,11 @@ export default function MemberProfilePage() {
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
         <div className="flex flex-col gap-6">
-          {/* Header */}
+          {/* Page Title */}
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-[#1F1F1F] mb-2">
-              My Profile
+            <h1 className="text-3xl md:text-4xl text-[#1F1F1F] mb-2" style={{ fontFamily: 'CONEBARS' }}>
+              Welcome back, {member.first_name}
             </h1>
-            <p className="text-[#5A5A5A]">
-              Manage your account information
-            </p>
           </div>
 
           {/* Profile Card */}
@@ -322,6 +338,15 @@ export default function MemberProfilePage() {
                   onClick={() => router.push('/member/settings')}
                 >
                   Security Settings
+                </Button>
+                <Separator className="my-1" />
+                <Button
+                  variant="ghost"
+                  className="justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Log Out
                 </Button>
               </div>
             </CardContent>

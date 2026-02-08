@@ -97,14 +97,33 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
         .from('members')
         .select('*')
         .eq('auth_user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        // PGRST116 (no rows) is expected for non-member users - don't log
-        if (error.code !== 'PGRST116') {
-          console.error('Error fetching member from auth:', error);
-        }
+        console.error('[MemberAuthContext] Error fetching member from auth:', error);
         setMember(null);
+        return;
+      }
+
+      // If no member found (e.g., admin user), silently ignore
+      if (!data) {
+        console.log('[MemberAuthContext] No member found for Supabase user (likely admin), checking cookie session...');
+        // Fall back to cookie-based session check
+        const sessionResponse = await fetch('/api/auth/check-session', {
+          credentials: 'include',
+        });
+
+        if (sessionResponse.ok) {
+          const sessionData = await sessionResponse.json();
+          if (sessionData.member) {
+            console.log('[MemberAuthContext] Cookie session found:', sessionData.member?.first_name);
+            setMember(sessionData.member as Member);
+          } else {
+            setMember(null);
+          }
+        } else {
+          setMember(null);
+        }
         return;
       }
 
@@ -171,46 +190,99 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
 
   // Initialize auth state
   useEffect(() => {
+    let mounted = true;
+
     const initAuth = async () => {
-      // First, check for httpOnly cookie session (password/biometric login)
-      await fetchMemberFromSession();
+      try {
+        console.log('[MemberAuthContext] Initializing auth...');
 
-      // If no session, check for Supabase Auth session (email magic link)
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+        // First, check for httpOnly cookie session (password/biometric login)
+        const sessionResponse = await fetch('/api/auth/check-session', {
+          credentials: 'include',
+        });
 
-      if (session?.user && !member) {
-        await fetchMemberFromAuth(session.user.id);
+        console.log('[MemberAuthContext] Session check response:', sessionResponse.status, sessionResponse.ok);
+
+        if (sessionResponse.ok && mounted) {
+          const data = await sessionResponse.json();
+          console.log('[MemberAuthContext] Session found, member:', data.member?.first_name);
+          setMember(data.member as Member);
+          setLoading(false);
+          return; // Session found, no need to check Supabase Auth
+        }
+
+        console.log('[MemberAuthContext] No session cookie, checking Supabase Auth...');
+
+        // If no session cookie, check for Supabase Auth session (email magic link)
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          console.log('[MemberAuthContext] Supabase session found, fetching member...');
+          await fetchMemberFromAuth(session.user.id);
+        } else {
+          console.log('[MemberAuthContext] No auth found, clearing member');
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('[MemberAuthContext] Error initializing auth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-
-      setLoading(false);
     };
 
     initAuth();
 
     // Listen for Supabase auth state changes (email magic link)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('[MemberAuthContext] Auth state changed:', _event, 'has session:', !!session);
+
+      if (!mounted) return;
+
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        console.log('[MemberAuthContext] Supabase session in state change, fetching member...');
         await fetchMemberFromAuth(session.user.id);
-      } else if (!member) {
-        // Only clear member if we don't have a session cookie
-        await fetchMemberFromSession();
+      } else {
+        console.log('[MemberAuthContext] No Supabase session, checking cookie...');
+        // Check if there's a session cookie before clearing member
+        const sessionResponse = await fetch('/api/auth/check-session', {
+          credentials: 'include',
+        });
+
+        if (sessionResponse.ok) {
+          const data = await sessionResponse.json();
+          console.log('[MemberAuthContext] Cookie session found in state change:', data.member?.first_name);
+          setMember(data.member as Member);
+        } else {
+          console.log('[MemberAuthContext] No cookie session, clearing member');
+          setMember(null);
+        }
       }
 
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchMemberFromSession, fetchMemberFromAuth]);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchMemberFromAuth]);
 
   // Track member when they sign in
-  useEffect(() => {
-    if (user && member) {
-      trackSession(user.id, member.member_id);
-    }
-  }, [user, member, trackSession]);
+  // NOTE: Session tracking is handled server-side in the login API endpoint
+  // to avoid RLS policy issues. Client-side session tracking is disabled.
+  // useEffect(() => {
+  //   if (user && member) {
+  //     trackSession(user.id, member.member_id);
+  //   }
+  // }, [user, member, trackSession]);
 
   // Update session activity every 5 minutes
   useEffect(() => {

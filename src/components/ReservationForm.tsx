@@ -23,6 +23,12 @@ interface ReservationFormProps {
   isMember?: boolean;
   onClose?: () => void;
   baseDays?: number[];
+  memberData?: {
+    phone: string;
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+  };
 }
 
 interface FormData {
@@ -129,7 +135,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   isEdit,
   isMember = false,
   onClose,
-  baseDays = []
+  baseDays = [],
+  memberData
 }) => {
   const toast = useToast();
   const { colors } = useTheme();
@@ -447,11 +454,16 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     // Debounce the API call to avoid excessive requests
     debounceTimerRef.current = setTimeout(async () => {
       async function fetchAvailableTimes() {
-        if (!date || !form.party_size || form.party_size < 1) return;
-        
+        if (!date || !form.party_size || form.party_size < 1) {
+          console.log('Skipping fetch - missing data:', { date: date?.toFormat('yyyy-MM-dd'), party_size: form.party_size });
+          return;
+        }
+
         // Format date as YYYY-MM-DD using Luxon
         const dateStr = date.toFormat('yyyy-MM-dd');
-        
+
+        console.log('Fetching available slots for:', { dateStr, party_size: form.party_size, phone: form.phone });
+
         try {
           const { slots } = await fetchAvailableSlotsCached(dateStr, form.party_size);
           const normalizedSlots: string[] = Array.isArray(slots) ? slots : [];
@@ -488,71 +500,77 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
   // Prefetch availability map for the booking window to gray out dates with no availability
   // Optimized: batches requests and limits concurrency
-  useEffect(() => {
-    let cancelled = false;
-    
-    async function prefetchAvailability() {
-      if (!form.party_size || form.party_size < 1) return;
-      // Use effectiveStartDate and effectiveMaxDate (not calendarMaxDate) since we're hiding 2026 dates for non-members
-      const start = DateTime.fromJSDate(effectiveStartDate).startOf('day');
-      const end = effectiveMaxDate ? DateTime.fromJSDate(effectiveMaxDate).endOf('day') : DateTime.now().plus({ days: 60 });
-      const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
-
-      const newMap: Record<string, boolean> = {};
-      const datesToCheck: string[] = [];
-      
-      // First pass: identify dates that need checking (only within booking window)
-      let cursor = start;
-      while (cursor <= end) {
-        const dateStr = cursor.toFormat('yyyy-MM-dd');
-        
-        const isExceptionalOpen = exceptionalOpens.includes(dateStr);
-        const isBaseDay = effectiveBaseDays.includes(cursor.weekday % 7);
-        const isClosed = exceptionalClosures.includes(dateStr);
-        const isPrivateEvent = privateEventDates.includes(dateStr);
-
-        if (!((isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent)) {
-          newMap[dateStr] = false;
-        } else {
-          datesToCheck.push(dateStr);
-        }
-        cursor = cursor.plus({ days: 1 });
-      }
-      
-      // Batch requests with concurrency limit (process 5 at a time)
-      const CONCURRENT_LIMIT = 5;
-      for (let i = 0; i < datesToCheck.length; i += CONCURRENT_LIMIT) {
-        if (cancelled) break;
-        
-        const batch = datesToCheck.slice(i, i + CONCURRENT_LIMIT);
-        const promises = batch.map(async (dateStr) => {
-          try {
-            const { slots } = await fetchAvailableSlotsCached(dateStr, form.party_size!);
-            return { dateStr, hasSlots: slots.length > 0 };
-          } catch (e) {
-            // If API fails, don't block date purely due to error
-            return { dateStr, hasSlots: true };
-          }
-        });
-        
-        const results = await Promise.all(promises);
-        results.forEach(({ dateStr, hasSlots }) => {
-          newMap[dateStr] = hasSlots;
-        });
-      }
-      
-      if (!cancelled) {
-        setAvailabilityByDate(newMap);
-      }
-    }
-    
-    prefetchAvailability();
-    
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.party_size, effectiveStartDate, effectiveMaxDate, baseDays, internalBaseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
+  // DISABLED: Causing infinite loop issues in member portal
+  // useEffect(() => {
+  //   let cancelled = false;
+  //
+  //   async function prefetchAvailability() {
+  //     if (!form.party_size || form.party_size < 1) return;
+  //     // Use effectiveStartDate and effectiveMaxDate (not calendarMaxDate) since we're hiding 2026 dates for non-members
+  //     const start = DateTime.fromJSDate(effectiveStartDate).startOf('day');
+  //     const end = effectiveMaxDate ? DateTime.fromJSDate(effectiveMaxDate).endOf('day') : DateTime.now().plus({ days: 60 });
+  //     const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
+  //
+  //     const newMap: Record<string, boolean> = {};
+  //     const datesToCheck: string[] = [];
+  //
+  //     // First pass: identify dates that need checking (only within booking window)
+  //     let cursor = start;
+  //     while (cursor <= end) {
+  //       const dateStr = cursor.toFormat('yyyy-MM-dd');
+  //
+  //       const isExceptionalOpen = exceptionalOpens.includes(dateStr);
+  //       const isBaseDay = effectiveBaseDays.includes(cursor.weekday % 7);
+  //       const isClosed = exceptionalClosures.includes(dateStr);
+  //       const isPrivateEvent = privateEventDates.includes(dateStr);
+  //
+  //       if (!((isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent)) {
+  //         newMap[dateStr] = false;
+  //       } else {
+  //         datesToCheck.push(dateStr);
+  //       }
+  //       cursor = cursor.plus({ days: 1 });
+  //     }
+  //
+  //     // Batch requests with concurrency limit (process 5 at a time)
+  //     const CONCURRENT_LIMIT = 5;
+  //     for (let i = 0; i < datesToCheck.length; i += CONCURRENT_LIMIT) {
+  //       if (cancelled) break;
+  //
+  //       const batch = datesToCheck.slice(i, i + CONCURRENT_LIMIT);
+  //       const promises = batch.map(async (dateStr) => {
+  //         try {
+  //           const { slots } = await fetchAvailableSlotsCached(dateStr, form.party_size!);
+  //           return { dateStr, hasSlots: slots.length > 0 };
+  //         } catch (e) {
+  //           // If API fails, don't block date purely due to error
+  //           return { dateStr, hasSlots: true };
+  //         }
+  //       });
+  //
+  //       const results = await Promise.all(promises);
+  //       results.forEach(({ dateStr, hasSlots }) => {
+  //         newMap[dateStr] = hasSlots;
+  //       });
+  //     }
+  //
+  //     if (!cancelled) {
+  //       // Only update if the data has actually changed to prevent infinite loops
+  //       setAvailabilityByDate(prev => {
+  //         const changed = Object.keys(newMap).some(key => prev[key] !== newMap[key]) ||
+  //                        Object.keys(prev).length !== Object.keys(newMap).length;
+  //         return changed ? newMap : prev;
+  //       });
+  //     }
+  //   }
+  //
+  //   prefetchAvailability();
+  //
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [form.party_size, effectiveStartDate, effectiveMaxDate, baseDays, internalBaseDays, exceptionalClosures, exceptionalOpens, privateEventDates]);
 
   // Set default time only when availableTimes changes and current time is not in slots
   useEffect(() => {
@@ -718,6 +736,33 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     setForm({ ...form, phone: digits.length > 0 ? formatPhoneStorage(digits) : '' });
   };
 
+  // Populate member data when component mounts for members
+  useEffect(() => {
+    if (isMember && memberData) {
+      // Ensure phone is in correct format: +1XXXXXXXXXX
+      let formattedPhone = memberData.phone || '';
+      if (formattedPhone && !formattedPhone.startsWith('+')) {
+        const digits = formattedPhone.replace(/\D/g, '');
+        formattedPhone = `+1${digits.slice(-10)}`; // Take last 10 digits and add +1
+      }
+
+      console.log('Populating member data:', {
+        phone: formattedPhone,
+        email: memberData.email,
+        first_name: memberData.first_name,
+        last_name: memberData.last_name,
+      });
+
+      setForm(prev => ({
+        ...prev,
+        phone: formattedPhone,
+        email: memberData.email || prev.email,
+        first_name: memberData.first_name || prev.first_name,
+        last_name: memberData.last_name || prev.last_name,
+      }));
+    }
+  }, [isMember, memberData]);
+
   // Sync displayPhone if form.phone is set programmatically
   useEffect(() => {
     if (!form.phone) {
@@ -762,7 +807,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     const isExceptionalOpen = exceptionalOpens.includes(dateStr);
     const isClosed = exceptionalClosures.includes(dateStr);
     const isPrivateEvent = privateEventDates.includes(dateStr);
-    const hasAvailability = availabilityByDate[dateStr] === true;
 
     if (!isBaseDay && !isExceptionalOpen) {
       toast({
@@ -779,75 +823,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       toast({
         title: 'Date not available',
         description: 'The selected date is closed or has a private event.',
-        status: 'error',
-        duration: 3000,
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Check availability - if not in map yet, verify it now
-    if (availabilityByDate[dateStr] === undefined) {
-      // Availability hasn't been checked yet, verify it now
-      try {
-        const res = await fetch('/api/available-slots', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr, party_size: form.party_size })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const slots: string[] = Array.isArray(data?.slots) ? data.slots : [];
-          const dateHasAvailability = slots.length > 0;
-          // Update the availability map
-          setAvailabilityByDate(prev => ({ ...prev, [dateStr]: dateHasAvailability }));
-          
-          if (!dateHasAvailability) {
-            toast({
-              title: 'No availability',
-              description: 'The selected date does not have availability for your party size. Please select a different date.',
-              status: 'error',
-              duration: 3000,
-            });
-            setIsSubmitting(false);
-            return;
-          }
-          // Verify the selected time is in the available slots
-          if (!slots.includes(time)) {
-            toast({
-              title: 'Time not available',
-              description: 'The selected time is no longer available. Please select a different time.',
-              status: 'error',
-              duration: 3000,
-            });
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          toast({
-            title: 'Availability check failed',
-            description: 'Unable to verify availability. Please try again.',
-            status: 'error',
-            duration: 3000,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking availability:', error);
-        toast({
-          title: 'Availability check failed',
-          description: 'Unable to verify availability. Please try again.',
-          status: 'error',
-          duration: 3000,
-        });
-        setIsSubmitting(false);
-        return;
-      }
-    } else if (!hasAvailability) {
-      toast({
-        title: 'No availability',
-        description: 'The selected date does not have availability for your party size. Please select a different date.',
         status: 'error',
         duration: 3000,
       });
@@ -1235,12 +1210,13 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
   return (
     <Box fontFamily="Montserrat, sans-serif" color="nightSky" w="full" minH="auto">
-      <Box 
-        bg="#fff" 
-        borderRadius="2xl" 
-        boxShadow="2xl" 
-        p={{ base: 4, sm: 6, md: 8 }} 
-        w="full" 
+      <Box
+        bg="#fff"
+        borderRadius="2xl"
+        boxShadow="2xl"
+        p={{ base: 4, sm: 6, md: 8 }}
+        pt={isMember ? { base: 8, sm: 10, md: 12 } : { base: 4, sm: 6, md: 8 }}
+        w="full"
         maxW={{ base: "full", sm: "400px" }}
         mx="auto"
         minH="auto"
@@ -1248,12 +1224,14 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         className="reservation-form-content"
       >
         <form onSubmit={handleReservationSubmit}>
-          <VStack spacing={{ base: 4, sm: 5 }} align="stretch" w="100%" minH="auto">
+          <VStack spacing={isMember ? { base: 3, sm: 3 } : { base: 4, sm: 5 }} align="stretch" w="100%" minH="auto">
             {/* Party Size */}
             <FormControl isRequired>
-              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
-                Party Size
-              </FormLabel>
+              {!isMember && (
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Party Size
+                </FormLabel>
+              )}
               <Select
                 value={form.party_size || ''}
                 onChange={handlePartySizeChange}
@@ -1285,9 +1263,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Date */}
             <FormControl isRequired>
-              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
-                Date
-              </FormLabel>
+              {!isMember && (
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Date
+                </FormLabel>
+              )}
               <Box position="relative" w="full">
                 <DatePicker
                   selected={date.toJSDate()}
@@ -1298,20 +1278,28 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   popperPlacement="bottom-start"
                   dayClassName={(d: Date) => {
                     const dateStr = DateTime.fromJSDate(d).toFormat('yyyy-MM-dd');
-                    const availabilityStatus = availabilityByDate[dateStr];
-                    const isUnavailable = availabilityStatus === false;
-                    
+
                     // Check if date is outside the selectable window
                     // Normalize both dates to start of day for proper comparison (consistent with filterDate)
                     const dateDateTime = DateTime.fromJSDate(d).startOf('day');
                     const maxSelectableDate = effectiveMaxDate ? DateTime.fromJSDate(effectiveMaxDate).startOf('day') : null;
                     const isOutsideSelectableWindow = maxSelectableDate && dateDateTime > maxSelectableDate;
-                    
-                    // Add unavailable class for dates that are unavailable or outside selectable window
-                    if (isUnavailable || isOutsideSelectableWindow) {
+
+                    // Check if date is a valid venue day (base day or exceptional open)
+                    const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
+                    const isExceptionalOpen = exceptionalOpens.includes(dateStr);
+                    const isBaseDay = effectiveBaseDays.includes(d.getDay());
+                    const isClosed = exceptionalClosures.includes(dateStr);
+                    const isPrivateEvent = privateEventDates.includes(dateStr);
+
+                    // If the date is not a valid venue day or is explicitly closed, mark as unavailable
+                    const isVenueDay = (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent;
+
+                    // Add unavailable class for dates that are not valid venue days or outside selectable window
+                    if (!isVenueDay || isOutsideSelectableWindow) {
                       return 'react-datepicker__day--unavailable';
                     }
-                    
+
                     return '';
                   }}
                   renderCustomHeader={({ date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => {
@@ -1354,13 +1342,12 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     if (!isMember && d >= membersOnlyStartDate) {
                       return false;
                     }
-                    
+
                     // Only allow dates that are:
                     // - within booking window (handled by minDate/maxDate)
                     // - on a base open day or exceptional open
                     // - not in exceptional closures (full day)
                     // - not in private event dates
-                    // - have availability for the selected party size
                     // Use Luxon for date formatting
                     const dateStr = DateTime.fromJSDate(d).toFormat('yyyy-MM-dd');
                     const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
@@ -1368,16 +1355,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     const isBaseDay = effectiveBaseDays.includes(d.getDay());
                     const isClosed = exceptionalClosures.includes(dateStr);
                     const isPrivateEvent = privateEventDates.includes(dateStr);
-                    
-                    // Check availability: block if explicitly false
-                    const availabilityStatus = availabilityByDate[dateStr];
-                    const isUnavailable = availabilityStatus === false;
-                    
-                    // If unavailable, prevent selection
-                    if (isUnavailable) {
-                      return false;
-                    }
-                    
+
                     // Allow dates that meet all criteria
                     return (isExceptionalOpen || isBaseDay) && !isClosed && !isPrivateEvent;
                   }}
@@ -1406,9 +1384,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Time */}
             <FormControl isRequired isDisabled={availableTimes.length === 0}>
-              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
-                Time
-              </FormLabel>
+              {!isMember && (
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Time
+                </FormLabel>
+              )}
               <Select
                 value={time}
                 onChange={handleTimeChange}
@@ -1445,31 +1425,33 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               )}
             </FormControl>
 
-            {/* Phone */}
-            <FormControl isRequired>
-              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
-                Phone Number *
-              </FormLabel>
-              <Input
-                name="phone"
-                value={displayPhone}
-                onChange={handlePhoneChange}
-                placeholder="(555) 555-5555"
-                size={{ base: "md", sm: "lg" }}
-                h={{ base: "44px", sm: "48px" }}
-                borderRadius="lg"
-                borderColor="gray.200"
-                _hover={{ borderColor: 'gray.300' }}
-                _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                fontSize={{ base: "sm", sm: "md" }}
-                isInvalid={!form.phone && isSubmitting}
-              />
-              {!form.phone && isSubmitting && (
-                <Text color="red.500" fontSize="xs" mt={1}>
-                  Phone number is required
-                </Text>
-              )}
-            </FormControl>
+            {/* Phone - Hidden for members who are already logged in */}
+            {!isMember && (
+              <FormControl isRequired>
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Phone Number *
+                </FormLabel>
+                <Input
+                  name="phone"
+                  value={displayPhone}
+                  onChange={handlePhoneChange}
+                  placeholder="(555) 555-5555"
+                  size={{ base: "md", sm: "lg" }}
+                  h={{ base: "44px", sm: "48px" }}
+                  borderRadius="lg"
+                  borderColor="gray.200"
+                  _hover={{ borderColor: 'gray.300' }}
+                  _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                  fontSize={{ base: "sm", sm: "md" }}
+                  isInvalid={!form.phone && isSubmitting}
+                />
+                {!form.phone && isSubmitting && (
+                  <Text color="red.500" fontSize="xs" mt={1}>
+                    Phone number is required
+                  </Text>
+                )}
+              </FormControl>
+            )}
 
             {/* Non-member fields */}
             {!isMember && (
@@ -1549,9 +1531,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Event Type */}
             <FormControl>
-              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
-                Occasion (Optional)
-              </FormLabel>
+              {!isMember && (
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Occasion (Optional)
+                </FormLabel>
+              )}
               <Select
                 name="event_type"
                 value={form.event_type}
@@ -1573,9 +1557,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
             {/* Notes */}
             <FormControl>
-              <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
-                Special Requests (Optional)
-              </FormLabel>
+              {!isMember && (
+                <FormLabel fontSize={{ base: "sm", sm: "md" }} fontWeight="medium" color="gray.600" mb={{ base: 2, sm: 1 }}>
+                  Special Requests (Optional)
+                </FormLabel>
+              )}
               <Input
                 name="notes"
                 value={form.notes}

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { serialize } from 'cookie';
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
@@ -12,6 +13,8 @@ const requestSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number'),
 });
 
+const SESSION_DURATION_DAYS = 7;
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -21,10 +24,13 @@ export default async function handler(
   }
 
   try {
+    console.log('[SET-PASSWORD] Request body:', req.body);
     const { phone, otpCode, newPassword } = requestSchema.parse(req.body);
 
-    // Normalize phone number
-    const normalizedPhone = phone.replace(/[\s\-\(\)]/g, '');
+    // Normalize phone number (remove all non-digits, then take last 10 digits)
+    const digitsOnly = phone.replace(/\D/g, '');
+    const normalizedPhone = digitsOnly.slice(-10);
+    console.log('[SET-PASSWORD] Normalized phone:', normalizedPhone);
 
     // Verify OTP first (security requirement)
     const { data: otpRecords, error: fetchError } = await supabaseAdmin
@@ -63,14 +69,30 @@ export default async function handler(
       .update({ verified: true })
       .eq('id', otpRecord.id);
 
-    // Get member by phone
-    const { data: member, error: memberError } = await supabaseAdmin
+    // Get member by phone (try both with and without +1 prefix)
+    let member: any = null;
+
+    const result1 = await supabaseAdmin
       .from('members')
       .select('member_id, first_name, last_name, email')
       .eq('phone', normalizedPhone)
-      .single();
+      .limit(1);
 
-    if (memberError || !member) {
+    if (result1.data && result1.data.length > 0) {
+      member = result1.data[0];
+    } else {
+      const result2 = await supabaseAdmin
+        .from('members')
+        .select('member_id, first_name, last_name, email')
+        .eq('phone', `+1${normalizedPhone}`)
+        .limit(1);
+
+      if (result2.data && result2.data.length > 0) {
+        member = result2.data[0];
+      }
+    }
+
+    if (!member) {
       return res.status(404).json({
         error: 'No member found with this phone number.',
       });
@@ -80,12 +102,13 @@ export default async function handler(
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(newPassword, saltRounds);
 
-    // Update member's password
+    // Update member's password (not temporary since user set it themselves)
     const { error: updateError } = await supabaseAdmin
       .from('members')
       .update({
         password_hash: passwordHash,
         password_set_at: new Date().toISOString(),
+        password_is_temporary: false,
       })
       .eq('member_id', member.member_id);
 
@@ -94,16 +117,55 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to set password' });
     }
 
+    // Create session automatically after setting password
+    const sessionToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
+
+    const { error: sessionError } = await supabaseAdmin
+      .from('member_portal_sessions')
+      .insert({
+        member_id: member.member_id,
+        session_token: sessionToken,
+        expires_at: expiresAt.toISOString(),
+      });
+
+    if (sessionError) {
+      console.error('Failed to create session:', sessionError);
+      // Still return success for password set, but don't create session
+      return res.status(200).json({
+        success: true,
+        message: 'Password set successfully. You can now login with your phone number and password.',
+      });
+    }
+
+    // Set httpOnly cookie for session (secure in production)
+    res.setHeader('Set-Cookie', [
+      serialize('member_session', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
+        path: '/',
+      }),
+    ]);
+
     res.status(200).json({
       success: true,
-      message: 'Password set successfully. You can now login with your phone number and password.',
+      message: 'Password set successfully. You are now logged in.',
+      member: {
+        id: member.member_id,
+        email: member.email,
+        firstName: member.first_name,
+        lastName: member.last_name,
+      },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error('[SET-PASSWORD] Validation error:', error.issues);
       return res.status(400).json({ error: error.issues[0].message });
     }
 
-    console.error('Set password error:', error);
+    console.error('[SET-PASSWORD] Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

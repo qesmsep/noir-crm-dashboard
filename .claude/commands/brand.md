@@ -299,6 +299,44 @@ transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 ```
 
+### Mobile-Specific Patterns
+
+**Tables → Card View on Mobile**
+
+CRITICAL: On mobile devices (< 768px), tables with multiple columns MUST be converted to card view for readability and touch-friendliness.
+
+**Pattern:**
+```jsx
+{/* Desktop Table View */}
+<TableContainer display={{ base: 'none', md: 'block' }}>
+  <Table variant="simple" size="sm">
+    {/* Full table with columns */}
+  </Table>
+</TableContainer>
+
+{/* Mobile Card View */}
+<VStack spacing={3} display={{ base: 'flex', md: 'none' }}>
+  {items.map((item) => (
+    <Box key={item.id} p={4} borderRadius="12px" border="1px solid" borderColor="#ECEAE5" bg="#FBFBFA" w="full">
+      {/* Card layout with stacked fields */}
+    </Box>
+  ))}
+</VStack>
+```
+
+**When to use:**
+- Transaction lists
+- Reservation history
+- Any data table with 3+ columns
+- Lists with multiple attributes per row
+
+**Card styling:**
+- Background: `#FBFBFA`
+- Border: `1px solid #ECEAE5`
+- Border radius: `12px`
+- Padding: `16px` (p={4})
+- Spacing between cards: `12px`
+
 ## Component-Specific Guidelines
 
 ### FullCalendar Toolbar

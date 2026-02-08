@@ -19,7 +19,12 @@ export default async function handler(
     const cookies = parse(req.headers.cookie || '');
     const sessionToken = cookies.member_session;
 
+    console.log('[CHECK-SESSION] Cookie header:', req.headers.cookie);
+    console.log('[CHECK-SESSION] Parsed cookies:', cookies);
+    console.log('[CHECK-SESSION] Session token:', sessionToken);
+
     if (!sessionToken) {
+      console.log('[CHECK-SESSION] No session token found in cookies');
       return res.status(401).json({ error: 'No session found' });
     }
 

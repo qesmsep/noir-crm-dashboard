@@ -30,6 +30,12 @@ interface NewReservationModalProps {
   initialDate?: Date;
   initialTableId?: string;
   onReservationCreated: () => void;
+  initialMemberData?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
 }
 
 const eventTypes = [
@@ -53,6 +59,7 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
   initialDate,
   initialTableId,
   onReservationCreated,
+  initialMemberData,
 }) => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -83,18 +90,18 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
       // Clear form data and set initial values based on the clicked slot
       const startTime = initialDate ? new Date(initialDate) : new Date();
       const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
-      
+
       console.log('NewReservationModal - initialDate:', initialDate);
       console.log('NewReservationModal - startTime:', startTime);
       console.log('NewReservationModal - endTime:', endTime);
       console.log('NewReservationModal - startTime ISO:', startTime.toISOString().slice(0, 16));
       console.log('NewReservationModal - endTime ISO:', endTime.toISOString().slice(0, 16));
-      
+
       setFormData({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
+        first_name: initialMemberData?.first_name || '',
+        last_name: initialMemberData?.last_name || '',
+        email: initialMemberData?.email || '',
+        phone: initialMemberData?.phone || '',
         party_size: 2,
         event_type: '',
         notes: '',
@@ -107,7 +114,7 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
         send_confirmation: false,
       });
     }
-  }, [isOpen, initialDate]);
+  }, [isOpen, initialDate, initialMemberData]);
 
   // Ensure table ID is set when modal opens
   useEffect(() => {

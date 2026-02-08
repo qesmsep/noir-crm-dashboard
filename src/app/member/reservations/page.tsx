@@ -182,7 +182,7 @@ export default function MemberReservationsPage() {
 
   return (
     <Box minH="100vh" bg="#ECEDE8" pb="80px">
-      {/* Header */}
+      {/* Header - Hidden on mobile */}
       <Box
         bg="white"
         borderBottom="1px solid"
@@ -190,6 +190,7 @@ export default function MemberReservationsPage() {
         position="sticky"
         top={0}
         zIndex={10}
+        display={{ base: 'none', md: 'block' }}
       >
         <Container maxW="container.xl">
           <HStack justify="space-between" py={4}>
@@ -217,14 +218,11 @@ export default function MemberReservationsPage() {
       {/* Main Content */}
       <Container maxW="container.xl" py={{ base: 4, md: 6, lg: 8 }}>
         <VStack spacing={6} align="stretch">
-          {/* Header */}
+          {/* Page Title */}
           <Box>
-            <Heading size="xl" color="#1F1F1F" mb={2}>
-              My Reservations
+            <Heading size="xl" color="#1F1F1F" mb={2} fontFamily="CONEBARS">
+              Welcome back, {member.first_name}
             </Heading>
-            <Text color="#5A5A5A">
-              View and manage your dining reservations
-            </Text>
           </Box>
 
           {/* Tabs */}

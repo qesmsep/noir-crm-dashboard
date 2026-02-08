@@ -41,31 +41,56 @@ export default async function handler(
     }
 
     // Get all ledger transactions for this member's account
-    const { data: transactions, error: transactionsError } = await supabaseAdmin
+    // Using same query as admin ledger: order by date ascending
+    const { data: transactions, error: transactionsError} = await supabaseAdmin
       .from('ledger')
       .select('*')
       .eq('account_id', member.account_id)
-      .order('created_at', { ascending: false });
+      .order('date', { ascending: true });
 
     if (transactionsError) {
       console.error('Error fetching transactions:', transactionsError);
       return res.status(500).json({ error: 'Failed to fetch transactions' });
     }
 
-    // Calculate running balance for each transaction
-    const sortedTransactions = [...(transactions || [])].reverse();
+    // Fetch attachments for all transactions
+    let attachmentMap: Record<number, any[]> = {};
+    if (transactions && transactions.length > 0) {
+      const { data: attachments, error: attachmentError } = await supabaseAdmin
+        .from('transaction_attachments')
+        .select('*')
+        .in('ledger_id', transactions.map(tx => tx.id))
+        .order('uploaded_at', { ascending: false });
+
+      if (!attachmentError && attachments) {
+        // Group attachments by ledger_id
+        attachmentMap = attachments.reduce((acc, att) => {
+          if (!acc[att.ledger_id]) acc[att.ledger_id] = [];
+          acc[att.ledger_id].push(att);
+          return acc;
+        }, {} as Record<number, any[]>);
+      }
+    }
+
+    // Calculate running balance for each transaction (same logic as admin)
     let runningBalance = 0;
-    const transactionsWithBalance = sortedTransactions.map((transaction) => {
+    const transactionsWithBalance = (transactions || []).map((transaction) => {
       const amount = parseFloat(transaction.amount.toString());
-      runningBalance += transaction.transaction_type === 'credit' ? amount : -amount;
+      runningBalance += amount; // Amount is already signed (positive for payment, negative for purchase)
       return {
         ...transaction,
+        description: transaction.note, // Map 'note' to 'description' for display
+        transaction_type: transaction.type === 'payment' ? 'credit' : 'debit', // Map 'type' to 'transaction_type'
         running_balance: runningBalance,
+        created_at: transaction.date, // Use date instead of created_at
+        attachments: attachmentMap[transaction.id] || [], // Add attachments
+        attachment_count: (attachmentMap[transaction.id] || []).length,
       };
-    }).reverse();
+    });
 
+    // Reverse to show most recent first
     res.status(200).json({
-      transactions: transactionsWithBalance,
+      transactions: transactionsWithBalance.reverse(),
     });
   } catch (error) {
     console.error('Transactions error:', error);

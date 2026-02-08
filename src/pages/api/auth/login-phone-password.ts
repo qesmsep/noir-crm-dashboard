@@ -37,6 +37,7 @@ export default async function handler(
     // Normalize phone number (remove all non-digits, then take last 10 digits)
     const digitsOnly = phone.replace(/\D/g, '');
     const normalizedPhone = digitsOnly.slice(-10); // Take last 10 digits (removes +1, *1, etc.)
+    console.log('[LOGIN] Attempting login for phone:', normalizedPhone);
 
     // Check rate limiting by IP
     const rateLimit = await checkRateLimit(ipAddress, 'login');
@@ -110,6 +111,7 @@ export default async function handler(
     }
 
     if (memberError || !member) {
+      console.log('[LOGIN] Member not found for phone:', normalizedPhone);
       await recordFailedLogin(normalizedPhone, ipAddress);
       await logAuthEvent({
         phone: normalizedPhone,
@@ -123,6 +125,8 @@ export default async function handler(
         error: 'Invalid phone number or password',
       });
     }
+
+    console.log('[LOGIN] Member found:', member.member_id, 'Has password hash:', !!member.password_hash);
 
     // Check if member has password set
     if (!member.password_hash) {
@@ -143,6 +147,7 @@ export default async function handler(
 
     // Verify password
     const passwordMatch = await bcrypt.compare(password, member.password_hash);
+    console.log('[LOGIN] Password match:', passwordMatch);
 
     if (!passwordMatch) {
       const failedResult = await recordFailedLogin(normalizedPhone, ipAddress);
@@ -203,15 +208,19 @@ export default async function handler(
     });
 
     // Set httpOnly cookie for session (secure in production)
-    res.setHeader('Set-Cookie', [
-      serialize('member_session', sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
-        path: '/',
-      }),
-    ]);
+    const cookieValue = serialize('member_session', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
+      path: '/',
+    });
+
+    console.log('[LOGIN] Setting cookie:', cookieValue);
+    console.log('[LOGIN] Session token:', sessionToken);
+    console.log('[LOGIN] Expires in days:', SESSION_DURATION_DAYS);
+
+    res.setHeader('Set-Cookie', [cookieValue]);
 
     res.status(200).json({
       success: true,
