@@ -41,7 +41,7 @@ import { useToast } from '@chakra-ui/react';
 export default function MemberBalancePage() {
   const router = useRouter();
   const { member, loading } = useMemberAuth();
-  const { toast } = useToast();
+  const toast = useToast();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
