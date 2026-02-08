@@ -36,13 +36,16 @@ import { useRouter } from 'next/navigation';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import MemberNav from '@/components/member/MemberNav';
 import { Receipt } from 'lucide-react';
+import { useToast } from '@chakra-ui/react';
 
 export default function MemberBalancePage() {
   const router = useRouter();
   const { member, loading } = useMemberAuth();
+  const { toast } = useToast();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     if (!loading && !member) {
@@ -66,6 +69,50 @@ export default function MemberBalancePage() {
       console.error('Error fetching transactions:', error);
     } finally {
       setLoadingTransactions(false);
+    }
+  };
+
+  const handlePayBalance = async () => {
+    if (!member?.account_id) return;
+
+    setIsProcessingPayment(true);
+    try {
+      const response = await fetch('/api/chargeBalance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: member.account_id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to process payment');
+      }
+
+      toast({
+        title: 'Payment Successful',
+        description: 'Your balance has been paid successfully',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+
+      // Refresh transactions to show the new payment
+      await fetchTransactions();
+    } catch (error: any) {
+      toast({
+        title: 'Payment Failed',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -136,45 +183,34 @@ export default function MemberBalancePage() {
             boxShadow="sm"
           >
             <CardBody p={{ base: 4, md: 5 }}>
-              <VStack spacing={3} align="stretch">
-                <HStack justify="space-between" align="start">
-                  <Box>
-                    <Text fontSize="sm" color="#5A5A5A" mb={1}>
-                      Current Balance
-                    </Text>
-                    <Text
-                      fontSize="2xl"
-                      fontWeight="bold"
-                      color={currentBalance >= 0 ? '#4CAF50' : '#F44336'}
-                    >
-                      ${Math.abs(currentBalance).toFixed(2)}
-                    </Text>
-                    <Text fontSize="xs" color="#8C7C6D">
-                      {currentBalance >= 0 ? 'Credit' : 'Balance Due'}
-                    </Text>
-                  </Box>
-                  <Box textAlign="right">
-                    <Text fontSize="sm" color="#5A5A5A" mb={1}>
-                      Monthly Credit
-                    </Text>
-                    <Text fontSize="lg" fontWeight="semibold" color="#1F1F1F">
-                      ${(member.monthly_credit || 0).toFixed(2)}
-                    </Text>
-                  </Box>
-                </HStack>
-
+              <HStack justify="space-between" align="center">
+                <Box>
+                  <Text fontSize="sm" color="#5A5A5A" mb={1}>
+                    Current Balance
+                  </Text>
+                  <Text
+                    fontSize="2xl"
+                    fontWeight="bold"
+                    color={currentBalance >= 0 ? '#4CAF50' : '#F44336'}
+                  >
+                    ${Math.abs(currentBalance).toFixed(2)}
+                  </Text>
+                </Box>
                 {currentBalance < 0 && (
                   <Button
-                    bg="#A59480"
-                    color="white"
-                    _hover={{ bg: '#8C7C6D' }}
-                    size="md"
-                    mt={1}
+                    variant="outline"
+                    borderColor="#DAD7D0"
+                    color="#5A5A5A"
+                    _hover={{ borderColor: '#A59480', color: '#A59480', bg: '#F6F5F2' }}
+                    size="sm"
+                    px={3}
+                    isLoading={isProcessingPayment}
+                    onClick={handlePayBalance}
                   >
                     Pay Balance
                   </Button>
                 )}
-              </VStack>
+              </HStack>
             </CardBody>
           </Card>
 

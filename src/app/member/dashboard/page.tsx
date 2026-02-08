@@ -23,6 +23,7 @@ export default function MemberDashboardPage() {
   const [baseDays, setBaseDays] = useState<number[]>([]);
   const [bookingStartDate, setBookingStartDate] = useState<Date | undefined>(undefined);
   const [bookingEndDate, setBookingEndDate] = useState<Date | undefined>(undefined);
+  const [currentBalance, setCurrentBalance] = useState<number>(0);
 
   useEffect(() => {
     setMounted(true);
@@ -64,11 +65,12 @@ export default function MemberDashboardPage() {
     }
   }, [member, loading, router]);
 
-  // Fetch next upcoming reservation
+  // Fetch next upcoming reservation and current balance
   useEffect(() => {
     if (!member) return;
 
     fetchNextReservation();
+    fetchCurrentBalance();
   }, [member]);
 
   const fetchNextReservation = async () => {
@@ -85,6 +87,24 @@ export default function MemberDashboardPage() {
       console.error('Error fetching next reservation:', error);
     } finally {
       setLoadingReservation(false);
+    }
+  };
+
+  const fetchCurrentBalance = async () => {
+    try {
+      const response = await fetch('/api/member/transactions', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const transactions = data.transactions || [];
+        if (transactions.length > 0) {
+          setCurrentBalance(parseFloat(transactions[0].running_balance || 0));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching balance:', error);
     }
   };
 
@@ -202,78 +222,39 @@ export default function MemberDashboardPage() {
             </Card>
 
             {/* Balance Card */}
-            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Wallet className="w-4 h-4 text-[#A59480]" />
-                  <span className="text-base font-semibold text-[#1F1F1F]" style={{ fontFamily: 'Montserrat' }}>
-                    Account Balance
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Main Balance */}
-                <div className="text-center py-2">
+            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+              <CardContent className="pt-5 pb-4 space-y-3">
+                {/* Balance Display */}
+                <div>
+                  <p className="text-xs text-[#8C7C6D] mb-1">Account Balance</p>
                   <p
-                    className={`text-3xl font-bold mb-0.5 ${
-                      (member.balance ?? 0) >= 0 ? 'text-[#4CAF50]' : 'text-[#F44336]'
+                    className={`text-xl font-semibold ${
+                      currentBalance >= 0 ? 'text-[#4CAF50]' : 'text-[#F44336]'
                     }`}
-                    style={{ fontFamily: 'Montserrat' }}
                   >
-                    ${(member.balance ?? 0).toFixed(2)}
+                    ${Math.abs(currentBalance).toFixed(2)}
                   </p>
-                  <p className="text-xs text-[#8C7C6D] uppercase tracking-wider" style={{ fontFamily: 'Montserrat', fontWeight: 300 }}>
-                    {(member.balance ?? 0) >= 0 ? 'Credit' : 'Balance Due'}
-                  </p>
-                </div>
-
-                {/* Divider */}
-                <div className="border-t border-[#ECEAE5]"></div>
-
-                {/* Monthly Credit */}
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <p className="text-xs text-[#8C7C6D] uppercase tracking-wider mb-0.5" style={{ fontFamily: 'Montserrat', fontWeight: 300 }}>
-                      Monthly Credit
-                    </p>
-                    <p className="text-lg font-bold text-[#1F1F1F]" style={{ fontFamily: 'Montserrat' }}>
-                      ${(member.monthly_credit || 0).toFixed(2)}
-                    </p>
-                  </div>
-                  {member.credit_renewal_date && (
-                    <div className="text-right">
-                      <p className="text-xs text-[#8C7C6D] uppercase tracking-wider mb-0.5" style={{ fontFamily: 'Montserrat', fontWeight: 300 }}>
-                        Renews
-                      </p>
-                      <p className="text-xs font-medium text-[#2C2C2C]" style={{ fontFamily: 'Montserrat' }}>
-                        {new Date(member.credit_renewal_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Action Buttons */}
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white transition-colors text-xs"
-                    onClick={() => router.push('/member/balance')}
-                    style={{ fontFamily: 'Montserrat', fontWeight: 500 }}
-                  >
-                    Pay Balance
-                  </Button>
+                <div className="flex gap-2">
+                  {currentBalance < 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white text-xs h-8"
+                      onClick={() => router.push('/member/balance')}
+                    >
+                      Pay Now
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full text-[#A59480] hover:bg-[#F6F5F2] transition-colors text-xs"
+                    className={`${currentBalance < 0 ? 'flex-1' : 'w-full'} text-[#8C7C6D] hover:bg-[#F6F5F2] hover:text-[#A59480] text-xs h-8`}
                     onClick={() => router.push('/member/balance')}
-                    style={{ fontFamily: 'Montserrat', fontWeight: 300 }}
                   >
-                    View Transaction History
+                    View Details →
                   </Button>
                 </div>
               </CardContent>
