@@ -14,7 +14,8 @@ import {
   Calendar,
   Home,
   UserCircle,
-  Settings
+  Settings,
+  TrendingUp
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -141,6 +142,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
 
   const navItems = [
     { href: '/admin/dashboard-v2', label: 'Dashboard', icon: BarChart3 },
+    { href: '/admin/business', label: 'Business', icon: TrendingUp },
     { href: '/admin/reservations', label: 'Reservations', icon: CalendarDays },
     { href: '/admin/members', label: 'Members', icon: Users },
     { href: '/admin/waitlist', label: 'Waitlist', icon: Clock },

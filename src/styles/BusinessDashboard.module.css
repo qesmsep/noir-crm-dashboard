@@ -1,0 +1,526 @@
+/* ============================================
+   BUSINESS DASHBOARD - APPLE-INSPIRED, MOBILE FIRST
+   ============================================ */
+
+.root {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  padding: 4rem 0.75rem 2rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0));
+}
+
+/* Page header */
+.header {
+  width: 100%;
+  max-width: 95%;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  margin: 0;
+}
+
+.monthSelector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.monthSelector select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1d1d1f;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.snapshotBtn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: #bca892;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.snapshotBtn:hover {
+  background: #a89278;
+}
+
+.snapshotBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Section titles */
+.sectionTitle {
+  width: 100%;
+  max-width: 95%;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #1d1d1f;
+  margin: 1.5rem 0 0.75rem;
+}
+
+/* ============================================
+   KPI TILES
+   ============================================ */
+.kpiGrid {
+  width: 100%;
+  max-width: 95%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpiTile {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kpiValue {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #1d1d1f;
+  line-height: 1.2;
+}
+
+.kpiLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6e6e73;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
+.kpiDelta {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.deltaPositive {
+  color: #34c759;
+}
+
+.deltaNegative {
+  color: #ff3b30;
+}
+
+.deltaNeutral {
+  color: #86868b;
+}
+
+/* ============================================
+   CHARTS SECTION
+   ============================================ */
+.chartsGrid {
+  width: 100%;
+  max-width: 95%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.chartCard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.chartTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.chartContainer {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* SVG chart bars */
+.barPositive {
+  fill: #34c759;
+}
+
+.barNegative {
+  fill: #ff3b30;
+}
+
+.barNeutral {
+  fill: #86868b;
+}
+
+.barMrr {
+  fill: #bca892;
+}
+
+.barAttach {
+  fill: #007aff;
+}
+
+/* ============================================
+   COHORT HEATMAP
+   ============================================ */
+.cohortContainer {
+  width: 100%;
+  max-width: 95%;
+  margin-bottom: 1.5rem;
+}
+
+.cohortCard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cohortTable {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.cohortTable th,
+.cohortTable td {
+  padding: 0.5rem 0.375rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cohortTable th {
+  font-weight: 600;
+  color: #6e6e73;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cohortTable td:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.cohortCell {
+  border-radius: 4px;
+  padding: 0.375rem;
+  font-weight: 500;
+  font-size: 0.6875rem;
+}
+
+/* ============================================
+   DRILL-DOWN TABLES
+   ============================================ */
+.tablesGrid {
+  width: 100%;
+  max-width: 95%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.tableCard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tableTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
+.dataTable {
+  width: 100%;
+  min-width: 500px;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.dataTable th {
+  padding: 0.625rem 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: #6e6e73;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.dataTable td {
+  padding: 0.625rem 0.5rem;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  color: #1d1d1f;
+}
+
+.dataTable tr:last-child td {
+  border-bottom: none;
+}
+
+.dataTable tbody tr:hover {
+  background-color: rgba(0,0,0,0.02);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #86868b;
+  font-size: 0.875rem;
+}
+
+/* ============================================
+   ALERTS PANEL
+   ============================================ */
+.alertsContainer {
+  width: 100%;
+  max-width: 95%;
+  margin-bottom: 2rem;
+}
+
+.alertsCard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.alertItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.alertItem:last-child {
+  border-bottom: none;
+}
+
+.alertDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.alertTriggered {
+  background: #ff3b30;
+  box-shadow: 0 0 6px rgba(255, 59, 48, 0.4);
+}
+
+.alertOk {
+  background: #34c759;
+}
+
+.alertInfo {
+  flex: 1;
+}
+
+.alertLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  line-height: 1.3;
+}
+
+.alertMeta {
+  font-size: 0.75rem;
+  color: #86868b;
+  margin-top: 0.125rem;
+}
+
+/* ============================================
+   LOADING / ERROR
+   ============================================ */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  font-size: 1rem;
+  color: #86868b;
+}
+
+.error {
+  background: #fff2f2;
+  color: #ff3b30;
+  padding: 1rem;
+  border-radius: 12px;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  width: 100%;
+  max-width: 95%;
+  text-align: center;
+}
+
+/* ============================================
+   RESPONSIVE - TABLET
+   ============================================ */
+@media (min-width: 768px) {
+  .kpiGrid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .chartsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tablesGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kpiTile {
+    padding: 1.25rem;
+  }
+
+  .kpiValue {
+    font-size: 1.75rem;
+  }
+
+  .kpiLabel {
+    font-size: 0.8125rem;
+  }
+}
+
+/* ============================================
+   RESPONSIVE - DESKTOP
+   ============================================ */
+@media (min-width: 1024px) {
+  .root {
+    padding: 5rem 1.5rem 3rem;
+  }
+
+  .header,
+  .sectionTitle,
+  .kpiGrid,
+  .chartsGrid,
+  .cohortContainer,
+  .tablesGrid,
+  .alertsContainer {
+    max-width: 1400px;
+  }
+
+  .kpiGrid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1.25rem;
+  }
+
+  .chartsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .tablesGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+
+  .kpiTile {
+    padding: 1.5rem;
+    border-radius: 18px;
+  }
+
+  .kpiValue {
+    font-size: 2rem;
+  }
+
+  .chartCard,
+  .cohortCard,
+  .tableCard,
+  .alertsCard {
+    border-radius: 18px;
+    padding: 1.5rem;
+  }
+
+  .title {
+    font-size: 1.75rem;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .kpiTile,
+  .chartCard,
+  .tableCard,
+  .alertsCard {
+    transition: none !important;
+  }
+}
+
+/* Print */
+@media print {
+  .root {
+    background: #fff;
+    padding: 1rem;
+  }
+  .kpiTile,
+  .chartCard,
+  .cohortCard,
+  .tableCard,
+  .alertsCard {
+    box-shadow: none;
+    border: 1px solid #e5e5e7;
+    break-inside: avoid;
+  }
+  .snapshotBtn,
+  .monthSelector {
+    display: none;
+  }
+}
