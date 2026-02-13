@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import MemberNav from '@/components/member/MemberNav';
@@ -14,15 +14,149 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/useToast';
 import { Separator } from '@/components/ui/separator';
-import { LogOut } from 'lucide-react';
+import { LogOut, Camera, CreditCard, Plus, Check, Trash2 } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+// ──────────────────────────────────────────────
+// Payment Method types
+// ──────────────────────────────────────────────
+
+interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  is_default: boolean;
+}
+
+// ──────────────────────────────────────────────
+// Add Card Form (needs Stripe Elements context)
+// ──────────────────────────────────────────────
+
+function AddCardForm({
+  accountId,
+  onSuccess,
+  onCancel,
+}: {
+  accountId: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    setCardError(null);
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) return;
+
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+    });
+
+    if (error) {
+      setCardError(error.message || 'Failed to process card');
+      setProcessing(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/setupPaymentMethod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          payment_method_id: paymentMethod.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to save card');
+      }
+
+      onSuccess();
+    } catch (err: any) {
+      setCardError(err.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div
+        className="border border-[#DAD7D0] rounded-[10px] p-4 mb-3 bg-white"
+        style={{ minHeight: 44 }}
+      >
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: '15px',
+                fontFamily: "'Montserrat', sans-serif",
+                color: '#1F1F1F',
+                '::placeholder': { color: '#ABA8A1' },
+              },
+              invalid: { color: '#e53e3e' },
+            },
+          }}
+        />
+      </div>
+      {cardError && (
+        <p className="text-sm text-red-600 mb-3">{cardError}</p>
+      )}
+      <div className="flex gap-3">
+        <Button
+          type="submit"
+          disabled={!stripe || processing}
+          className="flex-1 bg-[#A59480] text-white hover:bg-[#8C7C6D] rounded-[10px] font-semibold text-sm"
+          style={{
+            boxShadow: '0 1px 2px rgba(165,148,128,0.15), 0 4px 8px rgba(165,148,128,0.25), 0 8px 16px rgba(165,148,128,0.18)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {processing ? 'Adding...' : 'Add Card'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={processing}
+          className="flex-1 border-[#DAD7D0] text-[#1F1F1F] hover:border-[#A59480] hover:text-[#A59480] rounded-[10px] font-semibold text-sm"
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ──────────────────────────────────────────────
+// Main Profile Page
+// ──────────────────────────────────────────────
 
 export default function MemberProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { member, loading, refreshMember, signOut } = useMemberAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -33,6 +167,13 @@ export default function MemberProfilePage() {
       email: true,
     },
   });
+
+  // Payment methods state
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
+  const [settingDefault, setSettingDefault] = useState<string | null>(null);
+  const [removingCard, setRemovingCard] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !member) {
@@ -48,6 +189,92 @@ export default function MemberProfilePage() {
     }
   }, [member, loading, router]);
 
+  // Fetch payment methods
+  const fetchPaymentMethods = useCallback(async () => {
+    if (!member?.account_id) return;
+    setLoadingPayments(true);
+    try {
+      const response = await fetch(`/api/listPaymentMethods?account_id=${member.account_id}`);
+      if (!response.ok) throw new Error('Failed to fetch payment methods');
+      const data = await response.json();
+      setPaymentMethods(data.payment_methods || []);
+    } catch (err: any) {
+      console.error('Error fetching payment methods:', err);
+    } finally {
+      setLoadingPayments(false);
+    }
+  }, [member?.account_id]);
+
+  useEffect(() => {
+    if (member?.account_id) {
+      fetchPaymentMethods();
+    }
+  }, [member?.account_id, fetchPaymentMethods]);
+
+  // ── Profile photo upload ──
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Client-side validation
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload a JPEG, PNG, or WebP image.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Maximum file size is 5MB.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+
+      const response = await fetch('/api/member/upload-profile-photo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formDataUpload,
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload photo');
+      }
+
+      await refreshMember();
+
+      toast({
+        title: 'Photo updated',
+        description: 'Your profile photo has been updated',
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload photo',
+        variant: 'error',
+      });
+    } finally {
+      setUploadingPhoto(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // ── Profile save ──
   const handleSave = async () => {
     setSaving(true);
 
@@ -98,6 +325,65 @@ export default function MemberProfilePage() {
     setEditing(false);
   };
 
+  // ── Payment methods actions ──
+  const handleSetDefault = async (paymentMethodId: string) => {
+    setSettingDefault(paymentMethodId);
+    try {
+      const response = await fetch('/api/setDefaultPaymentMethod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: member?.account_id,
+          payment_method_id: paymentMethodId,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to set default');
+      await fetchPaymentMethods();
+      toast({
+        title: 'Default updated',
+        description: 'Your default payment method has been changed',
+        variant: 'success',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to update default payment method',
+        variant: 'error',
+      });
+    } finally {
+      setSettingDefault(null);
+    }
+  };
+
+  const handleRemoveCard = async (paymentMethodId: string) => {
+    setRemovingCard(paymentMethodId);
+    try {
+      const response = await fetch('/api/removePaymentMethod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: member?.account_id,
+          payment_method_id: paymentMethodId,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to remove card');
+      await fetchPaymentMethods();
+      toast({
+        title: 'Card removed',
+        description: 'Payment method has been removed',
+        variant: 'success',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to remove card',
+        variant: 'error',
+      });
+    } finally {
+      setRemovingCard(null);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await signOut();
@@ -114,6 +400,20 @@ export default function MemberProfilePage() {
         variant: 'error',
       });
     }
+  };
+
+  // ── Card brand display helper ──
+  const formatBrand = (brand: string) => {
+    const brands: Record<string, string> = {
+      visa: 'Visa',
+      mastercard: 'Mastercard',
+      amex: 'Amex',
+      discover: 'Discover',
+      diners: 'Diners',
+      jcb: 'JCB',
+      unionpay: 'UnionPay',
+    };
+    return brands[brand.toLowerCase()] || brand.toUpperCase();
   };
 
   if (loading) {
@@ -155,16 +455,43 @@ export default function MemberProfilePage() {
           </div>
 
           {/* Profile Card */}
-          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+          <Card className="bg-white rounded-2xl border border-[#ECEAE5]" style={{ boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)' }}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <Avatar className="h-14 w-14 bg-[#A59480]">
-                    <AvatarImage src={member.profile_photo_url || undefined} />
-                    <AvatarFallback className="bg-[#A59480] text-white">
-                      {member.first_name[0]}{member.last_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                  {/* Avatar with photo upload overlay */}
+                  <div className="relative group">
+                    <Avatar className="h-16 w-16 bg-[#A59480]">
+                      <AvatarImage src={member.profile_photo_url || undefined} />
+                      <AvatarFallback className="bg-[#A59480] text-white text-lg font-semibold">
+                        {member.first_name[0]}{member.last_name[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    {/* Upload overlay */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 group-hover:bg-black/40 transition-all duration-200 cursor-pointer"
+                      aria-label="Change profile photo"
+                    >
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        {uploadingPhoto ? (
+                          <Spinner size="sm" className="text-white" />
+                        ) : (
+                          <Camera className="w-5 h-5 text-white" />
+                        )}
+                      </div>
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                      aria-hidden="true"
+                    />
+                  </div>
                   <div>
                     <h2 className="text-xl font-semibold text-[#1F1F1F]">
                       {member.first_name} {member.last_name}
@@ -178,8 +505,11 @@ export default function MemberProfilePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
+                    className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white rounded-[10px] font-semibold text-sm"
                     onClick={() => setEditing(true)}
+                    style={{
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    }}
                   >
                     Edit Profile
                   </Button>
@@ -296,15 +626,19 @@ export default function MemberProfilePage() {
                 {editing && (
                   <div className="flex gap-3 mt-4">
                     <Button
-                      className="flex-1 bg-[#A59480] text-white hover:bg-[#8C7C6D]"
+                      className="flex-1 bg-[#A59480] text-white hover:bg-[#8C7C6D] rounded-[10px] font-semibold"
                       onClick={handleSave}
                       disabled={saving}
+                      style={{
+                        boxShadow: '0 1px 2px rgba(165,148,128,0.15), 0 4px 8px rgba(165,148,128,0.25), 0 8px 16px rgba(165,148,128,0.18)',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
                     >
                       {saving ? 'Saving...' : 'Save Changes'}
                     </Button>
                     <Button
                       variant="outline"
-                      className="flex-1 border-[#DAD7D0] text-[#2C2C2C] hover:border-[#A59480] hover:text-[#A59480]"
+                      className="flex-1 border-[#DAD7D0] text-[#2C2C2C] hover:border-[#A59480] hover:text-[#A59480] rounded-[10px] font-semibold"
                       onClick={handleCancel}
                       disabled={saving}
                     >
@@ -316,8 +650,134 @@ export default function MemberProfilePage() {
             </CardContent>
           </Card>
 
+          {/* Payment Methods Card */}
+          <Card className="bg-white rounded-2xl border border-[#ECEAE5]" style={{ boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)' }}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-[#A59480]" />
+                  <CardTitle className="text-xl font-semibold text-[#1F1F1F]">
+                    Payment Methods
+                  </CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingPayments ? (
+                <div className="flex items-center justify-center py-8">
+                  <Spinner size="md" className="text-[#A59480]" />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {paymentMethods.length === 0 && !showAddCard && (
+                    <div className="text-center py-6">
+                      <CreditCard className="w-10 h-10 text-[#ABA8A1] mx-auto mb-3" />
+                      <p className="text-sm text-[#5A5A5A] mb-1">No payment methods on file</p>
+                      <p className="text-xs text-[#868686]">Add a card to make payments easier</p>
+                    </div>
+                  )}
+
+                  {paymentMethods.map((method) => (
+                    <div
+                      key={method.id}
+                      className="flex items-center justify-between p-4 border border-[#ECEAE5] rounded-[12px] bg-[#FBFBFA]"
+                      style={{
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex-shrink-0 w-10 h-7 rounded bg-[#F7F6F2] border border-[#ECEAE5] flex items-center justify-center">
+                          <CreditCard className="w-4 h-4 text-[#A59480]" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#1F1F1F]">
+                            {formatBrand(method.brand)} ending in {method.last4}
+                          </p>
+                          <p className="text-xs text-[#868686]">
+                            Expires {String(method.exp_month).padStart(2, '0')}/{method.exp_year}
+                          </p>
+                        </div>
+                        {method.is_default && (
+                          <Badge className="bg-[#A59480]/10 text-[#A59480] border-0 text-xs px-2 py-0.5 flex-shrink-0">
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                        {!method.is_default && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSetDefault(method.id)}
+                              disabled={settingDefault === method.id}
+                              className="text-xs text-[#A59480] hover:text-[#8C7C6D] hover:bg-[#F7F6F2] h-8 px-2"
+                            >
+                              {settingDefault === method.id ? (
+                                <Spinner size="sm" className="text-[#A59480]" />
+                              ) : (
+                                <><Check className="w-3.5 h-3.5 mr-1" /> Set Default</>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRemoveCard(method.id)}
+                              disabled={removingCard === method.id}
+                              className="text-xs text-[#868686] hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
+                            >
+                              {removingCard === method.id ? (
+                                <Spinner size="sm" className="text-[#868686]" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Add Card Section */}
+                  {showAddCard ? (
+                    <div className="mt-2">
+                      <Elements stripe={stripePromise}>
+                        <AddCardForm
+                          accountId={member.account_id}
+                          onSuccess={() => {
+                            setShowAddCard(false);
+                            fetchPaymentMethods();
+                            toast({
+                              title: 'Card added',
+                              description: 'Your new payment method has been saved',
+                              variant: 'success',
+                            });
+                          }}
+                          onCancel={() => setShowAddCard(false)}
+                        />
+                      </Elements>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowAddCard(true)}
+                      className="w-full border-[#DAD7D0] border-dashed text-[#A59480] hover:border-[#A59480] hover:bg-[#F7F6F2] rounded-[10px] font-semibold text-sm mt-1"
+                      style={{
+                        boxShadow: '0 1px 2px rgba(165,148,128,0.08), 0 4px 8px rgba(165,148,128,0.12), 0 8px 16px rgba(165,148,128,0.08)',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add New Card
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Account Settings Card */}
-          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+          <Card className="bg-white rounded-2xl border border-[#ECEAE5]" style={{ boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)' }}>
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-[#1F1F1F]">
                 Account Settings

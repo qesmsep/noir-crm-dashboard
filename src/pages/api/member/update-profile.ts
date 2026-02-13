@@ -12,6 +12,7 @@ const requestSchema = z.object({
     sms: z.boolean(),
     email: z.boolean(),
   }),
+  profile_photo_url: z.string().url().nullable().optional(),
 });
 
 /**
@@ -54,15 +55,21 @@ export default async function handler(
     const member = Array.isArray(session.members) ? session.members[0] : session.members;
 
     // Update member profile
+    const updatePayload: Record<string, any> = {
+      first_name: profileData.first_name,
+      last_name: profileData.last_name,
+      email: profileData.email,
+      contact_preferences: profileData.contact_preferences,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (profileData.profile_photo_url !== undefined) {
+      updatePayload.profile_photo_url = profileData.profile_photo_url;
+    }
+
     const { error: updateError } = await supabaseAdmin
       .from('members')
-      .update({
-        first_name: profileData.first_name,
-        last_name: profileData.last_name,
-        email: profileData.email,
-        contact_preferences: profileData.contact_preferences,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('member_id', member.member_id);
 
     if (updateError) {
