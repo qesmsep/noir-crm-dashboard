@@ -70,3 +70,6 @@ logs/
 # Local development-only documentation and external project snapshot
 /venue-management-crm-12012025/
 HOWTO.md
+
+# Test files
+test-*.js
