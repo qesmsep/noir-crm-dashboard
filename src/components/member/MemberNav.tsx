@@ -60,15 +60,6 @@ export default function MemberNav({ onBookClick }: MemberNavProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#ECEAE5] shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-[1000]">
       <div className="flex items-center h-[70px] max-w-7xl mx-auto px-4">
-        {/* Logo */}
-        <div className="flex-shrink-0 mr-2">
-          <img
-            src="/images/noir-wedding-day.png"
-            alt="Noir"
-            className="h-6"
-          />
-        </div>
-
         {/* Nav Items */}
         <div className="flex justify-around items-center flex-1">
           {navItems.map((item, index) => {

@@ -134,9 +134,19 @@ export default function MemberDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#ECEDE8] pb-20">
+    <div className="min-h-screen bg-[#ECEDE8] pb-20 relative">
+      {/* Watermark Logo */}
+      <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-0">
+        <img
+          src="/images/noir-wedding-day.png"
+          alt=""
+          aria-hidden="true"
+          style={{ width: '520px', opacity: 0.08, userSelect: 'none', filter: 'invert(1)' }}
+        />
+      </div>
+
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
         <div className="flex flex-col gap-6">
           {/* Welcome Header */}
           <div>
