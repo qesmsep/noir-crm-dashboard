@@ -1,224 +1,19 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useRef, useEffect } from 'react';
-import { useDisclosure, Box, VStack, Text, Button, Input, Select, HStack, IconButton, Center, useToast, AlertDialog, AlertDialogBody, AlertDialogFooter, AlertDialogHeader, AlertDialogContent, AlertDialogOverlay, Drawer, DrawerOverlay, DrawerContent, DrawerHeader, DrawerBody, DrawerFooter, DrawerCloseButton, FormControl, FormLabel, Heading } from '@chakra-ui/react';
-import { AddIcon, MinusIcon, ChevronDownIcon } from '@chakra-ui/icons';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, useStripe, useElements } from '@stripe/react-stripe-js';
-import { CardNumberElement, CardExpiryElement, CardCvcElement } from '@stripe/react-stripe-js';
-import { getSupabaseClient } from '../pages/api/supabaseClient';
-import ReservationForm from '../components/ReservationForm';
-import ReservationSection from '../components/ReservationSection';
+import { useState } from 'react';
 import Modal from 'react-modal';
-import dynamic from 'next/dynamic';
-import { useSettings } from '../context/SettingsContext';
 import MenuViewer from '../components/MenuViewer';
 
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-  : null;
-
-function InlineStripeForm({ partySize, onSuccess }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const toast = useToast();
-  const { settings } = useSettings();
-
-  const handleCardSubmit = async (e) => {
-    e.preventDefault && e.preventDefault();
-    if (!stripe || !elements) return;
-    
-    // If hold fee is disabled, skip payment processing
-    if (!settings.hold_fee_enabled) {
-      onSuccess('no-hold', { /* you can pass back customer info if needed */ });
-      return;
-    }
-
-    // Get individual elements
-    const cardNumber = elements.getElement(CardNumberElement);
-    // Use CardNumberElement for payment method
-    const { error, paymentMethod } = await stripe.createPaymentMethod({
-      type: 'card',
-      card: cardNumber,
-    });
-    if (error) {
-      toast({ title: error.message, status: 'error', duration: 3000 });
-      return;
-    }
-    // Call your API to create a hold
-    const resp = await fetch('/api/create-hold', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payment_method_id: paymentMethod.id, amount: settings.hold_fee_amount }),
-    });
-    const data = await resp.json();
-    if (resp.ok) onSuccess(data.holdId, { /* you can pass back customer info if needed */ });
-    else toast({ title: data.error || 'Hold failed', status: 'error', duration: 3000 });
-  };
-  return (
-    <form onSubmit={handleCardSubmit} style={{ width: '100%' }}>
-      <VStack spacing={5} align="stretch" w="full">
-        {/* Card Number */}
-        <Box
-          w="full"
-          h="60px"
-          border="1px solid #ECEDE8"
-          borderRadius="lg"
-          p={4}
-          bg="#ECEDE8"
-          display="flex"
-          alignItems="center"
-        >
-          <Box flex="1">
-            <CardNumberElement
-              options={{
-                style: {
-                  base: {
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    color: '#353535',
-                    textAlign: 'center',
-                    '::placeholder': { color: '#888' },
-                    letterSpacing: '1px',
-                  },
-                },
-              }}
-            />
-          </Box>
-        </Box>
-        {/* Expiry & CVC in one row */}
-        <HStack spacing={2} w="full">
-          <Box
-            flex="1"
-            h="60px"
-            border="1px solid #ECEDE8"
-            textAlign= 'center'
-            borderRadius="lg"
-            p={4}
-            bg="#ECEDE8"
-            display="flex"
-            alignItems="center"
-          >
-            <Box flex="1">
-              <CardExpiryElement
-                options={{
-                  style: {
-                    base: {
-                      fontSize: '16px',
-                      fontWeight: 'bold',
-                      color: '#353535',
-                      textAlign: 'center',
-                      '::placeholder': { color: '#888' },
-                    },
-                  },
-                }}
-              />
-            </Box>
-          </Box>
-          <Box
-            flex="1"
-            h="60px"
-            border="1px solid #ECEDE8"
-            borderRadius="lg"
-            p={4}
-            bg="#ECEDE8"
-            display="flex"
-            alignItems="center"
-          >
-            <Box flex="1">
-              <CardCvcElement
-                options={{
-                  style: {
-                    base: {
-                      fontSize: '16px',
-                      fontWeight: 'bold',
-                      color: '#353535',
-                      textAlign: 'center',
-                      '::placeholder': { color: '#888' },
-                    },
-                  },
-                }}
-              />
-            </Box>
-          </Box>
-        </HStack>
-        <Button
-          type="submit"
-          w="full"
-          h="48px"
-          borderRadius="full"
-          bg="#353535"
-          color="#A59480"
-          fontSize="xl"
-          fontWeight="bold"
-          fontFamily="Montserrat, sans-serif"
-          textTransform="uppercase"
-          letterSpacing="0.1em"
-          _hover={{ bg: '#222' }}
-          transition="all 0.2s"
-          boxShadow="2xl"
-          mt={1}
-        >
-          RESERVE
-        </Button>
-      </VStack>
-    </form>
-  );
-}
-
 export default function Home() {
-  const [bookingStartDate, setBookingStartDate] = useState(null);
-  const [bookingEndDate, setBookingEndDate] = useState(null);
-  const [baseDays, setBaseDays] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [menuModalOpen, setMenuModalOpen] = useState(false);
-
-  useEffect(() => {
-    async function fetchConfig() {
-      setLoading(true);
-      // Fetch booking window from settings
-      const supabase = getSupabaseClient();
-      const { data: settingsData } = await supabase
-        .from('settings')
-        .select('booking_start_date, booking_end_date')
-        .single();
-      // Fetch baseDays from venue_hours
-      const { data: baseData } = await supabase
-        .from('venue_hours')
-        .select('day_of_week')
-        .eq('type', 'base')
-        .gte('time_ranges', '[]');
-      setBookingStartDate(settingsData && settingsData.booking_start_date ? new Date(settingsData.booking_start_date) : new Date());
-      setBookingEndDate(settingsData && settingsData.booking_end_date ? new Date(settingsData.booking_end_date) : (() => { const d = new Date(); d.setDate(d.getDate() + 60); return d; })());
-      setBaseDays(Array.isArray(baseData) ? baseData.map(r => typeof r.day_of_week === 'string' ? Number(r.day_of_week) : r.day_of_week) : [1,2,3,4,5,6,0]);
-      setLoading(false);
-    }
-    fetchConfig();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col bg-[#ECEDE8] items-center justify-center">
-        <div className="text-2xl sm:text-3xl font-medium text-[#353535]" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-          Loading...
-        </div>
-      </div>
-    );
-  }
 
   // Apple Maps link helper
   const appleMapsUrl = 'https://maps.apple.com/?address=106%20W%2011th%20St,Kansas%20City,MO%2064105';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#ECEDE8]">
-      {/** Membership announcement popup (client-only; dynamic import handles SSR=false) */}
-      {(() => {
-        const MembershipPopup = dynamic(() => import('../components/MembershipPopup'), { ssr: false });
-        return <MembershipPopup initialDelayMs={5000} reappearDays={7} />;
-      })()}
+      {/** Membership announcement popup - DISABLED (membership info now in main content) */}
       {/* Mobile-Optimized Navigation - Overlay on Hero */}
       <nav className="absolute top-0 left-0 right-0 w-full flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 bg-white/20 backdrop-blur-sm z-50" style={{ color: '#ECEDE8' }}>
         <div className="flex items-center gap-2">
@@ -232,20 +27,7 @@ export default function Home() {
           />
         </div>
         <div className="flex gap-2 sm:gap-4 items-center">
-          <a 
-            href="#reserve" 
-            className="mobile-accessible px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-all duration-200 hover:bg-[#8B7A6A] active:scale-95" 
-            style={{ 
-              background: '#A59480', 
-              color: '#fff', 
-              fontWeight: 600, 
-              letterSpacing: '0.05em',
-              touchAction: 'manipulation'
-            }}
-            aria-label="Reserve a table"
-          >
-            Reserve
-          </a>
+          {/* Reserve button hidden - memberships only */}
         </div>
       </nav>
 
@@ -291,19 +73,98 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Mobile-Optimized Reservation Section */}
-      <Elements stripe={stripePromise}>
-        <section
-          id="reserve"
-          className="scroll-mt-20 sm:scroll-mt-24"
-        >
-          <ReservationSection
-            baseDays={baseDays}
-            bookingStartDate={bookingStartDate}
-            bookingEndDate={bookingEndDate}
-          />
-        </section>
-      </Elements>
+      {/* Membership Access Section - Replaces Reservation Form */}
+      <section
+        id="reserve"
+        className="scroll-mt-20 sm:scroll-mt-24 bg-[#23201C] py-12 sm:py-16 md:py-20 px-4 sm:px-8"
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-[#353535] rounded-2xl shadow-xl p-6 sm:p-8 md:p-12 border border-[#3A362F]">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-6 sm:mb-8">
+                <img
+                  src="/images/noir-wedding-day.png"
+                  alt="Noir KC"
+                  className="h-16 sm:h-20 md:h-24 object-contain mx-auto"
+                />
+              </div>
+              <h2
+                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6"
+                style={{
+                  fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: '#ECEDE8',
+                  fontWeight: 600
+                }}
+              >
+                <span style={{ color: '#BCA892' }}>Exclusive Access</span> is HERE.
+              </h2>
+              <p
+                className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-2xl"
+                style={{
+                  fontFamily: 'Montserrat, sans-serif',
+                  color: '#ECEDE8',
+                  lineHeight: 1.5
+                }}
+              >
+                Noir is now exclusively for Members — access is granted while membership capacity remains.
+              </p>
+              <div className="mb-6 sm:mb-8 space-y-3">
+                <p
+                  className="text-lg sm:text-xl font-semibold"
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    color: '#ECEDE8'
+                  }}
+                >
+                  Limited memberships available.
+                </p>
+                <p
+                  className="text-base sm:text-lg"
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    color: '#BCA892'
+                  }}
+                >
+                  To get access or ask questions:
+                </p>
+                <p
+                  className="text-base sm:text-lg"
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    color: '#ECEDE8'
+                  }}
+                >
+                  Text <strong>MEMBERSHIP</strong> to{' '}
+                  <a
+                    href="sms:9137774488?body=MEMBERSHIP"
+                    className="font-semibold underline hover:no-underline transition-all"
+                    style={{ color: '#BCA892' }}
+                    aria-label="Text MEMBERSHIP to 913.777.4488"
+                  >
+                    913.777.4488
+                  </a>
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
+                <a
+                  href="sms:9137774488?body=MEMBERSHIP"
+                  className="mobile-button mobile-accessible px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    letterSpacing: '0.05em',
+                    touchAction: 'manipulation'
+                  }}
+                  aria-label="Start SMS about membership"
+                >
+                  Text MEMBERSHIP
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Mobile-Optimized Hours & Location Section */}
       <section className="bg-[#ECEDE8] py-12 sm:py-16 md:py-20 px-4 sm:px-8">
