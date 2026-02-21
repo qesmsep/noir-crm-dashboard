@@ -230,7 +230,7 @@ export default function Home() {
                color: '#BCA892',
                lineHeight: 1.5
              }}>
-            Explore our curated selection of cocktails, spirits, and small plates. Turn the pages to discover the Noir experience.
+            Explore our curated selection of elevated cocktails, mocktails, and spirits. Turn the pages to discover the Noir experience.
           </p>
           {/* Inline Book Menu Viewer */}
           <div className="w-full">

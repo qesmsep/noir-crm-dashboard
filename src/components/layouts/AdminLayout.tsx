@@ -2,7 +2,6 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useAuth } from '../../lib/auth-context';
 import { debugLog } from '../../utils/debugLogger';
 import styles from '../../styles/AdminLayout.module.css';
@@ -147,59 +146,48 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/members', label: 'Members', icon: Users },
     { href: '/admin/waitlist', label: 'Waitlist', icon: Clock },
     { href: '/admin/event-calendar', label: 'Events', icon: Calendar },
-    { href: '/admin/homepage', label: 'HomePage', icon: Home },
-    { href: '/member/login', label: 'Member Portal', icon: UserCircle },
+    { href: '/admin/homepage', label: 'Home', icon: Home },
+    { href: '/member/login', label: 'Portal', icon: UserCircle },
     { href: '/admin/settings', label: 'Settings', icon: Settings },
   ];
 
+  const row1 = navItems.slice(0, 5);
+  const row2 = navItems.slice(5);
+
   const initials = user?.email?.[0]?.toUpperCase() || 'N';
+
+  const renderNavItem = (item: typeof navItems[0]) => {
+    const IconComponent = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`${styles.navIconButton} ${pathname === item.href ? styles.navIconButtonActive : ''}`}
+        title={item.label}
+        onClick={() => {
+          debugLog.nav('ADMIN LAYOUT', 'Link clicked', { href: item.href, pathname });
+          if (typeof document !== 'undefined') {
+            document.body.style.overflow = '';
+            document.body.style.pointerEvents = '';
+          }
+        }}
+      >
+        <IconComponent className={styles.navIcon} size={16} strokeWidth={2} />
+        <span className={styles.navLabel}>{item.label}</span>
+      </Link>
+    );
+  };
 
   return (
     <div className={styles.root}>
-      <header className={styles.topNav}>
-        <div className={styles.brand}>
-          <Link href="/admin/dashboard-v2" className={styles.brandLink}>
-            <Image 
-              src="/images/noir-wedding-day.png" 
-              alt="Noir Logo" 
-              width={72} 
-              height={36} 
-              priority 
-              style={{ objectFit: 'contain' }}
-            />
-          </Link>
-        </div>
+      {/* Watermark */}
+      <div className={styles.watermark}>
+        <img src="/images/noir-wedding-day.png" alt="" aria-hidden="true" />
+      </div>
 
-        <nav className={styles.navIcons}>
-          {navItems.map((item) => {
-            const IconComponent = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${styles.navIconButton} ${pathname === item.href ? styles.navIconButtonActive : ''}`}
-                title={item.label}
-                onClick={(e) => {
-                  debugLog.nav('ADMIN LAYOUT', 'Link clicked', {
-                    href: item.href,
-                    pathname,
-                    isNavigating,
-                    loading,
-                    user: !!user
-                  });
-                  // Ensure body scroll is unlocked before navigation
-                  if (typeof document !== 'undefined') {
-                    document.body.style.overflow = '';
-                    document.body.style.pointerEvents = '';
-                  }
-                }}
-              >
-                <IconComponent className={styles.navIcon} size={18} strokeWidth={2} />
-                <span className={styles.navLabel}>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+      <header className={styles.topNav}>
+        <nav className={styles.navRow}>{row1.map(renderNavItem)}</nav>
+        <nav className={styles.navRow}>{row2.map(renderNavItem)}</nav>
       </header>
 
       <main className={`${styles.main} ${isFullScreen ? styles.fullScreen : ''}`}>

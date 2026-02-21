@@ -195,24 +195,10 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     return result;
   }, [isMember, bookingEndDate, settings?.timezone]);
 
-  // Calculate January 1, 2026 for members-only indicator
-  const membersOnlyStartDate = useMemo(() => {
-    const timezone = settings?.timezone || 'America/Chicago';
-    return DateTime.fromObject({ year: 2026, month: 1, day: 1 }, { zone: timezone }).startOf('day').toJSDate();
-  }, [settings?.timezone]);
-
-  // For non-members, show dates up to bookingEndDate (to display "members only" dates)
-  // but selection is capped at December 31, 2025 via effectiveMaxDate
+  // Calendar max date - same for everyone since we verify membership on submit
   const prevCalendarMaxDateRef = useRef<Date | null>(null);
   const calendarMaxDate = useMemo(() => {
-    let result: Date;
-    if (isMember) {
-      result = effectiveMaxDate;
-    } else {
-      // Show dates up to bookingEndDate to display "members only" dates, but selection is still capped
-      result = bookingEndDate || effectiveMaxDate;
-    }
-    
+    const result = effectiveMaxDate;
     // Only return a new Date if the timestamp actually changed
     if (prevCalendarMaxDateRef.current && prevCalendarMaxDateRef.current.getTime() === result.getTime()) {
       return prevCalendarMaxDateRef.current;
@@ -970,178 +956,75 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     setCurrentReservationData(reservationData);
 
     try {
-      // For members, verify membership status
-      if (isMember) {
-        console.log('Verifying member with phone:', form.phone);
-        console.log('Form data:', form);
+      // ALWAYS verify membership status by checking phone number
+      console.log('Checking membership status for phone:', form.phone);
 
-        const { data: members, error: memberError } = await supabase
-          .from('members')
-          .select('member_id, first_name, last_name, phone')
-          .eq('phone', form.phone)
-          .limit(1);
+      const { data: members, error: memberError } = await supabase
+        .from('members')
+        .select('member_id, first_name, last_name, phone')
+        .eq('phone', form.phone)
+        .limit(1);
 
-        const member = members && members.length > 0 ? members[0] : null;
+      const member = members && members.length > 0 ? members[0] : null;
+      console.log('Member verification response:', { member, memberError });
 
-        console.log('Member verification response:', { member, memberError });
-
-        if (memberError || !member) {
-          console.error('Member verification error:', memberError);
-          toast({
-            title: 'Invalid member',
-            description: 'The provided phone number is not associated with a member account.',
-            status: 'error',
-            duration: 3000,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (!member) {
-          console.log('No member found with phone:', form.phone);
-          toast({
-            title: 'Invalid member',
-            description: 'The provided phone number is not associated with a member account.',
-            status: 'error',
-            duration: 3000,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
-        console.log('Member found:', member);
-        console.log('Preparing reservation data:', reservationData);
-        
-        // Store member data for use in confirmation modal
-        setVerifiedMember(member);
-
-        // Send reservation data to backend for members
-        try {
-          const requestBody = {
-            ...reservationData,
-            member_id: member.member_id // Add member_id to the reservation data
-          };
-          
-          console.log('Sending reservation request to API...');
-          console.log('Request body:', requestBody);
-          console.log('Request body JSON:', JSON.stringify(requestBody));
-          
-          const response = await fetch('/api/reservations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-          });
-          
-          console.log('API Response status:', response.status);
-          const data = await response.json();
-          console.log('API Response data:', data);
-
-          if (!response.ok) {
-            // Check if this is a 409 status with alternative times
-            if (response.status === 409 && data.alternative_times) {
-              setAlternativeTimes(data.alternative_times);
-              setShowAlternativeTimesModal(true);
-              setIsSubmitting(false);
-              return;
-            }
-            // Include detailed error information
-            const errorMessage = data.details 
-              ? `${data.error || 'Failed to create reservation'}: ${data.details}`
-              : (data.error || 'Failed to create reservation');
-            console.error('Reservation creation failed:', errorMessage, data);
-            throw new Error(errorMessage);
-          }
-          
-          const confirmedReservation = data.data || data; // Handle both {data: {...}} and direct object
-          console.log('Reservation confirmed:', confirmedReservation);
-          
-          // For members, ensure we have the name from the member object if not in reservation
-          if (isMember && verifiedMember && !confirmedReservation.first_name) {
-            confirmedReservation.first_name = verifiedMember.first_name;
-            confirmedReservation.last_name = verifiedMember.last_name;
-          }
-          
-          setConfirmationData(confirmedReservation);
-          setShowConfirmationModal(true);
-          if (onSave) {
-            onSave(confirmedReservation);
-          }
-          if (onClose) {
-            onClose();
-          }
-        } catch (error) {
-          console.error('Error creating reservation:', error);
-          throw error;
-        } finally {
-          setIsSubmitting(false);
-        }
+      // If not a member, show "Members only" message
+      if (!member) {
+        console.log('No member found with phone:', form.phone);
+        toast({
+          title: 'Noir is Members Only',
+          description: (
+            <div>
+              <p>Reservations are currently available for Noir members only.</p>
+              <br />
+              <a
+                href={`sms:9137774488?body=${encodeURIComponent('MEMBERSHIP')}`}
+                style={{
+                  color: '#A59480',
+                  textDecoration: 'underline',
+                  fontWeight: 'bold'
+                }}
+              >
+                Text MEMBERSHIP to 913.777.4488 to learn more
+              </a>
+            </div>
+          ),
+          status: 'info',
+          duration: 8000,
+          isClosable: true,
+        });
+        setIsSubmitting(false);
         return;
       }
 
-      // For non-members, handle based on hold fee settings
-      if (!isMember) {
-        let requestBody: any = { ...reservationData };
-        
-        // Only create payment method if hold fees are enabled
-        if (settings?.hold_fee_enabled) {
-          if (!stripe || !elements) {
-            toast({
-              title: 'Stripe not loaded',
-              description: 'Please try again in a moment.',
-              status: 'error',
-              duration: 3000,
-            });
-            setIsSubmitting(false);
-            return;
-          }
-          
-          // Create payment method
-          const cardElement = elements.getElement('card');
-          if (!cardElement) {
-            toast({
-              title: 'Card error',
-              description: 'Card input not found. Please try again.',
-              status: 'error',
-              duration: 3000,
-            });
-            setIsSubmitting(false);
-            return;
-          }
-          
-          const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-            type: 'card',
-            card: cardElement,
-            billing_details: {
-              name: `${form.first_name} ${form.last_name}`.trim(),
-              email: form.email,
-            },
-          });
-          
-          if (pmError || !paymentMethod) {
-            toast({
-              title: 'Card error',
-              description: pmError?.message || 'Failed to create payment method',
-              status: 'error',
-              duration: 3000,
-            });
-            setIsSubmitting(false);
-            return;
-          }
-          
-          // Add payment method ID to request body
-          requestBody.payment_method_id = paymentMethod.id;
-        }
-        
-        console.log('Sending non-member reservation request to API...');
+      // Member found - proceed with member reservation flow
+      console.log('Member found:', member);
+      console.log('Preparing reservation data:', reservationData);
+
+      // Store member data for use in confirmation modal
+      setVerifiedMember(member);
+
+      // Send reservation data to backend for members
+      try {
+        const requestBody = {
+          ...reservationData,
+          member_id: member.member_id // Add member_id to the reservation data
+        };
+
+        console.log('Sending reservation request to API...');
         console.log('Request body:', requestBody);
         console.log('Request body JSON:', JSON.stringify(requestBody));
-        
+
         const response = await fetch('/api/reservations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
         });
+
+        console.log('API Response status:', response.status);
         const data = await response.json();
+        console.log('API Response data:', data);
+
         if (!response.ok) {
           // Check if this is a 409 status with alternative times
           if (response.status === 409 && data.alternative_times) {
@@ -1150,9 +1033,23 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
             setIsSubmitting(false);
             return;
           }
-          throw new Error(data.error || 'Failed to create reservation');
+          // Include detailed error information
+          const errorMessage = data.details
+            ? `${data.error || 'Failed to create reservation'}: ${data.details}`
+            : (data.error || 'Failed to create reservation');
+          console.error('Reservation creation failed:', errorMessage, data);
+          throw new Error(errorMessage);
         }
+
         const confirmedReservation = data.data || data; // Handle both {data: {...}} and direct object
+        console.log('Reservation confirmed:', confirmedReservation);
+
+        // Ensure we have the name from the member object if not in reservation
+        if (verifiedMember && !confirmedReservation.first_name) {
+          confirmedReservation.first_name = verifiedMember.first_name;
+          confirmedReservation.last_name = verifiedMember.last_name;
+        }
+
         setConfirmationData(confirmedReservation);
         setShowConfirmationModal(true);
         if (onSave) {
@@ -1161,17 +1058,21 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         if (onClose) {
           onClose();
         }
+      } catch (error) {
+        console.error('Error creating reservation:', error);
+        throw error;
+      } finally {
         setIsSubmitting(false);
-        return;
       }
-    } catch (error: any) {
+    } catch (error) {
+      // Outer catch for member verification errors
+      console.error('Reservation creation error:', error);
       toast({
-        title: 'Error creating reservation',
-        description: error.message || 'There was an error creating your reservation. Please try again.',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create reservation',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -1337,12 +1238,6 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   }}
                   renderDayContents={(dayOfMonth: number) => dayOfMonth}
                   filterDate={d => {
-                    // For non-members, prevent selection of dates after December 31, 2025
-                    // This is already handled by maxDate, but keep as safety check
-                    if (!isMember && d >= membersOnlyStartDate) {
-                      return false;
-                    }
-
                     // Only allow dates that are:
                     // - within booking window (handled by minDate/maxDate)
                     // - on a base open day or exceptional open
@@ -1375,7 +1270,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     />
                   }
                   wrapperClassName="datepicker-wrapper"
-                  popperClassName={`datepicker-popper ${!isMember && currentCalendarMonth && DateTime.fromJSDate(currentCalendarMonth) >= DateTime.fromObject({ year: 2026, month: 1, day: 1 }) ? 'members-only-month' : ''}`}
+                  popperClassName="datepicker-popper"
                   portalId="react-datepicker-portal"
                   withPortal={false}
                 />

@@ -108,12 +108,12 @@ const ReservationSection = ({ baseDays, bookingStartDate, bookingEndDate }: Rese
               zIndex={{ base: 10, sm: "auto" }}
               className="reservation-form-container"
             >
-              <ReservationForm 
-                isMember={true} 
-                onClose={onMemberClose} 
-                baseDays={baseDays} 
-                bookingStartDate={bookingStartDate} 
-                bookingEndDate={bookingEndDate} 
+              <ReservationForm
+                isMember={false}
+                onClose={onMemberClose}
+                baseDays={baseDays}
+                bookingStartDate={bookingStartDate}
+                bookingEndDate={bookingEndDate}
               />
             </Box>
           </Collapse>

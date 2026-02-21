@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import HTMLFlipBook from 'react-pageflip';
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface BookMenuViewerProps {
   className?: string;
@@ -11,7 +11,6 @@ interface BookMenuViewerProps {
 const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
   const [menuImages, setMenuImages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const bookRef = useRef<any>(null);
 
@@ -58,7 +57,15 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
 
   const nextPage = () => {
     if (bookRef.current) {
-      bookRef.current.pageFlip().flipNext();
+      // If on cover (page 0), slide first then flip after delay
+      if (currentPage === 0) {
+        setCurrentPage(1); // Trigger slide animation
+        setTimeout(() => {
+          bookRef.current.pageFlip().flipNext();
+        }, 400); // Wait 400ms for slide, then flip (total animation is 700ms slide + 800ms flip)
+      } else {
+        bookRef.current.pageFlip().flipNext();
+      }
     }
   };
 
@@ -66,10 +73,6 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
     if (bookRef.current) {
       bookRef.current.pageFlip().flipPrev();
     }
-  };
-
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
   };
 
   const onFlip = (e: any) => {
@@ -83,14 +86,12 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
         nextPage();
       } else if (e.key === 'ArrowLeft') {
         prevPage();
-      } else if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
+  }, []);
 
   if (isLoading) {
     return (
@@ -115,12 +116,8 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
     );
   }
 
-  const containerClass = isFullscreen
-    ? 'fixed inset-0 z-[9999] bg-[#1A1A1A] flex flex-col items-center justify-center p-4 sm:p-8'
-    : `w-full flex flex-col items-center justify-center ${className}`;
-
   return (
-    <div className={containerClass}>
+    <div className={`w-full flex flex-col items-center justify-center ${className}`}>
       {/* Book Container with Spotlight Effect */}
       <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center">
         {/* Spotlight gradient background */}
@@ -147,19 +144,24 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
         )}
 
         {/* The Book */}
-        <div className="relative">
+        <div
+          className="relative transition-all duration-700 ease-out"
+          style={{
+            transform: currentPage === 0 ? 'translateX(-25%)' : 'translateX(0)',
+          }}
+        >
           <HTMLFlipBook
             ref={bookRef}
-            width={550}
-            height={733}
+            width={800}
+            height={1030}
             size="stretch"
-            minWidth={315}
-            maxWidth={1000}
-            minHeight={420}
-            maxHeight={1533}
+            minWidth={400}
+            maxWidth={1600}
+            minHeight={515}
+            maxHeight={2060}
             drawShadow={true}
             flippingTime={800}
-            usePortrait={true}
+            usePortrait={false}
             startZIndex={0}
             autoSize={true}
             maxShadowOpacity={0.5}
@@ -177,13 +179,13 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
           >
             {menuImages.map((src, idx) => (
               <div key={idx} className="page" data-density="hard">
-                <div className="page-content bg-[#ECEDE8] rounded-lg overflow-hidden">
+                <div className="page-content bg-[#ECEDE8] overflow-hidden">
                   <img
                     src={src}
                     alt={`Menu page ${idx + 1}`}
                     className="w-full h-full object-cover"
                     style={{
-                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(0, 0, 0, 0.1)',
+                      boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.1)',
                     }}
                   />
                 </div>
@@ -208,7 +210,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
       </div>
 
       {/* Controls Footer */}
-      <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 w-full max-w-4xl">
+      <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 w-full max-w-4xl">
         {/* Page Counter */}
         <div
           className="text-[#ECEDE8] text-base sm:text-lg text-center"
@@ -236,26 +238,6 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
             />
           ))}
         </div>
-
-        {/* Fullscreen Toggle */}
-        <button
-          onClick={toggleFullscreen}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#353535] hover:bg-[#BCA892] border border-[#BCA892] text-[#ECEDE8] hover:text-[#23201C] transition-all duration-300 text-sm"
-          style={{ fontFamily: 'Montserrat, sans-serif' }}
-          aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-        >
-          {isFullscreen ? (
-            <>
-              <Minimize2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Exit</span>
-            </>
-          ) : (
-            <>
-              <Maximize2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Fullscreen</span>
-            </>
-          )}
-        </button>
       </div>
 
       {/* Helpful Instructions */}

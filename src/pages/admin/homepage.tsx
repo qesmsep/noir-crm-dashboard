@@ -4,7 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/useToast';
-import { Trash2 } from 'lucide-react';
+import { Trash2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface MenuFile {
   name: string;
@@ -12,11 +29,106 @@ interface MenuFile {
   size: number;
 }
 
+function SortableMenuItem({ file, onDelete, pageNumber }: { file: MenuFile; onDelete: (name: string) => void; pageNumber: number }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: file.name });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="border border-[#EFEDE8] rounded-lg overflow-hidden bg-white hover:border-[#BCA892] transition-colors relative"
+    >
+      {/* Page Number Badge */}
+      <div className="absolute top-2 left-2 z-10">
+        <div className="w-7 h-7 rounded-full bg-[#BCA892] text-white flex items-center justify-center text-xs font-bold shadow-md">
+          {pageNumber}
+        </div>
+      </div>
+
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 right-2 z-10 cursor-grab active:cursor-grabbing text-[#8C7C6D] hover:text-[#BCA892] transition-colors bg-white/80 rounded p-1"
+      >
+        <GripVertical className="w-4 h-4" />
+      </div>
+
+      {/* Thumbnail */}
+      <div className="w-full aspect-[2/3] bg-[#F7F6F3] overflow-hidden">
+        <img
+          src={file.path}
+          alt={file.name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+
+      {/* File Info & Actions */}
+      <div className="p-3 space-y-2">
+        <div>
+          <p className="font-semibold text-[#1F1F1F] truncate text-sm">
+            {file.name}
+          </p>
+          <p className="text-xs text-gray-500">
+            {(file.size / 1024).toFixed(1)} KB
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            asChild
+            size="sm"
+            variant="ghost"
+            className="text-[#5A5A5A] hover:bg-[#F0EEE9] flex-1"
+          >
+            <a
+              href={file.path}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View
+            </a>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-[#8B4A4A] hover:bg-[#F3E7E7]"
+            onClick={() => onDelete(file.name)}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePageAdmin() {
   const [menuFiles, setMenuFiles] = useState<MenuFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const { toast } = useToast();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchMenuFiles();
@@ -108,18 +220,62 @@ export default function HomePageAdmin() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = menuFiles.findIndex((file) => file.name === active.id);
+      const newIndex = menuFiles.findIndex((file) => file.name === over.id);
+
+      const newOrder = arrayMove(menuFiles, oldIndex, newIndex);
+      setMenuFiles(newOrder);
+
+      // Save the new order to the server
+      setReordering(true);
+      try {
+        const response = await fetch('/api/admin/reorder-menu-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order: newOrder.map((file) => file.name),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save order');
+        }
+
+        toast({
+          title: 'Order updated',
+          description: 'Menu page order has been saved.',
+        });
+      } catch (error) {
+        console.error('Error saving menu order:', error);
+        toast({
+          title: 'Failed to save order',
+          description: 'Could not save the new menu order. Please try again.',
+          variant: 'error',
+        });
+        // Revert to original order
+        fetchMenuFiles();
+      } finally {
+        setReordering(false);
+      }
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="bg-[#F6F5F2] min-h-screen py-6 md:py-10">
-        <div className="max-w-[1100px] mx-auto px-4 md:px-8">
+        <div className="max-w-[900px] mx-auto px-4 md:px-8">
           <div className="flex flex-col gap-6 md:gap-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-6">
               <div>
                 <h1 className="text-2xl font-bold text-[#1F1F1F]" style={{ fontFamily: 'IvyJournal, serif' }}>
-                  HomePage
+                  Menu Pages
                 </h1>
                 <p className="mt-2 text-gray-600 text-sm">
-                  Manage the menu images shown on the homepage carousel.
+                  Drag to reorder • First page is the cover
                 </p>
               </div>
               <div className="flex gap-3">
@@ -156,9 +312,9 @@ export default function HomePageAdmin() {
             <div className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm">
               <div className="px-4 md:px-6 pt-4 md:pt-6 pb-4">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-[#1F1F1F]">Homepage Menu Images</h2>
+                  <h2 className="text-xl font-semibold text-[#1F1F1F]">Menu Images</h2>
                   <Badge className="bg-[#F3F1EC] text-[#8C7C6D] border border-[#E6E0D8] px-2 py-1 font-semibold">
-                    {menuFiles.length} images
+                    {menuFiles.length} pages
                   </Badge>
                 </div>
               </div>
@@ -169,60 +325,37 @@ export default function HomePageAdmin() {
                     <Spinner size="sm" />
                     <span>Loading images...</span>
                   </div>
+                ) : menuFiles.length === 0 ? (
+                  <div>
+                    <p className="text-gray-600">No menu images uploaded yet.</p>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    {menuFiles.length === 0 && (
-                      <div>
-                        <p className="text-gray-600">No menu images uploaded yet.</p>
-                      </div>
-                    )}
-                    {menuFiles.map((file) => (
-                      <div
-                        key={file.name}
-                        className="border border-[#EFEDE8] rounded-lg overflow-hidden bg-[#FBFBFA]"
-                      >
-                        <div className="bg-white border-b border-[#EFEDE8] px-4 py-3">
-                          <p className="font-semibold text-[#1F1F1F] truncate">
-                            {file.name}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {(file.size / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                        <div className="bg-[#F7F6F3] px-4 py-3 flex justify-center">
-                          <img
-                            src={file.path}
-                            alt={file.name}
-                            className="w-full max-h-[120px] md:max-h-[140px] object-contain"
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={menuFiles.map((file) => file.name)}
+                      strategy={rectSortingStrategy}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        {menuFiles.map((file, index) => (
+                          <SortableMenuItem
+                            key={file.name}
+                            file={file}
+                            pageNumber={index + 1}
+                            onDelete={handleDeleteMenuFile}
                           />
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-3 gap-2">
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="ghost"
-                            className="text-[#5A5A5A] hover:bg-[#F0EEE9]"
-                          >
-                            <a
-                              href={file.path}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              View
-                            </a>
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-[#8B4A4A] hover:bg-[#F3E7E7]"
-                            onClick={() => handleDeleteMenuFile(file.name)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Delete
-                          </Button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    </SortableContext>
+                  </DndContext>
+                )}
+                {reordering && (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-[#8C7C6D]">
+                    <Spinner size="sm" />
+                    <span>Saving new order...</span>
                   </div>
                 )}
               </div>
