@@ -114,18 +114,18 @@ export default function MemberLogin() {
 
       if (otpError) throw otpError;
 
-      // Send SMS via your API
-      const response = await fetch('/api/send-otp', {
+      // Send SMS via OpenPhone API
+      const response = await fetch('/api/auth/send-phone-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: normalizePhone(phone),
-          message: `Your Noir verification code is: ${otpCode}. This code expires in 10 minutes.`
+          phone: normalizePhone(phone)
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send verification code');
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to send verification code');
       }
 
       setStep('otp');
