@@ -53,7 +53,8 @@ export default function Home() {
                 letterSpacing: '0.08em',
                 fontWeight: 400,
                 textTransform: 'uppercase',
-                lineHeight: 1.1
+                lineHeight: 1.1,
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
             >
               ELEVATED SPIRITS.<br />UNFORGETTABLE SPACE.
