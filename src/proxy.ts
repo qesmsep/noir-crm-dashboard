@@ -3,10 +3,12 @@ import type { NextRequest } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Global middleware for Next.js App Router
+ * Global proxy for Next.js App Router (Next.js 16+)
  * Adds request ID tracking and basic security headers
+ *
+ * Migrated from middleware.ts to proxy.ts per Next.js 16 requirements
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const requestId = uuidv4();
   const startTime = Date.now();
 
@@ -42,7 +44,7 @@ export function middleware(request: NextRequest) {
 }
 
 /**
- * Configure which routes to run middleware on
+ * Configure which routes to run proxy on
  * Exclude static files and internal Next.js routes
  */
 export const config = {

@@ -1,12 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
-import Modal from 'react-modal';
-import MenuViewer from '../components/MenuViewer';
+import BookMenuViewer from '../components/BookMenuViewer';
 
 export default function Home() {
-  const [menuModalOpen, setMenuModalOpen] = useState(false);
 
   // Apple Maps link helper
   const appleMapsUrl = 'https://maps.apple.com/?address=106%20W%2011th%20St,Kansas%20City,MO%2064105';
@@ -211,40 +208,33 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Mobile-Optimized Noir Menu Section */}
-      <section className="bg-[#ABA8A1] py-36 sm:py-32 px-4 sm:px-8;">
-        <div className="max-w-6xl mx-auto flex flex-col items-center justify-center">
-          <h3 
-            className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-center"
-            style={{ 
+      {/* Noir Menu Section - Inline Book Viewer */}
+      <section className="bg-[#1A1A1A] py-16 sm:py-20 md:py-24 px-4 sm:px-8" id="menu">
+        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center">
+          <h3
+            className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-8 text-center"
+            style={{
               fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif',
-              marginTop: '100px',
               textTransform: 'uppercase',
-              fontWeight: 900,
+              fontWeight: 600,
               letterSpacing: '0.08em',
-              color: '#353535'
+              color: '#ECEDE8'
             }}
           >
             Noir Menu
           </h3>
-          <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-center max-w-2xl px-4" 
-             style={{ 
+          <p className="text-base sm:text-lg md:text-xl mb-10 sm:mb-12 md:mb-16 text-center max-w-2xl px-4"
+             style={{
                fontFamily: 'Montserrat, sans-serif',
-               fontWeight: 'semi-bold', 
-               color: '#ecede8',
+               fontWeight: 400,
+               color: '#BCA892',
                lineHeight: 1.5
              }}>
-            Explore our curated selection of cocktails, spirits, and small plates. Enjoy the Noir experience.
+            Explore our curated selection of cocktails, spirits, and small plates. Turn the pages to discover the Noir experience.
           </p>
-          <div className="w-full max-w-4xl mx-auto px-4 flex justify-center">
-            <button
-              onClick={() => setMenuModalOpen(true)}
-              className="mobile-button mobile-accessible px-6 py-3 rounded-full bg-[#BCA892] text-[#23201C] text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
-              style={{ fontFamily: 'Montserrat, sans-serif', letterSpacing: '0.05em', touchAction: 'manipulation', minWidth: 180, marginBottom: '100px' }}
-              aria-label="View Noir Menu"
-            >
-              View Menu
-            </button>
+          {/* Inline Book Menu Viewer */}
+          <div className="w-full">
+            <BookMenuViewer />
           </div>
         </div>
       </section>
@@ -497,68 +487,6 @@ export default function Home() {
           </div>
         </div>
       </footer>
-
-      {/* Noir Menu Modal using react-modal */}
-      <Modal
-        isOpen={menuModalOpen}
-        onRequestClose={() => setMenuModalOpen(false)}
-        contentLabel="Noir Menu Modal"
-        style={{
-          overlay: {
-            backgroundColor: 'rgba(0,0,0,0.9)',
-            zIndex: 2000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-          },
-          content: {
-            inset: 0,
-            background: '#23201C',
-            border: 'none',
-            borderRadius: '0',
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflowY: 'auto',
-            width: '100%',
-            height: '100vh',
-            maxWidth: '100%',
-            maxHeight: '100vh',
-            margin: '0 auto',
-          },
-        }}
-        ariaHideApp={false}
-      >
-        <button
-          onClick={() => setMenuModalOpen(false)}
-          style={{
-            position: 'absolute',
-            top: 10,
-            right: 10,
-            background: 'rgba(53,53,53,0.8)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '50%',
-            width: 40,
-            height: 40,
-            fontSize: 24,
-            cursor: 'pointer',
-            zIndex: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 'bold'
-          }}
-          aria-label="Close Menu"
-        >
-          ×
-        </button>
-        <h2 className="text-2xl font-bold text-[#ECEDE8] mb-4" style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Noir Menu</h2>
-        <MenuViewer />
-      </Modal>
     </div>
   );
 }
