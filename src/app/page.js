@@ -430,15 +430,8 @@ export default function Home() {
             <div>
               <div className="font-semibold text-lg sm:text-xl mb-2 sm:mb-3">Contact</div>
               <div className="text-sm sm:text-base leading-relaxed">
-                <a 
-                  href="mailto:drink@noirkc.com" 
-                  className="text-[#BCA892] underline hover:text-[#ECEDE8] transition-colors block mb-1"
-                  aria-label="Send email to drink@noirkc.com"
-                >
-                  drink@noirkc.com
-                </a>
-                <a 
-                  href="tel:9137774488" 
+                <a
+                  href="tel:9137774488"
                   className="text-[#BCA892] underline hover:text-[#ECEDE8] transition-colors"
                   aria-label="Call 913.777.4488"
                 >
