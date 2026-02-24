@@ -14,12 +14,13 @@ export default function Home() {
       {/* Mobile-Optimized Navigation - Overlay on Hero */}
       <nav className="absolute top-0 left-0 right-0 w-full flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 bg-white/20 backdrop-blur-sm z-50" style={{ color: '#ECEDE8' }}>
         <div className="flex items-center gap-2">
-          <Image 
-            src="/images/noir-wedding-day.png" 
-            alt="Noir Logo" 
-            width={60} 
-            height={45} 
-            className="object-contain sm:w-[100px] sm:h-[70px] lg:w-[120px] lg:h-[80px]" 
+          <Image
+            src="/images/noir-wedding-day.png"
+            alt="Noir Logo"
+            width={60}
+            height={45}
+            className="object-contain sm:w-[100px] sm:h-[70px] lg:w-[120px] lg:h-[80px]"
+            style={{ height: 'auto' }}
             priority
           />
         </div>

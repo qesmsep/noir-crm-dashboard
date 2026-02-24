@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import styles from './BookMenuViewer.module.css';
 
 interface BookMenuViewerProps {
   className?: string;
@@ -168,7 +169,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
             showCover={true}
             mobileScrollSupport={true}
             onFlip={onFlip}
-            className="book-container"
+            className={styles.bookContainer}
             style={{}}
             startPage={0}
             clickEventForward={true}
@@ -178,8 +179,8 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
             disableFlipByClick={false}
           >
             {menuImages.map((src, idx) => (
-              <div key={idx} className="page" data-density="hard">
-                <div className="page-content bg-[#ECEDE8] overflow-hidden">
+              <div key={idx} className={styles.page} data-density="hard">
+                <div className={`${styles.pageContent} bg-[#ECEDE8] overflow-hidden`}>
                   <img
                     src={src}
                     alt={`Menu page ${idx + 1}`}
@@ -248,38 +249,6 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
         <span className="hidden sm:inline">Click edges or use arrow keys to turn pages • </span>
         Swipe on mobile • Click page dots to jump
       </div>
-
-      {/* Custom Styles */}
-      <style jsx global>{`
-        .page {
-          background: white;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .page-content {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .book-container {
-          margin: 0 auto;
-        }
-
-        /* Mobile optimizations */
-        @media (max-width: 768px) {
-          .page {
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-          }
-        }
-
-        /* Smooth page flip animations */
-        .stf__wrapper {
-          transition: transform 0.8s cubic-bezier(0.645, 0.045, 0.355, 1);
-        }
-      `}</style>
     </div>
   );
 };
