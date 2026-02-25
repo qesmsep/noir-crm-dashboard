@@ -58,7 +58,7 @@ export default function MemberSubscriptionCard({ memberId, accountId }: Props) {
       toast({
         title: 'Error',
         description: 'Failed to load subscription data',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -97,7 +97,7 @@ export default function MemberSubscriptionCard({ memberId, accountId }: Props) {
       toast({
         title: 'Error',
         description: error.message || 'Failed to cancel subscription',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setActionLoading(false);
@@ -129,7 +129,7 @@ export default function MemberSubscriptionCard({ memberId, accountId }: Props) {
       toast({
         title: 'Error',
         description: error.message || 'Failed to reactivate subscription',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setActionLoading(false);
