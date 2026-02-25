@@ -1,0 +1,254 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.modal {
+  background: white;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.07),
+    0 10px 15px rgba(0, 0, 0, 0.1),
+    0 20px 25px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #ECEAE5;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #8C7C6D;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.closeButton:hover {
+  background: #F7F6F3;
+  color: #1F1F1F;
+}
+
+.content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.loading,
+.empty {
+  text-align: center;
+  color: #8C7C6D;
+  padding: 40px 20px;
+  font-size: 14px;
+}
+
+.planList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planCard {
+  position: relative;
+  padding: 20px;
+  border: 2px solid #ECEAE5;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.planCard:hover {
+  border-color: #A59480;
+  background: #FBFBFA;
+}
+
+.planCard.selected {
+  border-color: #A59480;
+  background: #F7F6F3;
+  box-shadow: 0 2px 8px rgba(165, 148, 128, 0.15);
+}
+
+.planCard.current {
+  border-color: #A59480;
+}
+
+.planHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.planName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.currentBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  background-color: #D1FAE5;
+  color: #065F46;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.planDescription {
+  font-size: 14px;
+  color: #8C7C6D;
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+}
+
+.planPrice {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.amount {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1F1F1F;
+}
+
+.interval {
+  font-size: 14px;
+  color: #8C7C6D;
+}
+
+.monthlyEquivalent {
+  font-size: 13px;
+  color: #A59480;
+  font-style: italic;
+}
+
+.radioButton {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.radioButton input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #A59480;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #ECEAE5;
+}
+
+.cancelButton,
+.submitButton {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.cancelButton {
+  background: white;
+  color: #8C7C6D;
+  border: 1px solid #ECEAE5;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: #F7F6F3;
+  border-color: #A59480;
+}
+
+.submitButton {
+  background: #A59480;
+  color: white;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: #8C7C6D;
+}
+
+.submitButton:disabled,
+.cancelButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .modal {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 12px;
+  }
+
+  .header {
+    padding: 20px 16px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .footer {
+    padding: 16px;
+  }
+
+  .planCard {
+    padding: 16px;
+  }
+
+  .radioButton {
+    top: 16px;
+    right: 16px;
+  }
+}

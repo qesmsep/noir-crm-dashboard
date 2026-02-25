@@ -26,7 +26,7 @@ const supabase = createClient(
  *   - event_type: 'upgrade' | 'downgrade'
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'PUT') {
+  if (req.method !== 'POST' && req.method !== 'PUT') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 

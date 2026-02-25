@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
 import styles from '../styles/MemberSubscriptionCard.module.css';
+import UpdatePlanModal from './UpdatePlanModal';
+import UpdatePaymentModal from './UpdatePaymentModal';
 
 interface SubscriptionData {
   stripe_subscription_id: string | null;
@@ -12,6 +14,7 @@ interface SubscriptionData {
   payment_method_type: string | null;
   payment_method_last4: string | null;
   payment_method_brand: string | null;
+  current_price_id: string | null;
 }
 
 interface Props {
@@ -23,6 +26,8 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showUpdatePlanModal, setShowUpdatePlanModal] = useState(false);
+  const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false);
 
   useEffect(() => {
     if (accountId) {
@@ -41,6 +46,21 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
 
       // Extract subscription data from account
       const account = result.data;
+
+      // If there's a subscription, fetch current price_id from Stripe
+      let currentPriceId = null;
+      if (account.stripe_subscription_id) {
+        try {
+          const subResponse = await fetch(`/api/subscriptions/${account.stripe_subscription_id}`);
+          const subData = await subResponse.json();
+          if (subData.subscription && subData.subscription.items?.data?.[0]?.price?.id) {
+            currentPriceId = subData.subscription.items.data[0].price.id;
+          }
+        } catch (err) {
+          console.error('Error fetching subscription price:', err);
+        }
+      }
+
       setSubscription({
         stripe_subscription_id: account.stripe_subscription_id || null,
         subscription_status: account.subscription_status || null,
@@ -51,6 +71,7 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
         payment_method_type: account.payment_method_type || null,
         payment_method_last4: account.payment_method_last4 || null,
         payment_method_brand: account.payment_method_brand || null,
+        current_price_id: currentPriceId,
       });
     } catch (error: any) {
       console.error('Error fetching subscription data:', error);
@@ -256,22 +277,41 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
 
         <button
           className={styles.updateButton}
-          onClick={() => {
-            toast({ title: 'Info', description: 'Update plan functionality coming soon' });
-          }}
+          onClick={() => setShowUpdatePlanModal(true)}
         >
           Update Plan
         </button>
 
         <button
           className={styles.paymentButton}
-          onClick={() => {
-            toast({ title: 'Info', description: 'Update payment method functionality coming soon' });
-          }}
+          onClick={() => setShowUpdatePaymentModal(true)}
         >
           Update Payment
         </button>
       </div>
+
+      {showUpdatePlanModal && (
+        <UpdatePlanModal
+          accountId={accountId}
+          currentPriceId={subscription.current_price_id}
+          onSuccess={() => {
+            fetchSubscriptionData();
+            setShowUpdatePlanModal(false);
+          }}
+          onClose={() => setShowUpdatePlanModal(false)}
+        />
+      )}
+
+      {showUpdatePaymentModal && (
+        <UpdatePaymentModal
+          accountId={accountId}
+          onSuccess={() => {
+            fetchSubscriptionData();
+            setShowUpdatePaymentModal(false);
+          }}
+          onClose={() => setShowUpdatePaymentModal(false)}
+        />
+      )}
     </div>
   );
 }

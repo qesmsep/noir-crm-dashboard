@@ -1,0 +1,228 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.modal {
+  background: white;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.07),
+    0 10px 15px rgba(0, 0, 0, 0.1),
+    0 20px 25px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #ECEAE5;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #8C7C6D;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.closeButton:hover {
+  background: #F7F6F3;
+  color: #1F1F1F;
+}
+
+.content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.loading {
+  text-align: center;
+  color: #8C7C6D;
+  padding: 40px 20px;
+  font-size: 14px;
+}
+
+.currentMethod {
+  background: #F7F6F3;
+  border: 1px solid #ECEAE5;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.methodHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #8C7C6D;
+}
+
+.methodLabel {
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.methodDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardInfo {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1F1F1F;
+}
+
+.cardExpiry {
+  font-size: 14px;
+  color: #8C7C6D;
+}
+
+.newMethodSection {
+  margin-top: 24px;
+}
+
+.label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1F1F1F;
+  margin-bottom: 8px;
+}
+
+.cardElementWrapper {
+  padding: 14px 16px;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  background: white;
+  transition: all 0.15s ease;
+}
+
+.cardElementWrapper:focus-within {
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.secureNote {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #8C7C6D;
+  line-height: 1.5;
+  display: flex;
+  align-items: start;
+  gap: 6px;
+}
+
+.secureNote::before {
+  content: "🔒";
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #ECEAE5;
+}
+
+.cancelButton,
+.submitButton {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.cancelButton {
+  background: white;
+  color: #8C7C6D;
+  border: 1px solid #ECEAE5;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: #F7F6F3;
+  border-color: #A59480;
+}
+
+.submitButton {
+  background: #A59480;
+  color: white;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: #8C7C6D;
+}
+
+.submitButton:disabled,
+.cancelButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .modal {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 12px;
+  }
+
+  .header {
+    padding: 20px 16px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .footer {
+    padding: 16px;
+  }
+
+  .currentMethod {
+    padding: 12px;
+  }
+}
