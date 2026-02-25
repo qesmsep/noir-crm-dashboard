@@ -148,8 +148,8 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       stripe_subscription_id: subscription.id,
       subscription_status: subscription.status,
       subscription_start_date: new Date(subscription.created * 1000).toISOString(),
-      next_renewal_date: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString()
+      next_renewal_date: (subscription as any).current_period_end
+        ? new Date((subscription as any).current_period_end * 1000).toISOString()
         : null,
       monthly_dues: price?.recurring?.interval === 'year' ? amount / 12 : amount,
       ...paymentMethodInfo,
@@ -194,11 +194,11 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     .from('members')
     .update({
       subscription_status: subscription.status,
-      subscription_cancel_at: subscription.cancel_at
-        ? new Date(subscription.cancel_at * 1000).toISOString()
+      subscription_cancel_at: (subscription as any).cancel_at
+        ? new Date((subscription as any).cancel_at * 1000).toISOString()
         : null,
-      next_renewal_date: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString()
+      next_renewal_date: (subscription as any).current_period_end
+        ? new Date((subscription as any).current_period_end * 1000).toISOString()
         : null,
       monthly_dues: newMrr,
       ...paymentMethodInfo,
@@ -282,7 +282,7 @@ async function handleSubscriptionResumed(subscription: Stripe.Subscription) {
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) return;
+  if (!(invoice as any).subscription) return;
 
   const member = await findMemberByStripeCustomer(invoice.customer as string);
   if (!member) return;
@@ -295,14 +295,14 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   await supabase.from('subscription_events').insert({
     member_id: member.member_id,
     event_type: 'payment_failed',
-    stripe_subscription_id: invoice.subscription as string,
+    stripe_subscription_id: (invoice as any).subscription as string,
     effective_date: new Date().toISOString(),
     metadata: { invoice_id: invoice.id, amount: invoice.amount_due }
   });
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) return;
+  if (!(invoice as any).subscription) return;
 
   const member = await findMemberByStripeCustomer(invoice.customer as string);
   if (!member) return;
@@ -331,7 +331,7 @@ async function findMemberByStripeCustomer(customerId: string): Promise<any | nul
   return data;
 }
 
-async function getPaymentMethodInfo(paymentMethodId: string | null): Promise<{
+async function getPaymentMethodInfo(paymentMethodId: string | null | undefined): Promise<{
   payment_method_type?: string;
   payment_method_last4?: string;
   payment_method_brand?: string;
@@ -350,8 +350,8 @@ async function getPaymentMethodInfo(paymentMethodId: string | null): Promise<{
     } else if (paymentMethod.type === 'us_bank_account' && paymentMethod.us_bank_account) {
       return {
         payment_method_type: 'us_bank_account',
-        payment_method_last4: paymentMethod.us_bank_account.last4,
-        payment_method_brand: paymentMethod.us_bank_account.bank_name || 'Bank Account',
+        payment_method_last4: paymentMethod.us_bank_account.last4 || undefined,
+        payment_method_brand: paymentMethod.us_bank_account.bank_name || undefined,
       };
     }
   } catch (error) {

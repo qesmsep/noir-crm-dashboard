@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Extract client secret for payment confirmation (if needed)
     let clientSecret: string | undefined;
     if (subscription.latest_invoice && typeof subscription.latest_invoice !== 'string') {
-      const paymentIntent = subscription.latest_invoice.payment_intent;
+      const paymentIntent = (subscription.latest_invoice as any).payment_intent;
       if (paymentIntent && typeof paymentIntent !== 'string') {
         clientSecret = paymentIntent.client_secret || undefined;
       }
@@ -115,8 +115,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         stripe_subscription_id: subscription.id,
         subscription_status: subscription.status,
         subscription_start_date: new Date(subscription.created * 1000).toISOString(),
-        next_renewal_date: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
+        next_renewal_date: (subscription as any).current_period_end
+          ? new Date((subscription as any).current_period_end * 1000).toISOString()
           : null,
         monthly_dues: mrr,
       })
