@@ -35,6 +35,7 @@ type SortDirection = 'asc' | 'desc';
 export default function MembersAdmin() {
   const [members, setMembers] = useState<Member[]>([]);
   const [ledger, setLedger] = useState<LedgerTransaction[]>([]);
+  const [failedPaymentAccounts, setFailedPaymentAccounts] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lookupQuery, setLookupQuery] = useState("");
@@ -67,7 +68,21 @@ export default function MembersAdmin() {
   useEffect(() => {
     fetchMembers();
     fetchLedger();
+    fetchFailedPayments();
   }, []);
+
+  async function fetchFailedPayments() {
+    try {
+      const res = await fetch('/api/accounts/failed-payments-summary');
+      const result = await res.json();
+      if (!result.error && result.failed_payment_accounts) {
+        const failedSet = new Set(result.failed_payment_accounts.map((fp: any) => fp.account_id));
+        setFailedPaymentAccounts(failedSet);
+      }
+    } catch (err: any) {
+      console.error('Error fetching failed payments:', err);
+    }
+  }
 
   // Initialize selected members when modal opens
   useEffect(() => {
@@ -522,6 +537,11 @@ export default function MembersAdmin() {
                     onClick={() => router.push(`/admin/members/${account.account_id}`)}
                   >
                     <div className={styles.mobileCardHeader}>
+                      {failedPaymentAccounts.has(account.account_id) && (
+                        <div className={styles.paymentFailedBanner}>
+                          PAYMENT FAILED
+                        </div>
+                      )}
                       <div className={styles.mobileMemberRow}>
                         {member1?.photo ? (
                           <div className={styles.mobileAvatar}>
