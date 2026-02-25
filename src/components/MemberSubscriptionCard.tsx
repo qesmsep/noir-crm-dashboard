@@ -34,14 +34,15 @@ export default function MemberSubscriptionCard({ memberId, accountId }: Props) {
   const fetchSubscriptionData = async () => {
     try {
       const response = await fetch(`/api/members?member_id=${memberId}`);
-      const data = await response.json();
+      const result = await response.json();
 
-      if (data.error) {
-        throw new Error(data.error);
+      if (result.error) {
+        throw new Error(result.error);
       }
 
       // Extract subscription data from member
-      const member = Array.isArray(data) ? data[0] : data;
+      // API returns {data: member} for single member or {data: [members]} for all
+      const member = Array.isArray(result.data) ? result.data[0] : result.data;
       setSubscription({
         stripe_subscription_id: member.stripe_subscription_id || null,
         subscription_status: member.subscription_status || null,
