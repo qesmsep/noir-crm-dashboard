@@ -55,7 +55,7 @@ export default function SubscriptionPlansAdmin() {
       toast({
         title: 'Error',
         description: err.message || 'Failed to load subscription plans',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -135,7 +135,7 @@ export default function SubscriptionPlansAdmin() {
       toast({
         title: 'Error',
         description: err.message,
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setSaving(false);
@@ -177,7 +177,7 @@ export default function SubscriptionPlansAdmin() {
       toast({
         title: 'Error',
         description: err.message,
-        variant: 'destructive',
+        variant: 'error',
       });
     }
   }
