@@ -229,6 +229,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const { error: updateError } = await supabase
     .from('members')
     .update({
+      stripe_subscription_id: subscription.id, // Always update subscription ID
       subscription_status: subscription.status,
       subscription_cancel_at: (subscription as any).cancel_at
         ? new Date((subscription as any).cancel_at * 1000).toISOString()
