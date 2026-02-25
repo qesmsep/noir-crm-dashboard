@@ -12,12 +12,12 @@ const supabase = createClient(
 );
 
 /**
- * GET /api/stripe/payment-methods/list?member_id=xxx
+ * GET /api/stripe/payment-methods/list?account_id=xxx
  *
- * Lists all payment methods for a member
+ * Lists all payment methods for an account
  *
  * Query params:
- *   - member_id: UUID
+ *   - account_id: UUID
  *
  * Returns:
  *   - payment_methods: Array of Stripe PaymentMethod objects
@@ -28,38 +28,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id } = req.query;
+  const { account_id } = req.query;
 
-  if (!member_id || typeof member_id !== 'string') {
-    return res.status(400).json({ error: 'member_id is required' });
+  if (!account_id || typeof account_id !== 'string') {
+    return res.status(400).json({ error: 'account_id is required' });
   }
 
   try {
-    // Fetch member
-    const { data: member, error: memberError } = await supabase
-      .from('members')
+    // Fetch account
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
       .select('stripe_customer_id, stripe_subscription_id')
-      .eq('member_id', member_id)
+      .eq('account_id', account_id)
       .single();
 
-    if (memberError || !member || !member.stripe_customer_id) {
-      return res.status(404).json({ error: 'Member or Stripe customer not found' });
+    if (accountError || !account || !account.stripe_customer_id) {
+      return res.status(404).json({ error: 'Account or Stripe customer not found' });
     }
 
     // List payment methods
     const paymentMethods = await stripe.paymentMethods.list({
-      customer: member.stripe_customer_id,
+      customer: account.stripe_customer_id,
       limit: 100,
     });
 
     // Get default payment method from subscription or customer
     let defaultPaymentMethod: string | null = null;
 
-    if (member.stripe_subscription_id) {
-      const subscription = await stripe.subscriptions.retrieve(member.stripe_subscription_id);
+    if (account.stripe_subscription_id) {
+      const subscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
       defaultPaymentMethod = subscription.default_payment_method as string;
     } else {
-      const customer = await stripe.customers.retrieve(member.stripe_customer_id);
+      const customer = await stripe.customers.retrieve(account.stripe_customer_id);
       if ('invoice_settings' in customer) {
         defaultPaymentMethod = customer.invoice_settings?.default_payment_method as string;
       }

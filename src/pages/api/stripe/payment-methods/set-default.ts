@@ -14,10 +14,10 @@ const supabase = createClient(
 /**
  * PUT /api/stripe/payment-methods/set-default
  *
- * Sets the default payment method for a member's subscription
+ * Sets the default payment method for an account's subscription
  *
  * Body:
- *   - member_id: UUID
+ *   - account_id: UUID
  *   - payment_method_id: string (Stripe PaymentMethod ID)
  *
  * Returns:
@@ -29,48 +29,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id, payment_method_id } = req.body;
+  const { account_id, payment_method_id } = req.body;
 
-  if (!member_id || !payment_method_id) {
-    return res.status(400).json({ error: 'member_id and payment_method_id are required' });
+  if (!account_id || !payment_method_id) {
+    return res.status(400).json({ error: 'account_id and payment_method_id are required' });
   }
 
   try {
-    // Fetch member
-    const { data: member, error: memberError } = await supabase
-      .from('members')
+    // Fetch account
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
       .select('stripe_customer_id, stripe_subscription_id')
-      .eq('member_id', member_id)
+      .eq('account_id', account_id)
       .single();
 
-    if (memberError || !member || !member.stripe_customer_id) {
-      return res.status(404).json({ error: 'Member or Stripe customer not found' });
+    if (accountError || !account || !account.stripe_customer_id) {
+      return res.status(404).json({ error: 'Account or Stripe customer not found' });
     }
 
     // Attach payment method to customer if not already attached
     const paymentMethod = await stripe.paymentMethods.retrieve(payment_method_id);
 
-    if (paymentMethod.customer !== member.stripe_customer_id) {
+    if (paymentMethod.customer !== account.stripe_customer_id) {
       await stripe.paymentMethods.attach(payment_method_id, {
-        customer: member.stripe_customer_id,
+        customer: account.stripe_customer_id,
       });
     }
 
     // Update customer default payment method
-    await stripe.customers.update(member.stripe_customer_id, {
+    await stripe.customers.update(account.stripe_customer_id, {
       invoice_settings: {
         default_payment_method: payment_method_id,
       },
     });
 
     // Update subscription default payment method if exists
-    if (member.stripe_subscription_id) {
-      await stripe.subscriptions.update(member.stripe_subscription_id, {
+    if (account.stripe_subscription_id) {
+      await stripe.subscriptions.update(account.stripe_subscription_id, {
         default_payment_method: payment_method_id,
       });
     }
 
-    // Update member payment method info in database
+    // Update account payment method info in database
     const updatedPaymentMethod = await stripe.paymentMethods.retrieve(payment_method_id);
     let paymentMethodInfo: any = {};
 
@@ -89,9 +89,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     await supabase
-      .from('members')
+      .from('accounts')
       .update(paymentMethodInfo)
-      .eq('member_id', member_id);
+      .eq('account_id', account_id);
 
     return res.json({
       success: true,

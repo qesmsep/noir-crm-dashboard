@@ -17,7 +17,7 @@ const supabase = createClient(
  * Creates a Stripe SetupIntent for adding/updating payment methods
  *
  * Body:
- *   - member_id: UUID
+ *   - account_id: UUID
  *   - payment_method_type: 'card' | 'us_bank_account'
  *
  * Returns:
@@ -29,43 +29,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id, payment_method_type = 'card' } = req.body;
+  const { account_id, payment_method_type = 'card' } = req.body;
 
-  if (!member_id) {
-    return res.status(400).json({ error: 'member_id is required' });
+  if (!account_id) {
+    return res.status(400).json({ error: 'account_id is required' });
   }
 
   try {
-    // Fetch member
-    const { data: member, error: memberError } = await supabase
-      .from('members')
-      .select('stripe_customer_id, first_name, last_name, email')
-      .eq('member_id', member_id)
+    // Fetch account
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('stripe_customer_id')
+      .eq('account_id', account_id)
       .single();
 
-    if (memberError || !member) {
-      return res.status(404).json({ error: 'Member not found' });
+    if (accountError || !account) {
+      return res.status(404).json({ error: 'Account not found' });
     }
 
     // Get or create Stripe customer
-    let customerId = member.stripe_customer_id;
+    let customerId = account.stripe_customer_id;
 
     if (!customerId) {
+      // Fetch a member from this account to get email/name
+      const { data: member } = await supabase
+        .from('members')
+        .select('first_name, last_name, email')
+        .eq('account_id', account_id)
+        .limit(1)
+        .single();
+
       const customer = await stripe.customers.create({
-        email: member.email || undefined,
-        name: `${member.first_name} ${member.last_name}`,
+        email: member?.email || undefined,
+        name: member ? `${member.first_name} ${member.last_name}` : undefined,
         metadata: {
-          member_id,
+          account_id,
         },
       });
 
       customerId = customer.id;
 
-      // Update member with stripe_customer_id
+      // Update account with stripe_customer_id
       await supabase
-        .from('members')
+        .from('accounts')
         .update({ stripe_customer_id: customerId })
-        .eq('member_id', member_id);
+        .eq('account_id', account_id);
     }
 
     // Create SetupIntent
@@ -73,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       customer: customerId,
       payment_method_types: [payment_method_type],
       metadata: {
-        member_id,
+        account_id,
       },
     });
 

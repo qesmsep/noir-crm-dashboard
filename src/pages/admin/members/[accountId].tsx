@@ -7,6 +7,7 @@ import { getSupabaseClient } from "../../api/supabaseClient";
 import AdminLayout from '../../../components/layouts/AdminLayout';
 import InlineAttachments from '../../../components/InlineAttachments';
 import MemberSubscriptionCard from '../../../components/MemberSubscriptionCard';
+import SubscriptionTransactionHistory from '../../../components/SubscriptionTransactionHistory';
 import styles from '../../../styles/MemberDetail.module.css';
 
 interface Member {
@@ -1146,6 +1147,11 @@ export default function MemberDetailAdmin() {
 
               {/* Subscription Card - Account-level subscription */}
               <MemberSubscriptionCard
+                accountId={accountId as string}
+              />
+
+              {/* Transaction History Card - Stripe invoices */}
+              <SubscriptionTransactionHistory
                 accountId={accountId as string}
               />
             </div>

@@ -1,0 +1,274 @@
+.card {
+  background: white;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    0 4px 8px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.06),
+    0 4px 8px rgba(0, 0, 0, 0.06),
+    0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #ECEAE5;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.count {
+  font-size: 14px;
+  color: #8C7C6D;
+  font-weight: 500;
+}
+
+.loading,
+.empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: #8C7C6D;
+  font-size: 14px;
+}
+
+.invoiceList {
+  padding: 0;
+  margin: 0;
+}
+
+.invoiceRow {
+  padding: 20px 24px;
+  border-bottom: 1px solid #EFEDE8;
+  transition: background-color 0.15s ease;
+}
+
+.invoiceRow:last-child {
+  border-bottom: none;
+}
+
+.invoiceRow:hover {
+  background-color: #FBFBFA;
+}
+
+.invoiceMain {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.invoiceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.invoiceNumber {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F1F1F;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+}
+
+.invoiceDate {
+  font-size: 13px;
+  color: #8C7C6D;
+}
+
+.invoiceAmount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.amount {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1F1F1F;
+}
+
+.invoiceDescription {
+  font-size: 13px;
+  color: #5A5A5A;
+  margin-bottom: 12px;
+  padding-left: 0;
+}
+
+.invoiceActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #A59480;
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #ECEAE5;
+  background: white;
+  transition: all 0.15s ease;
+}
+
+.actionLink:hover {
+  background: #F7F6F3;
+  border-color: #A59480;
+  color: #8C7C6D;
+}
+
+.icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Status badges */
+.statusPaid {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  background-color: #D1FAE5;
+  color: #065F46;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusOpen {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  background-color: #FEF3C7;
+  color: #92400E;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusFailed {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  background-color: #FEE2E2;
+  color: #991B1B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusDraft {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  background-color: #E5E7EB;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusDefault {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  background-color: #F3F4F6;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.footer {
+  padding: 16px 24px;
+  border-top: 1px solid #EFEDE8;
+  display: flex;
+  justify-content: center;
+}
+
+.showMoreButton {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #A59480;
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.showMoreButton:hover {
+  background: #F7F6F3;
+  border-color: #A59480;
+  color: #8C7C6D;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .header {
+    padding: 20px 16px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .count {
+    font-size: 13px;
+  }
+
+  .invoiceRow {
+    padding: 16px;
+  }
+
+  .invoiceMain {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .invoiceAmount {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .amount {
+    font-size: 15px;
+  }
+
+  .invoiceNumber {
+    font-size: 13px;
+  }
+
+  .actionLink {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+}
