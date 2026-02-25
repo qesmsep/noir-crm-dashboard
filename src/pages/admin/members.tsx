@@ -478,6 +478,37 @@ export default function MembersAdmin() {
           </div>
         ) : (
           <>
+            {/* Mobile Sort Controls */}
+            <div className={styles.mobileSortControls}>
+              <label className={styles.sortLabel}>Sort by:</label>
+              <select
+                className={styles.sortSelect}
+                value={sortField || ''}
+                onChange={(e) => handleSort(e.target.value as SortField)}
+              >
+                <option value="">None</option>
+                <option value="name">Name</option>
+                <option value="join_date">Sign Up Date</option>
+                <option value="renewal_date">Renewal Date</option>
+                <option value="ltv">LTV</option>
+              </select>
+              {sortField && (
+                <button
+                  className={styles.sortDirectionButton}
+                  onClick={() => {
+                    const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    setSortDirection(newDirection);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('membersSortDirection', newDirection);
+                    }
+                  }}
+                  aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+                >
+                  {sortDirection === 'asc' ? '↑' : '↓'}
+                </button>
+              )}
+            </div>
+
             <div className={styles.mobileList}>
               {sortedAccounts.map((account) => {
                 const sortedMembers = account.allMembers.sort((a, b) => a.primary === b.primary ? 0 : a.primary ? -1 : 1);

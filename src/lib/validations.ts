@@ -18,7 +18,15 @@ export const memberSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-export const updateMemberSchema = memberSchema.partial();
+// Create update schema manually to avoid .partial() issue with refinements in Zod v4
+export const updateMemberSchema = z.object({
+  first_name: z.string().min(1, 'First name is required').max(50).optional(),
+  last_name: z.string().min(1, 'Last name is required').max(50).optional(),
+  email: z.string().email('Invalid email address').optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
+  membership: z.string().optional(),
+  notes: z.string().max(500).optional(),
+});
 
 export type MemberInput = z.infer<typeof memberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
@@ -44,7 +52,17 @@ export const reservationSchema = z.object({
   }
 );
 
-export const updateReservationSchema = reservationSchema.partial();
+// Create update schema manually to avoid .partial() issue with refinements in Zod v4
+export const updateReservationSchema = z.object({
+  member_id: z.string().uuid().optional(),
+  table_id: z.string().uuid().optional(),
+  start_time: z.string().datetime().optional(),
+  end_time: z.string().datetime().optional(),
+  party_size: z.number().int().min(1).max(20).optional(),
+  event_type: z.string().optional(),
+  notes: z.string().max(1000).optional(),
+  status: z.enum(['confirmed', 'pending', 'cancelled', 'completed']).optional(),
+});
 
 export type ReservationInput = z.infer<typeof reservationSchema>;
 export type UpdateReservationInput = z.infer<typeof updateReservationSchema>;

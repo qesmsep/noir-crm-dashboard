@@ -38,6 +38,19 @@ export interface Member {
   status?: string;
   balance?: number;
   notes?: string;
+  // Subscription tracking fields
+  stripe_subscription_id?: string;
+  stripe_customer_id?: string;
+  subscription_status?: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'paused' | 'trialing';
+  subscription_start_date?: string;
+  subscription_cancel_at?: string;
+  subscription_canceled_at?: string;
+  next_renewal_date?: string;
+  monthly_dues?: number;
+  // Payment method fields (for display)
+  payment_method_type?: 'card' | 'us_bank_account';
+  payment_method_last4?: string;
+  payment_method_brand?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -264,6 +277,73 @@ export interface PaginatedResponse<T> {
     totalPages: number;
     hasMore: boolean;
   };
+}
+
+// ========================================
+// Subscription & Payment Types
+// ========================================
+
+export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid' | 'paused' | 'trialing';
+
+export type SubscriptionEventType =
+  | 'subscribe'
+  | 'cancel'
+  | 'upgrade'
+  | 'downgrade'
+  | 'payment_failed'
+  | 'reactivate'
+  | 'pause'
+  | 'resume';
+
+export interface SubscriptionEvent {
+  id: string;
+  member_id: string;
+  event_type: SubscriptionEventType;
+  stripe_subscription_id?: string;
+  stripe_event_id?: string;
+  previous_plan?: string;
+  new_plan?: string;
+  previous_mrr?: number;
+  new_mrr?: number;
+  effective_date: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export interface SubscriptionPlan {
+  id: string;
+  plan_name: string;
+  stripe_product_id: string;
+  stripe_price_id: string;
+  monthly_price: number;
+  interval: 'month' | 'year';
+  is_active: boolean;
+  display_order: number;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StripeWebhookEvent {
+  id: string;
+  stripe_event_id: string;
+  event_type: string;
+  payload: Record<string, any>;
+  processed: boolean;
+  processed_at?: string;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface PaymentMethod {
+  id: string;
+  type: 'card' | 'us_bank_account';
+  last4: string;
+  brand?: string;
+  exp_month?: number;
+  exp_year?: number;
+  bank_name?: string;
+  is_default: boolean;
 }
 
 // ========================================

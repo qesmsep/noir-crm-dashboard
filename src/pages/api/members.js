@@ -23,7 +23,11 @@ const ALLOWED_MEMBER_FIELDS = [
   'account_id', 'first_name', 'last_name', 'email', 'phone', 'stripe_customer_id',
   'join_date', 'company', 'address', 'address_2', 'city', 'state', 'zip', 'country',
   'referral', 'membership', 'monthly_dues', 'photo', 'dob', 'auth_code', 'token', 'created_at',
-  'member_type', 'member_id'
+  'member_type', 'member_id',
+  // Subscription tracking fields
+  'stripe_subscription_id', 'subscription_status', 'subscription_start_date',
+  'subscription_cancel_at', 'subscription_canceled_at', 'next_renewal_date',
+  'payment_method_type', 'payment_method_last4', 'payment_method_brand'
 ];
 
 function cleanMemberObject(obj) {

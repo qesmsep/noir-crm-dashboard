@@ -244,32 +244,46 @@ export function getSupabaseAdmin(): SupabaseClient {
 export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): Promise<number> {
   const supabase = sb || getSupabaseAdmin();
 
-  // Fetch all non-deactivated members with their subscription proxy data
-  const { data: members, error } = await supabase
+  // Fetch all non-deactivated members with their subscription data
+  const { data: members, error} = await supabase
     .from('members')
-    .select('member_id, account_id, monthly_dues, status, join_date, stripe_customer_id, deactivated')
+    .select('member_id, account_id, monthly_dues, status, join_date, stripe_customer_id, stripe_subscription_id, subscription_status, subscription_start_date, deactivated')
     .or('deactivated.is.null,deactivated.eq.false');
 
   if (error) throw new Error(`Failed to fetch members: ${error.message}`);
   if (!members || members.length === 0) return 0;
 
   const rows = members.map((m: any) => {
+    // Use real subscription status if available, otherwise fall back to monthly_dues proxy
+    const hasSubscription = m.stripe_subscription_id && m.subscription_status;
     const dues = Number(m.monthly_dues) || 0;
-    const isActive = m.status === 'active' && dues > 0;
-    // Treat 'inactive' members with dues=0 who were previously active as potential churn
-    // Treat 'pending' as not yet active (no MRR)
-    const isPaused = m.status === 'inactive' && !m.deactivated;
+
+    let mrr = 0;
+    let status = 'canceled';
+
+    if (hasSubscription) {
+      // Use real Stripe subscription data
+      status = m.subscription_status;
+      mrr = (status === 'active' || status === 'trialing') ? dues : 0;
+    } else {
+      // Fall back to legacy proxy logic
+      const isActive = m.status === 'active' && dues > 0;
+      const isPaused = m.status === 'inactive' && !m.deactivated;
+      mrr = isActive ? dues : 0;
+      status = isActive ? 'active' : (isPaused ? 'paused' : 'canceled');
+    }
 
     return {
       member_id: m.member_id,
       snapshot_month: monthStr,
-      mrr: isActive ? dues : 0,
+      mrr,
       plan_name: dues > 0 ? 'Membership' : null,
       plan_interval: 'month',
       plan_amount: dues,
-      subscription_status: isActive ? 'active' : (isPaused ? 'paused' : 'canceled'),
+      subscription_status: status,
+      stripe_subscription_id: m.stripe_subscription_id || null,
       stripe_customer_id: m.stripe_customer_id || null,
-      first_paid_date: m.join_date || null,
+      first_paid_date: m.subscription_start_date || m.join_date || null,
     };
   });
 

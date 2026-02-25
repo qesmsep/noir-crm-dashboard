@@ -14,7 +14,8 @@ import {
   Home,
   UserCircle,
   Settings,
-  TrendingUp
+  TrendingUp,
+  CreditCard
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -144,6 +145,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/business', label: 'Business', icon: TrendingUp },
     { href: '/admin/reservations', label: 'Reservations', icon: CalendarDays },
     { href: '/admin/members', label: 'Members', icon: Users },
+    { href: '/admin/subscription-plans', label: 'Plans', icon: CreditCard },
     { href: '/admin/waitlist', label: 'Waitlist', icon: Clock },
     { href: '/admin/event-calendar', label: 'Events', icon: Calendar },
     { href: '/admin/homepage', label: 'Home', icon: Home },

@@ -1,0 +1,259 @@
+/* Subscription Card */
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 4px 8px rgba(0, 0, 0, 0.04),
+    0 8px 16px rgba(0, 0, 0, 0.02);
+  margin-bottom: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ECEAE5;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+/* Status Badges */
+.statusActive {
+  background: #10B981;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.statusCanceled {
+  background: #EF4444;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.statusPastDue {
+  background: #F59E0B;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.statusPaused {
+  background: #6B7280;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.statusDefault {
+  background: #E5E7EB;
+  color: #374151;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Content Rows */
+.content {
+  margin-bottom: 20px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.label {
+  font-size: 14px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.value {
+  font-size: 14px;
+  color: #1F1F1F;
+  font-weight: 600;
+}
+
+.valueWarning {
+  font-size: 14px;
+  color: #EF4444;
+  font-weight: 600;
+}
+
+/* Loading & Empty States */
+.loading,
+.noSubscription {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6B7280;
+}
+
+.noSubscription p {
+  margin-bottom: 16px;
+  color: #6B7280;
+  font-size: 14px;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.actions button {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.createButton,
+.reactivateButton {
+  background: #A59480; /* Cork */
+  color: white;
+  box-shadow:
+    0 1px 3px rgba(165, 148, 128, 0.3),
+    0 4px 8px rgba(165, 148, 128, 0.2),
+    0 8px 16px rgba(165, 148, 128, 0.1);
+}
+
+.createButton:hover:not(:disabled),
+.reactivateButton:hover:not(:disabled) {
+  background: #8D7C6A;
+  box-shadow:
+    0 2px 4px rgba(165, 148, 128, 0.35),
+    0 6px 12px rgba(165, 148, 128, 0.25),
+    0 10px 20px rgba(165, 148, 128, 0.15);
+  transform: translateY(-1px);
+}
+
+.cancelButton {
+  background: white;
+  color: #EF4444;
+  border: 1px solid #EF4444 !important;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: #FEF2F2;
+  transform: translateY(-1px);
+}
+
+.updateButton,
+.paymentButton {
+  background: white;
+  color: #353535; /* Night Sky */
+  border: 1px solid #E5E7EB !important;
+}
+
+.updateButton:hover:not(:disabled),
+.paymentButton:hover:not(:disabled) {
+  background: #F9FAFB;
+  border-color: #D1D5DB !important;
+  transform: translateY(-1px);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .statusActive,
+  .statusCanceled,
+  .statusPastDue,
+  .statusPaused,
+  .statusDefault {
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+
+  .row {
+    padding: 10px 0;
+  }
+
+  .label,
+  .value,
+  .valueWarning {
+    font-size: 13px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .actions button {
+    width: 100%;
+    min-width: 100%;
+    min-height: 44px; /* Touch-friendly */
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 15px;
+  }
+
+  .label,
+  .value,
+  .valueWarning {
+    font-size: 12px;
+  }
+}

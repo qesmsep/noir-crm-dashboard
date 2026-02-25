@@ -6,6 +6,7 @@ import Image from "next/image";
 import { getSupabaseClient } from "../../api/supabaseClient";
 import AdminLayout from '../../../components/layouts/AdminLayout';
 import InlineAttachments from '../../../components/InlineAttachments';
+import MemberSubscriptionCard from '../../../components/MemberSubscriptionCard';
 import styles from '../../../styles/MemberDetail.module.css';
 
 interface Member {
@@ -1142,6 +1143,14 @@ export default function MemberDetailAdmin() {
                   </div>
                 ))}
               </div>
+
+              {/* Subscription Card - Show for primary member */}
+              {members.length > 0 && members[0] && (
+                <MemberSubscriptionCard
+                  memberId={members[0].member_id}
+                  accountId={accountId as string}
+                />
+              )}
             </div>
             </div>
 
