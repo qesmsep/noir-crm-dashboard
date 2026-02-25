@@ -62,6 +62,7 @@ interface Stats {
   invitationRequests: any[];
   financialMetrics?: FinancialMetrics;
   privateEvents?: any[];
+  failedPaymentsCount?: number;
 }
 
 function getNextBirthday(dob?: string) {
@@ -174,7 +175,8 @@ export default function Dashboard() {
         financialResult,
         waitlistResult,
         waitlistedResult,
-        privateEventsResult
+        privateEventsResult,
+        failedPaymentsResult
       ] = await Promise.all([
         safeFetch("/api/members"),
         safeFetch("/api/ledger"),
@@ -188,7 +190,8 @@ export default function Dashboard() {
           const startDate = now.toISOString();
           const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
           return safeFetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
-        })()
+        })(),
+        safeFetch("/api/accounts/failed-payments-summary")
       ]);
 
       // Extract data, using empty defaults if there was an error
@@ -240,7 +243,11 @@ export default function Dashboard() {
         : privateEventsResult.success === true
         ? privateEventsResult
         : { data: privateEventsResult.data || [] };
-      
+
+      const failedPaymentsData = failedPaymentsResult.error || failedPaymentsResult.success === false
+        ? { total_failed_accounts: 0 }
+        : failedPaymentsResult;
+
       setStats({
         members: membersData.data || [],
         ledger: ledgerData.data || [],
@@ -253,6 +260,7 @@ export default function Dashboard() {
         invitationRequests: waitlistData.data || [],
         financialMetrics: financialData,
         privateEvents: privateEventsData.data || [],
+        failedPaymentsCount: failedPaymentsData.total_failed_accounts || 0,
       });
       setReservationDetails(reservationsData.data || []);
     } catch (err) {
@@ -429,6 +437,11 @@ export default function Dashboard() {
           
           <DashboardCard label="Invitation Requests" value={stats.invitationRequestsCount} />
           <DashboardCard label="Waitlist" value={stats.waitlistCount} />
+          <DashboardCard
+            label="Failed Payments"
+            value={stats.failedPaymentsCount || 0}
+            description="Accounts with failed last payment attempt"
+          />
         </div>
         
         {/* Multi-data cards stacked below */}
