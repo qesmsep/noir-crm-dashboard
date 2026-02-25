@@ -15,44 +15,42 @@ interface SubscriptionData {
 }
 
 interface Props {
-  memberId: string;
   accountId: string;
 }
 
-export default function MemberSubscriptionCard({ memberId, accountId }: Props) {
+export default function MemberSubscriptionCard({ accountId }: Props) {
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    if (memberId) {
+    if (accountId) {
       fetchSubscriptionData();
     }
-  }, [memberId]);
+  }, [accountId]);
 
   const fetchSubscriptionData = async () => {
     try {
-      const response = await fetch(`/api/members?member_id=${memberId}`);
+      const response = await fetch(`/api/accounts/${accountId}`);
       const result = await response.json();
 
       if (result.error) {
         throw new Error(result.error);
       }
 
-      // Extract subscription data from member
-      // API returns {data: member} for single member or {data: [members]} for all
-      const member = Array.isArray(result.data) ? result.data[0] : result.data;
+      // Extract subscription data from account
+      const account = result.data;
       setSubscription({
-        stripe_subscription_id: member.stripe_subscription_id || null,
-        subscription_status: member.subscription_status || null,
-        subscription_start_date: member.subscription_start_date || null,
-        subscription_cancel_at: member.subscription_cancel_at || null,
-        next_renewal_date: member.next_renewal_date || null,
-        monthly_dues: member.monthly_dues || null,
-        payment_method_type: member.payment_method_type || null,
-        payment_method_last4: member.payment_method_last4 || null,
-        payment_method_brand: member.payment_method_brand || null,
+        stripe_subscription_id: account.stripe_subscription_id || null,
+        subscription_status: account.subscription_status || null,
+        subscription_start_date: account.subscription_start_date || null,
+        subscription_cancel_at: account.subscription_cancel_at || null,
+        next_renewal_date: account.next_renewal_date || null,
+        monthly_dues: account.monthly_dues || null,
+        payment_method_type: account.payment_method_type || null,
+        payment_method_last4: account.payment_method_last4 || null,
+        payment_method_brand: account.payment_method_brand || null,
       });
     } catch (error: any) {
       console.error('Error fetching subscription data:', error);
@@ -77,7 +75,7 @@ export default function MemberSubscriptionCard({ memberId, accountId }: Props) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          member_id: memberId,
+          account_id: accountId,
           cancel_at_period_end: true,
         }),
       });
@@ -111,7 +109,7 @@ export default function MemberSubscriptionCard({ memberId, accountId }: Props) {
       const response = await fetch('/api/subscriptions/reactivate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ member_id: memberId }),
+        body: JSON.stringify({ account_id: accountId }),
       });
 
       const data = await response.json();

@@ -1144,17 +1144,10 @@ export default function MemberDetailAdmin() {
                 ))}
               </div>
 
-              {/* Subscription Card - Show for member with subscription or first member */}
-              {members.length > 0 && (() => {
-                const memberWithSub = members.find(m => m.stripe_subscription_id);
-                const targetMember = memberWithSub || members[0];
-                return targetMember && (
-                  <MemberSubscriptionCard
-                    memberId={targetMember.member_id}
-                    accountId={accountId as string}
-                  />
-                );
-              })()}
+              {/* Subscription Card - Account-level subscription */}
+              <MemberSubscriptionCard
+                accountId={accountId as string}
+              />
             </div>
             </div>
 

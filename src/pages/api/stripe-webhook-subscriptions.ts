@@ -21,7 +21,7 @@ export const config = {
 /**
  * Stripe Webhook Handler for Subscription Events
  * Handles: subscription created, updated, deleted, paused, resumed
- * Updates: members table + subscription_events audit log
+ * Updates: accounts table + subscription_events audit log
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log('🔔 Stripe Subscription Webhook received');
@@ -155,13 +155,13 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   console.log('   Customer ID:', subscription.customer);
   console.log('   Status:', subscription.status);
 
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) {
-    console.error('❌ Member not found for customer:', subscription.customer);
+  const account = await findAccountByStripeCustomer(subscription.customer as string);
+  if (!account) {
+    console.error('❌ Account not found for customer:', subscription.customer);
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('✅ Found account:', account.account_id);
 
   const price = subscription.items.data[0]?.price;
   const amount = price?.unit_amount ? price.unit_amount / 100 : 0;
@@ -172,10 +172,10 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   // Get payment method details
   const paymentMethodInfo = await getPaymentMethodInfo(subscription.default_payment_method as string);
 
-  // Update member with subscription info
-  console.log('💾 Creating subscription for member...');
+  // Update account with subscription info
+  console.log('💾 Creating subscription for account...');
   const { error: updateError } = await supabase
-    .from('members')
+    .from('accounts')
     .update({
       stripe_subscription_id: subscription.id,
       subscription_status: subscription.status,
@@ -186,19 +186,19 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       monthly_dues: mrr,
       ...paymentMethodInfo,
     })
-    .eq('member_id', member.member_id);
+    .eq('account_id', account.account_id);
 
   if (updateError) {
-    console.error('❌ Failed to update member:', updateError);
+    console.error('❌ Failed to update account:', updateError);
     throw updateError;
   } else {
-    console.log('✅ Member subscription created successfully');
+    console.log('✅ Account subscription created successfully');
   }
 
   // Log subscription event
   console.log('📊 Logging subscription event...');
   const { error: logError } = await supabase.from('subscription_events').insert({
-    member_id: member.member_id,
+    account_id: account.account_id,
     event_type: 'subscribe',
     stripe_subscription_id: subscription.id,
     stripe_event_id: subscription.id,
@@ -221,19 +221,19 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('   Customer ID:', subscription.customer);
   console.log('   Status:', subscription.status);
 
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) {
-    console.log('❌ Member not found, skipping update');
+  const account = await findAccountByStripeCustomer(subscription.customer as string);
+  if (!account) {
+    console.log('❌ Account not found, skipping update');
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('✅ Found account:', account.account_id);
 
   const price = subscription.items.data[0]?.price;
   const newAmount = price?.unit_amount ? price.unit_amount / 100 : 0;
   const newMrr = price?.recurring?.interval === 'year' ? newAmount / 12 : newAmount;
 
-  const oldMrr = Number(member.monthly_dues) || 0;
+  const oldMrr = Number(account.monthly_dues) || 0;
 
   console.log('💰 Price change: $', oldMrr, '→ $', newMrr);
 
@@ -242,7 +242,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   if (newMrr > oldMrr) eventType = 'upgrade';
   else if (newMrr < oldMrr) eventType = 'downgrade';
   else if (subscription.cancel_at_period_end) eventType = 'cancel';
-  else if (member.subscription_status === 'canceled') eventType = 'reactivate';
+  else if (account.subscription_status === 'canceled') eventType = 'reactivate';
 
   console.log('🏷️ Event type:', eventType);
 
@@ -264,29 +264,29 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   };
 
   // Set subscription_start_date if missing (in case subscription.created never fired)
-  if (!member.subscription_start_date && subscription.created) {
+  if (!account.subscription_start_date && subscription.created) {
     updateData.subscription_start_date = new Date(subscription.created * 1000).toISOString();
     console.log('📅 Setting missing subscription_start_date');
   }
 
-  // Update member
-  console.log('💾 Updating member record...');
+  // Update account
+  console.log('💾 Updating account record...');
   const { error: updateError } = await supabase
-    .from('members')
+    .from('accounts')
     .update(updateData)
-    .eq('member_id', member.member_id);
+    .eq('account_id', account.account_id);
 
   if (updateError) {
-    console.error('❌ Failed to update member:', updateError);
+    console.error('❌ Failed to update account:', updateError);
   } else {
-    console.log('✅ Member updated successfully');
+    console.log('✅ Account updated successfully');
   }
 
   // Log event if significant change
   if (newMrr !== oldMrr || subscription.cancel_at_period_end) {
     console.log('📊 Logging subscription event...');
     const { error: logError } = await supabase.from('subscription_events').insert({
-      member_id: member.member_id,
+      account_id: account.account_id,
       event_type: eventType,
       stripe_subscription_id: subscription.id,
       previous_mrr: oldMrr,
@@ -313,21 +313,21 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log('   Subscription ID:', subscription.id);
   console.log('   Customer ID:', subscription.customer);
 
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) {
-    console.log('❌ Member not found, skipping delete');
+  const account = await findAccountByStripeCustomer(subscription.customer as string);
+  if (!account) {
+    console.log('❌ Account not found, skipping delete');
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('✅ Found account:', account.account_id);
 
-  const previousMrr = Number(member.monthly_dues) || 0;
+  const previousMrr = Number(account.monthly_dues) || 0;
   console.log('💰 Canceling subscription with MRR: $', previousMrr);
 
   // Clear all subscription fields
-  console.log('💾 Clearing subscription data from member...');
+  console.log('💾 Clearing subscription data from account...');
   const { error: updateError } = await supabase
-    .from('members')
+    .from('accounts')
     .update({
       subscription_status: 'canceled',
       subscription_canceled_at: new Date().toISOString(),
@@ -340,10 +340,10 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       payment_method_last4: null,
       payment_method_brand: null,
     })
-    .eq('member_id', member.member_id);
+    .eq('account_id', account.account_id);
 
   if (updateError) {
-    console.error('❌ Failed to update member:', updateError);
+    console.error('❌ Failed to update account:', updateError);
   } else {
     console.log('✅ Subscription data cleared successfully');
   }
@@ -351,7 +351,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   // Log subscription event
   console.log('📊 Logging subscription cancellation event...');
   const { error: logError } = await supabase.from('subscription_events').insert({
-    member_id: member.member_id,
+    account_id: account.account_id,
     event_type: 'cancel',
     stripe_subscription_id: subscription.id,
     previous_mrr: previousMrr,
@@ -371,37 +371,37 @@ async function handleSubscriptionPaused(subscription: Stripe.Subscription) {
   console.log('   Subscription ID:', subscription.id);
   console.log('   Customer ID:', subscription.customer);
 
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) {
-    console.log('❌ Member not found, skipping pause');
+  const account = await findAccountByStripeCustomer(subscription.customer as string);
+  if (!account) {
+    console.log('❌ Account not found, skipping pause');
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('✅ Found account:', account.account_id);
 
-  const previousMrr = Number(member.monthly_dues) || 0;
+  const previousMrr = Number(account.monthly_dues) || 0;
   console.log('⏸️ Pausing subscription with MRR: $', previousMrr);
 
-  // Update member
-  console.log('💾 Updating member record...');
+  // Update account
+  console.log('💾 Updating account record...');
   const { error: updateError } = await supabase
-    .from('members')
+    .from('accounts')
     .update({
       stripe_subscription_id: subscription.id, // Ensure subscription ID is set
       subscription_status: 'paused',
     })
-    .eq('member_id', member.member_id);
+    .eq('account_id', account.account_id);
 
   if (updateError) {
-    console.error('❌ Failed to update member:', updateError);
+    console.error('❌ Failed to update account:', updateError);
   } else {
-    console.log('✅ Member updated successfully');
+    console.log('✅ Account updated successfully');
   }
 
   // Log subscription event
   console.log('📊 Logging subscription pause event...');
   const { error: logError } = await supabase.from('subscription_events').insert({
-    member_id: member.member_id,
+    account_id: account.account_id,
     event_type: 'pause',
     stripe_subscription_id: subscription.id,
     previous_mrr: previousMrr,
@@ -421,13 +421,13 @@ async function handleSubscriptionResumed(subscription: Stripe.Subscription) {
   console.log('   Subscription ID:', subscription.id);
   console.log('   Customer ID:', subscription.customer);
 
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) {
-    console.log('❌ Member not found, skipping resume');
+  const account = await findAccountByStripeCustomer(subscription.customer as string);
+  if (!account) {
+    console.log('❌ Account not found, skipping resume');
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('✅ Found account:', account.account_id);
 
   const price = subscription.items.data[0]?.price;
   const amount = price?.unit_amount ? price.unit_amount / 100 : 0;
@@ -438,10 +438,10 @@ async function handleSubscriptionResumed(subscription: Stripe.Subscription) {
   // Get payment method details (may have changed)
   const paymentMethodInfo = await getPaymentMethodInfo(subscription.default_payment_method as string);
 
-  // Update member
-  console.log('💾 Updating member record...');
+  // Update account
+  console.log('💾 Updating account record...');
   const { error: updateError } = await supabase
-    .from('members')
+    .from('accounts')
     .update({
       stripe_subscription_id: subscription.id, // Ensure subscription ID is set
       subscription_status: 'active',
@@ -451,18 +451,18 @@ async function handleSubscriptionResumed(subscription: Stripe.Subscription) {
         : null,
       ...paymentMethodInfo,
     })
-    .eq('member_id', member.member_id);
+    .eq('account_id', account.account_id);
 
   if (updateError) {
-    console.error('❌ Failed to update member:', updateError);
+    console.error('❌ Failed to update account:', updateError);
   } else {
-    console.log('✅ Member updated successfully');
+    console.log('✅ Account updated successfully');
   }
 
   // Log subscription event
   console.log('📊 Logging subscription resume event...');
   const { error: logError } = await supabase.from('subscription_events').insert({
-    member_id: member.member_id,
+    account_id: account.account_id,
     event_type: 'resume',
     stripe_subscription_id: subscription.id,
     new_mrr: mrr,
@@ -489,32 +489,32 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
   console.log('   Subscription ID:', (invoice as any).subscription);
 
-  const member = await findMemberByStripeCustomer(invoice.customer as string);
-  if (!member) {
-    console.log('❌ Member not found, skipping payment failure update');
+  const account = await findAccountByStripeCustomer(invoice.customer as string);
+  if (!account) {
+    console.log('❌ Account not found, skipping payment failure update');
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('✅ Found account:', account.account_id);
   console.log('⚠️ Payment failed for subscription');
 
-  // Update member status to past_due
-  console.log('💾 Updating member status to past_due...');
+  // Update account status to past_due
+  console.log('💾 Updating account status to past_due...');
   const { error: updateError } = await supabase
-    .from('members')
+    .from('accounts')
     .update({ subscription_status: 'past_due' })
-    .eq('member_id', member.member_id);
+    .eq('account_id', account.account_id);
 
   if (updateError) {
-    console.error('❌ Failed to update member:', updateError);
+    console.error('❌ Failed to update account:', updateError);
   } else {
-    console.log('✅ Member status updated to past_due');
+    console.log('✅ Account status updated to past_due');
   }
 
   // Log subscription event
   console.log('📊 Logging payment failure event...');
   const { error: logError } = await supabase.from('subscription_events').insert({
-    member_id: member.member_id,
+    account_id: account.account_id,
     event_type: 'payment_failed',
     stripe_subscription_id: (invoice as any).subscription as string,
     effective_date: new Date().toISOString(),
@@ -541,47 +541,47 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
   console.log('   Subscription ID:', (invoice as any).subscription);
 
-  const member = await findMemberByStripeCustomer(invoice.customer as string);
-  if (!member) {
-    console.log('❌ Member not found, skipping payment success update');
+  const account = await findAccountByStripeCustomer(invoice.customer as string);
+  if (!account) {
+    console.log('❌ Account not found, skipping payment success update');
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('✅ Found account:', account.account_id);
 
   // Update subscription status to active if it was past_due
-  if (member.subscription_status === 'past_due') {
-    console.log('💾 Updating member status from past_due to active...');
+  if (account.subscription_status === 'past_due') {
+    console.log('💾 Updating account status from past_due to active...');
     const { error: updateError } = await supabase
-      .from('members')
+      .from('accounts')
       .update({ subscription_status: 'active' })
-      .eq('member_id', member.member_id);
+      .eq('account_id', account.account_id);
 
     if (updateError) {
-      console.error('❌ Failed to update member:', updateError);
+      console.error('❌ Failed to update account:', updateError);
     } else {
-      console.log('✅ Member status updated to active');
+      console.log('✅ Account status updated to active');
     }
   } else {
-    console.log('ℹ️ Member status already active, no update needed');
+    console.log('ℹ️ Account status already active, no update needed');
   }
 }
 
-async function findMemberByStripeCustomer(customerId: string): Promise<any | null> {
-  console.log('🔍 Looking up member with Stripe customer ID:', customerId);
+async function findAccountByStripeCustomer(customerId: string): Promise<any | null> {
+  console.log('🔍 Looking up account with Stripe customer ID:', customerId);
 
   const { data, error } = await supabase
-    .from('members')
+    .from('accounts')
     .select('*')
     .eq('stripe_customer_id', customerId)
     .single();
 
   if (error || !data) {
-    console.error(`❌ Member not found for Stripe customer: ${customerId}`, error);
+    console.error(`❌ Account not found for Stripe customer: ${customerId}`, error);
     return null;
   }
 
-  console.log(`✅ Found member: ${data.first_name} ${data.last_name} (${data.member_id})`);
+  console.log(`✅ Found account: ${data.account_id}`);
   return data;
 }
 
