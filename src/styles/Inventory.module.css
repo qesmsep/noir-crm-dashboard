@@ -1,0 +1,1553 @@
+/* ========================================
+   Inventory Management System Styles
+   Brand: Noir CRM Design System
+   ======================================== */
+
+/* Page Layout */
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.pageTitle {
+  font-family: 'IvyJournal', serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.pageActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Tab Navigation */
+.tabBar {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #ECEAE5;
+  padding-bottom: 0;
+}
+
+.tab {
+  padding: 0.625rem 1.25rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #868686;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab:hover {
+  color: #5A5A5A;
+}
+
+.tabActive {
+  color: #A59480;
+  border-bottom-color: #A59480;
+}
+
+.tabBadge {
+  background: #ECEAE5;
+  color: #5A5A5A;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+  min-width: 1.25rem;
+  text-align: center;
+}
+
+.tabActive .tabBadge {
+  background: #A59480;
+  color: #ffffff;
+}
+
+/* Stats Bar */
+.statsBar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.statCard {
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 12px rgba(165, 148, 128, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(165, 148, 128, 0.12);
+}
+
+.statLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #868686;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.25rem;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.statSubtext {
+  font-size: 0.6875rem;
+  color: #A59480;
+  margin: 0.125rem 0 0;
+  font-weight: 500;
+}
+
+.statWarning {
+  color: #D97706;
+}
+
+/* Search & Filter Bar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 400px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ABA8A1;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.8125rem;
+  color: #1F1F1F;
+  background: white;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(165, 148, 128, 0.08);
+}
+
+.searchInput:focus {
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.searchInput::placeholder {
+  color: #ABA8A1;
+}
+
+.filterSelect {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #1F1F1F;
+  background: white;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(165, 148, 128, 0.08);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23868686' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+.filterSelect:focus {
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+/* Buttons */
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #A59480;
+  border: 1px solid #A59480;
+  color: #ffffff;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.01em;
+  box-shadow:
+    0 1px 2px rgba(165, 148, 128, 0.15),
+    0 4px 8px rgba(165, 148, 128, 0.25),
+    0 8px 16px rgba(165, 148, 128, 0.18);
+  white-space: nowrap;
+}
+
+.btnPrimary:hover {
+  background: #8C7C6D;
+  border-color: #8C7C6D;
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(165, 148, 128, 0.2),
+    0 8px 16px rgba(165, 148, 128, 0.3),
+    0 16px 32px rgba(165, 148, 128, 0.22);
+}
+
+.btnPrimary:active {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 2px rgba(165, 148, 128, 0.15),
+    0 4px 8px rgba(165, 148, 128, 0.25);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #353535;
+  border: 1px solid #353535;
+  color: #ffffff;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.01em;
+  box-shadow:
+    0 1px 2px rgba(53, 53, 53, 0.15),
+    0 4px 8px rgba(53, 53, 53, 0.2),
+    0 8px 16px rgba(53, 53, 53, 0.15);
+  white-space: nowrap;
+}
+
+.btnSecondary:hover {
+  background: #1F1F1F;
+  border-color: #1F1F1F;
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(53, 53, 53, 0.2),
+    0 8px 16px rgba(53, 53, 53, 0.25),
+    0 16px 32px rgba(53, 53, 53, 0.18);
+}
+
+.btnSecondary:active {
+  transform: translateY(0);
+}
+
+.btnSecondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btnTertiary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1px solid #ECEAE5;
+  color: #1F1F1F;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.01em;
+  box-shadow:
+    0 1px 2px rgba(165, 148, 128, 0.08),
+    0 4px 8px rgba(165, 148, 128, 0.12),
+    0 8px 16px rgba(165, 148, 128, 0.08);
+  white-space: nowrap;
+}
+
+.btnTertiary:hover {
+  background: #F7F6F2;
+  border-color: #A59480;
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(165, 148, 128, 0.1),
+    0 8px 16px rgba(165, 148, 128, 0.15),
+    0 16px 32px rgba(165, 148, 128, 0.12);
+}
+
+.btnTertiary:active {
+  transform: translateY(0);
+}
+
+.btnSmall {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.btnIcon {
+  padding: 0.5rem;
+  min-width: 36px;
+  min-height: 36px;
+  justify-content: center;
+}
+
+.btnDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: white;
+  border: 1px solid #FCA5A5;
+  color: #DC2626;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btnDanger:hover {
+  background: #FEF2F2;
+  border-color: #DC2626;
+}
+
+/* Inventory Table (Desktop) */
+.tableContainer {
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(165, 148, 128, 0.08);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.table thead {
+  background: #F7F6F2;
+  border-bottom: 1px solid #ECEAE5;
+}
+
+.table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #868686;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: #1F1F1F;
+  border-bottom: 1px solid #F0EDE8;
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  transition: background-color 0.15s;
+}
+
+.table tbody tr:hover {
+  background: #FBFAF8;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.itemName {
+  font-weight: 600;
+  color: #1F1F1F;
+}
+
+.itemBrand {
+  font-size: 0.6875rem;
+  color: #868686;
+  margin-top: 0.125rem;
+}
+
+.categoryBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.categorySpirits { background: #FEF3C7; color: #92400E; }
+.categoryWine { background: #FCE7F3; color: #9D174D; }
+.categoryBeer { background: #FEF9C3; color: #854D0E; }
+.categoryMixers { background: #DBEAFE; color: #1E40AF; }
+.categoryGarnishes { background: #D1FAE5; color: #065F46; }
+.categorySupplies { background: #E5E7EB; color: #374151; }
+.categoryOther { background: #F3F4F6; color: #6B7280; }
+
+.quantityCell {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.quantityLow {
+  color: #DC2626;
+}
+
+.quantityOk {
+  color: #1F1F1F;
+}
+
+.costCell {
+  font-variant-numeric: tabular-nums;
+  color: #5A5A5A;
+}
+
+.parIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.parDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.parGood { background: #10B981; }
+.parWarning { background: #F59E0B; }
+.parCritical { background: #EF4444; }
+
+.rowActions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.rowActionBtn {
+  padding: 0.375rem;
+  background: transparent;
+  border: none;
+  color: #ABA8A1;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowActionBtn:hover {
+  background: #F7F6F2;
+  color: #A59480;
+}
+
+/* Mobile Card View */
+.cardList {
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card {
+  background: #FBFBFA;
+  border: 1px solid #ECEAE5;
+  border-radius: 12px;
+  padding: 1rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  box-shadow: 0 6px 16px rgba(165, 148, 128, 0.12);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.cardTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.cardBrand {
+  font-size: 0.75rem;
+  color: #868686;
+  margin: 0.125rem 0 0;
+}
+
+.cardBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.cardField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.cardFieldLabel {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #ABA8A1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cardFieldValue {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #1F1F1F;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #ECEAE5;
+}
+
+/* Drawer / Sidebar Panel */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 31, 31, 0.4);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.drawerOverlayVisible {
+  opacity: 1;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 480px;
+  max-width: 100vw;
+  background: white;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -8px 0 24px rgba(31, 31, 31, 0.12);
+}
+
+.drawerVisible {
+  transform: translateX(0);
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #ECEAE5;
+  flex-shrink: 0;
+}
+
+.drawerTitle {
+  font-family: 'IvyJournal', serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.drawerClose {
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  color: #868686;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawerClose:hover {
+  background: #F7F6F2;
+  color: #1F1F1F;
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.drawerFooter {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #ECEAE5;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  background: white;
+}
+
+/* Form Elements */
+.formGroup {
+  margin-bottom: 1.25rem;
+}
+
+.formLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #5A5A5A;
+  margin-bottom: 0.375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.formInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  color: #1F1F1F;
+  background: white;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.formInput:focus {
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.formInput::placeholder {
+  color: #ABA8A1;
+}
+
+.formSelect {
+  width: 100%;
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  color: #1F1F1F;
+  background: white;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23868686' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  box-sizing: border-box;
+}
+
+.formSelect:focus {
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.formTextarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  color: #1F1F1F;
+  background: white;
+  outline: none;
+  resize: vertical;
+  min-height: 80px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.formTextarea:focus {
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.formHint {
+  font-size: 0.6875rem;
+  color: #ABA8A1;
+  margin-top: 0.25rem;
+}
+
+/* Photo Scanner */
+.scannerArea {
+  border: 2px dashed #DAD7D0;
+  border-radius: 16px;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  background: #FBFBFA;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.scannerArea:hover {
+  border-color: #A59480;
+  background: #F7F6F2;
+}
+
+.scannerAreaActive {
+  border-color: #A59480;
+  background: #F7F6F2;
+  border-style: solid;
+}
+
+.scannerIcon {
+  color: #ABA8A1;
+  margin-bottom: 0.75rem;
+}
+
+.scannerTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0 0 0.375rem;
+}
+
+.scannerSubtext {
+  font-size: 0.8125rem;
+  color: #868686;
+  margin: 0;
+}
+
+.scannerPreview {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.scannerPreviewImage {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  display: block;
+  border-radius: 12px;
+}
+
+.scannerPreviewRemove {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.375rem;
+  background: rgba(31, 31, 31, 0.7);
+  border: none;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.scannerPreviewRemove:hover {
+  background: rgba(31, 31, 31, 0.9);
+}
+
+.scanResults {
+  margin-top: 1rem;
+}
+
+.scanResultsTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #5A5A5A;
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.scanItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  margin-bottom: 0.5rem;
+  background: white;
+  transition: all 0.15s;
+}
+
+.scanItem:hover {
+  border-color: #DAD7D0;
+}
+
+.scanItemInfo {
+  flex: 1;
+}
+
+.scanItemName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.scanItemMeta {
+  font-size: 0.6875rem;
+  color: #868686;
+  margin: 0.125rem 0 0;
+}
+
+.scanItemQuantity {
+  width: 60px;
+  padding: 0.375rem 0.5rem;
+  text-align: center;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  color: #1F1F1F;
+  outline: none;
+}
+
+.scanItemQuantity:focus {
+  border-color: #A59480;
+}
+
+.scanConfidence {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.confidenceHigh { background: #D1FAE5; color: #065F46; }
+.confidenceMedium { background: #FEF3C7; color: #92400E; }
+.confidenceLow { background: #FEE2E2; color: #991B1B; }
+
+/* Recipe Builder */
+.recipeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.recipeCard {
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 16px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(165, 148, 128, 0.08);
+}
+
+.recipeCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(165, 148, 128, 0.12);
+  border-color: #A59480;
+}
+
+.recipeCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.recipeName {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.recipeCategory {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 5px;
+  text-transform: capitalize;
+  background: #ECEAE5;
+  color: #5A5A5A;
+}
+
+.recipeIngredients {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+}
+
+.recipeIngredient {
+  font-size: 0.75rem;
+  color: #5A5A5A;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #F0EDE8;
+  display: flex;
+  justify-content: space-between;
+}
+
+.recipeIngredient:last-child {
+  border-bottom: none;
+}
+
+.recipeIngredientAmount {
+  color: #868686;
+  font-weight: 500;
+}
+
+.recipeCostRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid #ECEAE5;
+}
+
+.recipeCost {
+  font-size: 0.75rem;
+  color: #868686;
+}
+
+.recipeCostValue {
+  font-weight: 600;
+  color: #1F1F1F;
+}
+
+.recipeMargin {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 5px;
+}
+
+.marginGood { background: #D1FAE5; color: #065F46; }
+.marginOk { background: #FEF3C7; color: #92400E; }
+.marginLow { background: #FEE2E2; color: #991B1B; }
+
+.recipeAvailability {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.availabilityAvailable { color: #059669; }
+.availabilityPartial { color: #D97706; }
+.availabilityUnavailable { color: #DC2626; }
+
+/* Ingredient List (in Recipe Drawer) */
+.ingredientsList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ingredientRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #F0EDE8;
+}
+
+.ingredientRow:last-child {
+  border-bottom: none;
+}
+
+.ingredientSelect {
+  flex: 1;
+  min-width: 0;
+}
+
+.ingredientQuantityInput {
+  width: 70px;
+  padding: 0.375rem 0.5rem;
+  text-align: center;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-family: 'Montserrat', sans-serif;
+  color: #1F1F1F;
+  outline: none;
+}
+
+.ingredientQuantityInput:focus {
+  border-color: #A59480;
+}
+
+.ingredientUnitSelect {
+  width: 80px;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-family: 'Montserrat', sans-serif;
+  color: #1F1F1F;
+  outline: none;
+  appearance: none;
+  background: white;
+}
+
+.ingredientRemoveBtn {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: #ABA8A1;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ingredientRemoveBtn:hover {
+  color: #DC2626;
+  background: #FEF2F2;
+}
+
+.addIngredientBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0;
+  background: transparent;
+  border: none;
+  color: #A59480;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.addIngredientBtn:hover {
+  color: #8C7C6D;
+}
+
+/* Sales Upload */
+.uploadZone {
+  border: 2px dashed #DAD7D0;
+  border-radius: 16px;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  background: #FBFBFA;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+}
+
+.uploadZone:hover {
+  border-color: #A59480;
+  background: #F7F6F2;
+}
+
+.uploadZoneActive {
+  border-color: #A59480;
+  background: #F7F6F2;
+  border-style: solid;
+}
+
+.uploadIcon {
+  color: #ABA8A1;
+  margin-bottom: 1rem;
+}
+
+.uploadTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0 0 0.375rem;
+}
+
+.uploadSubtext {
+  font-size: 0.8125rem;
+  color: #868686;
+  margin: 0;
+}
+
+.uploadFormats {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.uploadFormat {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 5px;
+  background: #ECEAE5;
+  color: #5A5A5A;
+}
+
+.salesReviewSection {
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.salesReviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.salesReviewTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.salesItemRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid #F0EDE8;
+}
+
+.salesItemRow:last-child {
+  border-bottom: none;
+}
+
+.salesItemName {
+  flex: 1;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #1F1F1F;
+}
+
+.salesItemInput {
+  width: 70px;
+  padding: 0.375rem 0.5rem;
+  text-align: center;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  color: #1F1F1F;
+  outline: none;
+}
+
+.salesItemInput:focus {
+  border-color: #A59480;
+}
+
+.salesItemRevenue {
+  width: 90px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #5A5A5A;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.salesTotals {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0 0;
+  margin-top: 0.75rem;
+  border-top: 2px solid #ECEAE5;
+}
+
+.salesTotalLabel {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #1F1F1F;
+}
+
+.salesTotalValue {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sales History */
+.salesHistoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.salesHistoryCard {
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(165, 148, 128, 0.08);
+}
+
+.salesHistoryCard:hover {
+  box-shadow: 0 6px 16px rgba(165, 148, 128, 0.12);
+}
+
+.salesHistoryInfo {
+  flex: 1;
+}
+
+.salesHistoryFilename {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.salesHistoryMeta {
+  font-size: 0.6875rem;
+  color: #868686;
+  margin: 0.25rem 0 0;
+}
+
+.salesHistoryRevenue {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.statusPending { background: #FEF3C7; color: #92400E; }
+.statusReviewing { background: #DBEAFE; color: #1E40AF; }
+.statusProcessed { background: #D1FAE5; color: #065F46; }
+.statusError { background: #FEE2E2; color: #991B1B; }
+
+/* Processing Spinner */
+.processingOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #ECEAE5;
+  border-top-color: #A59480;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.processingText {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0 0 0.25rem;
+}
+
+.processingSubtext {
+  font-size: 0.8125rem;
+  color: #868686;
+  margin: 0;
+}
+
+/* Empty States */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.emptyIcon {
+  color: #DAD7D0;
+  margin-bottom: 1rem;
+}
+
+.emptyTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0 0 0.375rem;
+}
+
+.emptyText {
+  font-size: 0.8125rem;
+  color: #868686;
+  margin: 0 0 1.25rem;
+  max-width: 320px;
+}
+
+/* ========================================
+   Responsive Design
+   ======================================== */
+
+@media (max-width: 768px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .pageActions {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+  }
+
+  .pageTitle {
+    font-size: 1.375rem;
+  }
+
+  .tabBar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    gap: 0;
+  }
+
+  .tabBar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .statsBar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .statCard {
+    padding: 0.75rem 1rem;
+  }
+
+  .statValue {
+    font-size: 1.25rem;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchWrapper {
+    max-width: none;
+  }
+
+  .toolbarRight {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Hide table, show cards */
+  .tableContainer {
+    display: none;
+  }
+
+  .cardList {
+    display: flex;
+  }
+
+  /* Recipe grid single column */
+  .recipeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Drawer full width */
+  .drawer {
+    width: 100vw;
+  }
+
+  .drawerBody {
+    padding: 1rem;
+  }
+
+  .drawerHeader {
+    padding: 1rem;
+  }
+
+  .drawerFooter {
+    padding: 0.75rem 1rem;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  /* Upload zone */
+  .uploadZone {
+    padding: 2rem 1rem;
+  }
+
+  .scannerArea {
+    padding: 2rem 1rem;
+  }
+
+  /* Sales review */
+  .salesItemRow {
+    flex-wrap: wrap;
+  }
+
+  .salesItemName {
+    flex-basis: 100%;
+    margin-bottom: 0.375rem;
+  }
+
+  /* Sales history cards stack */
+  .salesHistoryCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .salesHistoryRevenue {
+    align-self: flex-end;
+  }
+
+  .btnPrimary,
+  .btnSecondary,
+  .btnTertiary {
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .cardBody {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.375rem 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .statsBar {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .pageActions {
+    flex-wrap: wrap;
+  }
+
+  .recipeCardHeader {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .statsBar {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .recipeGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

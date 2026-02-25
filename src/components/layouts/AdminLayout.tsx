@@ -14,7 +14,8 @@ import {
   Home,
   UserCircle,
   Settings,
-  TrendingUp
+  TrendingUp,
+  Package
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -146,6 +147,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/members', label: 'Members', icon: Users },
     { href: '/admin/waitlist', label: 'Waitlist', icon: Clock },
     { href: '/admin/event-calendar', label: 'Events', icon: Calendar },
+    { href: '/admin/inventory', label: 'Inventory', icon: Package },
     { href: '/admin/homepage', label: 'Home', icon: Home },
     { href: '/member/login', label: 'Portal', icon: UserCircle },
     { href: '/admin/settings', label: 'Settings', icon: Settings },
