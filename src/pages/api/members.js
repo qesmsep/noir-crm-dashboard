@@ -87,6 +87,24 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      const { member_id } = req.query;
+
+      // If member_id is provided, fetch single member
+      if (member_id) {
+        Logger.info('Fetching single member', { requestId, member_id });
+        const { data, error } = await supabase
+          .from('members')
+          .select('*')
+          .eq('member_id', member_id)
+          .single();
+        if (error) {
+          Logger.error('Supabase error fetching member', error, { requestId, member_id });
+          throw error;
+        }
+        return ApiResponse.success(res, data, 'Member retrieved successfully');
+      }
+
+      // Otherwise fetch all members
       Logger.info('Fetching all members', { requestId });
       const { data, error } = await supabase
         .from('members')
