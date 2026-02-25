@@ -36,6 +36,7 @@ export default function MembersAdmin() {
   const [members, setMembers] = useState<Member[]>([]);
   const [ledger, setLedger] = useState<LedgerTransaction[]>([]);
   const [failedPaymentAccounts, setFailedPaymentAccounts] = useState<Set<string>>(new Set());
+  const [noSubscriptionAccounts, setNoSubscriptionAccounts] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lookupQuery, setLookupQuery] = useState("");
@@ -69,6 +70,7 @@ export default function MembersAdmin() {
     fetchMembers();
     fetchLedger();
     fetchFailedPayments();
+    fetchNoSubscriptionAccounts();
   }, []);
 
   async function fetchFailedPayments() {
@@ -81,6 +83,19 @@ export default function MembersAdmin() {
       }
     } catch (err: any) {
       console.error('Error fetching failed payments:', err);
+    }
+  }
+
+  async function fetchNoSubscriptionAccounts() {
+    try {
+      const res = await fetch('/api/accounts/no-subscription-summary');
+      const result = await res.json();
+      if (!result.error && result.no_subscription_accounts) {
+        const noSubSet = new Set<string>(result.no_subscription_accounts.map((acc: any) => acc.account_id as string));
+        setNoSubscriptionAccounts(noSubSet);
+      }
+    } catch (err: any) {
+      console.error('Error fetching no subscription accounts:', err);
     }
   }
 
@@ -533,7 +548,7 @@ export default function MembersAdmin() {
                 return (
                   <div
                     key={account.account_id}
-                    className={styles.mobileCard}
+                    className={`${styles.mobileCard} ${noSubscriptionAccounts.has(account.account_id) ? styles.noSubscription : ''}`}
                     onClick={() => router.push(`/admin/members/${account.account_id}`)}
                   >
                     <div className={styles.mobileCardHeader}>

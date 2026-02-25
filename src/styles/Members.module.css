@@ -1008,6 +1008,11 @@
   transform: scale(0.98);
 }
 
+.mobileCard.noSubscription {
+  border: 2px solid #DC2626;
+  box-shadow: 0 2px 10px rgba(220, 38, 38, 0.15);
+}
+
 .paymentFailedBanner {
   background: #DC2626;
   color: white;
