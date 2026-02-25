@@ -76,7 +76,7 @@ export default function MembersAdmin() {
       const res = await fetch('/api/accounts/failed-payments-summary');
       const result = await res.json();
       if (!result.error && result.failed_payment_accounts) {
-        const failedSet = new Set(result.failed_payment_accounts.map((fp: any) => fp.account_id));
+        const failedSet = new Set<string>(result.failed_payment_accounts.map((fp: any) => fp.account_id as string));
         setFailedPaymentAccounts(failedSet);
       }
     } catch (err: any) {
