@@ -150,44 +150,69 @@ async function processWebhookEvent(event: Stripe.Event) {
 }
 
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
+  console.log('📝 Handling subscription.created event');
+  console.log('   Subscription ID:', subscription.id);
+  console.log('   Customer ID:', subscription.customer);
+  console.log('   Status:', subscription.status);
+
   const member = await findMemberByStripeCustomer(subscription.customer as string);
   if (!member) {
-    console.error(`Member not found for customer: ${subscription.customer}`);
+    console.error('❌ Member not found for customer:', subscription.customer);
     return;
   }
 
+  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+
   const price = subscription.items.data[0]?.price;
-  const amount = price ? price.unit_amount! / 100 : 0;
+  const amount = price?.unit_amount ? price.unit_amount / 100 : 0;
+  const mrr = price?.recurring?.interval === 'year' ? amount / 12 : amount;
+
+  console.log('💰 New subscription MRR: $', mrr);
 
   // Get payment method details
   const paymentMethodInfo = await getPaymentMethodInfo(subscription.default_payment_method as string);
 
   // Update member with subscription info
-  await supabase
+  console.log('💾 Creating subscription for member...');
+  const { error: updateError } = await supabase
     .from('members')
     .update({
       stripe_subscription_id: subscription.id,
       subscription_status: subscription.status,
       subscription_start_date: new Date(subscription.created * 1000).toISOString(),
-      next_renewal_date: (subscription as any).current_period_end
-        ? new Date((subscription as any).current_period_end * 1000).toISOString()
+      next_renewal_date: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
         : null,
-      monthly_dues: price?.recurring?.interval === 'year' ? amount / 12 : amount,
+      monthly_dues: mrr,
       ...paymentMethodInfo,
     })
     .eq('member_id', member.member_id);
 
+  if (updateError) {
+    console.error('❌ Failed to update member:', updateError);
+    throw updateError;
+  } else {
+    console.log('✅ Member subscription created successfully');
+  }
+
   // Log subscription event
-  await supabase.from('subscription_events').insert({
+  console.log('📊 Logging subscription event...');
+  const { error: logError } = await supabase.from('subscription_events').insert({
     member_id: member.member_id,
     event_type: 'subscribe',
     stripe_subscription_id: subscription.id,
     stripe_event_id: subscription.id,
     new_plan: price?.product as string,
-    new_mrr: price?.recurring?.interval === 'year' ? amount / 12 : amount,
+    new_mrr: mrr,
     effective_date: new Date(subscription.created * 1000).toISOString(),
     metadata: { stripe_status: subscription.status }
   });
+
+  if (logError) {
+    console.error('❌ Failed to log subscription event:', logError);
+  } else {
+    console.log('✅ Subscription event logged');
+  }
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -202,10 +227,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return;
   }
 
-  console.log('✅ Found member:', member.member_id, member.name);
+  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
 
   const price = subscription.items.data[0]?.price;
-  const newAmount = price ? price.unit_amount! / 100 : 0;
+  const newAmount = price?.unit_amount ? price.unit_amount / 100 : 0;
   const newMrr = price?.recurring?.interval === 'year' ? newAmount / 12 : newAmount;
 
   const oldMrr = Number(member.monthly_dues) || 0;
@@ -224,22 +249,31 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   // Get payment method details if payment method changed
   const paymentMethodInfo = await getPaymentMethodInfo(subscription.default_payment_method as string);
 
+  // Build update object
+  const updateData: any = {
+    stripe_subscription_id: subscription.id, // Always update subscription ID
+    subscription_status: subscription.status,
+    subscription_cancel_at: subscription.cancel_at
+      ? new Date(subscription.cancel_at * 1000).toISOString()
+      : null,
+    next_renewal_date: subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000).toISOString()
+      : null,
+    monthly_dues: newMrr,
+    ...paymentMethodInfo,
+  };
+
+  // Set subscription_start_date if missing (in case subscription.created never fired)
+  if (!member.subscription_start_date && subscription.created) {
+    updateData.subscription_start_date = new Date(subscription.created * 1000).toISOString();
+    console.log('📅 Setting missing subscription_start_date');
+  }
+
   // Update member
   console.log('💾 Updating member record...');
   const { error: updateError } = await supabase
     .from('members')
-    .update({
-      stripe_subscription_id: subscription.id, // Always update subscription ID
-      subscription_status: subscription.status,
-      subscription_cancel_at: (subscription as any).cancel_at
-        ? new Date((subscription as any).cancel_at * 1000).toISOString()
-        : null,
-      next_renewal_date: (subscription as any).current_period_end
-        ? new Date((subscription as any).current_period_end * 1000).toISOString()
-        : null,
-      monthly_dues: newMrr,
-      ...paymentMethodInfo,
-    })
+    .update(updateData)
     .eq('member_id', member.member_id);
 
   if (updateError) {
@@ -275,96 +309,261 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) return;
+  console.log('📝 Handling subscription.deleted event');
+  console.log('   Subscription ID:', subscription.id);
+  console.log('   Customer ID:', subscription.customer);
 
-  await supabase
+  const member = await findMemberByStripeCustomer(subscription.customer as string);
+  if (!member) {
+    console.log('❌ Member not found, skipping delete');
+    return;
+  }
+
+  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+
+  const previousMrr = Number(member.monthly_dues) || 0;
+  console.log('💰 Canceling subscription with MRR: $', previousMrr);
+
+  // Clear all subscription fields
+  console.log('💾 Clearing subscription data from member...');
+  const { error: updateError } = await supabase
     .from('members')
     .update({
       subscription_status: 'canceled',
       subscription_canceled_at: new Date().toISOString(),
+      stripe_subscription_id: null,
+      subscription_start_date: null,
+      subscription_cancel_at: null,
+      next_renewal_date: null,
+      monthly_dues: 0,
+      payment_method_type: null,
+      payment_method_last4: null,
+      payment_method_brand: null,
     })
     .eq('member_id', member.member_id);
 
-  await supabase.from('subscription_events').insert({
+  if (updateError) {
+    console.error('❌ Failed to update member:', updateError);
+  } else {
+    console.log('✅ Subscription data cleared successfully');
+  }
+
+  // Log subscription event
+  console.log('📊 Logging subscription cancellation event...');
+  const { error: logError } = await supabase.from('subscription_events').insert({
     member_id: member.member_id,
     event_type: 'cancel',
     stripe_subscription_id: subscription.id,
-    previous_mrr: Number(member.monthly_dues) || 0,
+    previous_mrr: previousMrr,
     new_mrr: 0,
     effective_date: new Date().toISOString(),
   });
+
+  if (logError) {
+    console.error('❌ Failed to log subscription event:', logError);
+  } else {
+    console.log('✅ Subscription cancellation logged');
+  }
 }
 
 async function handleSubscriptionPaused(subscription: Stripe.Subscription) {
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) return;
+  console.log('📝 Handling subscription.paused event');
+  console.log('   Subscription ID:', subscription.id);
+  console.log('   Customer ID:', subscription.customer);
 
-  await supabase
+  const member = await findMemberByStripeCustomer(subscription.customer as string);
+  if (!member) {
+    console.log('❌ Member not found, skipping pause');
+    return;
+  }
+
+  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+
+  const previousMrr = Number(member.monthly_dues) || 0;
+  console.log('⏸️ Pausing subscription with MRR: $', previousMrr);
+
+  // Update member
+  console.log('💾 Updating member record...');
+  const { error: updateError } = await supabase
     .from('members')
-    .update({ subscription_status: 'paused' })
+    .update({
+      stripe_subscription_id: subscription.id, // Ensure subscription ID is set
+      subscription_status: 'paused',
+    })
     .eq('member_id', member.member_id);
 
-  await supabase.from('subscription_events').insert({
+  if (updateError) {
+    console.error('❌ Failed to update member:', updateError);
+  } else {
+    console.log('✅ Member updated successfully');
+  }
+
+  // Log subscription event
+  console.log('📊 Logging subscription pause event...');
+  const { error: logError } = await supabase.from('subscription_events').insert({
     member_id: member.member_id,
     event_type: 'pause',
     stripe_subscription_id: subscription.id,
-    previous_mrr: Number(member.monthly_dues) || 0,
+    previous_mrr: previousMrr,
     new_mrr: 0,
     effective_date: new Date().toISOString(),
   });
+
+  if (logError) {
+    console.error('❌ Failed to log subscription event:', logError);
+  } else {
+    console.log('✅ Subscription pause logged');
+  }
 }
 
 async function handleSubscriptionResumed(subscription: Stripe.Subscription) {
-  const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) return;
+  console.log('📝 Handling subscription.resumed event');
+  console.log('   Subscription ID:', subscription.id);
+  console.log('   Customer ID:', subscription.customer);
 
-  await supabase
+  const member = await findMemberByStripeCustomer(subscription.customer as string);
+  if (!member) {
+    console.log('❌ Member not found, skipping resume');
+    return;
+  }
+
+  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+
+  const price = subscription.items.data[0]?.price;
+  const amount = price?.unit_amount ? price.unit_amount / 100 : 0;
+  const mrr = price?.recurring?.interval === 'year' ? amount / 12 : amount;
+
+  console.log('▶️ Resuming subscription with MRR: $', mrr);
+
+  // Get payment method details (may have changed)
+  const paymentMethodInfo = await getPaymentMethodInfo(subscription.default_payment_method as string);
+
+  // Update member
+  console.log('💾 Updating member record...');
+  const { error: updateError } = await supabase
     .from('members')
-    .update({ subscription_status: 'active' })
+    .update({
+      stripe_subscription_id: subscription.id, // Ensure subscription ID is set
+      subscription_status: 'active',
+      monthly_dues: mrr,
+      next_renewal_date: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : null,
+      ...paymentMethodInfo,
+    })
     .eq('member_id', member.member_id);
 
-  await supabase.from('subscription_events').insert({
+  if (updateError) {
+    console.error('❌ Failed to update member:', updateError);
+  } else {
+    console.log('✅ Member updated successfully');
+  }
+
+  // Log subscription event
+  console.log('📊 Logging subscription resume event...');
+  const { error: logError } = await supabase.from('subscription_events').insert({
     member_id: member.member_id,
     event_type: 'resume',
     stripe_subscription_id: subscription.id,
-    new_mrr: Number(member.monthly_dues) || 0,
+    new_mrr: mrr,
     effective_date: new Date().toISOString(),
   });
+
+  if (logError) {
+    console.error('❌ Failed to log subscription event:', logError);
+  } else {
+    console.log('✅ Subscription resume logged');
+  }
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  if (!(invoice as any).subscription) return;
+  console.log('📝 Handling invoice.payment_failed event');
+  console.log('   Invoice ID:', invoice.id);
+  console.log('   Customer ID:', invoice.customer);
+  console.log('   Amount Due:', invoice.amount_due);
+
+  if (!invoice.subscription) {
+    console.log('ℹ️ Invoice not associated with subscription, skipping');
+    return;
+  }
+
+  console.log('   Subscription ID:', invoice.subscription);
 
   const member = await findMemberByStripeCustomer(invoice.customer as string);
-  if (!member) return;
+  if (!member) {
+    console.log('❌ Member not found, skipping payment failure update');
+    return;
+  }
 
-  await supabase
+  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
+  console.log('⚠️ Payment failed for subscription');
+
+  // Update member status to past_due
+  console.log('💾 Updating member status to past_due...');
+  const { error: updateError } = await supabase
     .from('members')
     .update({ subscription_status: 'past_due' })
     .eq('member_id', member.member_id);
 
-  await supabase.from('subscription_events').insert({
+  if (updateError) {
+    console.error('❌ Failed to update member:', updateError);
+  } else {
+    console.log('✅ Member status updated to past_due');
+  }
+
+  // Log subscription event
+  console.log('📊 Logging payment failure event...');
+  const { error: logError } = await supabase.from('subscription_events').insert({
     member_id: member.member_id,
     event_type: 'payment_failed',
-    stripe_subscription_id: (invoice as any).subscription as string,
+    stripe_subscription_id: invoice.subscription as string,
     effective_date: new Date().toISOString(),
     metadata: { invoice_id: invoice.id, amount: invoice.amount_due }
   });
+
+  if (logError) {
+    console.error('❌ Failed to log subscription event:', logError);
+  } else {
+    console.log('✅ Payment failure logged');
+  }
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  if (!(invoice as any).subscription) return;
+  console.log('📝 Handling invoice.payment_succeeded event');
+  console.log('   Invoice ID:', invoice.id);
+  console.log('   Customer ID:', invoice.customer);
+  console.log('   Amount Paid:', invoice.amount_paid);
+
+  if (!invoice.subscription) {
+    console.log('ℹ️ Invoice not associated with subscription, skipping');
+    return;
+  }
+
+  console.log('   Subscription ID:', invoice.subscription);
 
   const member = await findMemberByStripeCustomer(invoice.customer as string);
-  if (!member) return;
+  if (!member) {
+    console.log('❌ Member not found, skipping payment success update');
+    return;
+  }
+
+  console.log('✅ Found member:', member.member_id, member.first_name, member.last_name);
 
   // Update subscription status to active if it was past_due
   if (member.subscription_status === 'past_due') {
-    await supabase
+    console.log('💾 Updating member status from past_due to active...');
+    const { error: updateError } = await supabase
       .from('members')
       .update({ subscription_status: 'active' })
       .eq('member_id', member.member_id);
+
+    if (updateError) {
+      console.error('❌ Failed to update member:', updateError);
+    } else {
+      console.log('✅ Member status updated to active');
+    }
+  } else {
+    console.log('ℹ️ Member status already active, no update needed');
   }
 }
 
@@ -382,7 +581,7 @@ async function findMemberByStripeCustomer(customerId: string): Promise<any | nul
     return null;
   }
 
-  console.log(`✅ Found member: ${data.name} (${data.member_id})`);
+  console.log(`✅ Found member: ${data.first_name} ${data.last_name} (${data.member_id})`);
   return data;
 }
 
