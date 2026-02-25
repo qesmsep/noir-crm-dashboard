@@ -24,7 +24,10 @@ export const config = {
  * Updates: members table + subscription_events audit log
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log('🔔 Stripe Subscription Webhook received');
+
   if (req.method !== 'POST') {
+    console.log('❌ Method not allowed:', req.method);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -32,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const sig = req.headers['stripe-signature'];
 
   if (!sig) {
+    console.log('❌ Missing Stripe signature');
     return res.status(400).json({ error: 'Missing Stripe signature' });
   }
 
@@ -40,17 +44,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Verify webhook signature - use dedicated subscription webhook secret
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET_SUBSCRIPTIONS || process.env.STRIPE_WEBHOOK_SECRET;
+    console.log('🔐 Using webhook secret:', webhookSecret ? `${webhookSecret.slice(0, 10)}...` : 'MISSING');
+
     event = stripe.webhooks.constructEvent(
       buf,
       sig,
       webhookSecret!
     );
+
+    console.log('✅ Webhook signature verified');
+    console.log('📦 Event type:', event.type);
+    console.log('📦 Event ID:', event.id);
   } catch (err: any) {
-    console.error('Webhook signature verification failed:', err.message);
+    console.error('❌ Webhook signature verification failed:', err.message);
     return res.status(400).json({ error: `Webhook Error: ${err.message}` });
   }
 
   // Check for duplicate event (idempotency)
+  console.log('🔍 Checking for duplicate event...');
   const { data: existingEvent } = await supabase
     .from('stripe_webhook_events')
     .select('id')
@@ -58,30 +69,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .single();
 
   if (existingEvent) {
-    console.log(`Duplicate event ${event.id}, skipping`);
+    console.log(`⚠️ Duplicate event ${event.id}, skipping`);
     return res.json({ received: true, duplicate: true });
   }
 
   // Store webhook event
-  await supabase.from('stripe_webhook_events').insert({
+  console.log('💾 Storing webhook event in database...');
+  const { error: insertError } = await supabase.from('stripe_webhook_events').insert({
     stripe_event_id: event.id,
     event_type: event.type,
     payload: event.data.object as any,
     processed: false
   });
 
+  if (insertError) {
+    console.error('❌ Failed to store webhook event:', insertError);
+  } else {
+    console.log('✅ Webhook event stored');
+  }
+
   try {
+    console.log('⚙️ Processing webhook event...');
     await processWebhookEvent(event);
 
     // Mark as processed
+    console.log('✅ Marking event as processed');
     await supabase
       .from('stripe_webhook_events')
       .update({ processed: true, processed_at: new Date().toISOString() })
       .eq('stripe_event_id', event.id);
 
+    console.log('✅ Webhook processing complete');
     return res.json({ received: true });
   } catch (error: any) {
-    console.error('Error processing webhook:', error);
+    console.error('❌ Error processing webhook:', error);
 
     // Log error but return 200 to prevent Stripe retries
     await supabase
@@ -170,14 +191,26 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  console.log('📝 Handling subscription.updated event');
+  console.log('   Subscription ID:', subscription.id);
+  console.log('   Customer ID:', subscription.customer);
+  console.log('   Status:', subscription.status);
+
   const member = await findMemberByStripeCustomer(subscription.customer as string);
-  if (!member) return;
+  if (!member) {
+    console.log('❌ Member not found, skipping update');
+    return;
+  }
+
+  console.log('✅ Found member:', member.member_id, member.name);
 
   const price = subscription.items.data[0]?.price;
   const newAmount = price ? price.unit_amount! / 100 : 0;
   const newMrr = price?.recurring?.interval === 'year' ? newAmount / 12 : newAmount;
 
   const oldMrr = Number(member.monthly_dues) || 0;
+
+  console.log('💰 Price change: $', oldMrr, '→ $', newMrr);
 
   // Determine event type
   let eventType: 'upgrade' | 'downgrade' | 'reactivate' | 'cancel' = 'upgrade';
@@ -186,11 +219,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   else if (subscription.cancel_at_period_end) eventType = 'cancel';
   else if (member.subscription_status === 'canceled') eventType = 'reactivate';
 
+  console.log('🏷️ Event type:', eventType);
+
   // Get payment method details if payment method changed
   const paymentMethodInfo = await getPaymentMethodInfo(subscription.default_payment_method as string);
 
   // Update member
-  await supabase
+  console.log('💾 Updating member record...');
+  const { error: updateError } = await supabase
     .from('members')
     .update({
       subscription_status: subscription.status,
@@ -205,9 +241,16 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     })
     .eq('member_id', member.member_id);
 
+  if (updateError) {
+    console.error('❌ Failed to update member:', updateError);
+  } else {
+    console.log('✅ Member updated successfully');
+  }
+
   // Log event if significant change
   if (newMrr !== oldMrr || subscription.cancel_at_period_end) {
-    await supabase.from('subscription_events').insert({
+    console.log('📊 Logging subscription event...');
+    const { error: logError } = await supabase.from('subscription_events').insert({
       member_id: member.member_id,
       event_type: eventType,
       stripe_subscription_id: subscription.id,
@@ -219,6 +262,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
         stripe_status: subscription.status
       }
     });
+
+    if (logError) {
+      console.error('❌ Failed to log subscription event:', logError);
+    } else {
+      console.log('✅ Subscription event logged');
+    }
+  } else {
+    console.log('ℹ️ No significant change, skipping event log');
   }
 }
 
@@ -317,6 +368,8 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 }
 
 async function findMemberByStripeCustomer(customerId: string): Promise<any | null> {
+  console.log('🔍 Looking up member with Stripe customer ID:', customerId);
+
   const { data, error } = await supabase
     .from('members')
     .select('*')
@@ -324,10 +377,11 @@ async function findMemberByStripeCustomer(customerId: string): Promise<any | nul
     .single();
 
   if (error || !data) {
-    console.error(`Member not found for Stripe customer: ${customerId}`);
+    console.error(`❌ Member not found for Stripe customer: ${customerId}`, error);
     return null;
   }
 
+  console.log(`✅ Found member: ${data.name} (${data.member_id})`);
   return data;
 }
 
