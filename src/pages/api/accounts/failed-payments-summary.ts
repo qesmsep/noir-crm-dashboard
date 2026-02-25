@@ -43,7 +43,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    const failedPaymentAccounts = [];
+    interface FailedPaymentAccount {
+      account_id: string;
+      last_payment_status: string;
+      failed_count: number;
+      last_payment_date: number;
+    }
+
+    const failedPaymentAccounts: FailedPaymentAccount[] = [];
 
     // Check each account's last payment status
     for (const account of accounts) {
