@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Fetch invoices from Stripe
+    // Fetch both invoices and charges for complete transaction history
     const invoicesParams: Stripe.InvoiceListParams = {
       customer: account.stripe_customer_id,
       limit,
@@ -67,41 +67,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       invoicesParams.status = status as Stripe.InvoiceListParams.Status;
     }
 
-    const invoices = await stripe.invoices.list(invoicesParams);
+    // Only fetch charges (payments), not invoices
+    const charges = await stripe.charges.list({
+      customer: account.stripe_customer_id,
+      limit
+    });
 
-    // Format invoices for frontend
-    const formattedInvoices = invoices.data.map((invoice) => ({
-      id: invoice.id,
-      number: invoice.number,
-      amount_due: invoice.amount_due / 100,
-      amount_paid: invoice.amount_paid / 100,
-      currency: invoice.currency.toUpperCase(),
-      status: invoice.status,
-      created: invoice.created,
-      due_date: invoice.due_date,
-      paid_at: invoice.status_transitions?.paid_at,
-      invoice_pdf: invoice.invoice_pdf,
-      hosted_invoice_url: invoice.hosted_invoice_url,
-      description: invoice.description,
-      subscription_id: invoice.subscription,
-      lines: invoice.lines.data.map((line) => ({
-        description: line.description,
-        amount: line.amount / 100,
-        quantity: line.quantity,
-        period: line.period
-          ? {
-              start: line.period.start,
-              end: line.period.end,
-            }
-          : null,
-      })),
-      metadata: invoice.metadata,
+    // Format charges as transactions
+    const formattedCharges = charges.data.map((charge) => ({
+      id: charge.id,
+      number: null,
+      amount_due: charge.amount / 100,
+      amount_paid: charge.amount_captured / 100,
+      currency: charge.currency.toUpperCase(),
+      status: charge.status === 'succeeded' ? 'paid' : charge.status === 'failed' ? 'uncollectible' : 'open',
+      created: charge.created,
+      due_date: null,
+      paid_at: charge.status === 'succeeded' ? charge.created : null,
+      invoice_pdf: charge.receipt_url,
+      hosted_invoice_url: charge.receipt_url,
+      description: charge.description || 'Payment',
+      subscription_id: null,
+      lines: [{
+        description: charge.description || 'Subscription payment',
+        amount: charge.amount / 100,
+        quantity: 1,
+        period: null,
+      }],
+      metadata: charge.metadata,
     }));
 
+    // Sort by date (newest first)
+    const allTransactions = formattedCharges.sort((a, b) => b.created - a.created);
+
     return res.json({
-      invoices: formattedInvoices,
-      has_more: invoices.has_more,
-      total_count: invoices.data.length,
+      invoices: allTransactions,
+      has_more: charges.has_more,
+      total_count: allTransactions.length,
     });
   } catch (error: any) {
     console.error('Error fetching invoices:', error);

@@ -51,7 +51,10 @@
 }
 
 .invoiceRow {
-  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
   border-bottom: 1px solid #EFEDE8;
   transition: background-color 0.15s ease;
 }
@@ -64,72 +67,50 @@
   background-color: #FBFBFA;
 }
 
-.invoiceMain {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-
-.invoiceInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-
-.invoiceNumber {
+.invoiceDescription {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: #1F1F1F;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+  flex: 1;
+  min-width: 0;
 }
 
 .invoiceDate {
   font-size: 13px;
   color: #8C7C6D;
-}
-
-.invoiceAmount {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  white-space: nowrap;
+  min-width: 110px;
 }
 
 .amount {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #1F1F1F;
-}
-
-.invoiceDescription {
-  font-size: 13px;
-  color: #5A5A5A;
-  margin-bottom: 12px;
-  padding-left: 0;
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: right;
 }
 
 .invoiceActions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
 }
 
 .actionLink {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 4px;
+  font-size: 12px;
   font-weight: 500;
   color: #A59480;
   text-decoration: none;
-  padding: 6px 12px;
+  padding: 4px 10px;
   border-radius: 6px;
   border: 1px solid #ECEAE5;
   background: white;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .actionLink:hover {
@@ -244,31 +225,34 @@
   }
 
   .invoiceRow {
-    padding: 16px;
-  }
-
-  .invoiceMain {
-    flex-direction: column;
+    flex-wrap: wrap;
+    padding: 14px 16px;
     gap: 12px;
   }
 
-  .invoiceAmount {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+  .invoiceDescription {
     width: 100%;
+    order: 1;
+  }
+
+  .invoiceDate {
+    order: 2;
+    min-width: auto;
   }
 
   .amount {
-    font-size: 15px;
+    order: 3;
+    margin-left: auto;
   }
 
-  .invoiceNumber {
-    font-size: 13px;
+  .invoiceActions {
+    order: 4;
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .actionLink {
-    font-size: 12px;
-    padding: 5px 10px;
+    font-size: 11px;
+    padding: 4px 8px;
   }
 }

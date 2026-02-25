@@ -132,31 +132,19 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
       <div className={styles.invoiceList}>
         {displayedInvoices.map((invoice) => (
           <div key={invoice.id} className={styles.invoiceRow}>
-            <div className={styles.invoiceMain}>
-              <div className={styles.invoiceInfo}>
-                <div className={styles.invoiceNumber}>
-                  {invoice.number || invoice.id.slice(0, 12)}
-                </div>
-                <div className={styles.invoiceDate}>
-                  {formatDate(invoice.paid_at || invoice.created)}
-                </div>
-              </div>
-
-              <div className={styles.invoiceAmount}>
-                <div className={styles.amount}>
-                  {formatCurrency(invoice.amount_paid || invoice.amount_due, invoice.currency)}
-                </div>
-                <span className={getStatusBadgeClass(invoice.status)}>
-                  {invoice.status.toUpperCase()}
-                </span>
-              </div>
+            <div className={styles.invoiceDescription}>
+              {invoice.lines.length > 0
+                ? (invoice.lines[0].description || invoice.description || 'Subscription payment')
+                : (invoice.description || 'Subscription payment')}
             </div>
 
-            {invoice.lines.length > 0 && (
-              <div className={styles.invoiceDescription}>
-                {invoice.lines[0].description || invoice.description || 'Subscription payment'}
-              </div>
-            )}
+            <div className={styles.invoiceDate}>
+              {formatDate(invoice.paid_at || invoice.created)}
+            </div>
+
+            <div className={styles.amount}>
+              {formatCurrency(invoice.amount_paid || invoice.amount_due, invoice.currency)}
+            </div>
 
             <div className={styles.invoiceActions}>
               {invoice.invoice_pdf && (
