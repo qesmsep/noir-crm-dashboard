@@ -191,10 +191,11 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to upsert account', debug: { ...debugInfo, upsertAccountError } });
       }
 
-      // Update all members for this account: set status to 'active' and set stripe_customer_id
+      // Update all members for this account: set status to 'active'
+      // Note: stripe_customer_id is stored on accounts table only, not members
       const { error: memberUpdateError } = await supabase
         .from('members')
-        .update({ status: 'active', stripe_customer_id: session.customer })
+        .update({ status: 'active' })
         .eq('account_id', accountId)
         .or('status.eq.pending,status.is.null');
       if (memberUpdateError) {
