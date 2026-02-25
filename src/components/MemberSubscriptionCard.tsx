@@ -17,6 +17,13 @@ interface SubscriptionData {
   current_price_id: string | null;
 }
 
+interface PaymentStatus {
+  last_payment_status: string | null;
+  last_payment_date: number | null;
+  last_payment_amount: number | null;
+  failed_payment_count: number;
+}
+
 interface Props {
   accountId: string;
 }
@@ -24,6 +31,7 @@ interface Props {
 export default function MemberSubscriptionCard({ accountId }: Props) {
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showUpdatePlanModal, setShowUpdatePlanModal] = useState(false);
@@ -32,6 +40,7 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
   useEffect(() => {
     if (accountId) {
       fetchSubscriptionData();
+      fetchPaymentStatus();
     }
   }, [accountId]);
 
@@ -82,6 +91,19 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPaymentStatus = async () => {
+    try {
+      const response = await fetch(`/api/accounts/${accountId}/last-payment-status`);
+      const result = await response.json();
+
+      if (!result.error) {
+        setPaymentStatus(result);
+      }
+    } catch (error: any) {
+      console.error('Error fetching payment status:', error);
     }
   };
 
@@ -210,9 +232,16 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
     <div className={styles.card}>
       <div className={styles.header}>
         <h3 className={styles.title}>Subscription</h3>
-        <span className={statusBadgeClass}>
-          {subscription.subscription_status?.toUpperCase()}
-        </span>
+        <div className={styles.badges}>
+          {paymentStatus?.last_payment_status === 'failed' && (
+            <span className={styles.paymentFailedBadge}>
+              PAYMENT FAILED
+            </span>
+          )}
+          <span className={statusBadgeClass}>
+            {subscription.subscription_status?.toUpperCase()}
+          </span>
+        </div>
       </div>
 
       <div className={styles.content}>

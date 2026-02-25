@@ -26,6 +26,34 @@
   margin: 0;
 }
 
+.badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Payment Failed Badge - Prominent Red */
+.paymentFailedBadge {
+  background: #DC2626;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
 /* Status Badges */
 .statusActive {
   background: #10B981;

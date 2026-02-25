@@ -51,7 +51,8 @@
 }
 
 .invoiceRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 110px 90px 110px 40px;
   align-items: center;
   gap: 16px;
   padding: 16px 24px;
@@ -71,8 +72,9 @@
   font-size: 14px;
   font-weight: 500;
   color: #1F1F1F;
-  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .invoiceDate {
@@ -92,97 +94,115 @@
 }
 
 .invoiceActions {
+  position: relative;
   display: flex;
-  gap: 8px;
+  justify-content: center;
   align-items: center;
 }
 
-.actionLink {
-  display: inline-flex;
+.menuButton {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #A59480;
-  text-decoration: none;
-  padding: 4px 10px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
   border-radius: 6px;
-  border: 1px solid #ECEAE5;
-  background: white;
+  cursor: pointer;
+  color: #8C7C6D;
   transition: all 0.15s ease;
-  white-space: nowrap;
 }
 
-.actionLink:hover {
+.menuButton:hover {
   background: #F7F6F3;
-  border-color: #A59480;
-  color: #8C7C6D;
+  color: #1F1F1F;
 }
 
 .icon {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
+}
+
+.actionMenu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1F1F1F;
+  text-decoration: none;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: #F7F6F3;
+}
+
+.menuIcon {
+  width: 16px;
+  height: 16px;
+  color: #8C7C6D;
+}
+
+.menuItemDisabled {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #A59480;
+  font-style: italic;
 }
 
 /* Status badges */
-.statusPaid {
+.statusBadge {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 4px 12px;
   font-size: 11px;
   font-weight: 600;
   border-radius: 12px;
-  background-color: #D1FAE5;
-  color: #065F46;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.statusPaid {
+  background-color: #D1FAE5;
+  color: #065F46;
 }
 
 .statusOpen {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 12px;
   background-color: #FEF3C7;
   color: #92400E;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .statusFailed {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 12px;
   background-color: #FEE2E2;
   color: #991B1B;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .statusDraft {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 12px;
   background-color: #E5E7EB;
   color: #374151;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .statusDefault {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 12px;
   background-color: #F3F4F6;
   color: #6B7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .footer {

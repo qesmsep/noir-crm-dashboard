@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
 import styles from '../styles/SubscriptionTransactionHistory.module.css';
-import { Download, ExternalLink } from 'lucide-react';
+import { Download, ExternalLink, MoreVertical } from 'lucide-react';
 
 interface Invoice {
   id: string;
@@ -35,6 +35,7 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     if (accountId) {
@@ -146,28 +147,50 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
               {formatCurrency(invoice.amount_paid || invoice.amount_due, invoice.currency)}
             </div>
 
+            <span className={`${styles.statusBadge} ${getStatusBadgeClass(invoice.status)}`}>
+              {invoice.status === 'paid' ? 'Paid' :
+               invoice.status === 'uncollectible' ? 'Failed' :
+               invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+            </span>
+
             <div className={styles.invoiceActions}>
-              {invoice.invoice_pdf && (
-                <a
-                  href={invoice.invoice_pdf}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.actionLink}
-                >
-                  <Download className={styles.icon} />
-                  PDF
-                </a>
-              )}
-              {invoice.hosted_invoice_url && (
-                <a
-                  href={invoice.hosted_invoice_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.actionLink}
-                >
-                  <ExternalLink className={styles.icon} />
-                  View
-                </a>
+              <button
+                className={styles.menuButton}
+                onClick={() => setOpenMenuId(openMenuId === invoice.id ? null : invoice.id)}
+              >
+                <MoreVertical className={styles.icon} />
+              </button>
+
+              {openMenuId === invoice.id && (
+                <div className={styles.actionMenu}>
+                  {invoice.invoice_pdf && (
+                    <a
+                      href={invoice.invoice_pdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.menuItem}
+                    >
+                      <Download className={styles.menuIcon} />
+                      Download PDF
+                    </a>
+                  )}
+                  {invoice.hosted_invoice_url && (
+                    <a
+                      href={invoice.hosted_invoice_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.menuItem}
+                    >
+                      <ExternalLink className={styles.menuIcon} />
+                      View Receipt
+                    </a>
+                  )}
+                  {!invoice.invoice_pdf && !invoice.hosted_invoice_url && (
+                    <div className={styles.menuItemDisabled}>
+                      No actions available
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
