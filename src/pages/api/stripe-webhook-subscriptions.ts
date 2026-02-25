@@ -482,12 +482,12 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   console.log('   Customer ID:', invoice.customer);
   console.log('   Amount Due:', invoice.amount_due);
 
-  if (!invoice.subscription) {
+  if (!(invoice as any).subscription) {
     console.log('ℹ️ Invoice not associated with subscription, skipping');
     return;
   }
 
-  console.log('   Subscription ID:', invoice.subscription);
+  console.log('   Subscription ID:', (invoice as any).subscription);
 
   const member = await findMemberByStripeCustomer(invoice.customer as string);
   if (!member) {
@@ -516,7 +516,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const { error: logError } = await supabase.from('subscription_events').insert({
     member_id: member.member_id,
     event_type: 'payment_failed',
-    stripe_subscription_id: invoice.subscription as string,
+    stripe_subscription_id: (invoice as any).subscription as string,
     effective_date: new Date().toISOString(),
     metadata: { invoice_id: invoice.id, amount: invoice.amount_due }
   });
@@ -534,12 +534,12 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   console.log('   Customer ID:', invoice.customer);
   console.log('   Amount Paid:', invoice.amount_paid);
 
-  if (!invoice.subscription) {
+  if (!(invoice as any).subscription) {
     console.log('ℹ️ Invoice not associated with subscription, skipping');
     return;
   }
 
-  console.log('   Subscription ID:', invoice.subscription);
+  console.log('   Subscription ID:', (invoice as any).subscription);
 
   const member = await findMemberByStripeCustomer(invoice.customer as string);
   if (!member) {
