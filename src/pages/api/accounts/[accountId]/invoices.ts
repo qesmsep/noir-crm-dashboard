@@ -57,9 +57,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Trim whitespace from stripe_customer_id to prevent API errors
+    const stripeCustomerId = account.stripe_customer_id.trim();
+
     // Fetch both invoices and charges for complete transaction history
     const invoicesParams: Stripe.InvoiceListParams = {
-      customer: account.stripe_customer_id,
+      customer: stripeCustomerId,
       limit,
     };
 
@@ -69,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Only fetch charges (payments), not invoices
     const charges = await stripe.charges.list({
-      customer: account.stripe_customer_id,
+      customer: stripeCustomerId,
       limit
     });
 
