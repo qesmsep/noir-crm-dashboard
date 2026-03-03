@@ -438,6 +438,132 @@ export default async function handler(req, res) {
       return res.json({ success: true });
     }
 
+    // Handle ACH payment method updates (e.g., returns, failures)
+    if (event.type === 'payment_method.automatically_updated') {
+      const paymentMethod = event.data.object;
+      console.log('Processing payment_method.automatically_updated:', {
+        paymentMethodId: paymentMethod.id,
+        type: paymentMethod.type,
+      });
+
+      // This event fires when Stripe automatically updates a payment method
+      // (e.g., ACH return, card replaced due to expiration)
+      // We should notify the customer to update their payment method
+
+      // For now, just log it - you can add email/SMS notification here
+      console.log('Payment method automatically updated:', paymentMethod.id);
+      return res.json({ success: true, message: 'Payment method updated' });
+    }
+
+    // Handle ACH charge succeeded
+    if (event.type === 'charge.succeeded') {
+      const charge = event.data.object;
+
+      // Only process ACH charges (skip card charges as they're handled by payment_intent)
+      if (charge.payment_method_details?.type === 'us_bank_account') {
+        console.log('Processing ACH charge.succeeded:', {
+          chargeId: charge.id,
+          customerId: charge.customer,
+          amount: charge.amount,
+        });
+
+        // Check if ledger entry already exists
+        const { data: existingCharge } = await supabase
+          .from('ledger')
+          .select('id')
+          .eq('stripe_charge_id', charge.id)
+          .single();
+
+        if (existingCharge) {
+          console.log('Ledger entry already exists for charge:', charge.id);
+          return res.json({ success: true, message: 'Ledger entry already exists' });
+        }
+
+        // Find account by customer ID
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('account_id')
+          .eq('stripe_customer_id', charge.customer)
+          .single();
+
+        if (accountError || !account) {
+          console.log('No account found for customer:', charge.customer);
+          return res.json({ received: true });
+        }
+
+        // Get primary member
+        const { data: primaryMember } = await supabase
+          .from('members')
+          .select('member_id')
+          .eq('account_id', account.account_id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (!primaryMember) {
+          console.log('No primary member found for account:', account.account_id);
+          return res.json({ received: true });
+        }
+
+        // Add to ledger
+        const { error: ledgerError } = await supabase
+          .from('ledger')
+          .insert({
+            account_id: account.account_id,
+            member_id: primaryMember.member_id,
+            amount: charge.amount / 100,
+            type: 'payment',
+            note: `ACH payment${charge.description ? `: ${charge.description}` : ''}`,
+            date: new Date().toISOString().split('T')[0],
+            stripe_charge_id: charge.id,
+          });
+
+        if (ledgerError) {
+          console.error('Error adding ACH payment to ledger:', ledgerError);
+          return res.status(500).json({ error: 'Failed to update ledger' });
+        }
+
+        console.log('Successfully processed ACH payment for account:', account.account_id);
+        return res.json({ success: true });
+      }
+    }
+
+    // Handle ACH charge failed
+    if (event.type === 'charge.failed') {
+      const charge = event.data.object;
+
+      // Only process ACH failures
+      if (charge.payment_method_details?.type === 'us_bank_account') {
+        console.log('Processing ACH charge.failed:', {
+          chargeId: charge.id,
+          customerId: charge.customer,
+          failureMessage: charge.failure_message,
+        });
+
+        // TODO: Notify customer of failed ACH payment
+        // You can send email/SMS here to alert them
+
+        console.log('ACH payment failed:', charge.failure_message);
+        return res.json({ success: true, message: 'ACH payment failure logged' });
+      }
+    }
+
+    // Handle ACH disputes
+    if (event.type === 'charge.dispute.created' || event.type === 'charge.dispute.updated') {
+      const dispute = event.data.object;
+      console.log('Processing charge dispute:', {
+        disputeId: dispute.id,
+        chargeId: dispute.charge,
+        reason: dispute.reason,
+        status: dispute.status,
+      });
+
+      // TODO: Notify admin of dispute and handle accordingly
+
+      console.log('Charge dispute:', dispute.status, dispute.reason);
+      return res.json({ success: true, message: 'Dispute logged' });
+    }
+
     // Return a 200 response for all other events
     console.log('Received unhandled event type:', event.type);
     res.json({ received: true });

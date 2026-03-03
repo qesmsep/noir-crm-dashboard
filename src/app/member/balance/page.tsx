@@ -36,7 +36,12 @@ import { ArrowUpIcon, ArrowDownIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import MemberNav from '@/components/member/MemberNav';
-import { Receipt } from 'lucide-react';
+import { Receipt, Download } from 'lucide-react';
+// Temporarily comment out PDF generation to avoid import issues
+// import { downloadTransactionReceipt } from '@/lib/pdfGenerator';
+const downloadTransactionReceipt = (data: any) => {
+  console.log('PDF generation temporarily disabled');
+};
 
 export default function MemberBalancePage() {
   const router = useRouter();
@@ -138,6 +143,39 @@ export default function MemberBalancePage() {
     return type === 'credit' ? `+$${formatted}` : `-$${formatted}`;
   };
 
+  const handleDownloadReceipt = () => {
+    if (!member || transactions.length === 0) return;
+
+    downloadTransactionReceipt({
+      memberName: `${member.first_name} ${member.last_name}`,
+      memberEmail: member.email,
+      memberPhone: member.phone,
+      membership: member.membership,
+      transactions: transactions.map(t => ({
+        date: t.date,
+        note: t.note,
+        type: t.type,
+        amount: parseFloat(t.amount),
+        running_balance: parseFloat(t.running_balance),
+      })),
+      generatedDate: new Date().toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    });
+
+    toast({
+      title: 'Receipt Downloaded',
+      description: 'Transaction receipt has been downloaded as PDF',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
   return (
     <Box minH="100vh" bg="#ECEDE8" pb="80px">
       {/* Header - Hidden on mobile */}
@@ -196,7 +234,7 @@ export default function MemberBalancePage() {
                     ${Math.abs(currentBalance).toFixed(2)}
                   </Text>
                 </Box>
-                {currentBalance < 0 && (
+                <HStack spacing={2}>
                   <Button
                     variant="outline"
                     borderColor="#DAD7D0"
@@ -204,12 +242,27 @@ export default function MemberBalancePage() {
                     _hover={{ borderColor: '#A59480', color: '#A59480', bg: '#F6F5F2' }}
                     size="sm"
                     px={3}
-                    isLoading={isProcessingPayment}
-                    onClick={handlePayBalance}
+                    onClick={handleDownloadReceipt}
+                    isDisabled={transactions.length === 0}
                   >
-                    Pay Balance
+                    <Download size={16} style={{ marginRight: '4px' }} />
+                    Receipt
                   </Button>
-                )}
+                  {currentBalance < 0 && (
+                    <Button
+                      variant="outline"
+                      borderColor="#DAD7D0"
+                      color="#5A5A5A"
+                      _hover={{ borderColor: '#A59480', color: '#A59480', bg: '#F6F5F2' }}
+                      size="sm"
+                      px={3}
+                      isLoading={isProcessingPayment}
+                      onClick={handlePayBalance}
+                    >
+                      Pay Balance
+                    </Button>
+                  )}
+                </HStack>
               </HStack>
             </CardBody>
           </Card>

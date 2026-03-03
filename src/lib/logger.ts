@@ -1,229 +1,53 @@
-import winston from 'winston';
-import fs from 'fs';
-import path from 'path';
-
 /**
- * Centralized logging configuration using Winston
- * Replaces console.log throughout the application
+ * Temporary simplified logger to fix Next.js startup issue
+ * Winston is temporarily disabled due to file system conflicts
  */
 
-// Define log levels
-const levels = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  http: 3,
-  debug: 4,
-};
-
-// Define colors for each level
-const colors = {
-  error: 'red',
-  warn: 'yellow',
-  info: 'green',
-  http: 'magenta',
-  debug: 'blue',
-};
-
-winston.addColors(colors);
-
-// Define format for logs
-const format = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-  winston.format.errors({ stack: true }),
-  winston.format.splat(),
-  winston.format.json(),
-  winston.format.printf((info) => {
-    const { timestamp, level, message, requestId, userId, ...meta } = info;
-
-    let log = `${timestamp} [${level.toUpperCase()}]`;
-
-    if (requestId) {
-      log += ` [ReqID: ${requestId}]`;
+// Simple console-based logger
+const logger = {
+  error: (message: string, ...args: any[]) => {
+    console.error(`[ERROR] ${new Date().toISOString()}: ${message}`, ...args);
+  },
+  warn: (message: string, ...args: any[]) => {
+    console.warn(`[WARN] ${new Date().toISOString()}: ${message}`, ...args);
+  },
+  info: (message: string, ...args: any[]) => {
+    console.info(`[INFO] ${new Date().toISOString()}: ${message}`, ...args);
+  },
+  http: (message: string, ...args: any[]) => {
+    console.log(`[HTTP] ${new Date().toISOString()}: ${message}`, ...args);
+  },
+  debug: (message: string, ...args: any[]) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`[DEBUG] ${new Date().toISOString()}: ${message}`, ...args);
     }
-
-    if (userId) {
-      log += ` [User: ${userId}]`;
-    }
-
-    log += `: ${message}`;
-
-    // Add additional metadata if present
-    if (Object.keys(meta).length > 0) {
-      log += ` ${JSON.stringify(meta)}`;
-    }
-
-    return log;
-  })
-);
-
-// Helper function to safely create logs directory
-function ensureLogsDirectory(): boolean {
-  try {
-    const logsDir = path.join(process.cwd(), 'logs');
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-    return true;
-  } catch (error) {
-    // In production/serverless environments (like Vercel), file system writes may not be allowed
-    // This is expected and we'll fall back to console-only logging
-    console.warn('[LOGGER] Cannot create logs directory, using console-only logging:', error instanceof Error ? error.message : String(error));
-    return false;
   }
-}
-
-// Determine if we should use file transports
-// In production/serverless, skip file logging if directory creation fails
-const canUseFileLogging = process.env.NODE_ENV === 'development' || ensureLogsDirectory();
-
-// Define which transports to use based on environment
-const transports: winston.transport[] = [];
-
-// Only add file transports if we can create the directory
-if (canUseFileLogging) {
-  try {
-    transports.push(
-      // Always log errors to a separate file
-      new winston.transports.File({
-        filename: 'logs/error.log',
-        level: 'error',
-        maxsize: 5242880, // 5MB
-        maxFiles: 5,
-      }),
-      // Log all levels to combined file
-      new winston.transports.File({
-        filename: 'logs/combined.log',
-        maxsize: 5242880, // 5MB
-        maxFiles: 5,
-      })
-    );
-  } catch (error) {
-    console.warn('[LOGGER] Failed to create file transports, using console-only:', error instanceof Error ? error.message : String(error));
-  }
-}
-
-// Always add console transport (works in all environments)
-transports.push(
-  new winston.transports.Console({
-    format: winston.format.combine(
-      process.env.NODE_ENV !== 'production' 
-        ? winston.format.colorize({ all: true })
-        : winston.format.uncolorize(),
-      winston.format.printf((info) => {
-        const { timestamp, level, message, requestId, userId, ...meta } = info;
-
-        let log = `${timestamp} [${level}]`;
-
-        if (requestId) {
-          log += ` [ReqID: ${requestId}]`;
-        }
-
-        if (userId) {
-          log += ` [User: ${userId}]`;
-        }
-
-        log += `: ${message}`;
-
-        // Add metadata in development for easier debugging
-        if (Object.keys(meta).length > 0) {
-          log += `\n${JSON.stringify(meta, null, 2)}`;
-        }
-
-        return log;
-      })
-    ),
-  })
-);
-
-// Determine log level based on environment
-const level = () => {
-  const env = process.env.NODE_ENV || 'development';
-  const isDevelopment = env === 'development';
-  return isDevelopment ? 'debug' : 'info';
 };
-
-// Create the logger instance with error handling
-let logger: winston.Logger;
-try {
-  logger = winston.createLogger({
-    level: level(),
-    levels,
-    format,
-    transports,
-    // Don't exit on errors
-    exitOnError: false,
-  });
-} catch (error) {
-  // Fallback to a simple console logger if Winston fails to initialize
-  console.error('[LOGGER] Failed to initialize Winston logger:', error instanceof Error ? error.message : String(error));
-  logger = winston.createLogger({
-    level: 'info',
-    levels,
-    format,
-    transports: [
-      new winston.transports.Console({
-        format: winston.format.simple(),
-      }),
-    ],
-    exitOnError: false,
-  });
-}
 
 /**
  * Structured logging helpers
  */
-
 export class Logger {
-  /**
-   * Log an error
-   */
   static error(message: string, error?: Error | unknown, meta?: object): void {
-    const errorMeta = error instanceof Error
-      ? {
-          error: {
-            message: error.message,
-            stack: error.stack,
-            name: error.name,
-          },
-          ...meta,
-        }
-      : { error, ...meta };
-
-    logger.error(message, errorMeta);
+    logger.error(message, { error, meta });
   }
 
-  /**
-   * Log a warning
-   */
   static warn(message: string, meta?: object): void {
     logger.warn(message, meta);
   }
 
-  /**
-   * Log info
-   */
   static info(message: string, meta?: object): void {
     logger.info(message, meta);
   }
 
-  /**
-   * Log HTTP requests
-   */
   static http(message: string, meta?: object): void {
     logger.http(message, meta);
   }
 
-  /**
-   * Log debug information (development only)
-   */
   static debug(message: string, meta?: object): void {
     logger.debug(message, meta);
   }
 
-  /**
-   * Log API requests with standard format
-   */
   static apiRequest(
     method: string,
     path: string,
@@ -240,9 +64,6 @@ export class Logger {
     });
   }
 
-  /**
-   * Log database operations
-   */
   static database(operation: string, table: string, duration?: number, meta?: object): void {
     logger.debug('Database Operation', {
       operation,
@@ -252,9 +73,6 @@ export class Logger {
     });
   }
 
-  /**
-   * Log authentication events
-   */
   static auth(event: string, userId?: string, meta?: object): void {
     logger.info('Auth Event', {
       event,
@@ -263,9 +81,6 @@ export class Logger {
     });
   }
 
-  /**
-   * Log payment/transaction events
-   */
   static payment(event: string, amount?: number, meta?: object): void {
     logger.info('Payment Event', {
       event,
@@ -274,9 +89,6 @@ export class Logger {
     });
   }
 
-  /**
-   * Log external API calls
-   */
   static externalApi(
     service: string,
     action: string,
@@ -293,9 +105,6 @@ export class Logger {
     });
   }
 
-  /**
-   * Log campaign/messaging events
-   */
   static campaign(event: string, campaignId?: string, meta?: object): void {
     logger.info('Campaign Event', {
       event,
@@ -304,9 +113,6 @@ export class Logger {
     });
   }
 
-  /**
-   * Log scheduled job execution
-   */
   static cronJob(jobName: string, success: boolean, duration?: number, meta?: object): void {
     logger.info('Cron Job', {
       jobName,
@@ -319,7 +125,6 @@ export class Logger {
 
 /**
  * Request logger middleware
- * Attaches logger instance to request object
  */
 export function createRequestLogger(requestId: string, userId?: string) {
   return {

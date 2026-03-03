@@ -90,6 +90,7 @@ export default function MemberDetailAdmin() {
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editingTransactionData, setEditingTransactionData] = useState<Partial<LedgerTransaction>>({});
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
+  const [transactionAttachments, setTransactionAttachments] = useState<Record<string, any[]>>({});
 
   // Attribute states (per member)
   const [newAttribute, setNewAttribute] = useState<Record<string, { key: string; value: string }>>({});
@@ -171,6 +172,34 @@ export default function MemberDetailAdmin() {
 
     fetchLedger();
   }, [accountId, toast]);
+
+  // Fetch attachments for each ledger transaction
+  useEffect(() => {
+    if (ledger.length === 0) return;
+
+    const fetchAllAttachments = async () => {
+      const attachmentsMap: Record<string, any[]> = {};
+
+      await Promise.all(
+        ledger.map(async (tx) => {
+          try {
+            const response = await fetch(`/api/transaction-attachments/${tx.id}`);
+            if (response.ok) {
+              const result = await response.json();
+              attachmentsMap[tx.id] = result.data || result.attachments || [];
+            }
+          } catch (error) {
+            console.error(`Error fetching attachments for transaction ${tx.id}:`, error);
+            attachmentsMap[tx.id] = [];
+          }
+        })
+      );
+
+      setTransactionAttachments(attachmentsMap);
+    };
+
+    fetchAllAttachments();
+  }, [ledger]);
 
   // Fetch messages
   useEffect(() => {
@@ -1276,12 +1305,16 @@ export default function MemberDetailAdmin() {
                               <option value="payment">Payment</option>
                               <option value="purchase">Purchase</option>
                             </select>
-                            <input
-                              type="number"
-                              className={styles.compactInput}
-                              value={Math.abs(editingTransactionData.amount || 0)}
-                              onChange={(e) => setEditingTransactionData({ ...editingTransactionData, amount: parseFloat(e.target.value) })}
-                            />
+                            <div style={{ position: 'relative', maxWidth: '80px' }}>
+                              <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#6e6e73', pointerEvents: 'none' }}>$</span>
+                              <input
+                                type="number"
+                                className={styles.compactInput}
+                                style={{ paddingLeft: '20px', width: '100%' }}
+                                value={Math.abs(editingTransactionData.amount || 0)}
+                                onChange={(e) => setEditingTransactionData({ ...editingTransactionData, amount: parseFloat(e.target.value) })}
+                              />
+                            </div>
                             <input
                               type="text"
                               placeholder="Note"
@@ -1290,11 +1323,22 @@ export default function MemberDetailAdmin() {
                               onChange={(e) => setEditingTransactionData({ ...editingTransactionData, note: e.target.value })}
                             />
                             <div className={styles.ledgerRowActions}>
-                              <button onClick={() => handleUpdateTransaction(tx.id)} className={styles.iconButton}>
+                              <button onClick={() => handleUpdateTransaction(tx.id)} className={styles.iconButton} title="Save">
                                 ✓
                               </button>
-                              <button onClick={() => setEditingTransactionId(null)} className={styles.iconButton}>
+                              <button onClick={() => setEditingTransactionId(null)} className={styles.iconButton} title="Cancel">
                                 ✕
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('Are you sure you want to delete this transaction?')) {
+                                    handleDeleteTransaction(tx.id);
+                                  }
+                                }}
+                                className={styles.iconButton}
+                                title="Delete"
+                              >
+                                🗑
                               </button>
                             </div>
                           </div>
@@ -1317,6 +1361,19 @@ export default function MemberDetailAdmin() {
                                     </div>
                                   )}
                                 </div>
+                                {transactionAttachments[tx.id]?.length > 0 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const attachment = transactionAttachments[tx.id][0];
+                                      window.open(attachment.file_url, '_blank');
+                                    }}
+                                    className={styles.downloadButton}
+                                    title="Download receipt"
+                                  >
+                                    📎
+                                  </button>
+                                )}
                                 <div className={styles.ledgerRowRight}>
                                   <div className={`${styles.ledgerAmount} ${tx.amount < 0 ? styles.negative : styles.positive}`}>
                                     {tx.amount >= 0 ? '+' : ''}{formatCurrency(tx.amount)}

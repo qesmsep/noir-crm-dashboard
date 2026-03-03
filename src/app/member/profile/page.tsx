@@ -14,7 +14,287 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/useToast';
 import { Separator } from '@/components/ui/separator';
-import { LogOut } from 'lucide-react';
+import { LogOut, CreditCard, Share2, Copy, Check, Building2 } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
+// Add Card Form Component
+function AddCardForm({ accountId, onSuccess, onCancel }: { accountId: string; onSuccess: () => void; onCancel: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { toast } = useToast();
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      // Step 1: Create SetupIntent
+      const setupResponse = await fetch('/api/stripe/payment-methods/setup-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId }),
+      });
+
+      const setupData = await setupResponse.json();
+
+      if (setupData.error) {
+        throw new Error(setupData.error);
+      }
+
+      // Step 2: Confirm card setup with Stripe
+      const { setupIntent, error: stripeError } = await stripe.confirmCardSetup(
+        setupData.client_secret,
+        {
+          payment_method: {
+            card: cardElement,
+          },
+        }
+      );
+
+      if (stripeError) {
+        throw new Error(stripeError.message);
+      }
+
+      if (!setupIntent || !setupIntent.payment_method) {
+        throw new Error('Failed to setup payment method');
+      }
+
+      // Step 3: Set as default payment method
+      const setDefaultResponse = await fetch('/api/stripe/payment-methods/set-default', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          payment_method_id: setupIntent.payment_method as string,
+        }),
+      });
+
+      const setDefaultData = await setDefaultResponse.json();
+
+      if (setDefaultData.error) {
+        throw new Error(setDefaultData.error);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Payment method added successfully',
+        variant: 'success',
+      });
+
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add payment method',
+        variant: 'error',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label className="text-[#1F1F1F] text-sm mb-2 block">Card Information</Label>
+        <div className="border border-[#DAD7D0] rounded-md p-3 bg-white">
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: '#1F1F1F',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  '::placeholder': {
+                    color: '#8C7C6D',
+                  },
+                },
+                invalid: {
+                  color: '#991B1B',
+                },
+              },
+            }}
+          />
+        </div>
+        <p className="text-xs text-[#8C7C6D] mt-2">
+          Your card information is securely processed by Stripe. We never store your full card details.
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <Button
+          type="submit"
+          className="flex-1 bg-[#A59480] text-white hover:bg-[#8C7C6D]"
+          disabled={submitting || !stripe}
+        >
+          {submitting ? 'Adding...' : 'Add Card'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1 border-[#DAD7D0] text-[#2C2C2C] hover:border-[#A59480] hover:text-[#A59480]"
+          onClick={onCancel}
+          disabled={submitting}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// Add Bank Account Form Component (ACH)
+function AddBankAccountForm({ accountId, onSuccess, onCancel }: { accountId: string; onSuccess: () => void; onCancel: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { toast } = useToast();
+  const [submitting, setSubmitting] = useState(false);
+  const [clientSecret, setClientSecret] = useState('');
+  const [setupIntentId, setSetupIntentId] = useState('');
+
+  useEffect(() => {
+    // Create SetupIntent on component mount
+    const createSetupIntent = async () => {
+      try {
+        const response = await fetch('/api/stripe/ach/setup-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: accountId }),
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setClientSecret(data.client_secret);
+        setSetupIntentId(data.setup_intent_id);
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to initialize bank account setup',
+          variant: 'error',
+        });
+      }
+    };
+
+    createSetupIntent();
+  }, [accountId, toast]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements || !clientSecret) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      // Confirm the SetupIntent with the bank account details
+      const { setupIntent, error: stripeError } = await stripe.confirmUsBankAccountSetup(clientSecret);
+
+      if (stripeError) {
+        throw new Error(stripeError.message);
+      }
+
+      if (!setupIntent || !setupIntent.payment_method) {
+        throw new Error('Failed to setup bank account');
+      }
+
+      // Set as default payment method
+      const setDefaultResponse = await fetch('/api/stripe/payment-methods/set-default', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          payment_method_id: setupIntent.payment_method as string,
+        }),
+      });
+
+      const setDefaultData = await setDefaultResponse.json();
+
+      if (setDefaultData.error) {
+        throw new Error(setDefaultData.error);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Bank account added successfully. Verification may take 1-2 business days.',
+        variant: 'success',
+      });
+
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add bank account',
+        variant: 'error',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label className="text-[#1F1F1F] text-sm mb-2 block">Bank Account Information</Label>
+        {clientSecret ? (
+          <div className="border border-[#DAD7D0] rounded-md p-3 bg-white">
+            <PaymentElement
+              options={{
+                layout: 'tabs',
+                paymentMethodOrder: ['us_bank_account'],
+              }}
+            />
+          </div>
+        ) : (
+          <div className="flex justify-center py-4">
+            <Spinner className="text-[#A59480]" />
+          </div>
+        )}
+        <p className="text-xs text-[#8C7C6D] mt-2">
+          Your bank account will be verified instantly or via microdeposits. ACH payments typically take 3-5 business days to process.
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <Button
+          type="submit"
+          className="flex-1 bg-[#A59480] text-white hover:bg-[#8C7C6D]"
+          disabled={submitting || !stripe || !clientSecret}
+        >
+          {submitting ? 'Adding...' : 'Add Bank Account'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1 border-[#DAD7D0] text-[#2C2C2C] hover:border-[#A59480] hover:text-[#A59480]"
+          onClick={onCancel}
+          disabled={submitting}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 export default function MemberProfilePage() {
   const router = useRouter();
@@ -34,6 +314,19 @@ export default function MemberProfilePage() {
     },
   });
 
+  // Payment methods state
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [defaultPaymentMethod, setDefaultPaymentMethod] = useState<string | null>(null);
+  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(true);
+  const [showAddCard, setShowAddCard] = useState(false);
+  const [showAddBankAccount, setShowAddBankAccount] = useState(false);
+  const [paymentMethodType, setPaymentMethodType] = useState<'card' | 'us_bank_account'>('card');
+
+  // Referral tracking state
+  const [referralStats, setReferralStats] = useState({ total: 0, active: 0 });
+  const [loadingReferrals, setLoadingReferrals] = useState(true);
+  const [copiedCode, setCopiedCode] = useState(false);
+
   useEffect(() => {
     if (!loading && !member) {
       router.push('/member/login');
@@ -45,8 +338,63 @@ export default function MemberProfilePage() {
         phone: member.phone || '',
         contact_preferences: member.contact_preferences || { sms: true, email: true },
       });
+      fetchPaymentMethods();
+      fetchReferralStats();
     }
   }, [member, loading, router]);
+
+  const fetchPaymentMethods = async () => {
+    if (!member?.account_id) return;
+
+    try {
+      const response = await fetch(`/api/stripe/payment-methods/list?account_id=${member.account_id}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setPaymentMethods(data.payment_methods || []);
+        setDefaultPaymentMethod(data.default_payment_method);
+      }
+    } catch (error) {
+      console.error('Error fetching payment methods:', error);
+    } finally {
+      setLoadingPaymentMethods(false);
+    }
+  };
+
+  const fetchReferralStats = async () => {
+    if (!member?.referral_code) {
+      setLoadingReferrals(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/member/referrals?code=${member.referral_code}`, {
+        credentials: 'include',
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        setReferralStats(data.stats || { total: 0, active: 0 });
+      }
+    } catch (error) {
+      console.error('Error fetching referral stats:', error);
+    } finally {
+      setLoadingReferrals(false);
+    }
+  };
+
+  const copyReferralCode = () => {
+    if (member?.referral_code) {
+      navigator.clipboard.writeText(member.referral_code);
+      setCopiedCode(true);
+      toast({
+        title: 'Copied!',
+        description: 'Referral code copied to clipboard',
+        variant: 'success',
+      });
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -315,6 +663,188 @@ export default function MemberProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Payment Methods Card */}
+          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-[#A59480]" />
+                  <CardTitle className="text-xl font-semibold text-[#1F1F1F]">
+                    Payment Methods
+                  </CardTitle>
+                </div>
+                {!showAddCard && !showAddBankAccount && !loadingPaymentMethods && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
+                      onClick={() => setShowAddCard(true)}
+                    >
+                      <CreditCard className="w-4 h-4 mr-1" />
+                      Add Card
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
+                      onClick={() => setShowAddBankAccount(true)}
+                    >
+                      <Building2 className="w-4 h-4 mr-1" />
+                      Add Bank
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingPaymentMethods ? (
+                <div className="flex justify-center py-4">
+                  <Spinner className="text-[#A59480]" />
+                </div>
+              ) : showAddCard ? (
+                <Elements stripe={stripePromise}>
+                  <AddCardForm
+                    accountId={member.account_id}
+                    onSuccess={() => {
+                      setShowAddCard(false);
+                      fetchPaymentMethods();
+                    }}
+                    onCancel={() => setShowAddCard(false)}
+                  />
+                </Elements>
+              ) : showAddBankAccount ? (
+                <Elements stripe={stripePromise}>
+                  <AddBankAccountForm
+                    accountId={member.account_id}
+                    onSuccess={() => {
+                      setShowAddBankAccount(false);
+                      fetchPaymentMethods();
+                    }}
+                    onCancel={() => setShowAddBankAccount(false)}
+                  />
+                </Elements>
+              ) : paymentMethods.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {paymentMethods.map((pm) => {
+                    const isCard = pm.type === 'card';
+                    const isBankAccount = pm.type === 'us_bank_account';
+
+                    return (
+                      <div
+                        key={pm.id}
+                        className="flex items-center justify-between p-3 border border-[#ECEAE5] rounded-lg bg-[#F6F5F2]"
+                      >
+                        <div className="flex items-center gap-3">
+                          {isCard && <CreditCard className="w-5 h-5 text-[#5A5A5A]" />}
+                          {isBankAccount && <Building2 className="w-5 h-5 text-[#5A5A5A]" />}
+                          <div>
+                            {isCard && (
+                              <>
+                                <p className="text-sm font-medium text-[#1F1F1F]">
+                                  {pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1)} •••• {pm.card.last4}
+                                </p>
+                                <p className="text-xs text-[#8C7C6D]">
+                                  Expires {pm.card.exp_month}/{pm.card.exp_year}
+                                </p>
+                              </>
+                            )}
+                            {isBankAccount && (
+                              <>
+                                <p className="text-sm font-medium text-[#1F1F1F]">
+                                  {pm.us_bank_account.bank_name || 'Bank Account'} •••• {pm.us_bank_account.last4}
+                                </p>
+                                <p className="text-xs text-[#8C7C6D]">
+                                  {pm.us_bank_account.account_type.charAt(0).toUpperCase() + pm.us_bank_account.account_type.slice(1)} • ACH
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {defaultPaymentMethod === pm.id && (
+                          <Badge className="bg-[#4CAF50] text-white px-2 py-1 text-xs">
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-[#8C7C6D] mt-2">
+                    Your default payment method will be used for balance payments and reservations.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-sm text-[#5A5A5A] mb-3">
+                    No payment methods on file
+                  </p>
+                  <p className="text-xs text-[#8C7C6D]">
+                    Add a card to pay your balance and secure reservations
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Referral Tracking Card */}
+          {member.referral_code && (
+            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-[#A59480]" />
+                  <CardTitle className="text-xl font-semibold text-[#1F1F1F]">
+                    Referral Program
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingReferrals ? (
+                  <div className="flex justify-center py-4">
+                    <Spinner className="text-[#A59480]" />
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between p-4 bg-[#F6F5F2] rounded-lg border border-[#ECEAE5]">
+                      <div>
+                        <p className="text-xs text-[#8C7C6D] mb-1">Your Referral Code</p>
+                        <p className="text-xl font-semibold text-[#1F1F1F] tracking-wider">
+                          {member.referral_code}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
+                        onClick={copyReferralCode}
+                      >
+                        {copiedCode ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-[#FBFBFA] rounded-lg border border-[#ECEAE5]">
+                        <p className="text-xs text-[#8C7C6D] mb-1">Total Referrals</p>
+                        <p className="text-2xl font-bold text-[#A59480]">{referralStats.total}</p>
+                      </div>
+                      <div className="p-4 bg-[#FBFBFA] rounded-lg border border-[#ECEAE5]">
+                        <p className="text-xs text-[#8C7C6D] mb-1">Active Members</p>
+                        <p className="text-2xl font-bold text-[#4CAF50]">{referralStats.active}</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-[#8C7C6D]">
+                      Share your referral code with friends. When they join Noir using your code, you'll both receive benefits!
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Account Settings Card */}
           <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">

@@ -43,17 +43,50 @@ interface NavItem {
 
 interface MemberNavProps {
   onBookClick?: () => void;
+  onBalanceClick?: () => void;
+  onReservationsClick?: () => void;
 }
 
-export default function MemberNav({ onBookClick }: MemberNavProps) {
+export default function MemberNav({ onBookClick, onBalanceClick, onReservationsClick }: MemberNavProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const handleBookClick = () => {
+    if (onBookClick) {
+      onBookClick();
+    } else {
+      // Fallback: navigate to dashboard which has the booking modal
+      router.push('/member/dashboard');
+    }
+  };
+
+  const handleBalanceClick = () => {
+    if (onBalanceClick) {
+      onBalanceClick();
+    } else {
+      // Fallback: navigate to dashboard
+      router.push('/member/dashboard');
+    }
+  };
+
+  const handleReservationsClick = () => {
+    if (onReservationsClick) {
+      onReservationsClick();
+    } else {
+      // Fallback: navigate to dashboard
+      router.push('/member/dashboard');
+    }
+  };
+
   const navItems: NavItem[] = [
     { label: 'Dashboard', icon: HomeIcon, path: '/member/dashboard' },
-    { label: 'Book', icon: BookIcon, action: onBookClick },
-    { label: 'Reservations', icon: ListIcon, path: '/member/reservations' },
-    { label: 'Balance', icon: WalletIcon, path: '/member/balance' },
+    {
+      label: 'Book',
+      icon: BookIcon,
+      action: handleBookClick
+    },
+    { label: 'Reservations', icon: ListIcon, action: handleReservationsClick },
+    { label: 'Balance', icon: WalletIcon, action: handleBalanceClick },
     { label: 'Profile', icon: UserIcon, path: '/member/profile' },
   ];
 
@@ -73,10 +106,21 @@ export default function MemberNav({ onBookClick }: MemberNavProps) {
                   isActive ? 'text-[#A59480]' : 'text-[#5A5A5A]'
                 } hover:text-[#A59480]`}
                 onClick={() => {
+                  console.log('[MemberNav] Click:', {
+                    label: item.label,
+                    hasAction: !!item.action,
+                    hasPath: !!item.path,
+                    path: item.path,
+                  });
+
                   if (item.action) {
+                    console.log('[MemberNav] Executing action for', item.label);
                     item.action();
                   } else if (item.path) {
+                    console.log('[MemberNav] Navigating to', item.path);
                     router.push(item.path);
+                  } else {
+                    console.error('[MemberNav] No action or path for', item.label);
                   }
                 }}
               >

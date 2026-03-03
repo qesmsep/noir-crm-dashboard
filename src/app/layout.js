@@ -3,7 +3,9 @@ import { AuthProvider } from '../lib/auth-context';
 import { SettingsProvider } from '../context/SettingsContext';
 import { Analytics } from '@vercel/analytics/react';
 import ViewportHeightProvider from '../components/ViewportHeightProvider';
-import { ErrorBoundary } from '../components/common/ErrorBoundary';
+// Temporarily disabled to fix startup issue
+// import { ErrorBoundary } from '../components/common/ErrorBoundary';
+// import GlobalErrorHandler from '../components/GlobalErrorHandler';
 import './globals.css';
 
 export const metadata = {
@@ -18,7 +20,8 @@ export default function RootLayout({ children }) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
       </head>
       <body className="font-sans">
-        <ErrorBoundary>
+        {/* <GlobalErrorHandler /> */}
+        {/* <ErrorBoundary> */}
           <ChakraClientProvider>
             <AuthProvider>
               <SettingsProvider>
@@ -27,7 +30,7 @@ export default function RootLayout({ children }) {
               </SettingsProvider>
             </AuthProvider>
           </ChakraClientProvider>
-        </ErrorBoundary>
+        {/* </ErrorBoundary> */}
         <Analytics />
       </body>
     </html>

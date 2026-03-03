@@ -22,6 +22,25 @@ import {
   TabPanel,
   Icon,
   Divider,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  useToast,
+  useDisclosure,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
 } from '@chakra-ui/react';
 import { CalendarIcon, TimeIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
@@ -30,9 +49,22 @@ import MemberNav from '@/components/member/MemberNav';
 
 export default function MemberReservationsPage() {
   const router = useRouter();
+  const toast = useToast();
   const { member, loading } = useMemberAuth();
   const [reservations, setReservations] = useState<any[]>([]);
   const [loadingReservations, setLoadingReservations] = useState(true);
+
+  // Edit modal state
+  const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
+  const [selectedReservation, setSelectedReservation] = useState<any>(null);
+  const [editFormData, setEditFormData] = useState({ party_size: 0, notes: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  // Cancel alert state
+  const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
+  const [reservationToCancel, setReservationToCancel] = useState<any>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const cancelRef = React.useRef(null);
 
   useEffect(() => {
     if (!loading && !member) {
@@ -56,6 +88,110 @@ export default function MemberReservationsPage() {
       console.error('Error fetching reservations:', error);
     } finally {
       setLoadingReservations(false);
+    }
+  };
+
+  const handleEditClick = (reservation: any) => {
+    setSelectedReservation(reservation);
+    setEditFormData({
+      party_size: reservation.party_size,
+      notes: reservation.notes || '',
+    });
+    onEditOpen();
+  };
+
+  const handleEditSubmit = async () => {
+    if (!selectedReservation) return;
+
+    setSubmitting(true);
+
+    try {
+      const response = await fetch('/api/member/reservations/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          reservation_id: selectedReservation.id,
+          party_size: editFormData.party_size,
+          notes: editFormData.notes,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update reservation');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Reservation updated successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      onEditClose();
+      fetchReservations();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update reservation',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelClick = (reservation: any) => {
+    setReservationToCancel(reservation);
+    onCancelOpen();
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!reservationToCancel) return;
+
+    setCancelling(true);
+
+    try {
+      const response = await fetch('/api/member/reservations/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          reservation_id: reservationToCancel.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to cancel reservation');
+      }
+
+      toast({
+        title: 'Cancelled',
+        description: 'Reservation cancelled successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      onCancelClose();
+      fetchReservations();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to cancel reservation',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -164,17 +300,30 @@ export default function MemberReservationsPage() {
         </VStack>
 
         {!isPast && reservation.status === 'confirmed' && (
-          <Button
-            size="sm"
-            variant="outline"
-            borderColor="#A59480"
-            color="#A59480"
-            _hover={{ bg: '#A59480', color: 'white' }}
-            mt={4}
-            width="full"
-          >
-            Modify Reservation
-          </Button>
+          <HStack mt={4} spacing={2}>
+            <Button
+              size="sm"
+              variant="outline"
+              borderColor="#A59480"
+              color="#A59480"
+              _hover={{ bg: '#A59480', color: 'white' }}
+              flex={1}
+              onClick={() => handleEditClick(reservation)}
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              borderColor="#F44336"
+              color="#F44336"
+              _hover={{ bg: '#F44336', color: 'white' }}
+              flex={1}
+              onClick={() => handleCancelClick(reservation)}
+            >
+              Cancel
+            </Button>
+          </HStack>
         )}
       </CardBody>
     </Card>
@@ -321,6 +470,144 @@ export default function MemberReservationsPage() {
 
       {/* Bottom Navigation */}
       <MemberNav />
+
+      {/* Edit Reservation Modal */}
+      <Modal isOpen={isEditOpen} onClose={onEditClose} size="md" isCentered>
+        <ModalOverlay bg="blackAlpha.700" />
+        <ModalContent bg="white" borderRadius="16px" mx={4}>
+          <ModalHeader color="#1F1F1F" borderBottom="1px solid" borderColor="#ECEAE5">
+            Edit Reservation
+          </ModalHeader>
+          <ModalCloseButton color="#5A5A5A" />
+          <ModalBody p={6}>
+            {selectedReservation && (
+              <VStack spacing={4} align="stretch">
+                <Text fontSize="sm" color="#8C7C6D">
+                  {new Date(selectedReservation.start_time).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })} at {new Date(selectedReservation.start_time).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })}
+                </Text>
+
+                <FormControl>
+                  <FormLabel color="#1F1F1F" fontSize="sm">Party Size</FormLabel>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editFormData.party_size}
+                    onChange={(e) => setEditFormData({ ...editFormData, party_size: parseInt(e.target.value) })}
+                    borderColor="#DAD7D0"
+                    _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel color="#1F1F1F" fontSize="sm">Special Requests / Notes</FormLabel>
+                  <Textarea
+                    value={editFormData.notes}
+                    onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                    placeholder="Allergies, seating preferences, etc."
+                    borderColor="#DAD7D0"
+                    _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
+                    rows={3}
+                  />
+                </FormControl>
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter borderTop="1px solid" borderColor="#ECEAE5">
+            <HStack spacing={3} width="full">
+              <Button
+                variant="outline"
+                borderColor="#DAD7D0"
+                color="#5A5A5A"
+                _hover={{ borderColor: '#A59480', color: '#A59480' }}
+                onClick={onEditClose}
+                flex={1}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                bg="#A59480"
+                color="white"
+                _hover={{ bg: '#8C7C6D' }}
+                onClick={handleEditSubmit}
+                flex={1}
+                isLoading={submitting}
+                loadingText="Saving..."
+              >
+                Save Changes
+              </Button>
+            </HStack>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Cancel Reservation Alert */}
+      <AlertDialog
+        isOpen={isCancelOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onCancelClose}
+        isCentered
+      >
+        <AlertDialogOverlay bg="blackAlpha.700">
+          <AlertDialogContent bg="white" borderRadius="16px" mx={4}>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold" color="#1F1F1F">
+              Cancel Reservation
+            </AlertDialogHeader>
+
+            <AlertDialogBody color="#5A5A5A">
+              {reservationToCancel && (
+                <>
+                  Are you sure you want to cancel your reservation for{' '}
+                  <strong>
+                    {new Date(reservationToCancel.start_time).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })} at {new Date(reservationToCancel.start_time).toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                    })}
+                  </strong>? This action cannot be undone.
+                </>
+              )}
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button
+                ref={cancelRef}
+                onClick={onCancelClose}
+                variant="outline"
+                borderColor="#DAD7D0"
+                color="#5A5A5A"
+                _hover={{ borderColor: '#A59480', color: '#A59480' }}
+                disabled={cancelling}
+              >
+                Keep Reservation
+              </Button>
+              <Button
+                bg="#F44336"
+                color="white"
+                _hover={{ bg: '#D32F2F' }}
+                onClick={handleCancelConfirm}
+                ml={3}
+                isLoading={cancelling}
+                loadingText="Cancelling..."
+              >
+                Cancel Reservation
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   );
 }

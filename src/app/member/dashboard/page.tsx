@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Calendar, Clock, Wallet } from 'lucide-react';
+import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import MemberNav from '@/components/member/MemberNav';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import { Modal, ModalOverlay, ModalContent, ModalBody, ModalCloseButton } from '@chakra-ui/react';
 import ReservationForm from '@/components/ReservationForm';
 import { getSupabaseClient } from '@/pages/api/supabaseClient';
+import BalanceModal from '@/components/member/BalanceModal';
+import ReservationsModal from '@/components/member/ReservationsModal';
 
 export default function MemberDashboardPage() {
   const router = useRouter();
@@ -19,11 +21,15 @@ export default function MemberDashboardPage() {
   const [nextReservation, setNextReservation] = useState<any>(null);
   const [loadingReservation, setLoadingReservation] = useState(true);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
+  const [isReservationsListModalOpen, setIsReservationsListModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [baseDays, setBaseDays] = useState<number[]>([]);
   const [bookingStartDate, setBookingStartDate] = useState<Date | undefined>(undefined);
   const [bookingEndDate, setBookingEndDate] = useState<Date | undefined>(undefined);
   const [currentBalance, setCurrentBalance] = useState<number>(0);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [pastVisits, setPastVisits] = useState<any[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -75,16 +81,29 @@ export default function MemberDashboardPage() {
 
   const fetchNextReservation = async () => {
     try {
-      const response = await fetch('/api/member/next-reservation', {
+      const response = await fetch('/api/member/reservations', {
         credentials: 'include',
       });
 
       if (response.ok) {
         const data = await response.json();
-        setNextReservation(data.reservation);
+        const reservations = data.reservations || [];
+        const now = new Date();
+
+        // Get next upcoming reservation
+        const upcoming = reservations.filter(
+          (r: any) => new Date(r.start_time) >= now && r.status !== 'cancelled'
+        );
+        setNextReservation(upcoming[0] || null);
+
+        // Get last 2-3 past visits
+        const past = reservations.filter(
+          (r: any) => new Date(r.start_time) < now || r.status === 'cancelled'
+        );
+        setPastVisits(past.slice(0, 3));
       }
     } catch (error) {
-      console.error('Error fetching next reservation:', error);
+      console.error('Error fetching reservations:', error);
     } finally {
       setLoadingReservation(false);
     }
@@ -101,6 +120,8 @@ export default function MemberDashboardPage() {
         const transactions = data.transactions || [];
         if (transactions.length > 0) {
           setCurrentBalance(parseFloat(transactions[0].running_balance || 0));
+          // Get last 3 transactions for preview
+          setRecentTransactions(transactions.slice(0, 3));
         }
       }
     } catch (error) {
@@ -162,119 +183,207 @@ export default function MemberDashboardPage() {
                 <CardTitle className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-[#A59480]" />
                   <span className="text-xl font-semibold text-[#1F1F1F]">
-                    Next Reservation
+                    Reservations
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 {loadingReservation ? (
                   <div className="flex justify-center py-8">
                     <Spinner className="text-[#A59480]" />
                   </div>
-                ) : nextReservation ? (
-                  <div className="flex flex-col gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="w-4 h-4 text-[#5A5A5A]" />
-                        <p className="text-lg font-medium text-[#1F1F1F]">
-                          {new Date(nextReservation.start_time).toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                          })} • {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true,
-                          })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4 mt-3 flex-wrap">
-                        <p className="text-sm text-[#5A5A5A]">
-                          Party of <strong>{nextReservation.party_size}</strong>
-                        </p>
-                        {nextReservation.table_number && (
-                          <p className="text-sm text-[#5A5A5A]">
-                            Table <strong>{nextReservation.table_number}</strong>
-                          </p>
-                        )}
-                        <Badge className="bg-[#A59480] text-white px-2 py-1 text-xs capitalize">
-                          {nextReservation.status}
-                        </Badge>
-                      </div>
-                      {nextReservation.notes && (
-                        <p className="text-sm text-[#5A5A5A] mt-3">
-                          {nextReservation.notes}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
-                      onClick={() => router.push('/member/reservations')}
-                    >
-                      View All Reservations
-                    </Button>
-                  </div>
                 ) : (
-                  <div className="flex flex-col gap-4">
-                    <p className="text-[#5A5A5A] text-center py-4">
-                      No upcoming reservations
-                    </p>
-                    <Button
-                      className="bg-[#A59480] text-white hover:bg-[#8C7C6D]"
-                      onClick={() => setIsReservationModalOpen(true)}
-                    >
-                      Make Reservation
-                    </Button>
-                  </div>
+                  <>
+                    {/* Next Reservation - One Line OR Make Reservation Button */}
+                    {nextReservation ? (
+                      <div>
+                        <p className="text-xs text-[#8C7C6D] mb-2">Your Next Reservation</p>
+                        <div
+                          className="flex items-center justify-between gap-3 py-2 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
+                          onClick={() => setIsReservationsListModalOpen(true)}
+                        >
+                          <p className="text-xs text-[#8C7C6D] flex-shrink-0">
+                            {new Date(nextReservation.start_time).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </p>
+                          <p className="text-xs font-medium text-[#1F1F1F] flex-1 truncate">
+                            {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true,
+                            })} • Party of {nextReservation.party_size}
+                          </p>
+                          <Badge className="text-xs px-2 py-0.5 bg-[#4CAF50] text-white">
+                            {nextReservation.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs text-[#8C7C6D] mb-2">Your Next Reservation</p>
+                        <Button
+                          className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsReservationModalOpen(true);
+                          }}
+                        >
+                          Make Reservation
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Past Visits Preview */}
+                    {pastVisits.length > 0 && (
+                      <div>
+                        <p className="text-xs text-[#8C7C6D] mb-2">Recent Visits</p>
+                        <div className="space-y-2">
+                          {pastVisits.map((visit, index) => (
+                            <div
+                              key={visit.id || index}
+                              className="flex items-center justify-between gap-3 py-2 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
+                              onClick={() => setIsReservationsListModalOpen(true)}
+                            >
+                              <p className="text-xs text-[#8C7C6D] flex-shrink-0">
+                                {new Date(visit.start_time).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </p>
+                              <p className="text-xs text-[#5A5A5A] flex-1 truncate">
+                                Party of {visit.party_size}
+                              </p>
+                              <Badge className="text-xs px-2 py-0.5 bg-[#DAD7D0] text-[#5A5A5A]">
+                                {visit.status}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
 
             {/* Balance Card */}
-            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
-              <CardContent className="pt-5 pb-4 space-y-3">
-                {/* Balance Display */}
-                <div>
-                  <p className="text-xs text-[#8C7C6D] mb-1">Account Balance</p>
+            <Card
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setIsBalanceModalOpen(true)}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Wallet className="w-5 h-5 text-[#A59480]" />
+                    <span className="text-xl font-semibold text-[#1F1F1F]">
+                      Balance
+                    </span>
+                  </div>
                   <p
-                    className={`text-xl font-semibold ${
+                    className={`text-xl font-bold ${
                       currentBalance >= 0 ? 'text-[#4CAF50]' : 'text-[#F44336]'
                     }`}
                   >
                     ${Math.abs(currentBalance).toFixed(2)}
                   </p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  {currentBalance < 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white text-xs h-8"
-                      onClick={() => router.push('/member/balance')}
-                    >
-                      Pay Now
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`${currentBalance < 0 ? 'flex-1' : 'w-full'} text-[#8C7C6D] hover:bg-[#F6F5F2] hover:text-[#A59480] text-xs h-8`}
-                    onClick={() => router.push('/member/balance')}
-                  >
-                    View Details →
-                  </Button>
-                </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Recent Transactions Preview */}
+                {recentTransactions.length > 0 ? (
+                  <div className="space-y-2">
+                    {recentTransactions.map((transaction, index) => (
+                      <div
+                        key={transaction.id || index}
+                        className="flex items-center justify-between gap-3 py-2 border-b border-[#ECEAE5] last:border-0"
+                      >
+                        <p className="text-xs text-[#8C7C6D] flex-shrink-0">
+                          {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <p className="text-xs font-medium text-[#1F1F1F] truncate flex-1 min-w-0">
+                          {transaction.description || 'Transaction'}
+                        </p>
+                        <p
+                          className={`text-sm font-semibold flex-shrink-0 ${
+                            transaction.transaction_type === 'credit' ? 'text-[#4CAF50]' : 'text-[#F44336]'
+                          }`}
+                        >
+                          {transaction.transaction_type === 'credit' ? '+' : '-'}$
+                          {Math.abs(parseFloat(transaction.amount)).toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#5A5A5A] text-center py-4">No recent transactions</p>
+                )}
               </CardContent>
             </Card>
+          </div>
+
+          {/* Quick Actions Grid */}
+          <div>
+            <h2 className="text-lg font-semibold text-[#1F1F1F] mb-3">Quick Actions</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Book Reservation */}
+              <Card
+                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                onClick={handleBookClick}
+              >
+                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+                  <Calendar className="w-8 h-8 text-[#A59480] mb-2" />
+                  <span className="text-sm font-medium text-[#1F1F1F]">Book</span>
+                </CardContent>
+              </Card>
+
+              {/* Reservations */}
+              <Card
+                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setIsReservationsListModalOpen(true)}
+              >
+                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+                  <List className="w-8 h-8 text-[#A59480] mb-2" />
+                  <span className="text-sm font-medium text-[#1F1F1F]">Reservations</span>
+                </CardContent>
+              </Card>
+
+              {/* Balance */}
+              <Card
+                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setIsBalanceModalOpen(true)}
+              >
+                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+                  <Wallet className="w-8 h-8 text-[#A59480] mb-2" />
+                  <span className="text-sm font-medium text-[#1F1F1F]">Balance</span>
+                </CardContent>
+              </Card>
+
+              {/* Profile */}
+              <Card
+                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => router.push('/member/profile')}
+              >
+                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+                  <User className="w-8 h-8 text-[#A59480] mb-2" />
+                  <span className="text-sm font-medium text-[#1F1F1F]">Profile</span>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Bottom Navigation */}
-      <MemberNav onBookClick={handleBookClick} />
+      <MemberNav
+        onBookClick={handleBookClick}
+        onBalanceClick={() => setIsBalanceModalOpen(true)}
+        onReservationsClick={() => setIsReservationsListModalOpen(true)}
+      />
 
       {/* Reservation Modal */}
       <Modal
@@ -312,6 +421,30 @@ export default function MemberDashboardPage() {
           </ModalBody>
         </ModalContent>
       </Modal>
+
+      {/* Balance Modal */}
+      <BalanceModal
+        isOpen={isBalanceModalOpen}
+        onClose={() => {
+          setIsBalanceModalOpen(false);
+          // Refresh balance after closing modal
+          fetchCurrentBalance();
+        }}
+        accountId={member?.account_id}
+        memberId={member?.member_id}
+      />
+
+      {/* Reservations List Modal */}
+      <ReservationsModal
+        isOpen={isReservationsListModalOpen}
+        onClose={() => setIsReservationsListModalOpen(false)}
+        onReservationUpdated={() => {
+          fetchNextReservation();
+        }}
+        onMakeReservation={() => {
+          setIsReservationModalOpen(true);
+        }}
+      />
     </div>
   );
 }

@@ -920,6 +920,7 @@
   flex: 1;
   min-width: 0;
   width: 100%;
+  justify-content: space-between;
 }
 
 .ledgerRowLeft {
@@ -1062,6 +1063,48 @@
 .ledgerRowEdit .ledgerRowActions {
   align-self: flex-end;
   margin-top: 0.25rem;
+}
+
+.ledgerInfo {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ledgerNote,
+.ledgerMember {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.downloadButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0 0.375rem;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: auto;
+}
+
+.downloadButton:hover {
+  transform: scale(1.1);
+}
+
+.ledgerRowRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.ledgerRowActions {
+  flex-shrink: 0;
 }
 
 /* Messages Section */
@@ -1397,3 +1440,47 @@
   }
 }
 
+
+
+/* Add Member Section Header */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.addMemberButton {
+  padding: 0.5rem 1rem;
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(165, 148, 128, 0.2);
+}
+
+.addMemberButton:hover {
+  background: #8B7B68;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(165, 148, 128, 0.3);
+}
+
+.addMemberButton:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .addMemberButton {
+    width: 100%;
+  }
+}

@@ -3,6 +3,8 @@
 import { MemberAuthProvider } from '@/context/MemberAuthContext';
 import { ChakraProvider } from '@chakra-ui/react';
 import { theme } from '@/theme';
+// Temporarily disabled to fix startup issue
+// import { ErrorBoundary } from '@/components/member/ErrorBoundary';
 
 export default function MemberPortalLayout({
   children,
@@ -10,10 +12,12 @@ export default function MemberPortalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ChakraProvider theme={theme}>
-      <MemberAuthProvider>
-        {children}
-      </MemberAuthProvider>
-    </ChakraProvider>
+    // <ErrorBoundary>
+      <ChakraProvider theme={theme}>
+        <MemberAuthProvider>
+          {children}
+        </MemberAuthProvider>
+      </ChakraProvider>
+    // </ErrorBoundary>
   );
 }
