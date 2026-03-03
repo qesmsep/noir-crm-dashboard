@@ -711,7 +711,7 @@ export default function MembersAdmin() {
                   return (
                     <tr
                       key={account.account_id}
-                      className={styles.tableRow}
+                      className={`${styles.tableRow} ${noSubscriptionAccounts.has(account.account_id) ? styles.noSubscription : ''}`}
                       onClick={() => router.push(`/admin/members/${account.account_id}`)}
                     >
                       {/* Member 1 Column */}

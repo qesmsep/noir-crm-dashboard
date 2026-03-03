@@ -1284,6 +1284,11 @@
   background: rgba(0, 122, 255, 0.03);
 }
 
+.tableRow.noSubscription {
+  border-left: 4px solid #DC2626;
+  background-color: rgba(220, 38, 38, 0.02);
+}
+
 .tableRow td {
   vertical-align: top;
 }
