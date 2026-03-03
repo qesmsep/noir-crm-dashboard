@@ -1165,8 +1165,8 @@ export default function MemberDetailAdmin() {
                 <div className={styles.ledgerHeaderActions}>
                   {!ledgerLoading && ledger.length > 0 && (
                     <>
-                      <div className={styles.currentBalance}>
-                        Balance: {formatCurrency(calculateRunningBalance(ledger, ledger.length - 1))}
+                      <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, ledger.length - 1) < 0 ? styles.balance : styles.credit}`}>
+                        {calculateRunningBalance(ledger, ledger.length - 1) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, ledger.length - 1)))}
                       </div>
                       {calculateRunningBalance(ledger, ledger.length - 1) < 0 && (
                         <button

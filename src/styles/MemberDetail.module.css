@@ -720,6 +720,14 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+.currentBalance.credit {
+  color: #28a745;
+}
+
+.currentBalance.balance {
+  color: #dc3545;
+}
+
 .payBalanceButton {
   height: 28px;
   padding: 0 0.75rem;
