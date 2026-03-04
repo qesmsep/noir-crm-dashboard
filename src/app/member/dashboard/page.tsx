@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon } from 'lucide-react';
+import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon, CreditCard, Settings, CalendarDays } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import MemberNav from '@/components/member/MemberNav';
 import { useMemberAuth } from '@/context/MemberAuthContext';
@@ -14,15 +14,46 @@ import ReservationForm from '@/components/ReservationForm';
 import { getSupabaseClient } from '@/pages/api/supabaseClient';
 import BalanceModal from '@/components/member/BalanceModal';
 import ReservationsModal from '@/components/member/ReservationsModal';
+import ProfileModal from '@/components/member/ProfileModal';
+import PaymentMethodModal from '@/components/member/PaymentMethodModal';
+import AccountSettingsModal from '@/components/member/AccountSettingsModal';
+import UpcomingEventsModal from '@/components/member/UpcomingEventsModal';
 
 export default function MemberDashboardPage() {
   const router = useRouter();
   const { member, loading } = useMemberAuth();
+
+  // Debug: Log member data when it changes
+  useEffect(() => {
+    if (member) {
+      console.log('[DASHBOARD] Member data received:', {
+        member_id: member.member_id,
+        first_name: member.first_name,
+        last_name: member.last_name,
+        profile_photo_url: member.profile_photo_url,
+        has_photo: !!member.profile_photo_url,
+        photo_value: member.profile_photo_url || 'NULL/UNDEFINED',
+        full_member: member
+      });
+
+      // Debug: Check what's actually in the database
+      fetch('/api/debug/member-photo', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          console.log('[DASHBOARD] Database debug info:', data);
+        })
+        .catch(err => console.error('[DASHBOARD] Debug fetch error:', err));
+    }
+  }, [member]);
   const [nextReservation, setNextReservation] = useState<any>(null);
   const [loadingReservation, setLoadingReservation] = useState(true);
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [isReservationsListModalOpen, setIsReservationsListModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
+  const [isUpcomingEventsModalOpen, setIsUpcomingEventsModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [baseDays, setBaseDays] = useState<number[]>([]);
   const [bookingStartDate, setBookingStartDate] = useState<Date | undefined>(undefined);
@@ -176,6 +207,39 @@ export default function MemberDashboardPage() {
             </h1>
           </div>
 
+          {/* Profile Card - Moved to Top */}
+          <Card
+            className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setIsProfileModalOpen(true)}
+          >
+            <CardHeader className="pb-0">
+              <CardTitle className="flex items-center gap-3">
+                <User className="w-5 h-5 text-[#A59480]" />
+                <span className="text-xl font-semibold text-[#1F1F1F]">
+                  Profile
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-1 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-24 h-24 bg-[#A59480] text-white rounded-full flex items-center justify-center text-3xl font-bold overflow-hidden">
+                  {(member?.photo || member?.profile_photo_url) ? (
+                    <img src={member.photo || member.profile_photo_url} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <>{member?.first_name?.charAt(0)}{member?.last_name?.charAt(0)}</>
+                  )}
+                </div>
+                <div>
+                  <p className="text-lg font-medium text-[#1F1F1F]">
+                    {member?.first_name} {member?.last_name}
+                  </p>
+                  <p className="text-sm text-[#5A5A5A]">{member?.email}</p>
+                  <p className="text-sm text-[#5A5A5A]">{member?.phone}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Next Reservation Card */}
             <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
@@ -326,54 +390,97 @@ export default function MemberDashboardPage() {
             </Card>
           </div>
 
-          {/* Quick Actions Grid */}
-          <div>
-            <h2 className="text-lg font-semibold text-[#1F1F1F] mb-3">Quick Actions</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Book Reservation */}
-              <Card
-                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={handleBookClick}
-              >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                  <Calendar className="w-8 h-8 text-[#A59480] mb-2" />
-                  <span className="text-sm font-medium text-[#1F1F1F]">Book</span>
-                </CardContent>
-              </Card>
+          {/* Additional Dashboard Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Payment Method Card */}
+            <Card
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setIsPaymentMethodModalOpen(true)}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <CreditCard className="w-5 h-5 text-[#A59480]" />
+                  <span className="text-xl font-semibold text-[#1F1F1F]">
+                    Payment Method
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="bg-[#F6F5F2] rounded-lg p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="w-8 h-8 text-[#A59480]" />
+                    <div>
+                      <p className="text-sm font-medium text-[#1F1F1F]">•••• 4242</p>
+                      <p className="text-xs text-[#5A5A5A]">Expires 12/24</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-[#4CAF50] text-white text-xs">Default</Badge>
+                </div>
+                <p className="text-xs text-[#8C7C6D]">Click to manage payment methods</p>
+              </CardContent>
+            </Card>
 
-              {/* Reservations */}
-              <Card
-                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setIsReservationsListModalOpen(true)}
-              >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                  <List className="w-8 h-8 text-[#A59480] mb-2" />
-                  <span className="text-sm font-medium text-[#1F1F1F]">Reservations</span>
-                </CardContent>
-              </Card>
+            {/* Account Settings Card */}
+            <Card
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setIsAccountSettingsModalOpen(true)}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <Settings className="w-5 h-5 text-[#A59480]" />
+                  <span className="text-xl font-semibold text-[#1F1F1F]">
+                    Account Settings
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between py-2 border-b border-[#ECEAE5]">
+                    <p className="text-sm text-[#5A5A5A]">Email Notifications</p>
+                    <Badge className="bg-[#4CAF50] text-white text-xs">On</Badge>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-[#ECEAE5]">
+                    <p className="text-sm text-[#5A5A5A]">SMS Alerts</p>
+                    <Badge className="bg-[#DAD7D0] text-[#5A5A5A] text-xs">Off</Badge>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <p className="text-sm text-[#5A5A5A]">Two-Factor Auth</p>
+                    <Badge className="bg-[#DAD7D0] text-[#5A5A5A] text-xs">Off</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Balance */}
-              <Card
-                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setIsBalanceModalOpen(true)}
-              >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                  <Wallet className="w-8 h-8 text-[#A59480] mb-2" />
-                  <span className="text-sm font-medium text-[#1F1F1F]">Balance</span>
-                </CardContent>
-              </Card>
-
-              {/* Profile */}
-              <Card
-                className="bg-white rounded-xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => router.push('/member/profile')}
-              >
-                <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                  <User className="w-8 h-8 text-[#A59480] mb-2" />
-                  <span className="text-sm font-medium text-[#1F1F1F]">Profile</span>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Upcoming Events Card */}
+            <Card
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setIsUpcomingEventsModalOpen(true)}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <CalendarDays className="w-5 h-5 text-[#A59480]" />
+                  <span className="text-xl font-semibold text-[#1F1F1F]">
+                    Calendar
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <div className="bg-[#F6F5F2] rounded-lg p-3">
+                    <p className="text-xs text-[#8C7C6D]">Next Event</p>
+                    <p className="text-sm font-medium text-[#1F1F1F] mt-1">Wine Tasting Evening</p>
+                    <p className="text-xs text-[#5A5A5A]">
+                      {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric'
+                      })} at 7:00 PM
+                    </p>
+                  </div>
+                  <p className="text-xs text-[#8C7C6D]">2 upcoming events this month</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
@@ -442,6 +549,35 @@ export default function MemberDashboardPage() {
           fetchNextReservation();
         }}
         onMakeReservation={() => {
+          setIsReservationModalOpen(true);
+        }}
+      />
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      {/* Payment Method Modal */}
+      <PaymentMethodModal
+        isOpen={isPaymentMethodModalOpen}
+        onClose={() => setIsPaymentMethodModalOpen(false)}
+        accountId={member?.account_id}
+      />
+
+      {/* Account Settings Modal */}
+      <AccountSettingsModal
+        isOpen={isAccountSettingsModalOpen}
+        onClose={() => setIsAccountSettingsModalOpen(false)}
+      />
+
+      {/* Upcoming Events Modal */}
+      <UpcomingEventsModal
+        isOpen={isUpcomingEventsModalOpen}
+        onClose={() => setIsUpcomingEventsModalOpen(false)}
+        onMakeReservation={() => {
+          setIsUpcomingEventsModalOpen(false);
           setIsReservationModalOpen(true);
         }}
       />

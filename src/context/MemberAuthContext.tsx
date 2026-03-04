@@ -19,6 +19,7 @@ interface Member {
   credit_renewal_date: string | null;
   deactivated: boolean;
   auth_user_id: string | null;
+  photo?: string | null; // Migrated photo field
   profile_photo_url: string | null;
   password_is_temporary?: boolean;
   contact_preferences: {
