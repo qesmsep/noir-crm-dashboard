@@ -902,7 +902,7 @@ export default function MemberDetailAdmin() {
 
     try {
       // Get primary member for this account
-      const primaryMember = members.find(m => m.member_type === 'primary');
+      const primaryMember = members.find(m => m.primary);
       if (!primaryMember) {
         throw new Error('No primary member found for this account');
       }
@@ -985,7 +985,7 @@ export default function MemberDetailAdmin() {
 
     try {
       // Get primary member for this account
-      const primaryMember = members.find(m => m.member_type === 'primary');
+      const primaryMember = members.find(m => m.primary);
       if (!primaryMember) {
         throw new Error('No primary member found for this account');
       }
@@ -1475,15 +1475,6 @@ export default function MemberDetailAdmin() {
                         </button>
                       )}
                     </>
-                  )}
-                  {!ledgerLoading && (
-                    <button
-                      onClick={() => setNewTransaction(newTransaction.member_id ? {} : { date: new Date().toISOString().split('T')[0] })}
-                      className={styles.toggleFormButton}
-                      aria-label={newTransaction.member_id || newTransaction.type ? 'Cancel' : 'Add Transaction'}
-                    >
-                      {newTransaction.member_id || newTransaction.type ? '−' : '+'}
-                    </button>
                   )}
                 </div>
               </div>
