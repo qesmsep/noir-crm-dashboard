@@ -147,7 +147,6 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/business', label: 'Business', icon: TrendingUp },
     { href: '/admin/reservations', label: 'Reservations', icon: CalendarDays },
     { href: '/admin/members', label: 'Members', icon: Users },
-    { href: '/admin/subscription-plans', label: 'Plans', icon: CreditCard },
     { href: '/admin/membership', label: 'Membership', icon: UserPlus },
     { href: '/admin/waitlist', label: 'Waitlist', icon: Clock },
     { href: '/admin/event-calendar', label: 'Events', icon: Calendar },

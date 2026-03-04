@@ -299,6 +299,130 @@ transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 ```
 
+## 🚫 CRITICAL: NO HORIZONTAL SCROLLING ON MOBILE
+
+**ABSOLUTE RULE**: Horizontal scrolling on mobile is FORBIDDEN. Period.
+
+### Why This Matters
+- Horizontal scrolling creates a terrible mobile UX
+- Users expect to scroll vertically only
+- Horizontal scroll indicates poor responsive design
+- Makes content difficult to access and frustrating to navigate
+
+### Prevention Strategies
+
+**1. Container Width Control**
+```css
+/* ALWAYS use these on mobile containers */
+.container {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+```
+
+**2. Responsive Text & Content**
+```css
+/* Text must wrap or truncate, NEVER overflow */
+.text {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Or truncate with ellipsis */
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+```
+
+**3. Navigation Patterns - NO HORIZONTAL SCROLL**
+
+**❌ BAD - Horizontal scrolling tabs:**
+```css
+.tabList {
+  display: flex;
+  overflow-x: auto; /* FORBIDDEN ON MOBILE */
+  white-space: nowrap;
+}
+```
+
+**✅ GOOD - Wrapping or stacked tabs:**
+```css
+.tabList {
+  display: flex;
+  flex-wrap: wrap; /* Wraps to multiple rows */
+  gap: 0.5rem;
+}
+
+/* Or for icon-based navigation */
+.tab {
+  display: flex;
+  flex-direction: column; /* Icon above text */
+  align-items: center;
+  padding: 0.5rem;
+  min-width: fit-content;
+}
+```
+
+**4. Tables - MUST Convert to Cards**
+- See "Tables → Card View on Mobile" section below
+- Tables with 3+ columns ALWAYS become cards on mobile
+- NEVER use horizontal scroll for tables
+
+**5. Images & Media**
+```css
+img, video, iframe {
+  max-width: 100%;
+  height: auto;
+}
+```
+
+**6. Fixed Width Elements**
+- NEVER use fixed pixel widths wider than 320px on mobile
+- Use `max-width` with percentage/vw units instead
+- Use `min-width` sparingly, only for touch targets (44px minimum)
+
+**7. Long URLs or Monospace Content**
+```css
+.url, .code {
+  word-break: break-all; /* Break anywhere if needed */
+  overflow-wrap: anywhere;
+}
+```
+
+### Testing for Horizontal Scroll
+
+**Before deploying ANY mobile changes:**
+1. Open DevTools mobile emulation at 320px width
+2. Scroll entire page vertically
+3. Check for ANY horizontal scrollbar or side-to-side movement
+4. Test on actual mobile device (iPhone/Android)
+5. If horizontal scroll exists → **MUST FIX BEFORE COMMIT**
+
+### Common Causes & Fixes
+
+| Cause | Fix |
+|-------|-----|
+| Wide tables | Convert to card view on mobile |
+| Long text/URLs | Add `word-break: break-word` |
+| Fixed width containers | Use `max-width: 100%` instead |
+| Tab navigation | Make tabs wrap or stack vertically |
+| Images | Add `max-width: 100%` |
+| Padding causing overflow | Use responsive padding (`px={{ base: 4, md: 6 }}`) |
+| viewport not set | Add `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+
+### Enforcement
+
+**This is a blocking issue:**
+- Code reviews MUST check for horizontal scroll on mobile
+- Mobile Validator MUST flag horizontal scroll as CRITICAL
+- Build should fail if horizontal scroll detected
+- NO EXCEPTIONS
+
 ### Mobile-Specific Patterns
 
 **Tables → Card View on Mobile**

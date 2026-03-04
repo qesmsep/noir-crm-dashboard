@@ -241,88 +241,151 @@ export default function QuestionnaireBuilder() {
   return (
     <VStack spacing={6} align="stretch">
       {/* Header */}
-      <HStack justify="space-between">
+      <HStack justify="space-between" align="start">
         <VStack align="start" spacing={1}>
-          <Heading size="md">Questionnaire Builder</Heading>
-          <Text fontSize="sm" color="gray.600">
+          <Heading size="lg" color="#1F1F1F" fontWeight="700">
+            Questionnaire Builder
+          </Heading>
+          <Text fontSize="sm" color="#5A5A5A">
             Create beautiful, custom forms to replace Typeform
           </Text>
         </VStack>
         <Button
-          leftIcon={<Plus size={16} />}
+          leftIcon={<Plus size={20} />}
           bg="#A59480"
           color="white"
-          _hover={{ bg: '#8F7F6B' }}
+          _hover={{ bg: '#8C7C6D', transform: 'translateY(-2px)' }}
+          _active={{ transform: 'translateY(0)' }}
           onClick={handleCreateQuestionnaire}
-          boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
+          borderRadius="10px"
+          fontWeight="600"
+          fontSize="0.875rem"
+          minH="44px"
+          px={6}
+          transition="all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+          boxShadow="0 1px 2px rgba(165, 148, 128, 0.15), 0 4px 8px rgba(165, 148, 128, 0.25), 0 8px 16px rgba(165, 148, 128, 0.18)"
         >
           Create Form
         </Button>
       </HStack>
 
       {/* Questionnaires List */}
-      <Card>
-        <CardBody>
-          <Table variant="simple">
-            <Thead>
-              <Tr>
-                <Th>Form Name</Th>
-                <Th>Type</Th>
-                <Th>Questions</Th>
-                <Th>Status</Th>
-                <Th>Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {questionnaires.map((q) => (
-                <Tr key={q.id}>
-                  <Td>
-                    <VStack align="start" spacing={1}>
-                      <Text fontWeight="bold">{q.title}</Text>
-                      <Text fontSize="sm" color="gray.500">{q.description}</Text>
-                    </VStack>
-                  </Td>
-                  <Td>
-                    <Badge colorScheme={q.type === 'waitlist' ? 'purple' : 'blue'}>
-                      {q.type}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    <Text>{q.questionnaire_questions?.length || 0} questions</Text>
-                  </Td>
-                  <Td>
-                    <Badge colorScheme={q.is_active ? 'green' : 'gray'}>
-                      {q.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    <HStack spacing={2}>
-                      <IconButton
-                        size="sm"
-                        icon={<Edit2 size={16} />}
-                        aria-label="Edit"
-                        onClick={() => handleEditQuestionnaire(q)}
-                      />
-                      <IconButton
-                        size="sm"
-                        icon={<Eye size={16} />}
-                        aria-label="Preview"
-                        colorScheme="blue"
-                      />
-                    </HStack>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-
-          {questionnaires.length === 0 && (
-            <Box py={8} textAlign="center">
-              <Text color="gray.500">No forms yet. Create your first one!</Text>
+      {questionnaires.length === 0 ? (
+        <Card className="bg-white rounded-2xl border border-[#ECEAE5]">
+          <CardBody>
+            <Box py={12} textAlign="center">
+              <Text fontSize="3xl" mb={3}>📋</Text>
+              <Heading size="md" mb={2} color="#1F1F1F">No questionnaires yet</Heading>
+              <Text color="#5A5A5A" mb={6}>
+                Create your first questionnaire to start collecting responses
+              </Text>
+              <Button
+                leftIcon={<Plus size={20} />}
+                bg="#A59480"
+                color="white"
+                _hover={{ bg: '#8C7C6D', transform: 'translateY(-2px)' }}
+                _active={{ transform: 'translateY(0)' }}
+                onClick={handleCreateQuestionnaire}
+                borderRadius="10px"
+                fontWeight="600"
+                minH="44px"
+                transition="all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+                boxShadow="0 1px 2px rgba(165, 148, 128, 0.15), 0 4px 8px rgba(165, 148, 128, 0.25), 0 8px 16px rgba(165, 148, 128, 0.18)"
+              >
+                Create First Questionnaire
+              </Button>
             </Box>
-          )}
-        </CardBody>
-      </Card>
+          </CardBody>
+        </Card>
+      ) : (
+        <VStack spacing={3} align="stretch">
+          {questionnaires.map((q) => (
+            <Card
+              key={q.id}
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            >
+              <CardBody py={4} px={5}>
+                <HStack justify="space-between" align="start">
+                  {/* Left side - Main content */}
+                  <VStack align="start" spacing={2} flex={1}>
+                    {/* Title and badges row */}
+                    <HStack spacing={3} wrap="wrap" align="center">
+                      <Text fontSize="xl" fontWeight="600" color="#1F1F1F">
+                        {q.title}
+                      </Text>
+                      <Badge
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        bg={q.is_active ? '#dcfce7' : '#DAD7D0'}
+                        color={q.is_active ? '#166534' : '#5A5A5A'}
+                      >
+                        {q.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                      <Badge
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        bg="#A59480"
+                        color="white"
+                        textTransform="capitalize"
+                      >
+                        {q.type}
+                      </Badge>
+                    </HStack>
+
+                    {/* Description */}
+                    {q.description && (
+                      <Text fontSize="sm" color="#5A5A5A" lineHeight="1.5">
+                        {q.description}
+                      </Text>
+                    )}
+
+                    {/* Metadata */}
+                    <Text fontSize="xs" color="#8C7C6D" fontWeight="500">
+                      Join the Noir waitlist • {q.questionnaire_questions?.length || 0} questions
+                    </Text>
+                  </VStack>
+
+                  {/* Right side - Actions */}
+                  <HStack spacing={2}>
+                    <IconButton
+                      size="md"
+                      minW="44px"
+                      minH="44px"
+                      variant="ghost"
+                      icon={<Edit2 size={18} />}
+                      aria-label="Edit questionnaire"
+                      onClick={() => handleEditQuestionnaire(q)}
+                      _hover={{ bg: '#F7F6F2' }}
+                      color="#1F1F1F"
+                      title="Edit"
+                    />
+                    <IconButton
+                      size="md"
+                      minW="44px"
+                      minH="44px"
+                      variant="ghost"
+                      icon={<Eye size={18} />}
+                      aria-label="Preview questionnaire"
+                      _hover={{ bg: '#F7F6F2' }}
+                      color="#1F1F1F"
+                      title="Preview"
+                    />
+                    <IconButton
+                      size="md"
+                      minW="44px"
+                      minH="44px"
+                      variant="ghost"
+                      icon={<Trash2 size={18} />}
+                      aria-label="Delete questionnaire"
+                      _hover={{ bg: '#fee2e2', color: '#dc2626' }}
+                      color="#1F1F1F"
+                      title="Delete"
+                    />
+                  </HStack>
+                </HStack>
+              </CardBody>
+            </Card>
+          ))}
+        </VStack>
+      )}
 
       {/* Questionnaire Editor Drawer */}
       <Drawer isOpen={isOpen} onClose={onClose} size="lg" placement="right">

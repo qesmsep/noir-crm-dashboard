@@ -35,17 +35,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 async function getQuestionnaire(id: string, res: NextApiResponse) {
   try {
     const { data, error } = await supabase
-      .from('questionnaires')
-      .select(`
-        *,
-        questionnaire_questions (*)
-      `)
+      .from('questionnaire_templates')
+      .select('*')
       .eq('id', id)
       .single();
 
     if (error) throw error;
 
-    return res.status(200).json(data);
+    // Transform to match expected format
+    const transformed = {
+      id: data.id,
+      title: data.name,
+      description: data.description,
+      type: data.name.toLowerCase().includes('invitation') || data.name.toLowerCase().includes('waitlist')
+        ? 'waitlist'
+        : data.name.toLowerCase().includes('member') || data.name.toLowerCase().includes('application')
+        ? 'membership'
+        : 'custom',
+      is_active: data.is_active,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      questionnaire_questions: Array.isArray(data.questions) ? data.questions : []
+    };
+
+    return res.status(200).json(transformed);
   } catch (error: any) {
     console.error('Error fetching questionnaire:', error);
     return res.status(404).json({ error: 'Questionnaire not found' });
@@ -56,46 +69,28 @@ async function updateQuestionnaire(id: string, req: NextApiRequest, res: NextApi
   const { title, description, type, is_active, questions } = req.body;
 
   try {
-    // Update questionnaire
-    const { error: questionnaireError } = await supabase
-      .from('questionnaires')
+    // Format questions for JSONB storage
+    const formattedQuestions = (questions || []).map((q: any, index: number) => ({
+      id: q.id || `q${index + 1}`,
+      question_text: q.question_text,
+      question_type: q.question_type,
+      placeholder: q.placeholder,
+      options: q.options,
+      is_required: q.is_required ?? false
+    }));
+
+    // Update questionnaire template
+    const { error } = await supabase
+      .from('questionnaire_templates')
       .update({
-        title,
+        name: title,
         description,
-        type,
-        is_active
+        is_active,
+        questions: formattedQuestions
       })
       .eq('id', id);
 
-    if (questionnaireError) throw questionnaireError;
-
-    // Handle questions update if provided
-    if (questions) {
-      // Delete existing questions
-      await supabase
-        .from('questionnaire_questions')
-        .delete()
-        .eq('questionnaire_id', id);
-
-      // Insert new questions
-      if (questions.length > 0) {
-        const questionsToInsert = questions.map((q: any) => ({
-          questionnaire_id: id,
-          question_text: q.question_text,
-          question_type: q.question_type,
-          placeholder: q.placeholder,
-          options: q.options,
-          is_required: q.is_required ?? false,
-          order_index: q.order_index
-        }));
-
-        const { error: questionsError } = await supabase
-          .from('questionnaire_questions')
-          .insert(questionsToInsert);
-
-        if (questionsError) throw questionsError;
-      }
-    }
+    if (error) throw error;
 
     return res.status(200).json({ success: true });
   } catch (error: any) {
@@ -107,7 +102,7 @@ async function updateQuestionnaire(id: string, req: NextApiRequest, res: NextApi
 async function deleteQuestionnaire(id: string, res: NextApiResponse) {
   try {
     const { error } = await supabase
-      .from('questionnaires')
+      .from('questionnaire_templates')
       .delete()
       .eq('id', id);
 

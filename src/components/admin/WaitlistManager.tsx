@@ -243,8 +243,8 @@ export default function WaitlistManager() {
   return (
     <VStack spacing={6} align="stretch">
       {/* Filters */}
-      <HStack spacing={4} wrap="wrap">
-        <InputGroup maxW="300px">
+      <HStack spacing={2} w="full">
+        <InputGroup flex="1">
           <InputLeftElement>
             <Icon as={FiSearch} color="gray.400" />
           </InputLeftElement>
@@ -258,7 +258,7 @@ export default function WaitlistManager() {
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          maxW="200px"
+          flex="1"
         >
           <option value="all">All Statuses</option>
           <option value="review">Review</option>
@@ -269,7 +269,8 @@ export default function WaitlistManager() {
         </Select>
       </HStack>
 
-      <Box overflowX="auto">
+      {/* Desktop Table View */}
+      <Box overflowX="auto" display={{ base: 'none', md: 'block' }}>
         <Table variant="simple">
           <Thead>
             <Tr>
@@ -295,14 +296,14 @@ export default function WaitlistManager() {
                     )}
                   </VStack>
                 </Td>
-                
+
                 <Td>
                   <VStack align="start" spacing={1}>
                     <Text fontSize="sm">{entry.email}</Text>
                     <Text fontSize="sm" color="gray.500">{entry.phone}</Text>
                   </VStack>
                 </Td>
-                
+
                 <Td>
                   <VStack align="start" spacing={1}>
                     {entry.occupation && (
@@ -313,17 +314,17 @@ export default function WaitlistManager() {
                     )}
                   </VStack>
                 </Td>
-                
+
                 <Td>
                   <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
                     {entry.status.replace('_', ' ')}
                   </Badge>
                 </Td>
-                
+
                 <Td>
                   <Text fontSize="sm">{formatDate(entry.submitted_at)}</Text>
                 </Td>
-                
+
                 <Td>
                   <VStack align="start" spacing={1}>
                     {entry.application_link_sent_at && (
@@ -343,31 +344,37 @@ export default function WaitlistManager() {
                     )}
                   </VStack>
                 </Td>
-                
+
                 <Td>
                   <HStack spacing={2}>
                     <IconButton
-                      size="xs"
+                      size="sm"
+                      minW="44px"
+                      minH="44px"
                       icon={<FiEye />}
                       onClick={() => handleViewEntry(entry)}
                       aria-label="View entry details"
                       colorScheme="blue"
                     />
-                    
+
                     {entry.status === 'review' && (
                       <IconButton
-                        size="xs"
+                        size="sm"
+                        minW="44px"
+                        minH="44px"
                         icon={<FiCheck />}
                         onClick={() => handleReview(entry)}
                         aria-label="Review entry"
                         colorScheme="yellow"
                       />
                     )}
-                    
+
                     {(entry.status === 'approved' || entry.status === 'link_sent') && (
                       <Tooltip label="Generate and send application link">
                         <IconButton
-                          size="xs"
+                          size="sm"
+                          minW="44px"
+                          minH="44px"
                           icon={<FiSend />}
                           onClick={() => handleGenerateLink(entry)}
                           aria-label="Generate and send application link"
@@ -382,13 +389,146 @@ export default function WaitlistManager() {
             ))}
           </Tbody>
         </Table>
-        
+
         {filteredEntries.length === 0 && (
           <Box py={8} textAlign="center">
             <Text color="gray.500">No waitlist entries found</Text>
           </Box>
         )}
       </Box>
+
+      {/* Mobile Card View */}
+      <VStack spacing={3} display={{ base: 'flex', md: 'none' }}>
+        {filteredEntries.length === 0 ? (
+          <Box py={8} textAlign="center" w="full">
+            <Text color="gray.500">No waitlist entries found</Text>
+          </Box>
+        ) : (
+          filteredEntries.map((entry) => (
+            <Box
+              key={entry.id}
+              p={4}
+              borderRadius="12px"
+              border="1px solid"
+              borderColor="#ECEAE5"
+              bg="white"
+              w="full"
+              boxShadow="0 2px 8px rgba(165, 148, 128, 0.08)"
+            >
+              <VStack align="stretch" spacing={3}>
+                {/* Name */}
+                <Box>
+                  <Text fontSize="sm" color="#5A5A5A" mb={1}>Name</Text>
+                  <Text fontWeight="600" fontSize="md" color="#1F1F1F">
+                    {entry.first_name} {entry.last_name}
+                  </Text>
+                  {entry.company && (
+                    <Text fontSize="xs" color="gray.500">{entry.company}</Text>
+                  )}
+                </Box>
+
+                {/* Contact */}
+                <Box>
+                  <Text fontSize="sm" color="#5A5A5A" mb={1}>Contact</Text>
+                  <Text fontSize="sm" color="#1F1F1F">{entry.email}</Text>
+                  <Text fontSize="sm" color="gray.500">{entry.phone}</Text>
+                </Box>
+
+                {/* Details */}
+                {(entry.occupation || entry.referral) && (
+                  <Box>
+                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Details</Text>
+                    {entry.occupation && (
+                      <Text fontSize="sm" color="#1F1F1F">{entry.occupation}</Text>
+                    )}
+                    {entry.referral && (
+                      <Text fontSize="sm" color="blue.500">Ref: {entry.referral}</Text>
+                    )}
+                  </Box>
+                )}
+
+                {/* Status & Submitted */}
+                <HStack justify="space-between" wrap="wrap">
+                  <Box>
+                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Status</Text>
+                    <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
+                      {entry.status.replace('_', ' ')}
+                    </Badge>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Submitted</Text>
+                    <Text fontSize="sm" color="#1F1F1F">{formatDate(entry.submitted_at)}</Text>
+                  </Box>
+                </HStack>
+
+                {/* Link Status */}
+                {(entry.application_link_sent_at || entry.application_link_opened_at || entry.application_expires_at) && (
+                  <Box>
+                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Link Status</Text>
+                    <VStack align="start" spacing={1}>
+                      {entry.application_link_sent_at && (
+                        <Text fontSize="xs" color="green.600">
+                          Sent {formatDate(entry.application_link_sent_at)}
+                        </Text>
+                      )}
+                      {entry.application_link_opened_at && (
+                        <Text fontSize="xs" color="blue.600">
+                          Opened {formatDate(entry.application_link_opened_at)}
+                        </Text>
+                      )}
+                      {entry.application_expires_at && (
+                        <Text fontSize="xs" color="orange.600">
+                          Expires {formatDate(entry.application_expires_at)}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Box>
+                )}
+
+                {/* Actions */}
+                <HStack spacing={2} pt={2} borderTop="1px solid" borderColor="#ECEAE5">
+                  <IconButton
+                    size="md"
+                    minW="44px"
+                    minH="44px"
+                    icon={<FiEye />}
+                    onClick={() => handleViewEntry(entry)}
+                    aria-label="View entry details"
+                    colorScheme="blue"
+                  />
+
+                  {entry.status === 'review' && (
+                    <IconButton
+                      size="md"
+                      minW="44px"
+                      minH="44px"
+                      icon={<FiCheck />}
+                      onClick={() => handleReview(entry)}
+                      aria-label="Review entry"
+                      colorScheme="yellow"
+                    />
+                  )}
+
+                  {(entry.status === 'approved' || entry.status === 'link_sent') && (
+                    <Tooltip label="Generate and send application link">
+                      <IconButton
+                        size="md"
+                        minW="44px"
+                        minH="44px"
+                        icon={<FiSend />}
+                        onClick={() => handleGenerateLink(entry)}
+                        aria-label="Generate and send application link"
+                        colorScheme="green"
+                        variant={entry.status === 'link_sent' ? 'outline' : 'solid'}
+                      />
+                    </Tooltip>
+                  )}
+                </HStack>
+              </VStack>
+            </Box>
+          ))
+        )}
+      </VStack>
 
       {/* Review Drawer */}
       <Drawer isOpen={isReviewOpen} onClose={onReviewClose} size="md" placement="right">

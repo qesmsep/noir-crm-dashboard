@@ -63,17 +63,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (waitlistError) throw waitlistError;
 
-    // Save all responses
-    const responseEntries = Object.entries(responses).map(([questionId, value]) => ({
-      waitlist_id: waitlistEntry.id,
-      question_id: questionId,
-      response_text: typeof value === 'string' ? value : JSON.stringify(value),
-      response_file_url: typeof value === 'string' && value.startsWith('http') ? value : null
-    }));
-
+    // Save questionnaire response (uses existing schema with jsonb answers)
     const { error: responsesError } = await supabase
       .from('questionnaire_responses')
-      .insert(responseEntries);
+      .insert({
+        questionnaire_id: questionnaire_id,
+        answers: responses,
+        file_urls: photoUrl ? { photo: photoUrl } : {},
+        tracking_id: waitlistEntry.id // Link to waitlist entry
+      });
 
     if (responsesError) throw responsesError;
 

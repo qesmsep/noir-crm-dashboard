@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   VStack,
@@ -13,12 +13,17 @@ import AnimatedQuestionnaire from '@/components/AnimatedQuestionnaire';
 import { useRouter } from 'next/navigation';
 
 export default function ApplyPage() {
+  const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
   const router = useRouter();
 
-  // Default waitlist questionnaire ID (from seed data)
-  const WAITLIST_QUESTIONNAIRE_ID = '00000000-0000-0000-0000-000000000001';
+  // Invitation Request questionnaire ID (from questionnaire_templates)
+  const WAITLIST_QUESTIONNAIRE_ID = 'a201cee3-3e34-459d-83c8-25b073fd26f7';
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleComplete = async (responses: Record<string, any>) => {
     setSubmitting(true);
@@ -63,8 +68,12 @@ export default function ApplyPage() {
     }
   };
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
-    <Box minH="100vh" bg="#1F1F1F" py={12}>
+    <Box minH="100vh" bg="#1F1F1F" py={12} suppressHydrationWarning>
       <Container maxW="container.md">
         {/* Header */}
         <VStack spacing={4} mb={12} textAlign="center">

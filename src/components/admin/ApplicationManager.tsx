@@ -31,6 +31,7 @@ import {
   IconButton
 } from '@chakra-ui/react';
 import { FiSearch, FiEye, FiCheck, FiX } from 'react-icons/fi';
+import styles from '../../styles/ApplicationManager.module.css';
 
 interface Application {
   id: string;
@@ -205,19 +206,17 @@ export default function ApplicationManager() {
   }
 
   return (
-    <VStack spacing={6} align="stretch">
-      <HStack justify="space-between">
-        <VStack align="start" spacing={1}>
-          <Heading size="md">Applications</Heading>
-          <Text fontSize="sm" color="gray.600">
-            Track membership applications
-          </Text>
-        </VStack>
-      </HStack>
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <div className={styles.headerTitle}>
+          <h2>Applications</h2>
+          <p>Track membership applications and onboarding progress</p>
+        </div>
+      </div>
 
       {/* Filters */}
-      <HStack spacing={4}>
-        <InputGroup maxW="300px">
+      <HStack spacing={4} w="full" className={styles.filters}>
+        <InputGroup maxW={{ base: "full", md: "300px" }} flex={{ base: "1", md: "initial" }}>
           <InputLeftElement>
             <Icon as={FiSearch} color="gray.400" />
           </InputLeftElement>
@@ -231,7 +230,8 @@ export default function ApplicationManager() {
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          maxW="200px"
+          maxW={{ base: "full", md: "200px" }}
+          flex={{ base: "1", md: "initial" }}
         >
           <option value="all">All Statuses</option>
           <option value="questionnaire_pending">Questionnaire Pending</option>
@@ -245,7 +245,9 @@ export default function ApplicationManager() {
         </Select>
       </HStack>
 
-      <Table variant="simple">
+      {/* Desktop Table View */}
+      <Box overflowX="auto" display={{ base: 'none', md: 'block' }}>
+        <Table variant="simple">
         <Thead>
           <Tr>
             <Th>Applicant</Th>
@@ -318,6 +320,8 @@ export default function ApplicationManager() {
                 <HStack spacing={2}>
                   <IconButton
                     size="sm"
+                    minW="44px"
+                    minH="44px"
                     icon={<FiEye />}
                     onClick={() => handleViewApplication(application)}
                     aria-label="View application"
@@ -326,6 +330,8 @@ export default function ApplicationManager() {
                   {application.status === 'payment_completed' && (
                     <IconButton
                       size="sm"
+                      minW="44px"
+                      minH="44px"
                       icon={<FiCheck />}
                       onClick={() => handleApproveApplication(application.id)}
                       aria-label="Approve application"
@@ -338,12 +344,92 @@ export default function ApplicationManager() {
           ))}
         </Tbody>
       </Table>
-      
+
       {filteredApplications.length === 0 && (
         <Box py={8} textAlign="center">
           <Text color="gray.500">No applications found</Text>
         </Box>
       )}
+      </Box>
+
+      {/* Mobile Card View */}
+      <VStack spacing={3} display={{ base: 'flex', md: 'none' }} className={styles.applicationsGrid}>
+        {filteredApplications.length === 0 ? (
+          <div className={styles.emptyState}>
+            <h3>No applications found</h3>
+            <p>Applications will appear here when members apply</p>
+          </div>
+        ) : (
+          filteredApplications.map((application) => (
+            <div key={application.id} className={styles.appCard} onClick={() => handleViewApplication(application)}>
+              <div className={styles.appContent}>
+                <div className={styles.appRow1}>
+                  <div>
+                    <h3 className={styles.appName}>{application.first_name} {application.last_name}</h3>
+                    {application.waitlist_id && (
+                      <Badge size="sm" colorScheme="purple">From Waitlist</Badge>
+                    )}
+                  </div>
+                  <span className={`${styles.appStatus} ${styles[application.status.replace('_', '')]}`}>
+                    {application.status.replace('_', ' ')}
+                  </span>
+                </div>
+
+                <div>
+                  <p className={styles.appEmail}>{application.email}</p>
+                  {application.phone && (
+                    <p className={styles.appPhone}>{application.phone}</p>
+                  )}
+                </div>
+
+                <div className={styles.appProgress}>
+                  <div className={styles.progressItem}>
+                    <span className={`${styles.progressIcon} ${application.questionnaire_completed_at ? styles.complete : styles.incomplete}`}>
+                      {application.questionnaire_completed_at ? '✓' : '○'}
+                    </span>
+                    <Text fontSize="xs" color={application.questionnaire_completed_at ? 'green.600' : 'gray.400'}>
+                      Questionnaire
+                    </Text>
+                  </div>
+                  <div className={styles.progressItem}>
+                    <span className={`${styles.progressIcon} ${application.agreement_completed_at ? styles.complete : styles.incomplete}`}>
+                      {application.agreement_completed_at ? '✓' : '○'}
+                    </span>
+                    <Text fontSize="xs" color={application.agreement_completed_at ? 'green.600' : 'gray.400'}>
+                      Agreement
+                    </Text>
+                  </div>
+                  <div className={styles.progressItem}>
+                    <span className={`${styles.progressIcon} ${application.payment_completed_at ? styles.complete : styles.incomplete}`}>
+                      {application.payment_completed_at ? '✓' : '○'}
+                    </span>
+                    <Text fontSize="xs" color={application.payment_completed_at ? 'green.600' : 'gray.400'}>
+                      Payment {application.payment_amount && `(${formatAmount(application.payment_amount)})`}
+                    </Text>
+                  </div>
+                </div>
+
+                <Text fontSize="xs" color="#8C7C6D">
+                  Submitted {formatDate(application.created_at)}
+                </Text>
+
+                <div className={styles.appActions}>
+                  <button className={`${styles.actionButton} ${styles.view}`} onClick={(e) => { e.stopPropagation(); handleViewApplication(application); }}>
+                    <FiEye size={18} />
+                    <span>View</span>
+                  </button>
+                  {application.status === 'payment_completed' && (
+                    <button className={`${styles.actionButton} ${styles.approve}`} onClick={(e) => { e.stopPropagation(); handleApproveApplication(application.id); }}>
+                      <FiCheck size={18} />
+                      <span>Approve</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </VStack>
 
       {/* Application Details Drawer */}
       <Drawer isOpen={isOpen} onClose={onClose} size="md" placement="right">
@@ -437,6 +523,6 @@ export default function ApplicationManager() {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-    </VStack>
+    </div>
   );
 } 

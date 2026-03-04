@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   VStack,
@@ -27,6 +27,12 @@ import { ArrowLeft, ArrowRight, Upload, Check } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 const MotionBox = motion(Box);
+
+// Create Supabase client outside component to avoid multiple instances
+const supabaseClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface Question {
   id: string;
@@ -60,10 +66,6 @@ export default function AnimatedQuestionnaire({
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const toast = useToast();
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   useEffect(() => {
     loadQuestions();
@@ -162,14 +164,14 @@ export default function AnimatedQuestionnaire({
       const fileName = `${waitlistId || 'temp'}-${currentQuestion.id}.${fileExt}`;
       const filePath = `questionnaire-uploads/${fileName}`;
 
-      const { data, error } = await supabase.storage
+      const { data, error } = await supabaseClient.storage
         .from('member-photos')
         .upload(filePath, file, { upsert: true });
 
       if (error) throw error;
 
       // Get public URL
-      const { data: urlData } = supabase.storage
+      const { data: urlData } = supabaseClient.storage
         .from('member-photos')
         .getPublicUrl(filePath);
 
@@ -429,29 +431,6 @@ export default function AnimatedQuestionnaire({
 
   return (
     <Box w="100%" maxW="600px" mx="auto" px={4} py={8}>
-      {/* Progress Bar */}
-      <VStack spacing={2} mb={8} align="stretch">
-        <HStack justify="space-between">
-          <Text fontSize="sm" fontWeight="medium" color="gray.600">
-            Question {currentQuestionIndex + 1} of {questions.length}
-          </Text>
-          <Text fontSize="sm" fontWeight="bold" color="#A59480">
-            {Math.round(progress)}%
-          </Text>
-        </HStack>
-        <Progress
-          value={progress}
-          borderRadius="full"
-          bg="gray.200"
-          sx={{
-            '& > div': {
-              background: 'linear-gradient(90deg, #A59480 0%, #8F7F6B 100%)'
-            }
-          }}
-          h="8px"
-        />
-      </VStack>
-
       {/* Animated Question Card */}
       <AnimatePresence mode="wait" custom={direction}>
         <MotionBox
@@ -534,6 +513,29 @@ export default function AnimatedQuestionnaire({
           </Card>
         </MotionBox>
       </AnimatePresence>
+
+      {/* Progress Bar Below */}
+      <VStack spacing={2} mt={8} align="stretch">
+        <HStack justify="space-between">
+          <Text fontSize="sm" fontWeight="medium" color="gray.600">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </Text>
+          <Text fontSize="sm" fontWeight="bold" color="#A59480">
+            {Math.round(progress)}%
+          </Text>
+        </HStack>
+        <Progress
+          value={progress}
+          borderRadius="full"
+          bg="gray.200"
+          sx={{
+            '& > div': {
+              background: 'linear-gradient(90deg, #A59480 0%, #8F7F6B 100%)'
+            }
+          }}
+          h="8px"
+        />
+      </VStack>
     </Box>
   );
 }

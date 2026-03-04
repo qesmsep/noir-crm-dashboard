@@ -1,22 +1,24 @@
 import React, { useState } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
+import SubscriptionPlansManager from '../../components/admin/SubscriptionPlansManager';
 import WaitlistManager from '../../components/admin/WaitlistManager';
 import ApplicationManager from '../../components/admin/ApplicationManager';
 import QuestionnaireManager from '../../components/admin/QuestionnaireManager';
 import AgreementManager from '../../components/admin/AgreementManager';
 import PaymentSettingsManager from '../../components/admin/PaymentSettingsManager';
-import { List, Users, FileText, CheckSquare, CreditCard } from 'lucide-react';
+import { Settings, List, Users, FileText, CheckSquare, CreditCard } from 'lucide-react';
 import styles from '../../styles/Membership.module.css';
 
 export default function AdminMembership() {
   const [activeTab, setActiveTab] = useState(0);
 
   const tabs = [
-    { id: 0, name: 'Waitlist', icon: List, component: WaitlistManager },
-    { id: 1, name: 'Applications', icon: Users, component: ApplicationManager },
-    { id: 2, name: 'Questionnaires', icon: FileText, component: QuestionnaireManager },
-    { id: 3, name: 'Agreements', icon: CheckSquare, component: AgreementManager },
-    { id: 4, name: 'Payment Settings', icon: CreditCard, component: PaymentSettingsManager },
+    { id: 0, name: 'Subscription Plans', icon: Settings, component: SubscriptionPlansManager },
+    { id: 1, name: 'Waitlist', icon: List, component: WaitlistManager },
+    { id: 2, name: 'Applications', icon: Users, component: ApplicationManager },
+    { id: 3, name: 'Questionnaires', icon: FileText, component: QuestionnaireManager },
+    { id: 4, name: 'Agreements', icon: CheckSquare, component: AgreementManager },
+    { id: 5, name: 'Payment Settings', icon: CreditCard, component: PaymentSettingsManager },
   ];
 
   const ActiveComponent = tabs[activeTab].component;
@@ -24,6 +26,16 @@ export default function AdminMembership() {
   return (
     <AdminLayout>
       <div className={styles.container}>
+        {/* Watermark Logo */}
+        <div className={styles.watermark}>
+          <img
+            src="/images/noir-wedding-day.png"
+            alt=""
+            aria-hidden="true"
+            className={styles.watermarkImage}
+          />
+        </div>
+
         <div className={styles.header}>
           <div className={styles.headerTitle}>
             <h1 className={styles.pageTitle}>Membership Management</h1>
@@ -43,7 +55,7 @@ export default function AdminMembership() {
                   className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
                   onClick={() => setActiveTab(tab.id)}
                 >
-                  <Icon size={18} strokeWidth={2} />
+                  <Icon size={20} strokeWidth={2} />
                   <span className={styles.tabText}>{tab.name}</span>
                 </button>
               );

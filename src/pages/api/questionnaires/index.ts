@@ -28,24 +28,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 async function getQuestionnaires(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { data, error } = await supabase
-      .from('questionnaires')
-      .select(`
-        *,
-        questionnaire_questions (
-          id,
-          question_text,
-          question_type,
-          placeholder,
-          options,
-          is_required,
-          order_index
-        )
-      `)
+      .from('questionnaire_templates')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    return res.status(200).json(data);
+    // Transform to match expected format with questionnaire_questions
+    const transformed = data?.map((template: any) => ({
+      id: template.id,
+      title: template.name,
+      description: template.description,
+      type: template.name.toLowerCase().includes('invitation') || template.name.toLowerCase().includes('waitlist')
+        ? 'waitlist'
+        : template.name.toLowerCase().includes('member') || template.name.toLowerCase().includes('application')
+        ? 'membership'
+        : 'custom',
+      is_active: template.is_active,
+      created_at: template.created_at,
+      updated_at: template.updated_at,
+      questionnaire_questions: Array.isArray(template.questions) ? template.questions : []
+    }));
+
+    return res.status(200).json(transformed || []);
   } catch (error: any) {
     console.error('Error fetching questionnaires:', error);
     return res.status(500).json({ error: error.message });
@@ -55,45 +60,36 @@ async function getQuestionnaires(req: NextApiRequest, res: NextApiResponse) {
 async function createQuestionnaire(req: NextApiRequest, res: NextApiResponse) {
   const { title, description, type, is_active, questions } = req.body;
 
-  if (!title || !type) {
-    return res.status(400).json({ error: 'Title and type are required' });
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
   }
 
   try {
-    // Create questionnaire
-    const { data: questionnaire, error: questionnaireError } = await supabase
-      .from('questionnaires')
+    // Format questions for JSONB storage
+    const formattedQuestions = (questions || []).map((q: any, index: number) => ({
+      id: q.id || `q${index + 1}`,
+      question_text: q.question_text,
+      question_type: q.question_type,
+      placeholder: q.placeholder,
+      options: q.options,
+      is_required: q.is_required ?? false
+    }));
+
+    // Create questionnaire template
+    const { data: template, error: templateError } = await supabase
+      .from('questionnaire_templates')
       .insert({
-        title,
+        name: title,
         description,
-        type,
-        is_active: is_active ?? true
+        is_active: is_active ?? true,
+        questions: formattedQuestions
       })
       .select()
       .single();
 
-    if (questionnaireError) throw questionnaireError;
+    if (templateError) throw templateError;
 
-    // Create questions if provided
-    if (questions && questions.length > 0) {
-      const questionsToInsert = questions.map((q: any) => ({
-        questionnaire_id: questionnaire.id,
-        question_text: q.question_text,
-        question_type: q.question_type,
-        placeholder: q.placeholder,
-        options: q.options,
-        is_required: q.is_required ?? false,
-        order_index: q.order_index
-      }));
-
-      const { error: questionsError } = await supabase
-        .from('questionnaire_questions')
-        .insert(questionsToInsert);
-
-      if (questionsError) throw questionsError;
-    }
-
-    return res.status(201).json({ success: true, id: questionnaire.id });
+    return res.status(201).json({ success: true, id: template.id });
   } catch (error: any) {
     console.error('Error creating questionnaire:', error);
     return res.status(500).json({ error: error.message });
