@@ -65,7 +65,7 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
 
       toast({
         title: 'Success',
-        description: 'Secondary member added successfully',
+        description: 'Member added successfully. Account will be charged $25/month for this additional member.',
       });
 
       onSuccess();
@@ -73,7 +73,7 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to add secondary member',
+        description: error.message || 'Failed to add member',
         variant: 'error',
       });
     } finally {
@@ -81,18 +81,11 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount / 100);
-  };
-
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Add Secondary Member</h2>
+          <h2 className={styles.modalTitle}>Add Member to Account</h2>
           <button
             onClick={onClose}
             className={styles.closeButton}
@@ -212,47 +205,15 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
 
           <div className={styles.divider} />
 
-          <div className={styles.formGroup}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={upgradeSubscription}
-                onChange={(e) => setUpgradeSubscription(e.target.checked)}
-                className={styles.checkbox}
-              />
-              <span>Upgrade subscription plan (e.g., Solo → Duo)</span>
-            </label>
-          </div>
-
-          {upgradeSubscription && (
-            <div className={styles.formGroup}>
-              <label htmlFor="plan" className={styles.label}>
-                Select New Plan <span className={styles.required}>*</span>
-              </label>
-              {loadingPlans ? (
-                <p className={styles.loadingText}>Loading plans...</p>
-              ) : (
-                <select
-                  id="plan"
-                  value={selectedPlanId}
-                  onChange={(e) => setSelectedPlanId(e.target.value)}
-                  className={styles.select}
-                  required={upgradeSubscription}
-                >
-                  <option value="">Select a plan</option>
-                  {availablePlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.nickname || plan.product} - {formatCurrency(plan.unit_amount)}/
-                      {plan.interval}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <p className={styles.helperText}>
-                Prorated charges will be applied immediately
+          <div className={styles.pricingNotice}>
+            <div className={styles.pricingIcon}>💳</div>
+            <div className={styles.pricingText}>
+              <strong>$25/month administration fee</strong>
+              <p className={styles.pricingSubtext}>
+                This additional member will increase monthly dues by $25. No additional beverage credit included.
               </p>
             </div>
-          )}
+          </div>
 
           <div className={styles.formActions}>
             <button
@@ -268,7 +229,7 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
               className={styles.submitButton}
               disabled={loading}
             >
-              {loading ? 'Adding Member...' : 'Add Secondary Member'}
+              {loading ? 'Adding Member...' : 'Add Member (+$25/mo)'}
             </button>
           </div>
         </form>
