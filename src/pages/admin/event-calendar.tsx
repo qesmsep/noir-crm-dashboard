@@ -1407,6 +1407,8 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PrivateEvent | null>(null);
   const [linkedReservations, setLinkedReservations] = useState<Reservation[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -1525,6 +1527,49 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
     }
   };
 
+  const uploadImage = async (eventId: string): Promise<string | null> => {
+    if (!imageFile) return null;
+
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${eventId}-${Date.now()}.${fileExt}`;
+      const filePath = `private-events/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload image',
+        status: 'error',
+        duration: 3000,
+      });
+      return null;
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -1579,6 +1624,18 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
           .eq('id', editingEvent.id);
 
         if (error) throw error;
+
+        // Upload image if one was selected
+        if (imageFile) {
+          const backgroundImageUrl = await uploadImage(editingEvent.id);
+          if (backgroundImageUrl) {
+            await supabase
+              .from('private_events')
+              .update({ background_image_url: backgroundImageUrl })
+              .eq('id', editingEvent.id);
+          }
+        }
+
         toast({
           title: 'Success',
           description: 'Private event updated successfully',
@@ -1616,11 +1673,25 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
           total_attendees_maximum: formData.total_attendees_maximum,
         };
 
-        const { error } = await supabase
+        const { data: newEvent, error } = await supabase
           .from('private_events')
-          .insert([eventData]);
+          .insert([eventData])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Upload image if one was selected
+        if (imageFile && newEvent) {
+          const backgroundImageUrl = await uploadImage(newEvent.id);
+          if (backgroundImageUrl) {
+            await supabase
+              .from('private_events')
+              .update({ background_image_url: backgroundImageUrl })
+              .eq('id', newEvent.id);
+          }
+        }
+
         toast({
           title: 'Success',
           description: 'Private event created successfully',
@@ -1715,6 +1786,8 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
     setIsCreateModalOpen(false);
     setEditingEvent(null);
     setLinkedReservations([]);
+    setImageFile(null);
+    setImagePreview(null);
     setFormData({
       name: '',
       title: '',
@@ -1984,6 +2057,31 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
                       fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
                       _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
                     />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Event Background Image (Optional)</FormLabel>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                      pt={1}
+                    />
+                    {imagePreview && (
+                      <Box mt={2}>
+                        <img src={imagePreview} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                      </Box>
+                    )}
+                    {!imagePreview && editingEvent?.background_image_url && (
+                      <Box mt={2}>
+                        <Text fontSize="xs" color="gray.600" fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Current image:</Text>
+                        <img src={editingEvent.background_image_url} alt="Current" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                      </Box>
+                    )}
+                    <Text fontSize="xs" color="gray.600" mt={1} fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
+                      If no image is uploaded, the main landing page hero image will be used as fallback
+                    </Text>
                   </FormControl>
 
                   {formData.rsvp_enabled && (

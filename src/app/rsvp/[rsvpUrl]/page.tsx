@@ -198,28 +198,40 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
 
   const timeOptions = generateTimeOptions();
 
+  // Fallback to main hero image if event doesn't have custom image
+  const FALLBACK_HERO_IMAGE = '/images/002-20250911-noir-fall-25-©LoveProjectPhotography.jpg';
+  const backgroundImage = event.background_image_url || FALLBACK_HERO_IMAGE;
+  const hasBackgroundImage = Boolean(event.background_image_url || FALLBACK_HERO_IMAGE);
+
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Background Image */}
-      {event.background_image_url && (
+      {/* Background Image or Gradient */}
+      {hasBackgroundImage ? (
         <>
           <div className="absolute inset-0 z-0">
             <img
-              src={event.background_image_url}
+              src={backgroundImage}
               alt="Event background"
               className="w-full h-full object-cover"
-              onLoad={() => console.log('Image loaded successfully')}
-              onError={(e) => console.error('Image failed to load:', e)}
+              onLoad={() => console.log('Image loaded successfully:', backgroundImage)}
+              onError={(e) => {
+                console.error('Image failed to load:', backgroundImage);
+                // Hide image and show gradient fallback instead
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
             />
           </div>
           <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/60 to-black/70" />
         </>
+      ) : (
+        // Gradient fallback if no images available
+        <div className="absolute inset-0 z-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />
       )}
 
-      <div className={`relative z-10 container max-w-md mx-auto py-8 px-4 ${!event.background_image_url ? 'bg-gray-50' : ''}`}>
+      <div className="relative z-10 container max-w-md mx-auto py-8 px-4">
         <div className="flex flex-col gap-8">
-          {/* Event Header */}
-          <div className={`text-center ${event.background_image_url ? 'text-white' : 'text-gray-800'}`}>
+          {/* Event Header - Always white text since we always have background */}
+          <div className="text-center text-white">
             <h1 className="text-3xl font-bold mb-2">
               {event.title}
             </h1>

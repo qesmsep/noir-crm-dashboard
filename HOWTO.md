@@ -18,7 +18,7 @@
 
 ## 📋 Summary
 
-**Last Updated**: 2026-03-03
+**Last Updated**: 2026-03-04
 
 This 100-line summary provides a high-level overview of the Noir CRM Dashboard system architecture, key concepts, and how to use this reference manual efficiently.
 
@@ -867,6 +867,27 @@ While focusing on aesthetics, maintain accessibility:
 - `review_notes` (TEXT)
 - `typeform_response_id` (TEXT)
 - `created_at`, `updated_at`
+
+#### `accounts`
+- `account_id` (UUID, PK)
+- `stripe_customer_id` (TEXT) - Stripe customer ID
+- `stripe_subscription_id` (TEXT) - Stripe subscription ID
+- `subscription_status` (TEXT) - 'active', 'canceled', 'past_due', 'paused'
+- `subscription_start_date` (DATE)
+- `subscription_cancel_at` (DATE)
+- `next_renewal_date` (DATE)
+- `monthly_dues` (DECIMAL) - Total MRR including base subscription + additional member fees
+- `payment_method_type` (TEXT) - 'card', 'us_bank_account'
+- `payment_method_last4` (TEXT) - Last 4 digits of payment method
+- `payment_method_brand` (TEXT) - Card brand or bank name
+- `credit_card_fee_enabled` (BOOLEAN) - Default: false - When true, adds 4% processing fee to credit card transactions
+- `created_at`, `updated_at`
+
+**Notes**:
+- Members are linked to accounts via `members.account_id` foreign key
+- Multiple members can share one account (primary + secondary members)
+- Each additional member adds $25/month to `monthly_dues`
+- Credit card fees only apply to card transactions when enabled (ACH/bank transfers exempt)
 
 #### `ledger`
 - `id` (UUID, PK)
@@ -1829,6 +1850,14 @@ Database-level security via Supabase RLS:
 - `src/pages/api/chargeBalance.js` - Charge member balance
 - Monthly credit overspend charging
 - Uses customer's default payment method
+- **Credit Card Fee System** (per-account toggle):
+  - Optional 4% processing fee on credit card transactions
+  - Controlled by `credit_card_fee_enabled` boolean column on `accounts` table
+  - Fee detection: Retrieves payment method type from Stripe
+  - ACH/bank transfers are exempt from fees
+  - Fee recorded as separate ledger entry: "4% Credit Card Processing Fee"
+  - Admin UI toggle in subscription card Payment Settings section
+  - Returns breakdown: base amount, fee amount, total charged
 
 ### Typeform Integration
 
