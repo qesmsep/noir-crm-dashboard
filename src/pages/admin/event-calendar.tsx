@@ -62,6 +62,7 @@ interface PrivateEvent {
   rsvp_url?: string;
   max_guests?: number;
   total_attendees_maximum?: number;
+  background_image_url?: string;
 }
 
 interface Reservation {
