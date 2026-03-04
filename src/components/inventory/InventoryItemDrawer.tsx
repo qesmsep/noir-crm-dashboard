@@ -12,6 +12,7 @@ interface InventoryItemDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: InventoryItemFormData) => void;
+  onDelete?: (id: string) => void;
   editItem: InventoryItem | null;
   saving: boolean;
 }
@@ -30,7 +31,8 @@ const EMPTY_FORM: InventoryItemFormData = {
   notes: '',
 };
 
-const SUBCATEGORY_OPTIONS: Record<InventoryCategory, string[]> = {
+// Default subcategory options (will be overridden by settings)
+const DEFAULT_SUBCATEGORY_OPTIONS: Record<string, string[]> = {
   spirits: ['Vodka', 'Gin', 'Rum', 'Tequila', 'Whiskey', 'Bourbon', 'Scotch', 'Brandy', 'Cognac', 'Mezcal', 'Liqueur', 'Other'],
   wine: ['Red', 'White', 'Rosé', 'Sparkling', 'Champagne', 'Other'],
   beer: ['Lager', 'IPA', 'Stout', 'Pilsner', 'Wheat', 'Sour', 'Craft', 'Import', 'Other'],
@@ -44,10 +46,13 @@ export default function InventoryItemDrawer({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   editItem,
   saving,
 }: InventoryItemDrawerProps) {
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_FORM);
+  const [categories, setCategories] = useState<string[]>(['spirits', 'wine', 'beer', 'mixers', 'garnishes', 'supplies', 'other']);
+  const [subcategoryOptions, setSubcategoryOptions] = useState<Record<string, string[]>>(DEFAULT_SUBCATEGORY_OPTIONS);
 
   useEffect(() => {
     if (editItem) {
@@ -69,6 +74,30 @@ export default function InventoryItemDrawer({
     }
   }, [editItem, isOpen]);
 
+  useEffect(() => {
+    // Load categories from localStorage or settings
+    const loadSettings = () => {
+      const stored = localStorage.getItem('inventory_settings');
+      if (stored) {
+        try {
+          const settings = JSON.parse(stored);
+          if (settings.inventoryCategories) {
+            setCategories(settings.inventoryCategories);
+          }
+          if (settings.inventorySubcategories) {
+            setSubcategoryOptions(settings.inventorySubcategories);
+          }
+        } catch (err) {
+          console.error('Failed to load settings from localStorage:', err);
+        }
+      }
+    };
+
+    if (isOpen) {
+      loadSettings();
+    }
+  }, [isOpen]);
+
   const handleChange = (
     field: keyof InventoryItemFormData,
     value: string | number
@@ -79,6 +108,15 @@ export default function InventoryItemDrawer({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(form);
+  };
+
+  const handleDelete = () => {
+    if (editItem && onDelete) {
+      if (confirm(`Are you sure you want to delete "${editItem.name}"? This action cannot be undone.`)) {
+        onDelete(editItem.id);
+        onClose();
+      }
+    }
   };
 
   return (
@@ -142,13 +180,11 @@ export default function InventoryItemDrawer({
                   handleChange('subcategory', '');
                 }}
               >
-                <option value="spirits">Spirits</option>
-                <option value="wine">Wine</option>
-                <option value="beer">Beer</option>
-                <option value="mixers">Mixers</option>
-                <option value="garnishes">Garnishes</option>
-                <option value="supplies">Supplies</option>
-                <option value="other">Other</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -160,7 +196,7 @@ export default function InventoryItemDrawer({
                 onChange={(e) => handleChange('subcategory', e.target.value)}
               >
                 <option value="">Select...</option>
-                {SUBCATEGORY_OPTIONS[form.category]?.map((sub) => (
+                {subcategoryOptions[form.category]?.map((sub) => (
                   <option key={sub} value={sub.toLowerCase()}>
                     {sub}
                   </option>
@@ -291,20 +327,33 @@ export default function InventoryItemDrawer({
         </form>
 
         <div className={styles.drawerFooter}>
-          <button className={styles.btnTertiary} onClick={onClose} type="button">
-            Cancel
-          </button>
-          <button
-            className={styles.btnPrimary}
-            onClick={handleSubmit}
-            disabled={saving || !form.name.trim()}
-          >
-            {saving
-              ? 'Saving...'
-              : editItem
-                ? 'Update Item'
-                : 'Add Item'}
-          </button>
+          <div>
+            {editItem && onDelete && (
+              <button
+                className={styles.btnDanger}
+                onClick={handleDelete}
+                type="button"
+              >
+                Delete Item
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button className={styles.btnTertiary} onClick={onClose} type="button">
+              Cancel
+            </button>
+            <button
+              className={styles.btnPrimary}
+              onClick={handleSubmit}
+              disabled={saving || !form.name.trim()}
+            >
+              {saving
+                ? 'Saving...'
+                : editItem
+                  ? 'Update Item'
+                  : 'Add Item'}
+            </button>
+          </div>
         </div>
       </div>
     </>

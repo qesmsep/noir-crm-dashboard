@@ -42,6 +42,16 @@ export default async function handler(
 
     const member = Array.isArray(session.members) ? session.members[0] : session.members;
 
+    // Debug: Log what we're getting from the database
+    console.log('[CHECK-SESSION] Member data from DB:', {
+      member_id: member.member_id,
+      first_name: member.first_name,
+      last_name: member.last_name,
+      profile_photo_url: member.profile_photo_url,
+      has_photo: !!member.profile_photo_url,
+      photo_url_value: member.profile_photo_url || 'NULL/UNDEFINED'
+    });
+
     // Calculate balance from ledger transactions
     const { data: ledger } = await supabaseAdmin
       .from('ledger')

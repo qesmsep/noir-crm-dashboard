@@ -977,7 +977,8 @@ export async function handler(req, res) {
   // Handle "MEMBER" and "MEMBERSHIP" messages for waitlist
   if (text.toLowerCase().trim() === 'member' || text.toLowerCase().trim() === 'membership') {
     console.log('Processing MEMBER/MEMBERSHIP message for waitlist');
-    const waitlistMessage = "Thank you for seeking information about becoming a member of Noir.\n\nTo learn more please respond directly to this message with any questions.\n\nTo request an invitation, please complete the following form.\n\nWe typically respond within 24 hours. 🖤\n\nhttps://skylineandco.typeform.com/noir-waitlist";
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirsandiego.com';
+    const waitlistMessage = `Thank you for seeking information about becoming a member of Noir.\n\nTo learn more please respond directly to this message with any questions.\n\nTo request an invitation, please complete the following form.\n\nWe typically respond within 24 hours. 🖤\n\n${baseUrl}/apply`;
     await sendSMS(from, waitlistMessage);
     return res.status(200).json({ message: 'Sent waitlist invitation message' });
   }

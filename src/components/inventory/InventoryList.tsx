@@ -17,6 +17,7 @@ interface InventoryListProps {
   onCategoryFilterChange: (cat: InventoryCategory | 'all') => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
+  onAdjustStock?: (id: string, newQuantity: number) => void;
 }
 
 const CATEGORY_STYLE_MAP: Record<string, string> = {
@@ -55,6 +56,7 @@ export default function InventoryList({
   onCategoryFilterChange,
   onEdit,
   onDelete,
+  onAdjustStock,
 }: InventoryListProps) {
   const filtered = items.filter((item) => {
     const matchesSearch =
@@ -123,7 +125,6 @@ export default function InventoryList({
                   <th>Cost</th>
                   <th>Price/Serving</th>
                   <th>Par Level</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -145,11 +146,28 @@ export default function InventoryList({
                         </span>
                       </td>
                       <td>
-                        <span
-                          className={`${styles.quantityCell} ${par === 'critical' ? styles.quantityLow : styles.quantityOk}`}
-                        >
-                          {item.quantity}
-                        </span>
+                        <div className={styles.quantityAdjust}>
+                          <button
+                            className={styles.adjustBtn}
+                            onClick={() => onAdjustStock?.(item.id, item.quantity - 1)}
+                            disabled={item.quantity <= 0}
+                            title="Remove 1"
+                          >
+                            -
+                          </button>
+                          <span
+                            className={`${styles.quantityCell} ${par === 'critical' ? styles.quantityLow : styles.quantityOk}`}
+                          >
+                            {item.quantity}
+                          </span>
+                          <button
+                            className={styles.adjustBtn}
+                            onClick={() => onAdjustStock?.(item.id, item.quantity + 1)}
+                            title="Add 1"
+                          >
+                            +
+                          </button>
+                        </div>
                       </td>
                       <td style={{ textTransform: 'capitalize' }}>
                         {item.unit}
@@ -161,28 +179,19 @@ export default function InventoryList({
                         {formatCurrency(item.price_per_serving)}
                       </td>
                       <td>
-                        <div className={styles.parIndicator}>
-                          <span
-                            className={`${styles.parDot} ${PAR_STYLE_MAP[par]}`}
-                          />
-                          {item.par_level}
-                        </div>
-                      </td>
-                      <td>
-                        <div className={styles.rowActions}>
+                        <div className={styles.parIndicatorWithEdit}>
+                          <div className={styles.parIndicator}>
+                            <span
+                              className={`${styles.parDot} ${PAR_STYLE_MAP[par]}`}
+                            />
+                            {item.par_level}
+                          </div>
                           <button
-                            className={styles.rowActionBtn}
+                            className={styles.editBtn}
                             title="Edit"
                             onClick={() => onEdit(item)}
                           >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            className={styles.rowActionBtn}
-                            title="Delete"
-                            onClick={() => onDelete(item.id)}
-                          >
-                            <Trash2 size={15} />
+                            <Edit2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -242,34 +251,29 @@ export default function InventoryList({
                         {formatCurrency(item.price_per_serving)}
                       </span>
                     </div>
-                    <div className={styles.cardField}>
-                      <span className={styles.cardFieldLabel}>Par Level</span>
-                      <span className={styles.cardFieldValue}>
-                        <span
-                          className={`${styles.parDot} ${PAR_STYLE_MAP[par]}`}
-                          style={{
-                            display: 'inline-block',
-                            marginRight: 6,
-                            verticalAlign: 'middle',
-                          }}
-                        />
-                        {item.par_level}
-                      </span>
+                    <div className={styles.cardFieldWithEdit}>
+                      <div className={styles.cardField}>
+                        <span className={styles.cardFieldLabel}>Par Level</span>
+                        <span className={styles.cardFieldValue}>
+                          <span
+                            className={`${styles.parDot} ${PAR_STYLE_MAP[par]}`}
+                            style={{
+                              display: 'inline-block',
+                              marginRight: 6,
+                              verticalAlign: 'middle',
+                            }}
+                          />
+                          {item.par_level}
+                        </span>
+                      </div>
+                      <button
+                        className={styles.editBtnCard}
+                        onClick={() => onEdit(item)}
+                        title="Edit"
+                      >
+                        <Edit2 size={14} />
+                      </button>
                     </div>
-                  </div>
-                  <div className={styles.cardFooter}>
-                    <button
-                      className={`${styles.btnTertiary} ${styles.btnSmall}`}
-                      onClick={() => onEdit(item)}
-                    >
-                      <Edit2 size={14} /> Edit
-                    </button>
-                    <button
-                      className={`${styles.btnDanger}`}
-                      onClick={() => onDelete(item.id)}
-                    >
-                      <Trash2 size={14} /> Delete
-                    </button>
                   </div>
                 </div>
               );

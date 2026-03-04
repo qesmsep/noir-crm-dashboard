@@ -1,0 +1,140 @@
+import { NextApiRequest, NextApiResponse } from 'next';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { questionnaire_id, responses } = req.body;
+
+  if (!questionnaire_id || !responses) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    // Extract basic contact info from responses
+    const questions = await getQuestionMap(questionnaire_id);
+
+    const firstName = findResponseByQuestionText(responses, questions, 'First Name');
+    const lastName = findResponseByQuestionText(responses, questions, 'Last Name');
+    const email = findResponseByQuestionText(responses, questions, 'Email');
+    const phone = findResponseByQuestionText(responses, questions, 'Phone');
+    const company = findResponseByQuestionText(responses, questions, 'Company');
+    const howDidYouHear = findResponseByQuestionText(responses, questions, 'How did you hear about Noir?');
+    const whyNoir = findResponseByQuestionText(responses, questions, 'Why are you interested in joining Noir?');
+    const occupation = findResponseByQuestionText(responses, questions, 'Occupation');
+    const industry = findResponseByQuestionText(responses, questions, 'Industry');
+
+    // Extract photo URL from responses (will be a URL starting with http)
+    let photoUrl = null;
+    for (const [questionId, value] of Object.entries(responses)) {
+      if (typeof value === 'string' && value.startsWith('http') && value.includes('supabase')) {
+        photoUrl = value;
+        break;
+      }
+    }
+
+    // Create waitlist entry
+    const { data: waitlistEntry, error: waitlistError } = await supabase
+      .from('waitlist')
+      .insert({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone,
+        company,
+        how_did_you_hear: howDidYouHear,
+        why_noir: whyNoir,
+        occupation,
+        industry,
+        photo_url: photoUrl,
+        status: 'review',
+        submitted_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (waitlistError) throw waitlistError;
+
+    // Save all responses
+    const responseEntries = Object.entries(responses).map(([questionId, value]) => ({
+      waitlist_id: waitlistEntry.id,
+      question_id: questionId,
+      response_text: typeof value === 'string' ? value : JSON.stringify(value),
+      response_file_url: typeof value === 'string' && value.startsWith('http') ? value : null
+    }));
+
+    const { error: responsesError } = await supabase
+      .from('questionnaire_responses')
+      .insert(responseEntries);
+
+    if (responsesError) throw responsesError;
+
+    // Send confirmation SMS (optional)
+    try {
+      await sendConfirmationSMS(phone, firstName);
+    } catch (smsError) {
+      console.error('Failed to send SMS:', smsError);
+      // Don't fail the request if SMS fails
+    }
+
+    return res.status(200).json({
+      success: true,
+      waitlist_id: waitlistEntry.id,
+      message: 'Application submitted successfully'
+    });
+
+  } catch (error: any) {
+    console.error('Waitlist submission error:', error);
+    return res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+}
+
+// Helper function to get question map
+async function getQuestionMap(questionnaireId: string): Promise<Record<string, any>> {
+  const { data: questions } = await supabase
+    .from('questionnaire_questions')
+    .select('*')
+    .eq('questionnaire_id', questionnaireId);
+
+  const map: Record<string, any> = {};
+  questions?.forEach(q => {
+    map[q.id] = q;
+  });
+  return map;
+}
+
+// Helper function to find response by question text
+function findResponseByQuestionText(
+  responses: Record<string, any>,
+  questions: Record<string, any>,
+  questionText: string
+): string | undefined {
+  for (const [questionId, value] of Object.entries(responses)) {
+    const question = questions[questionId];
+    if (question && question.question_text === questionText) {
+      return typeof value === 'string' ? value : JSON.stringify(value);
+    }
+  }
+  return undefined;
+}
+
+// Helper function to send confirmation SMS
+async function sendConfirmationSMS(phone: string, firstName: string): Promise<void> {
+  const message = `Hi ${firstName}! Thank you for applying to join Noir. We've received your application and will review it shortly. We typically respond within 24 hours. 🖤`;
+
+  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sendText`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: phone,
+      message
+    })
+  });
+}

@@ -1,0 +1,644 @@
+{
+  "timestamp": "2026-02-25T06:51:43.552Z",
+  "total_processed": 96,
+  "summary": {
+    "success": 80,
+    "no_subscription": 13,
+    "errors": 3
+  },
+  "details": {
+    "success": [
+      {
+        "account_id": "bfcb3070-0dde-4bf1-901c-52b223e684e7",
+        "stripe_customer_id": "cus_SHsUQrAxvVG7vw",
+        "subscription_id": "sub_1RNIjkFdjSPifIH5JceNBGHg",
+        "status": "active",
+        "monthly_dues": 1
+      },
+      {
+        "account_id": "faa84ef2-f16a-40a6-b3d5-5aedfb23595a",
+        "stripe_customer_id": "cus_SEzmSbeGDHz5Kb",
+        "subscription_id": "sub_1RKVmhFdjSPifIH5Q8w2hcQh",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "b7b82ff9-5862-4fdc-a7e0-0e7f3589776f",
+        "stripe_customer_id": "cus_SDTUZz42mMMhb0",
+        "subscription_id": "sub_1RJ2XuFdjSPifIH5gi4s4zBc",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "46c94423-4102-4f5d-b31b-2f732dea8add",
+        "stripe_customer_id": "cus_SBYK7ZB4nJDAIk",
+        "subscription_id": "sub_1RHBDeFdjSPifIH5W1i67XBe",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "b3dfb644-3bec-46a6-a4b6-bd36d4694cdc",
+        "stripe_customer_id": "cus_SJogUjGNcmwJP4",
+        "subscription_id": "sub_1RPB30FdjSPifIH5SBHQNSoh",
+        "status": "active",
+        "monthly_dues": 1
+      },
+      {
+        "account_id": "5ce23416-2e82-43c1-9c6e-696cf1062b4f",
+        "stripe_customer_id": "cus_SDiwMwEoYRSEUp",
+        "subscription_id": "sub_1RJHUYFdjSPifIH5ITTDfvwk",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "6e8c37d8-4d0d-405a-a02a-b6e82242c608",
+        "stripe_customer_id": "cus_STxNtZfXzSgqrH",
+        "subscription_id": "sub_1RYzSWFdjSPifIH5GTIdITcA",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "b3d09ac0-ccfb-4062-b860-10e5d8f0e77b",
+        "stripe_customer_id": "cus_STxNtZfXzSgqrH",
+        "subscription_id": "sub_1RYzSWFdjSPifIH5GTIdITcA",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "0820b682-93f3-45ca-be04-b449e1b5d052",
+        "stripe_customer_id": "cus_ST2Z0VGD6Ou6gy",
+        "subscription_id": "sub_1RY6U3FdjSPifIH56lUnr0rm",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "075a4fbf-a8c2-4852-910e-b56579e804c2",
+        "stripe_customer_id": "cus_STy4Hy4qGMot6G",
+        "subscription_id": "sub_1RZ085FdjSPifIH5g6nh5euE",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "0d22b3f2-b9a6-4627-83a1-46b2cd03b649",
+        "stripe_customer_id": "cus_SDsrAj7ohXx0ke",
+        "subscription_id": "sub_1RJR5kFdjSPifIH5I5dYz4Q5",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "b6a422e0-3b73-4dfe-8aa7-118c58855d7b",
+        "stripe_customer_id": "cus_SPTdppScfwoivm",
+        "subscription_id": "sub_1RUegjFdjSPifIH5pJqaXLLF",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "c32fdf32-f528-4368-8aec-de56a1083a10",
+        "stripe_customer_id": "cus_SheicxmTO4i9E8",
+        "subscription_id": "sub_1RmFOoFdjSPifIH53o6rxh71",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "fb492576-3872-4382-838e-fd11aeb6b159",
+        "stripe_customer_id": "cus_SixGiStI0wmWeO",
+        "subscription_id": "sub_1RnVMGFdjSPifIH516avZ2w9",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "6fa89bd8-0c2f-4606-808b-6e19f858c830",
+        "stripe_customer_id": "cus_Spxr1IpcCHitqm",
+        "subscription_id": "sub_1RuHvRFdjSPifIH5fx5ZCRWy",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "87d47d42-a883-4485-8f18-6b564f49747d",
+        "stripe_customer_id": "cus_SsgC0Vo815sfx5",
+        "subscription_id": "sub_1RwuqMFdjSPifIH5zbatS3tB",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "8f4a1660-0a4e-46f6-b011-844d1e6d26b6",
+        "stripe_customer_id": "cus_T0cC3UFtAFuzd6",
+        "subscription_id": "sub_1S4axoFdjSPifIH5m6mCYHX7",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "92a28886-9b66-4e65-ba62-337e5b10539a",
+        "stripe_customer_id": "cus_T0cHo5ynFbr3Uf",
+        "subscription_id": "sub_1S4b2mFdjSPifIH5K4Xu626T",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "1e697315-ecb1-4bb7-bf72-b444f0ab4394",
+        "stripe_customer_id": "cus_T2iver126wxkHt",
+        "subscription_id": "sub_1S6dTVFdjSPifIH5S4sb7Xgo",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "18daffc9-927d-4233-9df8-6754018230c5",
+        "stripe_customer_id": "cus_T2jjuoaO6JnQlC",
+        "subscription_id": "sub_1S6eG2FdjSPifIH5hiPefzkc",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "6f326b20-3344-4bad-a84a-35c50f8d7f13",
+        "stripe_customer_id": "cus_T30FP4vlZYByjb",
+        "subscription_id": "sub_1S6uEvFdjSPifIH5yrysFbWp",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "d1f0188a-9574-4322-b9e4-3bf7f7514acb",
+        "stripe_customer_id": "cus_T35rnrSgGCJfUk",
+        "subscription_id": "sub_1S6zfiFdjSPifIH50UeQNbwM",
+        "status": "active",
+        "monthly_dues": 10
+      },
+      {
+        "account_id": "bbcb639c-fcca-4613-b384-86c15661abb2",
+        "stripe_customer_id": "cus_T3EkchaJ67G6w8",
+        "subscription_id": "sub_1S78HVFdjSPifIH56mfO6Urb",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "465f4f0e-ed31-4ef2-81d1-7141fdc55585",
+        "stripe_customer_id": "cus_T4bUmYbFL146mP",
+        "subscription_id": "sub_1S8SH6FdjSPifIH5cbjhLHEx",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "8e74c809-226a-4e64-8ce5-a22d5986dbea",
+        "stripe_customer_id": "cus_T4ful5IlMF1XAd",
+        "subscription_id": "sub_1S8WYcFdjSPifIH58AQIfyfm",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "59c9035a-2e71-4d2a-b434-34b95f612856",
+        "stripe_customer_id": "cus_T5ouHbg1aRJoyM",
+        "subscription_id": "sub_1S9dGeFdjSPifIH5QZDwt25m",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "ef7d0b23-fb87-4858-8291-1011f026e02d",
+        "stripe_customer_id": "cus_TAheXcSqodutWa",
+        "subscription_id": "sub_1SEMF8FdjSPifIH50kkXOftw",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "fd9fa8fb-15c2-4739-9206-0eef217afe57",
+        "stripe_customer_id": "cus_TDeEolivA8dB0Y",
+        "subscription_id": "sub_1SHCwFFdjSPifIH5fKtl2yKS",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "166f5596-ca09-450e-b03c-441a9c53d9b1",
+        "stripe_customer_id": "cus_TDihDv9BIHRxy0",
+        "subscription_id": "sub_1SHHFwFdjSPifIH5ewnhjLWi",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "f3326e09-1422-4984-bddf-d07aa9d5e5f4",
+        "stripe_customer_id": "cus_TIMladYlb70Hfl",
+        "subscription_id": "sub_1SLm2EFdjSPifIH5ixPHKRrq",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "ef4ee861-188b-46ee-8566-e51d1ffb19b5",
+        "stripe_customer_id": "cus_TN1tf94UnAxyoN",
+        "subscription_id": "sub_1SVx9XFdjSPifIH5A9rYFP5C",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "8e72b0e3-e28b-4d48-817c-9e3b5b9693be",
+        "stripe_customer_id": "cus_TQ8BtLIgaXkYMt",
+        "subscription_id": "sub_1STHxDFdjSPifIH5F3LHHkzy",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "a0e8dec4-2596-41d7-bcfa-54824c415de3",
+        "stripe_customer_id": "cus_TQfBjkqCEKT5T8",
+        "subscription_id": "sub_1STnr5FdjSPifIH5HPsyHiaa",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "f9e7e988-3f52-4568-a03e-9cbe36b66724",
+        "stripe_customer_id": "cus_TWiVUNiJUXYwVA",
+        "subscription_id": "sub_1SZf4JFdjSPifIH5oKu01DYh",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "3b8cf6cb-9b76-41cb-86d9-a5d4b6d52462",
+        "stripe_customer_id": "cus_TWiW27iMg2ZMqj",
+        "subscription_id": "sub_1SZf5PFdjSPifIH5L93tNIGz",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "53814dc3-36d2-4d40-b075-8d030f920ec4",
+        "stripe_customer_id": "cus_TWiS4SCWqN0nNk",
+        "subscription_id": "sub_1SZfu3FdjSPifIH5oz7hq3t9",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "4fb0c914-6db6-423c-9be9-d8373ecd9f1b",
+        "stripe_customer_id": "cus_TXmzqCdMspHYe4",
+        "subscription_id": "sub_1SahPJFdjSPifIH59LgNRjdl",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "78f63c4a-8b25-4136-8047-9e200e4acd50",
+        "stripe_customer_id": "cus_TZg206uUXhxIZT",
+        "subscription_id": "sub_1ScWgIFdjSPifIH5IChK3FnW",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "3f136845-b7fe-4a1e-9d07-6d3a7e441f34",
+        "stripe_customer_id": "cus_TZykmWQqeGD9Tb",
+        "subscription_id": "sub_1SconJFdjSPifIH5ULEa3bHn",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "ed53fe2e-0f13-4a0e-a068-581c2069b331",
+        "stripe_customer_id": "cus_TbLlaaGprATb0H",
+        "subscription_id": "sub_1Se940FdjSPifIH5g3AYHrFT",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "6a5b9799-3f9c-46bb-98dc-8a96bd8fa985",
+        "stripe_customer_id": "cus_Tbi2ECOcCH54SN",
+        "subscription_id": "sub_1SeUccFdjSPifIH5u4smPiB9",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "d9613825-8f2b-456f-8462-00dac598f3c3",
+        "stripe_customer_id": "cus_Td8eKcXq2tb3Cd",
+        "subscription_id": "sub_1SfsMxFdjSPifIH57AtSoGAn",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "ba83736a-29fa-430f-9977-597be504f1d4",
+        "stripe_customer_id": "cus_TeT648gvXFO1Lr",
+        "subscription_id": "sub_1ShAA4FdjSPifIH5M5OnPce0",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "499da177-f2e5-40dc-b5b0-f9b90b1217e4",
+        "stripe_customer_id": "cus_Teq5rxSIGIN7sc",
+        "subscription_id": "sub_1ShWP3FdjSPifIH5rHN3lyUD",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "63bbeaf5-5ee0-4a73-a32b-9503f8816f1c",
+        "stripe_customer_id": "cus_TgXnE6WpTUDk9i",
+        "subscription_id": "sub_1SjAi7FdjSPifIH5nPTnidK9",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "aa5ee3f6-33f5-4374-99d1-2757e549e012",
+        "stripe_customer_id": "cus_TgZWJzEihckZXL",
+        "subscription_id": "sub_1SjCN8FdjSPifIH5De4216wj",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "0fa98a00-b034-405b-a8b4-6d2e73cce030",
+        "stripe_customer_id": "cus_TgZlYqYBDwsH0F",
+        "subscription_id": "sub_1SjCcPFdjSPifIH51VNO2yFj",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "a78cb1b4-7e2d-4778-aa55-16b7a721266e",
+        "stripe_customer_id": "cus_Tgn8Uc10JamI6M",
+        "subscription_id": "sub_1SjPXpFdjSPifIH5pvCtRi5E",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "1f945cbc-ad5f-448d-8320-faeae7c0dd1b",
+        "stripe_customer_id": "cus_Tgn9mjKhYQRkc9",
+        "subscription_id": "sub_1SjPYkFdjSPifIH5jYeDW55Z",
+        "status": "active",
+        "monthly_dues": 10
+      },
+      {
+        "account_id": "ed540153-909b-4d12-ae8b-2061c5704908",
+        "stripe_customer_id": "cus_ThFl01mtoaDJsV",
+        "subscription_id": "sub_1SjrFdFdjSPifIH5jcVupoGk",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "e1b44bfe-860c-44a9-9be7-df87ee458134",
+        "stripe_customer_id": "cus_ThWagZZhFHEA3t",
+        "subscription_id": "sub_1Sk7XPFdjSPifIH52buvASHq",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "d16bcf5a-59bc-48b2-bad2-a1bbc00287a0",
+        "stripe_customer_id": "cus_ThXIjb8bo8f0iW",
+        "subscription_id": "sub_1Sk8E1FdjSPifIH50mDWNNe9",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "0e1c9701-349d-42ce-85b3-330b10a11bf7",
+        "stripe_customer_id": "cus_TichhFoYbIWOOY",
+        "subscription_id": "sub_1SlBSSFdjSPifIH5Lppvys7X",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "d21bd26b-f5cd-492f-83ef-8e88a2c7acc1",
+        "stripe_customer_id": "cus_TigNxSTQ62dCHL",
+        "subscription_id": "sub_1SlF0WFdjSPifIH5E7HiYnmQ",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "98c628f5-6f64-4b10-8698-5625bb6137e7",
+        "stripe_customer_id": "cus_TikIu3kaLMdU8g",
+        "subscription_id": "sub_1SlIoCFdjSPifIH5dZtdWUMp",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "7102e760-0ae3-42da-bc6c-4cf8a51c1a9f",
+        "stripe_customer_id": "cus_Tikjsnc4jFVFUw",
+        "subscription_id": "sub_1SlJEHFdjSPifIH5bA6I033S",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "300c9ec5-a942-4fe6-a988-8b7cf26df2ce",
+        "stripe_customer_id": "cus_TilGVHJbGTVvFW",
+        "subscription_id": "sub_1SlJjsFdjSPifIH5cidSbiWx",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "7f3ee311-d4aa-4124-aaf7-9035916a0947",
+        "stripe_customer_id": "cus_TmV3sAcl7YMcup",
+        "subscription_id": "sub_1Sow3IFdjSPifIH5p2aQ2b9P",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "95149c3c-eb97-4b81-8690-e23b63656daa",
+        "stripe_customer_id": "cus_TnDFKiVuwf4JkM",
+        "subscription_id": "sub_1SpcooFdjSPifIH5gFoI6l6k",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "6af77873-6148-4a9e-acf6-793c7082798b",
+        "stripe_customer_id": "cus_TnbIXUiixfV1H1",
+        "subscription_id": "sub_1Sq05uFdjSPifIH5BJRAVa4o",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "2955f8c7-2978-4b51-a3d9-b060eae793e4",
+        "stripe_customer_id": "cus_TnzdIoTHcb10lp",
+        "subscription_id": "sub_1SqNeOFdjSPifIH5RrsCqqsq",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "1046ba1d-96d4-4a81-90e2-0c940d15b08b",
+        "stripe_customer_id": "cus_Tpn1xesZTdSNJz",
+        "subscription_id": "sub_1Ss7RYFdjSPifIH50Tva8GPD",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "6d733c85-b90c-481e-a5ba-6508ca6064aa",
+        "stripe_customer_id": "cus_TqSCyEzL5hTw4S",
+        "subscription_id": "sub_1SslIZFdjSPifIH50r5LkWrR",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "7d4b2d2d-c6c2-41c9-bbaf-2d6c3e4853d5",
+        "stripe_customer_id": "cus_TqUNZiud51n0fc",
+        "subscription_id": "sub_1SsnOmFdjSPifIH5LMqJRwVG",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "4dac2b5c-1ba2-4136-b9ad-506fb4163278",
+        "stripe_customer_id": "cus_Tqbsids2216hwC",
+        "subscription_id": "sub_1SsueoFdjSPifIH5H6JfAMqw",
+        "status": "active",
+        "monthly_dues": 125
+      },
+      {
+        "account_id": "d5542032-2598-4150-81d5-0e93f57f497e",
+        "stripe_customer_id": "cus_TqcuFoPTW8SWVt",
+        "subscription_id": "sub_1SsveFFdjSPifIH5r9FRcrKK",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "3557a013-7023-4a4a-9636-0e1048fe8b53",
+        "stripe_customer_id": "cus_TryO73U2TNLv38",
+        "subscription_id": "sub_1SuERmFdjSPifIH5KzpFw9f4",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "04651973-733b-4a69-848f-20aa456fb8d7",
+        "stripe_customer_id": "cus_TsQjtBYf1RZSF0",
+        "subscription_id": "sub_1Sufs0FdjSPifIH56iRy5V5S",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "53b57351-baea-4274-8bcb-dbc30986b791",
+        "stripe_customer_id": "cus_TsSJ5EqTDi6gau",
+        "subscription_id": "sub_1SuhP8FdjSPifIH5A7K3lW5V",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "9d1f7df4-85bd-489a-a8c8-a7f7cb4ddbfb",
+        "stripe_customer_id": "cus_TtbjiqarCdTUmM",
+        "subscription_id": "sub_1SvoWTFdjSPifIH5JHL51PkD",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "4fb05caa-b958-4df5-9909-2369b74b8a6f",
+        "stripe_customer_id": "cus_TvSXEhS6h0SXbb",
+        "subscription_id": "sub_1SxbcXFdjSPifIH5OUJ2WY1D",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "4ff8ba64-7f71-43dd-aaf5-b37435e5154c",
+        "stripe_customer_id": "cus_TvidVb8wvnEYN5",
+        "subscription_id": "sub_1SxrBzFdjSPifIH5e3qTB392",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "1b50e669-7060-41bb-adbc-15fb092fbe0e",
+        "stripe_customer_id": "cus_Tw70ApGn4lXi6w",
+        "subscription_id": "sub_1SyEmLFdjSPifIH5y64F9SYF",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "3b040048-d4d7-4996-85dc-c196c3d65ec7",
+        "stripe_customer_id": "cus_TwHBlwEMTgvOLp",
+        "subscription_id": "sub_1SyOcoFdjSPifIH511Qgqbdq",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "61f7002c-34d0-4fa7-9a10-1160e15f1836",
+        "stripe_customer_id": "cus_Ty1rV5BDPADE8T",
+        "subscription_id": "sub_1T05nRFdjSPifIH5tP7JO39A",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "75a32f91-e478-43cd-a94b-a2622f5ab0d6",
+        "stripe_customer_id": "cus_Tyh7NE78TsS9sA",
+        "subscription_id": "sub_1T0jjVFdjSPifIH5RLLSMXzo",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "56415330-74c5-42d6-8244-f2ccaab26206",
+        "stripe_customer_id": "cus_TylEzMqf23SXhB",
+        "subscription_id": "sub_1T0niRFdjSPifIH5nUIzFW9o",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "d5c5cf76-1689-4970-8230-78e529f912e0",
+        "stripe_customer_id": "cus_U13rTLRILbmCsj",
+        "subscription_id": "sub_1T31kEFdjSPifIH5phhvMtvV",
+        "status": "active",
+        "monthly_dues": 10
+      },
+      {
+        "account_id": "a2b79bce-2471-4578-8718-912869464b19",
+        "stripe_customer_id": "cus_U0aQUSPxTat7nT",
+        "subscription_id": "sub_1T2ZFsFdjSPifIH5sUfJYGAj",
+        "status": "active",
+        "monthly_dues": 100
+      },
+      {
+        "account_id": "e3017f8c-d886-4a7f-bd60-f35f2180a764",
+        "stripe_customer_id": "cus_TjsRch6C2rmYsY",
+        "subscription_id": "sub_1SmOgwFdjSPifIH5SEUKFyAQ",
+        "status": "active",
+        "monthly_dues": 10
+      }
+    ],
+    "noSubscription": [
+      {
+        "account_id": "e910dde8-4e64-4d8c-95e3-ef93473989e6",
+        "stripe_customer_id": "cus_SBUPzV58Lzk3JY"
+      },
+      {
+        "account_id": "54b5e427-d4d1-46ac-b696-4349dd328b19",
+        "stripe_customer_id": "cus_SH8un80gswMuZu"
+      },
+      {
+        "account_id": "c162a3b7-b3af-44ae-90a7-bab901028a21",
+        "stripe_customer_id": "cus_SIf96jfeiMjqAG"
+      },
+      {
+        "account_id": "c135b07e-f5ea-45fc-b071-b54cce87801f",
+        "stripe_customer_id": "cus_Sz3mcU58g3EwdD"
+      },
+      {
+        "account_id": "ac9e183b-878c-4ec5-98ca-d32a5f7b1848",
+        "stripe_customer_id": "cus_SzzUiTUmyKTLXG"
+      },
+      {
+        "account_id": "422b9b9c-9247-4142-a468-18f23b02e34d",
+        "stripe_customer_id": "cus_T0v9wK5GZuguvP"
+      },
+      {
+        "account_id": "2d307aa9-5fe4-4f74-be98-9063019485b6",
+        "stripe_customer_id": "cus_T8mPs4nabPuOPr"
+      },
+      {
+        "account_id": "0b873687-bebf-4e02-8f1f-7290b7542b7d",
+        "stripe_customer_id": "cus_TKpzRgYoElr1p7"
+      },
+      {
+        "account_id": "ded9cb3c-e637-486e-945c-55ed13734982",
+        "stripe_customer_id": "cus_TXW8PzEQvN1yRD"
+      },
+      {
+        "account_id": "1b757ef0-0f9c-48e7-83bb-db5a33dd794e",
+        "stripe_customer_id": "cus_TcmdrcIDQTl2mc"
+      },
+      {
+        "account_id": "086e3103-0c35-430f-9f99-1096ea719e14",
+        "stripe_customer_id": "cus_TcoqIaLZdCo6RH"
+      },
+      {
+        "account_id": "ca6136fc-22e5-4fa4-aa2b-48342376ec52",
+        "stripe_customer_id": "cus_TdSJFBfpr76X4W"
+      },
+      {
+        "account_id": "f1cb6f0d-8753-44de-a02e-c4015f46f077",
+        "stripe_customer_id": "cus_Theqfbok55r2ay"
+      }
+    ],
+    "errors": [
+      {
+        "account_id": "9640c1dc-b1f9-478d-be1c-636f27d0c7d7",
+        "stripe_customer_id": "cus_SQYqv8CwsAZKe2\n",
+        "error": "No such customer: 'cus_SQYqv8CwsAZKe2\\n'. Make sure you use the exact id without extra whitespace or quotes"
+      },
+      {
+        "account_id": "7d82d692-522d-454d-ad47-8e6ca1a3547c",
+        "stripe_customer_id": "cus_STwvvjbHMxC7rY\n",
+        "error": "No such customer: 'cus_STwvvjbHMxC7rY\\n'. Make sure you use the exact id without extra whitespace or quotes"
+      },
+      {
+        "account_id": "109391a4-d368-4ccf-a6e8-95dd08ac2c3e",
+        "stripe_customer_id": "cus_STwhbBOA4YDo2K\n",
+        "error": "No such customer: 'cus_STwhbBOA4YDo2K\\n'. Make sure you use the exact id without extra whitespace or quotes"
+      }
+    ]
+  }
+}

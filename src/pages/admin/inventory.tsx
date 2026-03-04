@@ -6,6 +6,7 @@ import InventoryPhotoScanner from '../../components/inventory/InventoryPhotoScan
 import RecipeBuilder from '../../components/inventory/RecipeBuilder';
 import RecipeDrawer from '../../components/inventory/RecipeDrawer';
 import SalesUpload from '../../components/inventory/SalesUpload';
+import InventorySettings from '../../components/inventory/InventorySettings';
 import {
   Package,
   ChefHat,
@@ -15,6 +16,9 @@ import {
   AlertTriangle,
   DollarSign,
   Layers,
+  Download,
+  History,
+  Settings,
 } from 'lucide-react';
 import type {
   InventoryItem,
@@ -50,6 +54,9 @@ export default function InventoryPage() {
   const [isRecipeDrawerOpen, setIsRecipeDrawerOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [savingRecipe, setSavingRecipe] = useState(false);
+
+  // Settings state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Sales state
   const [salesHistory, setSalesHistory] = useState<SalesRecord[]>([]);
@@ -143,6 +150,76 @@ export default function InventoryPage() {
     } catch (err) {
       console.error('Failed to delete item:', err);
     }
+  };
+
+  const handleAdjustStock = async (id: string, newQuantity: number) => {
+    if (newQuantity < 0) return;
+
+    // Find the current item to calculate the change
+    const currentItem = inventory.find(item => item.id === id);
+    if (!currentItem) return;
+
+    const quantityChange = newQuantity - currentItem.quantity;
+    const transactionType = quantityChange > 0 ? 'add' : 'remove';
+
+    try {
+      // Log the transaction and update quantity
+      const res = await fetch('/api/inventory/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item_id: id,
+          transaction_type: transactionType,
+          quantity_change: Math.abs(quantityChange),
+          notes: 'Quick adjustment from inventory list'
+        }),
+      });
+
+      if (res.ok) {
+        await fetchInventory();
+      }
+    } catch (err) {
+      console.error('Failed to adjust stock:', err);
+    }
+  };
+
+  const handleExportCSV = () => {
+    // Generate CSV content
+    const headers = ['Name', 'Brand', 'Category', 'Subcategory', 'Quantity', 'Unit', 'Volume (ml)', 'Cost per Unit', 'Price per Serving', 'Par Level', 'Status', 'Notes'];
+
+    const rows = inventory.map(item => [
+      item.name,
+      item.brand || '',
+      item.category,
+      item.subcategory || '',
+      item.quantity.toString(),
+      item.unit,
+      item.volume_ml?.toString() || '',
+      item.cost_per_unit?.toString() || '',
+      item.price_per_serving?.toString() || '',
+      item.par_level?.toString() || '',
+      item.quantity < item.par_level ? 'LOW STOCK' : 'OK',
+      item.notes || ''
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inventory_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleEditItem = (item: InventoryItem) => {
@@ -280,23 +357,33 @@ export default function InventoryPage() {
       {/* Page Header */}
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Inventory</h1>
-        <div className={styles.pageActions}>
-          {activeTab === 'inventory' && (
-            <>
-              <button className={styles.btnTertiary} onClick={() => setIsScannerOpen(true)}>
-                <Camera size={16} /> Scan
-              </button>
-              <button className={styles.btnPrimary} onClick={handleAddItem}>
-                <Plus size={16} /> Add Item
-              </button>
-            </>
-          )}
-          {activeTab === 'recipes' && (
+        {activeTab === 'inventory' && (
+          <div className={styles.pageActions}>
+            <button
+              className={styles.btnIcon}
+              onClick={() => setIsSettingsOpen(true)}
+              title="Settings"
+            >
+              <Settings size={20} />
+            </button>
+            <button className={styles.btnTertiary} onClick={handleExportCSV}>
+              <Download size={16} /> Export
+            </button>
+            <button className={styles.btnTertiary} onClick={() => setIsScannerOpen(true)}>
+              <Camera size={16} /> Scan
+            </button>
+            <button className={styles.btnPrimary} onClick={handleAddItem}>
+              <Plus size={16} /> Add Item
+            </button>
+          </div>
+        )}
+        {activeTab === 'recipes' && (
+          <div className={styles.pageActions}>
             <button className={styles.btnPrimary} onClick={handleAddRecipe}>
               <Plus size={16} /> New Recipe
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Bar */}
@@ -365,6 +452,13 @@ export default function InventoryPage() {
           Sales
           <span className={styles.tabBadge}>{salesHistory.length}</span>
         </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'history' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          <History size={16} />
+          History
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -377,6 +471,7 @@ export default function InventoryPage() {
           onCategoryFilterChange={setInventoryCategory}
           onEdit={handleEditItem}
           onDelete={handleDeleteItem}
+          onAdjustStock={handleAdjustStock}
         />
       )}
 
@@ -410,6 +505,7 @@ export default function InventoryPage() {
           setEditingItem(null);
         }}
         onSave={handleSaveItem}
+        onDelete={handleDeleteItem}
         editItem={editingItem}
         saving={savingItem}
       />
@@ -432,6 +528,12 @@ export default function InventoryPage() {
         editRecipe={editingRecipe}
         inventory={inventory}
         saving={savingRecipe}
+      />
+
+      {/* Settings Drawer */}
+      <InventorySettings
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </AdminLayout>
   );

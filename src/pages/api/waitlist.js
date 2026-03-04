@@ -286,7 +286,25 @@ export default async function handler(req, res) {
       // Note: archived status does not send SMS
       let smsMessage = '';
       if (status === 'approved') {
-        smsMessage = "Hi {firstName} - We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nTo officially join, please complete the following:\n\nhttps://skylineandco.typeform.com/noirkc-signup#auth_code=tw\n\nThe link expires in 24 hours, so please respond to this text with any questions.\n\nThank you.";
+        // Generate application token for agreement signing (7-day expiration)
+        const applicationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        // Update waitlist with application token
+        await supabase
+          .from('waitlist')
+          .update({
+            application_token: applicationToken,
+            application_link_sent_at: new Date().toISOString(),
+            application_expires_at: expiresAt.toISOString()
+          })
+          .eq('id', id);
+
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirsandiego.com';
+        const agreementUrl = `${baseUrl}/agreement/${applicationToken}`;
+
+        smsMessage = `Hi {firstName} - We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nTo officially join, please review and sign the membership agreement:\n\n${agreementUrl}\n\nThe link expires in 7 days. Please respond to this text with any questions.\n\nThank you. 🖤`;
       } else if (status === 'waitlisted') {
         smsMessage = "Hi {firstName} - We appreciate your request.\n\nNoir is intentionally intimate—each additional member carefully considered to preserve the experience we value most at Noir.\n\nAt this time, we aren't able to extend an invitation. However, you've been added to our waitlist, and as space allows, your request will be revisited and you'll be notified.\n\nThank you for your patience. We hope to welcome you, when the time is right.";
       } else if (status === 'denied') {

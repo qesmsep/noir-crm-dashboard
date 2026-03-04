@@ -154,7 +154,7 @@ export interface ScannedItem {
 // Tab & UI Types
 // ========================================
 
-export type InventoryTab = 'inventory' | 'recipes' | 'sales';
+export type InventoryTab = 'inventory' | 'recipes' | 'sales' | 'history';
 
 export interface InventoryStats {
   total_items: number;
