@@ -84,26 +84,36 @@ export default function MemberSubscriptionCard({
         console.error('Error fetching members:', err);
       }
 
-      // Calculate base MRR (total monthly dues minus additional member fees)
-      const additionalMemberFees = secondaryMemberCount * 25;
-      const calculatedBaseMRR = (account.monthly_dues || 0) - additionalMemberFees;
-
-      setAdditionalMembersCount(secondaryMemberCount);
-      setBaseMRR(calculatedBaseMRR);
-
-      // If there's a subscription, fetch current price_id from Stripe
+      // If there's a subscription, fetch actual base amount from Stripe
       let currentPriceId = null;
+      let stripeBaseMRR = 0;
+
       if (account.stripe_subscription_id) {
         try {
           const subResponse = await fetch(`/api/subscriptions/${account.stripe_subscription_id}`);
           const subData = await subResponse.json();
-          if (subData.subscription && subData.subscription.items?.data?.[0]?.price?.id) {
-            currentPriceId = subData.subscription.items.data[0].price.id;
+          if (subData.subscription && subData.subscription.items?.data?.[0]) {
+            const priceData = subData.subscription.items.data[0].price;
+            currentPriceId = priceData.id;
+
+            // Get the actual base subscription amount from Stripe
+            if (priceData.unit_amount) {
+              stripeBaseMRR = priceData.unit_amount / 100; // Convert cents to dollars
+            }
           }
         } catch (err) {
           console.error('Error fetching subscription price:', err);
         }
       }
+
+      // Use Stripe amount if available, otherwise calculate from monthly_dues
+      const additionalMemberFees = secondaryMemberCount * 25;
+      const calculatedBaseMRR = stripeBaseMRR > 0
+        ? stripeBaseMRR
+        : (account.monthly_dues || 0) - additionalMemberFees;
+
+      setAdditionalMembersCount(secondaryMemberCount);
+      setBaseMRR(calculatedBaseMRR);
 
       setSubscription({
         stripe_subscription_id: account.stripe_subscription_id || null,
