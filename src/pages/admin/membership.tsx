@@ -1,91 +1,60 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  Heading,
-  Icon
-} from '@chakra-ui/react';
-import { FiUsers, FiFileText, FiCheckSquare, FiCreditCard, FiList } from 'react-icons/fi';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistManager from '../../components/admin/WaitlistManager';
 import ApplicationManager from '../../components/admin/ApplicationManager';
 import QuestionnaireManager from '../../components/admin/QuestionnaireManager';
 import AgreementManager from '../../components/admin/AgreementManager';
 import PaymentSettingsManager from '../../components/admin/PaymentSettingsManager';
+import { List, Users, FileText, CheckSquare, CreditCard } from 'lucide-react';
+import styles from '../../styles/Membership.module.css';
 
 export default function AdminMembership() {
   const [activeTab, setActiveTab] = useState(0);
 
+  const tabs = [
+    { id: 0, name: 'Waitlist', icon: List, component: WaitlistManager },
+    { id: 1, name: 'Applications', icon: Users, component: ApplicationManager },
+    { id: 2, name: 'Questionnaires', icon: FileText, component: QuestionnaireManager },
+    { id: 3, name: 'Agreements', icon: CheckSquare, component: AgreementManager },
+    { id: 4, name: 'Payment Settings', icon: CreditCard, component: PaymentSettingsManager },
+  ];
+
+  const ActiveComponent = tabs[activeTab].component;
+
   return (
     <AdminLayout>
-      <VStack spacing={6} align="stretch">
-        <VStack align="start" spacing={2}>
-          <Heading size="lg">Membership Management</Heading>
-          <Text color="gray.600">
-            Manage membership applications, questionnaires, agreements, and payment settings
-          </Text>
-        </VStack>
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <div className={styles.headerTitle}>
+            <h1 className={styles.pageTitle}>Membership Management</h1>
+            <p className={styles.subtitle}>
+              Manage membership applications, questionnaires, agreements, and payment settings
+            </p>
+          </div>
+        </div>
 
-        <Tabs index={activeTab} onChange={setActiveTab} variant="enclosed">
-          <TabList>
-            <Tab>
-              <HStack spacing={2}>
-                <Icon as={FiList} />
-                <Text>Waitlist</Text>
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <Icon as={FiUsers} />
-                <Text>Applications</Text>
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <Icon as={FiFileText} />
-                <Text>Questionnaires</Text>
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <Icon as={FiCheckSquare} />
-                <Text>Agreements</Text>
-              </HStack>
-            </Tab>
-            <Tab>
-              <HStack spacing={2}>
-                <Icon as={FiCreditCard} />
-                <Text>Payment Settings</Text>
-              </HStack>
-            </Tab>
-          </TabList>
+        <div className={styles.tabContainer}>
+          <div className={styles.tabList}>
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <Icon size={18} strokeWidth={2} />
+                  <span className={styles.tabText}>{tab.name}</span>
+                </button>
+              );
+            })}
+          </div>
 
-          <TabPanels>
-            <TabPanel>
-              <WaitlistManager />
-            </TabPanel>
-            <TabPanel>
-              <ApplicationManager />
-            </TabPanel>
-            <TabPanel>
-              <QuestionnaireManager />
-            </TabPanel>
-            <TabPanel>
-              <AgreementManager />
-            </TabPanel>
-            <TabPanel>
-              <PaymentSettingsManager />
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </VStack>
+          <div className={styles.tabContent}>
+            <ActiveComponent />
+          </div>
+        </div>
+      </div>
     </AdminLayout>
   );
-} 
+}
