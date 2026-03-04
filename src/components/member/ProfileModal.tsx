@@ -117,7 +117,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       toast({
         title: 'Error',
         description: 'Failed to update profile',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -128,6 +128,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const first = member?.first_name?.charAt(0) || '';
     const last = member?.last_name?.charAt(0) || '';
     return `${first}${last}`.toUpperCase();
+  };
+
+  const formatPhone = (phone?: string) => {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '').slice(-10);
+    if (cleaned.length !== 10) return phone;
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
   };
 
   return (
@@ -148,7 +155,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             <div className="relative">
               <div className="w-32 h-32 border-4 border-[#ECEAE5] rounded-full overflow-hidden bg-[#A59480]">
                 {(member?.photo || member?.profile_photo_url) ? (
-                  <img src={member.photo || member.profile_photo_url} alt="Profile" className="w-full h-full object-cover" />
+                  <img src={(member.photo || member.profile_photo_url) ?? undefined} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-white text-3xl font-bold">
                     {getInitials()}
@@ -237,7 +244,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-[#8C7C6D]" />
-                    <p className="text-[#1F1F1F]">{member?.phone}</p>
+                    <p className="text-[#1F1F1F]">{formatPhone(member?.phone)}</p>
                   </div>
                 </div>
               </div>
@@ -309,7 +316,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         <p className="text-xs text-[#5A5A5A]">{accountMember.email}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-[#8C7C6D]">{accountMember.phone}</p>
+                        <p className="text-xs text-[#8C7C6D]">{formatPhone(accountMember.phone)}</p>
                       </div>
                     </div>
                   ))}

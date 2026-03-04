@@ -23,6 +23,13 @@ export default function MemberDashboardPage() {
   const router = useRouter();
   const { member, loading } = useMemberAuth();
 
+  const formatPhone = (phone?: string) => {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '').slice(-10);
+    if (cleaned.length !== 10) return phone;
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  };
+
   // Debug: Log member data when it changes
   useEffect(() => {
     if (member) {
@@ -234,7 +241,7 @@ export default function MemberDashboardPage() {
                     {member?.first_name} {member?.last_name}
                   </p>
                   <p className="text-sm text-[#5A5A5A]">{member?.email}</p>
-                  <p className="text-sm text-[#5A5A5A]">{member?.phone}</p>
+                  <p className="text-sm text-[#5A5A5A]">{formatPhone(member?.phone)}</p>
                 </div>
               </div>
             </CardContent>

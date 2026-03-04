@@ -103,7 +103,7 @@ function AddCardForm({ accountId, onSuccess, onCancel }: { accountId: string; on
       toast({
         title: 'Error',
         description: error.message || 'Failed to add payment method',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setSubmitting(false);
@@ -176,7 +176,7 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
       toast({
         title: 'Error',
         description: 'Failed to load payment methods',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -210,7 +210,7 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
       toast({
         title: 'Error',
         description: error.message || 'Failed to update payment method',
-        variant: 'destructive',
+        variant: 'error',
       });
     }
   };
@@ -242,7 +242,7 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
       toast({
         title: 'Error',
         description: error.message || 'Failed to remove payment method',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setDeletingId(null);

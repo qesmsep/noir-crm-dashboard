@@ -59,7 +59,7 @@ export default function ReservationsModal({ isOpen, onClose, onReservationUpdate
       toast({
         title: 'Error',
         description: 'Failed to load reservations',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setLoadingReservations(false);
@@ -100,7 +100,7 @@ export default function ReservationsModal({ isOpen, onClose, onReservationUpdate
       toast({
         title: 'Error',
         description: error.message,
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setCancelingId(null);

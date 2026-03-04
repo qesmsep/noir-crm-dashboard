@@ -50,7 +50,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
       toast({
         title: 'Error',
         description: 'Failed to load transactions',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setLoadingTransactions(false);
@@ -88,7 +88,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
       toast({
         title: 'Payment Failed',
         description: error.message,
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setIsProcessingPayment(false);
@@ -273,7 +273,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
                             toast({
                               title: 'Download Failed',
                               description: 'Could not download the receipt',
-                              variant: 'destructive',
+                              variant: 'error',
                             });
                           }
                         }}
@@ -318,7 +318,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
                               toast({
                                 title: 'Download Failed',
                                 description: 'Could not download the PDF',
-                                variant: 'destructive',
+                                variant: 'error',
                               });
                             }
                           }}
@@ -363,7 +363,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
                             toast({
                               title: 'Download Failed',
                               description: 'Could not download the file',
-                              variant: 'destructive',
+                              variant: 'error',
                             });
                           }
                         }}
