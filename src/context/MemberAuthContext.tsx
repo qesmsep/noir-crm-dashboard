@@ -66,6 +66,8 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
   const [user, setUser] = useState<User | null>(null);
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = React.useRef(false);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   // Fetch member data from session (httpOnly cookie)
   const fetchMemberFromSession = useCallback(async () => {
@@ -93,6 +95,22 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
 
   // Legacy: Fetch member data from Supabase Auth (for email magic links)
   const fetchMemberFromAuth = useCallback(async (userId: string) => {
+    // Prevent concurrent fetches
+    if (fetchingRef.current) {
+      console.log('[MemberAuthContext] Already fetching member, skipping...');
+      return;
+    }
+
+    // Cancel any existing in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    fetchingRef.current = true;
+
     try {
       const { data, error } = await supabase
         .from('members')
@@ -100,7 +118,18 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
         .eq('auth_user_id', userId)
         .maybeSingle();
 
+      // Check if this request was cancelled
+      if (abortController.signal.aborted) {
+        console.log('[MemberAuthContext] Request was cancelled');
+        return;
+      }
+
       if (error) {
+        // Ignore abort errors - they're expected when cancelling requests
+        if (error.message?.includes('AbortError') || error.code === '') {
+          console.log('[MemberAuthContext] Fetch aborted (expected behavior)');
+          return;
+        }
         console.error('[MemberAuthContext] Error fetching member from auth:', error);
         setMember(null);
         return;
@@ -109,30 +138,60 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
       // If no member found (e.g., admin user), silently ignore
       if (!data) {
         console.log('[MemberAuthContext] No member found for Supabase user (likely admin), checking cookie session...');
-        // Fall back to cookie-based session check
-        const sessionResponse = await fetch('/api/auth/check-session', {
-          credentials: 'include',
-        });
 
-        if (sessionResponse.ok) {
-          const sessionData = await sessionResponse.json();
-          if (sessionData.member) {
-            console.log('[MemberAuthContext] Cookie session found:', sessionData.member?.first_name);
-            setMember(sessionData.member as Member);
+        // Check if cancelled before making fetch request
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        // Fall back to cookie-based session check
+        try {
+          const sessionResponse = await fetch('/api/auth/check-session', {
+            credentials: 'include',
+            signal: abortController.signal,
+          });
+
+          if (abortController.signal.aborted) {
+            return;
+          }
+
+          if (sessionResponse.ok) {
+            const sessionData = await sessionResponse.json();
+            if (sessionData.member) {
+              console.log('[MemberAuthContext] Cookie session found:', sessionData.member?.first_name);
+              setMember(sessionData.member as Member);
+            } else {
+              setMember(null);
+            }
           } else {
             setMember(null);
           }
-        } else {
-          setMember(null);
+        } catch (fetchError: any) {
+          if (fetchError.name === 'AbortError') {
+            console.log('[MemberAuthContext] Session fetch aborted');
+            return;
+          }
+          throw fetchError;
         }
         return;
       }
 
       setMember(data as Member);
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore abort errors - they're expected when cancelling requests
+      if (error.name === 'AbortError' || error.message?.includes('AbortError')) {
+        console.log('[MemberAuthContext] Request aborted (expected behavior)');
+        return;
+      }
       // Only log unexpected errors
       console.error('Error in fetchMemberFromAuth:', error);
       setMember(null);
+    } finally {
+      fetchingRef.current = false;
+      // Clear the abort controller if it's still the current one
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
     }
   }, []);
 
@@ -273,6 +332,12 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      // Cancel any pending requests on unmount
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      fetchingRef.current = false;
     };
   }, [fetchMemberFromAuth]);
 
