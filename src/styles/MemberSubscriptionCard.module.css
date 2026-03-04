@@ -122,10 +122,25 @@
   border-bottom: none;
 }
 
+.rowTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #F3F4F6;
+  margin-top: 8px;
+}
+
 .label {
   font-size: 14px;
   color: #6B7280;
   font-weight: 500;
+}
+
+.labelBold {
+  font-size: 15px;
+  color: #1F1F1F;
+  font-weight: 700;
 }
 
 .value {
@@ -134,10 +149,22 @@
   font-weight: 600;
 }
 
+.valueBold {
+  font-size: 16px;
+  color: #1F1F1F;
+  font-weight: 700;
+}
+
 .valueWarning {
   font-size: 14px;
   color: #EF4444;
   font-weight: 600;
+}
+
+.divider {
+  height: 1px;
+  background: #E5E7EB;
+  margin: 16px 0;
 }
 
 /* Loading & Empty States */
@@ -427,5 +454,37 @@
 
   .settingDescription {
     font-size: 11px;
+  }
+}
+
+/* Update Payment Button in Payment Settings */
+.updatePaymentButton {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: white;
+  color: #353535;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.updatePaymentButton:hover {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.updatePaymentButton:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .updatePaymentButton {
+    min-height: 44px;
   }
 }

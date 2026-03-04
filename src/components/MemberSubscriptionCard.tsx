@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
+import { supabase } from '@/lib/supabase';
 import styles from '../styles/MemberSubscriptionCard.module.css';
 import UpdatePlanModal from './UpdatePlanModal';
 import UpdatePaymentModal from './UpdatePaymentModal';
@@ -44,6 +45,8 @@ export default function MemberSubscriptionCard({
   const [actionLoading, setActionLoading] = useState(false);
   const [showUpdatePlanModal, setShowUpdatePlanModal] = useState(false);
   const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false);
+  const [additionalMembersCount, setAdditionalMembersCount] = useState(0);
+  const [baseMRR, setBaseMRR] = useState(0);
 
   useEffect(() => {
     if (accountId) {
@@ -63,6 +66,30 @@ export default function MemberSubscriptionCard({
 
       // Extract subscription data from account
       const account = result.data;
+
+      // Fetch member count to calculate additional member fees
+      let secondaryMemberCount = 0;
+      try {
+        const { data: members, error: membersError } = await supabase
+          .from('members')
+          .select('member_id, member_type, deactivated')
+          .eq('account_id', accountId)
+          .eq('member_type', 'secondary')
+          .eq('deactivated', false);
+
+        if (!membersError && members) {
+          secondaryMemberCount = members.length;
+        }
+      } catch (err) {
+        console.error('Error fetching members:', err);
+      }
+
+      // Calculate base MRR (total monthly dues minus additional member fees)
+      const additionalMemberFees = secondaryMemberCount * 25;
+      const calculatedBaseMRR = (account.monthly_dues || 0) - additionalMemberFees;
+
+      setAdditionalMembersCount(secondaryMemberCount);
+      setBaseMRR(calculatedBaseMRR);
 
       // If there's a subscription, fetch current price_id from Stripe
       let currentPriceId = null;
@@ -321,10 +348,29 @@ export default function MemberSubscriptionCard({
       </div>
 
       <div className={styles.content}>
+        {/* Base Subscription */}
         <div className={styles.row}>
-          <span className={styles.label}>MRR</span>
-          <span className={styles.value}>{formatCurrency(subscription.monthly_dues)}/mo</span>
+          <span className={styles.label}>Base Subscription</span>
+          <span className={styles.value}>{formatCurrency(baseMRR)}/mo</span>
         </div>
+
+        {/* Additional Members */}
+        {additionalMembersCount > 0 && (
+          <div className={styles.row}>
+            <span className={styles.label}>
+              Additional Members ({additionalMembersCount} × $25)
+            </span>
+            <span className={styles.value}>{formatCurrency(additionalMembersCount * 25)}/mo</span>
+          </div>
+        )}
+
+        {/* Total MRR */}
+        <div className={styles.rowTotal}>
+          <span className={styles.labelBold}>Total MRR</span>
+          <span className={styles.valueBold}>{formatCurrency(subscription.monthly_dues)}/mo</span>
+        </div>
+
+        <div className={styles.divider} />
 
         <div className={styles.row}>
           <span className={styles.label}>Start Date</span>
@@ -403,13 +449,6 @@ export default function MemberSubscriptionCard({
         >
           Update Plan
         </button>
-
-        <button
-          className={styles.paymentButton}
-          onClick={() => setShowUpdatePaymentModal(true)}
-        >
-          Update Payment
-        </button>
       </div>
 
       {/* Payment Settings */}
@@ -435,6 +474,12 @@ export default function MemberSubscriptionCard({
               <span className={styles.toggleSlider}></span>
             </label>
           </div>
+          <button
+            className={styles.updatePaymentButton}
+            onClick={() => setShowUpdatePaymentModal(true)}
+          >
+            Update Payment Method
+          </button>
         </div>
       )}
 
