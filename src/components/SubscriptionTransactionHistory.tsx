@@ -34,8 +34,8 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (accountId) {
@@ -97,8 +97,6 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
     }
   };
 
-  const displayedInvoices = showAll ? invoices : invoices.slice(0, 5);
-
   if (loading) {
     return (
       <div className={styles.card}>
@@ -131,7 +129,7 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
       </div>
 
       <div className={styles.invoiceList}>
-        {displayedInvoices.map((invoice) => (
+        {invoices.map((invoice) => (
           <div key={invoice.id} className={styles.invoiceRow}>
             <div className={styles.invoiceDescription}>
               {invoice.lines.length > 0
@@ -196,17 +194,6 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
           </div>
         ))}
       </div>
-
-      {invoices.length > 5 && (
-        <div className={styles.footer}>
-          <button
-            className={styles.showMoreButton}
-            onClick={() => setShowAll(!showAll)}
-          >
-            {showAll ? 'Show Less' : `Show All (${invoices.length})`}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

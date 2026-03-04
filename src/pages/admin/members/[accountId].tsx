@@ -20,7 +20,7 @@ interface Member {
   phone?: string;
   photo?: string;
   join_date?: string;
-  primary?: boolean;
+  member_type?: string;
   dob?: string;
   company?: string;
   referred_by?: string;
@@ -142,8 +142,8 @@ export default function MemberDetailAdmin() {
 
         // Sort members: primary first
         const sorted = (data || []).sort((a, b) => {
-          if (a.primary && !b.primary) return -1;
-          if (!a.primary && b.primary) return 1;
+          if (a.member_type === 'primary' && b.member_type !== 'primary') return -1;
+          if (a.member_type !== 'primary' && b.member_type === 'primary') return 1;
           return 0;
         });
         setMembers(sorted);
@@ -906,7 +906,7 @@ export default function MemberDetailAdmin() {
 
     try {
       // Get primary member for this account
-      const primaryMember = members.find(m => m.primary);
+      const primaryMember = members.find(m => m.member_type === 'primary');
       if (!primaryMember) {
         throw new Error('No primary member found for this account');
       }
@@ -989,7 +989,7 @@ export default function MemberDetailAdmin() {
 
     try {
       // Get primary member for this account
-      const primaryMember = members.find(m => m.primary);
+      const primaryMember = members.find(m => m.member_type === 'primary');
       if (!primaryMember) {
         throw new Error('No primary member found for this account');
       }
@@ -1072,6 +1072,64 @@ export default function MemberDetailAdmin() {
     }
   };
 
+  // Handle reassign primary member
+  const handleReassignPrimary = async (newPrimaryMemberId: string, memberName: string) => {
+    if (!window.confirm(`Make ${memberName} the primary member? This will demote the current primary member.`)) {
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+
+      // First, demote current primary to secondary
+      const { error: demoteError } = await supabase
+        .from('members')
+        .update({ member_type: 'secondary' })
+        .eq('account_id', accountId)
+        .eq('member_type', 'primary');
+
+      if (demoteError) throw demoteError;
+
+      // Then, promote new member to primary
+      const { error: promoteError } = await supabase
+        .from('members')
+        .update({ member_type: 'primary' })
+        .eq('member_id', newPrimaryMemberId);
+
+      if (promoteError) throw promoteError;
+
+      // Refresh members list
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('deactivated', false);
+
+      if (error) throw error;
+
+      const sorted = (data || []).sort((a, b) => {
+        if (a.member_type === 'primary' && b.member_type !== 'primary') return -1;
+        if (a.member_type !== 'primary' && b.member_type === 'primary') return 1;
+        return 0;
+      });
+      setMembers(sorted);
+
+      toast({
+        title: 'Primary Member Updated',
+        description: `${memberName} is now the primary member`,
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reassign primary member',
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -1113,16 +1171,14 @@ export default function MemberDetailAdmin() {
               {/* Member Cards */}
               <div className={styles.membersSection}>
                 <div className={styles.membersSectionHeader}>
-                  <h2 className={styles.sectionTitle}>Account Members</h2>
-                  {members.length === 1 && (
-                    <button
-                      onClick={() => setShowAddSecondaryModal(true)}
-                      className={styles.addSecondaryButton}
-                      title="Add Secondary Member"
-                    >
-                      + Add Secondary Member
-                    </button>
-                  )}
+                  <h2 className={styles.sectionTitle}>Account Members ({members.length})</h2>
+                  <button
+                    onClick={() => setShowAddSecondaryModal(true)}
+                    className={styles.addSecondaryButton}
+                    title="Add Member ($25/month)"
+                  >
+                    + Add Member
+                  </button>
                 </div>
                 <div className={styles.membersGrid}>
                   {members.map(member => (
@@ -1148,7 +1204,7 @@ export default function MemberDetailAdmin() {
                       <div className={styles.memberInfo}>
                         <h3 className={styles.memberName}>
                           {member.first_name} {member.last_name}
-                          {member.primary && (
+                          {member.member_type === 'primary' && (
                             <span className={styles.primaryBadge}>Primary</span>
                           )}
                         </h3>
@@ -1196,6 +1252,25 @@ export default function MemberDetailAdmin() {
                                 className={styles.cancelButton}
                               >
                                 Cancel
+                              </button>
+                              {member.member_type !== 'primary' && (
+                                <button
+                                  onClick={() => handleReassignPrimary(member.member_id, `${member.first_name} ${member.last_name}`)}
+                                  className={styles.makePrimaryEditButton}
+                                  title="Make Primary Member"
+                                >
+                                  Make Primary
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleSendLoginInfo(member.member_id)}
+                                className={styles.sendLoginButton}
+                                title="Send Login Info"
+                                disabled={sendingLoginInfo || !member.phone}
+                              >
+                                <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clipRule="evenodd" />
+                                </svg>
                               </button>
                               <button
                                 onClick={() => handleArchiveMember(member.member_id, `${member.first_name} ${member.last_name}`)}
@@ -1252,32 +1327,18 @@ export default function MemberDetailAdmin() {
                                 <span>LTV: {formatCurrency(calculateMemberLTV(member.member_id))}</span>
                               </div>
                               {editingMemberId !== member.member_id && (
-                                <>
-                                  <button
-                                    onClick={() => handleSendLoginInfo(member.member_id)}
-                                    className={styles.iconButton}
-                                    title="Send Login Info"
-                                    disabled={sendingLoginInfo || !member.phone}
-                                    style={{ marginRight: '8px' }}
-                                  >
-                                    <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setEditingMemberId(member.member_id);
-                                      setEditingMemberData(member);
-                                    }}
-                                    className={styles.iconButton}
-                                    title="Edit Member"
-                                  >
-                                    <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                    </svg>
-                                  </button>
-                                </>
+                                <button
+                                  onClick={() => {
+                                    setEditingMemberId(member.member_id);
+                                    setEditingMemberData(member);
+                                  }}
+                                  className={styles.iconButton}
+                                  title="Edit Member"
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                  </svg>
+                                </button>
                               )}
                             </div>
                           </div>
@@ -1459,11 +1520,6 @@ export default function MemberDetailAdmin() {
 
               {/* Subscription Card - Account-level subscription */}
               <MemberSubscriptionCard
-                accountId={accountId as string}
-              />
-
-              {/* Transaction History Card - Stripe invoices */}
-              <SubscriptionTransactionHistory
                 accountId={accountId as string}
               />
             </div>
@@ -1676,71 +1732,19 @@ export default function MemberDetailAdmin() {
                   {ledger.map((tx, idx) => {
                     const txMember = members.find(m => m.member_id === tx.member_id);
                     const isEditing = editingTransactionId === tx.id;
+                    const isExpanded = expandedTransactionId === tx.id || isEditing;
 
-                    const isExpanded = expandedTransactionId === tx.id;
-                    
                     return (
                       <div key={tx.id} className={styles.ledgerRow}>
-                        {isEditing ? (
-                          <div className={styles.ledgerRowEdit}>
-                            <input
-                              type="date"
-                              className={styles.compactInput}
-                              value={editingTransactionData.date || ''}
-                              onChange={(e) => setEditingTransactionData({ ...editingTransactionData, date: e.target.value })}
-                            />
-                            <select
-                              className={styles.compactSelect}
-                              value={editingTransactionData.type || ''}
-                              onChange={(e) => setEditingTransactionData({ ...editingTransactionData, type: e.target.value as 'payment' | 'purchase' })}
-                            >
-                              <option value="payment">Payment</option>
-                              <option value="purchase">Purchase</option>
-                            </select>
-                            <div style={{ position: 'relative', maxWidth: '80px' }}>
-                              <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#6e6e73', pointerEvents: 'none' }}>$</span>
-                              <input
-                                type="number"
-                                className={styles.compactInput}
-                                style={{ paddingLeft: '20px', width: '100%' }}
-                                value={Math.abs(editingTransactionData.amount || 0)}
-                                onChange={(e) => setEditingTransactionData({ ...editingTransactionData, amount: parseFloat(e.target.value) })}
-                              />
-                            </div>
-                            <input
-                              type="text"
-                              placeholder="Note"
-                              className={styles.compactInput}
-                              value={editingTransactionData.note || ''}
-                              onChange={(e) => setEditingTransactionData({ ...editingTransactionData, note: e.target.value })}
-                            />
-                            <div className={styles.ledgerRowActions}>
-                              <button onClick={() => handleUpdateTransaction(tx.id)} className={styles.iconButton} title="Save">
-                                ✓
-                              </button>
-                              <button onClick={() => setEditingTransactionId(null)} className={styles.iconButton} title="Cancel">
-                                ✕
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm('Are you sure you want to delete this transaction?')) {
-                                    handleDeleteTransaction(tx.id);
-                                  }
-                                }}
-                                className={styles.iconButton}
-                                title="Delete"
-                              >
-                                🗑
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div 
-                              className={styles.ledgerRowContent}
-                              onClick={() => setExpandedTransactionId(isExpanded ? null : tx.id)}
-                              style={{ cursor: 'pointer' }}
-                            >
+                        <div
+                          className={styles.ledgerRowContent}
+                          onClick={() => {
+                            if (!isEditing) {
+                              setExpandedTransactionId(isExpanded ? null : tx.id);
+                            }
+                          }}
+                          style={{ cursor: isEditing ? 'default' : 'pointer' }}
+                        >
                               <div className={styles.ledgerRowMain}>
                                 <div className={styles.ledgerDate}>
                                   {formatLedgerDate(tx.date)}
@@ -1771,45 +1775,112 @@ export default function MemberDetailAdmin() {
                                     {tx.amount >= 0 ? '+' : ''}{formatCurrency(tx.amount)}
                                   </div>
                                 </div>
-                                <div className={styles.ledgerRowActions}>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingTransactionId(tx.id);
-                                      setEditingTransactionData(tx);
-                                    }}
-                                    className={styles.iconButton}
-                                    title="Edit"
-                                  >
-                                    ✎
-                                  </button>
-                                </div>
                               </div>
                             </div>
                             {isExpanded && (
                               <div className={styles.ledgerRowDetails} onClick={(e) => e.stopPropagation()}>
                                 <div className={styles.ledgerDetailRow}>
+                                  <span className={styles.ledgerDetailLabel}>Date:</span>
+                                  {isEditing ? (
+                                    <input
+                                      type="date"
+                                      className={styles.compactInput}
+                                      value={editingTransactionData.date || ''}
+                                      onChange={(e) => setEditingTransactionData({ ...editingTransactionData, date: e.target.value })}
+                                    />
+                                  ) : (
+                                    <span>{formatLedgerDate(tx.date)}</span>
+                                  )}
+                                </div>
+                                <div className={styles.ledgerDetailRow}>
                                   <span className={styles.ledgerDetailLabel}>Member:</span>
                                   <span>{txMember ? `${txMember.first_name} ${txMember.last_name}` : 'Unknown'}</span>
                                 </div>
-                                {tx.note && (
-                                  <div className={styles.ledgerDetailRow}>
-                                    <span className={styles.ledgerDetailLabel}>Note:</span>
-                                    <span>{tx.note}</span>
-                                  </div>
-                                )}
                                 <div className={styles.ledgerDetailRow}>
                                   <span className={styles.ledgerDetailLabel}>Type:</span>
-                                  <span>{tx.type === 'payment' ? 'Payment' : 'Purchase'}</span>
+                                  {isEditing ? (
+                                    <select
+                                      className={styles.compactSelect}
+                                      value={editingTransactionData.type || ''}
+                                      onChange={(e) => setEditingTransactionData({ ...editingTransactionData, type: e.target.value as 'payment' | 'purchase' })}
+                                    >
+                                      <option value="payment">Payment</option>
+                                      <option value="purchase">Purchase</option>
+                                    </select>
+                                  ) : (
+                                    <span>{tx.type === 'payment' ? 'Payment' : 'Purchase'}</span>
+                                  )}
+                                </div>
+                                <div className={styles.ledgerDetailRow}>
+                                  <span className={styles.ledgerDetailLabel}>Amount:</span>
+                                  {isEditing ? (
+                                    <input
+                                      type="number"
+                                      className={styles.compactInput}
+                                      value={Math.abs(editingTransactionData.amount || 0)}
+                                      onChange={(e) => setEditingTransactionData({ ...editingTransactionData, amount: parseFloat(e.target.value) })}
+                                      step="0.01"
+                                    />
+                                  ) : (
+                                    <span>{formatCurrency(tx.amount)}</span>
+                                  )}
+                                </div>
+                                <div className={styles.ledgerDetailRow}>
+                                  <span className={styles.ledgerDetailLabel}>Note:</span>
+                                  {isEditing ? (
+                                    <input
+                                      type="text"
+                                      placeholder="Note"
+                                      className={styles.compactInput}
+                                      value={editingTransactionData.note || ''}
+                                      onChange={(e) => setEditingTransactionData({ ...editingTransactionData, note: e.target.value })}
+                                    />
+                                  ) : (
+                                    <span>{tx.note || '—'}</span>
+                                  )}
                                 </div>
                                 <div className={styles.ledgerRowActions}>
-                                  <button
-                                    onClick={() => handleDeleteTransaction(tx.id)}
-                                    className={styles.iconButton}
-                                    title="Delete"
-                                  >
-                                    🗑
-                                  </button>
+                                  {isEditing ? (
+                                    <>
+                                      <button onClick={() => handleUpdateTransaction(tx.id)} className={styles.smallButton} title="Save">
+                                        Save
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setEditingTransactionId(null);
+                                          setEditingTransactionData({});
+                                        }}
+                                        className={styles.smallButton}
+                                        title="Cancel"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setEditingTransactionId(tx.id);
+                                          setEditingTransactionData(tx);
+                                        }}
+                                        className={styles.smallButton}
+                                        title="Edit"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (window.confirm('Are you sure you want to delete this transaction?')) {
+                                            handleDeleteTransaction(tx.id);
+                                          }
+                                        }}
+                                        className={styles.smallButton}
+                                        title="Delete"
+                                      >
+                                        Delete
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                                 <InlineAttachments
                                   ledgerId={tx.id}
@@ -1818,8 +1889,6 @@ export default function MemberDetailAdmin() {
                                 />
                               </div>
                             )}
-                          </>
-                        )}
                       </div>
                     );
                   })}
@@ -1828,6 +1897,11 @@ export default function MemberDetailAdmin() {
             </>
               )}
             </div>
+
+            {/* Transaction History Card - Stripe invoices */}
+            <SubscriptionTransactionHistory
+              accountId={accountId as string}
+            />
           </div>
           </div>
 
@@ -1885,8 +1959,8 @@ export default function MemberDetailAdmin() {
                 if (error) throw error;
 
                 const sorted = (data || []).sort((a, b) => {
-                  if (a.primary && !b.primary) return -1;
-                  if (!a.primary && b.primary) return 1;
+                  if (a.member_type === 'primary' && b.member_type !== 'primary') return -1;
+                  if (a.member_type !== 'primary' && b.member_type === 'primary') return 1;
                   return 0;
                 });
                 setMembers(sorted);
