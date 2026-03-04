@@ -23,7 +23,7 @@ export interface ReceiptData {
 /**
  * Generate a PDF receipt for member transactions
  */
-export function generateTransactionReceipt(data: ReceiptData): jsPDF {
+export function generateTransactionReceipt(data: ReceiptData): any {
   const doc = new jsPDF();
 
   // Noir brand colors
@@ -78,32 +78,32 @@ export function generateTransactionReceipt(data: ReceiptData): jsPDF {
   ]);
 
   // autoTable(doc, {
-    startY: 100,
-    head: [['Date', 'Description', 'Type', 'Amount', 'Balance']],
-    body: tableData,
-    theme: 'grid',
-    headStyles: {
-      fillColor: cork,
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 10,
-    },
-    bodyStyles: {
-      textColor: nightSky,
-      fontSize: 9,
-    },
-    alternateRowStyles: {
-      fillColor: weddingDay,
-    },
-    columnStyles: {
-      0: { cellWidth: 30 }, // Date
-      1: { cellWidth: 70 }, // Description
-      2: { cellWidth: 25 }, // Type
-      3: { cellWidth: 30, halign: 'right' }, // Amount
-      4: { cellWidth: 30, halign: 'right' }, // Balance
-    },
-    margin: { left: 20, right: 20 },
-  });
+  //   startY: 100,
+  //   head: [['Date', 'Description', 'Type', 'Amount', 'Balance']],
+  //   body: tableData,
+  //   theme: 'grid',
+  //   headStyles: {
+  //     fillColor: cork,
+  //     textColor: [255, 255, 255],
+  //     fontStyle: 'bold',
+  //     fontSize: 10,
+  //   },
+  //   bodyStyles: {
+  //     textColor: nightSky,
+  //     fontSize: 9,
+  //   },
+  //   alternateRowStyles: {
+  //     fillColor: weddingDay,
+  //   },
+  //   columnStyles: {
+  //     0: { cellWidth: 30 }, // Date
+  //     1: { cellWidth: 70 }, // Description
+  //     2: { cellWidth: 25 }, // Type
+  //     3: { cellWidth: 30, halign: 'right' }, // Amount
+  //     4: { cellWidth: 30, halign: 'right' }, // Balance
+  //   },
+  //   margin: { left: 20, right: 20 },
+  // });
 
   // Summary
   const finalY = (doc as any).lastAutoTable.finalY + 15;
@@ -154,7 +154,7 @@ export function downloadTransactionReceipt(data: ReceiptData) {
 export function generateSingleTransactionReceipt(
   transaction: Transaction,
   memberData: Omit<ReceiptData, 'transactions' | 'generatedDate'>
-): jsPDF {
+): any {
   return generateTransactionReceipt({
     ...memberData,
     transactions: [transaction],

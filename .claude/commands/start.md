@@ -1,11 +1,9 @@
 DO NOT COMMIT UNTIL TIM EXPLICITLY APPROVES.
 
-1. Read AI_QUICK_START.md.
-2. Use grep with pattern "^## 📋 Summary" on HOWTO.md with -A 185 to read Summary section.
-3. Use grep with pattern "^## Table of Contents" on HOWTO.md with -A 25 to read Table of Contents.
-4. Use grep with pattern "^## Design System & Brand Guidelines" on HOWTO.md with -A 60 to read core brand principles.
-5. Load specialized agent capabilities (listed below).
-6. Respond "Initialized. What would you like to work on?"
+1. Present the specialized agent capabilities (listed below) concisely.
+2. Respond "Initialized. Use /howto for project docs. What would you like to work on?"
+
+**Note:** Full project documentation is in AI_QUICK_START.md and HOWTO.md - read them when you need context for specific tasks.
 
 ---
 

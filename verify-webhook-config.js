@@ -5,7 +5,7 @@ const Stripe = require('stripe');
 const envFile = fs.readFileSync('.env.local', 'utf8');
 const STRIPE_SECRET_KEY = envFile.match(/STRIPE_SECRET_KEY=(.*)/)[1].trim();
 
-const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2025-06-30.basil' });
+const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2025-08-27.basil' });
 
 async function verifyWebhookConfiguration() {
   console.log('🔍 Checking Stripe Webhook Configuration...\n');

@@ -26,7 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const email = findResponseByQuestionText(responses, questions, 'Email');
     const phone = findResponseByQuestionText(responses, questions, 'Phone');
     const company = findResponseByQuestionText(responses, questions, 'Company');
-    const howDidYouHear = findResponseByQuestionText(responses, questions, 'How did you hear about Noir?');
+    const howDidYouHear = findResponseByQuestionText(responses, questions, 'Who referred you to Noir?')
+      || findResponseByQuestionText(responses, questions, 'How did you hear about Noir?'); // Fallback for existing data
     const whyNoir = findResponseByQuestionText(responses, questions, 'Why are you interested in joining Noir?');
     const occupation = findResponseByQuestionText(responses, questions, 'Occupation');
     const industry = findResponseByQuestionText(responses, questions, 'Industry');

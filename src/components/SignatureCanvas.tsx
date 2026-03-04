@@ -48,8 +48,8 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
     const scaleX = CANVAS_WIDTH / rect.width;
     const scaleY = CANVAS_HEIGHT / rect.height;
 
-    const clientX = 'clientX' in e ? e.clientX : e.clientX;
-    const clientY = 'clientY' in e ? e.clientY : e.clientY;
+    const clientX = e.clientX;
+    const clientY = e.clientY;
 
     return {
       x: (clientX - rect.left) * scaleX,

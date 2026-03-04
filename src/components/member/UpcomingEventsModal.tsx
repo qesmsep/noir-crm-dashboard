@@ -103,7 +103,7 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
     }
   };
 
-  const getDaysInMonth = (date: Date) => {
+  const getDaysInMonth = (date: Date): (Date | null)[] => {
     const year = date.getFullYear();
     const month = date.getMonth();
     const firstDay = new Date(year, month, 1);
@@ -111,7 +111,7 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
 
-    const days = [];
+    const days: (Date | null)[] = [];
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
