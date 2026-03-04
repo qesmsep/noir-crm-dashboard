@@ -1,34 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Input,
-  Textarea,
-  Button,
-  FormControl,
-  FormLabel,
-  Select,
-  useToast,
-  Image,
-  Heading,
-  Container,
-  Spinner,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure
-} from '@chakra-ui/react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/hooks/useToast';
+import { AlertCircle } from 'lucide-react';
 
 interface PrivateEvent {
   id: string;
@@ -62,8 +44,8 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
   const [error, setError] = useState<string | null>(null);
   const [rsvpUrl, setRsvpUrl] = useState<string>('');
   const [remainingSpots, setRemainingSpots] = useState<number | null>(null);
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState<RSVPForm>({
     first_name: '',
@@ -81,7 +63,7 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
       setRsvpUrl(resolvedParams.rsvpUrl);
       await fetchEvent(resolvedParams.rsvpUrl);
     };
-    
+
     initPage();
   }, [params]);
 
@@ -92,8 +74,10 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
         throw new Error('Event not found');
       }
       const eventData = await response.json();
+      console.log('Event data:', eventData);
+      console.log('Background image URL:', eventData.background_image_url);
       setEvent(eventData);
-      
+
       // Fetch current attendee count to calculate remaining spots
       if (eventData.id) {
         const attendeeResponse = await fetch(`/api/rsvp/attendee-count?event_id=${eventData.id}`);
@@ -155,14 +139,13 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
         throw new Error(result.error || 'Failed to submit RSVP');
       }
 
-      onOpen();
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error('Error submitting RSVP:', error);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to submit RSVP',
-        status: 'error',
-        duration: 5000,
+        variant: 'error',
       });
     } finally {
       setSubmitting(false);
@@ -190,238 +173,225 @@ export default function RSVPPage({ params }: { params: Promise<{ rsvpUrl: string
 
   if (loading) {
     return (
-      <Box
-        minH="100vh"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        bg="gray.50"
-      >
-        <VStack spacing={4}>
-          <Spinner size="xl" />
-          <Text>Loading event details...</Text>
-        </VStack>
-      </Box>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <Spinner className="h-12 w-12" />
+          <p className="text-gray-600">Loading event details...</p>
+        </div>
+      </div>
     );
   }
 
   if (error || !event) {
     return (
-      <Box
-        minH="100vh"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        bg="gray.50"
-      >
-        <Alert status="error" maxW="md">
-          <AlertIcon />
-          <Box>
-            <AlertTitle>Event Not Found</AlertTitle>
-            <AlertDescription>
-              {error || 'This RSVP link is invalid or the event has been cancelled.'}
-            </AlertDescription>
-          </Box>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Alert variant="error" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Event Not Found</AlertTitle>
+          <AlertDescription>
+            {error || 'This RSVP link is invalid or the event has been cancelled.'}
+          </AlertDescription>
         </Alert>
-      </Box>
+      </div>
     );
   }
 
   const timeOptions = generateTimeOptions();
 
   return (
-    <Box
-      minH="100vh"
-      bg={event.background_image_url ? 'transparent' : 'gray.50'}
-      position="relative"
-    >
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Image */}
       {event.background_image_url && (
-        <Box
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          bottom={0}
-          zIndex={0}
-        >
-          <Image
-            src={event.background_image_url}
-            alt="Event background"
-            w="full"
-            h="full"
-            objectFit="cover"
-            filter="brightness(0.3)"
-          />
-        </Box>
+        <>
+          <div className="absolute inset-0 z-0">
+            <img
+              src={event.background_image_url}
+              alt="Event background"
+              className="w-full h-full object-cover"
+              onLoad={() => console.log('Image loaded successfully')}
+              onError={(e) => console.error('Image failed to load:', e)}
+            />
+          </div>
+          <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/60 to-black/70" />
+        </>
       )}
 
-      <Container maxW="md" py={8} position="relative" zIndex={1}>
-        <VStack spacing={8} align="stretch">
-          <Box textAlign="center" color={event.background_image_url ? 'white' : 'gray.800'}>
-            <Heading size="lg" mb={2}>
+      <div className={`relative z-10 container max-w-md mx-auto py-8 px-4 ${!event.background_image_url ? 'bg-gray-50' : ''}`}>
+        <div className="flex flex-col gap-8">
+          {/* Event Header */}
+          <div className={`text-center ${event.background_image_url ? 'text-white' : 'text-gray-800'}`}>
+            <h1 className="text-3xl font-bold mb-2">
               {event.title}
-            </Heading>
-            <Text fontSize="lg" mb={4}>
+            </h1>
+            <p className="text-lg mb-4">
               {event.event_type}
-            </Text>
-            <Text fontSize="md" mb={2}>
+            </p>
+            <p className="text-base mb-2">
               {formatDateTime(event.start_time)}
-            </Text>
-            <Text fontSize="sm" opacity={0.8}>
+            </p>
+            <p className="text-sm opacity-80">
               {event.max_guests} guests maximum per reservation
               {event.deposit_required > 0 && ` • $${event.deposit_required} deposit required`}
-            </Text>
-            <Text fontSize="sm" opacity={0.8} mt={1}>
+            </p>
+            <p className="text-sm opacity-80 mt-1">
               Total Event Capacity: {event.total_attendees_maximum} guests
               {remainingSpots !== null && (
-                <span style={{ color: remainingSpots <= 5 ? '#e53e3e' : '#38a169' }}>
+                <span className={remainingSpots <= 5 ? 'text-red-400' : 'text-green-400'}>
                   {' '}• {remainingSpots} spots remaining
                 </span>
               )}
-            </Text>
+            </p>
             {event.event_description && (
-              <Text fontSize="sm" mt={4} opacity={0.9}>
+              <p className="text-sm mt-4 opacity-90">
                 {event.event_description}
-              </Text>
+              </p>
             )}
-          </Box>
+          </div>
 
-          <Box
-            bg="white"
-            p={6}
-            borderRadius="lg"
-            boxShadow="lg"
-          >
+          {/* RSVP Form */}
+          <div className="bg-white p-6 rounded-lg shadow-lg">
             <form onSubmit={handleSubmit}>
-              <VStack spacing={4}>
-                <Heading size="md" mb={4}>
-                  RSVP Form
-                </Heading>
+              <div className="flex flex-col gap-4">
+                <h2 className="text-xl font-semibold mb-4">RSVP Form</h2>
 
-                <HStack spacing={4} w="full">
-                  <FormControl isRequired>
-                    <FormLabel>First Name</FormLabel>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="first_name">First Name *</Label>
                     <Input
+                      id="first_name"
                       value={formData.first_name}
                       onChange={(e) => handleInputChange('first_name', e.target.value)}
                       placeholder="First name"
+                      required
                     />
-                  </FormControl>
+                  </div>
 
-                  <FormControl isRequired>
-                    <FormLabel>Last Name</FormLabel>
+                  <div className="space-y-2">
+                    <Label htmlFor="last_name">Last Name *</Label>
                     <Input
+                      id="last_name"
                       value={formData.last_name}
                       onChange={(e) => handleInputChange('last_name', e.target.value)}
                       placeholder="Last name"
+                      required
                     />
-                  </FormControl>
-                </HStack>
+                  </div>
+                </div>
 
-                <FormControl isRequired>
-                  <FormLabel>Email</FormLabel>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
                   <Input
+                    id="email"
                     type="email"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     placeholder="your@email.com"
+                    required
                   />
-                </FormControl>
+                </div>
 
-                <FormControl isRequired>
-                  <FormLabel>Phone Number</FormLabel>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
                   <Input
+                    id="phone"
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => handleInputChange('phone', e.target.value)}
                     placeholder="(555) 123-4567"
+                    required
                   />
-                </FormControl>
+                </div>
 
-                <FormControl isRequired>
-                  <FormLabel>Party Size</FormLabel>
+                <div className="space-y-2">
+                  <Label htmlFor="party_size">Party Size *</Label>
                   <Select
-                    value={formData.party_size}
+                    id="party_size"
+                    value={formData.party_size.toString()}
                     onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))}
+                    required
                   >
                     {Array.from({ length: Math.min(event.max_guests, remainingSpots || event.max_guests) }, (_, i) => i + 1).map(num => (
-                      <option key={num} value={num}>{num} {num === 1 ? 'guest' : 'guests'}</option>
+                      <option key={num} value={num.toString()}>
+                        {num} {num === 1 ? 'guest' : 'guests'}
+                      </option>
                     ))}
                   </Select>
                   {remainingSpots !== null && remainingSpots < event.max_guests && (
-                    <Text fontSize="xs" color="red.500" mt={1}>
+                    <p className="text-xs text-red-500">
                       Limited by remaining spots ({remainingSpots} available)
-                    </Text>
+                    </p>
                   )}
-                </FormControl>
+                </div>
 
                 {event.require_time_selection && (
-                  <FormControl isRequired>
-                    <FormLabel>Preferred Time</FormLabel>
+                  <div className="space-y-2">
+                    <Label htmlFor="time_selected">Preferred Time *</Label>
                     <Select
+                      id="time_selected"
                       value={formData.time_selected}
                       onChange={(e) => handleInputChange('time_selected', e.target.value)}
-                      placeholder="Select a time"
+                      required
                     >
+                      <option value="">Select a time</option>
                       {timeOptions.map(option => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
                       ))}
                     </Select>
-                  </FormControl>
+                  </div>
                 )}
 
-                <FormControl>
-                  <FormLabel>Special Requests</FormLabel>
+                <div className="space-y-2">
+                  <Label htmlFor="special_requests">Special Requests</Label>
                   <Textarea
+                    id="special_requests"
                     value={formData.special_requests}
                     onChange={(e) => handleInputChange('special_requests', e.target.value)}
                     placeholder="Any special requests or dietary restrictions..."
                     rows={3}
                   />
-                </FormControl>
+                </div>
 
                 <Button
                   type="submit"
-                  bg="#a59480"
-                  color="white"
-                  _hover={{ bg: '#8c7a5a' }}
+                  className="w-full bg-[#a59480] hover:bg-[#8c7a5a] text-white"
                   size="lg"
-                  w="full"
-                  isLoading={submitting}
-                  loadingText="Submitting RSVP..."
+                  disabled={submitting}
                 >
-                  Submit RSVP
+                  {submitting ? 'Submitting RSVP...' : 'Submit RSVP'}
                 </Button>
-              </VStack>
+              </div>
             </form>
-          </Box>
-        </VStack>
-      </Container>
+          </div>
+        </div>
+      </div>
 
-      <Modal isOpen={isOpen} onClose={onClose} isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>RSVP Confirmed!</ModalHeader>
-          <ModalBody>
-            <VStack spacing={4} textAlign="center">
-              <Text fontSize="lg">
-                Thank you for your RSVP!
-              </Text>
-              <Text>
-                We've sent a confirmation message to your phone number. 
-                Please respond directly to that message if you need to make any changes.
-              </Text>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button bg="#a59480" color="white" _hover={{ bg: '#8c7a5a' }} onClick={onClose}>
+      {/* Success Modal */}
+      <Dialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>RSVP Confirmed!</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 text-center py-4">
+            <DialogDescription className="text-lg">
+              Thank you for your RSVP!
+            </DialogDescription>
+            <p className="text-sm text-gray-600">
+              We've sent a confirmation message to your phone number.
+              Please respond directly to that message if you need to make any changes.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={() => setIsSuccessModalOpen(false)}
+              className="bg-[#a59480] hover:bg-[#8c7a5a] text-white"
+            >
               Close
             </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </Box>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
-} 
+}

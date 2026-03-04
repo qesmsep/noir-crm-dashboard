@@ -26,9 +26,17 @@ interface PaymentStatus {
 
 interface Props {
   accountId: string;
+  creditCardFeeEnabled?: boolean;
+  updatingFeeToggle?: boolean;
+  onToggleCreditCardFee?: () => void;
 }
 
-export default function MemberSubscriptionCard({ accountId }: Props) {
+export default function MemberSubscriptionCard({
+  accountId,
+  creditCardFeeEnabled = false,
+  updatingFeeToggle = false,
+  onToggleCreditCardFee
+}: Props) {
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
@@ -403,6 +411,32 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
           Update Payment
         </button>
       </div>
+
+      {/* Payment Settings */}
+      {onToggleCreditCardFee && (
+        <div className={styles.paymentSettings}>
+          <div className={styles.settingsDivider} />
+          <div className={styles.settingsTitle}>Payment Settings</div>
+          <div className={styles.settingRow}>
+            <div className={styles.settingInfo}>
+              <div className={styles.settingLabel}>Credit Card Processing Fee</div>
+              <div className={styles.settingDescription}>
+                Add 4% fee to credit card transactions (ACH/bank transfers exempt)
+              </div>
+            </div>
+            <label className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={creditCardFeeEnabled}
+                onChange={onToggleCreditCardFee}
+                disabled={updatingFeeToggle}
+                className={styles.toggleInput}
+              />
+              <span className={styles.toggleSlider}></span>
+            </label>
+          </div>
+        </div>
+      )}
 
       {showUpdatePlanModal && (
         <UpdatePlanModal

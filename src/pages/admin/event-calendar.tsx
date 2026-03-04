@@ -35,6 +35,7 @@ import {
   Select,
   Checkbox,
   Link,
+  Heading,
 } from '@chakra-ui/react';
 import { ChevronLeft, ChevronRight, Plus, Calendar, Settings, Download, X, Edit2 } from 'lucide-react';
 import AdminLayout from '../../components/layouts/AdminLayout';
@@ -59,6 +60,8 @@ interface PrivateEvent {
   minaka_url?: string;
   rsvp_enabled?: boolean;
   rsvp_url?: string;
+  max_guests?: number;
+  total_attendees_maximum?: number;
 }
 
 interface Reservation {
@@ -101,6 +104,8 @@ export default function EventCalendarNew() {
   const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PrivateEvent | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [eventFormData, setEventFormData] = useState({
     title: '',
     start_time: '',
@@ -111,6 +116,8 @@ export default function EventCalendarNew() {
     client_email: '',
     location: '',
     rsvp_enabled: false,
+    max_guests: 10,
+    total_attendees_maximum: 100,
   });
   const [monthStats, setMonthStats] = useState({
     totalReservations: 0,
@@ -384,6 +391,8 @@ export default function EventCalendarNew() {
       client_email: event.client_email || '',
       location: event.location || '',
       rsvp_enabled: event.rsvp_enabled || false,
+      max_guests: event.max_guests || 10,
+      total_attendees_maximum: event.total_attendees_maximum || 100,
     });
 
     setIsEditEventModalOpen(true);
@@ -484,6 +493,8 @@ export default function EventCalendarNew() {
         event_description: eventFormData.description || null,
         rsvp_enabled: eventFormData.rsvp_enabled,
         rsvp_url: eventFormData.rsvp_enabled ? rsvp_url : null,
+        max_guests: eventFormData.max_guests,
+        total_attendees_maximum: eventFormData.total_attendees_maximum,
       };
 
       console.log('Updating event with data:', eventData);
@@ -501,6 +512,17 @@ export default function EventCalendarNew() {
 
       console.log('Update successful:', data);
 
+      // Upload image if one was selected
+      if (imageFile) {
+        const backgroundImageUrl = await uploadImage(editingEvent.id);
+        if (backgroundImageUrl) {
+          await supabase
+            .from('private_events')
+            .update({ background_image_url: backgroundImageUrl })
+            .eq('id', editingEvent.id);
+        }
+      }
+
       toast({
         title: 'Success',
         description: 'Event updated successfully',
@@ -510,6 +532,8 @@ export default function EventCalendarNew() {
 
       setIsEditEventModalOpen(false);
       setEditingEvent(null);
+      setImageFile(null);
+      setImagePreview(null);
       fetchCalendarData();
     } catch (error) {
       console.error('Error updating event:', error);
@@ -555,9 +579,54 @@ export default function EventCalendarNew() {
     }
   };
 
+  const uploadImage = async (eventId: string): Promise<string | null> => {
+    if (!imageFile) return null;
+
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${eventId}-${Date.now()}.${fileExt}`;
+      const filePath = `private-events/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload image',
+        status: 'error',
+        duration: 3000,
+      });
+      return null;
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleCloseEventModal = () => {
     setIsEditEventModalOpen(false);
     setEditingEvent(null);
+    setImageFile(null);
+    setImagePreview(null);
     setEventFormData({
       title: '',
       start_time: '',
@@ -568,6 +637,8 @@ export default function EventCalendarNew() {
       client_email: '',
       location: '',
       rsvp_enabled: false,
+      max_guests: 10,
+      total_attendees_maximum: 100,
     });
   };
 
@@ -1144,6 +1215,64 @@ export default function EventCalendarNew() {
                     </FormControl>
 
                     <FormControl>
+                      <FormLabel fontSize="sm" mb={1}>Event Background Image (Optional)</FormLabel>
+                      <Input
+                        size="sm"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                      />
+                      {imagePreview && (
+                        <Box mt={2}>
+                          <img src={imagePreview} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                        </Box>
+                      )}
+                      {!imagePreview && editingEvent?.background_image_url && (
+                        <Box mt={2}>
+                          <Text fontSize="xs" color="gray.600">Current image:</Text>
+                          <img src={editingEvent.background_image_url} alt="Current" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                        </Box>
+                      )}
+                      <Text fontSize="xs" color="gray.600" mt={1}>
+                        If no image is uploaded, the main landing page hero image will be used as fallback
+                      </Text>
+                    </FormControl>
+
+                    {eventFormData.rsvp_enabled && (
+                      <>
+                        <FormControl>
+                          <FormLabel fontSize="sm" mb={1}>Max Guests Per Reservation</FormLabel>
+                          <Input
+                            size="sm"
+                            type="number"
+                            value={eventFormData.max_guests}
+                            onChange={(e) => setEventFormData({ ...eventFormData, max_guests: parseInt(e.target.value) || 10 })}
+                            placeholder="Maximum guests per RSVP"
+                            min={1}
+                          />
+                          <Text fontSize="xs" color="gray.600" mt={1}>
+                            Maximum party size for each individual RSVP
+                          </Text>
+                        </FormControl>
+
+                        <FormControl>
+                          <FormLabel fontSize="sm" mb={1}>Total Event Capacity</FormLabel>
+                          <Input
+                            size="sm"
+                            type="number"
+                            value={eventFormData.total_attendees_maximum}
+                            onChange={(e) => setEventFormData({ ...eventFormData, total_attendees_maximum: parseInt(e.target.value) || 100 })}
+                            placeholder="Total attendees maximum"
+                            min={1}
+                          />
+                          <Text fontSize="xs" color="gray.600" mt={1}>
+                            Maximum total guests for the entire event
+                          </Text>
+                        </FormControl>
+                      </>
+                    )}
+
+                    <FormControl>
                       <FormLabel fontSize="sm" mb={1}>Client Name</FormLabel>
                       <Input
                         size="sm"
@@ -1197,15 +1326,14 @@ export default function EventCalendarNew() {
                         <Box mt={2} p={2} bg="blue.50" borderRadius="md" borderWidth="1px" borderColor="blue.200">
                           <Text fontSize="xs" color="gray.600" mb={1}>RSVP Link:</Text>
                           <HStack spacing={2}>
-                            <Link
-                              href={`/rsvp/${editingEvent.rsvp_url}`}
-                              isExternal
+                            <Text
                               fontSize="sm"
                               color="blue.600"
                               fontWeight="medium"
+                              wordBreak="break-all"
                             >
-                              {typeof window !== 'undefined' ? `${window.location.origin}/rsvp/${editingEvent.rsvp_url}` : `/rsvp/${editingEvent.rsvp_url}`}
-                            </Link>
+                              /rsvp/{editingEvent.rsvp_url}
+                            </Text>
                             <Button
                               size="xs"
                               colorScheme="blue"
@@ -1278,6 +1406,7 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PrivateEvent | null>(null);
+  const [linkedReservations, setLinkedReservations] = useState<Reservation[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -1286,6 +1415,8 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
     description: '',
     guest_count: '',
     rsvp_enabled: false,
+    max_guests: 10,
+    total_attendees_maximum: 100,
   });
   const [mounted, setMounted] = useState(false);
   const toast = useToast();
@@ -1378,6 +1509,22 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
     }
   };
 
+  const fetchLinkedReservations = async (eventId: string) => {
+    try {
+      const { data: reservations, error } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('private_event_id', eventId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setLinkedReservations(reservations || []);
+    } catch (error) {
+      console.error('Error fetching linked reservations:', error);
+      setLinkedReservations([]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -1422,6 +1569,8 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
           event_description: formData.description || null,
           rsvp_enabled: formData.rsvp_enabled,
           rsvp_url: formData.rsvp_enabled ? rsvp_url : null,
+          max_guests: formData.max_guests,
+          total_attendees_maximum: formData.total_attendees_maximum,
         };
 
         const { error } = await supabase
@@ -1463,6 +1612,8 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
           event_description: formData.description || null,
           rsvp_enabled: formData.rsvp_enabled,
           rsvp_url: rsvp_url,
+          max_guests: formData.max_guests,
+          total_attendees_maximum: formData.total_attendees_maximum,
         };
 
         const { error } = await supabase
@@ -1525,7 +1676,7 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
 
   const handleEdit = (event: PrivateEvent) => {
     setEditingEvent(event);
-    
+
     // Convert ISO datetime strings to datetime-local format (YYYY-MM-DDTHH:mm)
     const formatForInput = (isoString: string) => {
       if (!isoString) return '';
@@ -1537,7 +1688,7 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
       const minutes = String(date.getMinutes()).padStart(2, '0');
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     };
-    
+
     setFormData({
       name: event.name || '',
       title: event.title || event.name || '',
@@ -1546,13 +1697,24 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
       description: event.description || '',
       guest_count: event.guest_count?.toString() || '',
       rsvp_enabled: event.rsvp_enabled || false,
+      max_guests: event.max_guests || 10,
+      total_attendees_maximum: event.total_attendees_maximum || 100,
     });
+
+    // Fetch linked reservations if RSVP is enabled
+    if (event.rsvp_enabled) {
+      fetchLinkedReservations(event.id);
+    } else {
+      setLinkedReservations([]);
+    }
+
     setIsCreateModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsCreateModalOpen(false);
     setEditingEvent(null);
+    setLinkedReservations([]);
     setFormData({
       name: '',
       title: '',
@@ -1561,6 +1723,8 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
       description: '',
       guest_count: '',
       rsvp_enabled: false,
+      max_guests: 10,
+      total_attendees_maximum: 100,
     });
   };
 
@@ -1822,6 +1986,42 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
                     />
                   </FormControl>
 
+                  {formData.rsvp_enabled && (
+                    <>
+                      <FormControl>
+                        <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Max Guests Per Reservation</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.max_guests}
+                          onChange={(e) => setFormData({ ...formData, max_guests: parseInt(e.target.value) || 10 })}
+                          placeholder="Maximum guests per RSVP"
+                          fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                          _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+                          min={1}
+                        />
+                        <Text fontSize="xs" color="gray.600" mt={1} fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
+                          Maximum party size for each individual RSVP
+                        </Text>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Total Event Capacity</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.total_attendees_maximum}
+                          onChange={(e) => setFormData({ ...formData, total_attendees_maximum: parseInt(e.target.value) || 100 })}
+                          placeholder="Total attendees maximum"
+                          fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                          _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+                          min={1}
+                        />
+                        <Text fontSize="xs" color="gray.600" mt={1} fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
+                          Maximum total guests for the entire event
+                        </Text>
+                      </FormControl>
+                    </>
+                  )}
+
                   <FormControl>
                     <FormLabel fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">Description</FormLabel>
                     <Textarea
@@ -1846,17 +2046,15 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
                       <Box mt={2} p={3} bg="blue.50" borderRadius="md" borderWidth="1px" borderColor="blue.200">
                         <Text fontSize="xs" color="gray.600" mb={1} fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">RSVP Link:</Text>
                         <HStack spacing={2} flexWrap="wrap">
-                          <Link
-                            href={`/rsvp/${editingEvent.rsvp_url}`}
-                            isExternal
+                          <Text
                             fontSize="sm"
                             color="blue.600"
                             fontWeight="medium"
                             fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
                             wordBreak="break-all"
                           >
-                            {typeof window !== 'undefined' ? `${window.location.origin}/rsvp/${editingEvent.rsvp_url}` : `/rsvp/${editingEvent.rsvp_url}`}
-                          </Link>
+                            /rsvp/{editingEvent.rsvp_url}
+                          </Text>
                           <Button
                             size="xs"
                             colorScheme="blue"
@@ -1901,6 +2099,59 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
                   </HStack>
                 </VStack>
               </form>
+
+              {/* RSVP Guest List - Only show when editing and event has RSVP enabled */}
+              {editingEvent && formData.rsvp_enabled && (
+                <Box mt={6} pt={6} borderTopWidth="1px" borderColor="gray.200">
+                  <Heading size="sm" mb={3} fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
+                    RSVP Guest List ({linkedReservations.length})
+                  </Heading>
+                  {linkedReservations.length === 0 ? (
+                    <Text fontSize="sm" color="gray.500" fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
+                      No RSVPs yet
+                    </Text>
+                  ) : (
+                    <Box overflowX="auto">
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #E2E8F0' }}>
+                            <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#4A5568' }}>Guest</th>
+                            <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#4A5568' }}>Email</th>
+                            <th style={{ padding: '8px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#4A5568' }}>Phone</th>
+                            <th style={{ padding: '8px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#4A5568' }}>Party Size</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {linkedReservations.map(reservation => (
+                            <tr key={reservation.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                              <td style={{ padding: '8px', fontSize: '13px', color: '#2D3748' }}>
+                                {reservation.first_name} {reservation.last_name}
+                              </td>
+                              <td style={{ padding: '8px', fontSize: '13px', color: '#2D3748' }}>
+                                {reservation.email}
+                              </td>
+                              <td style={{ padding: '8px', fontSize: '13px', color: '#2D3748' }}>
+                                {reservation.phone}
+                              </td>
+                              <td style={{ padding: '8px', textAlign: 'right', fontSize: '13px', fontWeight: 600, color: '#2D3748' }}>
+                                {reservation.party_size}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr style={{ borderTop: '2px solid #E2E8F0' }}>
+                            <td colSpan={3} style={{ padding: '8px', fontSize: '13px', fontWeight: 600, color: '#2D3748' }}>
+                              Total Guests
+                            </td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontSize: '13px', fontWeight: 700, color: '#2D3748' }}>
+                              {linkedReservations.reduce((sum, r) => sum + (r.party_size || 0), 0)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </Box>
+                  )}
+                </Box>
+              )}
             </Box>
           </Box>
         </Box>,

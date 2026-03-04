@@ -299,3 +299,133 @@
     font-size: 12px;
   }
 }
+
+/* ============================================
+   PAYMENT SETTINGS
+   ============================================ */
+
+.paymentSettings {
+  margin-top: 16px;
+}
+
+.settingsDivider {
+  height: 1px;
+  background: #ECEAE5;
+  margin-bottom: 16px;
+}
+
+.settingsTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B7280;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 12px 0;
+}
+
+.settingInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.settingLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1F1F1F;
+  margin-bottom: 4px;
+}
+
+.settingDescription {
+  font-size: 12px;
+  color: #6B7280;
+  line-height: 1.4;
+}
+
+/* Toggle Switch */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 51px;
+  height: 31px;
+  flex-shrink: 0;
+}
+
+.toggleInput {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #E5E7EB;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 31px;
+}
+
+.toggleSlider:before {
+  position: absolute;
+  content: "";
+  height: 27px;
+  width: 27px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.toggleInput:checked + .toggleSlider {
+  background-color: #10B981;
+}
+
+.toggleInput:focus + .toggleSlider {
+  box-shadow: 0 0 1px #10B981;
+}
+
+.toggleInput:checked + .toggleSlider:before {
+  transform: translateX(20px);
+}
+
+.toggleInput:disabled + .toggleSlider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toggleSlider:hover {
+    background-color: #D1D5DB;
+  }
+
+  .toggleInput:checked + .toggleSlider:hover {
+    background-color: #059669;
+  }
+}
+
+@media (max-width: 768px) {
+  .settingRow {
+    padding: 10px 0;
+  }
+
+  .settingLabel {
+    font-size: 13px;
+  }
+
+  .settingDescription {
+    font-size: 11px;
+  }
+}
