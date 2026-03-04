@@ -224,7 +224,7 @@ export default function MemberDashboardPage() {
               <div className="flex items-center gap-4">
                 <div className="w-24 h-24 bg-[#A59480] text-white rounded-full flex items-center justify-center text-3xl font-bold overflow-hidden">
                   {(member?.photo || member?.profile_photo_url) ? (
-                    <img src={member.photo || member.profile_photo_url} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={(member.photo || member.profile_photo_url) ?? undefined} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <>{member?.first_name?.charAt(0)}{member?.last_name?.charAt(0)}</>
                   )}

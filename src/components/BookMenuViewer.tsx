@@ -13,7 +13,18 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
   const [menuImages, setMenuImages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const bookRef = useRef<any>(null);
+
+  // Detect mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     // Fetch all images from the menu directory
@@ -58,8 +69,10 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
 
   const nextPage = () => {
     if (bookRef.current) {
-      // If on cover (page 0), slide first then flip after delay
-      if (currentPage === 0) {
+      // On mobile, skip page 2 (index 1)
+      if (isMobile && currentPage === 0) {
+        bookRef.current.pageFlip().flip(2); // Jump to page 3 (index 2)
+      } else if (currentPage === 0) {
         setCurrentPage(1); // Trigger slide animation
         setTimeout(() => {
           bookRef.current.pageFlip().flipNext();
@@ -72,7 +85,12 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
 
   const prevPage = () => {
     if (bookRef.current) {
-      bookRef.current.pageFlip().flipPrev();
+      // On mobile, skip page 2 (index 1) when going back
+      if (isMobile && currentPage === 2) {
+        bookRef.current.pageFlip().flip(0); // Jump to page 1 (index 0)
+      } else {
+        bookRef.current.pageFlip().flipPrev();
+      }
     }
   };
 
@@ -148,7 +166,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
         <div
           className="relative transition-all duration-700 ease-out"
           style={{
-            transform: currentPage === 0 ? 'translateX(-25%)' : 'translateX(0)',
+            transform: 'translateX(0)',
           }}
         >
           <HTMLFlipBook
@@ -156,13 +174,13 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
             width={800}
             height={1030}
             size="stretch"
-            minWidth={400}
+            minWidth={380}
             maxWidth={1600}
-            minHeight={515}
+            minHeight={490}
             maxHeight={2060}
             drawShadow={true}
             flippingTime={800}
-            usePortrait={false}
+            usePortrait={true}
             startZIndex={0}
             autoSize={true}
             maxShadowOpacity={0.5}
@@ -225,14 +243,14 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
         </div>
 
         {/* Page Dots */}
-        <div className="flex gap-2">
+        <div className="flex gap-0.5 sm:gap-2">
           {menuImages.map((_, idx) => (
             <button
               key={idx}
               onClick={() => bookRef.current?.pageFlip().flip(idx)}
-              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              className={`w-0.5 h-0.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300 ${
                 idx === currentPage
-                  ? 'bg-[#BCA892] w-8'
+                  ? 'bg-[#BCA892] w-3 sm:w-8'
                   : 'bg-[#ECEDE8] opacity-40 hover:opacity-60'
               }`}
               aria-label={`Go to page ${idx + 1}`}
