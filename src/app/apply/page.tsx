@@ -68,14 +68,17 @@ export default function ApplyPage() {
       <Container maxW="container.md">
         {/* Header */}
         <VStack spacing={4} mb={12} textAlign="center">
-          <Heading
-            fontSize={{ base: '4xl', md: '6xl' }}
-            fontWeight="bold"
-            color="white"
-            letterSpacing="tight"
-          >
-            NOIR
-          </Heading>
+          <Box mb={4}>
+            <img
+              src="/images/noir-wedding-day.png"
+              alt="Noir"
+              style={{
+                height: '120px',
+                width: 'auto',
+                margin: '0 auto'
+              }}
+            />
+          </Box>
           <Text fontSize="xl" color="#ECEDE8" maxW="500px">
             Join the waitlist for exclusive membership
           </Text>
