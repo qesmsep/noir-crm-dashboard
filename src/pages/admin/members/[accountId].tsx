@@ -125,7 +125,11 @@ export default function MemberDetailAdmin() {
   // Add secondary member modal
   const [showAddSecondaryModal, setShowAddSecondaryModal] = useState(false);
 
-  // Fetch members
+  // Credit card fee toggle
+  const [creditCardFeeEnabled, setCreditCardFeeEnabled] = useState(false);
+  const [updatingFeeToggle, setUpdatingFeeToggle] = useState(false);
+
+  // Fetch members and account settings
   useEffect(() => {
     if (!accountId) return;
 
@@ -152,15 +156,38 @@ export default function MemberDetailAdmin() {
         toast({
           title: 'Error loading members',
           description: err.message,
-          status: 'error',
-          duration: 5000,
+          variant: 'error',
         });
       } finally {
         setLoading(false);
       }
     }
 
+    async function fetchAccountSettings() {
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('credit_card_fee_enabled')
+          .eq('account_id', accountId)
+          .single();
+
+        if (error) {
+          // If column doesn't exist yet, silently ignore
+          if (!error.message?.includes('column')) {
+            console.error('Error fetching account settings:', error);
+          }
+          return;
+        }
+
+        setCreditCardFeeEnabled(data?.credit_card_fee_enabled || false);
+      } catch (err: any) {
+        console.error('Error fetching account settings:', err);
+      }
+    }
+
     fetchMembers();
+    fetchAccountSettings();
   }, [accountId, toast]);
 
   // Fetch ledger
@@ -291,7 +318,10 @@ export default function MemberDetailAdmin() {
   // Helper functions
   const formatDate = (date?: string) => {
     if (!date) return '';
-    return new Date(date).toLocaleDateString('en-US', {
+    // Parse date string manually to avoid timezone issues
+    const [year, month, day] = date.split('T')[0].split('-');
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    return dateObj.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -299,10 +329,8 @@ export default function MemberDetailAdmin() {
   };
 
   const formatLedgerDate = (date: string) => {
-    const d = new Date(date);
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const year = d.getFullYear();
+    // Parse date string manually to avoid timezone issues
+    const [year, month, day] = date.split('T')[0].split('-');
     return `${month}.${day}.${year}`;
   };
 
@@ -871,6 +899,40 @@ export default function MemberDetailAdmin() {
     }
   };
 
+  // Handle credit card fee toggle
+  const handleToggleCreditCardFee = async () => {
+    if (!accountId) return;
+
+    setUpdatingFeeToggle(true);
+    try {
+      const supabase = getSupabaseClient();
+      const newValue = !creditCardFeeEnabled;
+
+      const { error } = await supabase
+        .from('accounts')
+        .update({ credit_card_fee_enabled: newValue })
+        .eq('account_id', accountId);
+
+      if (error) throw error;
+
+      setCreditCardFeeEnabled(newValue);
+      toast({
+        title: newValue ? '4% Fee Enabled' : '4% Fee Disabled',
+        description: newValue
+          ? 'Credit card transactions will include a 4% processing fee'
+          : 'Credit card transactions will not include processing fees',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update fee setting',
+        variant: 'error',
+      });
+    } finally {
+      setUpdatingFeeToggle(false);
+    }
+  };
+
   // Handle add credit (ledger-only, no Stripe)
   const handleAddCredit = async () => {
     if (!accountId) {
@@ -1240,18 +1302,24 @@ export default function MemberDetailAdmin() {
                             <div className={styles.editActions}>
                               <button
                                 onClick={() => handleUpdateMember(member.member_id)}
-                                className={styles.saveButton}
+                                className={styles.saveIconButton}
+                                title="Save Changes"
                               >
-                                Save
+                                <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
                               </button>
                               <button
                                 onClick={() => {
                                   setEditingMemberId(null);
                                   setEditingMemberData({});
                                 }}
-                                className={styles.cancelButton}
+                                className={styles.cancelIconButton}
+                                title="Cancel"
                               >
-                                Cancel
+                                <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
                               </button>
                               {member.member_type !== 'primary' && (
                                 <button
@@ -1278,7 +1346,8 @@ export default function MemberDetailAdmin() {
                                 title="Archive Member"
                               >
                                 <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+                                  <path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
                                 </svg>
                               </button>
                             </div>
@@ -1522,6 +1591,33 @@ export default function MemberDetailAdmin() {
               <MemberSubscriptionCard
                 accountId={accountId as string}
               />
+
+              {/* Payment Settings Card */}
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <h3 className={styles.cardTitle}>Payment Settings</h3>
+                </div>
+                <div className={styles.cardContent}>
+                  <div className={styles.settingRow}>
+                    <div className={styles.settingInfo}>
+                      <div className={styles.settingLabel}>Credit Card Processing Fee</div>
+                      <div className={styles.settingDescription}>
+                        Add 4% fee to credit card transactions (ACH/bank transfers exempt)
+                      </div>
+                    </div>
+                    <label className={styles.toggle}>
+                      <input
+                        type="checkbox"
+                        checked={creditCardFeeEnabled}
+                        onChange={handleToggleCreditCardFee}
+                        disabled={updatingFeeToggle}
+                        className={styles.toggleInput}
+                      />
+                      <span className={styles.toggleSlider}></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
             </div>
 

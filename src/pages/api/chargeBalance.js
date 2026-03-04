@@ -19,16 +19,17 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'account_id is required' });
   }
 
-  // 1) Fetch stripe_customer_id from accounts
+  // 1) Fetch stripe_customer_id and credit_card_fee_enabled from accounts
   const { data: acct, error: acctErr } = await supabase
     .from('accounts')
-    .select('stripe_customer_id')
+    .select('stripe_customer_id, credit_card_fee_enabled')
     .eq('account_id', account_id)
     .single();
   if (acctErr || !acct || !acct.stripe_customer_id) {
     return res.status(400).json({ error: 'Stripe customer not found for account' });
   }
   const stripe_customer_id = acct.stripe_customer_id;
+  const credit_card_fee_enabled = acct.credit_card_fee_enabled || false;
 
   // 2) Get the primary member_id for this account
   const { data: primaryMember, error: pmErr } = await supabase
@@ -87,12 +88,12 @@ export default async function handler(req, res) {
   }
 
   // 4) Determine amount to charge
-  let amountToCharge; // in cents
+  let baseAmount; // in cents
   let chargeDescription;
 
   if (custom_amount && Number(custom_amount) > 0) {
     // Use custom amount for one-off charge
-    amountToCharge = Math.round(Number(custom_amount) * 100);
+    baseAmount = Math.round(Number(custom_amount) * 100);
     chargeDescription = custom_description || 'Custom charge';
   } else {
     // Use existing balance logic
@@ -107,9 +108,31 @@ export default async function handler(req, res) {
     if (balance >= 0) {
       return res.status(400).json({ error: 'No outstanding balance' });
     }
-    amountToCharge = Math.round(Math.abs(balance) * 100);
+    baseAmount = Math.round(Math.abs(balance) * 100);
     chargeDescription = 'Balance charged via Stripe';
   }
+
+  // 4b) Check payment method type and calculate credit card fee
+  let creditCardFee = 0;
+  let isCard = false;
+
+  if (credit_card_fee_enabled) {
+    try {
+      const paymentMethod = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
+      isCard = paymentMethod.type === 'card';
+
+      if (isCard) {
+        // Apply 4% credit card processing fee
+        creditCardFee = Math.round(baseAmount * 0.04);
+        console.log(`Applying 4% credit card fee: $${(creditCardFee / 100).toFixed(2)} to base amount: $${(baseAmount / 100).toFixed(2)}`);
+      }
+    } catch (err) {
+      console.error('Error retrieving payment method type:', err);
+      // If we can't determine the type, proceed without fee
+    }
+  }
+
+  const amountToCharge = baseAmount + creditCardFee;
 
   // 5) Create & confirm a PaymentIntent
   let intent;
@@ -129,32 +152,30 @@ export default async function handler(req, res) {
 
   // 6) Log payment in ledger (include both account_id and member_id)
   const transactionDate = new Date().toISOString().split('T')[0];
-  const transactionAmount = amountToCharge / 100;
+  const baseAmountDollars = baseAmount / 100;
+  const creditCardFeeDollars = creditCardFee / 100;
 
-  // Check for duplicate payment by amount and date
+  // Check for duplicate payment by payment intent ID first
   const { data: existingPayment } = await supabase
     .from('ledger')
     .select('id')
-    .eq('account_id', account_id)
-    .eq('amount', transactionAmount)
-    .eq('type', 'payment')
-    .eq('date', transactionDate)
+    .eq('stripe_payment_intent_id', intent.id)
     .limit(1)
     .single();
 
   if (existingPayment) {
-    console.log('Duplicate payment detected for account:', account_id, 'amount:', transactionAmount, 'date:', transactionDate);
+    console.log('Duplicate payment detected for payment intent:', intent.id);
     return res.status(200).json({ success: true, message: 'Payment already recorded' });
   }
 
-  // Record the payment (positive amount) - reduces outstanding balance
+  // Record the base payment (positive amount) - reduces outstanding balance
   const { error: insertErr } = await supabase
     .from('ledger')
     .insert({
       account_id,
       member_id,
       type: 'payment',
-      amount: transactionAmount,
+      amount: baseAmountDollars,
       note: chargeDescription,
       date: transactionDate,
       stripe_payment_intent_id: intent.id // Prevent webhook duplicate
@@ -165,5 +186,30 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to update ledger', details: insertErr.message });
   }
 
-  return res.status(200).json({ success: true, paymentIntent: intent });
+  // If credit card fee was applied, record it as a separate charge
+  if (creditCardFee > 0) {
+    const { error: feeErr } = await supabase
+      .from('ledger')
+      .insert({
+        account_id,
+        member_id,
+        type: 'charge',
+        amount: -creditCardFeeDollars, // Negative = charge
+        note: '4% Credit Card Processing Fee',
+        date: transactionDate,
+      });
+
+    if (feeErr) {
+      console.error('Failed to record credit card fee:', feeErr);
+      // Don't fail the entire transaction if fee recording fails
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    paymentIntent: intent,
+    baseAmount: baseAmountDollars,
+    creditCardFee: creditCardFeeDollars,
+    totalCharged: (amountToCharge / 100)
+  });
 }

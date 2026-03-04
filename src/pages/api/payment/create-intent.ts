@@ -70,6 +70,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('id', waitlist.id);
     }
 
+    // Note: Credit card fees are NOT applied to initial membership payments
+    // Only recurring charges and balance payments are subject to the 4% fee
+    // This can be adjusted per account using the credit_card_fee_enabled toggle
+
     // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
@@ -78,7 +82,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         waitlist_id: waitlist.id,
         membership_type,
-        token
+        token,
+        base_amount: amount,
+        credit_card_fee: 0,
+        fee_enabled: 'false'
       },
       description: `Noir ${membership_type} Membership - ${waitlist.first_name} ${waitlist.last_name}`,
       automatic_payment_methods: {
@@ -98,7 +105,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       client_secret: paymentIntent.client_secret,
-      amount
+      amount,
+      baseAmount: amount,
+      creditCardFee: 0,
+      feeMessage: 'No processing fee for initial membership payment'
     });
 
   } catch (error: any) {

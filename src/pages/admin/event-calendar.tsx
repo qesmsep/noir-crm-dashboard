@@ -33,6 +33,8 @@ import {
   Input,
   Textarea,
   Select,
+  Checkbox,
+  Link,
 } from '@chakra-ui/react';
 import { ChevronLeft, ChevronRight, Plus, Calendar, Settings, Download, X, Edit2 } from 'lucide-react';
 import AdminLayout from '../../components/layouts/AdminLayout';
@@ -55,6 +57,8 @@ interface PrivateEvent {
   client_email?: string;
   location?: string;
   minaka_url?: string;
+  rsvp_enabled?: boolean;
+  rsvp_url?: string;
 }
 
 interface Reservation {
@@ -106,6 +110,7 @@ export default function EventCalendarNew() {
     client_name: '',
     client_email: '',
     location: '',
+    rsvp_enabled: false,
   });
   const [monthStats, setMonthStats] = useState({
     totalReservations: 0,
@@ -378,6 +383,7 @@ export default function EventCalendarNew() {
       client_name: event.client_name || '',
       client_email: event.client_email || '',
       location: event.location || '',
+      rsvp_enabled: event.rsvp_enabled || false,
     });
 
     setIsEditEventModalOpen(true);
@@ -452,11 +458,32 @@ export default function EventCalendarNew() {
         return;
       }
 
+      // Generate RSVP URL if enabling RSVP and no URL exists yet
+      let rsvp_url = editingEvent.rsvp_url;
+      if (eventFormData.rsvp_enabled && !rsvp_url) {
+        const { data: urlData, error: urlError } = await supabase
+          .rpc('generate_rsvp_url');
+
+        if (urlError) {
+          console.error('Error generating RSVP URL:', urlError);
+          toast({
+            title: 'Error',
+            description: 'Failed to generate RSVP URL',
+            status: 'error',
+            duration: 3000,
+          });
+          return;
+        }
+        rsvp_url = urlData;
+      }
+
       const eventData = {
         title: eventFormData.title,
         start_time: startTimeUTC,
         end_time: endTimeUTC,
         event_description: eventFormData.description || null,
+        rsvp_enabled: eventFormData.rsvp_enabled,
+        rsvp_url: eventFormData.rsvp_enabled ? rsvp_url : null,
       };
 
       console.log('Updating event with data:', eventData);
@@ -540,6 +567,7 @@ export default function EventCalendarNew() {
       client_name: '',
       client_email: '',
       location: '',
+      rsvp_enabled: false,
     });
   };
 
@@ -1157,6 +1185,53 @@ export default function EventCalendarNew() {
                       />
                     </FormControl>
 
+                    <FormControl>
+                      <Checkbox
+                        isChecked={eventFormData.rsvp_enabled}
+                        onChange={(e) => setEventFormData({ ...eventFormData, rsvp_enabled: e.target.checked })}
+                        size="sm"
+                      >
+                        Enable RSVP
+                      </Checkbox>
+                      {eventFormData.rsvp_enabled && editingEvent?.rsvp_url && (
+                        <Box mt={2} p={2} bg="blue.50" borderRadius="md" borderWidth="1px" borderColor="blue.200">
+                          <Text fontSize="xs" color="gray.600" mb={1}>RSVP Link:</Text>
+                          <HStack spacing={2}>
+                            <Link
+                              href={`/rsvp/${editingEvent.rsvp_url}`}
+                              isExternal
+                              fontSize="sm"
+                              color="blue.600"
+                              fontWeight="medium"
+                            >
+                              {typeof window !== 'undefined' ? `${window.location.origin}/rsvp/${editingEvent.rsvp_url}` : `/rsvp/${editingEvent.rsvp_url}`}
+                            </Link>
+                            <Button
+                              size="xs"
+                              colorScheme="blue"
+                              onClick={() => {
+                                const url = `${window.location.origin}/rsvp/${editingEvent.rsvp_url}`;
+                                navigator.clipboard.writeText(url);
+                                toast({
+                                  title: 'Copied!',
+                                  description: 'RSVP link copied to clipboard',
+                                  status: 'success',
+                                  duration: 2000,
+                                });
+                              }}
+                            >
+                              Copy
+                            </Button>
+                          </HStack>
+                        </Box>
+                      )}
+                      {eventFormData.rsvp_enabled && !editingEvent?.rsvp_url && (
+                        <Text fontSize="xs" color="gray.600" mt={2}>
+                          RSVP link will be generated when you update the event
+                        </Text>
+                      )}
+                    </FormControl>
+
                     <HStack w="full" justify="space-between" pt={2}>
                       <Button
                         size="sm"
@@ -1210,6 +1285,7 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
     end_time: '',
     description: '',
     guest_count: '',
+    rsvp_enabled: false,
   });
   const [mounted, setMounted] = useState(false);
   const toast = useToast();
@@ -1319,14 +1395,35 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
       const startTimeUTC = localInputToUTC(formData.start_time, timezone);
       const endTimeUTC = localInputToUTC(formData.end_time, timezone);
 
-      const eventData = {
-        title: formData.title || formData.name,
-        start_time: startTimeUTC,
-        end_time: endTimeUTC,
-        event_description: formData.description || null,
-      };
-
       if (editingEvent) {
+        // Generate RSVP URL if enabling RSVP and no URL exists yet
+        let rsvp_url = editingEvent.rsvp_url;
+        if (formData.rsvp_enabled && !rsvp_url) {
+          const { data: urlData, error: urlError } = await supabase
+            .rpc('generate_rsvp_url');
+
+          if (urlError) {
+            console.error('Error generating RSVP URL:', urlError);
+            toast({
+              title: 'Error',
+              description: 'Failed to generate RSVP URL',
+              status: 'error',
+              duration: 3000,
+            });
+            return;
+          }
+          rsvp_url = urlData;
+        }
+
+        const eventData = {
+          title: formData.title || formData.name,
+          start_time: startTimeUTC,
+          end_time: endTimeUTC,
+          event_description: formData.description || null,
+          rsvp_enabled: formData.rsvp_enabled,
+          rsvp_url: formData.rsvp_enabled ? rsvp_url : null,
+        };
+
         const { error } = await supabase
           .from('private_events')
           .update(eventData)
@@ -1340,6 +1437,34 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
           duration: 3000,
         });
       } else {
+        // Generate RSVP URL if enabled
+        let rsvp_url = null;
+        if (formData.rsvp_enabled) {
+          const { data: urlData, error: urlError } = await supabase
+            .rpc('generate_rsvp_url');
+
+          if (urlError) {
+            console.error('Error generating RSVP URL:', urlError);
+            toast({
+              title: 'Error',
+              description: 'Failed to generate RSVP URL',
+              status: 'error',
+              duration: 3000,
+            });
+            return;
+          }
+          rsvp_url = urlData;
+        }
+
+        const eventData = {
+          title: formData.title || formData.name,
+          start_time: startTimeUTC,
+          end_time: endTimeUTC,
+          event_description: formData.description || null,
+          rsvp_enabled: formData.rsvp_enabled,
+          rsvp_url: rsvp_url,
+        };
+
         const { error } = await supabase
           .from('private_events')
           .insert([eventData]);
@@ -1420,6 +1545,7 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
       end_time: formatForInput(event.end_time),
       description: event.description || '',
       guest_count: event.guest_count?.toString() || '',
+      rsvp_enabled: event.rsvp_enabled || false,
     });
     setIsCreateModalOpen(true);
   };
@@ -1434,6 +1560,7 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
       end_time: '',
       description: '',
       guest_count: '',
+      rsvp_enabled: false,
     });
   };
 
@@ -1504,6 +1631,20 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
                   {event.guest_count && (
                     <Badge colorScheme={isPast ? "gray" : "green"} fontSize="sm">
                       👥 {event.guest_count} guests
+                    </Badge>
+                  )}
+                  {event.rsvp_enabled && event.rsvp_url && (
+                    <Badge colorScheme={isPast ? "gray" : "teal"} fontSize="sm" cursor="pointer" onClick={() => {
+                      const url = `${window.location.origin}/rsvp/${event.rsvp_url}`;
+                      navigator.clipboard.writeText(url);
+                      toast({
+                        title: 'Copied!',
+                        description: 'RSVP link copied to clipboard',
+                        status: 'success',
+                        duration: 2000,
+                      });
+                    }}>
+                      🔗 RSVP
                     </Badge>
                   )}
                 </HStack>
@@ -1691,6 +1832,56 @@ function PrivateEventsManager({ onEventChange }: { onEventChange: () => void }) 
                       fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
                       _placeholder={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
                     />
+                  </FormControl>
+
+                  <FormControl>
+                    <Checkbox
+                      isChecked={formData.rsvp_enabled}
+                      onChange={(e) => setFormData({ ...formData, rsvp_enabled: e.target.checked })}
+                      fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                    >
+                      Enable RSVP
+                    </Checkbox>
+                    {formData.rsvp_enabled && editingEvent?.rsvp_url && (
+                      <Box mt={2} p={3} bg="blue.50" borderRadius="md" borderWidth="1px" borderColor="blue.200">
+                        <Text fontSize="xs" color="gray.600" mb={1} fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">RSVP Link:</Text>
+                        <HStack spacing={2} flexWrap="wrap">
+                          <Link
+                            href={`/rsvp/${editingEvent.rsvp_url}`}
+                            isExternal
+                            fontSize="sm"
+                            color="blue.600"
+                            fontWeight="medium"
+                            fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                            wordBreak="break-all"
+                          >
+                            {typeof window !== 'undefined' ? `${window.location.origin}/rsvp/${editingEvent.rsvp_url}` : `/rsvp/${editingEvent.rsvp_url}`}
+                          </Link>
+                          <Button
+                            size="xs"
+                            colorScheme="blue"
+                            onClick={() => {
+                              const url = `${window.location.origin}/rsvp/${editingEvent.rsvp_url}`;
+                              navigator.clipboard.writeText(url);
+                              toast({
+                                title: 'Copied!',
+                                description: 'RSVP link copied to clipboard',
+                                status: 'success',
+                                duration: 2000,
+                              });
+                            }}
+                            fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif"
+                          >
+                            Copy
+                          </Button>
+                        </HStack>
+                      </Box>
+                    )}
+                    {formData.rsvp_enabled && !editingEvent?.rsvp_url && (
+                      <Text fontSize="xs" color="gray.600" mt={2} fontFamily="'Helvetica Neue', Helvetica, Arial, sans-serif">
+                        RSVP link will be generated when you {editingEvent ? 'update' : 'create'} the event
+                      </Text>
+                    )}
                   </FormControl>
 
                   <HStack w="full" justify="flex-end" spacing={3} pt={4}>

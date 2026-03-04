@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { randomUUID } from 'crypto';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,11 +67,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // No limit on number of members - each additional member adds $25/month
 
-    // Create the new member (secondary member, primary = false)
+    // Create the new member (secondary member)
     const newMember = {
+      member_id: randomUUID(),
       ...member_data,
       account_id,
-      primary: false,
       member_type: 'secondary',
       deactivated: false,
       created_at: new Date().toISOString(),
