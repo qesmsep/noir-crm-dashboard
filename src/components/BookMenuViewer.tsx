@@ -243,14 +243,14 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
         </div>
 
         {/* Page Dots */}
-        <div className="flex gap-0.5 sm:gap-2">
+        <div className="hidden sm:flex gap-2">
           {menuImages.map((_, idx) => (
             <button
               key={idx}
               onClick={() => bookRef.current?.pageFlip().flip(idx)}
-              className={`w-0.5 h-0.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300 ${
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
                 idx === currentPage
-                  ? 'bg-[#BCA892] w-3 sm:w-8'
+                  ? 'bg-[#BCA892] w-8'
                   : 'bg-[#ECEDE8] opacity-40 hover:opacity-60'
               }`}
               aria-label={`Go to page ${idx + 1}`}

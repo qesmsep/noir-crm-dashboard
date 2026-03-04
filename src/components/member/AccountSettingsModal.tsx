@@ -24,7 +24,7 @@ interface AccountSettingsModalProps {
 }
 
 export default function AccountSettingsModal({ isOpen, onClose }: AccountSettingsModalProps) {
-  const { member, logout } = useMemberAuth();
+  const { member, signOut } = useMemberAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -93,7 +93,7 @@ export default function AccountSettingsModal({ isOpen, onClose }: AccountSetting
       toast({
         title: 'Error',
         description: 'Failed to update preferences',
-        variant: 'destructive',
+        variant: 'error',
       });
       // Revert the change
       setPreferences({ ...preferences, [key]: !value });
@@ -105,7 +105,7 @@ export default function AccountSettingsModal({ isOpen, onClose }: AccountSetting
       toast({
         title: 'Error',
         description: 'Passwords do not match',
-        variant: 'destructive',
+        variant: 'error',
       });
       return;
     }
@@ -114,7 +114,7 @@ export default function AccountSettingsModal({ isOpen, onClose }: AccountSetting
       toast({
         title: 'Error',
         description: 'Password must be at least 8 characters',
-        variant: 'destructive',
+        variant: 'error',
       });
       return;
     }
@@ -150,7 +150,7 @@ export default function AccountSettingsModal({ isOpen, onClose }: AccountSetting
       toast({
         title: 'Error',
         description: 'Failed to change password. Please check your current password.',
-        variant: 'destructive',
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -159,14 +159,14 @@ export default function AccountSettingsModal({ isOpen, onClose }: AccountSetting
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await signOut();
       router.push('/member/login');
       onClose();
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to logout',
-        variant: 'destructive',
+        variant: 'error',
       });
     }
   };

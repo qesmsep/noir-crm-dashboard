@@ -304,7 +304,7 @@ export default function AgreementManager() {
         isOpen={isOpen}
         onClose={onClose}
         size={{ base: "full", md: "md" }}
-        placement={{ base: "bottom", md: "right" }}
+        placement="right"
       >
         <DrawerOverlay />
         <DrawerContent
