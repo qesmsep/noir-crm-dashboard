@@ -1,39 +1,17 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Button,
-  Heading,
-  Input,
-  Textarea,
-  Select,
-  FormControl,
-  FormLabel,
-  Switch,
-  IconButton,
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  useDisclosure,
-  useToast,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
-  Card,
-  CardBody,
-  Divider,
-  Checkbox
-} from '@chakra-ui/react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
+import { Select } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/useToast';
 import { Plus, Edit2, Trash2, GripVertical, Eye } from 'lucide-react';
 
 interface Question {
@@ -61,15 +39,10 @@ export default function QuestionnaireBuilder() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isQuestionOpen, setIsQuestionOpen] = useState(false);
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const {
-    isOpen: isQuestionDrawerOpen,
-    onOpen: onQuestionDrawerOpen,
-    onClose: onQuestionDrawerClose
-  } = useDisclosure();
-
-  const toast = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     loadQuestionnaires();
@@ -86,8 +59,7 @@ export default function QuestionnaireBuilder() {
       toast({
         title: 'Error',
         description: 'Failed to load questionnaires',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -102,13 +74,12 @@ export default function QuestionnaireBuilder() {
       is_active: true,
     });
     setQuestions([]);
-    onOpen();
+    setIsOpen(true);
   };
 
   const handleEditQuestionnaire = async (questionnaire: Questionnaire) => {
     setSelectedQuestionnaire(questionnaire);
 
-    // Load questions for this questionnaire
     if (questionnaire.id) {
       try {
         const response = await fetch(`/api/questionnaires/${questionnaire.id}/questions`);
@@ -121,7 +92,7 @@ export default function QuestionnaireBuilder() {
       }
     }
 
-    onOpen();
+    setIsOpen(true);
   };
 
   const handleSaveQuestionnaire = async () => {
@@ -146,11 +117,9 @@ export default function QuestionnaireBuilder() {
         toast({
           title: 'Success',
           description: `Questionnaire ${selectedQuestionnaire.id ? 'updated' : 'created'}`,
-          status: 'success',
-          duration: 3000,
         });
         loadQuestionnaires();
-        onClose();
+        setIsOpen(false);
       } else {
         throw new Error('Failed to save');
       }
@@ -158,8 +127,7 @@ export default function QuestionnaireBuilder() {
       toast({
         title: 'Error',
         description: 'Failed to save questionnaire',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     }
   };
@@ -172,12 +140,12 @@ export default function QuestionnaireBuilder() {
       is_required: false,
       order_index: questions.length + 1
     });
-    onQuestionDrawerOpen();
+    setIsQuestionOpen(true);
   };
 
   const handleEditQuestion = (question: Question) => {
     setEditingQuestion(question);
-    onQuestionDrawerOpen();
+    setIsQuestionOpen(true);
   };
 
   const handleSaveQuestion = () => {
@@ -186,16 +154,14 @@ export default function QuestionnaireBuilder() {
     const existingIndex = questions.findIndex(q => q.order_index === editingQuestion.order_index);
 
     if (existingIndex >= 0) {
-      // Update existing
       const updated = [...questions];
       updated[existingIndex] = editingQuestion;
       setQuestions(updated);
     } else {
-      // Add new
       setQuestions([...questions, editingQuestion]);
     }
 
-    onQuestionDrawerClose();
+    setIsQuestionOpen(false);
     setEditingQuestion(null);
   };
 
@@ -209,10 +175,8 @@ export default function QuestionnaireBuilder() {
 
     if (targetIndex < 0 || targetIndex >= newQuestions.length) return;
 
-    // Swap
     [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]];
 
-    // Update order_index
     newQuestions.forEach((q, i) => {
       q.order_index = i + 1;
     });
@@ -235,452 +199,467 @@ export default function QuestionnaireBuilder() {
   };
 
   if (loading) {
-    return <Text>Loading...</Text>;
+    return <div className="text-text-muted">Loading...</div>;
   }
 
   return (
-    <VStack spacing={6} align="stretch">
+    <div className="flex flex-col gap-3">
       {/* Header */}
-      <HStack justify="space-between" align="start">
-        <VStack align="start" spacing={1}>
-          <Heading size="lg" color="#1F1F1F" fontWeight="700">
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-lg md:text-xl font-bold text-[#1F1F1F]">
             Questionnaire Builder
-          </Heading>
-          <Text fontSize="sm" color="#5A5A5A">
+          </h2>
+          <p className="text-xs md:text-sm text-text-muted">
             Create beautiful, custom forms to replace Typeform
-          </Text>
-        </VStack>
+          </p>
+        </div>
         <Button
-          leftIcon={<Plus size={20} />}
-          bg="#A59480"
-          color="white"
-          _hover={{ bg: '#8C7C6D', transform: 'translateY(-2px)' }}
-          _active={{ transform: 'translateY(0)' }}
           onClick={handleCreateQuestionnaire}
-          borderRadius="10px"
-          fontWeight="600"
-          fontSize="0.875rem"
-          minH="44px"
-          px={6}
-          transition="all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
-          boxShadow="0 1px 2px rgba(165, 148, 128, 0.15), 0 4px 8px rgba(165, 148, 128, 0.25), 0 8px 16px rgba(165, 148, 128, 0.18)"
+          className="bg-cork text-white hover:bg-cork-dark rounded-lg font-semibold shadow-lg text-sm px-3 py-2"
         >
-          Create Form
+          <Plus className="w-4 h-4 md:mr-2" />
+          <span className="hidden md:inline">Create Form</span>
         </Button>
-      </HStack>
+      </div>
 
       {/* Questionnaires List */}
       {questionnaires.length === 0 ? (
-        <Card className="bg-white rounded-2xl border border-[#ECEAE5]">
-          <CardBody>
-            <Box py={12} textAlign="center">
-              <Text fontSize="3xl" mb={3}>📋</Text>
-              <Heading size="md" mb={2} color="#1F1F1F">No questionnaires yet</Heading>
-              <Text color="#5A5A5A" mb={6}>
-                Create your first questionnaire to start collecting responses
-              </Text>
-              <Button
-                leftIcon={<Plus size={20} />}
-                bg="#A59480"
-                color="white"
-                _hover={{ bg: '#8C7C6D', transform: 'translateY(-2px)' }}
-                _active={{ transform: 'translateY(0)' }}
-                onClick={handleCreateQuestionnaire}
-                borderRadius="10px"
-                fontWeight="600"
-                minH="44px"
-                transition="all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
-                boxShadow="0 1px 2px rgba(165, 148, 128, 0.15), 0 4px 8px rgba(165, 148, 128, 0.25), 0 8px 16px rgba(165, 148, 128, 0.18)"
-              >
-                Create First Questionnaire
-              </Button>
-            </Box>
-          </CardBody>
+        <Card className="bg-white rounded-lg border border-border-cream-1 p-6 md:p-8 text-center">
+          <div className="text-2xl md:text-3xl mb-2">📋</div>
+          <h3 className="text-base md:text-lg font-semibold text-[#1F1F1F] mb-1">No questionnaires yet</h3>
+          <p className="text-xs md:text-sm text-text-muted mb-4">
+            Create your first questionnaire to start collecting responses
+          </p>
+          <Button
+            onClick={handleCreateQuestionnaire}
+            className="bg-cork text-white hover:bg-cork-dark rounded-lg font-semibold shadow-lg text-sm px-3 py-2"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create First Questionnaire
+          </Button>
         </Card>
       ) : (
-        <VStack spacing={3} align="stretch">
+        <div className="flex flex-col gap-2">
           {questionnaires.map((q) => (
             <Card
               key={q.id}
-              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              className="bg-white rounded-lg border border-border-cream-1 shadow-sm hover:shadow-md transition-shadow cursor-pointer p-3"
             >
-              <CardBody py={4} px={5}>
-                <HStack justify="space-between" align="start">
-                  {/* Left side - Main content */}
-                  <VStack align="start" spacing={2} flex={1}>
-                    {/* Title and badges row */}
-                    <HStack spacing={3} wrap="wrap" align="center">
-                      <Text fontSize="xl" fontWeight="600" color="#1F1F1F">
-                        {q.title}
-                      </Text>
-                      <Badge
-                        className="text-xs px-2 py-0.5 rounded-full"
-                        bg={q.is_active ? '#dcfce7' : '#DAD7D0'}
-                        color={q.is_active ? '#166534' : '#5A5A5A'}
-                      >
-                        {q.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                      <Badge
-                        className="text-xs px-2 py-0.5 rounded-full"
-                        bg="#A59480"
-                        color="white"
-                        textTransform="capitalize"
-                      >
-                        {q.type}
-                      </Badge>
-                    </HStack>
+              <div className="flex justify-between items-start gap-2">
+                {/* Left side */}
+                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm md:text-base font-semibold text-[#1F1F1F]">
+                      {q.title}
+                    </h3>
+                    <Badge
+                      className={`text-2xs px-1.5 py-0.5 rounded ${
+                        q.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-[#DAD7D0] text-text-muted'
+                      }`}
+                    >
+                      {q.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <Badge className="text-2xs px-1.5 py-0.5 rounded bg-cork text-white capitalize">
+                      {q.type}
+                    </Badge>
+                  </div>
 
-                    {/* Description */}
-                    {q.description && (
-                      <Text fontSize="sm" color="#5A5A5A" lineHeight="1.5">
-                        {q.description}
-                      </Text>
-                    )}
+                  {q.description && (
+                    <p className="text-xs md:text-sm text-text-muted line-clamp-1">
+                      {q.description}
+                    </p>
+                  )}
 
-                    {/* Metadata */}
-                    <Text fontSize="xs" color="#8C7C6D" fontWeight="500">
-                      Join the Noir waitlist • {q.questionnaire_questions?.length || 0} questions
-                    </Text>
-                  </VStack>
+                  <p className="text-2xs text-[#8C7C6D] font-medium">
+                    {q.questionnaire_questions?.length || 0} questions
+                  </p>
+                </div>
 
-                  {/* Right side - Actions */}
-                  <HStack spacing={2}>
-                    <IconButton
-                      size="md"
-                      minW="44px"
-                      minH="44px"
-                      variant="ghost"
-                      icon={<Edit2 size={18} />}
-                      aria-label="Edit questionnaire"
-                      onClick={() => handleEditQuestionnaire(q)}
-                      _hover={{ bg: '#F7F6F2' }}
-                      color="#1F1F1F"
-                      title="Edit"
-                    />
-                    <IconButton
-                      size="md"
-                      minW="44px"
-                      minH="44px"
-                      variant="ghost"
-                      icon={<Eye size={18} />}
-                      aria-label="Preview questionnaire"
-                      _hover={{ bg: '#F7F6F2' }}
-                      color="#1F1F1F"
-                      title="Preview"
-                    />
-                    <IconButton
-                      size="md"
-                      minW="44px"
-                      minH="44px"
-                      variant="ghost"
-                      icon={<Trash2 size={18} />}
-                      aria-label="Delete questionnaire"
-                      _hover={{ bg: '#fee2e2', color: '#dc2626' }}
-                      color="#1F1F1F"
-                      title="Delete"
-                    />
-                  </HStack>
-                </HStack>
-              </CardBody>
+                {/* Right side - Actions */}
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEditQuestionnaire(q)}
+                    className="h-8 w-8 hover:bg-bg-cream-1"
+                    title="Edit"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-bg-cream-1 hidden md:flex"
+                    title="Preview"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-red-50 hover:text-red-600 hidden md:flex"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
             </Card>
           ))}
-        </VStack>
+        </div>
       )}
 
-      {/* Questionnaire Editor Drawer */}
-      <Drawer isOpen={isOpen} onClose={onClose} size="lg" placement="right">
-        <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" maxW="50vw" w="100%">
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px" color="#353535">
-            {selectedQuestionnaire?.id ? 'Edit' : 'Create'} Questionnaire
-          </DrawerHeader>
+      {/* Questionnaire Editor Sheet */}
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-[450px] overflow-y-auto bg-white p-4">
+          <SheetHeader className="pb-3">
+            <SheetTitle className="text-lg font-semibold text-[#1F1F1F]">
+              {selectedQuestionnaire?.id ? 'Edit' : 'Create'} Questionnaire
+            </SheetTitle>
+            <SheetDescription className="text-xs text-text-muted">
+              Design your form questions and settings
+            </SheetDescription>
+          </SheetHeader>
 
-          <DrawerBody>
-            <VStack spacing={6} align="stretch" pt={4}>
-              {/* Basic Info */}
-              <Card>
-                <CardBody>
-                  <VStack spacing={4} align="stretch">
-                    <FormControl isRequired>
-                      <FormLabel>Form Title</FormLabel>
-                      <Input
-                        value={selectedQuestionnaire?.title || ''}
-                        onChange={(e) =>
-                          setSelectedQuestionnaire({
-                            ...selectedQuestionnaire!,
-                            title: e.target.value
-                          })
-                        }
-                        placeholder="e.g., Waitlist Application"
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel>Description</FormLabel>
-                      <Textarea
-                        value={selectedQuestionnaire?.description || ''}
-                        onChange={(e) =>
-                          setSelectedQuestionnaire({
-                            ...selectedQuestionnaire!,
-                            description: e.target.value
-                          })
-                        }
-                        placeholder="Optional description"
-                        rows={2}
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel>Form Type</FormLabel>
-                      <Select
-                        value={selectedQuestionnaire?.type || 'waitlist'}
-                        onChange={(e) =>
-                          setSelectedQuestionnaire({
-                            ...selectedQuestionnaire!,
-                            type: e.target.value as any
-                          })
-                        }
-                      >
-                        <option value="waitlist">Waitlist</option>
-                        <option value="membership">Membership Application</option>
-                        <option value="custom">Custom</option>
-                      </Select>
-                    </FormControl>
-
-                    <FormControl display="flex" alignItems="center">
-                      <FormLabel mb="0">Active</FormLabel>
-                      <Switch
-                        isChecked={selectedQuestionnaire?.is_active}
-                        onChange={(e) =>
-                          setSelectedQuestionnaire({
-                            ...selectedQuestionnaire!,
-                            is_active: e.target.checked
-                          })
-                        }
-                        colorScheme="green"
-                      />
-                    </FormControl>
-                  </VStack>
-                </CardBody>
-              </Card>
-
-              <Divider />
-
-              {/* Questions Section */}
-              <Box>
-                <HStack justify="space-between" mb={4}>
-                  <Heading size="sm">Questions ({questions.length})</Heading>
-                  <Button
-                    size="sm"
-                    leftIcon={<Plus size={14} />}
-                    onClick={handleAddQuestion}
-                    colorScheme="blue"
-                  >
-                    Add Question
-                  </Button>
-                </HStack>
-
-                <VStack spacing={3} align="stretch">
-                  {questions.sort((a, b) => a.order_index - b.order_index).map((question, index) => (
-                    <Card key={question.order_index}>
-                      <CardBody>
-                        <HStack justify="space-between" align="start">
-                          <HStack spacing={3} flex={1}>
-                            <Text fontSize="lg">{getQuestionTypeIcon(question.question_type)}</Text>
-                            <VStack align="start" spacing={1} flex={1}>
-                              <HStack>
-                                <Text fontWeight="bold">#{question.order_index}</Text>
-                                <Text>{question.question_text}</Text>
-                                {question.is_required && (
-                                  <Badge colorScheme="red" size="sm">Required</Badge>
-                                )}
-                              </HStack>
-                              <Text fontSize="sm" color="gray.500">
-                                Type: {question.question_type}
-                              </Text>
-                            </VStack>
-                          </HStack>
-
-                          <HStack spacing={1}>
-                            <IconButton
-                              size="xs"
-                              icon={<GripVertical size={14} />}
-                              aria-label="Move up"
-                              onClick={() => moveQuestion(index, 'up')}
-                              isDisabled={index === 0}
-                            />
-                            <IconButton
-                              size="xs"
-                              icon={<GripVertical size={14} />}
-                              aria-label="Move down"
-                              onClick={() => moveQuestion(index, 'down')}
-                              isDisabled={index === questions.length - 1}
-                            />
-                            <IconButton
-                              size="xs"
-                              icon={<Edit2 size={14} />}
-                              aria-label="Edit"
-                              onClick={() => handleEditQuestion(question)}
-                            />
-                            <IconButton
-                              size="xs"
-                              icon={<Trash2 size={14} />}
-                              aria-label="Delete"
-                              colorScheme="red"
-                              onClick={() => handleDeleteQuestion(question.order_index)}
-                            />
-                          </HStack>
-                        </HStack>
-                      </CardBody>
-                    </Card>
-                  ))}
-
-                  {questions.length === 0 && (
-                    <Box py={6} textAlign="center" borderRadius="md" bg="gray.50">
-                      <Text color="gray.500">No questions yet. Add your first one!</Text>
-                    </Box>
-                  )}
-                </VStack>
-              </Box>
-            </VStack>
-          </DrawerBody>
-
-          <DrawerFooter borderTopWidth="1px">
-            <Button variant="outline" mr={3} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              bg="#A59480"
-              color="white"
-              _hover={{ bg: '#8F7F6B' }}
-              onClick={handleSaveQuestionnaire}
-              boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
-            >
-              Save Questionnaire
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-
-      {/* Question Editor Drawer */}
-      <Drawer isOpen={isQuestionDrawerOpen} onClose={onQuestionDrawerClose} size="md" placement="right">
-        <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8">
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px" color="#353535">
-            {editingQuestion?.id ? 'Edit' : 'Add'} Question
-          </DrawerHeader>
-
-          <DrawerBody>
-            <VStack spacing={4} align="stretch" pt={4}>
-              <FormControl isRequired>
-                <FormLabel>Question Text</FormLabel>
-                <Input
-                  value={editingQuestion?.question_text || ''}
-                  onChange={(e) =>
-                    setEditingQuestion({
-                      ...editingQuestion!,
-                      question_text: e.target.value
-                    })
-                  }
-                  placeholder="e.g., What is your email?"
-                />
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel>Question Type</FormLabel>
-                <Select
-                  value={editingQuestion?.question_type || 'text'}
-                  onChange={(e) =>
-                    setEditingQuestion({
-                      ...editingQuestion!,
-                      question_type: e.target.value as any
-                    })
-                  }
-                >
-                  <option value="text">Text</option>
-                  <option value="email">Email</option>
-                  <option value="phone">Phone</option>
-                  <option value="textarea">Long Text</option>
-                  <option value="select">Dropdown</option>
-                  <option value="radio">Multiple Choice</option>
-                  <option value="checkbox">Checkboxes</option>
-                  <option value="file">File Upload</option>
-                </Select>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Placeholder</FormLabel>
-                <Input
-                  value={editingQuestion?.placeholder || ''}
-                  onChange={(e) =>
-                    setEditingQuestion({
-                      ...editingQuestion!,
-                      placeholder: e.target.value
-                    })
-                  }
-                  placeholder="e.g., Enter your email"
-                />
-              </FormControl>
-
-              {(editingQuestion?.question_type === 'select' ||
-                editingQuestion?.question_type === 'radio' ||
-                editingQuestion?.question_type === 'checkbox') && (
-                <FormControl>
-                  <FormLabel>Options (one per line)</FormLabel>
-                  <Textarea
-                    placeholder="Option 1&#10;Option 2&#10;Option 3"
-                    rows={5}
-                    onChange={(e) => {
-                      const lines = e.target.value.split('\n').filter(l => l.trim());
-                      const options = lines.map((line, i) => ({
-                        value: `option${i + 1}`,
-                        label: line.trim()
-                      }));
-                      setEditingQuestion({
-                        ...editingQuestion!,
-                        options
-                      });
-                    }}
-                    value={editingQuestion?.options?.map(o => o.label).join('\n') || ''}
+          <div className="mt-3 flex flex-col gap-3">
+            {/* Basic Info Card */}
+            <Card className="bg-white border border-border-cream-1 shadow-sm p-3">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <Label htmlFor="title" className="text-xs font-semibold text-[#1F1F1F]">
+                    Form Title*
+                  </Label>
+                  <Input
+                    id="title"
+                    value={selectedQuestionnaire?.title || ''}
+                    onChange={(e) =>
+                      setSelectedQuestionnaire({
+                        ...selectedQuestionnaire!,
+                        title: e.target.value
+                      })
+                    }
+                    placeholder="e.g., Invitation Request"
+                    className="mt-1 text-sm h-9"
                   />
-                </FormControl>
-              )}
+                </div>
 
-              <FormControl display="flex" alignItems="center">
-                <Checkbox
-                  isChecked={editingQuestion?.is_required}
-                  onChange={(e) =>
-                    setEditingQuestion({
-                      ...editingQuestion!,
-                      is_required: e.target.checked
-                    })
-                  }
-                  colorScheme="red"
+                <div>
+                  <Label htmlFor="description" className="text-xs font-semibold text-[#1F1F1F]">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={selectedQuestionnaire?.description || ''}
+                    onChange={(e) =>
+                      setSelectedQuestionnaire({
+                        ...selectedQuestionnaire!,
+                        description: e.target.value
+                      })
+                    }
+                    placeholder="Waitlist application for prospective members"
+                    rows={2}
+                    className="mt-1 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="type" className="text-xs font-semibold text-[#1F1F1F]">
+                    Form Type
+                  </Label>
+                  <Select
+                    id="type"
+                    value={selectedQuestionnaire?.type || 'waitlist'}
+                    onChange={(e) =>
+                      setSelectedQuestionnaire({
+                        ...selectedQuestionnaire!,
+                        type: e.target.value as any
+                      })
+                    }
+                    className="mt-1 text-sm h-9"
+                  >
+                    <option value="waitlist">Waitlist</option>
+                    <option value="membership">Membership Application</option>
+                    <option value="custom">Custom</option>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <Label htmlFor="active" className="text-xs font-semibold text-[#1F1F1F]">
+                    Active
+                  </Label>
+                  <Switch
+                    id="active"
+                    checked={selectedQuestionnaire?.is_active}
+                    onCheckedChange={(checked) =>
+                      setSelectedQuestionnaire({
+                        ...selectedQuestionnaire!,
+                        is_active: checked
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Questions Section */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <div>
+                  <p className="text-xs font-semibold text-[#1F1F1F]">
+                    Questions ({questions.length})
+                  </p>
+                  <p className="text-2xs text-text-muted">
+                    Click to edit • Drag to reorder
+                  </p>
+                </div>
+                <Button
+                  onClick={handleAddQuestion}
+                  className="bg-cork text-white hover:bg-cork-dark text-xs px-2 py-1 h-7"
                 >
-                  <Text fontWeight="medium">Required field</Text>
-                </Checkbox>
-              </FormControl>
-            </VStack>
-          </DrawerBody>
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add
+                </Button>
+              </div>
 
-          <DrawerFooter borderTopWidth="1px">
-            <Button variant="outline" mr={3} onClick={onQuestionDrawerClose}>
+              <div className="flex flex-col gap-1.5">
+                {questions.sort((a, b) => a.order_index - b.order_index).map((question, index) => (
+                  <Card
+                    key={question.order_index}
+                    className="bg-white border border-border-cream-1 shadow-sm hover:bg-[#FBFBFA] hover:border-[#DAD7D0] transition-all cursor-pointer p-2"
+                    onClick={() => handleEditQuestion(question)}
+                  >
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex gap-1.5 flex-1 min-w-0">
+                        <span className="text-sm leading-none">
+                          {getQuestionTypeIcon(question.question_type)}
+                        </span>
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge className="bg-[#1F1F1F] text-white text-2xs px-1 py-0 rounded">
+                              #{question.order_index}
+                            </Badge>
+                            <span className="text-xs font-medium text-[#1F1F1F] truncate">
+                              {question.question_text}
+                            </span>
+                            {question.is_required && (
+                              <Badge className="bg-red-600 text-white text-2xs px-1 py-0 rounded">
+                                Required
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-2xs text-[#8C7C6D]">
+                            {question.question_type}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => moveQuestion(index, 'up')}
+                          disabled={index === 0}
+                          className="h-6 w-6"
+                        >
+                          <GripVertical className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => moveQuestion(index, 'down')}
+                          disabled={index === questions.length - 1}
+                          className="h-6 w-6"
+                        >
+                          <GripVertical className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteQuestion(question.order_index)}
+                          className="h-6 w-6 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+
+                {questions.length === 0 && (
+                  <Card className="bg-white border-2 border-dashed border-border-cream-1 py-4 text-center">
+                    <div className="text-xl mb-1">📝</div>
+                    <p className="text-xs font-medium text-[#1F1F1F] mb-0.5">
+                      No questions yet
+                    </p>
+                    <p className="text-2xs text-text-muted">
+                      Click "Add" to get started
+                    </p>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <SheetFooter className="mt-4 pt-3 border-t gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsOpen(false)}
+              className="text-sm h-8"
+            >
               Cancel
             </Button>
             <Button
-              bg="#A59480"
-              color="white"
-              _hover={{ bg: '#8F7F6B' }}
-              onClick={handleSaveQuestion}
-              boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
+              onClick={handleSaveQuestionnaire}
+              className="text-sm h-8"
             >
-              Save Question
+              Save
             </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-    </VStack>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Question Editor Sheet */}
+      <Sheet open={isQuestionOpen} onOpenChange={setIsQuestionOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-[400px] overflow-y-auto bg-white p-4">
+          <SheetHeader className="pb-3">
+            <SheetTitle className="text-lg font-semibold text-[#1F1F1F]">
+              {editingQuestion?.id ? 'Edit' : 'Add'} Question
+            </SheetTitle>
+            <SheetDescription className="text-xs text-text-muted">
+              Configure your question details
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <Label htmlFor="question-text" className="text-xs font-semibold text-[#1F1F1F]">
+                Question Text*
+              </Label>
+              <Input
+                id="question-text"
+                value={editingQuestion?.question_text || ''}
+                onChange={(e) =>
+                  setEditingQuestion({
+                    ...editingQuestion!,
+                    question_text: e.target.value
+                  })
+                }
+                placeholder="e.g., What is your email address?"
+                className="mt-1 text-sm h-9"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="question-type" className="text-xs font-semibold text-[#1F1F1F]">
+                Question Type*
+              </Label>
+              <Select
+                id="question-type"
+                value={editingQuestion?.question_type || 'text'}
+                onChange={(e) =>
+                  setEditingQuestion({
+                    ...editingQuestion!,
+                    question_type: e.target.value as any
+                  })
+                }
+                className="mt-1 text-sm h-9"
+              >
+                <option value="text">Text</option>
+                <option value="email">Email</option>
+                <option value="phone">Phone</option>
+                <option value="textarea">Long Text</option>
+                <option value="select">Dropdown</option>
+                <option value="radio">Multiple Choice</option>
+                <option value="checkbox">Checkboxes</option>
+                <option value="file">File Upload</option>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="placeholder" className="text-xs font-semibold text-[#1F1F1F]">
+                Placeholder Text
+              </Label>
+              <Input
+                id="placeholder"
+                value={editingQuestion?.placeholder || ''}
+                onChange={(e) =>
+                  setEditingQuestion({
+                    ...editingQuestion!,
+                    placeholder: e.target.value
+                  })
+                }
+                placeholder="e.g., your@email.com"
+                className="mt-1 text-sm h-9"
+              />
+            </div>
+
+            {(editingQuestion?.question_type === 'select' ||
+              editingQuestion?.question_type === 'radio' ||
+              editingQuestion?.question_type === 'checkbox') && (
+              <div>
+                <Label htmlFor="options" className="text-xs font-semibold text-[#1F1F1F]">
+                  Options (one per line)
+                </Label>
+                <Textarea
+                  id="options"
+                  placeholder="Option 1&#10;Option 2&#10;Option 3"
+                  rows={4}
+                  onChange={(e) => {
+                    const lines = e.target.value.split('\n').filter(l => l.trim());
+                    const options = lines.map((line, i) => ({
+                      value: `option${i + 1}`,
+                      label: line.trim()
+                    }));
+                    setEditingQuestion({
+                      ...editingQuestion!,
+                      options
+                    });
+                  }}
+                  value={editingQuestion?.options?.map(o => o.label).join('\n') || ''}
+                  className="mt-1 text-xs"
+                />
+              </div>
+            )}
+
+            <Card className={`border ${editingQuestion?.is_required ? 'border-red-600' : 'border-border-cream-1'} bg-white shadow-sm p-2.5`}>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="required" className="text-xs font-semibold text-[#1F1F1F]">
+                  Required field
+                </Label>
+                <Switch
+                  id="required"
+                  checked={editingQuestion?.is_required}
+                  onCheckedChange={(checked) =>
+                    setEditingQuestion({
+                      ...editingQuestion!,
+                      is_required: checked
+                    })
+                  }
+                />
+              </div>
+            </Card>
+          </div>
+
+          <SheetFooter className="mt-4 pt-3 border-t gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsQuestionOpen(false)}
+              className="text-sm h-8"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveQuestion}
+              className="text-sm h-8"
+            >
+              Save
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }

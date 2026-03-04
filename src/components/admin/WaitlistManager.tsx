@@ -1,41 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { Search, Send, ExternalLink, Clock, Check, X, Eye, Info, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Spinner } from '@/components/ui/spinner';
+import { Select } from '@/components/ui/select';
 import {
-  Box,
-  VStack,
-  HStack,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Text,
-  Button,
-  Badge,
-  Select,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  useDisclosure,
-  useToast,
-  Textarea,
-  FormControl,
-  FormLabel,
-  Alert,
-  AlertIcon,
-  Spinner,
-  Icon,
-  Tooltip,
-  IconButton
-} from '@chakra-ui/react';
-import { FiSearch, FiSend, FiExternalLink, FiClock, FiCheck, FiX, FiEye } from 'react-icons/fi';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { useToast } from '@/hooks/useToast';
 
 interface WaitlistEntry {
   id: string;
@@ -67,11 +48,11 @@ export default function WaitlistManager() {
   const [selectedEntry, setSelectedEntry] = useState<WaitlistEntry | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [sendingSMS, setSendingSMS] = useState(false);
-  
-  const { isOpen: isReviewOpen, onOpen: onReviewOpen, onClose: onReviewClose } = useDisclosure();
-  const { isOpen: isLinkOpen, onOpen: onLinkOpen, onClose: onLinkClose } = useDisclosure();
-  const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
-  const toast = useToast();
+
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isLinkOpen, setIsLinkOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadWaitlistEntries();
@@ -93,7 +74,6 @@ export default function WaitlistManager() {
           title: 'Error',
           description: 'Failed to load waitlist entries',
           status: 'error',
-          duration: 3000,
         });
       }
     } catch (error) {
@@ -101,7 +81,6 @@ export default function WaitlistManager() {
         title: 'Error',
         description: 'Failed to load waitlist entries',
         status: 'error',
-        duration: 3000,
       });
     } finally {
       setLoading(false);
@@ -111,17 +90,17 @@ export default function WaitlistManager() {
   const handleReview = (entry: WaitlistEntry) => {
     setSelectedEntry(entry);
     setReviewNotes(entry.review_notes || '');
-    onReviewOpen();
+    setIsReviewOpen(true);
   };
 
   const handleGenerateLink = (entry: WaitlistEntry) => {
     setSelectedEntry(entry);
-    onLinkOpen();
+    setIsLinkOpen(true);
   };
 
   const handleViewEntry = (entry: WaitlistEntry) => {
     setSelectedEntry(entry);
-    onViewOpen();
+    setIsViewOpen(true);
   };
 
   const submitReview = async (status: 'approved' | 'denied' | 'waitlisted') => {
@@ -143,9 +122,8 @@ export default function WaitlistManager() {
           title: 'Success',
           description: `Entry ${status} successfully`,
           status: 'success',
-          duration: 3000,
         });
-        onReviewClose();
+        setIsReviewOpen(false);
         loadWaitlistEntries();
       } else {
         throw new Error('Failed to update entry');
@@ -155,7 +133,6 @@ export default function WaitlistManager() {
         title: 'Error',
         description: 'Failed to update entry',
         status: 'error',
-        duration: 3000,
       });
     }
   };
@@ -179,9 +156,8 @@ export default function WaitlistManager() {
           title: 'Success',
           description: 'Application link generated and sent successfully',
           status: 'success',
-          duration: 3000,
         });
-        onLinkClose();
+        setIsLinkOpen(false);
         loadWaitlistEntries();
       } else {
         throw new Error('Failed to generate link');
@@ -191,21 +167,20 @@ export default function WaitlistManager() {
         title: 'Error',
         description: 'Failed to generate and send link',
         status: 'error',
-        duration: 3000,
       });
     } finally {
       setSendingSMS(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusVariant = (status: string): 'default' | 'secondary' | 'success' | 'error' | 'warning' => {
     switch (status) {
-      case 'review': return 'yellow';
-      case 'approved': return 'green';
-      case 'denied': return 'red';
-      case 'waitlisted': return 'blue';
-      case 'link_sent': return 'purple';
-      default: return 'gray';
+      case 'review': return 'warning';
+      case 'approved': return 'success';
+      case 'denied': return 'error';
+      case 'waitlisted': return 'secondary';
+      case 'link_sent': return 'default';
+      default: return 'secondary';
     }
   };
 
@@ -233,32 +208,31 @@ export default function WaitlistManager() {
 
   if (loading) {
     return (
-      <VStack spacing={4} align="center" py={8}>
+      <div className="flex flex-col items-center justify-center gap-4 py-8">
         <Spinner size="lg" />
-        <Text>Loading waitlist entries...</Text>
-      </VStack>
+        <p className="text-text-muted">Loading waitlist entries...</p>
+      </div>
     );
   }
 
   return (
-    <VStack spacing={6} align="stretch">
+    <div className="flex flex-col gap-6">
       {/* Filters */}
-      <HStack spacing={2} w="full">
-        <InputGroup flex="1">
-          <InputLeftElement>
-            <Icon as={FiSearch} color="gray.400" />
-          </InputLeftElement>
+      <div className="flex flex-col md:flex-row gap-2 w-full">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
           <Input
             placeholder="Search entries..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
           />
-        </InputGroup>
+        </div>
 
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          flex="1"
+          className="flex-1 md:max-w-[200px]"
         >
           <option value="all">All Statuses</option>
           <option value="review">Review</option>
@@ -267,479 +241,478 @@ export default function WaitlistManager() {
           <option value="waitlisted">Waitlisted</option>
           <option value="link_sent">Link Sent</option>
         </Select>
-      </HStack>
+      </div>
 
       {/* Desktop Table View */}
-      <Box overflowX="auto" display={{ base: 'none', md: 'block' }}>
-        <Table variant="simple">
-          <Thead>
-            <Tr>
-              <Th>Name</Th>
-              <Th>Contact</Th>
-              <Th>Details</Th>
-              <Th>Status</Th>
-              <Th>Submitted</Th>
-              <Th>Link Status</Th>
-              <Th>Actions</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
+      <div className="hidden md:block overflow-x-auto rounded-lg border border-border-cream-1">
+        <table className="w-full">
+          <thead className="bg-bg-cream-1 border-b border-border-cream-1">
+            <tr>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Name</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Contact</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Details</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Status</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Submitted</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Link Status</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white">
             {filteredEntries.map((entry) => (
-              <Tr key={entry.id}>
-                <Td>
-                  <VStack align="start" spacing={1}>
-                    <Text fontWeight="bold">
+              <tr key={entry.id} className="border-b border-border-cream-1 hover:bg-bg-cream-1/50 transition-colors">
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-semibold text-[#1F1F1F]">
                       {entry.first_name} {entry.last_name}
-                    </Text>
+                    </span>
                     {entry.company && (
-                      <Text fontSize="xs" color="gray.500">{entry.company}</Text>
+                      <span className="text-xs text-text-muted">{entry.company}</span>
                     )}
-                  </VStack>
-                </Td>
+                  </div>
+                </td>
 
-                <Td>
-                  <VStack align="start" spacing={1}>
-                    <Text fontSize="sm">{entry.email}</Text>
-                    <Text fontSize="sm" color="gray.500">{entry.phone}</Text>
-                  </VStack>
-                </Td>
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm text-[#1F1F1F]">{entry.email}</span>
+                    <span className="text-sm text-text-muted">{entry.phone}</span>
+                  </div>
+                </td>
 
-                <Td>
-                  <VStack align="start" spacing={1}>
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
                     {entry.occupation && (
-                      <Text fontSize="xs">{entry.occupation}</Text>
+                      <span className="text-xs text-[#1F1F1F]">{entry.occupation}</span>
                     )}
                     {entry.referral && (
-                      <Text fontSize="xs" color="blue.500">Ref: {entry.referral}</Text>
+                      <span className="text-xs text-blue-600">Ref: {entry.referral}</span>
                     )}
-                  </VStack>
-                </Td>
+                  </div>
+                </td>
 
-                <Td>
-                  <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
+                <td className="px-4 py-4">
+                  <Badge variant={getStatusVariant(entry.status)}>
                     {entry.status.replace('_', ' ')}
                   </Badge>
-                </Td>
+                </td>
 
-                <Td>
-                  <Text fontSize="sm">{formatDate(entry.submitted_at)}</Text>
-                </Td>
+                <td className="px-4 py-4">
+                  <span className="text-sm text-[#1F1F1F]">{formatDate(entry.submitted_at)}</span>
+                </td>
 
-                <Td>
-                  <VStack align="start" spacing={1}>
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
                     {entry.application_link_sent_at && (
-                      <Text fontSize="xs" color="green.600">
+                      <span className="text-xs text-green-600">
                         Sent {formatDate(entry.application_link_sent_at)}
-                      </Text>
+                      </span>
                     )}
                     {entry.application_link_opened_at && (
-                      <Text fontSize="xs" color="blue.600">
+                      <span className="text-xs text-blue-600">
                         Opened {formatDate(entry.application_link_opened_at)}
-                      </Text>
+                      </span>
                     )}
                     {entry.application_expires_at && (
-                      <Text fontSize="xs" color="orange.600">
+                      <span className="text-xs text-orange-600">
                         Expires {formatDate(entry.application_expires_at)}
-                      </Text>
+                      </span>
                     )}
-                  </VStack>
-                </Td>
+                  </div>
+                </td>
 
-                <Td>
-                  <HStack spacing={2}>
-                    <IconButton
-                      size="sm"
-                      minW="44px"
-                      minH="44px"
-                      icon={<FiEye />}
+                <td className="px-4 py-4">
+                  <div className="flex gap-2">
+                    <Button
+                      size="icon"
+                      variant="outline"
                       onClick={() => handleViewEntry(entry)}
                       aria-label="View entry details"
-                      colorScheme="blue"
-                    />
+                      className="h-9 w-9"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
 
                     {entry.status === 'review' && (
-                      <IconButton
-                        size="sm"
-                        minW="44px"
-                        minH="44px"
-                        icon={<FiCheck />}
+                      <Button
+                        size="icon"
+                        variant="outline"
                         onClick={() => handleReview(entry)}
                         aria-label="Review entry"
-                        colorScheme="yellow"
-                      />
+                        className="h-9 w-9 border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
                     )}
 
                     {(entry.status === 'approved' || entry.status === 'link_sent') && (
-                      <Tooltip label="Generate and send application link">
-                        <IconButton
-                          size="sm"
-                          minW="44px"
-                          minH="44px"
-                          icon={<FiSend />}
-                          onClick={() => handleGenerateLink(entry)}
-                          aria-label="Generate and send application link"
-                          colorScheme="green"
-                          variant={entry.status === 'link_sent' ? 'outline' : 'solid'}
-                        />
-                      </Tooltip>
+                      <Button
+                        size="icon"
+                        variant={entry.status === 'link_sent' ? 'outline' : 'default'}
+                        onClick={() => handleGenerateLink(entry)}
+                        aria-label="Generate and send application link"
+                        className="h-9 w-9"
+                        title="Generate and send application link"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     )}
-                  </HStack>
-                </Td>
-              </Tr>
+                  </div>
+                </td>
+              </tr>
             ))}
-          </Tbody>
-        </Table>
+          </tbody>
+        </table>
 
         {filteredEntries.length === 0 && (
-          <Box py={8} textAlign="center">
-            <Text color="gray.500">No waitlist entries found</Text>
-          </Box>
+          <div className="py-8 text-center">
+            <p className="text-text-muted">No waitlist entries found</p>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* Mobile Card View */}
-      <VStack spacing={3} display={{ base: 'flex', md: 'none' }}>
+      <div className="flex flex-col gap-3 md:hidden">
         {filteredEntries.length === 0 ? (
-          <Box py={8} textAlign="center" w="full">
-            <Text color="gray.500">No waitlist entries found</Text>
-          </Box>
+          <div className="py-8 text-center w-full">
+            <p className="text-text-muted">No waitlist entries found</p>
+          </div>
         ) : (
           filteredEntries.map((entry) => (
-            <Box
+            <div
               key={entry.id}
-              p={4}
-              borderRadius="12px"
-              border="1px solid"
-              borderColor="#ECEAE5"
-              bg="white"
-              w="full"
-              boxShadow="0 2px 8px rgba(165, 148, 128, 0.08)"
+              className="p-4 rounded-xl border border-border-cream-1 bg-white shadow-sm hover:shadow-md transition-shadow"
             >
-              <VStack align="stretch" spacing={3}>
+              <div className="flex flex-col gap-3">
                 {/* Name */}
-                <Box>
-                  <Text fontSize="sm" color="#5A5A5A" mb={1}>Name</Text>
-                  <Text fontWeight="600" fontSize="md" color="#1F1F1F">
+                <div>
+                  <span className="text-sm text-text-muted mb-1 block">Name</span>
+                  <p className="font-semibold text-base text-[#1F1F1F]">
                     {entry.first_name} {entry.last_name}
-                  </Text>
+                  </p>
                   {entry.company && (
-                    <Text fontSize="xs" color="gray.500">{entry.company}</Text>
+                    <p className="text-xs text-text-muted">{entry.company}</p>
                   )}
-                </Box>
+                </div>
 
                 {/* Contact */}
-                <Box>
-                  <Text fontSize="sm" color="#5A5A5A" mb={1}>Contact</Text>
-                  <Text fontSize="sm" color="#1F1F1F">{entry.email}</Text>
-                  <Text fontSize="sm" color="gray.500">{entry.phone}</Text>
-                </Box>
+                <div>
+                  <span className="text-sm text-text-muted mb-1 block">Contact</span>
+                  <p className="text-sm text-[#1F1F1F]">{entry.email}</p>
+                  <p className="text-sm text-text-muted">{entry.phone}</p>
+                </div>
 
                 {/* Details */}
                 {(entry.occupation || entry.referral) && (
-                  <Box>
-                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Details</Text>
+                  <div>
+                    <span className="text-sm text-text-muted mb-1 block">Details</span>
                     {entry.occupation && (
-                      <Text fontSize="sm" color="#1F1F1F">{entry.occupation}</Text>
+                      <p className="text-sm text-[#1F1F1F]">{entry.occupation}</p>
                     )}
                     {entry.referral && (
-                      <Text fontSize="sm" color="blue.500">Ref: {entry.referral}</Text>
+                      <p className="text-sm text-blue-600">Ref: {entry.referral}</p>
                     )}
-                  </Box>
+                  </div>
                 )}
 
                 {/* Status & Submitted */}
-                <HStack justify="space-between" wrap="wrap">
-                  <Box>
-                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Status</Text>
-                    <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
+                <div className="flex justify-between flex-wrap gap-2">
+                  <div>
+                    <span className="text-sm text-text-muted mb-1 block">Status</span>
+                    <Badge variant={getStatusVariant(entry.status)}>
                       {entry.status.replace('_', ' ')}
                     </Badge>
-                  </Box>
-                  <Box>
-                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Submitted</Text>
-                    <Text fontSize="sm" color="#1F1F1F">{formatDate(entry.submitted_at)}</Text>
-                  </Box>
-                </HStack>
+                  </div>
+                  <div>
+                    <span className="text-sm text-text-muted mb-1 block">Submitted</span>
+                    <p className="text-sm text-[#1F1F1F]">{formatDate(entry.submitted_at)}</p>
+                  </div>
+                </div>
 
                 {/* Link Status */}
                 {(entry.application_link_sent_at || entry.application_link_opened_at || entry.application_expires_at) && (
-                  <Box>
-                    <Text fontSize="sm" color="#5A5A5A" mb={1}>Link Status</Text>
-                    <VStack align="start" spacing={1}>
+                  <div>
+                    <span className="text-sm text-text-muted mb-1 block">Link Status</span>
+                    <div className="flex flex-col gap-1">
                       {entry.application_link_sent_at && (
-                        <Text fontSize="xs" color="green.600">
+                        <span className="text-xs text-green-600">
                           Sent {formatDate(entry.application_link_sent_at)}
-                        </Text>
+                        </span>
                       )}
                       {entry.application_link_opened_at && (
-                        <Text fontSize="xs" color="blue.600">
+                        <span className="text-xs text-blue-600">
                           Opened {formatDate(entry.application_link_opened_at)}
-                        </Text>
+                        </span>
                       )}
                       {entry.application_expires_at && (
-                        <Text fontSize="xs" color="orange.600">
+                        <span className="text-xs text-orange-600">
                           Expires {formatDate(entry.application_expires_at)}
-                        </Text>
+                        </span>
                       )}
-                    </VStack>
-                  </Box>
+                    </div>
+                  </div>
                 )}
 
                 {/* Actions */}
-                <HStack spacing={2} pt={2} borderTop="1px solid" borderColor="#ECEAE5">
-                  <IconButton
-                    size="md"
-                    minW="44px"
-                    minH="44px"
-                    icon={<FiEye />}
+                <div className="flex gap-2 pt-2 border-t border-border-cream-1">
+                  <Button
+                    size="icon"
+                    variant="outline"
                     onClick={() => handleViewEntry(entry)}
                     aria-label="View entry details"
-                    colorScheme="blue"
-                  />
+                    className="h-11 w-11"
+                  >
+                    <Eye className="h-5 w-5" />
+                  </Button>
 
                   {entry.status === 'review' && (
-                    <IconButton
-                      size="md"
-                      minW="44px"
-                      minH="44px"
-                      icon={<FiCheck />}
+                    <Button
+                      size="icon"
+                      variant="outline"
                       onClick={() => handleReview(entry)}
                       aria-label="Review entry"
-                      colorScheme="yellow"
-                    />
+                      className="h-11 w-11 border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                    >
+                      <Check className="h-5 w-5" />
+                    </Button>
                   )}
 
                   {(entry.status === 'approved' || entry.status === 'link_sent') && (
-                    <Tooltip label="Generate and send application link">
-                      <IconButton
-                        size="md"
-                        minW="44px"
-                        minH="44px"
-                        icon={<FiSend />}
-                        onClick={() => handleGenerateLink(entry)}
-                        aria-label="Generate and send application link"
-                        colorScheme="green"
-                        variant={entry.status === 'link_sent' ? 'outline' : 'solid'}
-                      />
-                    </Tooltip>
+                    <Button
+                      size="icon"
+                      variant={entry.status === 'link_sent' ? 'outline' : 'default'}
+                      onClick={() => handleGenerateLink(entry)}
+                      aria-label="Generate and send application link"
+                      className="h-11 w-11"
+                      title="Generate and send application link"
+                    >
+                      <Send className="h-5 w-5" />
+                    </Button>
                   )}
-                </HStack>
-              </VStack>
-            </Box>
+                </div>
+              </div>
+            </div>
           ))
         )}
-      </VStack>
+      </div>
 
-      {/* Review Drawer */}
-      <Drawer isOpen={isReviewOpen} onClose={onReviewClose} size="md" placement="right">
-        <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px" color="#353535">
-            Review Waitlist Entry: {selectedEntry?.first_name} {selectedEntry?.last_name}
-          </DrawerHeader>
-          <DrawerBody>
-            <VStack spacing={4} align="stretch" pt={4}>
-              {selectedEntry && (
-                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                  <VStack align="start" spacing={2}>
-                    <Text><strong>Email:</strong> {selectedEntry.email}</Text>
-                    <Text><strong>Phone:</strong> {selectedEntry.phone}</Text>
-                    {selectedEntry.company && (
-                      <Text><strong>Company:</strong> {selectedEntry.company}</Text>
-                    )}
-                    {selectedEntry.occupation && (
-                      <Text><strong>Occupation:</strong> {selectedEntry.occupation}</Text>
-                    )}
-                    {selectedEntry.why_noir && (
-                      <Text><strong>Why Noir:</strong> {selectedEntry.why_noir}</Text>
-                    )}
-                  </VStack>
-                </Box>
-              )}
+      {/* Review Sheet */}
+      <Sheet open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+        <SheetContent className="bg-[#ECEDE8] text-[#353535] w-full sm:max-w-[540px]">
+          <SheetHeader>
+            <SheetTitle className="text-[#353535]">
+              Review Waitlist Entry: {selectedEntry?.first_name} {selectedEntry?.last_name}
+            </SheetTitle>
+          </SheetHeader>
 
-              <FormControl>
-                <FormLabel color="#353535">Review Notes</FormLabel>
-                <Textarea
-                  value={reviewNotes}
-                  onChange={(e) => setReviewNotes(e.target.value)}
-                  placeholder="Add notes about this review..."
-                  rows={3}
-                  bg="white"
-                  borderColor="gray.300"
-                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
-                  w="100%"
-                />
-              </FormControl>
-            </VStack>
-          </DrawerBody>
-          <DrawerFooter borderTopWidth="1px">
-            <HStack spacing={3}>
-              <Button
-                colorScheme="red"
-                onClick={() => submitReview('denied')}
-                leftIcon={<FiX />}
-              >
-                Deny
-              </Button>
-              <Button
-                colorScheme="blue"
-                onClick={() => submitReview('waitlisted')}
-              >
-                Waitlist
-              </Button>
-              <Button
-                colorScheme="green"
-                onClick={() => submitReview('approved')}
-                leftIcon={<FiCheck />}
-              >
-                Approve
-              </Button>
-            </HStack>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-
-      {/* Application Link Drawer */}
-      <Drawer isOpen={isLinkOpen} onClose={onLinkClose} size="md" placement="right">
-        <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px" color="#353535">
-            Send Application Link: {selectedEntry?.first_name} {selectedEntry?.last_name}
-          </DrawerHeader>
-          <DrawerBody>
-            <VStack spacing={4} align="stretch" pt={4}>
-              <Alert status="info" bg="blue.50" border="1px" borderColor="blue.200">
-                <AlertIcon />
-                <VStack align="start" spacing={1}>
-                  <Text fontWeight="bold" color="#353535">
-                    Generate and send application link via SMS
-                  </Text>
-                  <Text fontSize="sm" color="#353535">
-                    This will create a unique application link that expires in 7 days and send it to {selectedEntry?.phone}
-                  </Text>
-                </VStack>
-              </Alert>
-
-              {selectedEntry?.application_link_sent_at && (
-                <Alert status="warning" bg="orange.50" border="1px" borderColor="orange.200">
-                  <AlertIcon />
-                  <Text fontSize="sm" color="#353535">
-                    A link was previously sent on {formatDate(selectedEntry.application_link_sent_at)}. 
-                    Sending a new link will invalidate the previous one.
-                  </Text>
-                </Alert>
-              )}
-            </VStack>
-          </DrawerBody>
-          <DrawerFooter borderTopWidth="1px">
-            <HStack spacing={3}>
-              <Button onClick={onLinkClose} variant="outline">
-                Cancel
-              </Button>
-              <Button
-                colorScheme="green"
-                onClick={generateAndSendLink}
-                isLoading={sendingSMS}
-                loadingText="Sending..."
-                leftIcon={<FiSend />}
-              >
-                Generate & Send Link
-              </Button>
-            </HStack>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-
-      {/* View Entry Drawer */}
-      <Drawer isOpen={isViewOpen} onClose={onViewClose} size="md" placement="right">
-        <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px" color="#353535">
-            Entry Details: {selectedEntry?.first_name} {selectedEntry?.last_name}
-          </DrawerHeader>
-          <DrawerBody>
+          <div className="flex flex-col gap-4 mt-6">
             {selectedEntry && (
-              <VStack spacing={4} align="stretch" pt={4}>
-                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                  <Text fontWeight="bold" mb={3} color="#353535">Contact Information</Text>
-                  <VStack align="start" spacing={2}>
-                    <Text><strong>Name:</strong> {selectedEntry.first_name} {selectedEntry.last_name}</Text>
-                    <Text><strong>Email:</strong> {selectedEntry.email}</Text>
-                    <Text><strong>Phone:</strong> {selectedEntry.phone}</Text>
-                    {selectedEntry.company && (
-                      <Text><strong>Company:</strong> {selectedEntry.company}</Text>
-                    )}
-                    {selectedEntry.occupation && (
-                      <Text><strong>Occupation:</strong> {selectedEntry.occupation}</Text>
-                    )}
-                    {selectedEntry.industry && (
-                      <Text><strong>Industry:</strong> {selectedEntry.industry}</Text>
-                    )}
-                  </VStack>
-                </Box>
-
-                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                  <Text fontWeight="bold" mb={3} color="#353535">Application Details</Text>
-                  <VStack align="start" spacing={2}>
-                    {selectedEntry.referral && (
-                      <Text><strong>Referral:</strong> {selectedEntry.referral}</Text>
-                    )}
-                    {selectedEntry.how_did_you_hear && (
-                      <Text><strong>How did you hear:</strong> {selectedEntry.how_did_you_hear}</Text>
-                    )}
-                    {selectedEntry.why_noir && (
-                      <Text><strong>Why Noir:</strong> {selectedEntry.why_noir}</Text>
-                    )}
-                    <Text><strong>Status:</strong> 
-                      <Badge ml={2} colorScheme={getStatusColor(selectedEntry.status)}>
-                        {selectedEntry.status.replace('_', ' ')}
-                      </Badge>
-                    </Text>
-                    <Text><strong>Submitted:</strong> {formatDate(selectedEntry.submitted_at)}</Text>
-                    {selectedEntry.reviewed_at && (
-                      <Text><strong>Reviewed:</strong> {formatDate(selectedEntry.reviewed_at)}</Text>
-                    )}
-                  </VStack>
-                </Box>
-
-                {selectedEntry.review_notes && (
-                  <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                    <Text fontWeight="bold" mb={3} color="#353535">Review Notes</Text>
-                    <Text>{selectedEntry.review_notes}</Text>
-                  </Box>
-                )}
-
-                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                  <Text fontWeight="bold" mb={3} color="#353535">Application Link Status</Text>
-                  <VStack align="start" spacing={2}>
-                    {selectedEntry.application_link_sent_at ? (
-                      <>
-                        <Text color="green.600">✓ Link sent on {formatDate(selectedEntry.application_link_sent_at)}</Text>
-                        {selectedEntry.application_link_opened_at && (
-                          <Text color="blue.600">✓ Link opened on {formatDate(selectedEntry.application_link_opened_at)}</Text>
-                        )}
-                        {selectedEntry.application_expires_at && (
-                          <Text color="orange.600">⚠ Expires on {formatDate(selectedEntry.application_expires_at)}</Text>
-                        )}
-                      </>
-                    ) : (
-                      <Text color="gray.500">No application link sent yet</Text>
-                    )}
-                  </VStack>
-                </Box>
-              </VStack>
+              <div className="bg-white p-4 rounded-lg border border-gray-300">
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm"><strong>Email:</strong> {selectedEntry.email}</p>
+                  <p className="text-sm"><strong>Phone:</strong> {selectedEntry.phone}</p>
+                  {selectedEntry.company && (
+                    <p className="text-sm"><strong>Company:</strong> {selectedEntry.company}</p>
+                  )}
+                  {selectedEntry.occupation && (
+                    <p className="text-sm"><strong>Occupation:</strong> {selectedEntry.occupation}</p>
+                  )}
+                  {selectedEntry.why_noir && (
+                    <p className="text-sm"><strong>Why Noir:</strong> {selectedEntry.why_noir}</p>
+                  )}
+                </div>
+              </div>
             )}
-          </DrawerBody>
-          <DrawerFooter borderTopWidth="1px">
-            <Button onClick={onViewClose} variant="outline">
+
+            <div className="space-y-2">
+              <Label htmlFor="review-notes" className="text-[#353535]">Review Notes</Label>
+              <Textarea
+                id="review-notes"
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+                placeholder="Add notes about this review..."
+                rows={3}
+                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <SheetFooter className="mt-6 gap-3 sm:gap-3">
+            <Button
+              variant="destructive"
+              onClick={() => submitReview('denied')}
+              className="flex items-center gap-2"
+            >
+              <X className="h-4 w-4" />
+              Deny
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => submitReview('waitlisted')}
+            >
+              Waitlist
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => submitReview('approved')}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Check className="h-4 w-4" />
+              Approve
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Application Link Sheet */}
+      <Sheet open={isLinkOpen} onOpenChange={setIsLinkOpen}>
+        <SheetContent className="bg-[#ECEDE8] text-[#353535] w-full sm:max-w-[540px]">
+          <SheetHeader>
+            <SheetTitle className="text-[#353535]">
+              Send Application Link: {selectedEntry?.first_name} {selectedEntry?.last_name}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="flex flex-col gap-4 mt-6">
+            <Alert variant="info">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex flex-col gap-1">
+                  <p className="font-bold text-[#353535]">
+                    Generate and send application link via SMS
+                  </p>
+                  <p className="text-sm text-[#353535]">
+                    This will create a unique application link that expires in 7 days and send it to {selectedEntry?.phone}
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+
+            {selectedEntry?.application_link_sent_at && (
+              <Alert variant="warning">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="text-sm text-[#353535]">
+                    A link was previously sent on {formatDate(selectedEntry.application_link_sent_at)}.
+                    Sending a new link will invalidate the previous one.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <SheetFooter className="mt-6 gap-3 sm:gap-3">
+            <Button onClick={() => setIsLinkOpen(false)} variant="outline">
+              Cancel
+            </Button>
+            <Button
+              onClick={generateAndSendLink}
+              disabled={sendingSMS}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+            >
+              {sendingSMS ? (
+                <>
+                  <Spinner size="sm" variant="light" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Generate & Send Link
+                </>
+              )}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* View Entry Sheet */}
+      <Sheet open={isViewOpen} onOpenChange={setIsViewOpen}>
+        <SheetContent className="bg-[#ECEDE8] text-[#353535] w-full sm:max-w-[540px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-[#353535]">
+              Entry Details: {selectedEntry?.first_name} {selectedEntry?.last_name}
+            </SheetTitle>
+          </SheetHeader>
+
+          {selectedEntry && (
+            <div className="flex flex-col gap-4 mt-6">
+              <div className="bg-white p-4 rounded-lg border border-gray-300">
+                <p className="font-bold mb-3 text-[#353535]">Contact Information</p>
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm"><strong>Name:</strong> {selectedEntry.first_name} {selectedEntry.last_name}</p>
+                  <p className="text-sm"><strong>Email:</strong> {selectedEntry.email}</p>
+                  <p className="text-sm"><strong>Phone:</strong> {selectedEntry.phone}</p>
+                  {selectedEntry.company && (
+                    <p className="text-sm"><strong>Company:</strong> {selectedEntry.company}</p>
+                  )}
+                  {selectedEntry.occupation && (
+                    <p className="text-sm"><strong>Occupation:</strong> {selectedEntry.occupation}</p>
+                  )}
+                  {selectedEntry.industry && (
+                    <p className="text-sm"><strong>Industry:</strong> {selectedEntry.industry}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border border-gray-300">
+                <p className="font-bold mb-3 text-[#353535]">Application Details</p>
+                <div className="flex flex-col gap-2">
+                  {selectedEntry.referral && (
+                    <p className="text-sm"><strong>Referral:</strong> {selectedEntry.referral}</p>
+                  )}
+                  {selectedEntry.how_did_you_hear && (
+                    <p className="text-sm"><strong>How did you hear:</strong> {selectedEntry.how_did_you_hear}</p>
+                  )}
+                  {selectedEntry.why_noir && (
+                    <p className="text-sm"><strong>Why Noir:</strong> {selectedEntry.why_noir}</p>
+                  )}
+                  <p className="text-sm flex items-center gap-2">
+                    <strong>Status:</strong>
+                    <Badge variant={getStatusVariant(selectedEntry.status)}>
+                      {selectedEntry.status.replace('_', ' ')}
+                    </Badge>
+                  </p>
+                  <p className="text-sm"><strong>Submitted:</strong> {formatDate(selectedEntry.submitted_at)}</p>
+                  {selectedEntry.reviewed_at && (
+                    <p className="text-sm"><strong>Reviewed:</strong> {formatDate(selectedEntry.reviewed_at)}</p>
+                  )}
+                </div>
+              </div>
+
+              {selectedEntry.review_notes && (
+                <div className="bg-white p-4 rounded-lg border border-gray-300">
+                  <p className="font-bold mb-3 text-[#353535]">Review Notes</p>
+                  <p className="text-sm">{selectedEntry.review_notes}</p>
+                </div>
+              )}
+
+              <div className="bg-white p-4 rounded-lg border border-gray-300">
+                <p className="font-bold mb-3 text-[#353535]">Application Link Status</p>
+                <div className="flex flex-col gap-2">
+                  {selectedEntry.application_link_sent_at ? (
+                    <>
+                      <p className="text-sm text-green-600">✓ Link sent on {formatDate(selectedEntry.application_link_sent_at)}</p>
+                      {selectedEntry.application_link_opened_at && (
+                        <p className="text-sm text-blue-600">✓ Link opened on {formatDate(selectedEntry.application_link_opened_at)}</p>
+                      )}
+                      {selectedEntry.application_expires_at && (
+                        <p className="text-sm text-orange-600">⚠ Expires on {formatDate(selectedEntry.application_expires_at)}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-text-muted">No application link sent yet</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <SheetFooter className="mt-6">
+            <Button onClick={() => setIsViewOpen(false)} variant="outline">
               Close
             </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-    </VStack>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
-} 
+}

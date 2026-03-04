@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Spinner } from '@chakra-ui/react';
+import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
 import { supabase } from '../../lib/supabase';

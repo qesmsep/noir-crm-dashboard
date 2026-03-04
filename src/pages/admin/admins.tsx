@@ -1,48 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  ModalCloseButton,
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  useToast,
-  Spinner,
-  Text,
-  Badge,
-  IconButton,
-  Tooltip,
-  Alert,
-  AlertIcon,
-  VStack,
-  HStack,
-  Heading,
-  useDisclosure,
-  Grid,
-  GridItem,
-} from '@chakra-ui/react';
-import { EditIcon, DeleteIcon, AddIcon } from '@chakra-ui/icons';
+import { Edit, Trash2, Plus } from 'lucide-react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import { supabase } from '../../lib/supabase';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
+import { Alert } from '@/components/ui/alert';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/useToast';
 
 interface Admin {
   id: string;
@@ -91,9 +60,9 @@ export default function AdminsPage() {
   });
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
-  
-  const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const { toast } = useToast();
 
   // Check super admin access and fetch admins on component mount
   useEffect(() => {
@@ -104,7 +73,7 @@ export default function AdminsPage() {
     try {
       setCheckingAccess(true);
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.access_token) {
         setIsSuperAdmin(false);
         setError('Authentication required');
@@ -162,9 +131,7 @@ export default function AdminsPage() {
       toast({
         title: 'Error',
         description: 'Failed to load admins',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -184,7 +151,7 @@ export default function AdminsPage() {
 
   const handleAddAdmin = () => {
     resetForm();
-    onOpen();
+    setIsOpen(true);
   };
 
   const handleEditAdmin = (admin: Admin) => {
@@ -196,7 +163,7 @@ export default function AdminsPage() {
       last_name: admin.last_name,
       access_level: admin.access_level,
     });
-    onOpen();
+    setIsOpen(true);
   };
 
   const handleDeleteAdmin = async (admin: Admin) => {
@@ -232,9 +199,6 @@ export default function AdminsPage() {
       toast({
         title: 'Success',
         description: 'Admin removed successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
       });
 
       fetchAdmins();
@@ -243,9 +207,7 @@ export default function AdminsPage() {
       toast({
         title: 'Error',
         description: err.message || 'Failed to remove admin',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        variant: 'error',
       });
     } finally {
       setSaving(false);
@@ -269,7 +231,7 @@ export default function AdminsPage() {
       }
 
       const method = editingAdmin ? 'PUT' : 'POST';
-      const body = editingAdmin 
+      const body = editingAdmin
         ? { id: editingAdmin.id, ...formData }
         : formData;
 
@@ -294,12 +256,9 @@ export default function AdminsPage() {
       toast({
         title: 'Success',
         description: editingAdmin ? 'Admin updated successfully' : 'Admin created successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
       });
 
-      onClose();
+      setIsOpen(false);
       resetForm();
       fetchAdmins();
     } catch (err: any) {
@@ -308,9 +267,7 @@ export default function AdminsPage() {
       toast({
         title: 'Error',
         description: err.message || 'Failed to save admin',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
+        variant: 'error',
       });
     } finally {
       setSaving(false);
@@ -327,27 +284,27 @@ export default function AdminsPage() {
 
   // Filter admins based on search and filters
   const filteredAdmins = admins.filter(admin => {
-    const matchesSearch = !filters.search || 
+    const matchesSearch = !filters.search ||
       admin.first_name.toLowerCase().includes(filters.search.toLowerCase()) ||
       admin.last_name.toLowerCase().includes(filters.search.toLowerCase()) ||
       admin.email.toLowerCase().includes(filters.search.toLowerCase()) ||
       admin.phone.includes(filters.search);
-    
+
     const matchesStatus = !filters.status || admin.status === filters.status;
     const matchesAccessLevel = !filters.access_level || admin.access_level === filters.access_level;
-    
+
     return matchesSearch && matchesStatus && matchesAccessLevel;
   });
 
   if (checkingAccess) {
     return (
       <AdminLayout>
-        <Box p={8} display="flex" justifyContent="center" alignItems="center" minH="100vh">
-          <VStack spacing={4}>
+        <div className="flex items-center justify-center min-h-screen p-8">
+          <div className="flex flex-col items-center gap-4">
             <Spinner size="xl" />
-            <Text fontFamily="'Montserrat', sans-serif">Checking access...</Text>
-          </VStack>
-        </Box>
+            <p className="text-sm">Checking access...</p>
+          </div>
+        </div>
       </AdminLayout>
     );
   }
@@ -355,19 +312,15 @@ export default function AdminsPage() {
   if (!isSuperAdmin) {
     return (
       <AdminLayout>
-        <Box p={8} display="flex" justifyContent="center" alignItems="center" minH="100vh">
-          <VStack spacing={4}>
-            <Text fontSize="xl" fontFamily="'Montserrat', sans-serif" color="red.500">
-              Access Denied
-            </Text>
-            <Text fontFamily="'Montserrat', sans-serif" textAlign="center">
-              {error || 'Super admin access required to manage admins'}
-            </Text>
-            <Text fontSize="sm" fontFamily="'Montserrat', sans-serif" color="gray.500">
+        <div className="flex items-center justify-center min-h-screen p-8">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <p className="text-xl text-red-600 font-semibold">Access Denied</p>
+            <p className="text-sm">{error || 'Super admin access required to manage admins'}</p>
+            <p className="text-xs text-gray-500">
               Only super admins can access this page. Contact your system administrator.
-            </Text>
-          </VStack>
-        </Box>
+            </p>
+          </div>
+        </div>
       </AdminLayout>
     );
   }
@@ -375,354 +328,288 @@ export default function AdminsPage() {
   if (loading) {
     return (
       <AdminLayout>
-        <Box p={8} display="flex" justifyContent="center" alignItems="center" minH="100vh">
+        <div className="flex items-center justify-center min-h-screen p-8">
           <Spinner size="xl" />
-        </Box>
+        </div>
       </AdminLayout>
     );
   }
 
   return (
     <AdminLayout>
-      <Box p={4} minH="100vh" bg="#353535" color="#ECEDE8">
-        <Box position="relative" ml={10} mr={10} zIndex={1} pt={28}>
-          <HStack justify="space-between" mb={8}>
-            <VStack align="start" spacing={1}>
-              <Heading size="lg" fontFamily="'Montserrat', sans-serif" color="#a59480">
-                Admin Management
-              </Heading>
-              <Text fontSize="sm" color="gray.400" fontFamily="'Montserrat', sans-serif">
-                Manage admin users and their access levels
-              </Text>
-            </VStack>
-            <Button
-              leftIcon={<AddIcon />}
-              colorScheme="blue"
-              onClick={handleAddAdmin}
-              fontFamily="'Montserrat', sans-serif"
-            >
+      <div className="min-h-screen bg-[#353535] text-[#ECEDE8] p-4">
+        <div className="relative ml-10 mr-10 z-10 pt-28">
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl md:text-3xl font-bold text-cork">Admin Management</h1>
+              <p className="text-xs md:text-sm text-gray-400">Manage admin users and their access levels</p>
+            </div>
+            <Button onClick={handleAddAdmin} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Plus className="w-4 h-4 mr-2" />
               Add Admin
             </Button>
-          </HStack>
+          </div>
 
           {/* Admin Statistics */}
-          <Box bg="#a59480" p={4} borderRadius="lg" mb={6} border="1px solid #ecede8">
-            <HStack justify="space-around" textAlign="center">
-              <VStack>
-                <Text fontSize="2xl" fontWeight="bold" color="white" fontFamily="'Montserrat', sans-serif">
-                  {admins.length}
-                </Text>
-                <Text fontSize="sm" color="white" fontFamily="'Montserrat', sans-serif">
-                  Total Admins
-                </Text>
-              </VStack>
-              <VStack>
-                <Text fontSize="2xl" fontWeight="bold" color="white" fontFamily="'Montserrat', sans-serif">
-                  {admins.filter(a => a.status === 'active').length}
-                </Text>
-                <Text fontSize="sm" color="white" fontFamily="'Montserrat', sans-serif">
-                  Active Admins
-                </Text>
-              </VStack>
-              <VStack>
-                <Text fontSize="2xl" fontWeight="bold" color="white" fontFamily="'Montserrat', sans-serif">
-                  {admins.filter(a => a.access_level === 'super_admin').length}
-                </Text>
-                <Text fontSize="sm" color="white" fontFamily="'Montserrat', sans-serif">
-                  Super Admins
-                </Text>
-              </VStack>
-            </HStack>
-          </Box>
+          <div className="bg-cork p-4 rounded-lg mb-6 border border-[#ecede8]">
+            <div className="flex justify-around text-center gap-4">
+              <div className="flex flex-col">
+                <p className="text-2xl font-bold text-white">{admins.length}</p>
+                <p className="text-sm text-white">Total Admins</p>
+              </div>
+              <div className="flex flex-col">
+                <p className="text-2xl font-bold text-white">{admins.filter(a => a.status === 'active').length}</p>
+                <p className="text-sm text-white">Active Admins</p>
+              </div>
+              <div className="flex flex-col">
+                <p className="text-2xl font-bold text-white">{admins.filter(a => a.access_level === 'super_admin').length}</p>
+                <p className="text-sm text-white">Super Admins</p>
+              </div>
+            </div>
+          </div>
 
           {/* Search and Filters */}
-          <Box bg="white" p={4} borderRadius="lg" mb={6} boxShadow="sm">
-            <HStack spacing={4} wrap="wrap">
-              <FormControl maxW="300px">
-                <FormLabel fontSize="sm" color="#353535"fontFamily="'Montserrat', sans-serif">Search</FormLabel>
+          <div className="bg-white p-4 rounded-lg mb-6 shadow-sm">
+            <div className="flex gap-4 flex-wrap">
+              <div className="flex-1 min-w-[200px] max-w-[300px]">
+                <Label htmlFor="search" className="text-sm text-[#353535] mb-1">Search</Label>
                 <Input
+                  id="search"
                   placeholder="Search by name, email, or phone..."
                   value={filters.search}
                   onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                  fontFamily="'Montserrat', sans-serif"
+                  className="text-sm h-9"
                 />
-              </FormControl>
-              <FormControl maxW="200px">
-                <FormLabel fontSize="sm" color="#353535"fontFamily="'Montserrat', sans-serif">Status</FormLabel>
+              </div>
+              <div className="w-[200px]">
+                <Label htmlFor="status-filter" className="text-sm text-[#353535] mb-1">Status</Label>
                 <Select
+                  id="status-filter"
                   value={filters.status}
                   onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                  fontFamily="'Montserrat', sans-serif"
+                  className="text-sm h-9"
                 >
                   <option value="">All Status</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </Select>
-              </FormControl>
-              <FormControl maxW="200px">
-                <FormLabel fontSize="sm" color="#353535"fontFamily="'Montserrat', sans-serif">Access Level</FormLabel>
+              </div>
+              <div className="w-[200px]">
+                <Label htmlFor="access-filter" className="text-sm text-[#353535] mb-1">Access Level</Label>
                 <Select
+                  id="access-filter"
                   value={filters.access_level}
                   onChange={(e) => setFilters({ ...filters, access_level: e.target.value })}
-                  fontFamily="'Montserrat', sans-serif"
+                  className="text-sm h-9"
                 >
                   <option value="">All Levels</option>
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>
                 </Select>
-              </FormControl>
-              <Button
-                variant="outline"
-                onClick={() => setFilters({ search: '', status: '', access_level: '' })}
-                fontFamily="'Montserrat', sans-serif"
-                mt={8}
-              >
-                Clear Filters
-              </Button>
-            </HStack>
-          </Box>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setFilters({ search: '', status: '', access_level: '' })}
+                  className="text-sm h-9"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          </div>
 
           {error && (
-            <Alert status="error" mb={4}>
-              <AlertIcon />
+            <Alert className="mb-4 bg-red-50 border-red-200 text-red-800">
               {error}
             </Alert>
           )}
 
-          <Box bg="white" borderRadius="lg" overflow="hidden" boxShadow="lg" width="90%" mx="auto">
-            <Table variant="simple" width="100%">
-              <Thead bg="#a59480">
-                <Tr>
-                  <Th color="white" fontFamily="'Montserrat', sans-serif" width="15%">Name</Th>
-                  <Th color="white" fontFamily="'Montserrat', sans-serif" width="20%">Email</Th>
-                  <Th color="white" fontFamily="'Montserrat', sans-serif" width="12%">Phone</Th>
-                  <Th color="white" fontFamily="'Montserrat', sans-serif" width="12%">Access Level</Th>
-                  <Th color="white" fontFamily="'Montserrat', sans-serif" width="10%">Status</Th>
-                  <Th color="white" fontFamily="'Montserrat', sans-serif" width="15%">Last Login</Th>
-                  <Th color="white" fontFamily="'Montserrat', sans-serif" width="16%">Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
+          <div className="bg-white rounded-lg overflow-hidden shadow-lg w-[90%] mx-auto">
+            <table className="w-full">
+              <thead className="bg-cork">
+                <tr>
+                  <th className="px-4 py-3 text-left text-white text-sm font-semibold w-[15%]">Name</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-semibold w-[20%]">Email</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-semibold w-[12%]">Phone</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-semibold w-[12%]">Access Level</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-semibold w-[10%]">Status</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-semibold w-[15%]">Last Login</th>
+                  <th className="px-4 py-3 text-left text-white text-sm font-semibold w-[16%]">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
                 {filteredAdmins.map((admin) => (
-                  <Tr key={admin.id}>
-                    <Td fontFamily="'Montserrat', sans-serif" color="#353535">
+                  <tr key={admin.id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-[#353535] text-sm">
                       {admin.first_name} {admin.last_name}
-                    </Td>
-                    <Td fontFamily="'Montserrat', sans-serif" color="#353535">{admin.email}</Td>
-                    <Td fontFamily="'Montserrat', sans-serif" color="#353535">{admin.phone}</Td>
-                    <Td>
-                      <Badge 
-                        
-                        color="#353535" 
-                        fontFamily="'Montserrat', sans-serif"
-                      >
+                    </td>
+                    <td className="px-4 py-3 text-[#353535] text-sm">{admin.email}</td>
+                    <td className="px-4 py-3 text-[#353535] text-sm">{admin.phone}</td>
+                    <td className="px-4 py-3">
+                      <Badge className="bg-gray-100 text-[#353535] text-xs hover:bg-gray-100">
                         {admin.access_level}
                       </Badge>
-                    </Td>
-                    <Td>
-                      <Badge
-                        bg={admin.status === 'active' ? '' : '#e53e3e'}
-                        color="#353535"
-                        fontFamily="'Montserrat', sans-serif"
-                      >
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={`text-xs ${admin.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} hover:bg-opacity-100`}>
                         {admin.status}
                       </Badge>
-                    </Td>
-                    <Td fontFamily="'Montserrat', sans-serif" color="#353535">
+                    </td>
+                    <td className="px-4 py-3 text-[#353535] text-sm">
                       {admin.last_login_at ? formatDate(admin.last_login_at) : 'Never'}
-                    </Td>
-                    <Td>
-                      <HStack spacing={2}>
-                        <Tooltip label="Edit Admin">
-                          <IconButton
-                            aria-label="Edit admin"
-                            icon={<EditIcon />}
-                            size="sm"
-                            colorScheme="blue"
-                            onClick={() => handleEditAdmin(admin)}
-                          />
-                        </Tooltip>
-                        <Tooltip label="Remove Admin">
-                          <IconButton
-                            aria-label="Remove admin"
-                            icon={<DeleteIcon />}
-                            size="sm"
-                            colorScheme="red"
-                            onClick={() => handleDeleteAdmin(admin)}
-                            isDisabled={saving}
-                          />
-                        </Tooltip>
-                      </HStack>
-                    </Td>
-                  </Tr>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => handleEditAdmin(admin)}
+                                className="h-8 w-8"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit Admin</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => handleDeleteAdmin(admin)}
+                                disabled={saving}
+                                className="h-8 w-8 text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Remove Admin</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </Tbody>
-            </Table>
-          </Box>
+              </tbody>
+            </table>
+          </div>
 
           {filteredAdmins.length === 0 && !loading && (
-            <Box textAlign="center" py={8}>
-              <Text fontFamily="'Montserrat', sans-serif" color="gray.500">
-                {admins.length === 0 
+            <div className="text-center py-8">
+              <p className="text-gray-500 text-sm">
+                {admins.length === 0
                   ? 'No admins found. Click "Add Admin" to create the first admin.'
                   : 'No admins match your current filters. Try adjusting your search criteria.'
                 }
-              </Text>
-            </Box>
+              </p>
+            </div>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
-      {/* Add/Edit Admin Drawer */}
-      <Drawer 
-        isOpen={isOpen} 
-        placement="right" 
-        onClose={onClose} 
-        size="sm"
-        closeOnOverlayClick={true}
-        closeOnEsc={true}
-      >
-        <Box zIndex="2000" position="relative">
-          <DrawerOverlay bg="blackAlpha.600" onClick={onClose} />
-                  <DrawerContent 
-          border="2px solid #353535" 
-          borderRadius="10px"  
-          fontFamily="Montserrat, sans-serif" 
-          maxW="350px" 
-          w="50vw" 
-          boxShadow="xl" 
-          mt="80px" 
-          mb="25px" 
-          paddingRight="40px" 
-          paddingLeft="40px" 
-          backgroundColor="#ecede8"
-          position="fixed"
-          top="0"
-          right="0"
-          style={{
-            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-            <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="0px" fontFamily="IvyJournal, sans-serif" color="#353535">
-              
-            </DrawerHeader>
-            <DrawerBody p={4} overflowY="auto" className="drawer-body-content">
-              <VStack spacing={4} align="stretch">
-                <Box>
-                  <Text mb="0px" fontSize="24px" fontWeight="bold" fontFamily="IvyJournal, sans-serif">
-                    {editingAdmin ? 'Edit Admin' : 'Add New Admin'}
-                  </Text>
-                </Box>
+      {/* Add/Edit Admin Sheet */}
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent className="bg-[#ecede8] max-w-[350px] p-6">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-2xl font-bold text-[#353535]">
+              {editingAdmin ? 'Edit Admin' : 'Add New Admin'}
+            </SheetTitle>
+          </SheetHeader>
 
-                <VStack spacing={4} as="section" align="stretch">
-                  <Grid templateColumns="repeat(2, 1fr)" gap={2}>
-                    <GridItem>
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm" mb={1} fontFamily="'Montserrat', sans-serif">First Name</FormLabel>
-                        <Input
-                          value={formData.first_name}
-                          onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                          fontFamily="'Montserrat', sans-serif"
-                          size="sm"
-                        />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm" mb={1} fontFamily="'Montserrat', sans-serif">Last Name</FormLabel>
-                        <Input
-                          value={formData.last_name}
-                          onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                          fontFamily="'Montserrat', sans-serif"
-                          size="sm"
-                        />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem colSpan={2}>
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm" mb={1} fontFamily="'Montserrat', sans-serif">Email</FormLabel>
-                        <Input
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          fontFamily="'Montserrat', sans-serif"
-                          size="sm"
-                        />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem colSpan={2}>
-                      <FormControl>
-                        <FormLabel fontSize="sm" mb={1} fontFamily="'Montserrat', sans-serif">Phone</FormLabel>
-                        <Input
-                          type="tel"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          placeholder="+1 (555) 123-4567"
-                          fontFamily="'Montserrat', sans-serif"
-                          size="sm"
-                        />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem colSpan={2}>
-                      <FormControl>
-                        <FormLabel fontSize="sm" mb={1} fontFamily="'Montserrat', sans-serif">Access Level</FormLabel>
-                        <Select
-                          value={formData.access_level}
-                          onChange={(e) => setFormData({ ...formData, access_level: e.target.value })}
-                          fontFamily="'Montserrat', sans-serif"
-                          size="sm"
-                        >
-                          <option value="admin">Admin</option>
-                          <option value="super_admin">Super Admin</option>
-                        </Select>
-                        <Text fontSize="sm" color="gray.500" mt={1}>
-                          {formData.access_level === 'admin' 
-                            ? 'Can manage members, reservations, settings, and templates'
-                            : 'Can manage everything including other admins and system settings'
-                          }
-                        </Text>
-                      </FormControl>
-                    </GridItem>
-                    {!editingAdmin && (
-                      <GridItem colSpan={2}>
-                        <FormControl isRequired>
-                          <FormLabel fontSize="sm" mb={1} fontFamily="'Montserrat', sans-serif">Password</FormLabel>
-                          <Input
-                            type="password"
-                            value={formData.password || ''}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            fontFamily="'Montserrat', sans-serif"
-                            size="sm"
-                          />
-                        </FormControl>
-                      </GridItem>
-                    )}
-                  </Grid>
-                </VStack>
-              </VStack>
-            </DrawerBody>
-              <DrawerFooter borderTopWidth="1px" justifyContent="space-between" className="drawer-footer-content">
-                <HStack spacing={3} mb={"10px"}>
-                  <Button variant="outline" onClick={onClose} fontFamily="'Montserrat', sans-serif">
-                    Cancel
-                  </Button>
-                  <Button 
-                    bg="#353535"
-                    color="#ecede8"
-                    _hover={{ bg: '#2a2a2a' }}
-                    fontFamily="'Montserrat', sans-serif"
-                    fontWeight="semibold"
-                    onClick={handleSubmit} 
-                    isLoading={saving}
-                  >
-                    {editingAdmin ? 'Update' : 'Create'}
-                  </Button>
-                </HStack>
-              </DrawerFooter>
-            </DrawerContent>
-          </Box>
-        </Drawer>
-      </AdminLayout>
-    );
-  } 
+          <div className="flex flex-col gap-4 mt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="first-name" className="text-xs font-semibold text-[#353535] mb-1">First Name *</Label>
+                <Input
+                  id="first-name"
+                  value={formData.first_name}
+                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                  className="text-sm h-9"
+                />
+              </div>
+              <div>
+                <Label htmlFor="last-name" className="text-xs font-semibold text-[#353535] mb-1">Last Name *</Label>
+                <Input
+                  id="last-name"
+                  value={formData.last_name}
+                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                  className="text-sm h-9"
+                />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="email" className="text-xs font-semibold text-[#353535] mb-1">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="text-sm h-9"
+                />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="phone" className="text-xs font-semibold text-[#353535] mb-1">Phone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
+                  className="text-sm h-9"
+                />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="access-level" className="text-xs font-semibold text-[#353535] mb-1">Access Level</Label>
+                <Select
+                  id="access-level"
+                  value={formData.access_level}
+                  onChange={(e) => setFormData({ ...formData, access_level: e.target.value })}
+                  className="text-sm h-9"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.access_level === 'admin'
+                    ? 'Can manage members, reservations, settings, and templates'
+                    : 'Can manage everything including other admins and system settings'
+                  }
+                </p>
+              </div>
+              {!editingAdmin && (
+                <div className="col-span-2">
+                  <Label htmlFor="password" className="text-xs font-semibold text-[#353535] mb-1">Password *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="text-sm h-9"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <SheetFooter className="mt-6 pt-4 border-t gap-2">
+            <Button variant="outline" onClick={() => setIsOpen(false)} className="text-sm h-9">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="bg-[#353535] hover:bg-[#2a2a2a] text-[#ecede8] text-sm h-9"
+            >
+              {editingAdmin ? 'Update' : 'Create'}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </AdminLayout>
+  );
+}

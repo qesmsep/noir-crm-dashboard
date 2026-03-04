@@ -1,9 +1,9 @@
-import { Box, Heading, SimpleGrid, Stat, StatLabel, StatNumber, Spinner, VStack, Text, Flex, Button, useDisclosure } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import WaitlistReviewDrawer from '../../components/WaitlistReviewDrawer';
 import DashboardCard from '../../components/dashboard/DashboardCard';
 import DashboardListCard from '../../components/dashboard/DashboardListCard';
+import { Spinner } from '@/components/ui/spinner';
 import styles from '../../styles/Dashboard.module.css';
 import Link from 'next/link';
 
@@ -138,7 +138,7 @@ export default function Dashboard() {
   });
   const [reservationDetails, setReservationDetails] = useState<any[]>([]);
   const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<any>(null);
-  const { isOpen: isWaitlistModalOpen, onOpen: onWaitlistModalOpen, onClose: onWaitlistModalClose } = useDisclosure();
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
 
   const fetchStats = async () => {
     setStats(s => ({ ...s, loading: true }));
@@ -276,7 +276,11 @@ export default function Dashboard() {
 
   if (stats.loading) {
     return (
-      <Box p={4}><Spinner size="xl" /></Box>
+      <AdminLayout>
+        <div className="flex items-center justify-center p-8">
+          <Spinner size="xl" />
+        </div>
+      </AdminLayout>
     );
   }
 
@@ -590,7 +594,7 @@ export default function Dashboard() {
         </div>
         <WaitlistReviewDrawer
           isOpen={isWaitlistModalOpen}
-          onClose={onWaitlistModalClose}
+          onClose={() => setIsWaitlistModalOpen(false)}
           entry={selectedWaitlistEntry}
           onStatusUpdate={fetchStats}
         />

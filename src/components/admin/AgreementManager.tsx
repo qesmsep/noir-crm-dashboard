@@ -1,36 +1,17 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Button,
-  Heading,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  useDisclosure,
-  useToast,
-  FormControl,
-  FormLabel,
-  Input,
-  Textarea,
-  Select,
-  Checkbox,
-  IconButton
-} from '@chakra-ui/react';
-import { FiPlus, FiEdit } from 'react-icons/fi';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { Select } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/useToast';
+import { Plus, Edit } from 'lucide-react';
 
 interface Agreement {
   id: string;
@@ -45,9 +26,8 @@ export default function AgreementManager() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAgreement, setEditingAgreement] = useState<Agreement | null>(null);
-
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
+  const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadAgreements();
@@ -60,30 +40,24 @@ export default function AgreementManager() {
         const data = await response.json();
         setAgreements(data);
       } else {
-        // Use mock data for now if API doesn't exist
-        setAgreements([
-          {
-            id: '1',
-            title: 'Noir Membership Agreement',
-            content: 'Standard membership agreement content...',
-            version: 1,
-            status: 'active',
-            is_current: true
-          }
-        ]);
-      }
-    } catch (error) {
-      // Use mock data if API fails
-      setAgreements([
-        {
+        setAgreements([{
           id: '1',
           title: 'Noir Membership Agreement',
           content: 'Standard membership agreement content...',
           version: 1,
           status: 'active',
           is_current: true
-        }
-      ]);
+        }]);
+      }
+    } catch (error) {
+      setAgreements([{
+        id: '1',
+        title: 'Noir Membership Agreement',
+        content: 'Standard membership agreement content...',
+        version: 1,
+        status: 'active',
+        is_current: true
+      }]);
     } finally {
       setLoading(false);
     }
@@ -98,12 +72,12 @@ export default function AgreementManager() {
       status: 'draft',
       is_current: false
     });
-    onOpen();
+    setIsOpen(true);
   };
 
   const handleEdit = (agreement: Agreement) => {
     setEditingAgreement({ ...agreement });
-    onOpen();
+    setIsOpen(true);
   };
 
   const handleSave = async () => {
@@ -111,8 +85,7 @@ export default function AgreementManager() {
       toast({
         title: 'Error',
         description: 'Please fill in all required fields',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
       return;
     }
@@ -129,264 +102,194 @@ export default function AgreementManager() {
         toast({
           title: 'Success',
           description: 'Agreement saved successfully',
-          status: 'success',
-          duration: 3000,
         });
-        onClose();
+        setIsOpen(false);
         loadAgreements();
       }
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to save agreement',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     }
   };
 
   if (loading) {
-    return <Text>Loading agreements...</Text>;
+    return <p className="text-text-muted">Loading agreements...</p>;
   }
 
   return (
-    <VStack spacing={4} align="stretch">
-      <HStack justify="space-between" flexWrap={{ base: "wrap", md: "nowrap" }} gap={3}>
-        <VStack align="start" spacing={1} flex="1">
-          <Heading size={{ base: "sm", md: "md" }} color="#1F1F1F">Agreements</Heading>
-          <Text fontSize={{ base: "xs", md: "sm" }} color="#5A5A5A">
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-between items-start gap-2 flex-wrap">
+        <div className="flex flex-col gap-0.5 flex-1">
+          <h2 className="text-lg md:text-xl font-semibold text-[#1F1F1F]">Agreements</h2>
+          <p className="text-xs md:text-sm text-text-muted">
             Manage membership agreements
-          </Text>
-        </VStack>
+          </p>
+        </div>
         <Button
-          leftIcon={<FiPlus />}
           onClick={handleCreate}
-          bg="#A59480"
-          color="white"
-          size={{ base: "sm", md: "md" }}
-          _hover={{ bg: '#8C7C6D' }}
-          boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.08), 0 8px 16px rgba(0,0,0,0.06)"
-          borderRadius="10px"
+          className="bg-cork text-white hover:bg-cork-dark rounded-lg shadow-lg text-sm px-3 py-2"
         >
-          Create Agreement
+          <Plus className="w-4 h-4 md:mr-2" />
+          <span className="hidden md:inline">Create Agreement</span>
         </Button>
-      </HStack>
+      </div>
 
-      {/* Mobile View - Cards */}
-      <Box display={{ base: "block", md: "none" }}>
-        <VStack spacing={3} align="stretch">
-          {agreements.map((agreement) => (
-            <Box
-              key={agreement.id}
-              bg="white"
-              p={4}
-              borderRadius="16px"
-              boxShadow="0 2px 4px rgba(0,0,0,0.05)"
-              borderWidth="1px"
-              borderColor="#ECEAE5"
-            >
-              <HStack justify="space-between" mb={2}>
-                <Text fontWeight="bold" fontSize="sm" color="#1F1F1F">
-                  {agreement.title}
-                </Text>
-                <IconButton
-                  size="sm"
-                  icon={<FiEdit />}
-                  onClick={() => handleEdit(agreement)}
-                  aria-label="Edit agreement"
-                  bg="#A59480"
-                  color="white"
-                  _hover={{ bg: '#8C7C6D' }}
-                />
-              </HStack>
-              <HStack spacing={2} flexWrap="wrap">
-                <Badge
-                  px={2}
-                  py={1}
-                  borderRadius="5px"
-                  fontSize="xs"
-                >
-                  v{agreement.version}
-                </Badge>
-                <Badge
-                  colorScheme={
-                    agreement.status === 'active' ? 'green' :
-                    agreement.status === 'draft' ? 'yellow' : 'gray'
-                  }
-                  px={2}
-                  py={1}
-                  borderRadius="5px"
-                  fontSize="xs"
-                >
-                  {agreement.status}
-                </Badge>
-                {agreement.is_current && (
-                  <Badge
-                    colorScheme="blue"
-                    px={2}
-                    py={1}
-                    borderRadius="5px"
-                    fontSize="xs"
-                  >
-                    Current
-                  </Badge>
-                )}
-              </HStack>
-            </Box>
-          ))}
-        </VStack>
-      </Box>
-
-      {/* Desktop View - Table */}
-      <Box
-        display={{ base: "none", md: "block" }}
-        overflowX="auto"
-        bg="white"
-        borderRadius="16px"
-        borderWidth="1px"
-        borderColor="#ECEAE5"
-      >
-        <Table variant="simple">
-          <Thead bg="#F6F5F2">
-            <Tr>
-              <Th color="#5A5A5A" borderBottom="2px" borderColor="#ECEAE5">Title</Th>
-              <Th color="#5A5A5A" borderBottom="2px" borderColor="#ECEAE5">Version</Th>
-              <Th color="#5A5A5A" borderBottom="2px" borderColor="#ECEAE5">Status</Th>
-              <Th color="#5A5A5A" borderBottom="2px" borderColor="#ECEAE5">Current</Th>
-              <Th color="#5A5A5A" borderBottom="2px" borderColor="#ECEAE5">Actions</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto bg-white rounded-2xl border border-border-cream-1">
+        <table className="w-full">
+          <thead className="bg-bg-cream-1">
+            <tr>
+              <th className="text-left p-4 text-sm font-semibold text-text-muted border-b-2 border-border-cream-1">Title</th>
+              <th className="text-left p-4 text-sm font-semibold text-text-muted border-b-2 border-border-cream-1">Version</th>
+              <th className="text-left p-4 text-sm font-semibold text-text-muted border-b-2 border-border-cream-1">Status</th>
+              <th className="text-left p-4 text-sm font-semibold text-text-muted border-b-2 border-border-cream-1">Current</th>
+              <th className="text-left p-4 text-sm font-semibold text-text-muted border-b-2 border-border-cream-1">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
             {agreements.map((agreement) => (
-              <Tr key={agreement.id} _hover={{ bg: '#FBFBFA' }}>
-                <Td borderBottom="1px" borderColor="#EFEDE8">
-                  <Text fontWeight="bold" color="#1F1F1F">{agreement.title}</Text>
-                </Td>
-                <Td borderBottom="1px" borderColor="#EFEDE8" color="#2C2C2C">v{agreement.version}</Td>
-                <Td borderBottom="1px" borderColor="#EFEDE8">
-                  <Badge
-                    colorScheme={
-                      agreement.status === 'active' ? 'green' :
-                      agreement.status === 'draft' ? 'yellow' : 'gray'
-                    }
-                    px={2}
-                    py={1}
-                    borderRadius="5px"
-                  >
+              <tr key={agreement.id} className="hover:bg-[#FBFBFA] transition-colors">
+                <td className="p-4 border-b border-[#EFEDE8]">
+                  <span className="font-semibold text-[#1F1F1F]">{agreement.title}</span>
+                </td>
+                <td className="p-4 border-b border-[#EFEDE8] text-[#2C2C2C]">v{agreement.version}</td>
+                <td className="p-4 border-b border-[#EFEDE8]">
+                  <Badge className={`px-2 py-1 rounded ${
+                    agreement.status === 'active' ? 'bg-green-100 text-green-800' :
+                    agreement.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
                     {agreement.status}
                   </Badge>
-                </Td>
-                <Td borderBottom="1px" borderColor="#EFEDE8">
+                </td>
+                <td className="p-4 border-b border-[#EFEDE8]">
                   {agreement.is_current && (
-                    <Badge colorScheme="blue" px={2} py={1} borderRadius="5px">Current</Badge>
+                    <Badge className="bg-blue-100 text-blue-800 px-2 py-1 rounded">Current</Badge>
                   )}
-                </Td>
-                <Td borderBottom="1px" borderColor="#EFEDE8">
-                  <IconButton
+                </td>
+                <td className="p-4 border-b border-[#EFEDE8]">
+                  <Button
                     size="sm"
-                    icon={<FiEdit />}
                     onClick={() => handleEdit(agreement)}
-                    aria-label="Edit agreement"
-                    bg="#A59480"
-                    color="white"
-                    _hover={{ bg: '#8C7C6D' }}
-                    boxShadow="0 2px 4px rgba(0,0,0,0.05)"
-                  />
-                </Td>
-              </Tr>
+                    className="bg-cork text-white hover:bg-cork-dark shadow-sm"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </td>
+              </tr>
             ))}
-          </Tbody>
-        </Table>
-      </Box>
+          </tbody>
+        </table>
+      </div>
 
-      {/* Edit Drawer */}
-      <Drawer
-        isOpen={isOpen}
-        onClose={onClose}
-        size={{ base: "full", md: "md" }}
-        placement="right"
-      >
-        <DrawerOverlay />
-        <DrawerContent
-          bg="#ECEDE8"
-          color="#353535"
-          maxW={{ base: "100%", md: "450px" }}
-          w="100%"
-          borderTopRadius={{ base: "20px", md: "0" }}
-          maxH={{ base: "90vh", md: "100vh" }}
-        >
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px" color="#353535">
-            {editingAgreement?.id ? 'Edit Agreement' : 'Create Agreement'}
-          </DrawerHeader>
-          <DrawerBody>
-            <VStack spacing={4} align="stretch" pt={4}>
-              <FormControl>
-                <FormLabel color="#353535">Title</FormLabel>
-                <Input
-                  value={editingAgreement?.title || ''}
-                  onChange={(e) => setEditingAgreement(prev => ({ ...prev!, title: e.target.value }))}
-                  placeholder="Enter agreement title"
-                  bg="white"
-                  borderColor="gray.300"
-                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
-                  w="100%"
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel color="#353535">Status</FormLabel>
-                <Select
-                  value={editingAgreement?.status || 'draft'}
-                  onChange={(e) => setEditingAgreement(prev => ({ ...prev!, status: e.target.value as any }))}
-                  bg="white"
-                  borderColor="gray.300"
-                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
-                  w="100%"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </Select>
-              </FormControl>
-
-              <FormControl>
-                <Checkbox
-                  isChecked={editingAgreement?.is_current || false}
-                  onChange={(e) => setEditingAgreement(prev => ({ ...prev!, is_current: e.target.checked }))}
-                  color="#353535"
-                >
-                  Set as current agreement
-                </Checkbox>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel color="#353535">Content (HTML)</FormLabel>
-                <Textarea
-                  value={editingAgreement?.content || ''}
-                  onChange={(e) => setEditingAgreement(prev => ({ ...prev!, content: e.target.value }))}
-                  placeholder="Enter agreement content (HTML supported)"
-                  rows={15}
-                  bg="white"
-                  borderColor="gray.300"
-                  _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
-                  w="100%"
-                />
-              </FormControl>
-            </VStack>
-          </DrawerBody>
-          <DrawerFooter borderTopWidth="1px">
-            <HStack spacing={3}>
-              <Button onClick={onClose} variant="outline">
-                Cancel
+      {/* Mobile Cards */}
+      <div className="flex md:hidden flex-col gap-3">
+        {agreements.map((agreement) => (
+          <Card key={agreement.id} className="bg-white p-4 rounded-2xl shadow-sm border border-border-cream-1">
+            <div className="flex justify-between items-start mb-2">
+              <span className="font-semibold text-sm text-[#1F1F1F]">{agreement.title}</span>
+              <Button
+                size="sm"
+                onClick={() => handleEdit(agreement)}
+                className="bg-cork text-white hover:bg-cork-dark"
+              >
+                <Edit className="w-3.5 h-3.5" />
               </Button>
-              <Button colorScheme="blue" onClick={handleSave}>
-                Save Agreement
-              </Button>
-            </HStack>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-    </VStack>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Badge className="px-2 py-1 rounded text-xs">v{agreement.version}</Badge>
+              <Badge className={`px-2 py-1 rounded text-xs ${
+                agreement.status === 'active' ? 'bg-green-100 text-green-800' :
+                agreement.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+              }`}>
+                {agreement.status}
+              </Badge>
+              {agreement.is_current && (
+                <Badge className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">Current</Badge>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Edit Sheet */}
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-[450px] overflow-y-auto bg-white p-4">
+          <SheetHeader className="pb-3">
+            <SheetTitle className="text-lg font-semibold text-[#353535]">
+              {editingAgreement?.id ? 'Edit Agreement' : 'Create Agreement'}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="flex flex-col gap-3 mt-3">
+            <div>
+              <Label htmlFor="title" className="text-xs font-semibold text-[#353535]">Title</Label>
+              <Input
+                id="title"
+                value={editingAgreement?.title || ''}
+                onChange={(e) => setEditingAgreement(prev => ({ ...prev!, title: e.target.value }))}
+                placeholder="Enter agreement title"
+                className="mt-1 text-sm h-9"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="status" className="text-xs font-semibold text-[#353535]">Status</Label>
+              <Select
+                id="status"
+                value={editingAgreement?.status || 'draft'}
+                onChange={(e) => setEditingAgreement(prev => ({ ...prev!, status: e.target.value as any }))}
+                className="mt-1 text-sm h-9"
+              >
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="is-current"
+                checked={editingAgreement?.is_current || false}
+                onCheckedChange={(checked) => setEditingAgreement(prev => ({ ...prev!, is_current: checked as boolean }))}
+              />
+              <Label htmlFor="is-current" className="text-xs font-medium text-[#353535] cursor-pointer">
+                Set as current agreement
+              </Label>
+            </div>
+
+            <div>
+              <Label htmlFor="content" className="text-xs font-semibold text-[#353535]">Content (HTML)</Label>
+              <Textarea
+                id="content"
+                value={editingAgreement?.content || ''}
+                onChange={(e) => setEditingAgreement(prev => ({ ...prev!, content: e.target.value }))}
+                placeholder="Enter agreement content (HTML supported)"
+                rows={12}
+                className="mt-1 text-sm"
+              />
+            </div>
+          </div>
+
+          <SheetFooter className="mt-4 pt-3 border-t gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsOpen(false)}
+              className="text-sm h-8"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              className="text-sm h-8"
+            >
+              Save
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
-} 
+}

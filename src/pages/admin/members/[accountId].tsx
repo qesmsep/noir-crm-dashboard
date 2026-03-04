@@ -8,6 +8,7 @@ import AdminLayout from '../../../components/layouts/AdminLayout';
 import InlineAttachments from '../../../components/InlineAttachments';
 import MemberSubscriptionCard from '../../../components/MemberSubscriptionCard';
 import SubscriptionTransactionHistory from '../../../components/SubscriptionTransactionHistory';
+import AddSecondaryMemberModal from '../../../components/AddSecondaryMemberModal';
 import styles from '../../../styles/MemberDetail.module.css';
 
 interface Member {
@@ -120,6 +121,9 @@ export default function MemberDetailAdmin() {
 
   // Ledger actions card expansion
   const [isLedgerActionsExpanded, setIsLedgerActionsExpanded] = useState(false);
+
+  // Add secondary member modal
+  const [showAddSecondaryModal, setShowAddSecondaryModal] = useState(false);
 
   // Fetch members
   useEffect(() => {
@@ -1108,7 +1112,18 @@ export default function MemberDetailAdmin() {
             <div className={styles.profileColumn}>
               {/* Member Cards */}
               <div className={styles.membersSection}>
-                <h2 className={styles.sectionTitle}>Account Members</h2>
+                <div className={styles.membersSectionHeader}>
+                  <h2 className={styles.sectionTitle}>Account Members</h2>
+                  {members.length === 1 && (
+                    <button
+                      onClick={() => setShowAddSecondaryModal(true)}
+                      className={styles.addSecondaryButton}
+                      title="Add Secondary Member"
+                    >
+                      + Add Secondary Member
+                    </button>
+                  )}
+                </div>
                 <div className={styles.membersGrid}>
                   {members.map(member => (
                   <div key={member.member_id} className={styles.memberCard}>
@@ -1850,6 +1865,39 @@ export default function MemberDetailAdmin() {
           </div>
         </div>
       </div>
+
+      {/* Add Secondary Member Modal */}
+      {showAddSecondaryModal && (
+        <AddSecondaryMemberModal
+          accountId={accountId as string}
+          onClose={() => setShowAddSecondaryModal(false)}
+          onSuccess={() => {
+            // Refresh members list
+            const fetchMembers = async () => {
+              try {
+                const supabase = getSupabaseClient();
+                const { data, error } = await supabase
+                  .from('members')
+                  .select('*')
+                  .eq('account_id', accountId)
+                  .eq('deactivated', false);
+
+                if (error) throw error;
+
+                const sorted = (data || []).sort((a, b) => {
+                  if (a.primary && !b.primary) return -1;
+                  if (!a.primary && b.primary) return 1;
+                  return 0;
+                });
+                setMembers(sorted);
+              } catch (err: any) {
+                console.error('Error refreshing members:', err);
+              }
+            };
+            fetchMembers();
+          }}
+        />
+      )}
     </AdminLayout>
   );
 }

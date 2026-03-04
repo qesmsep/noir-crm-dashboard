@@ -64,9 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Account has no primary member' });
     }
 
-    if (existingMembers.length >= 2) {
-      return res.status(400).json({ error: 'Account already has 2 members (maximum)' });
-    }
+    // No limit on number of members - each additional member adds $25/month
 
     // Create the new member (secondary member, primary = false)
     const newMember = {
@@ -90,59 +88,93 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw insertError;
     }
 
-    // If new_price_id provided, upgrade the subscription
+    // Add $25 administration fee to account's monthly dues
+    // Each additional member adds $25/month
     let updatedSubscription: any = null;
-    if (new_price_id && account.stripe_subscription_id) {
-      try {
-        const currentSubscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
-        const currentItem = currentSubscription.items.data[0];
+    try {
+      // Get current monthly dues from account
+      const { data: currentAccount } = await supabase
+        .from('accounts')
+        .select('monthly_dues')
+        .eq('account_id', account_id)
+        .single();
 
-        if (currentItem) {
-          const subscription = await stripe.subscriptions.update(account.stripe_subscription_id, {
-            items: [
-              {
-                id: currentItem.id,
-                price: new_price_id,
+      const currentMonthlyDues = currentAccount?.monthly_dues || 0;
+      const newMonthlyDues = currentMonthlyDues + 25;
+
+      // Update account with new monthly dues
+      await supabase
+        .from('accounts')
+        .update({
+          monthly_dues: newMonthlyDues,
+        })
+        .eq('account_id', account_id);
+
+      // If new_price_id provided, also update the subscription tier
+      if (new_price_id && account.stripe_subscription_id) {
+        try {
+          const currentSubscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
+          const currentItem = currentSubscription.items.data[0];
+
+          if (currentItem) {
+            const subscription = await stripe.subscriptions.update(account.stripe_subscription_id, {
+              items: [
+                {
+                  id: currentItem.id,
+                  price: new_price_id,
+                },
+              ],
+              proration_behavior: 'create_prorations',
+            });
+
+            // Get price details
+            const newPrice = await stripe.prices.retrieve(new_price_id);
+
+            // Log subscription event
+            await supabase.from('subscription_events').insert({
+              account_id,
+              event_type: 'upgrade',
+              stripe_subscription_id: account.stripe_subscription_id,
+              previous_plan: currentItem.price.product as string,
+              new_plan: newPrice.product as string,
+              new_mrr: newMonthlyDues,
+              effective_date: new Date().toISOString(),
+              metadata: {
+                reason: `Added member to account (+$25 administration fee)`,
+                updated_via_api: true,
+                member_count: existingMembers.length + 1,
               },
-            ],
-            proration_behavior: 'create_prorations',
-          });
+            });
 
-          // Get price details
-          const newPrice = await stripe.prices.retrieve(new_price_id);
-          const newAmount = newPrice.unit_amount! / 100;
-          const newMrr = newPrice.recurring?.interval === 'year' ? newAmount / 12 : newAmount;
-
-          // Update account with new MRR
-          await supabase
-            .from('accounts')
-            .update({
-              monthly_dues: newMrr,
-            })
-            .eq('account_id', account_id);
-
-          // Log subscription event
-          await supabase.from('subscription_events').insert({
-            account_id,
-            event_type: 'upgrade',
-            stripe_subscription_id: account.stripe_subscription_id,
-            previous_plan: currentItem.price.product as string,
-            new_plan: newPrice.product as string,
-            new_mrr: newMrr,
-            effective_date: new Date().toISOString(),
-            metadata: {
-              reason: 'Added secondary member to account',
-              updated_via_api: true,
-            },
-          });
-
-          updatedSubscription = subscription;
+            updatedSubscription = subscription;
+          }
+        } catch (stripeError: any) {
+          console.error('Error updating subscription:', stripeError);
+          // Don't fail the entire request if subscription update fails
+          // Member was already created successfully
         }
-      } catch (stripeError: any) {
-        console.error('Error updating subscription:', stripeError);
-        // Don't fail the entire request if subscription update fails
-        // Member was already created successfully
+      } else {
+        // Log the monthly dues increase even if no Stripe subscription change
+        await supabase.from('subscription_events').insert({
+          account_id,
+          event_type: 'upgrade',
+          stripe_subscription_id: account.stripe_subscription_id,
+          previous_plan: null,
+          new_plan: null,
+          new_mrr: newMonthlyDues,
+          effective_date: new Date().toISOString(),
+          metadata: {
+            reason: `Added member to account (+$25 administration fee)`,
+            updated_via_api: true,
+            member_count: existingMembers.length + 1,
+            previous_mrr: currentMonthlyDues,
+          },
+        });
       }
+    } catch (updateError: any) {
+      console.error('Error updating monthly dues:', updateError);
+      // Don't fail the entire request if MRR update fails
+      // Member was already created successfully
     }
 
     return res.json({

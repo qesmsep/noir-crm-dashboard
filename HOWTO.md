@@ -1305,6 +1305,38 @@ Month 3: +$100 credit, -$200 spent → Balance: $20
 - **Stripe Integration**: Holds, charges, payment methods
 - **Balance Tracking**: Per-member balance calculation
 - **PDF Generation**: Ledger PDFs (`src/utils/ledgerPdfGenerator.ts`)
+- **Quick Actions**: Collapsible card for ledger management on member detail page
+
+**Quick Actions (Member Detail Page)**:
+**Location**: `src/pages/admin/members/[accountId].tsx` (lines 1488-1611)
+
+Three quick action types in a single collapsible card interface:
+
+1. **Charge Card** (→ icon, tan button)
+   - Processes Stripe payment for custom amount
+   - Creates single `payment` entry in ledger (positive amount)
+   - Includes confirmation dialog before charging
+   - Records `stripe_payment_intent_id` to prevent webhook duplicates
+   - Use case: Partial payments, custom invoices, event fees
+
+2. **Add Credit** (+ icon, green button)
+   - Adds ledger-only credit without Stripe charge
+   - Creates `payment` entry (positive amount) - reduces balance
+   - No payment processing, ledger entry only
+   - Use case: Referral bonuses, comp credits, adjustments
+
+3. **Add Purchase** (− icon, red button)
+   - Adds ledger-only charge without Stripe payment
+   - Creates `purchase` entry (negative amount) - increases balance owed
+   - No payment processing, ledger entry only
+   - Use case: Event tickets, bar tabs, purchases
+
+**UI Features**:
+- Expandable "Quick Actions" card (collapsed by default)
+- Mobile-responsive grid layout (90px amount, flexible description, 34px icon button)
+- Icon-based buttons for compact, modern design
+- Color-coded by action type
+- Form validation: requires amount > $0 and description
 
 **Hold System**:
 - Non-member reservations require Stripe hold
@@ -1318,6 +1350,7 @@ Month 3: +$100 credit, -$200 spent → Balance: $20
 - `src/utils/holdFeeUtils.ts` - Hold fee calculation
 - `src/components/LedgerPDFPreview.tsx` - PDF preview
 - `src/components/ToastTransactionsSection.tsx` - Transaction display
+- `src/styles/MemberDetail.module.css` (lines 1488-1677) - Quick Actions styling
 
 ### 8. Admin Management
 
@@ -1518,8 +1551,19 @@ const handleExportCSV = () => {
 - `GET/PUT/DELETE /api/members/[memberId]` - Member operations
 - `POST /api/member_attributes` - Member attributes
 - `POST /api/member_notes` - Member notes
-- `POST /api/chargeBalance` - Charge member balance
+- `POST /api/chargeBalance` - Charge member balance via Stripe (supports custom amounts)
 - `POST /api/process-monthly-credits` - Process monthly credits
+
+**Ledger Management**:
+- `GET /api/ledger?account_id={id}` - Get ledger entries for account
+- `POST /api/ledger` - Create ledger entry (payment/purchase)
+  - Body: `{ account_id, member_id, type: 'payment'|'purchase', amount, note, date }`
+  - Used by Quick Actions: Add Credit, Add Purchase
+- `POST /api/chargeBalance` - Process Stripe payment and record in ledger
+  - Body: `{ account_id, custom_amount?, custom_description? }`
+  - If `custom_amount` provided: charges that amount via Stripe
+  - If not: charges full outstanding balance
+  - Records payment in ledger with `stripe_payment_intent_id` for deduplication
 
 **Waitlist**:
 - `GET /api/waitlist` - List waitlist entries

@@ -2,6 +2,16 @@
 
 This guide defines the visual design system for Noir CRM. Follow these patterns for all UI development to maintain brand consistency.
 
+## 🚫 CRITICAL: NO CHAKRA UI
+
+**NEVER use Chakra UI. Use Shadcn UI only.**
+
+- ❌ **BANNED:** `@chakra-ui/react` (all components)
+- ✅ **USE:** Shadcn UI from `@/components/ui/`
+- ✅ **STYLE:** Tailwind CSS only
+
+Full guide: `.claude/preferences.md`
+
 ## Color Palette
 
 ### Primary Colors

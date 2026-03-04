@@ -43,6 +43,9 @@ module.exports = {
           'sans-serif',
         ],
       },
+      fontSize: {
+        '2xs': ['0.625rem', { lineHeight: '0.75rem' }],
+      },
       spacing: {
         '72': '18rem',
         '84': '21rem',

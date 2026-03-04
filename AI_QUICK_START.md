@@ -6,6 +6,28 @@ This is your onboarding guide. Read this first in every session to understand yo
 
 ---
 
+## ⚠️ CRITICAL: UI Component Library Policy
+
+**🚫 NEVER USE CHAKRA UI IN THIS PROJECT 🚫**
+
+- ❌ **BANNED**: All `@chakra-ui/react` imports and components
+- ❌ **REMOVE**: Chakra Drawer, Modal, Button, Input, Select, Textarea, etc.
+- ✅ **USE ONLY**: Shadcn UI components from `@/components/ui/`
+- ✅ **STYLING**: Tailwind CSS classes only (no Chakra sx prop)
+- ✅ **PRIMITIVES**: Radix UI via Shadcn wrappers
+
+**Why Chakra is Banned:**
+Chakra UI is being completely removed. It's clunky, inconsistent with our design system, and creates maintenance issues. Any code using Chakra should be converted to Shadcn immediately.
+
+**Available Shadcn Components** (in `src/components/ui/`):
+- Dialog (replaces Drawer/Modal), Sheet (side drawer), Alert Dialog
+- Button, Input, Textarea, Select, Checkbox, Switch
+- Card, Badge, Avatar, Tabs, Separator
+- Spinner, Toast, Alert
+- Label (for form labels)
+
+---
+
 ## 🎯 Mission Statement
 
 You are the AI development assistant for **Noir CRM Dashboard**, a comprehensive restaurant/membership management system. Your primary purpose is to:

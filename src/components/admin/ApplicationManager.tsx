@@ -1,36 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { Search, Eye, Check, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Button,
-  Heading,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
-  Select,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  Icon,
-  useToast,
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  useDisclosure,
-  Divider,
-  IconButton
-} from '@chakra-ui/react';
-import { FiSearch, FiEye, FiCheck, FiX } from 'react-icons/fi';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
+import { Select } from '@/components/ui/select';
+import { useToast } from '@/hooks/useToast';
 import styles from '../../styles/ApplicationManager.module.css';
 
 interface Application {
@@ -56,9 +40,9 @@ export default function ApplicationManager() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
-  
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
+
+  const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadApplications();
@@ -80,8 +64,7 @@ export default function ApplicationManager() {
       toast({
         title: 'Error',
         description: 'Failed to load applications',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     } finally {
       setLoading(false);
@@ -94,14 +77,13 @@ export default function ApplicationManager() {
       if (response.ok) {
         const data = await response.json();
         setSelectedApplication(data);
-        onOpen();
+        setIsOpen(true);
       }
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to load application details',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     }
   };
@@ -118,18 +100,15 @@ export default function ApplicationManager() {
         toast({
           title: 'Success',
           description: 'Application approved successfully',
-          status: 'success',
-          duration: 3000,
         });
-        onClose();
+        setIsOpen(false);
         loadApplications();
       }
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to approve application',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     }
   };
@@ -146,30 +125,38 @@ export default function ApplicationManager() {
         toast({
           title: 'Success',
           description: 'Application rejected successfully',
-          status: 'success',
-          duration: 3000,
         });
-        onClose();
+        setIsOpen(false);
         loadApplications();
       }
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to reject application',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
+    }
+  };
+
+  const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+    switch (status) {
+      case 'questionnaire_completed': return 'default';
+      case 'agreement_completed': return 'secondary';
+      case 'payment_completed': return 'default';
+      case 'approved': return 'default';
+      case 'rejected': return 'destructive';
+      default: return 'outline';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'questionnaire_completed': return 'blue';
-      case 'agreement_completed': return 'yellow';
-      case 'payment_completed': return 'green';
-      case 'approved': return 'green';
-      case 'rejected': return 'red';
-      default: return 'gray';
+      case 'questionnaire_completed': return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
+      case 'agreement_completed': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100';
+      case 'payment_completed': return 'bg-green-100 text-green-800 hover:bg-green-100';
+      case 'approved': return 'bg-green-100 text-green-800 hover:bg-green-100';
+      case 'rejected': return 'bg-red-100 text-red-800 hover:bg-red-100';
+      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
     }
   };
 
@@ -202,7 +189,7 @@ export default function ApplicationManager() {
   });
 
   if (loading) {
-    return <Text>Loading applications...</Text>;
+    return <p className="text-[#1F1F1F]">Loading applications...</p>;
   }
 
   return (
@@ -215,23 +202,21 @@ export default function ApplicationManager() {
       </div>
 
       {/* Filters */}
-      <HStack spacing={4} w="full" className={styles.filters}>
-        <InputGroup maxW={{ base: "full", md: "300px" }} flex={{ base: "1", md: "initial" }}>
-          <InputLeftElement>
-            <Icon as={FiSearch} color="gray.400" />
-          </InputLeftElement>
+      <div className="flex flex-col md:flex-row gap-4 w-full mb-6">
+        <div className="relative flex-1 md:max-w-[300px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search applications..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
           />
-        </InputGroup>
+        </div>
 
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          maxW={{ base: "full", md: "200px" }}
-          flex={{ base: "1", md: "initial" }}
+          className="w-full md:w-[200px]"
         >
           <option value="all">All Statuses</option>
           <option value="questionnaire_pending">Questionnaire Pending</option>
@@ -243,117 +228,114 @@ export default function ApplicationManager() {
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
         </Select>
-      </HStack>
+      </div>
 
       {/* Desktop Table View */}
-      <Box overflowX="auto" display={{ base: 'none', md: 'block' }}>
-        <Table variant="simple">
-        <Thead>
-          <Tr>
-            <Th>Applicant</Th>
-            <Th>Contact</Th>
-            <Th>Status</Th>
-            <Th>Progress</Th>
-            <Th>Payment</Th>
-            <Th>Submitted</Th>
-            <Th>Actions</Th>
-          </Tr>
-        </Thead>
-        <Tbody>
-          {filteredApplications.map((application) => (
-            <Tr key={application.id}>
-              <Td>
-                <VStack align="start" spacing={1}>
-                  <Text fontWeight="bold">
-                    {application.first_name} {application.last_name}
-                  </Text>
-                  {application.waitlist_id && (
-                    <Badge size="sm" colorScheme="purple">From Waitlist</Badge>
-                  )}
-                </VStack>
-              </Td>
-              
-              <Td>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="sm">{application.email}</Text>
-                  {application.phone && (
-                    <Text fontSize="sm" color="gray.500">{application.phone}</Text>
-                  )}
-                </VStack>
-              </Td>
-              
-              <Td>
-                <Badge colorScheme={getStatusColor(application.status)}>
-                  {application.status.replace('_', ' ')}
-                </Badge>
-              </Td>
-              
-              <Td>
-                <VStack align="start" spacing={1}>
-                  {application.questionnaire_completed_at && (
-                    <Text fontSize="xs" color="green.600">✓ Questionnaire</Text>
-                  )}
-                  {application.agreement_completed_at && (
-                    <Text fontSize="xs" color="green.600">✓ Agreement</Text>
-                  )}
-                  {application.payment_completed_at && (
-                    <Text fontSize="xs" color="green.600">✓ Payment</Text>
-                  )}
-                </VStack>
-              </Td>
-              
-              <Td>
-                {application.payment_amount ? (
-                  <Text fontWeight="bold" color="green.600">
-                    {formatAmount(application.payment_amount)}
-                  </Text>
-                ) : (
-                  <Text fontSize="sm" color="gray.500">Pending</Text>
-                )}
-              </Td>
-              
-              <Td>
-                <Text fontSize="sm">{formatDate(application.created_at)}</Text>
-              </Td>
-              
-              <Td>
-                <HStack spacing={2}>
-                  <IconButton
-                    size="sm"
-                    minW="44px"
-                    minH="44px"
-                    icon={<FiEye />}
-                    onClick={() => handleViewApplication(application)}
-                    aria-label="View application"
-                    colorScheme="blue"
-                  />
-                  {application.status === 'payment_completed' && (
-                    <IconButton
-                      size="sm"
-                      minW="44px"
-                      minH="44px"
-                      icon={<FiCheck />}
-                      onClick={() => handleApproveApplication(application.id)}
-                      aria-label="Approve application"
-                      colorScheme="green"
-                    />
-                  )}
-                </HStack>
-              </Td>
-            </Tr>
-          ))}
-        </Tbody>
-      </Table>
+      <div className="hidden md:block overflow-x-auto border border-border-cream-1 rounded-lg">
+        <table className="w-full bg-white">
+          <thead className="bg-bg-cream-1 border-b border-border-cream-1">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[#1F1F1F] uppercase tracking-wider">Applicant</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[#1F1F1F] uppercase tracking-wider">Contact</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[#1F1F1F] uppercase tracking-wider">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[#1F1F1F] uppercase tracking-wider">Progress</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[#1F1F1F] uppercase tracking-wider">Payment</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[#1F1F1F] uppercase tracking-wider">Submitted</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[#1F1F1F] uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-cream-1">
+            {filteredApplications.map((application) => (
+              <tr key={application.id} className="hover:bg-bg-cream-1 transition-colors">
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
+                    <p className="font-bold text-[#1F1F1F]">
+                      {application.first_name} {application.last_name}
+                    </p>
+                    {application.waitlist_id && (
+                      <Badge className="w-fit bg-purple-100 text-purple-800 hover:bg-purple-100">From Waitlist</Badge>
+                    )}
+                  </div>
+                </td>
 
-      {filteredApplications.length === 0 && (
-        <Box py={8} textAlign="center">
-          <Text color="gray.500">No applications found</Text>
-        </Box>
-      )}
-      </Box>
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm text-[#1F1F1F]">{application.email}</p>
+                    {application.phone && (
+                      <p className="text-sm text-gray-500">{application.phone}</p>
+                    )}
+                  </div>
+                </td>
+
+                <td className="px-4 py-4">
+                  <Badge className={getStatusColor(application.status)}>
+                    {application.status.replace('_', ' ')}
+                  </Badge>
+                </td>
+
+                <td className="px-4 py-4">
+                  <div className="flex flex-col gap-1">
+                    {application.questionnaire_completed_at && (
+                      <p className="text-xs text-green-600">✓ Questionnaire</p>
+                    )}
+                    {application.agreement_completed_at && (
+                      <p className="text-xs text-green-600">✓ Agreement</p>
+                    )}
+                    {application.payment_completed_at && (
+                      <p className="text-xs text-green-600">✓ Payment</p>
+                    )}
+                  </div>
+                </td>
+
+                <td className="px-4 py-4">
+                  {application.payment_amount ? (
+                    <p className="font-bold text-green-600">
+                      {formatAmount(application.payment_amount)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Pending</p>
+                  )}
+                </td>
+
+                <td className="px-4 py-4">
+                  <p className="text-sm text-[#1F1F1F]">{formatDate(application.created_at)}</p>
+                </td>
+
+                <td className="px-4 py-4">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleViewApplication(application)}
+                      className="min-w-[44px] min-h-[44px] p-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {application.status === 'payment_completed' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleApproveApplication(application.id)}
+                        className="min-w-[44px] min-h-[44px] p-2 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {filteredApplications.length === 0 && (
+          <div className="py-8 text-center bg-white">
+            <p className="text-gray-500">No applications found</p>
+          </div>
+        )}
+      </div>
 
       {/* Mobile Card View */}
-      <VStack spacing={3} display={{ base: 'flex', md: 'none' }} className={styles.applicationsGrid}>
+      <div className="flex md:hidden flex-col gap-3">
         {filteredApplications.length === 0 ? (
           <div className={styles.emptyState}>
             <h3>No applications found</h3>
@@ -367,7 +349,7 @@ export default function ApplicationManager() {
                   <div>
                     <h3 className={styles.appName}>{application.first_name} {application.last_name}</h3>
                     {application.waitlist_id && (
-                      <Badge size="sm" colorScheme="purple">From Waitlist</Badge>
+                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 text-xs">From Waitlist</Badge>
                     )}
                   </div>
                   <span className={`${styles.appStatus} ${styles[application.status.replace('_', '')]}`}>
@@ -387,40 +369,40 @@ export default function ApplicationManager() {
                     <span className={`${styles.progressIcon} ${application.questionnaire_completed_at ? styles.complete : styles.incomplete}`}>
                       {application.questionnaire_completed_at ? '✓' : '○'}
                     </span>
-                    <Text fontSize="xs" color={application.questionnaire_completed_at ? 'green.600' : 'gray.400'}>
+                    <p className={`text-xs ${application.questionnaire_completed_at ? 'text-green-600' : 'text-gray-400'}`}>
                       Questionnaire
-                    </Text>
+                    </p>
                   </div>
                   <div className={styles.progressItem}>
                     <span className={`${styles.progressIcon} ${application.agreement_completed_at ? styles.complete : styles.incomplete}`}>
                       {application.agreement_completed_at ? '✓' : '○'}
                     </span>
-                    <Text fontSize="xs" color={application.agreement_completed_at ? 'green.600' : 'gray.400'}>
+                    <p className={`text-xs ${application.agreement_completed_at ? 'text-green-600' : 'text-gray-400'}`}>
                       Agreement
-                    </Text>
+                    </p>
                   </div>
                   <div className={styles.progressItem}>
                     <span className={`${styles.progressIcon} ${application.payment_completed_at ? styles.complete : styles.incomplete}`}>
                       {application.payment_completed_at ? '✓' : '○'}
                     </span>
-                    <Text fontSize="xs" color={application.payment_completed_at ? 'green.600' : 'gray.400'}>
+                    <p className={`text-xs ${application.payment_completed_at ? 'text-green-600' : 'text-gray-400'}`}>
                       Payment {application.payment_amount && `(${formatAmount(application.payment_amount)})`}
-                    </Text>
+                    </p>
                   </div>
                 </div>
 
-                <Text fontSize="xs" color="#8C7C6D">
+                <p className="text-xs text-[#8C7C6D]">
                   Submitted {formatDate(application.created_at)}
-                </Text>
+                </p>
 
                 <div className={styles.appActions}>
                   <button className={`${styles.actionButton} ${styles.view}`} onClick={(e) => { e.stopPropagation(); handleViewApplication(application); }}>
-                    <FiEye size={18} />
+                    <Eye size={18} />
                     <span>View</span>
                   </button>
                   {application.status === 'payment_completed' && (
                     <button className={`${styles.actionButton} ${styles.approve}`} onClick={(e) => { e.stopPropagation(); handleApproveApplication(application.id); }}>
-                      <FiCheck size={18} />
+                      <Check size={18} />
                       <span>Approve</span>
                     </button>
                   )}
@@ -429,100 +411,122 @@ export default function ApplicationManager() {
             </div>
           ))
         )}
-      </VStack>
+      </div>
 
-      {/* Application Details Drawer */}
-      <Drawer isOpen={isOpen} onClose={onClose} size="md" placement="right">
-        <DrawerOverlay />
-        <DrawerContent bg="#ECEDE8" color="#353535" maxW="33vw" w="100%">
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px" color="#353535">
-            Application Details: {selectedApplication?.first_name} {selectedApplication?.last_name}
-          </DrawerHeader>
-          <DrawerBody>
-            {selectedApplication && (
-              <VStack spacing={6} align="stretch" pt={4}>
-                {/* Basic Information */}
-                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                  <Text fontWeight="bold" mb={3} color="#353535">Basic Information</Text>
-                  <VStack align="start" spacing={2}>
-                    <Text><strong>Name:</strong> {selectedApplication.first_name} {selectedApplication.last_name}</Text>
-                    <Text><strong>Email:</strong> {selectedApplication.email}</Text>
-                    {selectedApplication.phone && (
-                      <Text><strong>Phone:</strong> {selectedApplication.phone}</Text>
-                    )}
-                    <Text><strong>Status:</strong> 
-                      <Badge ml={2} colorScheme={getStatusColor(selectedApplication.status)}>
-                        {selectedApplication.status.replace('_', ' ')}
-                      </Badge>
-                    </Text>
-                    <Text><strong>Submitted:</strong> {formatDate(selectedApplication.created_at)}</Text>
-                  </VStack>
-                </Box>
+      {/* Application Details Sheet */}
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent className="bg-[#ECEDE8] text-[#353535] w-full sm:max-w-[540px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-[#353535]">
+              Application Details: {selectedApplication?.first_name} {selectedApplication?.last_name}
+            </SheetTitle>
+          </SheetHeader>
 
-                {/* Progress */}
-                <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                  <Text fontWeight="bold" mb={3} color="#353535">Application Progress</Text>
-                  <VStack align="start" spacing={2}>
-                    {selectedApplication.questionnaire_completed_at && (
-                      <Text color="green.600">✓ Questionnaire completed on {formatDate(selectedApplication.questionnaire_completed_at)}</Text>
-                    )}
-                    {selectedApplication.agreement_completed_at && (
-                      <Text color="green.600">✓ Agreement signed on {formatDate(selectedApplication.agreement_completed_at)}</Text>
-                    )}
-                    {selectedApplication.payment_completed_at && (
-                      <Text color="green.600">✓ Payment completed on {formatDate(selectedApplication.payment_completed_at)}</Text>
-                    )}
-                    {selectedApplication.payment_amount && (
-                      <Text><strong>Payment Amount:</strong> {formatAmount(selectedApplication.payment_amount)}</Text>
-                    )}
-                  </VStack>
-                </Box>
+          {selectedApplication && (
+            <div className="flex flex-col gap-6 pt-6">
+              {/* Basic Information */}
+              <div className="bg-white p-4 rounded-md border border-gray-300">
+                <p className="font-bold mb-3 text-[#353535]">Basic Information</p>
+                <div className="flex flex-col gap-2">
+                  <p className="text-[#353535]">
+                    <strong>Name:</strong> {selectedApplication.first_name} {selectedApplication.last_name}
+                  </p>
+                  <p className="text-[#353535]">
+                    <strong>Email:</strong> {selectedApplication.email}
+                  </p>
+                  {selectedApplication.phone && (
+                    <p className="text-[#353535]">
+                      <strong>Phone:</strong> {selectedApplication.phone}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <strong>Status:</strong>
+                    <Badge className={getStatusColor(selectedApplication.status)}>
+                      {selectedApplication.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  <p className="text-[#353535]">
+                    <strong>Submitted:</strong> {formatDate(selectedApplication.created_at)}
+                  </p>
+                </div>
+              </div>
 
-                {/* Questionnaire Responses */}
-                {selectedApplication.questionnaire_responses && (
-                  <Box bg="white" p={4} borderRadius="md" border="1px" borderColor="gray.300">
-                    <Text fontWeight="bold" mb={3} color="#353535">Questionnaire Responses</Text>
-                    <VStack align="start" spacing={3}>
-                      {Object.entries(selectedApplication.questionnaire_responses).map(([question, answer]) => (
-                        <Box key={question} w="100%">
-                          <Text fontWeight="semibold" color="#353535">{question}</Text>
-                          <Text fontSize="sm" color="gray.600">{String(answer)}</Text>
-                        </Box>
-                      ))}
-                    </VStack>
-                  </Box>
-                )}
-              </VStack>
-            )}
-          </DrawerBody>
-          <DrawerFooter borderTopWidth="1px">
-            <HStack spacing={3}>
+              {/* Progress */}
+              <div className="bg-white p-4 rounded-md border border-gray-300">
+                <p className="font-bold mb-3 text-[#353535]">Application Progress</p>
+                <div className="flex flex-col gap-2">
+                  {selectedApplication.questionnaire_completed_at && (
+                    <p className="text-green-600">
+                      ✓ Questionnaire completed on {formatDate(selectedApplication.questionnaire_completed_at)}
+                    </p>
+                  )}
+                  {selectedApplication.agreement_completed_at && (
+                    <p className="text-green-600">
+                      ✓ Agreement signed on {formatDate(selectedApplication.agreement_completed_at)}
+                    </p>
+                  )}
+                  {selectedApplication.payment_completed_at && (
+                    <p className="text-green-600">
+                      ✓ Payment completed on {formatDate(selectedApplication.payment_completed_at)}
+                    </p>
+                  )}
+                  {selectedApplication.payment_amount && (
+                    <p className="text-[#353535]">
+                      <strong>Payment Amount:</strong> {formatAmount(selectedApplication.payment_amount)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Questionnaire Responses */}
+              {selectedApplication.questionnaire_responses && (
+                <div className="bg-white p-4 rounded-md border border-gray-300">
+                  <p className="font-bold mb-3 text-[#353535]">Questionnaire Responses</p>
+                  <div className="flex flex-col gap-3">
+                    {Object.entries(selectedApplication.questionnaire_responses).map(([question, answer]) => (
+                      <div key={question} className="w-full">
+                        <p className="font-semibold text-[#353535]">{question}</p>
+                        <p className="text-sm text-gray-600">{String(answer)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <SheetFooter className="mt-6 border-t border-gray-300 pt-4">
+            <div className="flex gap-3 w-full flex-col sm:flex-row sm:justify-end">
               {selectedApplication?.status === 'payment_completed' && (
                 <>
                   <Button
-                    leftIcon={<FiX />}
-                    colorScheme="red"
+                    variant="destructive"
                     onClick={() => handleRejectApplication(selectedApplication.id)}
+                    className="w-full sm:w-auto"
                   >
+                    <X className="mr-2 h-4 w-4" />
                     Reject
                   </Button>
                   <Button
-                    leftIcon={<FiCheck />}
-                    colorScheme="green"
                     onClick={() => handleApproveApplication(selectedApplication.id)}
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
                   >
+                    <Check className="mr-2 h-4 w-4" />
                     Approve
                   </Button>
                 </>
               )}
-              <Button onClick={onClose} variant="outline">
+              <Button
+                onClick={() => setIsOpen(false)}
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
                 Close
               </Button>
-            </HStack>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
-} 
+}

@@ -3,7 +3,7 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import { supabaseAdmin } from '../../lib/supabase';
 import styles from '../../styles/Settings.module.css';
 import CalendarAvailabilityControl from '../../components/CalendarAvailabilityControl';
-import { Spinner } from "@chakra-ui/react";
+import { Spinner } from '@/components/ui/spinner';
 import { useSettings } from '../../context/SettingsContext';
 import LedgerNotificationSettingsCard from '../../components/LedgerNotificationSettingsCard';
 
@@ -198,7 +198,7 @@ export default function Settings() {
       <AdminLayout>
         <div className={styles.container}>
           <div className={styles.loadingContainer}>
-            <Spinner size="xl" color="#007aff" />
+            <Spinner size="xl" />
             <p>Loading settings...</p>
           </div>
         </div>

@@ -1666,3 +1666,58 @@
     font-size: 1rem;
   }
 }
+
+/* ============================================
+   ADD SECONDARY MEMBER
+   ============================================ */
+
+.membersSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.addSecondaryButton {
+  padding: 0.5rem 1rem;
+  background: #A59480;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.08);
+  white-space: nowrap;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .addSecondaryButton:hover {
+    background: #8C7C6D;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12), 0 6px 12px rgba(0,0,0,0.1);
+  }
+}
+
+.addSecondaryButton:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .membersSectionHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .addSecondaryButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
