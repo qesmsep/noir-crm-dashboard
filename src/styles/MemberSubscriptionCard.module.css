@@ -179,7 +179,8 @@
 }
 
 .createButton,
-.reactivateButton {
+.reactivateButton,
+.resumeButton {
   background: #A59480; /* Cork */
   color: white;
   box-shadow:
@@ -189,12 +190,25 @@
 }
 
 .createButton:hover:not(:disabled),
-.reactivateButton:hover:not(:disabled) {
+.reactivateButton:hover:not(:disabled),
+.resumeButton:hover:not(:disabled) {
   background: #8D7C6A;
   box-shadow:
     0 2px 4px rgba(165, 148, 128, 0.35),
     0 6px 12px rgba(165, 148, 128, 0.25),
     0 10px 20px rgba(165, 148, 128, 0.15);
+  transform: translateY(-1px);
+}
+
+.pauseButton {
+  background: white;
+  color: #6B7280;
+  border: 1px solid #6B7280 !important;
+}
+
+.pauseButton:hover:not(:disabled) {
+  background: #F9FAFB;
+  border-color: #4B5563 !important;
   transform: translateY(-1px);
 }
 

@@ -178,6 +178,74 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
     }
   };
 
+  const handlePauseSubscription = async () => {
+    if (!confirm('Are you sure you want to pause this subscription? Billing will be paused.')) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/subscriptions/pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Subscription paused successfully',
+      });
+
+      fetchSubscriptionData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to pause subscription',
+        variant: 'error',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/subscriptions/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Subscription resumed successfully',
+      });
+
+      fetchSubscriptionData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to resume subscription',
+        variant: 'error',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.card}>
@@ -294,14 +362,31 @@ export default function MemberSubscriptionCard({ accountId }: Props) {
           >
             {actionLoading ? 'Processing...' : 'Reactivate'}
           </button>
-        ) : (
+        ) : subscription.subscription_status === 'paused' ? (
           <button
-            className={styles.cancelButton}
-            onClick={handleCancelSubscription}
+            className={styles.resumeButton}
+            onClick={handleResumeSubscription}
             disabled={actionLoading}
           >
-            {actionLoading ? 'Processing...' : 'Cancel Subscription'}
+            {actionLoading ? 'Processing...' : 'Resume Subscription'}
           </button>
+        ) : (
+          <>
+            <button
+              className={styles.pauseButton}
+              onClick={handlePauseSubscription}
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Processing...' : 'Pause'}
+            </button>
+            <button
+              className={styles.cancelButton}
+              onClick={handleCancelSubscription}
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Processing...' : 'Cancel'}
+            </button>
+          </>
         )}
 
         <button

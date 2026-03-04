@@ -18,7 +18,7 @@
 
 ## 📋 Summary
 
-**Last Updated**: 2026-02-07
+**Last Updated**: 2026-03-03
 
 This 100-line summary provides a high-level overview of the Noir CRM Dashboard system architecture, key concepts, and how to use this reference manual efficiently.
 
@@ -1114,7 +1114,8 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 - Balance tracking and ledger
 - Monthly credit system (Skyline members)
 - Member attributes and notes
-- Deactivation support
+- Archive/deactivation support (soft delete)
+- Add members to existing accounts (Solo → Duo upgrades)
 
 **Monthly Credits**:
 - Skyline members get $100 credit monthly
@@ -1122,12 +1123,178 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 - Processed via `/api/process-monthly-credits.ts` (cron: 7am CST)
 - Overspend automatically charged via Stripe (8am CST)
 
+**API Endpoints**:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/members` | POST | Create new member account (primary + optional secondary) |
+| `/api/members` | GET | List all active members (deactivated = false) |
+| `/api/members` | PUT | Update member details |
+| `/api/members/[memberId]` | DELETE | Archive member (sets deactivated = true) |
+| `/api/members/add-to-account` | POST | Add secondary member to existing account |
+| `/api/member_attributes` | GET/POST/PUT/DELETE | Manage member custom attributes |
+| `/api/member_notes` | GET/POST/PUT/DELETE | Manage member notes |
+
+**Example: Add Member to Account (Solo → Duo Upgrade)**
+```typescript
+// POST /api/members/add-to-account
+{
+  "account_id": "uuid-here",
+  "member_data": {
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "email": "jane@example.com",
+    "phone": "5551234567",
+    "dob": "1990-01-01"
+  },
+  "new_price_id": "price_duo_monthly" // optional: upgrade subscription tier
+}
+```
+
 **Related Files**:
 - `src/components/MemberDetail.tsx` - Member detail view
 - `src/pages/admin/members/[accountId].tsx` - Member detail page
+- `src/components/members/AddMemberModal.js` - Add member modal
+- `src/pages/api/members/add-to-account.ts` - Add to existing account API
 - `src/pages/api/member_attributes.js` - Member attributes API
 - `src/pages/api/member_notes.js` - Member notes API
 - `src/components/pages/MemberLedger.js` - Ledger view
+
+### 6.1. Subscription Management
+
+**Location**: `src/components/MemberSubscriptionCard.tsx`, `src/pages/api/subscriptions/`
+
+**Overview**: Comprehensive subscription lifecycle management integrated with Stripe billing.
+
+**Features**:
+- Create, pause, resume, cancel, and reactivate subscriptions
+- Upgrade/downgrade subscription plans with proration
+- Payment method management
+- Subscription status tracking (active, paused, canceled, past_due)
+- Transaction history (Stripe invoices)
+- MRR (Monthly Recurring Revenue) tracking
+
+**Subscription States & Actions**:
+
+| Current State | Available Actions | UI Buttons Shown |
+|--------------|-------------------|------------------|
+| **Active** | Pause, Cancel, Update Plan, Update Payment | Pause · Cancel · Update Plan · Update Payment |
+| **Paused** | Resume, Update Plan, Update Payment | Resume Subscription · Update Plan · Update Payment |
+| **Scheduled Cancellation** | Reactivate, Update Plan, Update Payment | Reactivate · Update Plan · Update Payment |
+| **No Subscription** | Create Subscription | Create Subscription |
+
+**API Endpoints**:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/subscriptions/create` | POST | Create new subscription for account |
+| `/api/subscriptions/pause` | POST | Pause subscription (stops billing) |
+| `/api/subscriptions/resume` | POST | Resume paused subscription |
+| `/api/subscriptions/cancel` | PUT | Cancel subscription at end of billing period |
+| `/api/subscriptions/reactivate` | POST | Remove scheduled cancellation |
+| `/api/subscriptions/update-plan` | POST | Upgrade or downgrade subscription tier |
+| `/api/subscriptions/plans` | GET | List all available subscription plans |
+| `/api/subscriptions/list` | GET | List all Stripe subscriptions with account data |
+| `/api/subscriptions/[subscriptionId]` | GET | Get single subscription details |
+
+**Example: Pause Subscription**
+```typescript
+// POST /api/subscriptions/pause
+{
+  "account_id": "uuid-here",
+  "reason": "Temporary travel" // optional
+}
+
+// Response:
+{
+  "subscription": { /* Stripe subscription object */ },
+  "message": "Subscription paused successfully"
+}
+```
+
+**Example: List Subscriptions**
+```typescript
+// GET /api/subscriptions/list?status=active&limit=50
+
+// Response:
+{
+  "subscriptions": [
+    {
+      "stripe_subscription_id": "sub_xxx",
+      "account_id": "uuid",
+      "status": "active",
+      "amount": 150,
+      "monthly_dues": 150,
+      "current_period_end": 1234567890,
+      ...
+    }
+  ],
+  "count": 42,
+  "has_more": false
+}
+```
+
+**Subscription Events Logging**:
+All subscription state changes are logged to `subscription_events` table:
+- Event types: `subscribe`, `cancel`, `upgrade`, `downgrade`, `pause`, `resume`
+- Tracks previous/new MRR, plan changes, effective dates
+- Includes metadata (reason, admin who made change, etc.)
+
+**Related Files**:
+- `src/components/MemberSubscriptionCard.tsx` - Subscription management UI
+- `src/components/SubscriptionTransactionHistory.tsx` - Stripe invoices display
+- `src/components/UpdatePlanModal.tsx` - Plan upgrade/downgrade modal
+- `src/components/UpdatePaymentModal.tsx` - Payment method update
+- `src/styles/MemberSubscriptionCard.module.css` - Subscription card styles
+
+### 6.2. Beverage Credit System
+
+**Location**: `.claude/docs/beverage-credit-system.md`
+
+**Overview**: Track member spending at venue separately from subscription billing.
+
+**Design Philosophy**:
+- **Two separate systems**: Stripe invoices (subscription billing) vs. Ledger (venue spending)
+- **Credits roll over**: Unused beverage credits accumulate month-to-month
+- **No pro-rating**: Members get full credit allocation regardless of join date
+- **Uses existing ledger**: No database schema changes required
+
+**Current Pricing Structure (March 2026)**:
+
+| Membership Tier | Monthly Fee | Beverage Credit | Admin Fee |
+|----------------|------------|----------------|-----------|
+| Solo Membership | $150 | $100 | $50 |
+| Duo Membership | $175 | $100 | $75 ($25 extra for 2nd member) |
+| Daytime Add-on | +$225 | +$225 | $0 (no admin fee on add-on) |
+
+**How It Works**:
+1. **Stripe charges subscription** ($150/mo) → Shows in Transaction History
+2. **Admin allocates beverage credit** ($100) → Ledger entry with `type: 'payment'`, `note: 'Monthly beverage credit allocation'`
+3. **Member makes purchases** → Ledger entry with `type: 'purchase'`, `note: 'Cocktail purchase'`
+4. **Running balance** = Sum of all ledger entries (positive for credits, negative for purchases)
+
+**Ledger Entry Types**:
+- `'payment'` - Used for beverage credit allocations (positive amount)
+- `'purchase'` - Venue purchases (negative amount)
+- `'charge'` - Manual charges
+- `'refund'` - Refunds
+
+**Example Ledger Flow**:
+```
+Month 1: +$100 credit, -$30 spent → Balance: $70
+Month 2: +$100 credit, -$50 spent → Balance: $120  (credits rolled over!)
+Month 3: +$100 credit, -$200 spent → Balance: $20
+```
+
+**Future Enhancement (Phase 2)**:
+- Automated monthly credit allocation via Stripe webhook (`invoice.paid`)
+- Calculate beverage credit based on subscription tier
+- Auto-insert ledger entry on subscription renewal
+
+**Related Documentation**:
+- `.claude/docs/beverage-credit-system.md` - Complete design document
+- Implementation status: Phase 1 (manual allocation) complete
+- Phase 2 (automated allocation) pending
 
 ### 7. Financial System
 
