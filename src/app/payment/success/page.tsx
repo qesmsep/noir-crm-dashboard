@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import {
   Box,
   VStack,
@@ -16,7 +16,7 @@ import {
 import { useSearchParams } from 'next/navigation';
 import { Check, ArrowRight, Calendar, CreditCard, MessageCircle } from 'lucide-react';
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const token = searchParams?.get('token');
@@ -144,5 +144,19 @@ export default function PaymentSuccessPage() {
         </VStack>
       </Container>
     </Box>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box minH="100vh" bg="#1F1F1F" display="flex" alignItems="center" justifyContent="center">
+          <Text color="white">Loading...</Text>
+        </Box>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

@@ -25,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .map(s => s.trim())
       .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('/*'));
 
-    const results = [];
-    const errors = [];
+    const results: string[] = [];
+    const errors: Array<{ statement?: string; error?: string; verification?: string }> = [];
 
     for (let i = 0; i < statements.length; i++) {
       const statement = statements[i] + ';';
@@ -40,14 +40,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Execute the statement
         const { error } = await supabaseAdmin.rpc('exec', {
           sql: statement
-        }).catch(async () => {
-          // If exec doesn't exist, try another approach
-          // For CREATE TABLE statements, we can check if table exists first
-          if (statement.includes('CREATE TABLE IF NOT EXISTS')) {
-            // The IF NOT EXISTS clause will handle this
-            return { error: null };
-          }
-          return { error: 'Could not execute statement' };
         });
 
         if (error) {
@@ -59,8 +51,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           results.push(`Statement ${i + 1} executed successfully`);
         }
       } catch (err: any) {
-        // Ignore "already exists" errors
-        if (!err.message?.includes('already exists')) {
+        // If exec doesn't exist or other errors occur
+        // For CREATE TABLE statements, we can check if table exists first
+        if (statement.includes('CREATE TABLE IF NOT EXISTS')) {
+          // The IF NOT EXISTS clause will handle this
+          results.push(`Statement ${i + 1} - table likely exists already`);
+        } else if (!err.message?.includes('already exists')) {
+          // Ignore "already exists" errors
           errors.push({ statement: statement.substring(0, 50) + '...', error: err.message });
         }
       }

@@ -9,7 +9,7 @@ if (!stripeKey) {
 }
 
 const stripe = new Stripe(stripeKey || 'sk_test_placeholder', {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2025-08-27.basil',
 });
 
 const supabase = createClient(

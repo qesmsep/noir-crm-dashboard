@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const industry = findResponseByQuestionText(responses, questions, 'Industry');
 
     // Extract photo URL from responses (will be a URL starting with http)
-    let photoUrl = null;
+    let photoUrl: string | null = null;
     for (const [questionId, value] of Object.entries(responses)) {
       if (typeof value === 'string' && value.startsWith('http') && value.includes('supabase')) {
         photoUrl = value;
@@ -78,11 +78,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (responsesError) throw responsesError;
 
     // Send confirmation SMS (optional)
-    try {
-      await sendConfirmationSMS(phone, firstName);
-    } catch (smsError) {
-      console.error('Failed to send SMS:', smsError);
-      // Don't fail the request if SMS fails
+    if (phone && firstName) {
+      try {
+        await sendConfirmationSMS(phone, firstName);
+      } catch (smsError) {
+        console.error('Failed to send SMS:', smsError);
+        // Don't fail the request if SMS fails
+      }
     }
 
     return res.status(200).json({
