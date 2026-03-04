@@ -38,7 +38,7 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          // Maximum dimensions - reduced for smaller file size
+          // Good quality size for profile photos
           const MAX_WIDTH = 600;
           const MAX_HEIGHT = 600;
 
@@ -71,8 +71,8 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Convert to JPEG with 0.7 quality for smaller file size
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          // Convert to JPEG with 0.75 quality for good balance
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
           resolve(compressedDataUrl);
         };
         img.onerror = () => reject(new Error('Failed to load image'));
@@ -133,7 +133,7 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const SIZE = 300; // Reduced output size for smaller file
+      const SIZE = 400; // Good size for profile photos
       canvas.width = SIZE;
       canvas.height = SIZE;
       const ctx = canvas.getContext('2d');
@@ -161,8 +161,8 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
         SIZE
       );
 
-      // Increased compression: 0.65 quality
-      const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+      // Good quality: 0.8 quality (80%)
+      const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
       setFormData(prev => ({ ...prev, photo: croppedDataUrl }));
       setShowCropModal(false);
       setTempImage(null);
