@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check how many members are already in the account
     const { data: existingMembers, error: membersError } = await supabase
       .from('members')
-      .select('member_id, primary')
+      .select('member_id, member_type')
       .eq('account_id', account_id)
       .eq('deactivated', false);
 
