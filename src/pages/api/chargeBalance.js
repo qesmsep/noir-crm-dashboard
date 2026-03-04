@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id } = req.body;
+  const { account_id, custom_amount, custom_description } = req.body;
   if (!account_id) {
     return res.status(400).json({ error: 'account_id is required' });
   }
@@ -86,19 +86,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No default payment method found' });
   }
 
-  // 4) Compute account balance from ledger
-  const { data: ledgerRows, error: ledgerErr } = await supabase
-    .from('ledger')
-    .select('amount')
-    .eq('account_id', account_id);
-  if (ledgerErr) {
-    return res.status(500).json({ error: ledgerErr.message });
+  // 4) Determine amount to charge
+  let amountToCharge; // in cents
+  let chargeDescription;
+
+  if (custom_amount && Number(custom_amount) > 0) {
+    // Use custom amount for one-off charge
+    amountToCharge = Math.round(Number(custom_amount) * 100);
+    chargeDescription = custom_description || 'Custom charge';
+  } else {
+    // Use existing balance logic
+    const { data: ledgerRows, error: ledgerErr } = await supabase
+      .from('ledger')
+      .select('amount')
+      .eq('account_id', account_id);
+    if (ledgerErr) {
+      return res.status(500).json({ error: ledgerErr.message });
+    }
+    const balance = (ledgerRows || []).reduce((sum, t) => sum + Number(t.amount), 0);
+    if (balance >= 0) {
+      return res.status(400).json({ error: 'No outstanding balance' });
+    }
+    amountToCharge = Math.round(Math.abs(balance) * 100);
+    chargeDescription = 'Balance charged via Stripe';
   }
-  const balance = (ledgerRows || []).reduce((sum, t) => sum + Number(t.amount), 0);
-  if (balance >= 0) {
-    return res.status(400).json({ error: 'No outstanding balance' });
-  }
-  const amountToCharge = Math.round(Math.abs(balance) * 100); // in cents
 
   // 5) Create & confirm a PaymentIntent
   let intent;
@@ -117,35 +128,38 @@ export default async function handler(req, res) {
   }
 
   // 6) Log payment in ledger (include both account_id and member_id)
+  const transactionDate = new Date().toISOString().split('T')[0];
+  const transactionAmount = amountToCharge / 100;
+
   // Check for duplicate payment by amount and date
-  const paymentAmount = Math.abs(balance);
-  const paymentDate = new Date().toISOString().split('T')[0];
-  
   const { data: existingPayment } = await supabase
     .from('ledger')
     .select('id')
     .eq('account_id', account_id)
-    .eq('amount', paymentAmount)
+    .eq('amount', transactionAmount)
     .eq('type', 'payment')
-    .eq('date', paymentDate)
+    .eq('date', transactionDate)
     .limit(1)
     .single();
-  
+
   if (existingPayment) {
-    console.log('Duplicate payment detected for account:', account_id, 'amount:', paymentAmount, 'date:', paymentDate);
+    console.log('Duplicate payment detected for account:', account_id, 'amount:', transactionAmount, 'date:', transactionDate);
     return res.status(200).json({ success: true, message: 'Payment already recorded' });
   }
-  
+
+  // Record the payment (positive amount) - reduces outstanding balance
   const { error: insertErr } = await supabase
     .from('ledger')
     .insert({
       account_id,
       member_id,
       type: 'payment',
-      amount: paymentAmount,
-      note: 'Balance charged via Stripe',
-      date: paymentDate
+      amount: transactionAmount,
+      note: chargeDescription,
+      date: transactionDate,
+      stripe_payment_intent_id: intent.id // Prevent webhook duplicate
     });
+
   if (insertErr) {
     console.error('Failed to update ledger:', insertErr);
     return res.status(500).json({ error: 'Failed to update ledger', details: insertErr.message });

@@ -107,6 +107,19 @@ export default function MemberDetailAdmin() {
 
   // Payment states
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [customChargeAmount, setCustomChargeAmount] = useState('');
+  const [customChargeDescription, setCustomChargeDescription] = useState('');
+
+  // Credit states
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditDescription, setCreditDescription] = useState('');
+
+  // Manual charge states
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeDescription, setChargeDescription] = useState('');
+
+  // Ledger actions card expansion
+  const [isLedgerActionsExpanded, setIsLedgerActionsExpanded] = useState(false);
 
   // Fetch members
   useEffect(() => {
@@ -712,7 +725,7 @@ export default function MemberDetailAdmin() {
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
   };
 
-  // Handle Stripe payment
+  // Handle Stripe payment for outstanding balance
   const handlePayBalance = async () => {
     if (!accountId) {
       toast({
@@ -762,6 +775,261 @@ export default function MemberDetailAdmin() {
       });
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  // Handle custom charge (Stripe payment)
+  const handleCustomCharge = async () => {
+    if (!accountId) {
+      toast({
+        title: 'Error',
+        description: 'No account selected',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    const amount = parseFloat(customChargeAmount);
+    if (!amount || amount <= 0) {
+      toast({
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than $0',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (!customChargeDescription.trim()) {
+      toast({
+        title: 'Description Required',
+        description: 'Please enter a description for this charge',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Charge member's card $${amount.toFixed(2)} for:\n"${customChargeDescription.trim()}"\n\nThis will process a payment via Stripe.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const response = await fetch('/api/chargeBalance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: accountId,
+          custom_amount: amount,
+          custom_description: customChargeDescription.trim(),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to process charge');
+      }
+
+      toast({
+        title: 'Payment Processed',
+        description: `Successfully processed $${amount.toFixed(2)} payment: ${customChargeDescription}`,
+        status: 'success',
+        duration: 5000,
+      });
+
+      // Clear form
+      setCustomChargeAmount('');
+      setCustomChargeDescription('');
+
+      // Refresh the ledger
+      const res = await fetch(`/api/ledger?account_id=${accountId}`);
+      const ledgerResult = await res.json();
+      setLedger(ledgerResult.data || []);
+    } catch (error: any) {
+      toast({
+        title: 'Charge Failed',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Handle add credit (ledger-only, no Stripe)
+  const handleAddCredit = async () => {
+    if (!accountId) {
+      toast({
+        title: 'Error',
+        description: 'No account selected',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    const amount = parseFloat(creditAmount);
+    if (!amount || amount <= 0) {
+      toast({
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than $0',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (!creditDescription.trim()) {
+      toast({
+        title: 'Description Required',
+        description: 'Please enter a description for this credit',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      // Get primary member for this account
+      const primaryMember = members.find(m => m.primary);
+      if (!primaryMember) {
+        throw new Error('No primary member found for this account');
+      }
+
+      const response = await fetch('/api/ledger', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: accountId,
+          member_id: primaryMember.member_id,
+          type: 'payment',
+          amount: amount,
+          note: creditDescription.trim(),
+          date: new Date().toISOString().split('T')[0],
+        }),
+      });
+
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+
+      toast({
+        title: 'Credit Added',
+        description: `Successfully added $${amount.toFixed(2)} credit: ${creditDescription}`,
+        status: 'success',
+        duration: 5000,
+      });
+
+      // Clear form
+      setCreditAmount('');
+      setCreditDescription('');
+
+      // Refresh the ledger
+      const res = await fetch(`/api/ledger?account_id=${accountId}`);
+      const ledgerResult = await res.json();
+      setLedger(ledgerResult.data || []);
+    } catch (error: any) {
+      toast({
+        title: 'Error Adding Credit',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
+  // Handle add charge (ledger-only, no Stripe)
+  const handleAddCharge = async () => {
+    if (!accountId) {
+      toast({
+        title: 'Error',
+        description: 'No account selected',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    const amount = parseFloat(chargeAmount);
+    if (!amount || amount <= 0) {
+      toast({
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount greater than $0',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (!chargeDescription.trim()) {
+      toast({
+        title: 'Description Required',
+        description: 'Please enter a description for this charge',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      // Get primary member for this account
+      const primaryMember = members.find(m => m.primary);
+      if (!primaryMember) {
+        throw new Error('No primary member found for this account');
+      }
+
+      const response = await fetch('/api/ledger', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_id: accountId,
+          member_id: primaryMember.member_id,
+          type: 'purchase',
+          amount: -amount, // Negative amount for charges
+          note: chargeDescription.trim(),
+          date: new Date().toISOString().split('T')[0],
+        }),
+      });
+
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+
+      toast({
+        title: 'Charge Added',
+        description: `Successfully added $${amount.toFixed(2)} charge: ${chargeDescription}`,
+        status: 'success',
+        duration: 5000,
+      });
+
+      // Clear form
+      setChargeAmount('');
+      setChargeDescription('');
+
+      // Refresh the ledger
+      const res = await fetch(`/api/ledger?account_id=${accountId}`);
+      const ledgerResult = await res.json();
+      setLedger(ledgerResult.data || []);
+    } catch (error: any) {
+      toast({
+        title: 'Error Adding Charge',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      });
     }
   };
 
@@ -1226,6 +1494,124 @@ export default function MemberDetailAdmin() {
             </div>
           ) : (
             <>
+              {/* Ledger Actions Card */}
+              <div className={styles.ledgerActionsCard}>
+                <button
+                  className={styles.ledgerActionsHeader}
+                  onClick={() => setIsLedgerActionsExpanded(!isLedgerActionsExpanded)}
+                >
+                  <span className={styles.ledgerActionsTitle}>Quick Actions</span>
+                  <svg
+                    className={`${styles.ledgerActionsChevron} ${isLedgerActionsExpanded ? styles.expanded : ''}`}
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                  >
+                    <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+
+                {isLedgerActionsExpanded && (
+                  <div className={styles.ledgerActionsContent}>
+                    {/* Charge Card */}
+                    <div className={styles.actionSection}>
+                      <h4 className={styles.actionTitle}>Charge Card</h4>
+                      <div className={styles.actionForm}>
+                        <input
+                          type="number"
+                          placeholder="$"
+                          className={styles.actionInput}
+                          value={customChargeAmount}
+                          onChange={(e) => setCustomChargeAmount(e.target.value)}
+                          min="0"
+                          step="0.01"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Description"
+                          className={styles.actionInput}
+                          value={customChargeDescription}
+                          onChange={(e) => setCustomChargeDescription(e.target.value)}
+                        />
+                        <button
+                          onClick={handleCustomCharge}
+                          disabled={isProcessingPayment || !customChargeAmount || !customChargeDescription}
+                          className={styles.actionButton}
+                          style={{ background: '#A59480' }}
+                          aria-label="Charge card"
+                        >
+                          {isProcessingPayment ? '...' : '→'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Add Credit */}
+                    <div className={styles.actionSection}>
+                      <h4 className={styles.actionTitle}>Add Credit</h4>
+                      <div className={styles.actionForm}>
+                        <input
+                          type="number"
+                          placeholder="$"
+                          className={styles.actionInput}
+                          value={creditAmount}
+                          onChange={(e) => setCreditAmount(e.target.value)}
+                          min="0"
+                          step="0.01"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Description"
+                          className={styles.actionInput}
+                          value={creditDescription}
+                          onChange={(e) => setCreditDescription(e.target.value)}
+                        />
+                        <button
+                          onClick={handleAddCredit}
+                          disabled={!creditAmount || !creditDescription}
+                          className={styles.actionButton}
+                          style={{ background: '#34C759' }}
+                          aria-label="Add credit"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Add Purchase */}
+                    <div className={styles.actionSection}>
+                      <h4 className={styles.actionTitle}>Add Purchase</h4>
+                      <div className={styles.actionForm}>
+                        <input
+                          type="number"
+                          placeholder="$"
+                          className={styles.actionInput}
+                          value={chargeAmount}
+                          onChange={(e) => setChargeAmount(e.target.value)}
+                          min="0"
+                          step="0.01"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Description"
+                          className={styles.actionInput}
+                          value={chargeDescription}
+                          onChange={(e) => setChargeDescription(e.target.value)}
+                        />
+                        <button
+                          onClick={handleAddCharge}
+                          disabled={!chargeAmount || !chargeDescription}
+                          className={styles.actionButton}
+                          style={{ background: '#FF3B30' }}
+                          aria-label="Add purchase"
+                        >
+                          −
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {(newTransaction.member_id || newTransaction.type || newTransaction.date) && (
                 <div className={styles.compactForm}>
