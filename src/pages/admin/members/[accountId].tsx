@@ -902,7 +902,7 @@ export default function MemberDetailAdmin() {
 
     try {
       // Get primary member for this account
-      const primaryMember = members.find(m => m.primary);
+      const primaryMember = members.find(m => m.member_type === 'primary');
       if (!primaryMember) {
         throw new Error('No primary member found for this account');
       }
@@ -985,7 +985,7 @@ export default function MemberDetailAdmin() {
 
     try {
       // Get primary member for this account
-      const primaryMember = members.find(m => m.primary);
+      const primaryMember = members.find(m => m.member_type === 'primary');
       if (!primaryMember) {
         throw new Error('No primary member found for this account');
       }
