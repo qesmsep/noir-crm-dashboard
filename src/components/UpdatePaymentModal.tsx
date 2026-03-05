@@ -200,90 +200,7 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
     // Wait for modal to close
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Body position was already locked before setup-intent, verify it's still locked
-    console.log('AFTER modal close - verify scroll still locked:', {
-      windowScrollY: window.scrollY,
-      documentScrollTop: document.documentElement.scrollTop,
-      bodyScrollTop: document.body.scrollTop,
-      bodyPosition: document.body.style.position,
-      bodyTop: document.body.style.top
-    });
-
-    // Watch for Stripe iframe insertion and fix positioning
-    const observer = new MutationObserver(() => {
-      const stripeIframe = document.querySelector('iframe[src*="stripe.com"], iframe[src*="js.stripe.com"]') as HTMLIFrameElement;
-      if (stripeIframe) {
-        console.log('🎯 STRIPE IFRAME DETECTED');
-
-        // Try to fix the visual offset by adjusting the iframe position
-        stripeIframe.style.position = 'fixed';
-        stripeIframe.style.top = '0';
-        stripeIframe.style.left = '0';
-        stripeIframe.style.transform = 'none';
-        stripeIframe.style.margin = '0';
-
-        // Also fix any parent containers
-        if (stripeIframe.parentElement) {
-          stripeIframe.parentElement.style.transform = 'none';
-          stripeIframe.parentElement.style.position = 'fixed';
-          stripeIframe.parentElement.style.top = '0';
-          stripeIframe.parentElement.style.left = '0';
-        }
-
-        console.log('🔧 Applied iframe position fixes');
-
-        observer.disconnect();
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-
     try {
-      // Final check RIGHT before calling Stripe
-      console.log('🚀 RIGHT BEFORE collectBankAccountForSetup:', {
-        'window.scrollY': window.scrollY,
-        'document.documentElement.scrollTop': document.documentElement.scrollTop,
-        'document.body.scrollTop': document.body.scrollTop,
-        'body.style.top': document.body.style.top,
-        'computed body.top': window.getComputedStyle(document.body).top,
-        'body.getBoundingClientRect().top': document.body.getBoundingClientRect().top,
-        'window.innerHeight': window.innerHeight,
-        'document.documentElement.clientHeight': document.documentElement.clientHeight
-      });
-
-      // Override ALL scroll properties Stripe might read
-      Object.defineProperty(window, 'pageYOffset', { value: 0, configurable: true });
-      Object.defineProperty(window, 'pageXOffset', { value: 0, configurable: true });
-      Object.defineProperty(document.documentElement, 'scrollTop', { value: 0, configurable: true, writable: true });
-      Object.defineProperty(document.body, 'scrollTop', { value: 0, configurable: true, writable: true });
-
-      console.log('🔒 OVERRIDDEN scroll properties:', {
-        'window.pageYOffset': window.pageYOffset,
-        'window.pageXOffset': window.pageXOffset,
-        'window.scrollY': window.scrollY,
-        'window.scrollX': window.scrollX
-      });
-
-      // Force visual viewport alignment
-      const viewport = document.querySelector('meta[name="viewport"]');
-      console.log('📱 Viewport meta:', viewport?.getAttribute('content'));
-
-      // Temporarily set viewport to prevent zooming/scaling issues
-      if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      }
-
-      // Force the HTML and body to have no margins/padding that might offset content
-      document.documentElement.style.margin = '0';
-      document.documentElement.style.padding = '0';
-      document.body.style.margin = '0';
-      document.body.style.padding = '0';
-
-      // Force a reflow to ensure styles are applied
-      void document.body.offsetHeight;
-
-      // Dispatch resize event
-      window.dispatchEvent(new Event('resize'));
-      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Step 2: Collect bank account - Financial Connections will auto-launch
       const { setupIntent, error: stripeError } = await stripe.collectBankAccountForSetup({
@@ -409,19 +326,25 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
                   </button>
                   <button
                     type="button"
-                    className={`${styles.typeButton} ${paymentType === 'ach' ? styles.typeButtonActive : ''}`}
-                    onClick={() => {
-                      console.log('🏦 ACH payment type selected');
-                      console.log('🏦 Scroll at ACH selection:', {
-                        windowScrollY: window.scrollY,
-                        documentScrollTop: document.documentElement.scrollTop,
-                        bodyScrollTop: document.body.scrollTop
-                      });
-                      setPaymentType('ach');
+                    className={styles.typeButton}
+                    onClick={async () => {
+                      setSubmitting(true);
+                      try {
+                        await handleAchSubmit();
+                      } catch (error: any) {
+                        toast({
+                          title: 'Error',
+                          description: error.message || 'Failed to add bank account',
+                          variant: 'error',
+                        });
+                      } finally {
+                        setSubmitting(false);
+                      }
                     }}
+                    disabled={submitting}
                   >
                     <Building2 size={18} />
-                    Bank Account (ACH)
+                    {submitting ? 'Processing...' : 'Add Bank Account'}
                   </button>
                 </div>
 
@@ -454,25 +377,6 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
                   </div>
                 )}
 
-                {/* ACH Instant Verification */}
-                {paymentType === 'ach' && (
-                  <div className={styles.newMethodSection}>
-                    <div className={styles.achInstantVerification}>
-                      <h3 className={styles.achTitle}>Instant Bank Verification</h3>
-                      <p className={styles.achDescription}>
-                        Click "Add Bank Account" below to securely connect your bank account through Stripe's instant verification.
-                      </p>
-                      <ul className={styles.achBenefits}>
-                        <li>🔒 Secure connection through your bank</li>
-                        <li>⚡ Instant verification - no waiting for deposits</li>
-                        <li>✓ Ready to use immediately</li>
-                      </ul>
-                      <p className={styles.achNote}>
-                        You'll be prompted to log into your bank to verify your account securely.
-                      </p>
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -486,13 +390,15 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className={styles.submitButton}
-              disabled={submitting || !stripe || loading}
-            >
-              {submitting ? 'Processing...' : paymentType === 'card' ? 'Update Card' : 'Add Bank Account'}
-            </button>
+            {paymentType === 'card' && (
+              <button
+                type="submit"
+                className={styles.submitButton}
+                disabled={submitting || !stripe || loading}
+              >
+                {submitting ? 'Processing...' : 'Update Card'}
+              </button>
+            )}
           </div>
         </form>
       </div>

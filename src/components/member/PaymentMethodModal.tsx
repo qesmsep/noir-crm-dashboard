@@ -49,7 +49,6 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
   // Lock body scroll when modal opens to prevent body.scrollTop from accumulating
   useEffect(() => {
     if (isOpen) {
-      console.log('🔒 PaymentMethodModal: Locking body scroll');
       const scrollY = window.scrollY;
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
@@ -57,7 +56,6 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
       document.body.style.overflow = 'hidden';
 
       return () => {
-        console.log('🔓 PaymentMethodModal: Unlocking body scroll');
         document.body.style.position = '';
         document.body.style.top = '';
         document.body.style.width = '';
@@ -76,15 +74,11 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
         throw new Error(data.error);
       }
 
-      console.log('Payment methods data:', data);
-
       // Map payment methods and add is_default flag
       const methodsWithDefault = (data.payment_methods || []).map((method: any) => ({
         ...method,
         is_default: method.id === data.default_payment_method,
       }));
-
-      console.log('Mapped payment methods:', methodsWithDefault);
 
       setPaymentMethods(methodsWithDefault);
     } catch (error) {
@@ -293,17 +287,7 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
               {/* Update Payment Method Section */}
               <div>
                 <Button
-                  onClick={() => {
-                    console.log('🔘 UPDATE PAYMENT METHOD BUTTON CLICKED');
-                    console.log('🔘 Scroll state:', {
-                      windowScrollY: window.scrollY,
-                      documentScrollTop: document.documentElement.scrollTop,
-                      bodyScrollTop: document.body.scrollTop,
-                      bodyPosition: document.body.style.position,
-                      bodyTop: document.body.style.top
-                    });
-                    setShowUpdatePaymentModal(true);
-                  }}
+                  onClick={() => setShowUpdatePaymentModal(true)}
                   className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D]"
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
