@@ -322,7 +322,10 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
                     onClick={() => setPaymentType('card')}
                   >
                     <CreditCard size={18} />
-                    Credit/Debit Card
+                    <div>
+                      <div>Credit/Debit</div>
+                      <div style={{ fontSize: '12px', opacity: 0.7 }}>(4% fee)</div>
+                    </div>
                   </button>
                   <button
                     type="button"
@@ -344,7 +347,10 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
                     disabled={submitting}
                   >
                     <Building2 size={18} />
-                    {submitting ? 'Processing...' : 'Add Bank Account'}
+                    <div>
+                      <div>{submitting ? 'Processing...' : 'ACH/Bank'}</div>
+                      <div style={{ fontSize: '12px', opacity: 0.7 }}>(No Fee)</div>
+                    </div>
                   </button>
                 </div>
 
