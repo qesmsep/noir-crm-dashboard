@@ -167,8 +167,7 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
       throw new Error('Stripe not loaded');
     }
 
-    // Reset scroll IMMEDIATELY before any Stripe API calls
-    console.log('🔧 PRE-SETUP-INTENT scroll reset');
+    // Reset scroll and lock body position before Stripe initializes
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
@@ -178,11 +177,6 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
     document.body.style.right = '0';
     document.body.style.width = '100%';
     document.body.style.overflow = 'hidden';
-
-    console.log('🔧 After pre-setup scroll reset:', {
-      bodyScrollTop: document.body.scrollTop,
-      windowScrollY: window.scrollY
-    });
 
     // Step 1: Create SetupIntent for ACH with Financial Connections
     const setupResponse = await fetch('/api/stripe/payment-methods/setup-intent', {
