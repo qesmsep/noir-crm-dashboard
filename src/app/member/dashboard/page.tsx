@@ -229,19 +229,19 @@ export default function MemberDashboardPage() {
             </CardHeader>
             <CardContent className="pt-1 pb-4">
               <div className="flex items-center gap-4">
-                <div className="w-24 h-24 bg-[#A59480] text-white rounded-full flex items-center justify-center text-3xl font-bold overflow-hidden">
-                  {(member?.photo || member?.profile_photo_url) ? (
-                    <img src={(member.photo || member.profile_photo_url) ?? undefined} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <>{member?.first_name?.charAt(0)}{member?.last_name?.charAt(0)}</>
-                  )}
-                </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-lg font-medium text-[#1F1F1F]">
                     {member?.first_name} {member?.last_name}
                   </p>
                   <p className="text-sm text-[#5A5A5A]">{member?.email}</p>
                   <p className="text-sm text-[#5A5A5A]">{formatPhone(member?.phone)}</p>
+                </div>
+                <div className="w-40 h-40 -mt-8 bg-[#A59480] text-white rounded-full flex items-center justify-center text-4xl font-bold overflow-hidden flex-shrink-0 border-4 border-white shadow-lg">
+                  {(member?.photo || member?.profile_photo_url) ? (
+                    <img src={(member.photo || member.profile_photo_url) ?? undefined} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <>{member?.first_name?.charAt(0)}{member?.last_name?.charAt(0)}</>
+                  )}
                 </div>
               </div>
             </CardContent>

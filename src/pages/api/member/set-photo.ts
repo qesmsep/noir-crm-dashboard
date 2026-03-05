@@ -18,6 +18,8 @@ export default async function handler(
     const cookies = parse(req.headers.cookie || '');
     const sessionToken = cookies.member_session;
 
+    console.log('Set photo API - Session token present:', !!sessionToken);
+
     if (!sessionToken) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
@@ -31,8 +33,11 @@ export default async function handler(
       .single();
 
     if (sessionError || !session) {
+      console.error('Session error:', sessionError);
       return res.status(401).json({ error: 'Invalid session' });
     }
+
+    console.log('Set photo API - Member ID:', session.member_id);
 
     const { photo_url } = req.body;
 
@@ -40,10 +45,15 @@ export default async function handler(
       return res.status(400).json({ error: 'photo_url is required' });
     }
 
-    // Update the member's profile photo URL
+    console.log('Set photo API - Photo URL length:', photo_url.length);
+
+    // Update both photo fields (photo is the primary one used in display logic)
     const { data, error } = await supabaseAdmin
       .from('members')
-      .update({ profile_photo_url: photo_url })
+      .update({
+        photo: photo_url,
+        profile_photo_url: photo_url
+      })
       .eq('member_id', session.member_id)
       .select()
       .single();
@@ -52,6 +62,8 @@ export default async function handler(
       console.error('Error updating profile photo:', error);
       return res.status(500).json({ error: 'Failed to update profile photo' });
     }
+
+    console.log('Set photo API - Successfully updated photo for member:', session.member_id);
 
     res.status(200).json({
       success: true,

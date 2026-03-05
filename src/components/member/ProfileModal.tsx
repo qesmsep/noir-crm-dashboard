@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/useToast';
 import { User, Mail, Phone, Camera, Edit2, Save, X, Users, Cake } from 'lucide-react';
 import { useMemberAuth } from '@/context/MemberAuthContext';
+import PhotoCropUpload from '@/components/PhotoCropUpload';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ interface AccountMember {
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const { member } = useMemberAuth();
+  const { member, refreshMember } = useMemberAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -89,16 +90,67 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     });
   };
 
-  const handleSave = async () => {
+  const handlePhotoSelected = async (photoDataUrl: string) => {
     setLoading(true);
     try {
-      const response = await fetch('/api/member/profile', {
-        method: 'PUT',
+      console.log('Uploading photo, data URL length:', photoDataUrl.length);
+
+      const response = await fetch('/api/member/set-photo', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ photo_url: photoDataUrl }),
+      });
+
+      const result = await response.json();
+      console.log('Photo upload response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to upload photo');
+      }
+
+      // Refresh the member data to show the new photo
+      await refreshMember();
+
+      toast({
+        title: 'Success',
+        description: 'Photo updated successfully',
+      });
+
+      // Exit edit mode to show the new photo
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error('Photo upload error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to upload photo',
+        variant: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/member/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          email: formData.email,
+          contact_preferences: member?.contact_preferences || {
+            sms: true,
+            email: true,
+          },
+        }),
       });
 
       if (!response.ok) {
@@ -111,8 +163,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       });
 
       setIsEditing(false);
-      // Refresh member data
-      window.location.reload();
+      onClose();
     } catch (error) {
       toast({
         title: 'Error',
@@ -139,11 +190,14 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold text-[#1F1F1F]">
             {member?.first_name}'s Profile
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            View and edit your member profile information
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto pr-2">
@@ -160,15 +214,51 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 )}
               </div>
               {isEditing && (
-                <button className="absolute bottom-0 right-0 bg-[#A59480] hover:bg-[#8C7C6D] text-white p-2 rounded-full transition-colors">
-                  <Camera className="w-4 h-4" />
-                </button>
+                <PhotoCropUpload
+                  onPhotoSelected={handlePhotoSelected}
+                  currentPhoto={(member?.photo || member?.profile_photo_url) || undefined}
+                  buttonClassName="absolute -bottom-1 right-0 bg-[#A59480] hover:bg-[#8C7C6D] text-white w-10 h-10 rounded-full transition-colors flex items-center justify-center"
+                />
               )}
             </div>
           </div>
 
           {/* Profile Information - Condensed */}
           <div className="bg-[#F6F5F2] rounded-xl p-4 border border-[#ECEAE5] -mt-4 relative z-10 shadow-lg">
+            {/* Edit Icon - Only show when not editing */}
+            {!isEditing && (
+              <button
+                onClick={handleEdit}
+                className="absolute -bottom-2 -right-6 text-[#8C7C6D] hover:text-[#A59480] transition-colors z-20 bg-transparent border-0 outline-none focus:outline-none p-0"
+                aria-label="Edit profile"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Cancel Icon - Top left when editing */}
+            {isEditing && (
+              <button
+                onClick={handleCancel}
+                disabled={loading}
+                className="absolute -top-2 left-2 text-[#5A5A5A] hover:text-[#8C7C6D] transition-colors z-20 bg-transparent border-0 outline-none focus:outline-none p-0"
+                aria-label="Cancel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Save Icon - Bottom right when editing */}
+            {isEditing && (
+              <button
+                onClick={handleSave}
+                disabled={loading}
+                className="absolute -bottom-2 -right-6 text-[#A59480] hover:text-[#8C7C6D] transition-colors z-20 bg-transparent border-0 outline-none focus:outline-none p-0"
+                aria-label="Save changes"
+              >
+                <Save className="w-4 h-4" />
+              </button>
+            )}
             {isEditing ? (
               <div className="space-y-3">
                 {/* First and Last Name Row */}
@@ -179,7 +269,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       id="first_name"
                       value={formData.first_name}
                       onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                      className="bg-white border-[#ECEAE5] pl-10"
+                      className="bg-white border-[#ECEAE5] pl-10 !text-xs focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#A59480]"
                       placeholder="First name"
                     />
                   </div>
@@ -187,7 +277,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     id="last_name"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="bg-white border-[#ECEAE5]"
+                    className="bg-white border-[#ECEAE5] !text-xs focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#A59480]"
                     placeholder="Last name"
                   />
                 </div>
@@ -201,7 +291,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="bg-white border-[#ECEAE5] pl-10"
+                      className="bg-white border-[#ECEAE5] pl-10 !text-xs focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#A59480]"
                       placeholder="Email address"
                     />
                   </div>
@@ -212,7 +302,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="bg-white border-[#ECEAE5] pl-10"
+                      className="bg-white border-[#ECEAE5] pl-10 !text-xs focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#A59480]"
                       placeholder="Phone number"
                     />
                   </div>
@@ -338,38 +428,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
-            {isEditing ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleCancel}
-                  disabled={loading}
-                  className="border-[#ECEAE5] text-[#5A5A5A] hover:bg-[#F6F5F2]"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={loading}
-                  className="bg-[#A59480] text-white hover:bg-[#8C7C6D]"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {loading ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={handleEdit}
-                className="bg-[#A59480] text-white hover:bg-[#8C7C6D]"
-              >
-                <Edit2 className="w-4 h-4 mr-2" />
-                Edit Profile
-              </Button>
-            )}
-          </div>
         </div>
       </DialogContent>
     </Dialog>
