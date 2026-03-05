@@ -93,10 +93,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Each additional member adds $25/month
     let updatedSubscription: any = null;
     try {
-      // Get current monthly dues from account
+      // Get current monthly dues and subscription from account
       const { data: currentAccount } = await supabase
         .from('accounts')
-        .select('monthly_dues')
+        .select('monthly_dues, stripe_subscription_id')
         .eq('account_id', account_id)
         .single();
 
@@ -110,6 +110,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           monthly_dues: newMonthlyDues,
         })
         .eq('account_id', account_id);
+
+      // CRITICAL: Update Stripe subscription to charge for additional member
+      if (currentAccount?.stripe_subscription_id) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(currentAccount.stripe_subscription_id);
+
+          // Find the "Additional Member" price from Stripe
+          const prices = await stripe.prices.list({
+            active: true,
+            expand: ['data.product'],
+          });
+
+          const additionalMemberPrice = prices.data.find(p => {
+            const product = p.product as any;
+            return product.name?.toLowerCase().includes('additional') &&
+                   product.name?.toLowerCase().includes('member') &&
+                   p.recurring?.interval === 'month';
+          });
+
+          if (!additionalMemberPrice) {
+            console.error('Additional Member price not found in Stripe - cannot charge for additional member');
+          } else {
+            // Check if additional member line item already exists
+            const existingMemberItem = subscription.items.data.find(
+              item => item.price.id === additionalMemberPrice.id
+            );
+
+            const secondaryMemberCount = existingMembers.filter(m => m.member_type === 'secondary').length + 1; // +1 for new member
+
+            if (existingMemberItem) {
+              // Update quantity
+              await stripe.subscriptionItems.update(existingMemberItem.id, {
+                quantity: secondaryMemberCount,
+              });
+            } else {
+              // Add new line item
+              await stripe.subscriptionItems.create({
+                subscription: currentAccount.stripe_subscription_id,
+                price: additionalMemberPrice.id,
+                quantity: secondaryMemberCount,
+              });
+            }
+
+            updatedSubscription = await stripe.subscriptions.retrieve(currentAccount.stripe_subscription_id);
+          }
+        } catch (stripeError: any) {
+          console.error('Error updating Stripe subscription for additional member:', stripeError);
+          // Don't fail the entire request
+        }
+      }
 
       // If new_price_id provided, also update the subscription tier
       if (new_price_id && account.stripe_subscription_id) {

@@ -45,7 +45,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Account or subscription not found' });
     }
 
-    if (account.subscription_status !== 'paused') {
+    // Check Stripe subscription for pause_collection (source of truth)
+    const currentSubscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
+
+    if (!currentSubscription.pause_collection) {
       return res.status(400).json({ error: 'Subscription is not paused' });
     }
 

@@ -16,6 +16,7 @@ interface SubscriptionData {
   payment_method_last4: string | null;
   payment_method_brand: string | null;
   current_price_id: string | null;
+  is_paused: boolean;
 }
 
 interface PaymentStatus {
@@ -87,18 +88,24 @@ export default function MemberSubscriptionCard({
       // If there's a subscription, fetch actual base amount from Stripe
       let currentPriceId = null;
       let stripeBaseMRR = 0;
+      let isPaused = false;
 
       if (account.stripe_subscription_id) {
         try {
           const subResponse = await fetch(`/api/subscriptions/${account.stripe_subscription_id}`);
           const subData = await subResponse.json();
-          if (subData.subscription && subData.subscription.items?.data?.[0]) {
-            const priceData = subData.subscription.items.data[0].price;
-            currentPriceId = priceData.id;
+          if (subData.subscription) {
+            // Check if subscription is paused
+            isPaused = !!subData.subscription.pause_collection;
 
-            // Get the actual base subscription amount from Stripe
-            if (priceData.unit_amount) {
-              stripeBaseMRR = priceData.unit_amount / 100; // Convert cents to dollars
+            if (subData.subscription.items?.data?.[0]) {
+              const priceData = subData.subscription.items.data[0].price;
+              currentPriceId = priceData.id;
+
+              // Get the actual base subscription amount from Stripe
+              if (priceData.unit_amount) {
+                stripeBaseMRR = priceData.unit_amount / 100; // Convert cents to dollars
+              }
             }
           }
         } catch (err) {
@@ -126,6 +133,7 @@ export default function MemberSubscriptionCard({
         payment_method_last4: account.payment_method_last4 || null,
         payment_method_brand: account.payment_method_brand || null,
         current_price_id: currentPriceId,
+        is_paused: isPaused,
       });
     } catch (error: any) {
       console.error('Error fetching subscription data:', error);
@@ -321,11 +329,13 @@ export default function MemberSubscriptionCard({
   }
 
   const statusBadgeClass =
+    subscription.is_paused ? styles.statusPaused :
     subscription.subscription_status === 'active' ? styles.statusActive :
     subscription.subscription_status === 'canceled' ? styles.statusCanceled :
     subscription.subscription_status === 'past_due' ? styles.statusPastDue :
-    subscription.subscription_status === 'paused' ? styles.statusPaused :
     styles.statusDefault;
+
+  const statusText = subscription.is_paused ? 'PAUSED' : subscription.subscription_status?.toUpperCase();
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
@@ -352,7 +362,7 @@ export default function MemberSubscriptionCard({
             </span>
           )}
           <span className={statusBadgeClass}>
-            {subscription.subscription_status?.toUpperCase()}
+            {statusText}
           </span>
         </div>
       </div>
@@ -377,7 +387,7 @@ export default function MemberSubscriptionCard({
         {/* Total MRR */}
         <div className={styles.rowTotal}>
           <span className={styles.labelBold}>Total MRR</span>
-          <span className={styles.valueBold}>{formatCurrency(subscription.monthly_dues)}/mo</span>
+          <span className={styles.valueBold}>{formatCurrency(baseMRR + (additionalMembersCount * 25))}/mo</span>
         </div>
 
         <div className={styles.divider} />
@@ -426,7 +436,7 @@ export default function MemberSubscriptionCard({
           >
             {actionLoading ? 'Processing...' : 'Reactivate'}
           </button>
-        ) : subscription.subscription_status === 'paused' ? (
+        ) : subscription.is_paused ? (
           <button
             className={styles.resumeButton}
             onClick={handleResumeSubscription}
@@ -466,6 +476,28 @@ export default function MemberSubscriptionCard({
         <div className={styles.paymentSettings}>
           <div className={styles.settingsDivider} />
           <div className={styles.settingsTitle}>Payment Settings</div>
+
+          {/* Default Payment Method */}
+          <div className={styles.settingRow}>
+            <div className={styles.settingInfo}>
+              <div className={styles.settingLabel}>Default Payment Method</div>
+              <div className={styles.settingDescription}>
+                {subscription.payment_method_type ? (
+                  subscription.payment_method_type === 'card' ? (
+                    <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
+                  ) : subscription.payment_method_type === 'us_bank_account' ? (
+                    <>Bank Account •••• {subscription.payment_method_last4}</>
+                  ) : (
+                    <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
+                  )
+                ) : (
+                  'No payment method on file'
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Credit Card Fee Toggle */}
           <div className={styles.settingRow}>
             <div className={styles.settingInfo}>
               <div className={styles.settingLabel}>Credit Card Processing Fee</div>

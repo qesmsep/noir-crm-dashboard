@@ -12,24 +12,22 @@ const supabase = createClient(
 );
 
 /**
- * POST /api/stripe/payment-methods/setup-intent
+ * POST /api/stripe/checkout/setup-ach
  *
- * Creates a Stripe SetupIntent for adding/updating payment methods
+ * Creates a Stripe Checkout Session for ACH setup
  *
  * Body:
  *   - account_id: UUID
- *   - payment_method_type: 'card' | 'us_bank_account'
  *
  * Returns:
- *   - client_secret: string (for Stripe Elements)
- *   - setup_intent_id: string
+ *   - url: string (redirect URL for Stripe Checkout)
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, payment_method_type = 'card' } = req.body;
+  const { account_id } = req.body;
 
   if (!account_id) {
     return res.status(400).json({ error: 'account_id is required' });
@@ -51,7 +49,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let customerId = account.stripe_customer_id;
 
     if (!customerId) {
-      // Fetch a member from this account to get email/name
       const { data: member } = await supabase
         .from('members')
         .select('first_name, last_name, email')
@@ -69,29 +66,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       customerId = customer.id;
 
-      // Update account with stripe_customer_id
       await supabase
         .from('accounts')
         .update({ stripe_customer_id: customerId })
         .eq('account_id', account_id);
     }
 
-    // Create SetupIntent with specified payment method type
-    const setupIntent = await stripe.setupIntents.create({
+    // Get base URL from request or environment
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers['host'];
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+
+    // Create Checkout Session for ACH setup
+    const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: [payment_method_type],
+      mode: 'setup',
+      payment_method_types: ['us_bank_account'],
+      success_url: `${baseUrl}/member/dashboard?payment_setup=success`,
+      cancel_url: `${baseUrl}/member/dashboard?payment_setup=cancelled`,
       metadata: {
         account_id,
-        payment_method_type,
       },
     });
 
     return res.json({
-      client_secret: setupIntent.client_secret,
-      setup_intent_id: setupIntent.id,
+      url: session.url,
     });
   } catch (error: any) {
-    console.error('Error creating SetupIntent:', error);
+    console.error('Error creating Checkout Session:', error);
     return res.status(500).json({ error: error.message });
   }
 }

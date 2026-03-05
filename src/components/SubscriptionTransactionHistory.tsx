@@ -129,12 +129,27 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
       </div>
 
       <div className={styles.invoiceList}>
-        {invoices.map((invoice) => (
+        {invoices.map((invoice) => {
+          // Check if invoice includes a credit card processing fee
+          const hasCCFee = invoice.lines.some(line =>
+            line.description?.includes('Credit Card Processing Fee') ||
+            line.description?.includes('4%')
+          );
+
+          // Get base description
+          let description = invoice.lines.length > 0
+            ? (invoice.lines[0].description || invoice.description || 'Subscription payment')
+            : (invoice.description || 'Subscription payment');
+
+          // Add fee indicator if present
+          if (hasCCFee) {
+            description = `${description} (incl. 4% CC fee)`;
+          }
+
+          return (
           <div key={invoice.id} className={styles.invoiceRow}>
             <div className={styles.invoiceDescription}>
-              {invoice.lines.length > 0
-                ? (invoice.lines[0].description || invoice.description || 'Subscription payment')
-                : (invoice.description || 'Subscription payment')}
+              {description}
             </div>
 
             <div className={styles.invoiceDate}>
@@ -192,7 +207,8 @@ export default function SubscriptionTransactionHistory({ accountId }: Props) {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

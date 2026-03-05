@@ -184,8 +184,8 @@ export default function ReservationsModal({ isOpen, onClose, onReservationUpdate
           <div className="flex gap-2 flex-shrink-0">
             <Button
               size="sm"
-              variant="outline"
-              className="border-[#F44336] text-[#F44336] hover:bg-[#F44336] hover:text-white"
+              variant="ghost"
+              className="text-[#F44336] hover:bg-[#F44336] hover:text-white border-0"
               onClick={() => setReservationToCancel(reservation)}
               disabled={!!cancelingId}
             >

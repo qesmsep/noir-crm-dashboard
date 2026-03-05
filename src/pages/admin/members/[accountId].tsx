@@ -276,15 +276,12 @@ export default function MemberDetailAdmin() {
   // Fetch attributes for a member
   const fetchMemberAttributes = async (memberId: string) => {
     try {
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from('member_attributes')
-        .select('*')
-        .eq('member_id', memberId)
-        .order('created_at', { ascending: false });
+      const response = await fetch(`/api/member_attributes?member_id=${memberId}`);
+      const result = await response.json();
 
-      if (error) throw error;
-      setMemberAttributes(prev => ({ ...prev, [memberId]: data || [] }));
+      if (!response.ok) throw new Error(result.error || 'Failed to fetch attributes');
+
+      setMemberAttributes(prev => ({ ...prev, [memberId]: result.data || [] }));
     } catch (err: any) {
       console.error('Error fetching attributes:', err);
     }
@@ -293,15 +290,12 @@ export default function MemberDetailAdmin() {
   // Fetch notes for a member
   const fetchMemberNotes = async (memberId: string) => {
     try {
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from('member_notes')
-        .select('*')
-        .eq('member_id', memberId)
-        .order('created_at', { ascending: false });
+      const response = await fetch(`/api/member_notes?member_id=${memberId}`);
+      const result = await response.json();
 
-      if (error) throw error;
-      setMemberNotes(prev => ({ ...prev, [memberId]: data || [] }));
+      if (!response.ok) throw new Error(result.error || 'Failed to fetch notes');
+
+      setMemberNotes(prev => ({ ...prev, [memberId]: result.data || [] }));
     } catch (err: any) {
       console.error('Error fetching notes:', err);
     }
@@ -558,16 +552,18 @@ export default function MemberDetailAdmin() {
     }
 
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('member_attributes')
-        .insert({
+      const response = await fetch('/api/member_attributes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           member_id: memberId,
           key: newAttribute[memberId].key,
           value: newAttribute[memberId].value,
-        });
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to add attribute');
 
       setNewAttribute(prev => ({ ...prev, [memberId]: { key: '', value: '' } }));
       await fetchMemberAttributes(memberId);
@@ -589,16 +585,19 @@ export default function MemberDetailAdmin() {
 
   const handleUpdateAttribute = async (memberId: string, attributeId: string) => {
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('member_attributes')
-        .update({
+      const response = await fetch('/api/member_attributes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: attributeId,
+          member_id: memberId,
           key: editingAttributeData[memberId]?.key,
           value: editingAttributeData[memberId]?.value,
-        })
-        .eq('id', attributeId);
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to update attribute');
 
       setEditingAttributeId(prev => ({ ...prev, [memberId]: null }));
       setEditingAttributeData(prev => ({ ...prev, [memberId]: { key: '', value: '' } }));
@@ -621,13 +620,16 @@ export default function MemberDetailAdmin() {
 
   const handleDeleteAttribute = async (memberId: string, attributeId: string) => {
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('member_attributes')
-        .delete()
-        .eq('id', attributeId);
+      const response = await fetch('/api/member_attributes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: attributeId,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to delete attribute');
 
       await fetchMemberAttributes(memberId);
 
@@ -659,18 +661,20 @@ export default function MemberDetailAdmin() {
     }
 
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('member_notes')
-        .insert({
+      const response = await fetch('/api/member_notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           member_id: memberId,
           note: newNote[memberId],
-        });
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to add note');
 
       setNewNote(prev => ({ ...prev, [memberId]: '' }));
-      await fetchMemberNotes(memberId);
+      setMemberNotes(prev => ({ ...prev, [memberId]: result.data || [] }));
 
       toast({
         title: 'Note added',
@@ -689,17 +693,22 @@ export default function MemberDetailAdmin() {
 
   const handleUpdateNote = async (memberId: string, noteId: string) => {
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('member_notes')
-        .update({ note: editingNoteData[memberId] })
-        .eq('id', noteId);
+      const response = await fetch('/api/member_notes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: noteId,
+          member_id: memberId,
+          note: editingNoteData[memberId],
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to update note');
 
       setEditingNoteId(prev => ({ ...prev, [memberId]: null }));
       setEditingNoteData(prev => ({ ...prev, [memberId]: '' }));
-      await fetchMemberNotes(memberId);
+      setMemberNotes(prev => ({ ...prev, [memberId]: result.data || [] }));
 
       toast({
         title: 'Note updated',
@@ -718,15 +727,19 @@ export default function MemberDetailAdmin() {
 
   const handleDeleteNote = async (memberId: string, noteId: string) => {
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase
-        .from('member_notes')
-        .delete()
-        .eq('id', noteId);
+      const response = await fetch('/api/member_notes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: noteId,
+          member_id: memberId,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to delete note');
 
-      await fetchMemberNotes(memberId);
+      setMemberNotes(prev => ({ ...prev, [memberId]: result.data || [] }));
 
       toast({
         title: 'Note deleted',
@@ -905,15 +918,22 @@ export default function MemberDetailAdmin() {
 
     setUpdatingFeeToggle(true);
     try {
-      const supabase = getSupabaseClient();
       const newValue = !creditCardFeeEnabled;
 
-      const { error } = await supabase
-        .from('accounts')
-        .update({ credit_card_fee_enabled: newValue })
-        .eq('account_id', accountId);
+      const response = await fetch('/api/accounts/update-credit-card-fee', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          enabled: newValue,
+        }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update fee setting');
+      }
 
       setCreditCardFeeEnabled(newValue);
       toast({
@@ -1448,39 +1468,53 @@ export default function MemberDetailAdmin() {
                               />
                               <button
                                 onClick={() => handleUpdateAttribute(member.member_id, attr.id)}
-                                className={styles.smallButton}
+                                className={styles.saveIconButton}
+                                title="Save"
                               >
-                                Save
+                                <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
                               </button>
                               <button
                                 onClick={() => setEditingAttributeId({ ...editingAttributeId, [member.member_id]: null })}
-                                className={styles.smallButton}
+                                className={styles.cancelIconButton}
+                                title="Cancel"
                               >
-                                Cancel
+                                <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
                               </button>
                             </>
                           ) : (
                             <>
                               <div className={styles.attributeKey}>{attr.key}:</div>
                               <div className={styles.attributeValue}>{attr.value}</div>
-                              <button
-                                onClick={() => {
-                                  setEditingAttributeId({ ...editingAttributeId, [member.member_id]: attr.id });
-                                  setEditingAttributeData({
-                                    ...editingAttributeData,
-                                    [member.member_id]: { key: attr.key, value: attr.value }
-                                  });
-                                }}
-                                className={styles.smallButton}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteAttribute(member.member_id, attr.id)}
-                                className={styles.smallButton}
-                              >
-                                Delete
-                              </button>
+                              <div className={styles.attributeActions}>
+                                <button
+                                  onClick={() => {
+                                    setEditingAttributeId({ ...editingAttributeId, [member.member_id]: attr.id });
+                                    setEditingAttributeData({
+                                      ...editingAttributeData,
+                                      [member.member_id]: { key: attr.key, value: attr.value }
+                                    });
+                                  }}
+                                  className={styles.iconButton}
+                                  title="Edit"
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteAttribute(member.member_id, attr.id)}
+                                  className={styles.deleteIconButton}
+                                  title="Delete"
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
                             </>
                           )}
                         </div>
@@ -1522,7 +1556,7 @@ export default function MemberDetailAdmin() {
                       {memberNotes[member.member_id]?.map(note => (
                         <div key={note.id} className={styles.noteItem}>
                           {editingNoteId[member.member_id] === note.id ? (
-                            <>
+                            <div className={styles.noteEditContainer}>
                               <textarea
                                 className={styles.textarea}
                                 value={editingNoteData[member.member_id] || ''}
@@ -1531,39 +1565,57 @@ export default function MemberDetailAdmin() {
                                   [member.member_id]: e.target.value
                                 })}
                               />
-                              <button
-                                onClick={() => handleUpdateNote(member.member_id, note.id)}
-                                className={styles.smallButton}
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => setEditingNoteId({ ...editingNoteId, [member.member_id]: null })}
-                                className={styles.smallButton}
-                              >
-                                Cancel
-                              </button>
-                            </>
+                              <div className={styles.noteEditActions}>
+                                <button
+                                  onClick={() => handleUpdateNote(member.member_id, note.id)}
+                                  className={styles.saveIconButton}
+                                  title="Save"
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => setEditingNoteId({ ...editingNoteId, [member.member_id]: null })}
+                                  className={styles.cancelIconButton}
+                                  title="Cancel"
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
                           ) : (
-                            <>
-                              <div className={styles.noteContent}>{note.note}</div>
-                              <div className={styles.noteDate}>{formatDate(note.created_at)}</div>
-                              <button
-                                onClick={() => {
-                                  setEditingNoteId({ ...editingNoteId, [member.member_id]: note.id });
-                                  setEditingNoteData({ ...editingNoteData, [member.member_id]: note.note });
-                                }}
-                                className={styles.smallButton}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteNote(member.member_id, note.id)}
-                                className={styles.smallButton}
-                              >
-                                Delete
-                              </button>
-                            </>
+                            <div className={styles.noteContentWrapper}>
+                              <div className={styles.noteTextContainer}>
+                                <div className={styles.noteContent}>{note.note}</div>
+                                <div className={styles.noteDate}>{formatDate(note.created_at)}</div>
+                              </div>
+                              <div className={styles.noteActions}>
+                                <button
+                                  onClick={() => {
+                                    setEditingNoteId({ ...editingNoteId, [member.member_id]: note.id });
+                                    setEditingNoteData({ ...editingNoteData, [member.member_id]: note.note });
+                                  }}
+                                  className={styles.iconButton}
+                                  title="Edit"
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteNote(member.member_id, note.id)}
+                                  className={styles.deleteIconButton}
+                                  title="Delete"
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       ))}

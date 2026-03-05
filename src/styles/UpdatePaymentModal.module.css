@@ -112,6 +112,40 @@
   color: #8C7C6D;
 }
 
+.paymentTypeSelector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.typeButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: white;
+  border: 2px solid #ECEAE5;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #8C7C6D;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.typeButton:hover {
+  border-color: #A59480;
+  background: #F7F6F3;
+}
+
+.typeButtonActive {
+  border-color: #A59480;
+  background: #F7F6F3;
+  color: #1F1F1F;
+}
+
 .newMethodSection {
   margin-top: 24px;
 }
@@ -122,6 +156,49 @@
   font-weight: 500;
   color: #1F1F1F;
   margin-bottom: 8px;
+}
+
+.formGroup {
+  margin-bottom: 16px;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #1F1F1F;
+  background: white;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.input::placeholder {
+  color: #8C7C6D;
+}
+
+.select {
+  cursor: pointer;
+}
+
+.achNote {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #8C7C6D;
+  line-height: 1.5;
+  padding: 12px;
+  background: #F7F6F3;
+  border-radius: 8px;
+  border-left: 3px solid #A59480;
 }
 
 .cardElementWrapper {
@@ -200,14 +277,22 @@
 
 /* Mobile responsive */
 @media (max-width: 768px) {
+  .overlay {
+    padding: 10px;
+  }
+
   .modal {
     max-width: 100%;
+    width: 100%;
+    max-height: 90vh;
     margin: 0;
-    border-radius: 12px;
+    border-radius: 16px;
+    overflow: hidden;
   }
 
   .header {
     padding: 20px 16px;
+    flex-shrink: 0;
   }
 
   .title {
@@ -216,13 +301,39 @@
 
   .content {
     padding: 16px;
+    padding-bottom: 8px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0;
   }
 
   .footer {
-    padding: 16px;
+    padding: 12px 16px 16px 16px;
+    flex-shrink: 0;
+    background: white;
+    border-top: 1px solid #ECEAE5;
   }
 
   .currentMethod {
     padding: 12px;
+  }
+
+  .paymentTypeSelector {
+    gap: 8px;
+  }
+
+  .typeButton {
+    font-size: 13px;
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .formGroup {
+    margin-bottom: 20px;
+  }
+
+  .achNote {
+    margin-bottom: 20px;
   }
 }

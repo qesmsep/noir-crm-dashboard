@@ -17,7 +17,7 @@ const supabase = createClient(
  * Reactivates a canceled subscription (removes scheduled cancellation)
  *
  * Body:
- *   - member_id: UUID
+ *   - account_id: UUID
  *
  * Returns:
  *   - subscription: Stripe.Subscription
@@ -27,26 +27,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id } = req.body;
+  const { account_id } = req.body;
 
-  if (!member_id) {
-    return res.status(400).json({ error: 'member_id is required' });
+  if (!account_id) {
+    return res.status(400).json({ error: 'account_id is required' });
   }
 
   try {
-    // Fetch member
-    const { data: member, error: memberError } = await supabase
-      .from('members')
-      .select('stripe_subscription_id, monthly_dues, subscription_status')
-      .eq('member_id', member_id)
+    // Fetch account
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('account_id, stripe_subscription_id, monthly_dues, subscription_status')
+      .eq('account_id', account_id)
       .single();
 
-    if (memberError || !member || !member.stripe_subscription_id) {
-      return res.status(404).json({ error: 'Member or subscription not found' });
+    if (accountError || !account || !account.stripe_subscription_id) {
+      return res.status(404).json({ error: 'Account or subscription not found' });
     }
 
     // Check if subscription is scheduled for cancellation
-    const currentSubscription = await stripe.subscriptions.retrieve(member.stripe_subscription_id);
+    const currentSubscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
 
     if (!currentSubscription.cancel_at_period_end) {
       return res.status(400).json({
@@ -55,25 +55,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Reactivate subscription
-    const subscription = await stripe.subscriptions.update(member.stripe_subscription_id, {
+    const subscription = await stripe.subscriptions.update(account.stripe_subscription_id, {
       cancel_at_period_end: false,
     });
 
-    // Update member
+    // Update account
     await supabase
-      .from('members')
+      .from('accounts')
       .update({
         subscription_status: 'active',
         subscription_cancel_at: null,
       })
-      .eq('member_id', member_id);
+      .eq('account_id', account_id);
 
     // Log reactivation event
     await supabase.from('subscription_events').insert({
-      member_id,
+      account_id,
       event_type: 'reactivate',
-      stripe_subscription_id: member.stripe_subscription_id,
-      new_mrr: Number(member.monthly_dues) || 0,
+      stripe_subscription_id: account.stripe_subscription_id,
+      new_mrr: Number(account.monthly_dues) || 0,
       effective_date: new Date().toISOString(),
       metadata: {
         reactivated_via_api: true,

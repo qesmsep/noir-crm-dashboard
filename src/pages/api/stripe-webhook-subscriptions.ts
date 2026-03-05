@@ -144,6 +144,10 @@ async function processWebhookEvent(event: Stripe.Event) {
       await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
       break;
 
+    case 'invoice.created':
+      await handleInvoiceCreated(event.data.object as Stripe.Invoice);
+      break;
+
     default:
       console.log(`Unhandled event type: ${event.type}`);
   }
@@ -564,6 +568,173 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     }
   } else {
     console.log('ℹ️ Account status already active, no update needed');
+  }
+
+  // Record payment in ledger
+  console.log('💾 Recording subscription payment in ledger...');
+
+  // Get primary member for this account
+  const { data: primaryMember } = await supabase
+    .from('members')
+    .select('member_id')
+    .eq('account_id', account.account_id)
+    .eq('member_type', 'primary')
+    .single();
+
+  if (!primaryMember) {
+    console.error('❌ No primary member found for account');
+    return;
+  }
+
+  const transactionDate = new Date().toISOString().split('T')[0];
+  const totalAmountPaid = invoice.amount_paid / 100; // Convert cents to dollars
+
+  // Check for duplicate payment by Stripe charge ID
+  const chargeId = invoice.charge;
+  if (chargeId) {
+    const { data: existingPayment } = await supabase
+      .from('ledger')
+      .select('id')
+      .eq('stripe_charge_id', chargeId)
+      .limit(1)
+      .single();
+
+    if (existingPayment) {
+      console.log('⚠️ Duplicate payment detected for charge:', chargeId);
+      return;
+    }
+  }
+
+  // Find credit card processing fee line item
+  let processingFeeAmount = 0;
+  const feeLineItem = invoice.lines.data.find(line =>
+    line.description?.includes('Credit Card Processing Fee') ||
+    line.description?.includes('4%')
+  );
+
+  if (feeLineItem) {
+    processingFeeAmount = feeLineItem.amount / 100;
+    console.log(`   Found processing fee: $${processingFeeAmount.toFixed(2)}`);
+  }
+
+  // Record total payment (positive amount = reduces balance)
+  const { error: paymentError } = await supabase
+    .from('ledger')
+    .insert({
+      account_id: account.account_id,
+      member_id: primaryMember.member_id,
+      type: 'payment',
+      amount: totalAmountPaid,
+      note: `Subscription Payment (${invoice.id})`,
+      date: transactionDate,
+      stripe_charge_id: chargeId || null,
+    });
+
+  if (paymentError) {
+    console.error('❌ Failed to record payment in ledger:', paymentError);
+  } else {
+    console.log(`✅ Payment recorded: +$${totalAmountPaid.toFixed(2)}`);
+  }
+
+  // If there was a processing fee, record it as a separate charge (makes it a wash)
+  if (processingFeeAmount > 0) {
+    const { error: feeError } = await supabase
+      .from('ledger')
+      .insert({
+        account_id: account.account_id,
+        member_id: primaryMember.member_id,
+        type: 'purchase',
+        amount: -processingFeeAmount, // Negative = charge
+        note: '4% Credit Card Processing Fee',
+        date: transactionDate,
+      });
+
+    if (feeError) {
+      console.error('❌ Failed to record processing fee in ledger:', feeError);
+    } else {
+      console.log(`✅ Processing fee recorded: -$${processingFeeAmount.toFixed(2)}`);
+    }
+  }
+
+  console.log('✅ Ledger entries complete');
+}
+
+async function handleInvoiceCreated(invoice: Stripe.Invoice) {
+  console.log('📝 Handling invoice.created event');
+  console.log('   Invoice ID:', invoice.id);
+  console.log('   Customer ID:', invoice.customer);
+  console.log('   Subtotal:', invoice.subtotal);
+
+  // Only process subscription invoices
+  if (!(invoice as any).subscription) {
+    console.log('ℹ️ Not a subscription invoice, skipping fee logic');
+    return;
+  }
+
+  console.log('   Subscription ID:', (invoice as any).subscription);
+
+  const account = await findAccountByStripeCustomer(invoice.customer as string);
+  if (!account) {
+    console.log('❌ Account not found, skipping fee logic');
+    return;
+  }
+
+  console.log('✅ Found account:', account.account_id);
+
+  // Check if credit card fee is enabled for this account
+  if (!account.credit_card_fee_enabled) {
+    console.log('ℹ️ Credit card fee disabled for this account');
+    return;
+  }
+
+  console.log('💳 Credit card fee enabled - checking payment method...');
+
+  // Get the payment method for this invoice
+  let paymentMethodId = invoice.default_payment_method;
+  if (!paymentMethodId && (invoice as any).subscription) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve((invoice as any).subscription as string);
+      paymentMethodId = subscription.default_payment_method as string;
+    } catch (err) {
+      console.error('Failed to retrieve subscription payment method:', err);
+    }
+  }
+
+  if (!paymentMethodId) {
+    console.log('⚠️ No payment method found, skipping fee');
+    return;
+  }
+
+  // Check if payment method is a card (not ACH)
+  try {
+    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+    console.log('   Payment method type:', paymentMethod.type);
+
+    if (paymentMethod.type !== 'card') {
+      console.log('✅ Payment method is not a card (ACH/bank), no fee applied');
+      return;
+    }
+
+    console.log('💳 Card payment detected - applying 4% fee');
+
+    // Calculate 4% of the invoice subtotal (excluding existing fees)
+    const feeAmount = Math.round(invoice.subtotal * 0.04);
+    console.log(`   Subtotal: $${(invoice.subtotal / 100).toFixed(2)}`);
+    console.log(`   4% Fee: $${(feeAmount / 100).toFixed(2)}`);
+
+    // Add invoice item for the processing fee
+    await stripe.invoiceItems.create({
+      customer: invoice.customer as string,
+      invoice: invoice.id,
+      amount: feeAmount,
+      currency: 'usd',
+      description: '4% Credit Card Processing Fee',
+    });
+
+    console.log('✅ Credit card processing fee added to invoice');
+  } catch (err) {
+    console.error('❌ Error adding credit card fee to invoice:', err);
+    // Don't fail the entire webhook if fee addition fails
   }
 }
 

@@ -127,11 +127,11 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
 
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">
             {/* Balance Summary */}
-            <div className="bg-[#F6F5F2] rounded-xl p-6 border border-[#ECEAE5]">
+            <div className="bg-[#F6F5F2] rounded-xl p-3 border border-[#ECEAE5]">
               <div className="text-center">
-                <p className="text-sm text-[#5A5A5A] mb-1">Current Balance</p>
+                <p className="text-xs text-[#5A5A5A] mb-0.5">Current Balance</p>
                 <p
-                  className={`text-3xl font-bold ${
+                  className={`text-2xl font-bold ${
                     currentBalance >= 0 ? 'text-[#4CAF50]' : 'text-[#F44336]'
                   }`}
                 >

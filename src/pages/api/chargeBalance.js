@@ -193,7 +193,7 @@ export default async function handler(req, res) {
       .insert({
         account_id,
         member_id,
-        type: 'charge',
+        type: 'purchase',
         amount: -creditCardFeeDollars, // Negative = charge
         note: '4% Credit Card Processing Fee',
         date: transactionDate,

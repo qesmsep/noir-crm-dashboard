@@ -8,15 +8,22 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/useToast';
-import { CreditCard, Plus, Trash2, Check, Building2 } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+import { CreditCard, Trash2 } from 'lucide-react';
+import UpdatePaymentModal from '../UpdatePaymentModal';
 
 interface PaymentMethodModalProps {
   isOpen: boolean;
@@ -24,137 +31,14 @@ interface PaymentMethodModalProps {
   accountId?: string;
 }
 
-// Add Card Form Component
-function AddCardForm({ accountId, onSuccess, onCancel }: { accountId: string; onSuccess: () => void; onCancel: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const { toast } = useToast();
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      // Step 1: Create SetupIntent
-      const setupResponse = await fetch('/api/stripe/payment-methods/setup-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ account_id: accountId }),
-      });
-
-      const setupData = await setupResponse.json();
-
-      if (setupData.error) {
-        throw new Error(setupData.error);
-      }
-
-      // Step 2: Confirm card setup with Stripe
-      const { setupIntent, error: stripeError } = await stripe.confirmCardSetup(
-        setupData.client_secret,
-        {
-          payment_method: {
-            card: cardElement,
-          },
-        }
-      );
-
-      if (stripeError) {
-        throw new Error(stripeError.message);
-      }
-
-      if (!setupIntent || !setupIntent.payment_method) {
-        throw new Error('Failed to setup payment method');
-      }
-
-      // Step 3: Set as default payment method
-      const setDefaultResponse = await fetch('/api/stripe/payment-methods/set-default', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          account_id: accountId,
-          payment_method_id: setupIntent.payment_method as string,
-        }),
-      });
-
-      const setDefaultData = await setDefaultResponse.json();
-
-      if (setDefaultData.error) {
-        throw new Error(setDefaultData.error);
-      }
-
-      toast({
-        title: 'Success',
-        description: 'Payment method added successfully',
-      });
-
-      onSuccess();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add payment method',
-        variant: 'error',
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-[#F6F5F2] p-4 rounded-lg border border-[#ECEAE5]">
-        <CardElement
-          options={{
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#1F1F1F',
-                '::placeholder': {
-                  color: '#8C7C6D',
-                },
-              },
-            },
-          }}
-        />
-      </div>
-      <div className="flex gap-3 justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={submitting}
-          className="border-[#ECEAE5] text-[#5A5A5A] hover:bg-[#F6F5F2]"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={!stripe || submitting}
-          className="bg-[#A59480] text-white hover:bg-[#8C7C6D]"
-        >
-          {submitting ? 'Adding...' : 'Add Card'}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethodModalProps) {
   const { toast } = useToast();
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddCard, setShowAddCard] = useState(false);
+  const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [paymentMethodToDelete, setPaymentMethodToDelete] = useState<any | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && accountId) {
@@ -171,7 +55,17 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
         throw new Error(data.error);
       }
 
-      setPaymentMethods(data.payment_methods || []);
+      console.log('Payment methods data:', data);
+
+      // Map payment methods and add is_default flag
+      const methodsWithDefault = (data.payment_methods || []).map((method: any) => ({
+        ...method,
+        is_default: method.id === data.default_payment_method,
+      }));
+
+      console.log('Mapped payment methods:', methodsWithDefault);
+
+      setPaymentMethods(methodsWithDefault);
     } catch (error) {
       toast({
         title: 'Error',
@@ -184,9 +78,12 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
   };
 
   const handleSetDefault = async (paymentMethodId: string) => {
+    setSettingDefaultId(paymentMethodId);
     try {
+      console.log('Setting default payment method:', paymentMethodId);
+
       const response = await fetch('/api/stripe/payment-methods/set-default', {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           account_id: accountId,
@@ -195,34 +92,43 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
       });
 
       const data = await response.json();
+      console.log('Set default response:', data);
 
       if (data.error) {
         throw new Error(data.error);
       }
 
+      // Wait a moment for Stripe to sync before refreshing
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      await fetchPaymentMethods();
+
       toast({
         title: 'Success',
         description: 'Default payment method updated',
       });
-
-      fetchPaymentMethods();
     } catch (error: any) {
+      console.error('Set default error:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to update payment method',
         variant: 'error',
       });
+    } finally {
+      setSettingDefaultId(null);
     }
   };
 
-  const handleDelete = async (paymentMethodId: string) => {
-    setDeletingId(paymentMethodId);
+  const handleDelete = async () => {
+    if (!paymentMethodToDelete) return;
+
+    setDeletingId(paymentMethodToDelete.id);
     try {
       const response = await fetch('/api/stripe/payment-methods/detach', {
-        method: 'POST',
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          payment_method_id: paymentMethodId,
+          payment_method_id: paymentMethodToDelete.id,
         }),
       });
 
@@ -246,11 +152,13 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
       });
     } finally {
       setDeletingId(null);
+      setPaymentMethodToDelete(null);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <>
+    <Dialog open={isOpen && !paymentMethodToDelete && !showUpdatePaymentModal} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold text-[#1F1F1F]">
@@ -275,14 +183,14 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
                     {paymentMethods.map((method) => (
                       <div
                         key={method.id}
-                        className={`bg-white rounded-xl p-4 border-2 ${
-                          method.is_default ? 'border-[#A59480]' : 'border-[#ECEAE5]'
+                        className={`bg-white rounded-xl p-4 border ${
+                          method.is_default ? 'border-[#4CAF50]' : 'border-[#ECEAE5]'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <CreditCard className="w-5 h-5 text-[#A59480]" />
-                            <div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <CreditCard className="w-5 h-5 text-[#A59480] flex-shrink-0" />
+                            <div className="min-w-0">
                               <p className="font-medium text-[#1F1F1F]">
                                 {method.type === 'card' ? (
                                   <>•••• {method.card?.last4}</>
@@ -301,38 +209,53 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
                               </p>
                             </div>
                           </div>
-                          {method.is_default && (
-                            <Badge className="bg-[#4CAF50] text-white text-xs">Default</Badge>
-                          )}
-                        </div>
 
-                        <div className="flex gap-2 mt-3">
-                          {!method.is_default && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSetDefault(method.id)}
-                              className="flex-1 border-[#ECEAE5] text-[#5A5A5A] hover:bg-[#F6F5F2]"
-                            >
-                              Set as Default
-                            </Button>
-                          )}
-                          {paymentMethods.length > 1 && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDelete(method.id)}
-                              disabled={deletingId === method.id || method.is_default}
-                              className="text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={method.is_default ? "Cannot delete default payment method" : "Delete payment method"}
-                            >
-                              {deletingId === method.id ? (
-                                <Spinner className="w-4 h-4" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {method.is_default ? (
+                              <Badge className="bg-[#4CAF50] text-[#1F1F1F] text-xs font-bold">Default</Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSetDefault(method.id)}
+                                disabled={settingDefaultId !== null}
+                                className="border-[#ECEAE5] text-[#5A5A5A] hover:bg-[#F6F5F2] text-xs disabled:opacity-50 min-w-[90px]"
+                              >
+                                {settingDefaultId === method.id ? '...' : 'Set Default'}
+                              </Button>
+                            )}
+                            {paymentMethods.length > 1 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (method.is_default) {
+                                    toast({
+                                      title: 'Cannot Delete Default Payment Method',
+                                      description: 'Please set another payment method as default before deleting this one.',
+                                      variant: 'error',
+                                    });
+                                    return;
+                                  }
+                                  setPaymentMethodToDelete(method);
+                                }}
+                                disabled={deletingId === method.id}
+                                className={`p-2 transition-colors ${
+                                  method.is_default
+                                    ? 'text-gray-400 cursor-not-allowed opacity-50'
+                                    : 'text-red-500 hover:bg-red-50'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                title={method.is_default ? "Cannot delete default payment method" : "Delete payment method"}
+                              >
+                                {deletingId === method.id ? (
+                                  <Spinner className="w-4 h-4" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -347,31 +270,18 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
               </div>
 
               {/* Update Payment Method Section */}
-              {showAddCard ? (
-                <div className="bg-white rounded-xl p-6 border-2 border-[#A59480]">
-                  <h3 className="text-lg font-semibold text-[#1F1F1F] mb-4">Update Payment Method</h3>
-                  <p className="text-sm text-[#5A5A5A] mb-4">Enter your new payment information below</p>
-                  <AddCardForm
-                    accountId={accountId!}
-                    onSuccess={() => {
-                      setShowAddCard(false);
-                      fetchPaymentMethods();
-                    }}
-                    onCancel={() => setShowAddCard(false)}
-                  />
-                </div>
-              ) : (
+              <div>
                 <Button
-                  onClick={() => setShowAddCard(true)}
+                  onClick={() => setShowUpdatePaymentModal(true)}
                   className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D]"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <CreditCard className="w-4 h-4 mr-2" />
                   Update Payment Method
                 </Button>
-              )}
+              </div>
 
               {/* Billing Information */}
-              <div className="bg-[#F6F5F2] rounded-xl p-6 border border-[#ECEAE5]">
+              <div className="bg-[#F6F5F2] rounded-xl p-6 border border-[#ECEAE5] relative z-0">
                 <h3 className="text-lg font-semibold text-[#1F1F1F] mb-4">Billing Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -403,13 +313,58 @@ function PaymentMethodModalContent({ isOpen, onClose, accountId }: PaymentMethod
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={!!paymentMethodToDelete} onOpenChange={() => setPaymentMethodToDelete(null)}>
+      <AlertDialogContent className="bg-white">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Payment Method?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to remove{' '}
+            {paymentMethodToDelete && (
+              <>
+                {paymentMethodToDelete.type === 'card' ? (
+                  <>
+                    {paymentMethodToDelete.card?.brand?.toUpperCase()} ending in {paymentMethodToDelete.card?.last4}
+                  </>
+                ) : (
+                  <>
+                    {paymentMethodToDelete.us_bank_account?.bank_name} ending in {paymentMethodToDelete.us_bank_account?.last4}
+                  </>
+                )}
+              </>
+            )}
+            ? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            className="bg-[#F44336] text-white hover:bg-[#D32F2F]"
+            disabled={!!deletingId}
+          >
+            {deletingId ? 'Deleting...' : 'Delete Payment Method'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Update Payment Method Modal */}
+    {accountId && showUpdatePaymentModal && (
+      <UpdatePaymentModal
+        accountId={accountId}
+        onSuccess={() => {
+          setShowUpdatePaymentModal(false);
+          fetchPaymentMethods();
+        }}
+        onClose={() => setShowUpdatePaymentModal(false)}
+      />
+    )}
+  </>
   );
 }
 
 export default function PaymentMethodModal(props: PaymentMethodModalProps) {
-  return (
-    <Elements stripe={stripePromise}>
-      <PaymentMethodModalContent {...props} />
-    </Elements>
-  );
+  return <PaymentMethodModalContent {...props} />;
 }

@@ -740,11 +740,19 @@ While focusing on aesthetics, maintain accessibility:
 - `account_id` (UUID) - Links to accounts table
 - `first_name`, `last_name`, `email`, `phone`
 - `membership` (TEXT) - 'Skyline', 'Duo', 'Solo', 'Annual'
+- **`member_type` (TEXT)** - 'primary' or 'secondary' - Distinguishes main vs additional members
+- `photo` (TEXT) - Base64-encoded JPEG profile photo (no index due to 8KB B-tree limit)
+- `dob` (DATE) - Date of birth
 - `monthly_credit` (DECIMAL) - Current credit balance
 - `last_credit_date` (DATE) - Last credit reset
 - `credit_renewal_date` (DATE) - Next renewal date
-- `deactivated` (BOOLEAN)
+- `deactivated` (BOOLEAN) - Soft delete flag
 - `created_at`, `updated_at`
+
+**Notes**:
+- `member_type` replaces deprecated `primary` boolean column
+- `photo` column has no B-tree index to allow larger base64 images (~50KB max)
+- Secondary members add $25/month to account's `monthly_dues`
 
 #### `reservations`
 - `id` (UUID, PK)
@@ -1156,6 +1164,20 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 | `/api/member_attributes` | GET/POST/PUT/DELETE | Manage member custom attributes |
 | `/api/member_notes` | GET/POST/PUT/DELETE | Manage member notes |
 
+**Member Type System**:
+- `member_type` field distinguishes primary vs secondary members on shared accounts
+- **Primary Member**: Main account holder, listed first
+- **Secondary Member**: Additional member at $25/month administration fee
+- Accounts can have multiple secondary members (no limit)
+- Each secondary member adds $25 to `monthly_dues`
+- Secondary members can be promoted to primary (demotes current primary)
+
+**Additional Member Pricing**:
+- Base subscription (e.g., $100/mo Skyline, $1/mo Host plan)
+- Each additional member: +$25/month administration fee
+- Total MRR = Base Subscription + (Secondary Member Count × $25)
+- Example: Skyline ($100) + 2 additional members = $150/month total
+
 **Example: Add Member to Account (Solo → Duo Upgrade)**
 ```typescript
 // POST /api/members/add-to-account
@@ -1166,20 +1188,33 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
     "last_name": "Doe",
     "email": "jane@example.com",
     "phone": "5551234567",
-    "dob": "1990-01-01"
+    "dob": "1990-01-01",
+    "photo": "base64_or_url", // optional: photo upload/URL
+    "member_type": "secondary" // automatically set
   },
   "new_price_id": "price_duo_monthly" // optional: upgrade subscription tier
 }
+
+// Response includes updated monthly_dues (+$25)
 ```
+
+**Photo Upload System**:
+- Supports file upload (up to 10MB) or URL input
+- Client-side image compression (600×600px @ 75% quality)
+- Crop/zoom modal for positioning (drag to reposition, slider for zoom)
+- Final output: 400×400px @ 80% quality JPEG
+- Stored as base64 data URL in `members.photo` column
+- Touch-enabled for mobile devices
 
 **Related Files**:
 - `src/components/MemberDetail.tsx` - Member detail view
-- `src/pages/admin/members/[accountId].tsx` - Member detail page
-- `src/components/members/AddMemberModal.js` - Add member modal
+- `src/pages/admin/members/[accountId].tsx` - Member detail page with inline ledger editing
+- `src/components/AddSecondaryMemberModal.tsx` - Add member modal with photo upload
 - `src/pages/api/members/add-to-account.ts` - Add to existing account API
 - `src/pages/api/member_attributes.js` - Member attributes API
 - `src/pages/api/member_notes.js` - Member notes API
 - `src/components/pages/MemberLedger.js` - Ledger view
+- `src/components/SubscriptionTransactionHistory.tsx` - Stripe invoice history
 
 ### 6.1. Subscription Management
 
@@ -1193,7 +1228,14 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 - Payment method management
 - Subscription status tracking (active, paused, canceled, past_due)
 - Transaction history (Stripe invoices)
-- MRR (Monthly Recurring Revenue) tracking
+- **MRR Breakdown Display**: Shows base subscription + additional member fees
+  - Base Subscription: Fetched from Stripe price.unit_amount (actual plan cost)
+  - Additional Members: Count × $25/mo per secondary member
+  - Total MRR: Sum displayed with visual hierarchy and divider
+- **Credit Card Processing Fee Toggle**: Per-account 4% fee on credit card transactions
+  - ACH/bank transfers exempt from fee
+  - Stored in `accounts.credit_card_fee_enabled` column
+  - Toggle accessible in Payment Settings section
 
 **Subscription States & Actions**:
 

@@ -249,8 +249,11 @@ export default function MemberDashboardPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Next Reservation Card */}
-            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg">
-              <CardHeader className="pb-3">
+            <Card
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => setIsReservationsListModalOpen(true)}
+            >
+              <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-[#A59480]" />
                   <span className="text-xl font-semibold text-[#1F1F1F]">
@@ -258,7 +261,7 @@ export default function MemberDashboardPage() {
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 pt-0">
+              <CardContent className="space-y-0 pt-0 pb-4">
                 {loadingReservation ? (
                   <div className="flex justify-center py-8">
                     <Spinner className="text-[#A59480]" />
@@ -267,73 +270,66 @@ export default function MemberDashboardPage() {
                   <>
                     {/* Next Reservation - One Line OR Make Reservation Button */}
                     {nextReservation ? (
-                      <div>
-                        <p className="text-xs text-[#8C7C6D] mb-1">Your Next Reservation</p>
-                        <div
-                          className="flex items-center justify-between gap-3 py-1.5 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
-                          onClick={() => setIsReservationsListModalOpen(true)}
-                        >
-                          <p className="text-xs text-[#8C7C6D] flex-shrink-0">
-                            {new Date(nextReservation.start_time).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </p>
-                          <p className="text-xs font-medium text-[#1F1F1F] flex-1 truncate">
-                            {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true,
-                            })} • Party of {nextReservation.party_size}
-                          </p>
-                          <Badge className="text-xs px-2 py-0.5 bg-[#4CAF50] text-white">
-                            {nextReservation.status}
-                          </Badge>
-                        </div>
+                      <div
+                        className="flex items-center justify-between gap-3 py-1 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsReservationsListModalOpen(true);
+                        }}
+                      >
+                        <p className="text-xs text-[#8C7C6D] flex-shrink-0">
+                          {new Date(nextReservation.start_time).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <p className="text-xs font-medium text-[#1F1F1F] flex-1 truncate">
+                          {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                          })} • Party of {nextReservation.party_size}
+                        </p>
+                        <Badge className="text-xs px-2 py-0.5 bg-[#4CAF50] text-white">
+                          {nextReservation.status}
+                        </Badge>
                       </div>
                     ) : (
-                      <div>
-                        <p className="text-xs text-[#8C7C6D] mb-1">Your Next Reservation</p>
-                        <Button
-                          className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsReservationModalOpen(true);
-                          }}
-                        >
-                          Make Reservation
-                        </Button>
-                      </div>
+                      <Button
+                        className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsReservationModalOpen(true);
+                        }}
+                      >
+                        Make Reservation
+                      </Button>
                     )}
 
                     {/* Past Visits Preview */}
-                    {pastVisits.length > 0 && (
-                      <div>
-                        <p className="text-xs text-[#8C7C6D] mb-1">Recent Visits</p>
-                        <div className="space-y-1">
-                          {pastVisits.map((visit, index) => (
-                            <div
-                              key={visit.id || index}
-                              className="flex items-center justify-between gap-3 py-1.5 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
-                              onClick={() => setIsReservationsListModalOpen(true)}
-                            >
-                              <p className="text-xs text-[#8C7C6D] flex-shrink-0">
-                                {new Date(visit.start_time).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                })}
-                              </p>
-                              <p className="text-xs text-[#5A5A5A] flex-1 truncate">
-                                Party of {visit.party_size}
-                              </p>
-                              <Badge className="text-xs px-2 py-0.5 bg-[#DAD7D0] text-[#5A5A5A]">
-                                {visit.status}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
+                    {pastVisits.map((visit, index) => (
+                      <div
+                        key={visit.id || index}
+                        className="flex items-center justify-between gap-3 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsReservationsListModalOpen(true);
+                        }}
+                      >
+                        <p className="text-xs text-[#8C7C6D] flex-shrink-0">
+                          {new Date(visit.start_time).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <p className="text-xs text-[#5A5A5A] flex-1 truncate">
+                          Party of {visit.party_size}
+                        </p>
+                        <Badge className="text-xs px-2 py-0.5 bg-[#DAD7D0] text-[#5A5A5A]">
+                          {visit.status}
+                        </Badge>
                       </div>
-                    )}
+                    ))}
                   </>
                 )}
               </CardContent>
@@ -344,7 +340,7 @@ export default function MemberDashboardPage() {
               className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => setIsBalanceModalOpen(true)}
             >
-              <CardHeader>
+              <CardHeader className="pb-2">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Wallet className="w-5 h-5 text-[#A59480]" />
@@ -361,14 +357,14 @@ export default function MemberDashboardPage() {
                   </p>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-0 pt-0 pb-4">
                 {/* Recent Transactions Preview */}
                 {recentTransactions.length > 0 ? (
-                  <div className="space-y-2">
+                  <>
                     {recentTransactions.map((transaction, index) => (
                       <div
                         key={transaction.id || index}
-                        className="flex items-center justify-between gap-3 py-2 border-b border-[#ECEAE5] last:border-0"
+                        className="flex items-center justify-between gap-3 py-1 border-b border-[#ECEAE5] last:border-0"
                       >
                         <p className="text-xs text-[#8C7C6D] flex-shrink-0">
                           {new Date(transaction.created_at).toLocaleDateString('en-US', {
@@ -389,7 +385,7 @@ export default function MemberDashboardPage() {
                         </p>
                       </div>
                     ))}
-                  </div>
+                  </>
                 ) : (
                   <p className="text-sm text-[#5A5A5A] text-center py-4">No recent transactions</p>
                 )}
