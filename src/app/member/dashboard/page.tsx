@@ -216,7 +216,7 @@ export default function MemberDashboardPage() {
 
           {/* Profile Card - Moved to Top */}
           <Card
-            className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
             onClick={() => setIsProfileModalOpen(true)}
           >
             <CardHeader className="pb-0">
@@ -249,8 +249,8 @@ export default function MemberDashboardPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Next Reservation Card */}
-            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
-              <CardHeader>
+            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg">
+              <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-[#A59480]" />
                   <span className="text-xl font-semibold text-[#1F1F1F]">
@@ -258,7 +258,7 @@ export default function MemberDashboardPage() {
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 pt-0">
                 {loadingReservation ? (
                   <div className="flex justify-center py-8">
                     <Spinner className="text-[#A59480]" />
@@ -268,9 +268,9 @@ export default function MemberDashboardPage() {
                     {/* Next Reservation - One Line OR Make Reservation Button */}
                     {nextReservation ? (
                       <div>
-                        <p className="text-xs text-[#8C7C6D] mb-2">Your Next Reservation</p>
+                        <p className="text-xs text-[#8C7C6D] mb-1">Your Next Reservation</p>
                         <div
-                          className="flex items-center justify-between gap-3 py-2 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
+                          className="flex items-center justify-between gap-3 py-1.5 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
                           onClick={() => setIsReservationsListModalOpen(true)}
                         >
                           <p className="text-xs text-[#8C7C6D] flex-shrink-0">
@@ -293,7 +293,7 @@ export default function MemberDashboardPage() {
                       </div>
                     ) : (
                       <div>
-                        <p className="text-xs text-[#8C7C6D] mb-2">Your Next Reservation</p>
+                        <p className="text-xs text-[#8C7C6D] mb-1">Your Next Reservation</p>
                         <Button
                           className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D]"
                           onClick={(e) => {
@@ -309,12 +309,12 @@ export default function MemberDashboardPage() {
                     {/* Past Visits Preview */}
                     {pastVisits.length > 0 && (
                       <div>
-                        <p className="text-xs text-[#8C7C6D] mb-2">Recent Visits</p>
-                        <div className="space-y-2">
+                        <p className="text-xs text-[#8C7C6D] mb-1">Recent Visits</p>
+                        <div className="space-y-1">
                           {pastVisits.map((visit, index) => (
                             <div
                               key={visit.id || index}
-                              className="flex items-center justify-between gap-3 py-2 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
+                              className="flex items-center justify-between gap-3 py-1.5 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
                               onClick={() => setIsReservationsListModalOpen(true)}
                             >
                               <p className="text-xs text-[#8C7C6D] flex-shrink-0">
@@ -341,7 +341,7 @@ export default function MemberDashboardPage() {
 
             {/* Balance Card */}
             <Card
-              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => setIsBalanceModalOpen(true)}
             >
               <CardHeader>
@@ -401,7 +401,7 @@ export default function MemberDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Payment Method Card */}
             <Card
-              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => setIsPaymentMethodModalOpen(true)}
             >
               <CardHeader>
@@ -429,7 +429,7 @@ export default function MemberDashboardPage() {
 
             {/* Account Settings Card */}
             <Card
-              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => setIsAccountSettingsModalOpen(true)}
             >
               <CardHeader>
@@ -460,7 +460,7 @@ export default function MemberDashboardPage() {
 
             {/* Upcoming Events Card */}
             <Card
-              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => setIsUpcomingEventsModalOpen(true)}
             >
               <CardHeader>

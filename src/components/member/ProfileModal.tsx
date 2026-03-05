@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/useToast';
-import { User, Mail, Phone, Camera, Edit2, Save, X, Users } from 'lucide-react';
+import { User, Mail, Phone, Camera, Edit2, Save, X, Users, Cake } from 'lucide-react';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 
 interface ProfileModalProps {
@@ -142,18 +142,15 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold text-[#1F1F1F]">
-            Profile
+            {member?.first_name}'s Profile
           </DialogTitle>
-          <DialogDescription className="text-sm text-[#5A5A5A] mt-1">
-            Manage your personal information and profile photo
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+        <div className="flex-1 overflow-y-auto pr-2">
           {/* Profile Photo Section */}
-          <div className="flex flex-col items-center space-y-4">
+          <div className="flex flex-col items-center space-y-4 pb-0 pt-2 relative z-20">
             <div className="relative">
-              <div className="w-32 h-32 border-4 border-[#ECEAE5] rounded-full overflow-hidden bg-[#A59480]">
+              <div className="w-40 h-40 border-4 border-[#ECEAE5] rounded-full overflow-hidden bg-[#A59480]">
                 {(member?.photo || member?.profile_photo_url) ? (
                   <img src={(member.photo || member.profile_photo_url) ?? undefined} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
@@ -168,15 +165,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 </button>
               )}
             </div>
-            {!isEditing && (
-              <p className="text-lg font-semibold text-[#1F1F1F]">
-                {member?.first_name} {member?.last_name}
-              </p>
-            )}
           </div>
 
           {/* Profile Information - Condensed */}
-          <div className="bg-[#F6F5F2] rounded-xl p-4 border border-[#ECEAE5]">
+          <div className="bg-[#F6F5F2] rounded-xl p-4 border border-[#ECEAE5] -mt-4 relative z-10 shadow-lg">
             {isEditing ? (
               <div className="space-y-3">
                 {/* First and Last Name Row */}
@@ -228,12 +220,28 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* First and Last Name Row */}
-                <div className="flex items-center gap-6">
+                {/* Name and DOB Row */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-[#8C7C6D]" />
                     <p className="text-[#1F1F1F] font-medium">{member?.first_name} {member?.last_name}</p>
                   </div>
+                  {(member as any)?.dob && (
+                    <div className="flex items-center gap-2">
+                      <Cake className="w-4 h-4 text-[#8C7C6D]" />
+                      <p className="text-[#1F1F1F]">
+                        {(() => {
+                          const [year, month, day] = (member as any).dob.split('-');
+                          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                          return date.toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          });
+                        })()}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Email and Phone Row */}
@@ -252,7 +260,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </div>
 
           {/* Member Information */}
-          <div className="bg-[#F6F5F2] rounded-xl p-6 border border-[#ECEAE5] space-y-4">
+          <div className="bg-[#F6F5F2] rounded-xl p-6 border border-[#ECEAE5] space-y-4 mt-6 shadow-lg">
             <h3 className="text-lg font-semibold text-[#1F1F1F] mb-2">Membership Details</h3>
 
             <div className="grid grid-cols-2 gap-4">
@@ -279,15 +287,21 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               </div>
 
               <div>
-                <p className="text-sm text-[#5A5A5A]">Member ID</p>
-                <p className="text-[#8C7C6D] text-xs font-medium">{member?.member_id?.slice(0, 8).toUpperCase()}</p>
+                <p className="text-sm text-[#5A5A5A]">Next Renewal</p>
+                <p className="text-[#1F1F1F] font-medium">
+                  {(member as any)?.next_renewal_date ? new Date((member as any).next_renewal_date).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  }) : 'N/A'}
+                </p>
               </div>
             </div>
           </div>
 
           {/* Account Members */}
           {accountMembers.length > 1 && (
-            <div className="bg-[#F6F5F2] rounded-xl p-6 border border-[#ECEAE5]">
+            <div className="bg-[#F6F5F2] rounded-xl p-6 border border-[#ECEAE5] mt-6 shadow-lg">
               <h3 className="text-lg font-semibold text-[#1F1F1F] mb-4 flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#A59480]" />
                 Other Account Members
