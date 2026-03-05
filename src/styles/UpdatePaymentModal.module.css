@@ -201,6 +201,41 @@
   border-left: 3px solid #A59480;
 }
 
+.achInstantVerification {
+  background: #F7F6F3;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.achTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin-bottom: 12px;
+}
+
+.achDescription {
+  font-size: 14px;
+  color: #5A5A5A;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.achBenefits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+  text-align: left;
+}
+
+.achBenefits li {
+  font-size: 14px;
+  color: #1F1F1F;
+  padding: 8px 0;
+  line-height: 1.5;
+}
+
 .cardElementWrapper {
   padding: 14px 16px;
   border: 1px solid #ECEAE5;

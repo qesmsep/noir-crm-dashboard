@@ -77,14 +77,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Create SetupIntent with specified payment method type
-    const setupIntent = await stripe.setupIntents.create({
+    const setupIntentParams: Stripe.SetupIntentCreateParams = {
       customer: customerId,
       payment_method_types: [payment_method_type],
       metadata: {
         account_id,
         payment_method_type,
       },
-    });
+    };
+
+    // Enable Financial Connections for instant ACH verification
+    // Falls back to micro-deposits if Financial Connections isn't available
+    if (payment_method_type === 'us_bank_account') {
+      setupIntentParams.payment_method_options = {
+        us_bank_account: {
+          financial_connections: {
+            permissions: ['payment_method', 'balances'],
+          },
+          verification_method: 'instant',
+        },
+      };
+    }
+
+    const setupIntent = await stripe.setupIntents.create(setupIntentParams);
 
     return res.json({
       client_secret: setupIntent.client_secret,
