@@ -69,14 +69,15 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
 
   const nextPage = () => {
     if (bookRef.current) {
-      // On mobile, skip page 2 (index 1)
+      // Mobile: skip page 2 (index 1)
       if (isMobile && currentPage === 0) {
         bookRef.current.pageFlip().flip(2); // Jump to page 3 (index 2)
-      } else if (currentPage === 0) {
-        setCurrentPage(1); // Trigger slide animation
+      } else if (!isMobile && currentPage === 0) {
+        // Desktop: On cover page, shift to 0 first, then flip
+        setCurrentPage(0.5); // Trigger shift animation to 0
         setTimeout(() => {
           bookRef.current.pageFlip().flipNext();
-        }, 400); // Wait 400ms for slide, then flip (total animation is 700ms slide + 800ms flip)
+        }, 700); // Wait for 700ms shift transition, then flip
       } else {
         bookRef.current.pageFlip().flipNext();
       }
@@ -85,7 +86,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
 
   const prevPage = () => {
     if (bookRef.current) {
-      // On mobile, skip page 2 (index 1) when going back
+      // Mobile: skip page 2 (index 1) when going back
       if (isMobile && currentPage === 2) {
         bookRef.current.pageFlip().flip(0); // Jump to page 1 (index 0)
       } else {
@@ -110,7 +111,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [currentPage, isMobile]);
 
   if (isLoading) {
     return (
@@ -166,7 +167,10 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
         <div
           className="relative transition-all duration-700 ease-out"
           style={{
-            transform: 'translateX(0)',
+            // Desktop: Cover page (0) shift left -200px, then shifts to 0 before flip
+            // Mobile: Cover page (0) at 0
+            // Both: Open pages (>0) at 0
+            transform: currentPage === 0 && !isMobile ? 'translateX(-200px)' : 'translateX(0)',
           }}
         >
           <HTMLFlipBook
@@ -180,7 +184,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
             maxHeight={2060}
             drawShadow={true}
             flippingTime={800}
-            usePortrait={true}
+            usePortrait={isMobile}
             startZIndex={0}
             autoSize={true}
             maxShadowOpacity={0.5}
