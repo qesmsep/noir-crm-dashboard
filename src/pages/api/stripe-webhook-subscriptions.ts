@@ -590,7 +590,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   const totalAmountPaid = invoice.amount_paid / 100; // Convert cents to dollars
 
   // Check for duplicate payment by Stripe charge ID
-  const chargeId = invoice.charge;
+  const chargeId = (invoice as any).charge as string | null;
   if (chargeId) {
     const { data: existingPayment } = await supabase
       .from('ledger')
@@ -707,7 +707,8 @@ async function handleInvoiceCreated(invoice: Stripe.Invoice) {
 
   // Check if payment method is a card (not ACH)
   try {
-    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+    const paymentMethodIdString = typeof paymentMethodId === 'string' ? paymentMethodId : paymentMethodId.id;
+    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodIdString);
     console.log('   Payment method type:', paymentMethod.type);
 
     if (paymentMethod.type !== 'card') {

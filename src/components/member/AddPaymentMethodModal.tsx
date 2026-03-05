@@ -152,141 +152,8 @@ function PaymentForm({ accountId, onSuccess, onCancel, modalRef, paymentType, cl
           </div>
         </div>
       ) : (
-        /* Use PaymentElement for bank accounts - ACH has click issues, warn user */
-        <div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-yellow-800">
-              <strong>Note:</strong> If you have trouble clicking options below, try scrolling the page to the top first.
-            </p>
-          </div>
-          <PaymentElement
-            onChange={(event) => {
-              console.log('Payment method changed:', event);
-            }}
-            onReady={() => {
-            console.log('=== STRIPE ACH DEBUG ===');
-            console.log('Body scroll:', document.body.scrollTop);
-
-          const iframe = document.querySelector('iframe[name^="__privateStripeFrame"]') as HTMLIFrameElement;
-          if (iframe) {
-            // NUCLEAR OPTION: Manually inject CSS into Stripe's iframe to offset button positions
-            try {
-              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-              if (iframeDoc) {
-                const style = iframeDoc.createElement('style');
-                style.textContent = `
-                  * {
-                    transform: translateY(-100px) !important;
-                  }
-                `;
-                iframeDoc.head.appendChild(style);
-                console.log('✓ Injected offset correction into Stripe iframe');
-              }
-            } catch (e) {
-              console.log('Cannot inject into Stripe iframe (cross-origin):', e);
-            }
-
-            const rect = iframe.getBoundingClientRect();
-            console.log('Iframe position AFTER reflow:', {
-              x: rect.x,
-              y: rect.y,
-              top: rect.top,
-              left: rect.left,
-              width: rect.width,
-              height: rect.height
-            });
-
-            // Calculate where "Card" button is
-            const iframeRect = iframe.getBoundingClientRect();
-            const cardButtonTop = iframeRect.top + 40; // Where Card button should be
-            const cardButtonLeft = iframeRect.left + 100;
-
-            // Add TWO markers: one red for visual Card position, one green for where click lands
-            const redMarker = document.createElement('div');
-            redMarker.style.position = 'fixed';
-            redMarker.style.left = cardButtonLeft + 'px';
-            redMarker.style.top = cardButtonTop + 'px';
-            redMarker.style.width = '15px';
-            redMarker.style.height = '15px';
-            redMarker.style.borderRadius = '50%';
-            redMarker.style.backgroundColor = 'red';
-            redMarker.style.zIndex = '99999';
-            redMarker.style.pointerEvents = 'none';
-            redMarker.textContent = 'C';
-            redMarker.style.color = 'white';
-            redMarker.style.fontSize = '10px';
-            redMarker.style.textAlign = 'center';
-            document.body.appendChild(redMarker);
-            console.log('RED MARKER (C) = Visual Card button position:', cardButtonLeft, cardButtonTop);
-
-            // Add click listener to show where clicks actually land
-            let clickCount = 0;
-            if (modalRef?.current) {
-              modalRef.current.addEventListener('click', (e) => {
-                clickCount++;
-
-                // Show green dot where click landed
-                const greenDot = document.createElement('div');
-                greenDot.style.position = 'fixed';
-                greenDot.style.left = e.clientX + 'px';
-                greenDot.style.top = e.clientY + 'px';
-                greenDot.style.width = '10px';
-                greenDot.style.height = '10px';
-                greenDot.style.borderRadius = '50%';
-                greenDot.style.backgroundColor = 'lime';
-                greenDot.style.border = '2px solid green';
-                greenDot.style.zIndex = '99999';
-                greenDot.style.pointerEvents = 'none';
-                document.body.appendChild(greenDot);
-                setTimeout(() => greenDot.remove(), 3000);
-
-                console.log('CLICK #' + clickCount + ':', {
-                  clickAt: { x: e.clientX, y: e.clientY },
-                  cardButtonVisualPos: { x: cardButtonLeft, y: cardButtonTop },
-                  offsetFromCard: {
-                    x: e.clientX - cardButtonLeft,
-                    y: e.clientY - cardButtonTop
-                  }
-                });
-              }, true);
-            }
-
-            // Add click listener to detect actual click position
-            iframe.addEventListener('click', (e) => {
-              const iframeRect = iframe.getBoundingClientRect();
-              console.log('CLICK on iframe:', {
-                clientX: e.clientX,
-                clientY: e.clientY,
-                pageX: e.pageX,
-                pageY: e.pageY,
-                offsetX: e.offsetX,
-                offsetY: e.offsetY,
-                iframeRect: {
-                  x: iframeRect.x,
-                  y: iframeRect.y,
-                  top: iframeRect.top,
-                  left: iframeRect.left
-                }
-              });
-
-              // Draw a red dot where the click was registered
-              const dot = document.createElement('div');
-              dot.style.position = 'fixed';
-              dot.style.left = e.clientX + 'px';
-              dot.style.top = e.clientY + 'px';
-              dot.style.width = '10px';
-              dot.style.height = '10px';
-              dot.style.borderRadius = '50%';
-              dot.style.backgroundColor = 'red';
-              dot.style.zIndex = '99999';
-              dot.style.pointerEvents = 'none';
-              document.body.appendChild(dot);
-              setTimeout(() => dot.remove(), 2000);
-            }, true);
-          }
-        }}
-        />
-        </div>
+        /* Use PaymentElement for bank accounts */
+        <PaymentElement />
       )}
       <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
         <Button
@@ -314,7 +181,6 @@ function PaymentForm({ accountId, onSuccess, onCancel, modalRef, paymentType, cl
 function AddPaymentMethodModalContent({ isOpen, onClose, accountId, onSuccess, initialPaymentType }: AddPaymentMethodModalProps) {
   const { toast } = useToast();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [scrollLocked, setScrollLocked] = useState(false);
   const [paymentType, setPaymentType] = useState<'card' | 'us_bank_account' | null>(initialPaymentType || null);
   const dialogRef = React.useRef<HTMLDivElement>(null);
 
@@ -326,84 +192,26 @@ function AddPaymentMethodModalContent({ isOpen, onClose, accountId, onSuccess, i
   }, [initialPaymentType]);
 
   useEffect(() => {
-    if (dialogRef.current && clientSecret) {
-      const element = dialogRef.current;
-      const computed = window.getComputedStyle(element);
-      console.log('Dialog Debug:', {
-        transform: computed.transform,
-        translate: computed.translate,
-        position: computed.position,
-        top: computed.top,
-        left: computed.left,
-        zIndex: computed.zIndex,
-        boundingRect: element.getBoundingClientRect()
-      });
-
-      // Check all parent transforms
-      let parent = element.parentElement;
-      let level = 0;
-      while (parent && level < 5) {
-        const parentComputed = window.getComputedStyle(parent);
-        if (parentComputed.transform !== 'none') {
-          console.log(`Parent ${level} transform:`, parentComputed.transform, parent);
-        }
-        parent = parent.parentElement;
-        level++;
-      }
-    }
-  }, [clientSecret, dialogRef.current]);
-
-  useEffect(() => {
-    if (isOpen && accountId && scrollLocked && paymentType) {
+    if (isOpen && accountId && paymentType) {
       fetchSetupIntent();
     }
-  }, [isOpen, accountId, scrollLocked, paymentType]);
+  }, [isOpen, accountId, paymentType]);
 
-  // Lock body scroll when modal opens - force body scrollTop to 0
+  // Lock body scroll when modal opens
   useEffect(() => {
     if (isOpen) {
       const scrollY = window.scrollY;
-      const bodyScrollTop = document.body.scrollTop;
-
-      // Force body scroll to 0
-      document.body.scrollTop = 0;
-      document.documentElement.scrollTop = 0;
-      window.scrollTo(0, 0);
-
-      // Lock scroll
-      document.body.style.position = 'fixed';
-      document.body.style.top = '0';
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
-
-      // Poll until body scroll is ACTUALLY 0, then allow Stripe to load
-      const checkScroll = () => {
-        const currentBodyScroll = document.body.scrollTop;
-        console.log('Checking body.scrollTop:', currentBodyScroll);
-        if (currentBodyScroll === 0) {
-          console.log('✓ Body scroll is 0, loading Stripe...');
-          setScrollLocked(true);
-        } else {
-          console.log('✗ Body scroll still not 0, forcing again...');
-          document.body.scrollTop = 0;
-          document.documentElement.scrollTop = 0;
-          setTimeout(checkScroll, 50);
-        }
-      };
-      setTimeout(checkScroll, 50);
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
 
       return () => {
+        document.body.style.overflow = '';
         document.body.style.position = '';
         document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
         document.body.style.width = '';
-        document.body.style.overflow = '';
         window.scrollTo(0, scrollY);
-        document.body.scrollTop = bodyScrollTop;
-        setScrollLocked(false);
       };
     }
   }, [isOpen]);
