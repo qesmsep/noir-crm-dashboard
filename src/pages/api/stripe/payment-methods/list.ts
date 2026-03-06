@@ -61,6 +61,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }),
     ]);
 
+    console.log('[PAYMENT METHODS] Customer ID:', account.stripe_customer_id);
+    console.log('[PAYMENT METHODS] Cards found:', cards.data.length);
+    console.log('[PAYMENT METHODS] Bank accounts found:', bankAccounts.data.length);
+    console.log('[PAYMENT METHODS] Bank accounts:', JSON.stringify(bankAccounts.data, null, 2));
+
     const paymentMethods = {
       data: [...cards.data, ...bankAccounts.data],
     };
