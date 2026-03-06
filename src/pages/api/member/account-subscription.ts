@@ -1,6 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { parse } from 'cookie';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-08-27.basil',
+});
 
 /**
  * Get subscription details for the logged-in member's account
@@ -78,18 +83,17 @@ export default async function handler(
 
     if (account?.stripe_subscription_id) {
       try {
-        const subResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/subscriptions/${account.stripe_subscription_id}`
-        );
-        const subData = await subResponse.json();
+        const subscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id, {
+          expand: ['items.data.price'],
+        });
 
-        if (subData.subscription?.items?.data?.[0]?.price?.unit_amount) {
-          baseMRR = subData.subscription.items.data[0].price.unit_amount / 100;
+        if (subscription?.items?.data?.[0]?.price?.unit_amount) {
+          baseMRR = subscription.items.data[0].price.unit_amount / 100;
         } else {
           console.error('Stripe subscription missing price data:', account.stripe_subscription_id);
           return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching subscription price:', err);
         return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
       }
