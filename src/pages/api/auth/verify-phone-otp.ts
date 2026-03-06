@@ -213,17 +213,17 @@ export default async function handler(
               let found = false;
 
               while (!found && page <= 10) { // Limit to 10 pages (1000 users)
-                const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+                const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({
                   page,
                   perPage: 100,
                 });
 
-                if (listError) {
+                if (listError || !data) {
                   console.error('[VERIFY-OTP] Failed to list users:', listError);
                   break;
                 }
 
-                const foundUser = users.find(u => u.email?.toLowerCase() === member.email?.toLowerCase());
+                const foundUser = data.users.find((u: any) => u.email?.toLowerCase() === member.email?.toLowerCase());
                 if (foundUser) {
                   existingUser = foundUser;
                 }
@@ -231,7 +231,7 @@ export default async function handler(
                 if (existingUser) {
                   found = true;
                   console.log('[VERIFY-OTP] Found existing auth user by email:', existingUser.id);
-                } else if (users.length < 100) {
+                } else if (data.users.length < 100) {
                   // Last page reached
                   break;
                 }
