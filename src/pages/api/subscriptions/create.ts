@@ -122,7 +122,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const amount = price ? price.unit_amount! / 100 : 0;
     const mrr = price?.recurring?.interval === 'year' ? amount / 12 : amount;
 
-    await supabase
+    console.log('Updating account:', member.account_id, 'with subscription:', subscription.id);
+
+    const { data: updateData, error: updateError } = await supabase
       .from('accounts')
       .update({
         stripe_subscription_id: subscription.id,
@@ -134,6 +136,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         monthly_dues: mrr,
       })
       .eq('account_id', member.account_id);
+
+    if (updateError) {
+      console.error('Error updating account with subscription info:', updateError);
+      throw new Error(`Failed to update account: ${updateError.message}`);
+    }
+
+    console.log('Account updated with subscription info:', updateData);
 
     // Log subscription event
     await supabase.from('subscription_events').insert({
