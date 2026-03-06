@@ -62,7 +62,6 @@ export default function SimpleReservationRequestModal({
   const [time, setTime] = useState('');
   const [partySize, setPartySize] = useState('2');
   const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [blockedTimes, setBlockedTimes] = useState<any[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
@@ -224,66 +223,6 @@ export default function SimpleReservationRequestModal({
     }
   };
 
-  const handleSubmit = async () => {
-    if (!date || !time) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please select a date and time',
-        status: 'error',
-        duration: 3000,
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const formattedDate = DateTime.fromJSDate(date).toFormat('MMMM d, yyyy');
-
-      const response = await fetch('/api/send-reservation-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberName,
-          memberPhone,
-          date: formattedDate,
-          time,
-          partySize,
-          notes,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send reservation request');
-      }
-
-      toast({
-        title: 'Request Sent!',
-        description: 'We\'ll confirm your reservation shortly via text',
-        status: 'success',
-        duration: 5000,
-      });
-
-      // Reset form
-      setDate(null);
-      setTime('');
-      setPartySize('2');
-      setNotes('');
-      onClose();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to send request',
-        status: 'error',
-        duration: 5000,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const filterDate = (date: Date) => {
     // Only allow Thursday (4), Friday (5), Saturday (6)
     const day = date.getDay();
@@ -421,23 +360,6 @@ export default function SimpleReservationRequestModal({
               mt={2}
             >
               Make Reservation
-            </Button>
-
-            {/* Send Request Button */}
-            <Button
-              onClick={handleSubmit}
-              isLoading={isSubmitting}
-              loadingText="Sending..."
-              h="48px"
-              bg="#A59480"
-              color="white"
-              fontSize="md"
-              fontWeight="600"
-              borderRadius="lg"
-              _hover={{ bg: '#8C7C6D' }}
-              _active={{ bg: '#7A6B5F' }}
-            >
-              Send Request
             </Button>
           </VStack>
         </ModalBody>

@@ -3780,6 +3780,10 @@ node scripts/sync-payment-methods.js
    - Added `lastYearRevenue` calculation - Total revenue from previous year
    - Added `averageMonthlyRevenue` - Average of last 3 full months of total revenue
    - Added `monthlyBreakdown` - Last 12 months of revenue data for charting
+   - Added `pastDueBalances` calculation - Outstanding balances where payment due date has passed
+     - **Logic**: Filters accounts with negative balances (owed to us) where the member's due date (based on join_date) is in the past
+     - **Calculation**: Compares current month's due date (day of month from join_date) with today's date
+     - **Returns**: Total amount past due, breakdown with member names and amounts, sorted by balance (highest first)
    - All calculations based on ledger transactions with `type='payment'`
 
 4. **Member Status Field Standardization**
@@ -3811,13 +3815,13 @@ node scripts/sync-payment-methods.js
 - `deactivated` field remains as boolean but `status` is authoritative
 
 **API Changes**:
-- `GET /api/financial-metrics` - Added new fields: `ytdRevenue`, `lastYearRevenue`, `averageMonthlyRevenue` (with `monthlyBreakdown`)
+- `GET /api/financial-metrics` - Added new fields: `ytdRevenue`, `lastYearRevenue`, `averageMonthlyRevenue` (with `monthlyBreakdown`), `pastDueBalances` (with breakdown showing member names and amounts past due)
 - `GET /api/members` - Changed filter from `deactivated=false` to `status='active'`
 
 **Components Modified**:
 - `/admin/business.tsx` - Business dashboard with new revenue cards and modal chart
 - `/admin/dashboard.tsx` - Dashboard v1 with YTD/Last Year revenue cards
-- `/admin/dashboard-v2.tsx` - Dashboard v2 with revenue tracking
+- `/admin/dashboard-v2.tsx` - Dashboard v2 with revenue tracking and Past Due Balances card (removed Monthly Revenue by Stream and Revenue Progress charts)
 - `BarChart` component - Enhanced with y-axis, gridlines, and configurable scaling
 
 **Business Dashboard Updates**:

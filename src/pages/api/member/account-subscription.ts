@@ -70,10 +70,11 @@ export default async function handler(
       .eq('member_type', 'secondary')
       .eq('deactivated', false);
 
-    const secondaryMemberCount = members?.length || 0;
+    const actualSecondaryCount = members?.length || 0;
 
     // Fetch Stripe subscription to get actual base price
     let baseMRR = 0;
+    let secondaryMemberCount = actualSecondaryCount;
     let stripeSubscription = null;
 
     if (account?.stripe_subscription_id) {
@@ -89,17 +90,22 @@ export default async function handler(
           // Get base price from Stripe subscription item
           if (subData.subscription.items?.data?.[0]?.price?.unit_amount) {
             baseMRR = subData.subscription.items.data[0].price.unit_amount / 100;
+          } else {
+            console.warn(`Stripe subscription ${account.stripe_subscription_id} missing price data for account ${member.account_id}`);
           }
+        } else {
+          console.warn(`Failed to fetch Stripe subscription ${account.stripe_subscription_id} for account ${member.account_id}:`, subData.error);
         }
       } catch (err) {
-        console.error('Error fetching Stripe subscription:', err);
+        console.error(`Error fetching Stripe subscription ${account.stripe_subscription_id} for account ${member.account_id}:`, err);
       }
     }
 
-    // If we couldn't get base from Stripe, calculate it
-    if (baseMRR === 0 && account?.monthly_dues) {
-      const additionalMemberFees = secondaryMemberCount * 25;
-      baseMRR = parseFloat(account.monthly_dues.toString()) - additionalMemberFees;
+    // If we have a subscription but couldn't get baseMRR from Stripe, that's an error
+    if (account?.stripe_subscription_id && baseMRR === 0) {
+      console.error(`CRITICAL: Account ${member.account_id} has stripe_subscription_id ${account.stripe_subscription_id} but baseMRR is 0`);
+      // Don't return fake data - return error so we can fix the root cause
+      return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
     }
 
     res.status(200).json({
