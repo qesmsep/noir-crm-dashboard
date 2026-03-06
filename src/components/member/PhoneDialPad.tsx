@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Phone, Delete } from 'lucide-react';
+import { Check, Delete } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface PhoneDialPadProps {
@@ -174,7 +174,7 @@ export function PhoneDialPad({
           0
         </button>
 
-        {/* Call Button */}
+        {/* Submit Button */}
         <button
           onClick={handleCall}
           className={cn(
@@ -198,7 +198,7 @@ export function PhoneDialPad({
           disabled={!isCallReady}
           type="button"
         >
-          <Phone className="w-6 h-6" />
+          <Check className="w-7 h-7 stroke-[3]" />
         </button>
       </div>
     </div>

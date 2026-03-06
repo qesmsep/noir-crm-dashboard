@@ -19,6 +19,8 @@ export default function MemberLoginPage() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
+  const [memberInfo, setMemberInfo] = useState<{ first_name: string; has_password: boolean } | null>(null);
+  const [phoneNotRecognized, setPhoneNotRecognized] = useState(false);
 
   const { signInWithPassword, signInWithBiometric, signInWithPhone, verifyOTP, isBiometricAvailable, member } = useMemberAuth();
   const { toast } = useToast();
@@ -36,9 +38,56 @@ export default function MemberLoginPage() {
     }
   }, [member, router]);
 
-  // Handle dial pad "Call" button - show password input
-  const handleCall = () => {
-    setShowPasswordInput(true);
+  // Handle dial pad "Call" button - verify phone first, then show password input
+  const handleCall = async () => {
+    if (!phone || phone.length < 10) {
+      toast({
+        title: 'Phone number required',
+        description: 'Please enter your 10-digit phone number',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setLoading(true);
+    setPhoneNotRecognized(false);
+
+    try {
+      const response = await fetch('/api/member/verify-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.exists) {
+        // Phone number recognized - store member info and show password/OTP screen
+        setMemberInfo(data.member);
+        setShowPasswordInput(true);
+      } else {
+        // Phone number not recognized
+        setPhoneNotRecognized(true);
+        toast({
+          title: 'Phone number not recognized',
+          description: 'Please text us at 913-777-4488 for assistance',
+          variant: 'error',
+          duration: 8000,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to verify phone number',
+        variant: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle going back to dial pad
@@ -47,6 +96,8 @@ export default function MemberLoginPage() {
     setShowOtpInput(false);
     setPassword('');
     setOtp('');
+    setMemberInfo(null);
+    setPhoneNotRecognized(false);
   };
 
   // Handle request OTP
@@ -64,6 +115,8 @@ export default function MemberLoginPage() {
 
     try {
       await signInWithPhone(phone);
+      // Transition to OTP input screen
+      setShowPasswordInput(false);
       setShowOtpInput(true);
       toast({
         title: 'Code sent',
@@ -194,9 +247,20 @@ export default function MemberLoginPage() {
               alt="Noir"
               className="h-12 mx-auto mb-6"
             />
-            <p className="text-[#5A5A5A] text-sm">
-              {showPasswordInput ? 'Enter your password' : showOtpInput ? 'Enter verification code' : 'Dial your phone number'}
-            </p>
+            {showPasswordInput && memberInfo ? (
+              <div className="space-y-2">
+                <h2 className="text-[#1F1F1F] text-xl font-semibold">
+                  Welcome back, {memberInfo.first_name}
+                </h2>
+                <p className="text-[#5A5A5A] text-sm">
+                  Please enter your password to access your member portal
+                </p>
+              </div>
+            ) : showOtpInput ? (
+              <p className="text-[#5A5A5A] text-sm">Enter verification code</p>
+            ) : (
+              <p className="text-[#5A5A5A] text-sm">Dial your phone number</p>
+            )}
           </div>
 
           {/* Login Card */}
@@ -210,36 +274,19 @@ export default function MemberLoginPage() {
                   onCall={handleCall}
                 />
 
-                {/* OTP Option */}
-                {phone.length === 10 && (
-                  <div className="pt-2">
-                    <Button
-                      type="button"
-                      size="lg"
-                      variant="outline"
-                      className="w-full border-2 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white transition-all hover:-translate-y-0.5 active:translate-y-0"
-                      disabled={loading}
-                      onClick={handleRequestOTP}
-                    >
-                      {loading ? 'Sending code...' : 'Sign in with Code'}
-                    </Button>
-                  </div>
-                )}
-
-                {/* Biometric Option */}
-                {biometricAvailable && phone.length === 10 && (
-                  <div className="pt-2">
-                    <Button
-                      type="button"
-                      size="lg"
-                      variant="outline"
-                      className="w-full border-2 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white transition-all hover:-translate-y-0.5 active:translate-y-0"
-                      disabled={loading}
-                      onClick={handleBiometricLogin}
-                    >
-                      <Fingerprint className="w-5 h-5 mr-2" />
-                      {loading ? 'Authenticating...' : 'Sign In with Face ID / Touch ID'}
-                    </Button>
+                {/* Unrecognized Phone Error */}
+                {phoneNotRecognized && (
+                  <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
+                    <p className="text-red-800 font-medium mb-2">
+                      Phone number not recognized
+                    </p>
+                    <p className="text-red-700 text-sm">
+                      Our apologies, but we do not recognize this phone number. Please text us at{' '}
+                      <a href="sms:913-777-4488" className="font-semibold underline">
+                        913-777-4488
+                      </a>{' '}
+                      so we can remedy this issue immediately.
+                    </p>
                   </div>
                 )}
               </div>
@@ -307,47 +354,98 @@ export default function MemberLoginPage() {
               /* Password Input View */
               <form onSubmit={handleLogin}>
                 <div className="flex flex-col gap-5">
-                  {/* Password Input */}
-                  <div>
-                    <Label htmlFor="password" className="text-[#2C2C2C] font-medium">
-                      Password *
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      required
-                      autoFocus
-                      className="h-12 border-[#DAD7D0] focus:border-[#A59480] focus:ring-[#A59480]"
-                    />
-                  </div>
+                  {/* First-time Login Notice */}
+                  {memberInfo && !memberInfo.has_password && (
+                    <div className="bg-[#E8F5E9] border-2 border-[#4CAF50] rounded-xl p-4 text-center">
+                      <p className="text-[#2C5F2D] font-medium mb-2">
+                        First time logging in?
+                      </p>
+                      <p className="text-[#2C5F2D] text-sm mb-3">
+                        It looks like you haven't logged in yet. Please request a one-time password to get started.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-[#4CAF50] text-white hover:bg-[#388E3C] w-full"
+                        onClick={handleRequestOTP}
+                        disabled={loading}
+                      >
+                        {loading ? 'Sending...' : 'Request One-Time Password'}
+                      </Button>
+                    </div>
+                  )}
 
-                  {/* Biometric Alternative */}
-                  {biometricAvailable && (
-                    <Button
-                      type="button"
-                      size="lg"
-                      variant="outline"
-                      className="border-2 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white transition-all hover:-translate-y-0.5 active:translate-y-0"
-                      disabled={loading}
-                      onClick={handleBiometricLogin}
-                    >
-                      <Fingerprint className="w-5 h-5 mr-2" />
-                      {loading ? 'Authenticating...' : 'Use Face ID / Touch ID Instead'}
-                    </Button>
+                  {/* Password Input */}
+                  {memberInfo && memberInfo.has_password && (
+                    <div>
+                      <Label htmlFor="password" className="text-[#2C2C2C] font-medium">
+                        Password *
+                      </Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        required
+                        autoFocus
+                        className="h-12 border-[#DAD7D0] focus:border-[#A59480] focus:ring-[#A59480]"
+                      />
+                    </div>
                   )}
 
                   {/* Access Button */}
-                  <Button
-                    type="submit"
-                    size="lg"
-                    className="bg-[#A59480] text-white hover:bg-[#8f7e6b] transition-all hover:-translate-y-0.5 active:translate-y-0 mt-2"
-                    disabled={loading}
-                  >
-                    {loading ? 'Accessing...' : 'Access'}
-                  </Button>
+                  {memberInfo && memberInfo.has_password && (
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="bg-[#A59480] text-white hover:bg-[#8f7e6b] transition-all hover:-translate-y-0.5 active:translate-y-0 mt-2"
+                      disabled={loading}
+                    >
+                      {loading ? 'Accessing...' : 'Access'}
+                    </Button>
+                  )}
+
+                  {/* Alternative Sign-In Options */}
+                  {memberInfo && (
+                    <div className="space-y-3 pt-2">
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-[#ECEAE5]"></div>
+                        </div>
+                        <div className="relative flex justify-center text-xs">
+                          <span className="bg-white px-2 text-[#8C7C6D]">Or sign in with</span>
+                        </div>
+                      </div>
+
+                      {/* OTP Option */}
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        className="w-full border-2 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white transition-all hover:-translate-y-0.5 active:translate-y-0"
+                        disabled={loading}
+                        onClick={handleRequestOTP}
+                      >
+                        {loading ? 'Sending code...' : 'One-Time Password'}
+                      </Button>
+
+                      {/* Biometric Option */}
+                      {biometricAvailable && (
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          className="w-full border-2 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white transition-all hover:-translate-y-0.5 active:translate-y-0"
+                          disabled={loading}
+                          onClick={handleBiometricLogin}
+                        >
+                          <Fingerprint className="w-5 h-5 mr-2" />
+                          {loading ? 'Authenticating...' : 'Face ID / Touch ID'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Back to Dial Pad */}
                   <Button
@@ -362,14 +460,16 @@ export default function MemberLoginPage() {
                   </Button>
 
                   {/* Forgot Password */}
-                  <div className="text-center pt-2">
-                    <Link
-                      href="/member/forgot-password"
-                      className="text-[#A59480] text-sm font-medium hover:underline"
-                    >
-                      Forgot your password?
-                    </Link>
-                  </div>
+                  {memberInfo && memberInfo.has_password && (
+                    <div className="text-center pt-2">
+                      <Link
+                        href="/member/forgot-password"
+                        className="text-[#A59480] text-sm font-medium hover:underline"
+                      >
+                        Forgot your password?
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </form>
             )}

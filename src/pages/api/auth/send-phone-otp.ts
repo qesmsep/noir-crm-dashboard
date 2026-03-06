@@ -125,7 +125,7 @@ export default async function handler(
     try {
       await sendPersonalizedSMS(
         `+1${normalizedPhone}`,
-        `Your Noir verification code is: ${code}\n\nThis code expires in 10 minutes.`,
+        `Your One Time Password to access your member portal for Noir is: ${code}\n\nThis code expires in 10 minutes.`,
         member.first_name
       );
     } catch (smsError) {
