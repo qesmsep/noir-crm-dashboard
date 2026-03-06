@@ -223,6 +223,42 @@ export default async function handler(req, res) {
 
     const totalOutstanding = outstandingBreakdown.reduce((sum, acc) => sum + acc.balance, 0);
 
+    // Calculate Past Due Balances (outstanding balances where due date has passed)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset to start of day for comparison
+
+    const pastDueBreakdown = Object.values(accountBalances)
+      .filter(acc => {
+        if (acc.balance >= 0) return false; // Only negative balances (owed to us)
+
+        // Find the member to get their join_date
+        const member = membersData.find(m => m.member_id === acc.member_id);
+        if (!member || !member.join_date) return false;
+
+        // Calculate their most recent due date
+        const joinDate = new Date(member.join_date);
+        const currentMonthDueDate = new Date(today.getFullYear(), today.getMonth(), joinDate.getDate());
+
+        // If current month's due date hasn't passed yet, check last month
+        let dueDate = currentMonthDueDate;
+        if (currentMonthDueDate > today) {
+          dueDate = new Date(today.getFullYear(), today.getMonth() - 1, joinDate.getDate());
+        }
+
+        // Include if due date has passed
+        return dueDate < today;
+      })
+      .map(acc => ({
+        account_id: acc.account_id,
+        member_id: acc.member_id,
+        balance: Math.abs(acc.balance),
+        amount: Math.abs(acc.balance),
+        transactions: acc.transactions
+      }))
+      .sort((a, b) => b.balance - a.balance);
+
+    const totalPastDue = pastDueBreakdown.reduce((sum, acc) => sum + acc.balance, 0);
+
     // Get member names for breakdowns
     const memberMap = {};
     membersData.forEach(member => {
@@ -241,6 +277,11 @@ export default async function handler(req, res) {
     });
 
     outstandingBreakdown.forEach(account => {
+      const member = memberMap[account.member_id];
+      account.member_name = member ? `${member.first_name} ${member.last_name}` : 'Unknown';
+    });
+
+    pastDueBreakdown.forEach(account => {
       const member = memberMap[account.member_id];
       account.member_name = member ? `${member.first_name} ${member.last_name}` : 'Unknown';
     });
@@ -352,6 +393,11 @@ export default async function handler(req, res) {
         total: totalOutstanding,
         breakdown: outstandingBreakdown,
         description: "Total amount owed by all members with negative account balances - represents outstanding debt across all accounts"
+      },
+      pastDueBalances: {
+        total: totalPastDue,
+        breakdown: pastDueBreakdown,
+        description: "Total amount owed by members where payment due date has passed - past due balances requiring immediate attention"
       },
       ytdRevenue: {
         total: ytdRevenue,

@@ -90,6 +90,11 @@ interface FinancialMetrics {
     breakdown: any[];
     description: string;
   };
+  pastDueBalances: {
+    total: number;
+    breakdown: any[];
+    description: string;
+  };
   ytdRevenue: {
     total: number;
     description: string;
@@ -602,6 +607,22 @@ export default function DashboardV2() {
 
           <div className={styles.metricCard}>
             <div className={styles.metricHeader}>
+              <span>Past Due Balances</span>
+            </div>
+            <div className={styles.metricValueLarge}>
+              ${stats.financialMetrics?.pastDueBalances?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}
+            </div>
+            <div className={styles.metricSubtitle}>
+              Outstanding balances past due date
+            </div>
+            <div className={styles.metricStatRow}>
+              <span>Accounts</span>
+              <strong>{stats.financialMetrics?.pastDueBalances?.breakdown?.length || 0}</strong>
+            </div>
+          </div>
+
+          <div className={styles.metricCard}>
+            <div className={styles.metricHeader}>
               <span>Avg Monthly Total Revenue</span>
             </div>
             <div className={styles.metricValueLarge}>
@@ -768,71 +789,6 @@ export default function DashboardV2() {
                 ))}
               </div>
             )}
-          </div>
-        </div>
-
-        <div className={styles.chartGrid}>
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span>Monthly Revenue by Stream</span>
-              <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.8rem', color: '#6e6e73' }}>
-                <span>{monthLabels[0]} — {monthLabels[monthLabels.length - 1]}</span>
-              </div>
-            </div>
-            <div className={styles.chartLegend}>
-              <div className={styles.chartLegendItem}>
-                <span className={styles.legendDot} style={{ background: '#A59480' }}></span> Total Revenue
-              </div>
-              <div className={styles.chartLegendItem}>
-                <span className={styles.legendDot} style={{ background: '#8C7C6D' }}></span> Membership Revenue
-              </div>
-            </div>
-            <div className={styles.chartContainer}>
-              <LineChart
-                datasets={[
-                  { data: monthlyRevenueSeries, stroke: '#A59480', strokeWidth: 2.5, opacity: 1 },
-                  { data: membershipSeries, stroke: '#8C7C6D', strokeWidth: 2, opacity: 0.75 }
-                ]}
-              />
-              <div className={styles.chartLabels}>
-                {monthLabels.map((label, idx) => (
-                  idx % 2 === 0 || monthLabels.length <= 6 ? <span key={idx}>{label}</span> : <span key={idx}></span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.chartCard}>
-            <div className={styles.chartHeader}>
-              <span>Revenue Progress</span>
-              <span style={{ fontSize: '0.8rem' }}>{now.getFullYear()}</span>
-            </div>
-            <div className={styles.metricValueLarge}>
-              ${ytdRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </div>
-            <div className={styles.metricSubtitle}>
-              Goal ${annualRevenueGoal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </div>
-            <div className={styles.barStack}>
-              <div className={styles.barRow}>
-                <div className={styles.barLabel}>
-                  <span>Through {now.toLocaleString('default', { month: 'short' })}</span>
-                  <span>{progressPercent.toFixed(0)}%</span>
-                </div>
-                <div className={styles.barTrack}>
-                  <div className={styles.barFill} style={{ width: `${progressPercent}%` }}></div>
-                </div>
-              </div>
-              <div className={styles.barRow}>
-                <div className={styles.barLabel}>
-                  <span>Remaining</span>
-                  <span>${Math.max(annualRevenueGoal - ytdRevenue, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                </div>
-                <div className={styles.barTrack}>
-                  <div className={styles.barFill} style={{ width: `${100 - progressPercent}%`, background: '#BCA892' }}></div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
