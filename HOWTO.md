@@ -3715,6 +3715,43 @@ This section maintains a running log of all significant commits and changes to t
 
 ---
 
+## Utility Scripts
+
+### Payment Method Sync Script
+
+**Purpose**: Bulk sync payment method information from Stripe to database for accounts with active subscriptions
+
+**Location**: `scripts/sync-payment-methods.js`
+
+**Usage**:
+```bash
+# Dry run (preview changes without applying)
+node scripts/sync-payment-methods.js --dry-run
+
+# Execute sync
+node scripts/sync-payment-methods.js
+```
+
+**What it does**:
+1. Finds accounts with active subscriptions missing payment method info
+2. Retrieves subscription from Stripe
+3. Fetches payment method details (type, last4, brand)
+4. Updates accounts table with payment info
+5. Supports card and us_bank_account payment types
+6. Rate limited (100ms delay between requests)
+
+**Output**:
+- ✅ Successfully synced accounts
+- ⚠️ Accounts with no payment method attached
+- ❌ Errors encountered
+
+**When to use**:
+- After webhook failures that didn't sync payment methods
+- After bulk subscription imports
+- When payment method data is missing for existing subscriptions
+
+---
+
 ### 2026-03-06 - Business Dashboard Enhancements & Member Status Cleanup
 
 **Summary**: Comprehensive updates to business dashboard with new revenue tracking metrics, member/account counting improvements, and standardization of member status field as the source of truth.
@@ -3823,8 +3860,112 @@ This section maintains a running log of all significant commits and changes to t
 
 ---
 
-**Last Updated**: March 3, 2026
-**Version**: Inventory System v1.0 - Complete Stock Management with Custom Settings
+### 2026-03-06 - Webhook Error Handling, Pending Members Management & Payment Method Sync
+
+**Summary**: Fixed critical webhook error handling issues, implemented pending member management system, resolved ledger balance calculation bug, and synced payment method data for 71 accounts.
+
+**Bug Fixes**:
+
+1. **Stripe Webhook Error Handling** (`stripe-webhook-subscriptions.ts`)
+   - **Critical Fix**: Changed 9 instances of silent `return;` statements to `throw new Error()`
+   - Previously: Webhooks failed silently when account/member not found, marked as processed but didn't update database
+   - Now: Properly throws errors, marks webhook as failed, allows retry and debugging
+   - Affected scenarios: subscription created, updated, deleted, invoice paid, payment failed
+   - **Impact**: Prevents subscription data loss from silent webhook failures
+
+2. **Ledger Balance Calculation** (`admin/members/[accountId].tsx`)
+   - Fixed incorrect balance display using `ledger.length - 1` (oldest transaction only)
+   - Changed to `calculateRunningBalance(ledger, 0)` (all transactions)
+   - Now correctly shows running balance/credit on member detail page
+
+3. **TypeScript Build Error** (`api/member/reservations.ts`)
+   - Fixed "Argument of type 'string' is not assignable to parameter of type 'never'" error
+   - Added explicit type annotation: `const conditions: string[] = [];`
+
+4. **Multiple Rows API Error** (`api/accounts/[accountId].ts`)
+   - Removed `.single()` call causing "JSON object requested, multiple (or no) rows returned" error
+   - Added proper handling for 0, 1, or multiple account results
+
+**New Features**:
+
+1. **Pending Members Management System**
+   - **New Modal**: `PendingMembersModal.tsx` - View and manage members with status='pending'
+   - **New API**: `POST /api/members/[memberId]/mark-incomplete` - Change pending → incomplete
+   - **Updated Members Page**:
+     - Added "Pending Members" button (clock icon) in header
+     - Excluded pending members from main member list
+     - Updated active member count to exclude pending status
+   - **Updated Business Dashboard**: Active member count now filters by `status='active'`
+   - **Workflow**: Admin can review pending signups, mark incomplete if they don't complete onboarding
+
+2. **Payment Method Sync Script** (`scripts/sync-payment-methods.js`)
+   - **Purpose**: Bulk sync payment method details from Stripe to database
+   - **Features**:
+     - Dry-run mode for previewing changes
+     - Fetches subscription → payment method → updates account
+     - Supports card and us_bank_account payment types
+     - Rate limiting (100ms between requests)
+     - Progress tracking with success/warning/error counts
+   - **Usage**: `node scripts/sync-payment-methods.js [--dry-run]`
+   - **Results**: Successfully synced 71 accounts with missing payment method data
+
+3. **Homepage Footer Update** (`src/app/page.js`)
+   - Added member login link next to admin link
+   - Styled with brand colors (cork accent, hover states)
+   - Minimal, elegant design matching landing page aesthetic
+
+**Database Changes** (Not in git):
+- Created 2 missing account records for orphaned members (Keaira Emery, Michael Nguyen)
+- Marked 3 duplicate/incomplete members as status='incomplete' (Eric Korth, Keaira Emery, Michael Nguyen)
+- Synced payment method info for 71 accounts (65 via script, 6 manual verification)
+
+**Components Created**:
+- `src/components/PendingMembersModal.tsx` - Pending member management UI
+- Uses existing `ArchivedMembersModal.module.css` for consistent styling
+
+**APIs Created**:
+- `POST /api/members/[memberId]/mark-incomplete` - Update member status from pending to incomplete
+  - Requires member_id in URL
+  - Only updates members with status='pending'
+  - Returns updated member record
+
+**Files Modified**:
+- `src/pages/api/stripe-webhook-subscriptions.ts` - Error handling improvements
+- `src/pages/admin/members/[accountId].tsx` - Ledger balance fix
+- `src/pages/api/member/reservations.ts` - TypeScript type fix
+- `src/pages/api/accounts/[accountId].ts` - Multiple rows error fix
+- `src/pages/admin/members.tsx` - Pending members button, filter updates
+- `src/pages/admin/business.tsx` - Active member count filter
+- `src/app/page.js` - Member login link
+
+**Scripts Created**:
+- `scripts/sync-payment-methods.js` - Payment method bulk sync utility
+
+**Troubleshooting Added**:
+
+**Problem**: Subscription exists in Stripe but not showing in database
+**Solution**:
+1. Check webhook events table for processed events
+2. Check if webhook failed silently (processed=true but no account update)
+3. Run sync script or manually trigger webhook replay from Stripe dashboard
+4. After webhook fix, future events will properly error instead of silently failing
+
+**Problem**: Payment method info missing for accounts
+**Solution**: Run `node scripts/sync-payment-methods.js` to bulk sync from Stripe
+
+**Testing Recommendations**:
+1. Create new subscription → verify webhook properly syncs payment method
+2. Test webhook failure scenarios → verify errors are thrown and logged
+3. Test pending member workflow → mark as incomplete → verify exclusion from main list
+4. Verify ledger balance displays correctly on member detail pages
+5. Test member login link on homepage footer
+
+**Status**: Complete and committed
+
+---
+
+**Last Updated**: March 6, 2026
+**Version**: Webhook Error Handling v2.0 + Pending Members Management
 
 ---
 

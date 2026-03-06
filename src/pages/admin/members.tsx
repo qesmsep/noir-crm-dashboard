@@ -188,22 +188,19 @@ export default function MembersAdmin() {
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
   };
 
-  // Get current balance for an account from the most recent ledger entry
+  // Calculate current balance for an account (sum of all signed transaction amounts)
+  // Amounts in ledger are already signed: positive for payments, negative for purchases
   // Positive balance = credit, Negative balance = amount due
   const calculateAccountBalance = (accountId: string) => {
     if (!ledger || ledger.length === 0) return 0;
 
-    // Filter ledger entries for this account and sort by date (most recent first)
-    const accountLedger = ledger
+    // Sum all transaction amounts for this account
+    // Amounts are already signed in the database
+    const balance = ledger
       .filter(tx => tx.account_id === accountId)
-      .sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
-    // Return the running_balance from the most recent transaction
-    if (accountLedger.length > 0 && accountLedger[0].running_balance !== undefined) {
-      return Number(accountLedger[0].running_balance);
-    }
-
-    return 0;
+    return balance;
   };
 
   // Calculate next renewal date from join_date
