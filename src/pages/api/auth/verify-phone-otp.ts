@@ -207,15 +207,26 @@ export default async function handler(
     }
 
     // Set httpOnly cookie for session (secure in production)
-    res.setHeader('Set-Cookie', [
-      serialize('member_session', sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
-        path: '/',
-      }),
-    ]);
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
+      path: '/',
+      // Explicitly set domain for production
+      ...(isProduction && { domain: '.noirkc.com' }),
+    };
+
+    const cookie = serialize('member_session', sessionToken, cookieOptions);
+
+    console.log('[VERIFY-OTP] Setting cookie:', {
+      name: 'member_session',
+      options: cookieOptions,
+      cookieString: cookie.split(';').slice(0, 2).join(';'), // Log first parts only (not the full token)
+    });
+
+    res.setHeader('Set-Cookie', [cookie]);
 
     // Check if member needs to set a password
     const needsPassword = !member.password_hash || member.password_is_temporary;

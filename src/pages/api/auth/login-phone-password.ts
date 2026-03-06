@@ -208,17 +208,24 @@ export default async function handler(
     });
 
     // Set httpOnly cookie for session (secure in production)
-    const cookieValue = serialize('member_session', sessionToken, {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: 'lax' as const,
       maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
       path: '/',
-    });
+      // Explicitly set domain for production
+      ...(isProduction && { domain: '.noirkc.com' }),
+    };
 
-    console.log('[LOGIN] Setting cookie:', cookieValue);
-    console.log('[LOGIN] Session token:', sessionToken);
-    console.log('[LOGIN] Expires in days:', SESSION_DURATION_DAYS);
+    const cookieValue = serialize('member_session', sessionToken, cookieOptions);
+
+    console.log('[LOGIN] Setting cookie:', {
+      name: 'member_session',
+      options: cookieOptions,
+      cookieString: cookieValue.split(';').slice(0, 2).join(';'),
+    });
 
     res.setHeader('Set-Cookie', [cookieValue]);
 
