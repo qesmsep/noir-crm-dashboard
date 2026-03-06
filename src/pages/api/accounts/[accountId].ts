@@ -19,22 +19,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'GET') {
     try {
-      const { data, error } = await supabase
+      // First check if account exists
+      const { data: accounts, error: queryError } = await supabase
         .from('accounts')
         .select('*')
-        .eq('account_id', accountId)
-        .single();
+        .eq('account_id', accountId);
 
-      if (error) {
-        console.error('Error fetching account:', error);
-        return res.status(500).json({ error: error.message });
+      if (queryError) {
+        console.error('Error fetching account:', queryError);
+        return res.status(500).json({ error: queryError.message });
       }
 
-      if (!data) {
+      if (!accounts || accounts.length === 0) {
+        console.error(`Account not found: ${accountId}`);
         return res.status(404).json({ error: 'Account not found' });
       }
 
-      return res.json({ success: true, data });
+      if (accounts.length > 1) {
+        console.error(`Multiple accounts found for ID: ${accountId}`, accounts.length);
+        // Return the first one but log the issue
+        return res.json({ success: true, data: accounts[0] });
+      }
+
+      return res.json({ success: true, data: accounts[0] });
     } catch (error: any) {
       console.error('Unexpected error:', error);
       return res.status(500).json({ error: error.message || 'Internal server error' });
