@@ -1,10 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,14 +9,15 @@ const supabase = createClient(
 /**
  * POST /api/subscriptions/pause
  *
- * Pauses an account's subscription
+ * Pauses an account's subscription (app-managed, no Stripe subscription)
+ * When paused, billing is stopped until resumed
  *
  * Body:
  *   - account_id: UUID
  *   - reason?: string (pause reason for metadata)
  *
  * Returns:
- *   - subscription: Stripe.Subscription
+ *   - account: Updated account data
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -38,39 +34,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch account
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('account_id, stripe_subscription_id, monthly_dues')
+      .select('account_id, subscription_status, monthly_dues')
       .eq('account_id', account_id)
       .single();
 
-    if (accountError || !account || !account.stripe_subscription_id) {
-      return res.status(404).json({ error: 'Account or subscription not found' });
+    if (accountError || !account) {
+      return res.status(404).json({ error: 'Account not found' });
     }
 
-    // Pause subscription using Stripe's pause_collection feature
-    const subscription = await stripe.subscriptions.update(account.stripe_subscription_id, {
-      pause_collection: {
-        behavior: 'mark_uncollectible', // Don't charge during pause
-      },
-      metadata: {
-        pause_reason: reason || 'No reason provided',
-        paused_by: 'admin',
-        paused_at: new Date().toISOString(),
-      },
-    });
+    if (account.subscription_status === 'paused') {
+      return res.status(400).json({ error: 'Subscription is already paused' });
+    }
 
-    // Update account status
-    await supabase
+    if (account.subscription_status === 'canceled') {
+      return res.status(400).json({ error: 'Cannot pause a canceled subscription' });
+    }
+
+    // Pause subscription - stop billing until resumed
+    const { data: updatedAccount, error: updateError } = await supabase
       .from('accounts')
       .update({
         subscription_status: 'paused',
+        next_billing_date: null, // Clear billing date - no charges while paused
       })
-      .eq('account_id', account_id);
+      .eq('account_id', account_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error(`Failed to pause subscription: ${updateError.message}`);
+    }
 
     // Log pause event
     await supabase.from('subscription_events').insert({
       account_id,
       event_type: 'pause',
-      stripe_subscription_id: account.stripe_subscription_id,
       previous_mrr: Number(account.monthly_dues) || 0,
       new_mrr: 0, // MRR drops to 0 while paused
       effective_date: new Date().toISOString(),
@@ -80,10 +78,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
+    console.log(`⏸️  Subscription paused for account ${account_id}`);
+
     return res.json({
-      subscription,
-      message: 'Subscription paused successfully',
+      success: true,
+      account: updatedAccount,
+      message: 'Subscription paused successfully. Billing will not occur until resumed.',
     });
+
   } catch (error: any) {
     console.error('Error pausing subscription:', error);
     return res.status(500).json({ error: error.message });

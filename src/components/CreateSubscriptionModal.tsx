@@ -29,6 +29,7 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [primaryMemberId, setPrimaryMemberId] = useState<string | null>(null);
+  const [chargeImmediately, setChargeImmediately] = useState(false);
 
   useEffect(() => {
     fetchPrimaryMember();
@@ -108,6 +109,7 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
         body: JSON.stringify({
           member_id: primaryMemberId,
           price_id: selectedPriceId,
+          charge_immediately: chargeImmediately,
         }),
       });
 
@@ -122,6 +124,11 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
         toast({
           title: 'Payment Required',
           description: 'Subscription created. Payment method needs to be added and confirmed.',
+        });
+      } else if (chargeImmediately) {
+        toast({
+          title: 'Success',
+          description: 'Subscription created and charged successfully. Account is now active.',
         });
       } else {
         toast({
@@ -217,16 +224,30 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.cancelButton} onClick={onClose} disabled={submitting}>
-            Cancel
-          </button>
-          <button
-            className={styles.submitButton}
-            onClick={handleSubmit}
-            disabled={submitting || !selectedPriceId || !primaryMemberId}
-          >
-            {submitting ? 'Creating...' : 'Create Subscription'}
-          </button>
+          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="checkbox"
+              id="chargeImmediately"
+              checked={chargeImmediately}
+              onChange={(e) => setChargeImmediately(e.target.checked)}
+              disabled={submitting}
+            />
+            <label htmlFor="chargeImmediately" style={{ cursor: 'pointer', fontSize: '14px' }}>
+              Charge immediately and activate (requires valid payment method)
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <button className={styles.cancelButton} onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button
+              className={styles.submitButton}
+              onClick={handleSubmit}
+              disabled={submitting || !selectedPriceId || !primaryMemberId}
+            >
+              {submitting ? 'Creating...' : 'Create Subscription'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

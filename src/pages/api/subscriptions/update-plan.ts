@@ -15,14 +15,14 @@ const supabase = createClient(
  * PUT /api/subscriptions/update-plan
  *
  * Updates an account's subscription plan (upgrade or downgrade)
+ * App-managed, no Stripe subscription
  *
  * Body:
  *   - account_id: UUID
  *   - new_price_id: string (Stripe Price ID)
- *   - proration_behavior?: 'create_prorations' | 'none' | 'always_invoice' (default: 'create_prorations')
  *
  * Returns:
- *   - subscription: Stripe.Subscription
+ *   - account: Updated account data
  *   - event_type: 'upgrade' | 'downgrade'
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, new_price_id, proration_behavior = 'create_prorations' } = req.body;
+  const { account_id, new_price_id } = req.body;
 
   if (!account_id || !new_price_id) {
     return res.status(400).json({ error: 'account_id and new_price_id are required' });
@@ -40,73 +40,87 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch account
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('account_id, stripe_subscription_id, monthly_dues')
+      .select('account_id, subscription_status, monthly_dues')
       .eq('account_id', account_id)
       .single();
 
-    if (accountError || !account || !account.stripe_subscription_id) {
-      return res.status(404).json({ error: 'Account or subscription not found' });
+    if (accountError || !account) {
+      return res.status(404).json({ error: 'Account not found' });
     }
 
-    // Get current subscription
-    const currentSubscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
-    const currentItem = currentSubscription.items.data[0];
-
-    if (!currentItem) {
-      return res.status(400).json({ error: 'Subscription has no items' });
+    if (account.subscription_status !== 'active') {
+      return res.status(400).json({ error: 'Can only update plan for active subscriptions' });
     }
 
-    // Get price details for the new plan
+    // Get new price details
     const newPrice = await stripe.prices.retrieve(new_price_id);
-    const newAmount = newPrice.unit_amount! / 100;
-    const newMrr = newPrice.recurring?.interval === 'year' ? newAmount / 12 : newAmount;
+    const basePriceAmount = newPrice.unit_amount ? newPrice.unit_amount / 100 : 0;
+
+    // Count secondary members to recalculate monthly dues
+    const { data: secondaryMembers } = await supabase
+      .from('members')
+      .select('member_id')
+      .eq('account_id', account_id)
+      .eq('member_type', 'secondary')
+      .eq('deactivated', false);
+
+    const secondaryMemberCount = secondaryMembers?.length || 0;
+
+    // Calculate new monthly dues: base + (additional members * $25)
+    // Exception: Skyline plan ($10/month) gets free additional members
+    const isSkylinePlan = basePriceAmount === 10;
+    const additionalMemberFee = isSkylinePlan ? 0 : 25;
+    const newMonthlyDues = basePriceAmount + (secondaryMemberCount * additionalMemberFee);
 
     const oldMrr = Number(account.monthly_dues) || 0;
-    const eventType = newMrr > oldMrr ? 'upgrade' : 'downgrade';
+    const eventType = newMonthlyDues > oldMrr ? 'upgrade' : 'downgrade';
 
-    // Update subscription
-    const subscription = await stripe.subscriptions.update(account.stripe_subscription_id, {
-      items: [
-        {
-          id: currentItem.id,
-          price: new_price_id,
-        },
-      ],
-      proration_behavior,
-    });
+    console.log('💰 Updating subscription plan:');
+    console.log(`   Old MRR: $${oldMrr}`);
+    console.log(`   New base: $${basePriceAmount}`);
+    console.log(`   Additional members: ${secondaryMemberCount} x $${additionalMemberFee} = $${secondaryMemberCount * additionalMemberFee}`);
+    console.log(`   New MRR: $${newMonthlyDues}`);
+    console.log(`   Event type: ${eventType}`);
 
-    // Update account
-    await supabase
+    // Update account with new monthly dues
+    const { data: updatedAccount, error: updateError } = await supabase
       .from('accounts')
       .update({
-        monthly_dues: newMrr,
-        next_renewal_date: (subscription as any).current_period_end
-          ? new Date((subscription as any).current_period_end * 1000).toISOString()
-          : null,
+        monthly_dues: newMonthlyDues,
       })
-      .eq('account_id', account_id);
+      .eq('account_id', account_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error(`Failed to update plan: ${updateError.message}`);
+    }
 
     // Log subscription event
     await supabase.from('subscription_events').insert({
       account_id,
       event_type: eventType,
-      stripe_subscription_id: account.stripe_subscription_id,
-      previous_plan: currentItem.price.product as string,
-      new_plan: newPrice.product as string,
       previous_mrr: oldMrr,
-      new_mrr: newMrr,
+      new_mrr: newMonthlyDues,
       effective_date: new Date().toISOString(),
       metadata: {
-        proration_behavior,
+        new_price_id,
+        base_price: basePriceAmount,
+        secondary_members: secondaryMemberCount,
+        additional_member_fee: additionalMemberFee,
         updated_via_api: true,
       },
     });
 
+    console.log(`✅ Subscription ${eventType}d for account ${account_id}`);
+
     return res.json({
-      subscription,
+      success: true,
+      account: updatedAccount,
       event_type: eventType,
-      message: `Subscription ${eventType}d successfully`,
+      message: `Subscription ${eventType}d successfully. New monthly dues: $${newMonthlyDues}`,
     });
+
   } catch (error: any) {
     console.error('Error updating subscription plan:', error);
     return res.status(500).json({ error: error.message });

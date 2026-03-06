@@ -39,6 +39,7 @@
   ],
   "exclude": [
     "node_modules",
-    "venue-management-crm-12012025"
+    "venue-management-crm-12012025",
+    "scripts"
   ]
 }
