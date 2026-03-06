@@ -63,12 +63,18 @@ export default function MemberSubscriptionCard({
 
   const fetchSubscriptionData = async () => {
     try {
+      if (!accountId) {
+        console.error('No account ID provided');
+        return;
+      }
+
       const response = await fetch(`/api/accounts/${accountId}?t=${Date.now()}`, {
         cache: 'no-store'
       });
       const result = await response.json();
 
       if (result.error) {
+        console.error('Error fetching subscription data:', result.error, 'Account ID:', accountId);
         throw new Error(result.error);
       }
 
