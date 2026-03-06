@@ -127,14 +127,13 @@ export default function MemberSubscriptionCard({
         }
       }
 
-      // Determine the base MRR from Stripe or account data
+      // Use Stripe base MRR - no fallback!
       let calculatedBaseMRR = stripeBaseMRR;
 
-      if (calculatedBaseMRR === 0 && account.monthly_dues) {
-        // If we don't have Stripe data, calculate from monthly_dues
-        // Assume $25 per additional member unless we determine otherwise
-        const additionalMemberFees = secondaryMemberCount * 25;
-        calculatedBaseMRR = account.monthly_dues - additionalMemberFees;
+      // If we couldn't get base MRR from Stripe, that's an error state
+      if (calculatedBaseMRR === 0 && account.stripe_subscription_id) {
+        console.error('Failed to fetch base MRR from Stripe for subscription:', account.stripe_subscription_id);
+        // Set to 0 and let the UI show error state
       }
 
       // Determine additional member fee rate based on plan

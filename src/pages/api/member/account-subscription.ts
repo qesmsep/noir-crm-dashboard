@@ -75,7 +75,6 @@ export default async function handler(
     // Fetch Stripe subscription to get actual base price
     let baseMRR = 0;
     let secondaryMemberCount = actualSecondaryCount;
-    let stripeSubscription = null;
 
     if (account?.stripe_subscription_id) {
       try {
@@ -84,28 +83,19 @@ export default async function handler(
         );
         const subData = await subResponse.json();
 
-        if (subData.subscription) {
-          stripeSubscription = subData.subscription;
-
-          // Get base price from Stripe subscription item
-          if (subData.subscription.items?.data?.[0]?.price?.unit_amount) {
-            baseMRR = subData.subscription.items.data[0].price.unit_amount / 100;
-          } else {
-            console.warn(`Stripe subscription ${account.stripe_subscription_id} missing price data for account ${member.account_id}`);
-          }
+        if (subData.subscription?.items?.data?.[0]?.price?.unit_amount) {
+          baseMRR = subData.subscription.items.data[0].price.unit_amount / 100;
         } else {
-          console.warn(`Failed to fetch Stripe subscription ${account.stripe_subscription_id} for account ${member.account_id}:`, subData.error);
+          console.error('Stripe subscription missing price data:', account.stripe_subscription_id);
+          return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
         }
       } catch (err) {
-        console.error(`Error fetching Stripe subscription ${account.stripe_subscription_id} for account ${member.account_id}:`, err);
+        console.error('Error fetching subscription price:', err);
+        return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
       }
-    }
-
-    // If we have a subscription but couldn't get baseMRR from Stripe, that's an error
-    if (account?.stripe_subscription_id && baseMRR === 0) {
-      console.error(`CRITICAL: Account ${member.account_id} has stripe_subscription_id ${account.stripe_subscription_id} but baseMRR is 0`);
-      // Don't return fake data - return error so we can fix the root cause
-      return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
+    } else {
+      // No subscription ID
+      return res.status(404).json({ error: 'No subscription found for this account' });
     }
 
     res.status(200).json({
