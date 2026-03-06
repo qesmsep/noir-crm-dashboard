@@ -29,6 +29,19 @@ export default function MemberDashboardPage() {
     return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
   };
 
+  // Helper to parse date strings without timezone conversion
+  // Date-only strings from DB should be treated as local dates, not UTC
+  const parseLocalDate = (dateString: string) => {
+    if (!dateString) return new Date();
+    // If it's a date-only string (YYYY-MM-DD), parse it as local time
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    // Otherwise parse normally (for full timestamps)
+    return new Date(dateString);
+  };
+
   // Debug: Log member data when it changes
   useEffect(() => {
     if (member) {
@@ -455,7 +468,7 @@ export default function MemberDashboardPage() {
                         className="flex items-center justify-between gap-3 py-1 border-b border-[#ECEAE5] last:border-0"
                       >
                         <p className="text-xs text-[#8C7C6D] flex-shrink-0">
-                          {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                          {parseLocalDate(transaction.created_at).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                           })}

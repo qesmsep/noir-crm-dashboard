@@ -143,6 +143,19 @@ export default function MemberBalancePage() {
     return type === 'credit' ? `+$${formatted}` : `-$${formatted}`;
   };
 
+  // Helper to parse date strings without timezone conversion
+  // Date-only strings from DB should be treated as local dates, not UTC
+  const parseLocalDate = (dateString: string) => {
+    if (!dateString) return new Date();
+    // If it's a date-only string (YYYY-MM-DD), parse it as local time
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    // Otherwise parse normally (for full timestamps)
+    return new Date(dateString);
+  };
+
   const handleDownloadReceipt = () => {
     if (!member || transactions.length === 0) return;
 
@@ -298,7 +311,7 @@ export default function MemberBalancePage() {
                         {transactions.map((transaction, index) => (
                           <Tr key={transaction.id || index}>
                             <Td color="#5A5A5A" fontSize="sm">
-                              {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                              {parseLocalDate(transaction.created_at).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric',
@@ -366,7 +379,7 @@ export default function MemberBalancePage() {
                           <HStack justify="space-between" align="center">
                             <HStack spacing={2}>
                               <Text fontSize="xs" color="#8C7C6D">
-                                {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                                {parseLocalDate(transaction.created_at).toLocaleDateString('en-US', {
                                   month: 'short',
                                   day: 'numeric',
                                   year: 'numeric',

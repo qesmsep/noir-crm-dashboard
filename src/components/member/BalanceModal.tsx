@@ -28,6 +28,19 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
 
+  // Helper to parse date strings without timezone conversion
+  // Date-only strings from DB should be treated as local dates, not UTC
+  const parseLocalDate = (dateString: string) => {
+    if (!dateString) return new Date();
+    // If it's a date-only string (YYYY-MM-DD), parse it as local time
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    // Otherwise parse normally (for full timestamps)
+    return new Date(dateString);
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchTransactions();
@@ -187,7 +200,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
                         {/* Row 2: Date and Running Balance */}
                         <div className="flex items-center justify-between gap-3 mt-1">
                           <p className="text-xs text-[#8C7C6D]">
-                            {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                            {parseLocalDate(transaction.created_at).toLocaleDateString('en-US', {
                               month: 'numeric',
                               day: 'numeric',
                               year: 'numeric',
@@ -224,7 +237,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
               <DialogTitle>Transaction Receipt</DialogTitle>
               <DialogDescription>
                 Receipt for {selectedTransaction.description || 'Transaction'} on{' '}
-                {new Date(selectedTransaction.created_at).toLocaleDateString()}
+                {parseLocalDate(selectedTransaction.created_at).toLocaleDateString()}
               </DialogDescription>
             </DialogHeader>
             <div className="relative flex items-start justify-center min-h-full">

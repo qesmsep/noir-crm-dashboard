@@ -33,6 +33,7 @@ interface PrivateEvent {
   rsvp_url?: string;
   max_guests?: number;
   total_attendees_maximum?: number;
+  price_per_seat?: number;
   background_image_url?: string;
   is_member_event?: boolean;
 }
@@ -74,6 +75,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
     rsvp_enabled: false,
     max_guests: 10,
     total_attendees_maximum: 100,
+    price_per_seat: 0,
     is_member_event: false,
   });
   const { toast } = useToast();
@@ -231,6 +233,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
             rsvp_url: formData.rsvp_enabled ? rsvp_url : null,
             max_guests: formData.rsvp_enabled ? formData.max_guests : null,
             total_attendees_maximum: formData.rsvp_enabled ? formData.total_attendees_maximum : null,
+            price_per_seat: formData.rsvp_enabled ? formData.price_per_seat : 0,
             background_image_url,
             is_member_event: formData.is_member_event,
           })
@@ -255,6 +258,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
             rsvp_enabled: formData.rsvp_enabled,
             max_guests: formData.rsvp_enabled ? formData.max_guests : null,
             total_attendees_maximum: formData.rsvp_enabled ? formData.total_attendees_maximum : null,
+            price_per_seat: formData.rsvp_enabled ? formData.price_per_seat : 0,
             is_member_event: formData.is_member_event,
           })
           .select()
@@ -358,6 +362,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
       rsvp_enabled: event.rsvp_enabled || false,
       max_guests: event.max_guests || 10,
       total_attendees_maximum: event.total_attendees_maximum || 100,
+      price_per_seat: event.price_per_seat || 0,
       is_member_event: event.is_member_event || false,
     });
 
@@ -386,6 +391,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
       rsvp_enabled: false,
       max_guests: 10,
       total_attendees_maximum: 100,
+      price_per_seat: 0,
       is_member_event: false,
     });
   };
@@ -429,6 +435,11 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
             {event.is_member_event && (
               <Badge variant="default">
                 ⭐ Noir Event
+              </Badge>
+            )}
+            {event.price_per_seat && event.price_per_seat > 0 && (
+              <Badge variant="default">
+                💵 ${event.price_per_seat.toFixed(2)}/seat
               </Badge>
             )}
             {event.rsvp_enabled && event.rsvp_url && (
@@ -622,6 +633,20 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                     min={1}
                   />
                   <p className={styles.helpText}>Maximum total attendees across ALL RSVPs (e.g., if set to 100, RSVPs close once 100 total guests have signed up)</p>
+                </div>
+
+                <div className={styles.formField}>
+                  <Label htmlFor="price_per_seat">Price Per Seat (Optional)</Label>
+                  <Input
+                    id="price_per_seat"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price_per_seat}
+                    onChange={(e) => setFormData({ ...formData, price_per_seat: parseFloat(e.target.value) || 0 })}
+                    placeholder="0.00"
+                  />
+                  <p className={styles.helpText}>Cost per seat charged to member's account ledger when they RSVP. Leave at 0 for free events.</p>
                 </div>
               </>
             )}

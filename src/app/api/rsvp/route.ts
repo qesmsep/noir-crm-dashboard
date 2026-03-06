@@ -124,6 +124,51 @@ export async function POST(request: Request) {
       );
     }
 
+    // Create transaction if event has a per-seat price
+    if (event.price_per_seat && event.price_per_seat > 0) {
+      try {
+        // Find the member by email or phone
+        const { data: member, error: memberError } = await supabase
+          .from('members')
+          .select('member_id, account_id, first_name, last_name')
+          .or(`email.eq.${email},phone.eq.${phone}`)
+          .single();
+
+        if (member && !memberError && member.account_id) {
+          const totalCost = event.price_per_seat * party_size;
+
+          // Get current date in CST timezone
+          const cstDate = DateTime.now().setZone('America/Chicago').toISODate();
+
+          // Create the transaction in the ledger table
+          // Note: amount should be negative for purchases/debits
+          const { error: transactionError } = await supabase
+            .from('ledger')
+            .insert([{
+              member_id: member.member_id,
+              account_id: member.account_id,
+              type: 'purchase',
+              amount: -totalCost, // Negative for purchases/charges
+              note: `Private Event: ${event.title} - ${party_size} seat${party_size > 1 ? 's' : ''}`,
+              date: cstDate, // Date in CST timezone
+            }]);
+
+          if (transactionError) {
+            console.error('Error creating transaction:', transactionError);
+            // Don't fail the reservation if transaction creation fails
+            // Just log it for manual resolution
+          } else {
+            console.log(`Transaction created for member ${member.member_id}: $${totalCost} charge`);
+          }
+        } else {
+          console.log('Member not found for transaction creation. This may be a non-member RSVP.');
+        }
+      } catch (transactionError) {
+        console.error('Error in transaction creation:', transactionError);
+        // Don't fail the reservation if transaction creation fails
+      }
+    }
+
     // Send SMS confirmation
     try {
       // Check if OpenPhone credentials are configured

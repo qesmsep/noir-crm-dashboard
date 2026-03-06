@@ -32,6 +32,7 @@ interface PrivateEvent {
   max_guests: number;
   total_attendees_maximum: number;
   deposit_required: number;
+  price_per_seat: number;
   event_description: string;
   rsvp_enabled: boolean;
   background_image_url: string | null;
@@ -207,6 +208,16 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
                   </>
                 )}
               </div>
+              {event.price_per_seat > 0 && (
+                <div className="mt-3 pt-3 border-t border-[#DAD7D0]">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[#5A5A5A]">Price per seat:</span>
+                    <span className="font-semibold text-[#1F1F1F]">
+                      ${event.price_per_seat.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {error && (
@@ -225,7 +236,10 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
                 min={1}
                 max={event.max_guests}
                 value={formData.party_size}
-                onChange={(e) => setFormData({ ...formData, party_size: parseInt(e.target.value) })}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  setFormData({ ...formData, party_size: isNaN(value) ? 1 : value });
+                }}
                 required
                 disabled={submitting}
                 className="h-8 text-sm"
@@ -243,6 +257,20 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
                 className="text-sm"
               />
             </div>
+
+            {event.price_per_seat > 0 && (
+              <div className="bg-[#FFF9F0] border border-[#F4D9A6] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-[#1F1F1F]">Total Cost:</span>
+                  <span className="text-lg font-bold text-[#1F1F1F]">
+                    ${((event.price_per_seat || 0) * (formData.party_size || 0)).toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-xs text-[#5A5A5A]">
+                  This amount will be added to your account ledger upon confirmation.
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button
