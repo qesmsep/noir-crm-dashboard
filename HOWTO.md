@@ -2058,13 +2058,20 @@ Database-level security via Supabase RLS:
 **Implemented**: Full authentication with phone + password and biometric support
 
 **Login Methods**:
-1. **Phone + Password**: Primary authentication method
+1. **SMS OTP (One-Time Password)**: Self-service passwordless login ⭐ NEW
+   - 6-digit code sent via SMS (OpenPhone integration)
+   - Code expires in 10 minutes, single-use only
+   - Members can activate their portal without admin intervention
+   - Automatic redirect to password setup on first login
+   - API: `POST /api/auth/send-phone-otp`, `POST /api/auth/verify-phone-otp`
+
+2. **Phone + Password**: Primary authentication method
    - 10-digit phone number (normalizes +1, spaces, dashes, parentheses)
    - Bcrypt password hashing (10 salt rounds)
    - httpOnly session cookies (7-day expiration)
    - Session stored in `member_portal_sessions` table
 
-2. **Biometric Authentication** (WebAuthn/FIDO2):
+3. **Biometric Authentication** (WebAuthn/FIDO2):
    - Face ID, Touch ID, Windows Hello support
    - Platform authenticator only (no security keys)
    - Stored in `biometric_credentials` table
@@ -2072,8 +2079,11 @@ Database-level security via Supabase RLS:
    - Endpoints: `register-challenge`, `register-verify`, `login-challenge`, `login-verify`
 
 **Security Features**:
-- **Rate Limiting**: 10 requests per 15-minute window per IP
-- **Account Lockout**: 5 failed attempts = 15-minute lockout
+- **OTP Rate Limiting**: 3 OTP requests per phone per 15 min, 10 per IP per hour ⭐ NEW
+- **OTP Account Lockout**: 5 failed verifications in 15 min = 15-min lockout ⭐ NEW
+- **OTP Audit Logging**: All OTP requests, verifications, failures logged with IP/user agent ⭐ NEW
+- **Rate Limiting**: 10 requests per 15-minute window per IP (password login)
+- **Account Lockout**: 5 failed attempts = 15-minute lockout (password login)
 - **Audit Logging**: All auth events tracked in `auth_audit_logs` (90-day retention)
 - **Temporary Password Flow**: Admin-generated temp passwords force password change on first login
 - **Admin Unlock**: `/api/admin/unlock-member-account` endpoint for locked accounts
@@ -2086,8 +2096,9 @@ Database-level security via Supabase RLS:
 
 **Context**: `src/context/MemberAuthContext.tsx`
 - Manages auth state globally
-- Supports both custom sessions (password/biometric) and Supabase Auth (email magic links)
-- Provides hooks: `signInWithPassword`, `signInWithBiometric`, `registerBiometric`, `signOut`
+- Supports both custom sessions (password/biometric/OTP) and Supabase Auth (email magic links)
+- Provides hooks: `signInWithPhone`, `verifyOTP`, `signInWithPassword`, `signInWithBiometric`, `registerBiometric`, `signOut`
+- OTP methods: `signInWithPhone()` sends code, `verifyOTP()` returns `boolean` indicating if password setup needed
 
 ### Database Schema Additions
 
@@ -2140,6 +2151,19 @@ login_attempts (
   success BOOLEAN,
   created_at TIMESTAMPTZ
 )
+
+-- OTP codes (SMS verification)
+phone_otp_codes (
+  id UUID PRIMARY KEY,
+  phone TEXT,
+  code TEXT,
+  expires_at TIMESTAMPTZ,
+  verified BOOLEAN DEFAULT false,
+  attempts INTEGER DEFAULT 0,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ
+)
 ```
 
 **Members Table Extensions**:
@@ -2158,11 +2182,17 @@ ALTER TABLE members ADD COLUMN:
 All pages use Noir design system and are fully mobile-responsive with bottom navigation.
 
 #### 1. Login Page (`/member/login`)
-- Phone + password form (single input method as requested)
-- Biometric button (auto-shows if available and phone entered)
-- Redirects to password change if temporary password
+- Phone dial pad for 10-digit number entry
+- **Three login options** (shown based on phone entry): ⭐ NEW
+  1. **"Sign in with Code"** button - Request SMS OTP (passwordless)
+  2. **"Call"** button - Use password authentication
+  3. **Biometric button** - Face ID/Touch ID (if available)
+- **OTP Input View**: 6-digit code entry with resend option ⭐ NEW
+- **Password Input View**: Password entry with show/hide toggle
+- Redirects to password change if temporary password OR first OTP login ⭐ NEW
 - Links to forgot password flow
 - Toast notifications for errors/success
+- Mobile-first responsive design
 
 #### 2. Dashboard (`/member/dashboard`)
 **Features**:
@@ -3861,6 +3891,87 @@ node scripts/sync-payment-methods.js
 
 **Git Commits**:
 - `fa6fd03` - Enhance inventory system with improved UX and customizable settings
+
+---
+
+### 2026-03-06 - Secure OTP Login with Enterprise-Grade Security
+
+**Summary**: Implemented passwordless SMS OTP login for member portal, enabling self-service account activation and eliminating admin overhead for sending credentials. Includes comprehensive security measures: rate limiting, account lockout, and audit logging.
+
+**New Features**:
+
+1. **SMS OTP Login System**
+   - **Self-Service Activation**: Members can activate portal without admin sending passwords
+   - **6-digit SMS codes**: Sent via OpenPhone, expire in 10 minutes, single-use
+   - **Login Page UI**: Added "Sign in with Code" button and OTP input view
+   - **Automatic Password Setup**: First-time OTP users redirected to set permanent password
+   - **Multiple Login Options**: Members choose OTP, password, or biometric (Face ID/Touch ID)
+   - **Files**: `src/app/member/login/page.tsx`, `src/context/MemberAuthContext.tsx`
+
+2. **Enterprise-Grade Security Measures**
+
+   **Rate Limiting**:
+   - 3 OTP requests per phone number per 15 minutes
+   - 10 OTP requests per IP address per hour
+   - Returns 429 status with retry-after time when exceeded
+
+   **Account Lockout**:
+   - 5 failed verification attempts in 15 minutes = account locked
+   - Automatic unlock after 15 minutes
+   - Lockout applies per phone number (not per individual code)
+
+   **Audit Logging**:
+   - OTP requested: logs phone, IP, user agent, timestamp
+   - OTP verification success: logs member ID, IP, needs_password flag
+   - OTP verification failed: logs phone, IP, attempt count
+   - Account locked: logs phone, IP, total failed attempts
+   - All logs tagged with `[AUTH-AUDIT]` for easy filtering
+
+   **IP & Device Tracking**:
+   - IP address stored with every OTP request
+   - User agent stored for forensic analysis
+   - Enables detection of suspicious activity patterns
+
+3. **API Enhancements**
+   - **`POST /api/auth/send-phone-otp`**: Send 6-digit OTP with rate limiting and tracking
+   - **`POST /api/auth/verify-phone-otp`**: Verify OTP with lockout protection, returns `needsPasswordSetup` flag
+   - **MemberAuthContext**: Updated `verifyOTP()` to return boolean indicating password setup needed
+
+4. **Database Schema**
+   - **`phone_otp_codes` table**: Existing table now stores `ip_address` and `user_agent` for tracking
+   - Uses existing rate limiting queries for phone and IP-based limits
+
+**Security Benefits**:
+- ✅ Eliminates admin overhead for sending temporary passwords
+- ✅ Members can activate accounts instantly via SMS
+- ✅ Protected against brute force attacks (rate limiting + lockout)
+- ✅ Protected against DoS attacks (IP-based rate limiting)
+- ✅ Comprehensive audit trail for security investigations
+- ✅ Backup authentication methods (password + biometric)
+
+**User Experience**:
+- **First-Time**: OTP → verify → set password → dashboard (no admin action needed)
+- **Returning**: Choose OTP (quick) or password (familiar) or biometric (convenient)
+
+**Technical Details**:
+- OTP codes: 6 digits, 100,000-999,999 range
+- Expiration: 10 minutes from generation
+- Max attempts per code: 5 (then require new code)
+- Session duration: 7 days (httpOnly cookie)
+- Password requirement: Min 8 characters
+
+**Files Modified**:
+- `src/app/member/login/page.tsx` - Added OTP input view and handlers
+- `src/context/MemberAuthContext.tsx` - Updated verifyOTP return type
+- `src/pages/api/auth/send-phone-otp.ts` - Added rate limiting and audit logging
+- `src/pages/api/auth/verify-phone-otp.ts` - Added lockout protection and password check
+
+**Testing Notes**:
+- Test rate limiting: Request 4 codes quickly (4th should fail)
+- Test lockout: Enter wrong code 5 times (should lock account)
+- Test first-time flow: OTP login → verify password setup redirect
+- Test returning user: OTP login → verify direct to dashboard
+- Check logs for `[AUTH-AUDIT]` entries
 
 ---
 
