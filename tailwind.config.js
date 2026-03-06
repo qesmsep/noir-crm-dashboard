@@ -8,6 +8,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        cork: '#A59480',
+        daybreak: '#F5F5F0',
+        greige: '#E8E6E1',
+        'bg-cream-1': '#FAFAF8',
+        'error-red': '#C84B31',
+        'text-primary': '#1A1A1A',
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',

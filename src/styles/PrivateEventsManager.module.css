@@ -74,7 +74,7 @@
 
 .eventCard {
   background: white;
-  padding: 1.5rem;
+  padding: 1rem 1.25rem;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
@@ -92,25 +92,33 @@
 .eventHeader {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
 }
 
 .eventInfo {
   flex: 1;
+  display: grid;
+  grid-template-columns: minmax(150px, 200px) auto;
+  gap: 1rem;
+  align-items: center;
 }
 
 .eventTitle {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   color: #1f2937;
-  margin-bottom: 0.5rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badges {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, max-content));
   gap: 0.5rem;
+  align-items: center;
 }
 
 .clickableBadge {
@@ -124,8 +132,9 @@
 
 .eventDescription {
   color: #6b7280;
-  margin-top: 0.75rem;
-  line-height: 1.5;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+  font-size: 0.875rem;
 }
 
 .modal {

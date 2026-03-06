@@ -66,6 +66,8 @@ export default function MemberDashboardPage() {
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [pastVisits, setPastVisits] = useState<any[]>([]);
+  const [nextEvent, setNextEvent] = useState<any>(null);
+  const [upcomingEventsCount, setUpcomingEventsCount] = useState<number>(0);
 
   useEffect(() => {
     setMounted(true);
@@ -113,6 +115,7 @@ export default function MemberDashboardPage() {
 
     fetchNextReservation();
     fetchCurrentBalance();
+    fetchUpcomingEvents();
   }, [member]);
 
   const fetchNextReservation = async () => {
@@ -162,6 +165,39 @@ export default function MemberDashboardPage() {
       }
     } catch (error) {
       console.error('Error fetching balance:', error);
+    }
+  };
+
+  const fetchUpcomingEvents = async () => {
+    try {
+      const response = await fetch('/api/noir-member-events', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const events = data.events || [];
+        const now = new Date();
+
+        // Get upcoming events (from now onwards)
+        const upcoming = events.filter(
+          (e: any) => new Date(e.start_time) >= now
+        );
+
+        // Set the next upcoming event
+        setNextEvent(upcoming[0] || null);
+
+        // Count events in current month
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const thisMonthEvents = upcoming.filter((e: any) => {
+          const eventDate = new Date(e.start_time);
+          return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+        });
+        setUpcomingEventsCount(thisMonthEvents.length);
+      }
+    } catch (error) {
+      console.error('Error fetching upcoming events:', error);
     }
   };
 
@@ -435,20 +471,35 @@ export default function MemberDashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <div className="bg-[#F6F5F2] rounded-lg p-3">
-                    <p className="text-xs text-[#8C7C6D]">Next Event</p>
-                    <p className="text-sm font-medium text-[#1F1F1F] mt-1">Wine Tasting Evening</p>
-                    <p className="text-xs text-[#5A5A5A]">
-                      {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric'
-                      })} at 7:00 PM
+                {nextEvent ? (
+                  <div className="space-y-2">
+                    <div className="bg-[#F6F5F2] rounded-lg p-3">
+                      <p className="text-xs text-[#8C7C6D]">Next Event</p>
+                      <p className="text-sm font-medium text-[#1F1F1F] mt-1">{nextEvent.title}</p>
+                      <p className="text-xs text-[#5A5A5A]">
+                        {new Date(nextEvent.start_time).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric'
+                        })} at {new Date(nextEvent.start_time).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
+                      </p>
+                    </div>
+                    <p className="text-xs text-[#8C7C6D]">
+                      {upcomingEventsCount} {upcomingEventsCount === 1 ? 'event' : 'events'} this month
                     </p>
                   </div>
-                  <p className="text-xs text-[#8C7C6D]">2 upcoming events this month</p>
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="bg-[#F6F5F2] rounded-lg p-3">
+                      <p className="text-sm text-[#5A5A5A] text-center py-2">No upcoming events</p>
+                    </div>
+                    <p className="text-xs text-[#8C7C6D]">Check back later for new events</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

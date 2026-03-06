@@ -1347,20 +1347,39 @@ The payment method system supports two payment types with instant verification f
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/stripe/payment-methods/setup-intent` | POST | Create SetupIntent with Financial Connections for instant ACH or card |
+| `/api/stripe/checkout/setup-ach` | POST | Create Stripe Checkout Session for ACH setup (member portal flow) |
 | `/api/stripe/payment-methods/set-default` | PUT | Set payment method as default on Stripe customer |
 | `/api/stripe/payment-methods/list` | GET | List all payment methods for account with default flag |
 | `/api/stripe/payment-methods/detach` | DELETE | Remove payment method from Stripe customer |
 | `/api/accounts/update-credit-card-fee` | PUT | Toggle 4% credit card fee setting for account |
 
+**Member Portal Payment Flow** (2-Step Process):
+
+The member portal uses a simplified two-step flow to avoid Stripe iframe click detection issues:
+
+1. **Payment Type Selection**: User selects "Credit Card" or "US Bank Account"
+2. **Payment Method Entry**:
+   - **Credit Cards**: CardElement form rendered in-app (no iframe issues, no collapsible options)
+   - **ACH/Bank**: Redirects to Stripe Checkout hosted page (avoids iframe entirely)
+
+**Technical Implementation**:
+- **AddPaymentMethodModal** (`src/components/member/AddPaymentMethodModal.tsx`): Two-step modal with payment type selection
+- **CardElement API**: Stable, direct integration for cards (no PaymentElement wrapper)
+- **Stripe Checkout Redirect**: ACH setup uses hosted Stripe Checkout Session for reliable bank verification
+- **Body Scroll Lock**: Position fixed applied before Stripe initialization to prevent click offset issues
+- **Success/Cancel URLs**: Returns to `/member/dashboard?payment_setup=success|cancelled`
+
 **Related Files**:
 - `src/components/MemberSubscriptionCard.tsx` - Subscription management UI, displays default payment method
 - `src/components/SubscriptionTransactionHistory.tsx` - Stripe invoices with "(incl. 4% CC fee)" indicator
 - `src/components/UpdatePlanModal.tsx` - Plan upgrade/downgrade modal
-- `src/components/UpdatePaymentModal.tsx` - Unified payment method update (Card/ACH with instant verification)
+- `src/components/UpdatePaymentModal.tsx` - Unified payment method update (Card/ACH with instant verification) - ADMIN PANEL
 - `src/components/member/PaymentMethodModal.tsx` - Member portal payment methods list modal
+- `src/components/member/AddPaymentMethodModal.tsx` - Member portal add payment method modal (2-step flow)
 - `src/components/ui/dialog.tsx` - Base dialog component (flexbox centering, no transforms for Stripe compatibility)
 - `src/pages/api/stripe/payment-methods/setup-intent.ts` - Creates SetupIntent with Financial Connections config
-- `src/app/globals.css` - Stripe modal CSS exceptions (body.stripe-ach-active class)
+- `src/pages/api/stripe/checkout/setup-ach.ts` - Creates Stripe Checkout Session for ACH (member portal)
+- `src/app/globals.css` - Stripe modal CSS exceptions (body.stripe-ach-active class), scrollbar-hide utility
 - `src/styles/UpdatePaymentModal.module.css` - Payment modal styles with mobile responsiveness
 
 ### 6.2. Beverage Credit System
@@ -1432,7 +1451,8 @@ Three quick action types in a single collapsible card interface:
    - Processes Stripe payment for custom amount
    - Creates single `payment` entry in ledger (positive amount)
    - Includes confirmation dialog before charging
-   - Records `stripe_payment_intent_id` to prevent webhook duplicates
+   - Records `stripe_payment_intent_id` AND `stripe_charge_id` to prevent webhook duplicates
+   - Migration added `stripe_charge_id` column: `supabase/migrations/20260305_add_stripe_charge_id_to_ledger.sql`
    - Use case: Partial payments, custom invoices, event fees
 
 2. **Add Credit** (+ icon, green button)
@@ -2114,15 +2134,41 @@ All pages use Noir design system and are fully mobile-responsive with bottom nav
 **API**: `/api/member/next-reservation` fetches upcoming reservation by phone/email match
 
 #### 3. Profile Page (`/member/profile`)
-**Features**:
-- View/edit mode toggle
-- Avatar with member initials/photo
-- Editable fields: first name, last name, email
-- Read-only phone (requires admin)
-- Contact preferences: SMS/email toggle switches
-- Links to security settings and password change
 
-**API**: `POST /api/member/update-profile` updates member info
+**Features**:
+- **Profile Photo**: Upload/crop with zoom functionality (`PhotoCropUpload` component)
+- **Profile Information Card** (compact, small text):
+  - View/edit mode toggle with save/cancel icons
+  - Editable fields: first name, last name, email, phone
+  - Birthday display (if set)
+  - Small icons (User, Mail, Phone, Cake)
+- **Membership Details Card** (compact):
+  - Subscription plan name
+  - Member since date
+  - Active status
+  - Next renewal date
+  - Bold headers for fields
+- **Other Account Members Card** (if multi-member account):
+  - Lists all members on the same account
+  - Shows profile photos, names, emails, phones
+  - Compact display with small avatars
+- **Security Section**:
+  - Change Password button (expands to password form)
+  - Sign Out button (red text)
+  - Password form: current password, new password, confirm password
+- **Scrollbar Hidden**: Clean appearance with `.scrollbar-hide` utility
+
+**API**:
+- `POST /api/member/update-profile` - Updates member info
+- `POST /api/member/set-photo` - Uploads profile photo
+- `POST /api/member/change-password` - Changes password
+- `GET /api/member/account-members` - Fetches all members on same account
+
+**UI/UX Notes**:
+- All cards use small font sizes (text-xs) for compact display
+- Edit/save icons positioned outside card borders
+- No Account Settings card on dashboard - all settings moved to Profile modal
+- Password change and sign-out consolidated into Profile modal Security section
 
 #### 4. Reservations Page (`/member/reservations`)
 **Features**:

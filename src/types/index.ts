@@ -150,6 +150,7 @@ export interface PrivateEvent {
   capacity?: number;
   description?: string;
   status: 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+  is_member_event?: boolean;
   created_at: string;
   updated_at?: string;
 }

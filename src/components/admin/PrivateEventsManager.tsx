@@ -22,6 +22,7 @@ interface PrivateEvent {
   start_time: string;
   end_time: string;
   description?: string;
+  event_description?: string;
   guest_count?: number;
   source?: 'minaka' | 'local';
   client_name?: string;
@@ -33,6 +34,7 @@ interface PrivateEvent {
   max_guests?: number;
   total_attendees_maximum?: number;
   background_image_url?: string;
+  is_member_event?: boolean;
 }
 
 interface Reservation {
@@ -72,6 +74,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
     rsvp_enabled: false,
     max_guests: 10,
     total_attendees_maximum: 100,
+    is_member_event: false,
   });
   const { toast } = useToast();
 
@@ -220,16 +223,16 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
           .from('private_events')
           .update({
             title: formData.title,
-            name: formData.title, // Keep name in sync for backwards compatibility
             start_time: startTimeUTC,
             end_time: endTimeUTC,
-            description: formData.description,
+            event_description: formData.description,
             guest_count: formData.guest_count ? parseInt(formData.guest_count) : null,
             rsvp_enabled: formData.rsvp_enabled,
             rsvp_url: formData.rsvp_enabled ? rsvp_url : null,
             max_guests: formData.rsvp_enabled ? formData.max_guests : null,
             total_attendees_maximum: formData.rsvp_enabled ? formData.total_attendees_maximum : null,
             background_image_url,
+            is_member_event: formData.is_member_event,
           })
           .eq('id', editingEvent.id);
 
@@ -245,15 +248,14 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
           .from('private_events')
           .insert({
             title: formData.title,
-            name: formData.title,
             start_time: startTimeUTC,
             end_time: endTimeUTC,
-            description: formData.description,
+            event_description: formData.description,
             guest_count: formData.guest_count ? parseInt(formData.guest_count) : null,
-            source: 'local',
             rsvp_enabled: formData.rsvp_enabled,
             max_guests: formData.rsvp_enabled ? formData.max_guests : null,
             total_attendees_maximum: formData.rsvp_enabled ? formData.total_attendees_maximum : null,
+            is_member_event: formData.is_member_event,
           })
           .select()
           .single();
@@ -351,11 +353,12 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
       title: event.title || event.name || '',
       start_time: formatForInput(event.start_time),
       end_time: formatForInput(event.end_time),
-      description: event.description || '',
+      description: event.event_description || event.description || '',
       guest_count: event.guest_count?.toString() || '',
       rsvp_enabled: event.rsvp_enabled || false,
       max_guests: event.max_guests || 10,
       total_attendees_maximum: event.total_attendees_maximum || 100,
+      is_member_event: event.is_member_event || false,
     });
 
     if (event.rsvp_enabled) {
@@ -383,6 +386,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
       rsvp_enabled: false,
       max_guests: 10,
       total_attendees_maximum: 100,
+      is_member_event: false,
     });
   };
 
@@ -413,9 +417,18 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
             <Badge variant={isPast ? "secondary" : "default"}>
               🕐 {format(parseISO(event.start_time), 'h:mm a')} - {format(parseISO(event.end_time), 'h:mm a')}
             </Badge>
-            {event.guest_count && (
+            {event.rsvp_enabled && event.total_attendees_maximum ? (
+              <Badge variant="success">
+                👥 Capacity: {event.total_attendees_maximum}
+              </Badge>
+            ) : event.guest_count ? (
               <Badge variant="success">
                 👥 {event.guest_count} guests
+              </Badge>
+            ) : null}
+            {event.is_member_event && (
+              <Badge variant="default">
+                ⭐ Noir Event
               </Badge>
             )}
             {event.rsvp_enabled && event.rsvp_url && (
@@ -453,8 +466,8 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
           </Button>
         </div>
       </div>
-      {event.description && (
-        <p className={styles.eventDescription}>{event.description}</p>
+      {(event.event_description || event.description) && (
+        <p className={styles.eventDescription}>{event.event_description || event.description}</p>
       )}
     </div>
   );
@@ -520,6 +533,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                 placeholder="e.g., Holiday Party"
                 required
               />
+              <p className={styles.helpText}>The name of the private event</p>
             </div>
 
             <div className={styles.formField}>
@@ -531,6 +545,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                 onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
                 required
               />
+              <p className={styles.helpText}>When the event begins</p>
             </div>
 
             <div className={styles.formField}>
@@ -542,6 +557,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                 onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                 required
               />
+              <p className={styles.helpText}>When the event ends</p>
             </div>
 
             <div className={styles.formField}>
@@ -553,6 +569,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                 onChange={(e) => setFormData({ ...formData, guest_count: e.target.value })}
                 placeholder="Number of guests"
               />
+              <p className={styles.helpText}>Expected number of guests (for non-RSVP events)</p>
             </div>
 
             <div className={styles.formField}>
@@ -588,10 +605,10 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                     type="number"
                     value={formData.max_guests}
                     onChange={(e) => setFormData({ ...formData, max_guests: parseInt(e.target.value) || 10 })}
-                    placeholder="Maximum guests per RSVP"
+                    placeholder="e.g., 10"
                     min={1}
                   />
-                  <p className={styles.helpText}>Maximum party size for each individual RSVP</p>
+                  <p className={styles.helpText}>Maximum party size for each individual RSVP (e.g., if set to 10, one person can RSVP for up to 10 guests)</p>
                 </div>
 
                 <div className={styles.formField}>
@@ -601,10 +618,10 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                     type="number"
                     value={formData.total_attendees_maximum}
                     onChange={(e) => setFormData({ ...formData, total_attendees_maximum: parseInt(e.target.value) || 100 })}
-                    placeholder="Total attendees maximum"
+                    placeholder="e.g., 100"
                     min={1}
                   />
-                  <p className={styles.helpText}>Maximum total guests for the entire event</p>
+                  <p className={styles.helpText}>Maximum total attendees across ALL RSVPs (e.g., if set to 100, RSVPs close once 100 total guests have signed up)</p>
                 </div>
               </>
             )}
@@ -618,6 +635,21 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                 placeholder="Event details..."
                 rows={4}
               />
+              <p className={styles.helpText}>Additional details about the event (optional)</p>
+            </div>
+
+            <div className={styles.checkboxField}>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_member_event"
+                  checked={formData.is_member_event}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_member_event: checked as boolean })}
+                />
+                <Label htmlFor="is_member_event" className="cursor-pointer">Show in Member Portal Calendar</Label>
+              </div>
+              <p className={styles.helpText}>
+                When enabled, NOAA members will see this event in their calendar tab
+              </p>
             </div>
 
             <div className={styles.checkboxField}>
@@ -629,6 +661,9 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                 />
                 <Label htmlFor="rsvp_enabled" className="cursor-pointer">Enable RSVP</Label>
               </div>
+              <p className={styles.helpText}>
+                Generate a public RSVP link for guests to sign up (shows Max Guests and Total Capacity fields)
+              </p>
               {formData.rsvp_enabled && editingEvent?.rsvp_url && (
                 <div className={styles.rsvpLink}>
                   <p className={styles.rsvpLabel}>RSVP Link:</p>

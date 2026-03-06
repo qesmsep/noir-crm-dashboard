@@ -47,16 +47,23 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
     setLoading(true);
     try {
       // Fetch reservations
-      const response = await fetch('/api/member/reservations', {
+      const reservationsResponse = await fetch('/api/member/reservations', {
         credentials: 'include',
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      // Fetch member events
+      const memberEventsResponse = await fetch('/api/noir-member-events', {
+        credentials: 'include',
+      });
+
+      const allEvents: Event[] = [];
+
+      // Process reservations
+      if (reservationsResponse.ok) {
+        const data = await reservationsResponse.json();
         const reservations = data.reservations || [];
 
-        // Convert reservations to events
-        const formattedEvents = reservations.map((res: any) => ({
+        const formattedReservations = reservations.map((res: any) => ({
           id: res.id,
           title: `Reservation - Party of ${res.party_size}`,
           date: new Date(res.start_time),
@@ -72,30 +79,33 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
           description: res.special_requests,
         }));
 
-        // Add some special events (these would come from a separate API)
-        const specialEvents: Event[] = [
-          {
-            id: 'event-1',
-            title: 'Wine Tasting Evening',
-            date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-            time: '7:00 PM',
-            location: 'Wine Cellar',
-            type: 'event',
-            description: 'Join us for an exclusive wine tasting featuring selections from Napa Valley',
-          },
-          {
-            id: 'event-2',
-            title: 'Jazz Night',
-            date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-            time: '8:00 PM',
-            location: 'Lounge',
-            type: 'special',
-            description: 'Live jazz performance by the Chicago Quartet',
-          },
-        ];
-
-        setEvents([...formattedEvents, ...specialEvents].sort((a, b) => a.date.getTime() - b.date.getTime()));
+        allEvents.push(...formattedReservations);
       }
+
+      // Process member events
+      if (memberEventsResponse.ok) {
+        const data = await memberEventsResponse.json();
+        const memberEvents = data.events || [];
+
+        const formattedMemberEvents = memberEvents.map((event: any) => ({
+          id: event.id,
+          title: event.title || event.name || 'Member Event',
+          date: new Date(event.start_time),
+          time: new Date(event.start_time).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          }),
+          location: event.location || 'Noir KC',
+          type: 'event' as const,
+          description: event.description || event.event_description,
+        }));
+
+        allEvents.push(...formattedMemberEvents);
+      }
+
+      // Sort all events by date
+      setEvents(allEvents.sort((a, b) => a.date.getTime() - b.date.getTime()));
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {

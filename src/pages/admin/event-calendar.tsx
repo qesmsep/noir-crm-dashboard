@@ -64,6 +64,7 @@ interface PrivateEvent {
   max_guests?: number;
   total_attendees_maximum?: number;
   background_image_url?: string;
+  is_member_event?: boolean;
 }
 
 interface Reservation {
@@ -120,6 +121,7 @@ export default function EventCalendarNew() {
     rsvp_enabled: false,
     max_guests: 10,
     total_attendees_maximum: 100,
+    is_member_event: false,
   });
   const [monthStats, setMonthStats] = useState({
     totalReservations: 0,
@@ -395,6 +397,7 @@ export default function EventCalendarNew() {
       rsvp_enabled: event.rsvp_enabled || false,
       max_guests: event.max_guests || 10,
       total_attendees_maximum: event.total_attendees_maximum || 100,
+      is_member_event: event.is_member_event || false,
     });
 
     setIsEditEventModalOpen(true);
@@ -497,6 +500,7 @@ export default function EventCalendarNew() {
         rsvp_url: eventFormData.rsvp_enabled ? rsvp_url : null,
         max_guests: eventFormData.max_guests,
         total_attendees_maximum: eventFormData.total_attendees_maximum,
+        is_member_event: eventFormData.is_member_event,
       };
 
       console.log('Updating event with data:', eventData);
@@ -641,6 +645,7 @@ export default function EventCalendarNew() {
       rsvp_enabled: false,
       max_guests: 10,
       total_attendees_maximum: 100,
+      is_member_event: false,
     });
   };
 
@@ -1314,6 +1319,19 @@ export default function EventCalendarNew() {
                         placeholder="Event details..."
                         rows={3}
                       />
+                    </FormControl>
+
+                    <FormControl>
+                      <Checkbox
+                        isChecked={eventFormData.is_member_event}
+                        onChange={(e) => setEventFormData({ ...eventFormData, is_member_event: e.target.checked })}
+                        size="sm"
+                      >
+                        Show in Member Portal Calendar
+                      </Checkbox>
+                      <Text fontSize="xs" color="gray.600" mt={1}>
+                        When enabled, NOAA members will see this event in their calendar tab
+                      </Text>
                     </FormControl>
 
                     <FormControl>
