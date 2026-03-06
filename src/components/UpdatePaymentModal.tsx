@@ -219,17 +219,55 @@ function UpdatePaymentForm({ accountId, onSuccess, onClose }: Props) {
         throw new Error(stripeError.message);
       }
 
-      if (!setupIntent || !setupIntent.payment_method) {
+      if (!setupIntent) {
         throw new Error('Failed to setup bank account');
+      }
+
+      // Get the payment method ID (might need to create it from Financial Connections)
+      let paymentMethodId = setupIntent.payment_method as string;
+
+      // If payment_method wasn't created automatically, create it from the Financial Connections account
+      if (!paymentMethodId) {
+        console.log('[ACH Setup] No payment method on SetupIntent, checking for Financial Connections account...');
+
+        // Retrieve the full SetupIntent to get latest_attempt details
+        const fullSetupIntent = await fetch(`/api/stripe/setup-intents/${setupIntent.id}`, {
+          method: 'GET',
+        });
+        const setupIntentData = await fullSetupIntent.json();
+
+        if (setupIntentData.financial_connections_account) {
+          console.log('[ACH Setup] Creating PaymentMethod from Financial Connections account:', setupIntentData.financial_connections_account);
+
+          // Create PaymentMethod from Financial Connections account
+          const createPMResponse = await fetch('/api/stripe/payment-methods/create-from-fc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              account_id: accountId,
+              financial_connections_account_id: setupIntentData.financial_connections_account,
+            }),
+          });
+
+          const createPMData = await createPMResponse.json();
+
+          if (createPMData.error) {
+            throw new Error(createPMData.error);
+          }
+
+          paymentMethodId = createPMData.payment_method_id;
+        } else {
+          throw new Error('Failed to setup bank account - no payment method or Financial Connections account found');
+        }
       }
 
       // Step 3: Set as default payment method
       const setDefaultResponse = await fetch('/api/stripe/payment-methods/set-default', {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           account_id: accountId,
-          payment_method_id: setupIntent.payment_method as string,
+          payment_method_id: paymentMethodId,
         }),
       });
 
