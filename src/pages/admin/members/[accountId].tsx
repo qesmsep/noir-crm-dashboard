@@ -2031,10 +2031,10 @@ export default function MemberDetailAdmin() {
                 <div className={styles.ledgerHeaderActions}>
                   {!ledgerLoading && ledger.length > 0 && (
                     <>
-                      <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, ledger.length - 1) < 0 ? styles.balance : styles.credit}`}>
-                        {calculateRunningBalance(ledger, ledger.length - 1) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, ledger.length - 1)))}
+                      <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, 0) < 0 ? styles.balance : styles.credit}`}>
+                        {calculateRunningBalance(ledger, 0) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, 0)))}
                       </div>
-                      {calculateRunningBalance(ledger, ledger.length - 1) < 0 && (
+                      {calculateRunningBalance(ledger, 0) < 0 && (
                         <button
                           onClick={handlePayBalance}
                           disabled={isProcessingPayment}

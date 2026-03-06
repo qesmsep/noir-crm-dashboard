@@ -163,7 +163,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const account = await findAccountByStripeCustomer(subscription.customer as string);
   if (!account) {
     console.error('❌ Account not found for customer:', subscription.customer);
-    return;
+    throw new Error(`Account not found for Stripe customer: ${subscription.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
@@ -229,7 +229,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const account = await findAccountByStripeCustomer(subscription.customer as string);
   if (!account) {
     console.log('❌ Account not found, skipping update');
-    return;
+    throw new Error(`Account not found for Stripe customer: ${subscription.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
@@ -321,7 +321,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const account = await findAccountByStripeCustomer(subscription.customer as string);
   if (!account) {
     console.log('❌ Account not found, skipping delete');
-    return;
+    throw new Error(`Account not found for Stripe customer: ${subscription.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
@@ -379,7 +379,7 @@ async function handleSubscriptionPaused(subscription: Stripe.Subscription) {
   const account = await findAccountByStripeCustomer(subscription.customer as string);
   if (!account) {
     console.log('❌ Account not found, skipping pause');
-    return;
+    throw new Error(`Account not found for Stripe customer: ${subscription.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
@@ -429,7 +429,7 @@ async function handleSubscriptionResumed(subscription: Stripe.Subscription) {
   const account = await findAccountByStripeCustomer(subscription.customer as string);
   if (!account) {
     console.log('❌ Account not found, skipping resume');
-    return;
+    throw new Error(`Account not found for Stripe customer: ${subscription.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
@@ -497,7 +497,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const account = await findAccountByStripeCustomer(invoice.customer as string);
   if (!account) {
     console.log('❌ Account not found, skipping payment failure update');
-    return;
+    throw new Error(`Account not found for Stripe customer: ${invoice.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
@@ -549,7 +549,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   const account = await findAccountByStripeCustomer(invoice.customer as string);
   if (!account) {
     console.log('❌ Account not found, skipping payment success update');
-    return;
+    throw new Error(`Account not found for Stripe customer: ${invoice.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
@@ -584,7 +584,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
   if (!primaryMember) {
     console.error('❌ No primary member found for account');
-    return;
+    throw new Error(`No primary member found for account: ${account.account_id}`);
   }
 
   const transactionDate = getTodayLocalDate();
@@ -697,7 +697,7 @@ async function handleInvoiceCreated(invoice: Stripe.Invoice) {
   const account = await findAccountByStripeCustomer(invoice.customer as string);
   if (!account) {
     console.log('❌ Account not found, skipping fee logic');
-    return;
+    throw new Error(`Account not found for Stripe customer: ${invoice.customer}`);
   }
 
   console.log('✅ Found account:', account.account_id);
