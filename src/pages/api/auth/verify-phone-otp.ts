@@ -201,45 +201,53 @@ export default async function handler(
         });
 
         if (authError) {
-          // If email already exists, try to find existing auth user by email or phone
+          // If email already exists, search for existing auth user
           if (authError.message?.includes('email address has already been registered') || authError.code === 'email_exists') {
-            console.log('[VERIFY-OTP] Email exists, looking up existing auth user');
+            console.log('[VERIFY-OTP] Email exists, searching for existing auth user by email:', member.email);
 
-            // Try to get user by email first
             let existingUser = null;
 
-            if (member.email) {
-              try {
-                const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(member.email);
-                if (!getUserError && userData?.user) {
-                  existingUser = userData.user;
+            try {
+              // List users with pagination, searching for matching email
+              let page = 1;
+              let found = false;
+
+              while (!found && page <= 10) { // Limit to 10 pages (1000 users)
+                const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+                  page,
+                  perPage: 100,
+                });
+
+                if (listError) {
+                  console.error('[VERIFY-OTP] Failed to list users:', listError);
+                  break;
+                }
+
+                existingUser = users.find(u => u.email?.toLowerCase() === member.email?.toLowerCase());
+
+                if (existingUser) {
+                  found = true;
                   console.log('[VERIFY-OTP] Found existing auth user by email:', existingUser.id);
+                } else if (users.length < 100) {
+                  // Last page reached
+                  break;
                 }
-              } catch (e) {
-                console.error('[VERIFY-OTP] getUserByEmail failed:', e);
-              }
-            }
 
-            // If not found by email, try by phone
-            if (!existingUser) {
-              try {
-                const phone = member.phone.startsWith('+') ? member.phone : `+1${normalizedPhone}`;
-                const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserByPhone(phone);
-                if (!getUserError && userData?.user) {
-                  existingUser = userData.user;
-                  console.log('[VERIFY-OTP] Found existing auth user by phone:', existingUser.id);
-                }
-              } catch (e) {
-                console.error('[VERIFY-OTP] getUserByPhone failed:', e);
+                page++;
               }
-            }
 
-            if (existingUser) {
-              authUserId = existingUser.id;
-            } else {
-              console.error('[VERIFY-OTP] Could not find existing auth user');
+              if (existingUser) {
+                authUserId = existingUser.id;
+              } else {
+                console.error('[VERIFY-OTP] Email exists but could not find auth user');
+                return res.status(500).json({
+                  error: 'Account setup conflict. Please contact support.',
+                });
+              }
+            } catch (e) {
+              console.error('[VERIFY-OTP] Error searching for auth user:', e);
               return res.status(500).json({
-                error: 'Account setup conflict. Please contact support.',
+                error: 'Failed to set up account. Please contact support.',
               });
             }
           } else {
