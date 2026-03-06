@@ -97,8 +97,10 @@ export async function chargeAccount(account: any): Promise<{
     let creditCardFee = 0;
 
     if (account.credit_card_fee_enabled) {
-      // 2.9% + $0.30
-      creditCardFee = Math.round((amount * 0.029 + 0.30) * 100) / 100;
+      // Calculate both options: 4% vs 2.9% + $0.30, use whichever is greater
+      const flatRate = amount * 0.04;
+      const stripeFee = amount * 0.029 + 0.30;
+      creditCardFee = Math.round(Math.max(flatRate, stripeFee) * 100) / 100;
       totalAmount = amount + creditCardFee;
     }
 
@@ -138,13 +140,16 @@ export async function chargeAccount(account: any): Promise<{
 
 /**
  * Log a successful payment to the ledger
+ * Creates two entries: payment as "credit" and fee as "charge"
  */
 export async function logPaymentToLedger(account: any, paymentIntent: Stripe.PaymentIntent) {
   try {
     const charges = (paymentIntent as any).charges?.data || [];
     const charge = charges[0];
-    const amount = paymentIntent.amount / 100;
     const metadata = paymentIntent.metadata || {};
+
+    const baseAmount = parseFloat(metadata.base_amount || '0');
+    const feeAmount = parseFloat(metadata.credit_card_fee || '0');
 
     // Get primary member for this account
     const { data: primaryMember } = await supabase
@@ -159,18 +164,37 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       return;
     }
 
-    await supabase.from('ledger').insert({
+    const entries: any[] = [];
+
+    // 1. Log the payment as a "credit" (negative amount = reduces balance owed)
+    entries.push({
       member_id: primaryMember.member_id,
       account_id: account.account_id,
-      type: 'payment',
-      amount: -amount, // Negative = payment (reduces balance)
+      type: 'credit',
+      amount: -baseAmount,
       date: getTodayLocalDate(),
       note: `Monthly dues - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
       stripe_charge_id: charge?.id,
       stripe_payment_intent_id: paymentIntent.id,
     });
 
-    console.log(`✅ Logged payment to ledger for account ${account.account_id}: -$${amount}`);
+    // 2. If there's a fee, log it as a "charge" (positive amount = adds to balance)
+    if (feeAmount > 0) {
+      entries.push({
+        member_id: primaryMember.member_id,
+        account_id: account.account_id,
+        type: 'charge',
+        amount: feeAmount,
+        date: getTodayLocalDate(),
+        note: 'Credit card processing fee',
+        stripe_charge_id: charge?.id,
+        stripe_payment_intent_id: paymentIntent.id,
+      });
+    }
+
+    await supabase.from('ledger').insert(entries);
+
+    console.log(`✅ Logged payment to ledger for account ${account.account_id}: -$${baseAmount} credit, +$${feeAmount} fee`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
   }
