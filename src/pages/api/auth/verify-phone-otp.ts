@@ -94,6 +94,7 @@ export default async function handler(
     }
 
     if (!otpRecords || otpRecords.length === 0) {
+      console.error('[VERIFY-OTP] No unverified OTP found for phone:', normalizedPhone);
       return res.status(400).json({
         error: 'No verification code found. Please request a new code.',
       });
@@ -179,13 +180,53 @@ export default async function handler(
       });
     }
 
-    // If member doesn't have auth_user_id, they need to be linked to a Supabase user first
+    // If member doesn't have auth_user_id, create Supabase Auth user on first login
     if (!member.auth_user_id) {
-      return res.status(400).json({
-        error: 'Account not set up for portal access. Please contact support.',
-        needsSetup: true,
-        memberId: member.member_id,
-      });
+      console.log('[VERIFY-OTP] First time login - creating Supabase Auth user for member:', member.member_id);
+
+      try {
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: member.email || `${member.phone}@noirkc.com`,
+          phone: member.phone.startsWith('+') ? member.phone : `+1${normalizedPhone}`,
+          email_confirm: true,
+          phone_confirm: true,
+          user_metadata: {
+            first_name: member.first_name,
+            last_name: member.last_name,
+            member_id: member.member_id,
+          },
+        });
+
+        if (authError) {
+          console.error('[VERIFY-OTP] Failed to create auth user:', authError);
+          return res.status(500).json({
+            error: 'Failed to create account. Please try again.',
+          });
+        }
+
+        console.log('[VERIFY-OTP] Created auth user:', authData.user.id);
+
+        // Link auth user to member
+        const { error: linkError } = await supabaseAdmin
+          .from('members')
+          .update({ auth_user_id: authData.user.id })
+          .eq('member_id', member.member_id);
+
+        if (linkError) {
+          console.error('[VERIFY-OTP] Failed to link auth user to member:', linkError);
+          return res.status(500).json({
+            error: 'Failed to link account. Please try again.',
+          });
+        }
+
+        member.auth_user_id = authData.user.id;
+        console.log('[VERIFY-OTP] Successfully linked auth user to member');
+      } catch (createError: any) {
+        console.error('[VERIFY-OTP] Error during auth user creation:', createError);
+        return res.status(500).json({
+          error: 'Failed to set up account. Please contact support.',
+        });
+      }
     }
 
     // Generate session token for member
