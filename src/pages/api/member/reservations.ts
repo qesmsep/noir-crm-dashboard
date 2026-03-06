@@ -41,17 +41,8 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Get member's account_id
-    const { data: memberData } = await supabaseAdmin
-      .from('members')
-      .select('account_id')
-      .eq('member_id', memberId)
-      .single();
-
-    const accountId = memberData?.account_id;
-
-    // Get all reservations for this member/account
-    // Query by member_id and account_id (most reliable)
+    // Get reservations for this specific member only
+    // Query by member_id, phone, and email (for backwards compatibility)
 
     // Query 1: By member_id
     const { data: reservationsByMemberId } = await supabaseAdmin
@@ -60,16 +51,7 @@ export default async function handler(
       .eq('member_id', memberId)
       .order('start_time', { ascending: false });
 
-    // Query 2: By account_id (for reservations made by other members on same account)
-    const { data: reservationsByAccountId } = accountId
-      ? await supabaseAdmin
-          .from('reservations')
-          .select('*, private_events(title)')
-          .eq('account_id', accountId)
-          .order('start_time', { ascending: false })
-      : { data: [] };
-
-    // Query 3: By phone (for old reservations without member_id/account_id)
+    // Query 2: By phone (for old reservations without member_id/account_id)
     const phoneDigits = member.phone ? member.phone.replace(/\D/g, '') : '';
     const { data: reservationsByPhone } = phoneDigits
       ? await supabaseAdmin
@@ -81,7 +63,7 @@ export default async function handler(
           .order('start_time', { ascending: false })
       : { data: [] };
 
-    // Query 4: By email (for old reservations without member_id/account_id)
+    // Query 3: By email (for old reservations without member_id/account_id)
     const { data: reservationsByEmail } = member.email
       ? await supabaseAdmin
           .from('reservations')
@@ -95,7 +77,6 @@ export default async function handler(
     // Merge and deduplicate
     const allReservations = [
       ...(reservationsByMemberId || []),
-      ...(reservationsByAccountId || []),
       ...(reservationsByPhone || []),
       ...(reservationsByEmail || []),
     ];
