@@ -615,7 +615,7 @@ export default function MembersAdmin() {
                               alt={`${member1.first_name} ${member1.last_name}`}
                               width={48}
                               height={48}
-                              style={{ objectFit: 'cover', borderRadius: '10px' }}
+                              style={{ width: 'auto', height: 'auto', objectFit: 'cover', borderRadius: '10px' }}
                               loading="lazy"
                             />
                           </div>
@@ -653,7 +653,7 @@ export default function MembersAdmin() {
                               alt={`${member2.first_name} ${member2.last_name}`}
                               width={36}
                               height={36}
-                              style={{ objectFit: 'cover', borderRadius: '8px' }}
+                              style={{ width: 'auto', height: 'auto', objectFit: 'cover', borderRadius: '8px' }}
                               loading="lazy"
                             />
                           </div>
@@ -793,6 +793,8 @@ export default function MembersAdmin() {
                                   width={64}
                                   height={64}
                                   style={{
+                                    width: 'auto',
+                                    height: 'auto',
                                     objectFit: 'cover',
                                     objectPosition: 'center',
                                     borderRadius: '8px'
@@ -837,6 +839,8 @@ export default function MembersAdmin() {
                                   width={64}
                                   height={64}
                                   style={{
+                                    width: 'auto',
+                                    height: 'auto',
                                     objectFit: 'cover',
                                     objectPosition: 'center',
                                     borderRadius: '8px'
