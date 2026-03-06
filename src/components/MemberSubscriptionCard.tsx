@@ -3,7 +3,7 @@ import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabase';
 import styles from '../styles/MemberSubscriptionCard.module.css';
 import UpdatePlanModal from './UpdatePlanModal';
-import UpdatePaymentModal from './UpdatePaymentModal';
+import PaymentMethodModal from './member/PaymentMethodModal';
 import CreateSubscriptionModal from './CreateSubscriptionModal';
 
 interface SubscriptionData {
@@ -605,13 +605,13 @@ export default function MemberSubscriptionCard({
       )}
 
       {showUpdatePaymentModal && (
-        <UpdatePaymentModal
-          accountId={accountId}
-          onSuccess={() => {
+        <PaymentMethodModal
+          isOpen={showUpdatePaymentModal}
+          onClose={() => {
             fetchSubscriptionData();
             setShowUpdatePaymentModal(false);
           }}
-          onClose={() => setShowUpdatePaymentModal(false)}
+          accountId={accountId}
         />
       )}
 
