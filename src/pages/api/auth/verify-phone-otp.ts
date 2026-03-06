@@ -205,7 +205,7 @@ export default async function handler(
           if (authError.message?.includes('email address has already been registered') || authError.code === 'email_exists') {
             console.log('[VERIFY-OTP] Email exists, searching for existing auth user by email:', member.email);
 
-            let existingUser = null;
+            let existingUser: any = null;
 
             try {
               // List users with pagination, searching for matching email
@@ -223,7 +223,10 @@ export default async function handler(
                   break;
                 }
 
-                existingUser = users.find(u => u.email?.toLowerCase() === member.email?.toLowerCase());
+                const foundUser = users.find(u => u.email?.toLowerCase() === member.email?.toLowerCase());
+                if (foundUser) {
+                  existingUser = foundUser;
+                }
 
                 if (existingUser) {
                   found = true;
