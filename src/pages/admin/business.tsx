@@ -430,11 +430,12 @@ export default function BusinessDashboard() {
         setLastMonthRevenue(breakdown[breakdown.length - 1].revenue);
       }
 
-      // Fetch total active members count (individual people) - using status field
+      // Fetch total active members count (individual people) - using status field, excluding pending
       const { count: memberCount } = await supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .eq('deactivated', false);
       setActiveMemberCount(memberCount ?? null);
 
       // Fetch active accounts count (distinct accounts with Skyline, Solo, or Duo memberships)
