@@ -122,17 +122,29 @@ export default function MemberDashboardPage() {
         const reservations = data.reservations || [];
         const now = new Date();
 
-        // Get next upcoming reservation
-        const upcoming = reservations.filter(
-          (r: any) => new Date(r.start_time) >= now && r.status !== 'cancelled'
-        );
-        setNextReservation(upcoming[0] || null);
+        console.log('[RESERVATIONS] Total fetched:', reservations.length);
+        console.log('[RESERVATIONS] Current time:', now);
 
-        // Get last 2-3 past visits
-        const past = reservations.filter(
-          (r: any) => new Date(r.start_time) < now || r.status === 'cancelled'
-        );
-        setPastVisits(past.slice(0, 3));
+        // Get all upcoming reservations (sorted soonest first)
+        const upcoming = reservations
+          .filter((r: any) => {
+            const startTime = new Date(r.start_time);
+            const isUpcoming = startTime >= now && r.status !== 'cancelled';
+            console.log('[RESERVATIONS]', startTime, isUpcoming ? 'UPCOMING' : 'PAST', r.private_events?.title || 'Table reservation');
+            return isUpcoming;
+          })
+          .sort((a: any, b: any) => {
+            // Sort upcoming by start_time ASC (soonest first)
+            return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+          });
+
+        console.log('[RESERVATIONS] Upcoming count:', upcoming.length);
+
+        // Store up to 5 upcoming reservations
+        setNextReservation(upcoming.length > 0 ? { isMultiple: true, all: upcoming.slice(0, 5) } : null);
+
+        // Don't show past visits on the card
+        setPastVisits([]);
       }
     } catch (error) {
       console.error('Error fetching reservations:', error);
@@ -388,35 +400,36 @@ export default function MemberDashboardPage() {
                     {(nextReservation || pastVisits.length > 0) ? (
                       <>
                         {/* Column Headers */}
-                        <div className="grid grid-cols-[60px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5]">
+                        <div className="grid grid-cols-[50px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5]">
                           <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase">Date</p>
                           <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase">Event</p>
                           <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase text-right">Time</p>
                           <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase text-center">Guests</p>
                         </div>
 
-                        {/* Next Reservation */}
-                        {nextReservation && (
+                        {/* All Upcoming Reservations (up to 5) */}
+                        {nextReservation?.all?.map((reservation: any, index: number) => (
                           <div
-                            className="grid grid-cols-[60px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
+                            key={reservation.id || index}
+                            className="grid grid-cols-[50px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
                             onClick={(e) => {
                               e.stopPropagation();
                               setIsReservationsListModalOpen(true);
                             }}
                           >
                             <p className="text-xs text-[#8C7C6D]">
-                              {new Date(nextReservation.start_time).toLocaleDateString('en-US', {
+                              {new Date(reservation.start_time).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
                               })}
                             </p>
                             <p className="text-xs font-medium text-[#1F1F1F] truncate">
-                              {(nextReservation.private_events?.title || nextReservation.special_requests || 'Reservation').substring(0, 35)}
-                              {((nextReservation.private_events?.title || nextReservation.special_requests || 'Reservation').length > 35) ? '...' : ''}
+                              {(reservation.private_events?.title || reservation.special_requests || 'Reservation').substring(0, 38)}
+                              {((reservation.private_events?.title || reservation.special_requests || 'Reservation').length > 38) ? '...' : ''}
                             </p>
                             <p className="text-xs text-[#5A5A5A] text-right">
                               {(() => {
-                                const time = new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
+                                const time = new Date(reservation.start_time).toLocaleTimeString('en-US', {
                                   hour: 'numeric',
                                   minute: '2-digit',
                                   hour12: true,
@@ -425,16 +438,16 @@ export default function MemberDashboardPage() {
                               })()}
                             </p>
                             <p className="text-xs text-[#5A5A5A] text-center">
-                              {nextReservation.party_size}
+                              {reservation.party_size}
                             </p>
                           </div>
-                        )}
+                        ))}
 
-                        {/* Past Visits Preview */}
+                        {/* Past Visits Preview - HIDDEN */}
                         {pastVisits.map((visit, index) => (
                           <div
                             key={visit.id || index}
-                            className="grid grid-cols-[60px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
+                            className="grid grid-cols-[50px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
                             onClick={(e) => {
                               e.stopPropagation();
                               setIsReservationsListModalOpen(true);
@@ -447,8 +460,8 @@ export default function MemberDashboardPage() {
                               })}
                             </p>
                             <p className="text-xs text-[#5A5A5A] truncate">
-                              {(visit.private_events?.title || visit.special_requests || 'Visit').substring(0, 35)}
-                              {((visit.private_events?.title || visit.special_requests || 'Visit').length > 35) ? '...' : ''}
+                              {(visit.private_events?.title || visit.special_requests || 'Visit').substring(0, 38)}
+                              {((visit.private_events?.title || visit.special_requests || 'Visit').length > 38) ? '...' : ''}
                             </p>
                             <p className="text-xs text-[#5A5A5A] text-right">
                               {(() => {

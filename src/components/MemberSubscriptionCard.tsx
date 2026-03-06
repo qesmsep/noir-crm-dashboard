@@ -63,7 +63,9 @@ export default function MemberSubscriptionCard({
 
   const fetchSubscriptionData = async () => {
     try {
-      const response = await fetch(`/api/accounts/${accountId}`);
+      const response = await fetch(`/api/accounts/${accountId}?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
       const result = await response.json();
 
       if (result.error) {
@@ -154,7 +156,9 @@ export default function MemberSubscriptionCard({
 
   const fetchPaymentStatus = async () => {
     try {
-      const response = await fetch(`/api/accounts/${accountId}/last-payment-status`);
+      const response = await fetch(`/api/accounts/${accountId}/last-payment-status?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
       const result = await response.json();
 
       if (!result.error) {
@@ -317,20 +321,33 @@ export default function MemberSubscriptionCard({
 
   if (!subscription || !subscription.stripe_subscription_id) {
     return (
-      <div className={styles.card}>
-        <div className={styles.header}>
-          <h3 className={styles.title}>Subscription</h3>
+      <>
+        <div className={styles.card}>
+          <div className={styles.header}>
+            <h3 className={styles.title}>Subscription</h3>
+          </div>
+          <div className={styles.noSubscription}>
+            <p>No active subscription</p>
+            <button
+              className={styles.createButton}
+              onClick={() => setShowCreateSubscriptionModal(true)}
+            >
+              Create Subscription
+            </button>
+          </div>
         </div>
-        <div className={styles.noSubscription}>
-          <p>No active subscription</p>
-          <button
-            className={styles.createButton}
-            onClick={() => setShowCreateSubscriptionModal(true)}
-          >
-            Create Subscription
-          </button>
-        </div>
-      </div>
+
+        {showCreateSubscriptionModal && (
+          <CreateSubscriptionModal
+            accountId={accountId}
+            onSuccess={() => {
+              fetchSubscriptionData();
+              setShowCreateSubscriptionModal(false);
+            }}
+            onClose={() => setShowCreateSubscriptionModal(false)}
+          />
+        )}
+      </>
     );
   }
 
@@ -579,6 +596,17 @@ export default function MemberSubscriptionCard({
             setShowUpdatePaymentModal(false);
           }}
           onClose={() => setShowUpdatePaymentModal(false)}
+        />
+      )}
+
+      {showCreateSubscriptionModal && (
+        <CreateSubscriptionModal
+          accountId={accountId}
+          onSuccess={() => {
+            fetchSubscriptionData();
+            setShowCreateSubscriptionModal(false);
+          }}
+          onClose={() => setShowCreateSubscriptionModal(false)}
         />
       )}
     </div>

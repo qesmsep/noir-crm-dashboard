@@ -37,10 +37,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Fetch member
+    // Fetch member to get account_id
     const { data: member, error: memberError } = await supabase
       .from('members')
-      .select('stripe_customer_id, first_name, last_name, email, stripe_subscription_id')
+      .select('account_id, first_name, last_name, email')
       .eq('member_id', member_id)
       .single();
 
@@ -48,15 +48,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Check if member already has an active subscription
-    if (member.stripe_subscription_id) {
+    // Fetch account to get/check subscription info
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('stripe_customer_id, stripe_subscription_id')
+      .eq('account_id', member.account_id)
+      .single();
+
+    if (accountError || !account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    // Check if account already has an active subscription
+    if (account.stripe_subscription_id) {
       return res.status(400).json({
-        error: 'Member already has an active subscription. Use upgrade/downgrade instead.',
+        error: 'Account already has an active subscription. Use upgrade/downgrade instead.',
       });
     }
 
     // Get or create Stripe customer
-    let customerId = member.stripe_customer_id;
+    let customerId = account.stripe_customer_id;
 
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -64,16 +75,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: `${member.first_name} ${member.last_name}`,
         metadata: {
           member_id,
+          account_id: member.account_id,
         },
       });
 
       customerId = customer.id;
 
-      // Update member with stripe_customer_id
+      // Update account with stripe_customer_id
       await supabase
-        .from('members')
+        .from('accounts')
         .update({ stripe_customer_id: customerId })
-        .eq('member_id', member_id);
+        .eq('account_id', member.account_id);
     }
 
     // Create subscription
@@ -85,6 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expand: ['latest_invoice.payment_intent'],
       metadata: {
         member_id,
+        account_id: member.account_id,
       },
     };
 
@@ -104,27 +117,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Update member with subscription info (webhook will also do this, but we update immediately)
+    // Update account with subscription info (webhook will also do this, but we update immediately)
     const price = subscription.items.data[0]?.price;
     const amount = price ? price.unit_amount! / 100 : 0;
     const mrr = price?.recurring?.interval === 'year' ? amount / 12 : amount;
 
     await supabase
-      .from('members')
+      .from('accounts')
       .update({
         stripe_subscription_id: subscription.id,
         subscription_status: subscription.status,
         subscription_start_date: new Date(subscription.created * 1000).toISOString(),
-        next_renewal_date: (subscription as any).current_period_end
-          ? new Date((subscription as any).current_period_end * 1000).toISOString()
+        next_renewal_date: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
           : null,
         monthly_dues: mrr,
       })
-      .eq('member_id', member_id);
+      .eq('account_id', member.account_id);
 
     // Log subscription event
     await supabase.from('subscription_events').insert({
       member_id,
+      account_id: member.account_id,
       event_type: 'subscribe',
       stripe_subscription_id: subscription.id,
       new_plan: price?.product as string,
