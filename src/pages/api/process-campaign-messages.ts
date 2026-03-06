@@ -635,13 +635,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
               if (!campaignError && campaignData?.include_event_list && campaignData?.event_list_date_range) {
                 console.log('📅 Fetching event list for all_members campaign...');
-                
-                // Fetch Noir Member Events for the specified date range
-                const eventsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/noir-member-events?dateRange=${encodeURIComponent(JSON.stringify(campaignData.event_list_date_range))}`);
-                
-                if (eventsResponse.ok) {
-                  const eventsData = await eventsResponse.json();
-                  const events = eventsData.events || [];
+
+                // Fetch Noir Member Events for the specified date range using utility
+                const { getNoirMemberEvents } = await import('@/lib/events');
+                const { events, error: eventsError } = await getNoirMemberEvents(campaignData.event_list_date_range);
+
+                if (!eventsError) {
                   
                   console.log(`📅 Found ${events.length} events for date range:`, campaignData.event_list_date_range);
                   
@@ -674,7 +673,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     console.log('ℹ️  No events found for the specified date range');
                   }
                 } else {
-                  console.error('❌ Failed to fetch event list:', await eventsResponse.text());
+                  console.error('❌ Failed to fetch event list:', eventsError);
                 }
               } else {
                 console.log('ℹ️  Event list not enabled for this campaign');

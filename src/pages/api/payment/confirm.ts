@@ -159,12 +159,10 @@ Questions? Just reply to this text.
 
 We're excited to have you!`;
 
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sendText`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: waitlist.phone,
-      message
-    })
+  // Send SMS using shared utility
+  const { sendSMS } = await import('@/lib/sms');
+  await sendSMS({
+    to: waitlist.phone,
+    content: message
   });
 }

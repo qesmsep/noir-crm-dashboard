@@ -159,13 +159,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Send welcome SMS (optional - using existing SMS infrastructure)
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-sms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: waitlist.phone,
-          message: `Welcome to Noir, ${waitlist.first_name}! Your ${membership_type} membership is now active. Check your messages for login instructions. 🖤`
-        })
+      const { sendSMS } = await import('@/lib/sms');
+      await sendSMS({
+        to: waitlist.phone,
+        content: `Welcome to Noir, ${waitlist.first_name}! Your ${membership_type} membership is now active. Check your messages for login instructions. 🖤`
       });
     } catch (smsError) {
       console.error('Failed to send welcome SMS:', smsError);

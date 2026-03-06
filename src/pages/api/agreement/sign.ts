@@ -96,12 +96,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 async function sendSignatureConfirmationSMS(phone: string, firstName: string): Promise<void> {
   const message = `Hi ${firstName}! Your membership agreement has been signed. Next step: Complete payment to activate your membership. You'll receive a link shortly. 🖤`;
 
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sendText`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: phone,
-      message
-    })
+  // Send SMS using shared utility
+  const { sendSMS } = await import('@/lib/sms');
+  await sendSMS({
+    to: phone,
+    content: message
   });
 }

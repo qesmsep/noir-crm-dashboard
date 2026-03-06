@@ -130,12 +130,10 @@ function findResponseByQuestionText(
 async function sendConfirmationSMS(phone: string, firstName: string): Promise<void> {
   const message = `Hi ${firstName}! Thank you for applying to join Noir. We've received your application and will review it shortly. We typically respond within 24 hours. 🖤`;
 
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sendText`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: phone,
-      message
-    })
+  // Send SMS using shared utility
+  const { sendSMS } = await import('@/lib/sms');
+  await sendSMS({
+    to: phone,
+    content: message
   });
 }
