@@ -32,22 +32,8 @@ export default function ChangePasswordPage() {
 
   // Check if this is first-time password setup
   useEffect(() => {
-    const checkPasswordStatus = async () => {
-      try {
-        const response = await fetch('/api/member/check-password-status', {
-          credentials: 'include',
-        });
-        const data = await response.json();
-        if (response.ok) {
-          setIsFirstTimeSetup(!data.has_password);
-        }
-      } catch (error) {
-        console.error('Failed to check password status:', error);
-      }
-    };
-
     if (member) {
-      checkPasswordStatus();
+      setIsFirstTimeSetup(!member.has_password);
     }
   }, [member]);
 

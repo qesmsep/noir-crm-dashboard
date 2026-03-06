@@ -22,6 +22,7 @@ interface Member {
   photo?: string | null; // Migrated photo field
   profile_photo_url: string | null;
   password_is_temporary?: boolean;
+  has_password?: boolean; // Whether member has set a password
   contact_preferences: {
     sms: boolean;
     email: boolean;

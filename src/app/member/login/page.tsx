@@ -31,10 +31,15 @@ export default function MemberLoginPage() {
     isBiometricAvailable().then(setBiometricAvailable);
   }, [isBiometricAvailable]);
 
-  // Redirect if already logged in
+  // Redirect if already logged in (but check password setup first)
   React.useEffect(() => {
     if (member) {
-      router.push('/member/dashboard');
+      // Check if member has password - if not, redirect to setup
+      if (!member.has_password) {
+        router.push('/member/change-password');
+      } else {
+        router.push('/member/dashboard');
+      }
     }
   }, [member, router]);
 
@@ -142,22 +147,21 @@ export default function MemberLoginPage() {
     try {
       const needsPassword = await verifyOTP(phone, otp);
 
-      // If member needs to set password, redirect to change password page
+      // Show appropriate message (redirect handled by useEffect)
       if (needsPassword) {
         toast({
           title: 'Welcome!',
           description: 'Please set a password for your account to continue.',
           variant: 'success',
         });
-        router.push('/member/change-password');
       } else {
         toast({
           title: 'Welcome back',
           description: 'You are now signed in.',
           variant: 'success',
         });
-        router.push('/member/dashboard');
       }
+      // Note: Redirect is handled by the "already logged in" useEffect above
     } catch (error: any) {
       toast({
         title: 'Verification failed',
@@ -177,22 +181,21 @@ export default function MemberLoginPage() {
     try {
       const isTemporary = await signInWithPassword(phone, password);
 
-      // If password is temporary, redirect to change password page
+      // Show appropriate message (redirect handled by useEffect)
       if (isTemporary) {
         toast({
           title: 'Password change required',
           description: 'Please set a new password to continue.',
           variant: 'warning',
         });
-        router.push('/member/change-password');
       } else {
         toast({
           title: 'Welcome back',
           description: 'You are now signed in.',
           variant: 'success',
         });
-        router.push('/member/dashboard');
       }
+      // Note: Redirect is handled by the "already logged in" useEffect above
     } catch (error: any) {
       toast({
         title: 'Login failed',
@@ -224,7 +227,7 @@ export default function MemberLoginPage() {
         description: 'You are now signed in.',
         variant: 'success',
       });
-      router.push('/member/dashboard');
+      // Note: Redirect is handled by the "already logged in" useEffect above
     } catch (error: any) {
       toast({
         title: 'Biometric login failed',

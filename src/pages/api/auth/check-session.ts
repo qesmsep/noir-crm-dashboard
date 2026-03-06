@@ -31,7 +31,32 @@ export default async function handler(
     // Get member from session
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('member_portal_sessions')
-      .select('member_id, expires_at, members(*, password_is_temporary)')
+      .select(`
+        member_id,
+        expires_at,
+        members(
+          member_id,
+          account_id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          membership,
+          monthly_credit,
+          last_credit_date,
+          credit_renewal_date,
+          deactivated,
+          auth_user_id,
+          profile_photo_url,
+          password_is_temporary,
+          password_hash,
+          contact_preferences,
+          referral_code,
+          referred_by,
+          created_at,
+          updated_at
+        )
+      `)
       .eq('session_token', sessionToken)
       .gte('expires_at', new Date().toISOString())
       .single();
@@ -73,11 +98,13 @@ export default async function handler(
       .update({ last_activity: new Date().toISOString() })
       .eq('session_token', sessionToken);
 
-    // Return full member object to match MemberAuthContext type
+    // Return member object with balance and has_password flag (exclude password_hash for security)
+    const { password_hash, ...memberWithoutPassword } = member;
     res.status(200).json({
       member: {
-        ...member,
+        ...memberWithoutPassword,
         balance,
+        has_password: !!password_hash,
       },
     });
   } catch (error) {
