@@ -46,11 +46,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Account or Stripe customer not found' });
     }
 
-    // List payment methods
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: account.stripe_customer_id,
-      limit: 100,
-    });
+    // List payment methods - fetch both cards and bank accounts
+    // Note: Stripe requires separate calls for different payment method types
+    const [cards, bankAccounts] = await Promise.all([
+      stripe.paymentMethods.list({
+        customer: account.stripe_customer_id,
+        type: 'card',
+        limit: 100,
+      }),
+      stripe.paymentMethods.list({
+        customer: account.stripe_customer_id,
+        type: 'us_bank_account',
+        limit: 100,
+      }),
+    ]);
+
+    const paymentMethods = {
+      data: [...cards.data, ...bankAccounts.data],
+    };
 
     // Get default payment method from subscription or customer
     let defaultPaymentMethod: string | null = null;
