@@ -42,10 +42,21 @@ export default async function handler(
 
     // Get all reservations for this member (match by phone or email)
     // Include private_events data for event reservations
-    const { data: reservations, error: reservationsError } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('reservations')
-      .select('*, private_events(title, name)')
-      .or(`phone.eq.${member.phone},email.eq.${member.email}`)
+      .select('*, private_events(title)');
+
+    // Build OR condition based on available contact info
+    const conditions = [];
+    if (member.phone) conditions.push(`phone.eq.${member.phone}`);
+    if (member.email) conditions.push(`email.eq.${member.email}`);
+
+    if (conditions.length === 0) {
+      return res.status(400).json({ error: 'Member has no contact information' });
+    }
+
+    const { data: reservations, error: reservationsError } = await query
+      .or(conditions.join(','))
       .order('start_time', { ascending: false });
 
     if (reservationsError) {
