@@ -8,6 +8,7 @@ import { getSupabaseClient } from "../api/supabaseClient";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import AddMemberModal from '../../components/members/AddMemberModal';
 import ArchivedMembersModal from '../../components/ArchivedMembersModal';
+import PendingMembersModal from '../../components/PendingMembersModal';
 import styles from '../../styles/Members.module.css';
 
 interface Member {
@@ -43,6 +44,7 @@ export default function MembersAdmin() {
   const [lookupQuery, setLookupQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isArchivedModalOpen, setIsArchivedModalOpen] = useState(false);
+  const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sortField, setSortField] = useState<SortField>(() => {
     if (typeof window !== 'undefined') {
@@ -114,10 +116,11 @@ export default function MembersAdmin() {
   async function fetchMembers() {
     try {
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('members')
         .select('*')
-        .eq('deactivated', false);
+        .eq('deactivated', false)
+        .neq('status', 'pending'); // Exclude pending members from main list
       if (error) throw error;
       setMembers(data || []);
     } catch (err: any) {
@@ -510,6 +513,17 @@ export default function MembersAdmin() {
                 <path d="M5 8h10M5 8a2 2 0 110-4h10a2 2 0 110 4M5 8v10a2 2 0 002 2h6a2 2 0 002-2V8m-3 4h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
+            <button
+              onClick={() => setIsPendingModalOpen(true)}
+              className={styles.iconButton}
+              title="View Pending Members"
+              aria-label="View pending members"
+            >
+              <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 6v4l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -846,6 +860,15 @@ export default function MembersAdmin() {
         onClose={() => setIsArchivedModalOpen(false)}
         onUnarchiveSuccess={() => {
           // Refresh the members list when a member is unarchived
+          fetchMembers();
+        }}
+      />
+
+      <PendingMembersModal
+        isOpen={isPendingModalOpen}
+        onClose={() => setIsPendingModalOpen(false)}
+        onStatusChangeSuccess={() => {
+          // Refresh the members list when a pending member status changes
           fetchMembers();
         }}
       />
