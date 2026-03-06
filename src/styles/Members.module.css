@@ -1603,3 +1603,14 @@
 .mobileChargeButton:active {
   transform: translateY(0);
 }
+
+/* Balance color indicators */
+.negative {
+  color: #ff3b30 !important; /* Red for amounts due */
+  font-weight: 600;
+}
+
+.positive {
+  color: #34c759 !important; /* Green for credit */
+  font-weight: 600;
+}

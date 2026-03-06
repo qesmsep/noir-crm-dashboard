@@ -29,9 +29,12 @@ interface LedgerTransaction {
   member_id: string;
   type: 'payment' | 'purchase';
   amount: number;
+  running_balance?: number;
+  date?: string;
+  created_at?: string;
 }
 
-type SortField = 'name' | 'join_date' | 'renewal_date' | 'ltv' | null;
+type SortField = 'name' | 'join_date' | 'renewal_date' | 'ltv' | 'balance' | null;
 type SortDirection = 'asc' | 'desc';
 
 export default function MembersAdmin() {
@@ -49,7 +52,7 @@ export default function MembersAdmin() {
   const [sortField, setSortField] = useState<SortField>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('membersSortField');
-      return (saved === 'name' || saved === 'join_date' || saved === 'renewal_date' || saved === 'ltv') ? saved : null;
+      return (saved === 'name' || saved === 'join_date' || saved === 'renewal_date' || saved === 'ltv' || saved === 'balance') ? saved : null;
     }
     return null;
   });
@@ -185,6 +188,24 @@ export default function MembersAdmin() {
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
   };
 
+  // Get current balance for an account from the most recent ledger entry
+  // Positive balance = credit, Negative balance = amount due
+  const calculateAccountBalance = (accountId: string) => {
+    if (!ledger || ledger.length === 0) return 0;
+
+    // Filter ledger entries for this account and sort by date (most recent first)
+    const accountLedger = ledger
+      .filter(tx => tx.account_id === accountId)
+      .sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+
+    // Return the running_balance from the most recent transaction
+    if (accountLedger.length > 0 && accountLedger[0].running_balance !== undefined) {
+      return Number(accountLedger[0].running_balance);
+    }
+
+    return 0;
+  };
+
   // Calculate next renewal date from join_date
   const getNextRenewal = (joinDate?: string): Date | null => {
     if (!joinDate) return null;
@@ -218,6 +239,7 @@ export default function MembersAdmin() {
     primaryMember: Member;
     allMembers: Member[];
     ltv: number;
+    balance: number;
     join_date?: string;
     renewal_date: Date | null;
   }
@@ -235,6 +257,7 @@ export default function MembersAdmin() {
       primaryMember: primary,
       allMembers: accountMembers,
       ltv: calculateAccountLTV(accountId),
+      balance: calculateAccountBalance(accountId),
       join_date: primary.join_date,
       renewal_date: getNextRenewal(primary.join_date),
     };
@@ -282,6 +305,9 @@ export default function MembersAdmin() {
         break;
       case 'ltv':
         comparison = a.ltv - b.ltv;
+        break;
+      case 'balance':
+        comparison = a.balance - b.balance;
         break;
     }
 
@@ -547,6 +573,7 @@ export default function MembersAdmin() {
                 <option value="join_date">Sign Up Date</option>
                 <option value="renewal_date">Renewal Date</option>
                 <option value="ltv">LTV</option>
+                <option value="balance">Balance</option>
               </select>
               {sortField && (
                 <button
@@ -671,6 +698,12 @@ export default function MembersAdmin() {
                         <span className={styles.mobileMetaLabel}>LTV</span>
                         <span className={styles.mobileMetaValue}>{formatCurrency(account.ltv)}</span>
                       </div>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>Balance</span>
+                        <span className={`${styles.mobileMetaValue} ${account.balance < 0 ? styles.negative : account.balance > 0 ? styles.positive : ''}`}>
+                          {formatCurrency(account.balance)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -715,12 +748,23 @@ export default function MembersAdmin() {
                       </span>
                     )}
                   </th>
-                  <th 
+                  <th
                     className={`${styles.sortableHeader} ${styles.thinColumn} ${sortField === 'ltv' ? styles.activeSort : ''}`}
                     onClick={() => handleSort('ltv')}
                   >
                     LTV
                     {sortField === 'ltv' && (
+                      <span className={styles.sortIndicator}>
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </th>
+                  <th
+                    className={`${styles.sortableHeader} ${styles.thinColumn} ${sortField === 'balance' ? styles.activeSort : ''}`}
+                    onClick={() => handleSort('balance')}
+                  >
+                    Balance
+                    {sortField === 'balance' && (
                       <span className={styles.sortIndicator}>
                         {sortDirection === 'asc' ? '↑' : '↓'}
                       </span>
@@ -838,6 +882,9 @@ export default function MembersAdmin() {
                       </td>
                       <td className={`${styles.ltvCell} ${styles.thinCell}`}>
                         {formatCurrency(account.ltv)}
+                      </td>
+                      <td className={`${styles.ltvCell} ${styles.thinCell} ${account.balance < 0 ? styles.negative : account.balance > 0 ? styles.positive : ''}`}>
+                        {formatCurrency(account.balance)}
                       </td>
                     </tr>
                   );

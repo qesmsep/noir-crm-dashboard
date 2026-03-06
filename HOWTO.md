@@ -1226,16 +1226,21 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 - Create, pause, resume, cancel, and reactivate subscriptions
 - Upgrade/downgrade subscription plans with proration
 - Payment method management
-- Subscription status tracking (active, paused, canceled, past_due)
+- Subscription status tracking (active, paused, canceled, past_due, trialing)
 - Transaction history (Stripe invoices)
 - **MRR Breakdown Display**: Shows base subscription + additional member fees
   - Base Subscription: Fetched from Stripe price.unit_amount (actual plan cost)
-  - Additional Members: Count × $25/mo per secondary member
+  - Additional Members: Dynamic rate based on plan type (see below)
   - Total MRR: Sum displayed with visual hierarchy and divider
 - **Credit Card Processing Fee Toggle**: Per-account 4% fee on credit card transactions
   - ACH/bank transfers exempt from fee
   - Stored in `accounts.credit_card_fee_enabled` column
   - Toggle accessible in Payment Settings section
+- **Subscription Creation Modal**: Admin can create subscriptions from member detail page
+  - Lists all available plans from Stripe
+  - Creates subscription with 1-day trial to avoid "incomplete" status
+  - Automatically updates account with subscription info
+  - Member can add payment method later via member portal
 
 **Subscription States & Actions**:
 
@@ -1246,19 +1251,42 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 | **Scheduled Cancellation** | Reactivate, Update Plan, Update Payment | Reactivate · Update Plan · Update Payment |
 | **No Subscription** | Create Subscription | Create Subscription |
 
+**Dynamic Additional Member Fees**:
+
+The system automatically adjusts additional member fees based on the subscription plan:
+- **Skyline Membership** ($10/month base): $0 per additional member (free)
+- **All other plans**: $25/month per additional member
+
+This is calculated by checking if `base_mrr === 10`, making Skyline a special "unlimited members" tier.
+
 **API Endpoints**:
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/subscriptions/create` | POST | Create new subscription for account |
+| `/api/subscriptions/create` | POST | Create new subscription for account (adds 1-day trial) |
 | `/api/subscriptions/pause` | POST | Pause subscription (stops billing) |
 | `/api/subscriptions/resume` | POST | Resume paused subscription |
 | `/api/subscriptions/cancel` | PUT | Cancel subscription at end of billing period |
 | `/api/subscriptions/reactivate` | POST | Remove scheduled cancellation |
 | `/api/subscriptions/update-plan` | POST | Upgrade or downgrade subscription tier |
-| `/api/subscriptions/plans` | GET | List all available subscription plans |
+| `/api/subscriptions/plans` | GET | List all available subscription plans from Stripe |
 | `/api/subscriptions/list` | GET | List all Stripe subscriptions with account data |
 | `/api/subscriptions/[subscriptionId]` | GET | Get single subscription details |
+
+**Example: Create Subscription**
+```typescript
+// POST /api/subscriptions/create
+{
+  "member_id": "uuid-here",  // Primary member ID
+  "price_id": "price_xxx"    // Stripe price ID from /api/subscriptions/plans
+}
+
+// Response:
+{
+  "subscription": { /* Stripe subscription object with 1-day trial */ },
+  "client_secret": "pi_xxx_secret_yyy" // If payment confirmation needed
+}
+```
 
 **Example: Pause Subscription**
 ```typescript
@@ -1363,6 +1391,11 @@ The member portal uses a simplified two-step flow to avoid Stripe iframe click d
    - **ACH/Bank**: Redirects to Stripe Checkout hosted page (avoids iframe entirely)
 
 **Technical Implementation**:
+- **MemberSubscriptionCard** (`src/components/MemberSubscriptionCard.tsx`): Main subscription management UI with dynamic fee calculation
+- **CreateSubscriptionModal** (`src/components/CreateSubscriptionModal.tsx`): Modal for admin to create new subscriptions with plan selection
+- **UpdatePlanModal** (`src/components/UpdatePlanModal.tsx`): Modal for changing subscription plans
+- **UpdatePaymentModal** (`src/components/UpdatePaymentModal.tsx`): Modal for updating payment methods
+- **AddSecondaryMemberModal** (`src/components/AddSecondaryMemberModal.tsx`): Shows dynamic fees ($0 for Skyline, $25 for others)
 - **AddPaymentMethodModal** (`src/components/member/AddPaymentMethodModal.tsx`): Two-step modal with payment type selection
 - **CardElement API**: Stable, direct integration for cards (no PaymentElement wrapper)
 - **Stripe Checkout Redirect**: ACH setup uses hosted Stripe Checkout Session for reliable bank verification
@@ -3670,6 +3703,111 @@ This section maintains a running log of all significant commits and changes to t
 - Mobile-optimized button layouts
 - Inline edit buttons for better space utilization
 - Danger button styling for destructive actions
+
+---
+
+### 2026-03-06 - Business Dashboard Enhancements & Member Status Cleanup
+
+**Summary**: Comprehensive updates to business dashboard with new revenue tracking metrics, member/account counting improvements, and standardization of member status field as the source of truth.
+
+**New Features**:
+
+1. **Business Dashboard Revenue Metrics**
+   - Added "Current Month Total Revenue" card - Shows real-time revenue from all member payments (dues + purchases) for the current month with clickable chart
+   - Added "Last Month Total Revenue" card - Displays total revenue from the previous complete month
+   - Added "Active Members" card - Count of individual members with status='active'
+   - Added "Active Accounts" card - Count of accounts with primary membership as Skyline, Solo, or Duo
+   - Removed "Avg Monthly Total Revenue" card (calculation was inaccurate)
+   - Interactive modal chart showing 12-month revenue trend with:
+     - Y-axis in $3k increments
+     - Horizontal gridlines
+     - Proper scaling and labels
+     - Chronological display (oldest to newest)
+
+2. **Dashboard Data Accuracy Review**
+   - Verified all existing dashboard cards pull correct data from database
+   - Confirmed MRR, Outstanding Balances, and monthly revenue calculations are accurate
+   - Updated business dashboard to use `status='active'` filter instead of `deactivated=false`
+
+3. **Financial Metrics API Enhancements** (`/api/financial-metrics`)
+   - Added `ytdRevenue` calculation - Year-to-date total revenue from all payments
+   - Added `lastYearRevenue` calculation - Total revenue from previous year
+   - Added `averageMonthlyRevenue` - Average of last 3 full months of total revenue
+   - Added `monthlyBreakdown` - Last 12 months of revenue data for charting
+   - All calculations based on ledger transactions with `type='payment'`
+
+4. **Member Status Field Standardization**
+   - **Breaking Change**: Standardized on `status` field as the single source of truth for member state
+   - Updated `/api/members` to filter by `status='active'` instead of `deactivated=false`
+   - Updated business dashboard queries to use `status` field
+   - Data cleanup performed:
+     - 8 members changed from `status='active', deactivated=true` to `status='deactivated'`
+     - 1 duplicate entry changed from `status='pending'` to `status='payment_failed'`
+     - 17 members changed from `status='pending'` to `status='active'`
+
+5. **Member Status Values** (Standardized):
+   - `active` - Currently paying member (120 members)
+   - `pending` - Onboarding/awaiting approval (3 members remaining)
+   - `inactive` - No longer active but not formally deactivated (3 members)
+   - `deactivated` - Formally deactivated/cancelled (8 members)
+   - `payment_failed` - Payment issues (1 member)
+
+6. **Chart Improvements**
+   - Enhanced BarChart component with y-axis labels and gridlines
+   - Configurable tick increments ($3k for revenue charts)
+   - Proper height scaling for modal display (320px)
+   - Tooltip hover showing exact values
+
+**Database Insights**:
+- Total members in system: 153
+- Active members (status='active'): 120
+- Member counting now correctly excludes pending/inactive/deactivated members
+- `deactivated` field remains as boolean but `status` is authoritative
+
+**API Changes**:
+- `GET /api/financial-metrics` - Added new fields: `ytdRevenue`, `lastYearRevenue`, `averageMonthlyRevenue` (with `monthlyBreakdown`)
+- `GET /api/members` - Changed filter from `deactivated=false` to `status='active'`
+
+**Components Modified**:
+- `/admin/business.tsx` - Business dashboard with new revenue cards and modal chart
+- `/admin/dashboard.tsx` - Dashboard v1 with YTD/Last Year revenue cards
+- `/admin/dashboard-v2.tsx` - Dashboard v2 with revenue tracking
+- `BarChart` component - Enhanced with y-axis, gridlines, and configurable scaling
+
+**Business Dashboard Updates**:
+- Revenue Health section now includes 6 key metrics: MRR, ARR, Current Month, Last Month, Active Members, Active Accounts
+- Member Health section displays metrics from business snapshot data
+- All revenue metrics include complete transaction data (dues + purchases)
+- Clickable revenue cards open modal with 12-month trend visualization
+
+**Future Considerations**:
+- Consider migrating `deactivated` field from boolean to timestamp (deactivation date)
+- Potential to add `status` enum constraint in database for data integrity
+- May want to add status transition history/audit log
+
+**Files Modified**:
+- `src/pages/admin/business.tsx`
+- `src/pages/admin/dashboard.tsx`
+- `src/pages/admin/dashboard-v2.tsx`
+- `src/pages/api/financial-metrics.js`
+- `src/pages/api/members.js`
+- `src/styles/BusinessDashboard.module.css`
+
+**Data Changes** (Direct database updates):
+- 8 members updated to `status='deactivated'`
+- 1 member updated to `status='payment_failed'`
+- 17 members updated to `status='active'`
+- 1 member (Maria Rodriguez) updated to `status='active'`
+
+**Testing Recommendations**:
+1. Verify business dashboard displays correct member counts
+2. Confirm revenue metrics match ledger transactions
+3. Test clickable revenue cards and modal chart display
+4. Verify members page shows 120 active members (matching business dashboard)
+5. Check that pending members (Tessa, Kent, Ka'Von) are correctly excluded from active count
+
+**Status**: Complete and tested
+**Git Commits**: Ready for approval
 
 **Git Commits**:
 - `fa6fd03` - Enhance inventory system with improved UX and customizable settings
