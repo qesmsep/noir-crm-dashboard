@@ -89,9 +89,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Create subscription
+    // Add a 1-day trial to avoid 'incomplete' status when no payment method is attached
+    // This allows admin to create subscription and member can add payment method later
     const subscriptionParams: Stripe.SubscriptionCreateParams = {
       customer: customerId,
       items: [{ price: price_id }],
+      trial_period_days: 1,
       payment_behavior: 'default_incomplete',
       payment_settings: { save_default_payment_method: 'on_subscription' },
       expand: ['latest_invoice.payment_intent'],
@@ -122,27 +125,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const amount = price ? price.unit_amount! / 100 : 0;
     const mrr = price?.recurring?.interval === 'year' ? amount / 12 : amount;
 
-    console.log('Updating account:', member.account_id, 'with subscription:', subscription.id);
+    console.log('Updating account:', member.account_id, 'with subscription:', subscription.id, 'status:', subscription.status);
 
-    const { data: updateData, error: updateError } = await supabase
-      .from('accounts')
-      .update({
-        stripe_subscription_id: subscription.id,
-        subscription_status: subscription.status,
-        subscription_start_date: new Date(subscription.created * 1000).toISOString(),
-        next_renewal_date: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : null,
-        monthly_dues: mrr,
-      })
-      .eq('account_id', member.account_id);
+    // Only update account if subscription status is not 'incomplete' or 'incomplete_expired'
+    // The webhook will update the account when the subscription becomes active
+    if (subscription.status !== 'incomplete' && subscription.status !== 'incomplete_expired') {
+      const { data: updateData, error: updateError } = await supabase
+        .from('accounts')
+        .update({
+          stripe_subscription_id: subscription.id,
+          subscription_status: subscription.status,
+          subscription_start_date: new Date(subscription.created * 1000).toISOString(),
+          next_renewal_date: subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
+          monthly_dues: mrr,
+        })
+        .eq('account_id', member.account_id);
 
-    if (updateError) {
-      console.error('Error updating account with subscription info:', updateError);
-      throw new Error(`Failed to update account: ${updateError.message}`);
+      if (updateError) {
+        console.error('Error updating account with subscription info:', updateError);
+        throw new Error(`Failed to update account: ${updateError.message}`);
+      }
+
+      console.log('Account updated with subscription info:', updateData);
+    } else {
+      console.log('Subscription status is incomplete, skipping account update. Webhook will handle it when status changes.');
     }
-
-    console.log('Account updated with subscription info:', updateData);
 
     // Log subscription event
     await supabase.from('subscription_events').insert({

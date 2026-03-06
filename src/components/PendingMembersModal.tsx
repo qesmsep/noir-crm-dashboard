@@ -110,35 +110,36 @@ export default function PendingMembersModal({ isOpen, onClose, onStatusChangeSuc
   if (!isOpen) return null;
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContainer} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Pending Members</h2>
-          <button className={styles.closeButton} onClick={onClose}>×</button>
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>Pending Members</h2>
+          <button className={styles.closeButton} onClick={onClose} aria-label="Close">
+            ×
+          </button>
         </div>
 
-        <div className={styles.modalBody}>
+        <div className={styles.content}>
           {loading ? (
-            <div className={styles.loading}>Loading...</div>
+            <div className={styles.loading}>Loading pending members...</div>
           ) : pendingMembers.length === 0 ? (
-            <div className={styles.emptyState}>
-              <p>No pending members</p>
-            </div>
+            <div className={styles.empty}>No pending members</div>
           ) : (
             <div className={styles.membersList}>
               {pendingMembers.map((member) => (
                 <div key={member.member_id} className={styles.memberCard}>
-                  <div className={styles.memberInfo} onClick={() => handleViewMember(member.account_id)}>
+                  <div className={styles.memberInfo}>
                     {member.photo ? (
-                      <Image
-                        src={member.photo}
-                        alt={`${member.first_name} ${member.last_name}`}
-                        width={48}
-                        height={48}
-                        className={styles.memberPhoto}
-                      />
+                      <div className={styles.memberPhoto}>
+                        <Image
+                          src={member.photo}
+                          alt={`${member.first_name} ${member.last_name}`}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                        />
+                      </div>
                     ) : (
-                      <div className={styles.memberPhotoPlaceholder}>
+                      <div className={styles.photoPlaceholder}>
                         {member.first_name?.[0]}{member.last_name?.[0]}
                       </div>
                     )}
@@ -152,19 +153,29 @@ export default function PendingMembersModal({ isOpen, onClose, onStatusChangeSuc
                       {member.email && <div className={styles.memberContact}>{member.email}</div>}
                       {member.phone && <div className={styles.memberContact}>{member.phone}</div>}
                       {member.join_date && (
-                        <div className={styles.memberJoinDate}>
+                        <div className={styles.memberContact}>
                           Joined: {new Date(member.join_date).toLocaleDateString()}
                         </div>
                       )}
                     </div>
                   </div>
-                  <button
-                    className={styles.actionButton}
-                    onClick={() => handleMarkIncomplete(member.member_id, `${member.first_name} ${member.last_name}`)}
-                    disabled={processing === member.member_id}
-                  >
-                    {processing === member.member_id ? 'Processing...' : 'Mark Incomplete'}
-                  </button>
+                  <div className={styles.actions}>
+                    <button
+                      onClick={() => handleViewMember(member.account_id)}
+                      className={styles.viewButton}
+                      title="View member details"
+                    >
+                      View
+                    </button>
+                    <button
+                      className={styles.unarchiveButton}
+                      onClick={() => handleMarkIncomplete(member.member_id, `${member.first_name} ${member.last_name}`)}
+                      disabled={processing === member.member_id}
+                      title="Mark as incomplete"
+                    >
+                      {processing === member.member_id ? 'Processing...' : 'Mark Incomplete'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
