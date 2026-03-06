@@ -73,17 +73,14 @@ export default async function handler(
     // Cancel the reservation
     const { data: cancelledReservation, error: cancelError } = await supabaseAdmin
       .from('reservations')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: 'cancelled' })
       .eq('id', validatedData.reservation_id)
       .select()
       .single();
 
     if (cancelError) {
       console.error('Error cancelling reservation:', cancelError);
-      return res.status(500).json({ error: 'Failed to cancel reservation' });
+      return res.status(500).json({ error: 'Failed to cancel reservation', details: cancelError.message });
     }
 
     // TODO: Send cancellation SMS notification (optional)
