@@ -33,13 +33,10 @@ export default function MemberDashboardPage() {
   // Date-only strings from DB should be treated as local dates, not UTC
   const parseLocalDate = (dateString: string) => {
     if (!dateString) return new Date();
-    // If it's a date-only string (YYYY-MM-DD), parse it as local time
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      const [year, month, day] = dateString.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-    // Otherwise parse normally (for full timestamps)
-    return new Date(dateString);
+    // Parse date string manually to avoid timezone issues
+    // Split by 'T' first to handle both timestamps and date-only strings
+    const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+    return new Date(year, month - 1, day);
   };
 
   // Debug: Log member data when it changes
@@ -190,54 +187,64 @@ export default function MemberDashboardPage() {
 
   const fetchUpcomingEvents = async () => {
     try {
-      // Fetch both Noir events and private events
-      const [noirResponse, reservationsResponse] = await Promise.all([
+      // Fetch Noir events, all private events, and member's reservations
+      const [noirResponse, privateEventsResponse, reservationsResponse] = await Promise.all([
         fetch('/api/noir-member-events', { credentials: 'include' }),
+        fetch('/api/member/private-events', { credentials: 'include' }),
         fetch('/api/member/reservations', { credentials: 'include' })
       ]);
 
       const now = new Date();
-      let allEvents: any[] = [];
+      const eventMap = new Map<string, any>(); // Use map to deduplicate by ID
       const rsvpdEventIds = new Set<string>();
+      const noirEventIds = new Set<string>();
 
-      // Get reservations first to track RSVP'd events
+      // Get reservations to track which events the member has RSVP'd to
       let reservations: any[] = [];
       if (reservationsResponse.ok) {
         const reservationsData = await reservationsResponse.json();
         reservations = reservationsData.reservations || [];
 
-        // Track which private events the member has RSVP'd to
+        // Track which events the member has RSVP'd to (exclude cancelled)
         reservations.forEach((r: any) => {
-          if (r.private_event_id) {
+          if (r.private_event_id && r.status !== 'cancelled') {
             rsvpdEventIds.add(r.private_event_id);
           }
         });
       }
 
-      // Get Noir events
+      // Get Noir events first (they take priority)
       if (noirResponse.ok) {
         const noirData = await noirResponse.json();
-        const noirEvents = (noirData.events || []).map((e: any) => ({
-          ...e,
-          eventType: 'noir',
-          displayTitle: e.title,
-          hasRSVPd: false // Noir events don't track RSVPs in reservations
-        }));
-        allEvents = [...allEvents, ...noirEvents];
+        (noirData.events || []).forEach((e: any) => {
+          noirEventIds.add(e.id);
+          eventMap.set(e.id, {
+            ...e,
+            eventType: 'noir',
+            displayTitle: e.title,
+            hasRSVPd: rsvpdEventIds.has(e.id)
+          });
+        });
       }
 
-      // Get private events from reservations
-      const privateEvents = reservations
-        .filter((r: any) => r.private_events && r.private_events.title)
-        .map((r: any) => ({
-          ...r,
-          title: r.private_events.title,
-          eventType: 'private',
-          displayTitle: 'Private Event',
-          end_time: r.end_time,
-          hasRSVPd: true
-        }));
-      allEvents = [...allEvents, ...privateEvents];
+      // Get private events - only add if NOT already in Noir events (to avoid duplicates)
+      if (privateEventsResponse.ok) {
+        const privateData = await privateEventsResponse.json();
+        (privateData.events || []).forEach((e: any) => {
+          // Only add if this event is NOT a Noir event
+          if (!noirEventIds.has(e.id)) {
+            eventMap.set(e.id, {
+              ...e,
+              eventType: 'private',
+              displayTitle: 'Private Event',
+              hasRSVPd: rsvpdEventIds.has(e.id)
+            });
+          }
+        });
+      }
+
+      // Convert map to array and filter/sort
+      const allEvents = Array.from(eventMap.values());
 
       // Filter for upcoming events and sort by start time
       const upcoming = allEvents
@@ -301,8 +308,9 @@ export default function MemberDashboardPage() {
   };
 
   const handleReservationCreated = useCallback(() => {
-    // Refresh the next reservation after creating a new one
+    // Refresh the next reservation and balance after creating a new one
     fetchNextReservation();
+    fetchCurrentBalance();
   }, []);
 
   const handleBookClick = useCallback(() => {
@@ -721,9 +729,15 @@ export default function MemberDashboardPage() {
                             {event.displayTitle || event.title}
                           </p>
                           <p className="text-xs text-right whitespace-nowrap leading-tight m-0">
-                            {event.hasRSVPd ? (
+                            {event.eventType === 'private' ? (
+                              event.hasRSVPd ? (
+                                <span className="text-[#4CAF50]">RSVP'd</span>
+                              ) : (
+                                <span className="text-[#8C7C6D]">Closed</span>
+                              )
+                            ) : event.hasRSVPd ? (
                               <span className="text-[#4CAF50]">RSVP'd</span>
-                            ) : event.rsvpEnabled && event.rsvpUrl && event.eventType === 'noir' ? (
+                            ) : event.rsvpEnabled && event.rsvpUrl ? (
                               <span
                                 onClick={(e) => {
                                   e.stopPropagation();

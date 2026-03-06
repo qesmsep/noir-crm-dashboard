@@ -274,85 +274,8 @@ export default async function handler(req, res) {
       return res.json({ success: true, debug: debugInfo });
     }
 
-    // Handle subscription renewal events
-    if (event.type === 'invoice.paid') {
-      const invoice = event.data.object;
-      console.log('Processing invoice.paid:', {
-        invoiceId: invoice.id,
-        customerId: invoice.customer,
-        amount: invoice.amount_paid
-      });
-      
-      // Only process subscription invoices
-      if (invoice.subscription) {
-        // Check if ledger entry already exists for this invoice
-        const exists = await checkExistingLedgerEntry(invoice.id, null);
-        if (exists) {
-          console.log('Ledger entry already exists for invoice:', invoice.id);
-          return res.json({ success: true, message: 'Ledger entry already exists' });
-        }
-
-        // Get the customer ID from the invoice
-        const customerId = invoice.customer;
-        
-        // Find the account with this Stripe customer ID
-        const { data: account, error: accountError } = await supabase
-          .from('accounts')
-          .select('account_id')
-          .eq('stripe_customer_id', customerId)
-          .limit(1)
-          .single();
-
-        if (accountError || !account) {
-          console.log('No account found for customer ID:', customerId, accountError);
-          return res.json({ received: true });
-        }
-
-        // Check for duplicate payment by amount and date
-        const paymentAmount = invoice.amount_paid / 100;
-        const paymentDate = new Date().toISOString().split('T')[0];
-        const duplicateExists = await checkDuplicatePayment(account.account_id, paymentAmount, paymentDate);
-        if (duplicateExists) {
-          console.log('Duplicate payment detected for account:', account.account_id, 'amount:', paymentAmount, 'date:', paymentDate);
-          return res.json({ success: true, message: 'Duplicate payment detected' });
-        }
-
-        // Get the primary member for this account to associate with the payment
-        const { data: primaryMember, error: memberError } = await supabase
-          .from('members')
-          .select('member_id')
-          .eq('account_id', account.account_id)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .single();
-
-        if (memberError || !primaryMember) {
-          console.log('No primary member found for account:', account.account_id, memberError);
-          return res.json({ received: true });
-        }
-
-        // Add the payment to the ledger with updated description format
-        const { error: ledgerError } = await supabase
-          .from('ledger')
-          .insert({
-            account_id: account.account_id,
-            member_id: primaryMember.member_id,
-            amount: invoice.amount_paid / 100, // Convert from cents to dollars
-            type: 'payment',
-            note: formatSubscriptionDescription(invoice),
-            date: paymentDate,
-            stripe_invoice_id: invoice.id
-          });
-
-        if (ledgerError) {
-          console.error('Error adding payment to ledger:', ledgerError);
-          return res.status(500).json({ error: 'Failed to update ledger' });
-        }
-
-        console.log('Successfully processed subscription renewal for account:', account.account_id);
-        return res.json({ success: true });
-      }
-    }
+    // NOTE: invoice.paid is now handled by /api/stripe-webhook-subscriptions
+    // This webhook only handles non-subscription payments (checkout, manual charges, ACH)
 
     // Handle manual payment events
     if (event.type === 'payment_intent.succeeded') {
@@ -360,19 +283,28 @@ export default async function handler(req, res) {
       console.log('Processing payment_intent.succeeded:', {
         paymentIntentId: paymentIntent.id,
         customerId: paymentIntent.customer,
-        amount: paymentIntent.amount
+        amount: paymentIntent.amount,
+        invoice: paymentIntent.invoice
       });
-      
+
+      // Skip payment intents associated with invoices (subscription payments)
+      // Those are handled by /api/stripe-webhook-subscriptions
+      if (paymentIntent.invoice) {
+        console.log('Skipping payment intent associated with invoice:', paymentIntent.invoice);
+        console.log('This will be handled by the subscription webhook');
+        return res.json({ received: true, skipped: 'subscription payment' });
+      }
+
       // Check if ledger entry already exists for this payment intent
       const exists = await checkExistingLedgerEntry(null, paymentIntent.id);
       if (exists) {
         console.log('Ledger entry already exists for payment intent:', paymentIntent.id);
         return res.json({ success: true, message: 'Ledger entry already exists' });
       }
-      
+
       // Get the customer ID from the payment intent
       const customerId = paymentIntent.customer;
-      
+
       // Ignore payments without a customer ID
       if (!customerId) {
         console.log('No customer ID found in payment intent');

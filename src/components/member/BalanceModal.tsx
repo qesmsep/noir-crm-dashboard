@@ -32,13 +32,10 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
   // Date-only strings from DB should be treated as local dates, not UTC
   const parseLocalDate = (dateString: string) => {
     if (!dateString) return new Date();
-    // If it's a date-only string (YYYY-MM-DD), parse it as local time
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      const [year, month, day] = dateString.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-    // Otherwise parse normally (for full timestamps)
-    return new Date(dateString);
+    // Parse date string manually to avoid timezone issues
+    // Split by 'T' first to handle both timestamps and date-only strings
+    const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+    return new Date(year, month - 1, day);
   };
 
   useEffect(() => {

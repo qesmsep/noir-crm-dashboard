@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { getTodayLocalDate } from '@/lib/utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -124,7 +125,7 @@ async function createMemberFromWaitlist(waitlist: any) {
       member_id: member.member_id,
       type: 'payment',
       amount: (waitlist.payment_amount / 100).toFixed(2), // Convert cents to dollars
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayLocalDate(),
       note: `Initial ${waitlist.selected_membership} membership payment`,
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id
     });

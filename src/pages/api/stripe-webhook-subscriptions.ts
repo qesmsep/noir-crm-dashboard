@@ -2,6 +2,7 @@ import { buffer } from 'micro';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { getTodayLocalDate } from '@/lib/utils';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
@@ -586,11 +587,14 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     return;
   }
 
-  const transactionDate = new Date().toISOString().split('T')[0];
+  const transactionDate = getTodayLocalDate();
   const totalAmountPaid = invoice.amount_paid / 100; // Convert cents to dollars
 
-  // Check for duplicate payment by Stripe charge ID
+  // Check for duplicate payment by Stripe charge ID or invoice ID
   const chargeId = (invoice as any).charge as string | null;
+  const invoiceId = invoice.id;
+
+  // Check by charge ID
   if (chargeId) {
     const { data: existingPayment } = await supabase
       .from('ledger')
@@ -601,6 +605,21 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
     if (existingPayment) {
       console.log('⚠️ Duplicate payment detected for charge:', chargeId);
+      return;
+    }
+  }
+
+  // Check by invoice ID (prevents duplicates from old webhook handler)
+  if (invoiceId) {
+    const { data: existingInvoice } = await supabase
+      .from('ledger')
+      .select('id')
+      .eq('stripe_invoice_id', invoiceId)
+      .limit(1)
+      .single();
+
+    if (existingInvoice) {
+      console.log('⚠️ Duplicate payment detected for invoice:', invoiceId);
       return;
     }
   }
@@ -628,6 +647,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       note: `Subscription Payment (${invoice.id})`,
       date: transactionDate,
       stripe_charge_id: chargeId || null,
+      stripe_invoice_id: invoiceId || null,
     });
 
   if (paymentError) {

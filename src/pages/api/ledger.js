@@ -6,6 +6,15 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Helper function to get current date in local timezone as YYYY-MM-DD
+function getTodayLocalDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default async function handler(req, res) {
   console.log('Ledger handler:', req.method, req.body, req.query);
   try {
@@ -83,7 +92,7 @@ export default async function handler(req, res) {
             type,
             amount: amt,
             note,
-            date: date || new Date().toISOString().split('T')[0]
+            date: date || getTodayLocalDate()
           }
         ])
         .select()
@@ -101,7 +110,7 @@ export default async function handler(req, res) {
       if (!id || !type || isNaN(amt)) {
         return res.status(400).json({ error: "Missing required fields" });
       }
-      const dateString = date ? date : new Date().toISOString().split('T')[0];
+      const dateString = date ? date : getTodayLocalDate();
       const { data, error } = await supabaseAdmin
         .from("ledger")
         .update({ type, amount: amt, note, date: dateString })

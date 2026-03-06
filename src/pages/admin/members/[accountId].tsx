@@ -11,6 +11,7 @@ import SubscriptionTransactionHistory from '../../../components/SubscriptionTran
 import AddSecondaryMemberModal from '../../../components/AddSecondaryMemberModal';
 import PhotoCropUpload from '../../../components/PhotoCropUpload';
 import styles from '../../../styles/MemberDetail.module.css';
+import { getTodayLocalDate } from '@/lib/utils';
 
 interface Member {
   member_id: string;
@@ -459,7 +460,7 @@ export default function MemberDetailAdmin() {
         body: JSON.stringify({
           ...newTransaction,
           account_id: accountId,
-          date: newTransaction.date || new Date().toISOString().split('T')[0],
+          date: newTransaction.date || getTodayLocalDate(),
         }),
       });
 
