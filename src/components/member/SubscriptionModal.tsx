@@ -127,10 +127,10 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-[#1F1F1F]">
-              Subscription & Members
+              Membership & Members
             </DialogTitle>
             <DialogDescription className="text-sm text-[#5A5A5A] mt-1">
-              Manage your subscription, members, and payment methods
+              Manage your membership, members, and payment methods
             </DialogDescription>
           </DialogHeader>
 
@@ -141,10 +141,10 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
               </div>
             ) : (
               <>
-                {/* Subscription Overview */}
+                {/* Membership Overview */}
                 <div className="bg-[#F6F5F2] rounded-xl p-4 border border-[#ECEAE5]">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-base font-semibold text-[#1F1F1F]">Subscription</h3>
+                    <h3 className="text-base font-semibold text-[#1F1F1F]">Membership</h3>
                     <Badge className={`text-white text-xs ${
                       subscriptionData?.subscription_status === 'active' ? 'bg-[#4CAF50]' :
                       subscriptionData?.subscription_status === 'past_due' ? 'bg-[#FF9800]' :
@@ -157,7 +157,7 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-[#8C7C6D]">Base Subscription</span>
+                      <span className="text-xs text-[#8C7C6D]">Base Membership</span>
                       <span className="text-xs font-medium text-[#1F1F1F]">{formatCurrency(baseMRR)}/mo</span>
                     </div>
 

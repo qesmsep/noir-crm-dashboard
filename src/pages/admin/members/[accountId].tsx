@@ -1902,7 +1902,7 @@ export default function MemberDetailAdmin() {
             </div>
 
             <div className={styles.ledgerColumn}>
-            {/* Subscription Card - Account-level subscription */}
+            {/* Membership Card - Account-level membership */}
             <MemberSubscriptionCard
               accountId={accountId as string}
               creditCardFeeEnabled={creditCardFeeEnabled}
@@ -1911,7 +1911,7 @@ export default function MemberDetailAdmin() {
               totalLTV={members.reduce((sum, member) => sum + calculateMemberLTV(member.member_id), 0)}
             />
 
-            {/* Quick Actions Card - Between Subscription and Ledger */}
+            {/* Quick Actions Card - Between Membership and Ledger */}
             <div className={styles.ledgerActionsCard}>
                 <button
                   className={styles.ledgerActionsHeader}

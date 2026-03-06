@@ -328,9 +328,9 @@ export default function MemberSubscriptionCard({
     return (
       <div className={styles.card}>
         <div className={styles.header}>
-          <h3 className={styles.title}>Subscription</h3>
+          <h3 className={styles.title}>Membership</h3>
         </div>
-        <div className={styles.loading}>Loading subscription data...</div>
+        <div className={styles.loading}>Loading membership data...</div>
       </div>
     );
   }
@@ -340,15 +340,15 @@ export default function MemberSubscriptionCard({
       <>
         <div className={styles.card}>
           <div className={styles.header}>
-            <h3 className={styles.title}>Subscription</h3>
+            <h3 className={styles.title}>Membership</h3>
           </div>
           <div className={styles.noSubscription}>
-            <p>No active subscription</p>
+            <p>No active membership</p>
             <button
               className={styles.createButton}
               onClick={() => setShowCreateSubscriptionModal(true)}
             >
-              Create Subscription
+              Create Membership
             </button>
           </div>
         </div>
@@ -394,7 +394,7 @@ export default function MemberSubscriptionCard({
     <div className={styles.card}>
       <div className={styles.header} style={{ cursor: 'pointer' }} onClick={() => setIsExpanded(!isExpanded)}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <h3 className={styles.title}>Subscription</h3>
+          <h3 className={styles.title}>Membership</h3>
           <svg
             width="20"
             height="20"
@@ -466,9 +466,9 @@ export default function MemberSubscriptionCard({
           <>
             <div className={styles.divider} style={{ marginTop: '0.75rem' }} />
 
-            {/* Base Subscription */}
+            {/* Base Membership */}
             <div className={styles.row}>
-              <span className={styles.label}>Base Subscription</span>
+              <span className={styles.label}>Base Membership</span>
               <span className={styles.value}>{formatCurrency(baseMRR)}/mo</span>
             </div>
 
@@ -506,7 +506,7 @@ export default function MemberSubscriptionCard({
             onClick={handleResumeSubscription}
             disabled={actionLoading}
           >
-            {actionLoading ? 'Processing...' : 'Resume Subscription'}
+            {actionLoading ? 'Processing...' : 'Resume Membership'}
           </button>
         ) : (
           <>

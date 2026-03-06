@@ -555,7 +555,7 @@ export default function MemberDashboardPage() {
 
           {/* Additional Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Subscription Card */}
+            {/* Membership Card */}
             <Card
               className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
               onClick={() => setIsSubscriptionModalOpen(true)}
@@ -564,7 +564,7 @@ export default function MemberDashboardPage() {
                 <CardTitle className="flex items-center gap-3">
                   <Users className="w-5 h-5 text-[#A59480]" />
                   <span className="text-xl font-semibold text-[#1F1F1F]">
-                    Subscription
+                    Membership
                   </span>
                 </CardTitle>
               </CardHeader>
@@ -582,7 +582,7 @@ export default function MemberDashboardPage() {
                         {/* Base + Additional Members breakdown */}
                         <div className="space-y-1 mb-2">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-[#8C7C6D]">Base Subscription</span>
+                            <span className="text-[#8C7C6D]">Base Membership</span>
                             <span className="text-[#5A5A5A] font-medium">${baseMRR.toFixed(2)}/mo</span>
                           </div>
                           {secondaryMemberCount > 0 && (
@@ -629,7 +629,7 @@ export default function MemberDashboardPage() {
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-[#8C7C6D]">Click to manage subscription & members</p>
+                <p className="text-xs text-[#8C7C6D]">Click to manage membership & members</p>
               </CardContent>
             </Card>
 
