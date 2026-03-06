@@ -1377,8 +1377,10 @@ The payment method system supports two payment types with instant verification f
 | `/api/stripe/payment-methods/setup-intent` | POST | Create SetupIntent with Financial Connections for instant ACH or card |
 | `/api/stripe/checkout/setup-ach` | POST | Create Stripe Checkout Session for ACH setup (member portal flow) |
 | `/api/stripe/payment-methods/set-default` | PUT | Set payment method as default on Stripe customer |
-| `/api/stripe/payment-methods/list` | GET | List all payment methods for account with default flag |
+| `/api/stripe/payment-methods/list` | GET | List all payment methods (card + us_bank_account) with default flag |
 | `/api/stripe/payment-methods/detach` | DELETE | Remove payment method from Stripe customer |
+| `/api/stripe/payment-methods/create-from-fc` | POST | Create PaymentMethod from Financial Connections account |
+| `/api/stripe/setup-intents/[id]` | GET | Retrieve SetupIntent with latest_attempt details |
 | `/api/accounts/update-credit-card-fee` | PUT | Toggle 4% credit card fee setting for account |
 
 **Member Portal Payment Flow** (2-Step Process):
@@ -1394,13 +1396,21 @@ The member portal uses a simplified two-step flow to avoid Stripe iframe click d
 - **MemberSubscriptionCard** (`src/components/MemberSubscriptionCard.tsx`): Main subscription management UI with dynamic fee calculation
 - **CreateSubscriptionModal** (`src/components/CreateSubscriptionModal.tsx`): Modal for admin to create new subscriptions with plan selection
 - **UpdatePlanModal** (`src/components/UpdatePlanModal.tsx`): Modal for changing subscription plans
-- **UpdatePaymentModal** (`src/components/UpdatePaymentModal.tsx`): Modal for updating payment methods
+- **UpdatePaymentModal** (`src/components/UpdatePaymentModal.tsx`): Modal for updating payment methods with ACH via Financial Connections
 - **AddSecondaryMemberModal** (`src/components/AddSecondaryMemberModal.tsx`): Shows dynamic fees ($0 for Skyline, $25 for others)
 - **AddPaymentMethodModal** (`src/components/member/AddPaymentMethodModal.tsx`): Two-step modal with payment type selection
 - **CardElement API**: Stable, direct integration for cards (no PaymentElement wrapper)
-- **Stripe Checkout Redirect**: ACH setup uses hosted Stripe Checkout Session for reliable bank verification
+- **Financial Connections ACH**: `collectBankAccountForSetup()` for instant bank verification with fallback PaymentMethod creation from FC account
 - **Body Scroll Lock**: Position fixed applied before Stripe initialization to prevent click offset issues
 - **Success/Cancel URLs**: Returns to `/member/dashboard?payment_setup=success|cancelled`
+
+**ACH Setup Flow** (UpdatePaymentModal):
+1. Create SetupIntent with `payment_method_type: 'us_bank_account'`
+2. Call `stripe.collectBankAccountForSetup()` to launch Financial Connections
+3. On success, check if `setupIntent.payment_method` exists
+4. If not, retrieve full SetupIntent to get `financial_connections_account` ID
+5. Create PaymentMethod from FC account via `/api/stripe/payment-methods/create-from-fc`
+6. Set PaymentMethod as default on customer and subscription
 
 **Related Files**:
 - `src/components/MemberSubscriptionCard.tsx` - Subscription management UI, displays default payment method
@@ -1411,6 +1421,10 @@ The member portal uses a simplified two-step flow to avoid Stripe iframe click d
 - `src/components/member/AddPaymentMethodModal.tsx` - Member portal add payment method modal (2-step flow)
 - `src/components/ui/dialog.tsx` - Base dialog component (flexbox centering, no transforms for Stripe compatibility)
 - `src/pages/api/stripe/payment-methods/setup-intent.ts` - Creates SetupIntent with Financial Connections config
+- `src/pages/api/stripe/payment-methods/list.ts` - Lists both card and us_bank_account payment methods
+- `src/pages/api/stripe/payment-methods/set-default.ts` - Sets default payment method on customer/subscription
+- `src/pages/api/stripe/payment-methods/create-from-fc.ts` - Creates PaymentMethod from Financial Connections account
+- `src/pages/api/stripe/setup-intents/[id].ts` - Retrieves SetupIntent with latest_attempt details
 - `src/pages/api/stripe/checkout/setup-ach.ts` - Creates Stripe Checkout Session for ACH (member portal)
 - `src/app/globals.css` - Stripe modal CSS exceptions (body.stripe-ach-active class), scrollbar-hide utility
 - `src/styles/UpdatePaymentModal.module.css` - Payment modal styles with mobile responsiveness
@@ -4079,10 +4093,180 @@ node scripts/sync-payment-methods.js
 
 ---
 
+### 2026-03-06 - ACH Payment Method Improvements & Bug Fixes
+
+**Summary**: Enhanced ACH bank account setup flow with fallback PaymentMethod creation, fixed payment method listing to include us_bank_account types, and resolved various API and mobile UX bugs.
+
+**Key Improvements**:
+
+1. **ACH Setup Flow Enhancement** (`UpdatePaymentModal.tsx`)
+   - Fixed issue where Financial Connections account wasn't creating PaymentMethod automatically
+   - **New Flow**:
+     - After `collectBankAccountForSetup()`, check if `setupIntent.payment_method` exists
+     - If not, retrieve full SetupIntent to get `financial_connections_account` ID
+     - Create PaymentMethod from FC account via new API endpoint
+     - Set as default payment method
+   - **Impact**: ACH setup now works reliably even when Stripe doesn't auto-create PaymentMethod
+
+2. **Payment Method Listing Fix** (`/api/stripe/payment-methods/list.ts`)
+   - **Issue**: API only returned card payment methods, ACH bank accounts weren't visible
+   - **Root Cause**: Stripe requires separate API calls for different payment method types
+   - **Fix**: Added parallel calls for both `card` and `us_bank_account` types
+   - **Added**: Debug logging to troubleshoot missing payment methods
+   - **Impact**: Both card and bank account payment methods now visible in admin and member portals
+
+3. **New API Endpoints**:
+   - `POST /api/stripe/payment-methods/create-from-fc` - Creates PaymentMethod from Financial Connections account
+     - Body: `{ account_id, financial_connections_account_id }`
+     - Returns: `{ payment_method_id }`
+   - `GET /api/stripe/setup-intents/[id]` - Retrieves SetupIntent with latest_attempt details
+     - Used to get Financial Connections account ID when PaymentMethod wasn't auto-created
+
+4. **Payment Method API Fix** (`set-default.ts`)
+   - Fixed 405 Method Not Allowed error
+   - Changed from POST to PUT (or supports both)
+   - Updated frontend to use PUT consistently
+
+**Bug Fixes**:
+
+1. **Mobile Keyboard Issues** (`SimpleReservationRequestModal.tsx`)
+   - Added `inputMode="none"` to date picker and time select
+   - Prevents keyboard popup on touch devices
+   - Improves UX for date/time selection
+
+2. **Mobile Horizontal Scrolling** (`member/profile/page.tsx`)
+   - Fixed ability to swipe left/right on profile modal
+   - Added `touch-action: none` CSS constraints
+   - Width constraints to prevent content overflow
+
+3. **Private Event Blocking Timezone Fix** (`/api/check-date-availability.ts`)
+   - **Issue**: Times showed as available during private events in production
+   - **Root Cause**: UTC hours returned instead of local timezone hours
+   - **Fix**: Added `.setZone('America/Chicago')` to convert event times to local timezone
+   - **Example**: 6pm event (stored as 23:00 UTC) now correctly blocks 6pm time slot (18:00 local)
+
+4. **Subscription Pricing Fixes** (`/api/member/account-subscription.ts`)
+   - Fixed $0 subscription display in production
+   - **Root Cause**: API calling localhost:3000 in serverless environment (ECONNREFUSED)
+   - **Fix**: Changed to call Stripe SDK directly instead of internal fetch
+   - Removed fallback logic per user preference (returns 500 if Stripe fails)
+
+5. **Backwards Calculation Logic** (`MemberSubscriptionCard.tsx`)
+   - **Issue**: Negative base prices displayed
+   - **Root Cause**: `baseMRR = monthly_dues - secondaryFees` (backwards!)
+   - **Fix**: Use `monthly_dues` directly as base (it's already the base price from Stripe)
+
+6. **Reservation Cancellation 500 Error** (`/api/member/reservations/cancel.ts`)
+   - **Issue**: Database error on cancellation
+   - **Root Cause**: `status` column didn't exist on reservations table
+   - **Fix**: Created migration to add `status` column with default 'confirmed'
+   - Created runner script: `run-add-status-column.js`
+
+**Files Created**:
+- `src/pages/api/stripe/payment-methods/create-from-fc.ts` - Create PM from FC account
+- `src/pages/api/stripe/setup-intents/[id].ts` - Retrieve SetupIntent details
+- `migrations/add_reservations_status_column.sql` - Add status column to reservations
+- `run-add-status-column.js` - Migration runner script
+
+**Files Modified**:
+- `src/components/UpdatePaymentModal.tsx` - ACH setup flow with FC fallback
+- `src/pages/api/stripe/payment-methods/list.ts` - Fetch both card and bank account types
+- `src/pages/api/stripe/payment-methods/set-default.ts` - Support PUT method
+- `src/pages/api/check-date-availability.ts` - Timezone conversion for event blocking
+- `src/pages/api/member/account-subscription.ts` - Direct Stripe SDK calls
+- `src/components/MemberSubscriptionCard.tsx` - Fix pricing calculation
+- `src/components/member/SimpleReservationRequestModal.tsx` - Mobile keyboard fix
+- `src/app/member/profile/page.tsx` - Mobile scrolling fix
+- `src/pages/api/member/reservations/cancel.ts` - Remove updated_at field
+- `src/pages/api/reservations/index.ts` - Remove non-existent status filter
+
+**Known Issues**:
+- Some ACH bank accounts may not appear in payment methods list despite being attached to customer in Stripe
+- Currently investigating via debug logging to determine if accounts have specific status or are attached differently
+
+**Testing Recommendations**:
+1. Test ACH setup flow end-to-end (Financial Connections → PaymentMethod creation → Set as default)
+2. Verify both card and bank account payment methods appear in payment methods list
+3. Test reservation cancellation with new status column
+4. Verify private events block time slots correctly in America/Chicago timezone
+5. Test mobile reservation flow (no keyboard popup, no horizontal scrolling)
+
+**Status**: Partially complete - ACH visibility issue still under investigation
+
+---
+
 **Last Updated**: March 6, 2026
-**Version**: Webhook Error Handling v2.0 + Pending Members Management
+**Version**: Webhook Error Handling v2.0 + Pending Members Management + ACH Payment Fixes
 
 ---
 
 *This document is maintained as the single source of truth for understanding the Noir CRM Dashboard. Update it when making significant changes to the system.*
 
+
+---
+
+### 2026-03-06 (PM) - ACH Financial Connections PaymentMethod Creation Fix
+
+**Session Summary**: Fixed critical bug where ACH bank accounts linked via Stripe Financial Connections weren't creating usable PaymentMethods, preventing customers from being charged via ACH.
+
+**Problem**: When users completed ACH setup via `collectBankAccountForSetup`, Stripe created a Financial Connections account but didn't always automatically create a corresponding PaymentMethod. This left ACH accounts visible in Financial Connections dashboard but unusable for charging customers.
+
+**Root Cause**: Stripe's `collectBankAccountForSetup` API doesn't guarantee PaymentMethod creation when using Financial Connections for instant bank verification. The SetupIntent can complete successfully with only a Financial Connections account reference, leaving no attached payment method.
+
+**Solution**: Added automatic fallback logic to detect and handle missing PaymentMethods:
+1. After `collectBankAccountForSetup` completes, check if SetupIntent has `payment_method`
+2. If missing, retrieve SetupIntent's `latest_attempt.payment_method_details.us_bank_account.financial_connections_account`
+3. Create PaymentMethod from Financial Connections account via new API endpoint
+4. Attach PaymentMethod to customer and set as default
+
+**Changes**:
+
+1. **UpdatePaymentModal.tsx** (`src/components/UpdatePaymentModal.tsx`)
+   - Added fallback logic in `handleAchSubmit()` to detect missing PaymentMethod
+   - Calls new API endpoints to retrieve SetupIntent details and create PaymentMethod from Financial Connections
+   - Maintains backward compatibility - if PaymentMethod exists, uses it directly
+
+2. **New API: Get SetupIntent Details** (`src/pages/api/stripe/setup-intents/[id].ts`)
+   - Retrieves SetupIntent with expanded `latest_attempt` details
+   - Extracts Financial Connections account ID from payment method details
+   - Returns: `{ id, status, payment_method, financial_connections_account, customer }`
+
+3. **New API: Create PaymentMethod from Financial Connections** (`src/pages/api/stripe/payment-methods/create-from-fc.ts`)
+   - Creates `us_bank_account` PaymentMethod from Financial Connections account
+   - Automatically attaches to customer
+   - Returns: `{ payment_method_id, bank_name, last4 }`
+
+4. **Cleanup** (`src/pages/api/stripe/payment-methods/list.ts`)
+   - Removed debug logging added during troubleshooting
+
+**API Endpoints Added**:
+- `GET /api/stripe/setup-intents/[id]` - Retrieve SetupIntent with Financial Connections details
+- `POST /api/stripe/payment-methods/create-from-fc` - Create PaymentMethod from Financial Connections account
+  - Body: `{ account_id, financial_connections_account_id }`
+  - Returns: `{ payment_method_id, bank_name, last4 }`
+
+**Files Created**:
+- `src/pages/api/stripe/setup-intents/[id].ts` - SetupIntent retrieval endpoint
+- `src/pages/api/stripe/payment-methods/create-from-fc.ts` - PaymentMethod creation endpoint
+
+**Files Modified**:
+- `src/components/UpdatePaymentModal.tsx` - ACH setup fallback logic
+- `src/pages/api/stripe/payment-methods/list.ts` - Debug logging cleanup
+
+**Manual Fix Applied**: Manually created PaymentMethod `pm_1T7trqFdjSPifIH51Kkep2FP` from existing Financial Connections account `fca_1T7tXnFdjSPifIH5rKntHLJk` for customer `cus_SH6Kr9Xkf5cRTj` to resolve immediate issue.
+
+**Testing Recommendations**:
+1. Complete ACH setup flow in admin panel → Verify PaymentMethod appears in payment methods list
+2. Test with both scenarios:
+   - Stripe automatically creates PaymentMethod (normal path)
+   - Stripe doesn't create PaymentMethod (fallback path with console logs)
+3. Verify ACH shows in subscription card payment method display
+4. Test charging ACH payment method via chargeBalance API
+5. Verify member portal ACH setup still works (uses different Checkout flow, unaffected by this bug)
+
+**Impact**:
+- **Before**: ACH setup completed but customers couldn't be charged (PaymentMethod didn't exist)
+- **After**: ACH setup automatically creates usable PaymentMethod, enabling immediate charging
+- **Scope**: Affects admin panel ACH setup only (member portal uses Stripe Checkout, which handles this correctly)
+
+**Status**: Complete and committed (commit 11ad328)

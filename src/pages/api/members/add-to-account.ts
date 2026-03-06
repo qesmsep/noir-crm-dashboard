@@ -89,8 +89,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw insertError;
     }
 
-    // Add $25 administration fee to account's monthly dues
-    // Each additional member adds $25/month
+    // Add administration fee to account's monthly dues
+    // Skyline members: $0/member (free additional members)
+    // Other plans: $25/member
     let updatedSubscription: any = null;
     try {
       // Get current monthly dues and subscription from account
@@ -101,7 +102,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .single();
 
       const currentMonthlyDues = currentAccount?.monthly_dues || 0;
-      const newMonthlyDues = currentMonthlyDues + 25;
+
+      // Determine additional member fee based on plan
+      let additionalMemberFee = 25; // Default for most plans
+      let isSkylinePlan = false;
+
+      if (currentAccount?.stripe_subscription_id) {
+        const subscription = await stripe.subscriptions.retrieve(currentAccount.stripe_subscription_id);
+
+        // Check if this is Skyline plan ($10/month base)
+        if (subscription.items.data[0]?.price?.unit_amount === 1000) {
+          additionalMemberFee = 0;
+          isSkylinePlan = true;
+          console.log('[Add Member] Skyline plan detected - additional members are FREE');
+        }
+      }
+
+      const newMonthlyDues = currentMonthlyDues + additionalMemberFee;
 
       // Update account with new monthly dues
       await supabase
@@ -112,7 +129,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('account_id', account_id);
 
       // CRITICAL: Update Stripe subscription to charge for additional member
-      if (currentAccount?.stripe_subscription_id) {
+      // Skip this for Skyline members (free additional members)
+      if (currentAccount?.stripe_subscription_id && !isSkylinePlan) {
         try {
           const subscription = await stripe.subscriptions.retrieve(currentAccount.stripe_subscription_id);
 
@@ -159,6 +177,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.error('Error updating Stripe subscription for additional member:', stripeError);
           // Don't fail the entire request
         }
+      } else if (isSkylinePlan) {
+        console.log('[Add Member] Skipping Stripe update - Skyline members get free additional members');
       }
 
       // If new_price_id provided, also update the subscription tier
@@ -191,7 +211,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               new_mrr: newMonthlyDues,
               effective_date: new Date().toISOString(),
               metadata: {
-                reason: `Added member to account (+$25 administration fee)`,
+                reason: additionalMemberFee > 0
+                  ? `Added member to account (+$${additionalMemberFee} administration fee)`
+                  : `Added member to account (free - Skyline benefit)`,
                 updated_via_api: true,
                 member_count: existingMembers.length + 1,
               },
@@ -215,7 +237,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           new_mrr: newMonthlyDues,
           effective_date: new Date().toISOString(),
           metadata: {
-            reason: `Added member to account (+$25 administration fee)`,
+            reason: additionalMemberFee > 0
+              ? `Added member to account (+$${additionalMemberFee} administration fee)`
+              : `Added member to account (free - Skyline benefit)`,
             updated_via_api: true,
             member_count: existingMembers.length + 1,
             previous_mrr: currentMonthlyDues,
