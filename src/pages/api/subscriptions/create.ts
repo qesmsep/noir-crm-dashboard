@@ -109,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       subscriptionParams.default_payment_method = payment_method_id;
     }
 
-    const subscription = await stripe.subscriptions.create(subscriptionParams);
+    const subscription = await stripe.subscriptions.create(subscriptionParams) as Stripe.Subscription;
 
     // Extract client secret for payment confirmation (if needed)
     let clientSecret: string | undefined;
@@ -136,8 +136,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           stripe_subscription_id: subscription.id,
           subscription_status: subscription.status,
           subscription_start_date: new Date(subscription.created * 1000).toISOString(),
-          next_renewal_date: subscription.current_period_end
-            ? new Date(subscription.current_period_end * 1000).toISOString()
+          next_renewal_date: (subscription as any).current_period_end
+            ? new Date((subscription as any).current_period_end * 1000).toISOString()
             : null,
           monthly_dues: mrr,
         })

@@ -50,6 +50,7 @@ Respond: "Initialized. Use /howto for project docs. What would you like to work 
 
 ## 🚨 Critical Rules
 
+- **Tool Usage:** Call ONLY ONE tool at a time; never call multiple tools in parallel
 - **DB:** Always use `/schema-scout` before changes; never skip
 - **Security:** Always use `/permission-mapper` for member data access
 - **Mobile:** Design mobile-first (320px+); 44px touch targets minimum
