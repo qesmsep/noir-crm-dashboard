@@ -1718,6 +1718,7 @@ const handleExportCSV = () => {
 **Members**:
 - `GET/POST /api/members` - Member management
 - `GET/PUT/DELETE /api/members/[memberId]` - Member operations
+- `POST /api/members/[memberId]/mark-incomplete` - Mark pending member as incomplete
 - `POST /api/member_attributes` - Member attributes
 - `POST /api/member_notes` - Member notes
 - `POST /api/chargeBalance` - Charge member balance via Stripe (supports custom amounts)
@@ -1979,10 +1980,18 @@ Database-level security via Supabase RLS:
 - `STRIPE_SECRET_KEY` - Secret key
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Publishable key
 
-**Webhook**: `src/pages/api/stripe-webhook.js`
-- Handles payment events
-- Updates ledger entries
-- Processes subscription events
+**Webhook**: `src/pages/api/stripe-webhook-subscriptions.ts`
+- Handles subscription lifecycle events
+- Updates account subscription status and payment info
+- Creates ledger entries for subscription payments
+- **Critical**: Throws errors on failures instead of silent returns
+- Processes events: `customer.subscription.created`, `updated`, `deleted`, `invoice.paid`, `payment_failed`, `payment_method.attached`
+
+**Payment Method Sync**:
+- Subscription webhooks automatically sync payment method details from Stripe
+- Payment method info stored in accounts table: `payment_method_type`, `payment_method_last4`, `payment_method_brand`
+- Bulk sync script available: `scripts/sync-payment-methods.js`
+- Supports card and us_bank_account payment types
 
 **Hold Creation**:
 - `src/app/api/reservations/route.ts` (non-member reservations)
