@@ -52,6 +52,7 @@ export default function MemberSubscriptionCard({
   const [showCreateSubscriptionModal, setShowCreateSubscriptionModal] = useState(false);
   const [additionalMembersCount, setAdditionalMembersCount] = useState(0);
   const [baseMRR, setBaseMRR] = useState(0);
+  const [additionalMemberFeeRate, setAdditionalMemberFeeRate] = useState(25);
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -126,14 +127,24 @@ export default function MemberSubscriptionCard({
         }
       }
 
-      // Use Stripe amount if available, otherwise calculate from monthly_dues
-      const additionalMemberFees = secondaryMemberCount * 25;
-      const calculatedBaseMRR = stripeBaseMRR > 0
-        ? stripeBaseMRR
-        : (account.monthly_dues || 0) - additionalMemberFees;
+      // Determine the base MRR from Stripe or account data
+      let calculatedBaseMRR = stripeBaseMRR;
+
+      if (calculatedBaseMRR === 0 && account.monthly_dues) {
+        // If we don't have Stripe data, calculate from monthly_dues
+        // Assume $25 per additional member unless we determine otherwise
+        const additionalMemberFees = secondaryMemberCount * 25;
+        calculatedBaseMRR = account.monthly_dues - additionalMemberFees;
+      }
+
+      // Determine additional member fee rate based on plan
+      // Skyline Membership ($10/month) has $0 additional member fees
+      // Other plans have $25/month per additional member
+      const feeRate = calculatedBaseMRR === 10 ? 0 : 25;
 
       setAdditionalMembersCount(secondaryMemberCount);
       setBaseMRR(calculatedBaseMRR);
+      setAdditionalMemberFeeRate(feeRate);
 
       setSubscription({
         stripe_subscription_id: account.stripe_subscription_id || null,
@@ -406,7 +417,7 @@ export default function MemberSubscriptionCard({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div>
             <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Total MRR</div>
-            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>{formatCurrency(baseMRR + (additionalMembersCount * 25))}/mo</div>
+            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>{formatCurrency(baseMRR + (additionalMembersCount * additionalMemberFeeRate))}/mo</div>
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Account LTV</div>
@@ -466,9 +477,9 @@ export default function MemberSubscriptionCard({
             {additionalMembersCount > 0 && (
               <div className={styles.row}>
                 <span className={styles.label}>
-                  Additional Members ({additionalMembersCount} × $25)
+                  Additional Members ({additionalMembersCount} × ${additionalMemberFeeRate})
                 </span>
-                <span className={styles.value}>{formatCurrency(additionalMembersCount * 25)}/mo</span>
+                <span className={styles.value}>{formatCurrency(additionalMembersCount * additionalMemberFeeRate)}/mo</span>
               </div>
             )}
 

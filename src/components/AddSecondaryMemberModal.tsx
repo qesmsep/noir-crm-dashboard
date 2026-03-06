@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/useToast';
 import styles from '../styles/AddSecondaryMemberModal.module.css';
 
@@ -6,9 +6,10 @@ interface Props {
   accountId: string;
   onClose: () => void;
   onSuccess: () => void;
+  additionalMemberFee?: number;
 }
 
-export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess }: Props) {
+export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess, additionalMemberFee = 25 }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -16,6 +17,35 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
   const [tempImage, setTempImage] = useState<string | null>(null);
   const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
+  const [calculatedFee, setCalculatedFee] = useState(additionalMemberFee);
+
+  // Fetch account subscription to determine the fee rate
+  useEffect(() => {
+    const fetchAccountSubscription = async () => {
+      try {
+        const response = await fetch(`/api/accounts/${accountId}`);
+        const result = await response.json();
+
+        if (result.data && result.data.stripe_subscription_id) {
+          // Fetch Stripe subscription details to get the base plan amount
+          const subResponse = await fetch(`/api/subscriptions/${result.data.stripe_subscription_id}`);
+          const subData = await subResponse.json();
+
+          if (subData.subscription?.items?.data?.[0]?.price?.unit_amount) {
+            const baseMRR = subData.subscription.items.data[0].price.unit_amount / 100;
+            // Skyline Membership ($10/month) has $0 additional member fees
+            const feeRate = baseMRR === 10 ? 0 : 25;
+            setCalculatedFee(feeRate);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching subscription for fee calculation:', error);
+        // Keep default fee if fetch fails
+      }
+    };
+
+    fetchAccountSubscription();
+  }, [accountId, additionalMemberFee]);
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -219,7 +249,9 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
 
       toast({
         title: 'Success',
-        description: 'Member added successfully. Account will be charged $25/month for this additional member.',
+        description: calculatedFee > 0
+          ? `Member added successfully. Account will be charged $${calculatedFee}/month for this additional member.`
+          : 'Member added successfully. No additional fees for this account.',
       });
 
       onSuccess();
@@ -389,15 +421,27 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
 
           <div className={styles.divider} />
 
-          <div className={styles.pricingNotice}>
-            <div className={styles.pricingIcon}>💳</div>
-            <div className={styles.pricingText}>
-              <strong>$25/month administration fee</strong>
-              <p className={styles.pricingSubtext}>
-                This additional member will increase monthly dues by $25.
-              </p>
+          {calculatedFee > 0 ? (
+            <div className={styles.pricingNotice}>
+              <div className={styles.pricingIcon}>💳</div>
+              <div className={styles.pricingText}>
+                <strong>${calculatedFee}/month administration fee</strong>
+                <p className={styles.pricingSubtext}>
+                  This additional member will increase monthly dues by ${calculatedFee}.
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={styles.pricingNotice} style={{ backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }}>
+              <div className={styles.pricingIcon}>✨</div>
+              <div className={styles.pricingText}>
+                <strong>No additional fee</strong>
+                <p className={styles.pricingSubtext}>
+                  Additional members are included at no extra cost for this plan.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className={styles.formActions}>
             <button
@@ -413,7 +457,7 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess 
               className={styles.submitButton}
               disabled={loading}
             >
-              {loading ? 'Adding Member...' : 'Add Member (+$25/mo)'}
+              {loading ? 'Adding Member...' : calculatedFee > 0 ? `Add Member (+$${calculatedFee}/mo)` : 'Add Member (Free)'}
             </button>
           </div>
         </form>
