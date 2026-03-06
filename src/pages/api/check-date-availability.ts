@@ -35,10 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Failed to fetch events' });
     }
 
-    // Format blocked time ranges
+    // Format blocked time ranges in local timezone (America/Chicago)
     const blockedTimeRanges = (events || []).map((event) => {
-      const start = DateTime.fromISO(event.start_time);
-      const end = DateTime.fromISO(event.end_time);
+      const start = DateTime.fromISO(event.start_time).setZone('America/Chicago');
+      const end = DateTime.fromISO(event.end_time).setZone('America/Chicago');
 
       return {
         id: event.id,
