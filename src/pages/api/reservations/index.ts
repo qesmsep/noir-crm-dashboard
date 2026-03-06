@@ -339,8 +339,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Query for private events that overlap with this date
         const { data: privateEvents, error: privateEventsError } = await client
           .from('private_events')
-          .select('start_time, end_time, full_day, title, status')
-          .eq('status', 'active')
+          .select('start_time, end_time, full_day, title')
           .lt('start_time', endOfDayUtc)
           .gt('end_time', startOfDayUtc);
         
