@@ -18,7 +18,7 @@
 
 ## 📋 Summary
 
-**Last Updated**: 2026-03-04
+**Last Updated**: 2026-03-05
 
 This 100-line summary provides a high-level overview of the Noir CRM Dashboard system architecture, key concepts, and how to use this reference manual efficiently.
 
@@ -1303,12 +1303,65 @@ All subscription state changes are logged to `subscription_events` table:
 - Tracks previous/new MRR, plan changes, effective dates
 - Includes metadata (reason, admin who made change, etc.)
 
+**Payment Method Management**:
+
+The payment method system supports two payment types with instant verification for ACH/bank accounts:
+
+1. **Credit/Debit Cards** (4% fee)
+   - Traditional card entry via Stripe CardElement
+   - Shows "(4% fee)" label on payment type selector
+   - Submit form to update default payment method
+
+2. **ACH/Bank Account** (No Fee)
+   - **Instant bank verification** via Stripe Financial Connections (Plaid)
+   - Click "ACH/Bank" button to **immediately** trigger Stripe's secure bank login flow
+   - No manual entry of routing/account numbers required
+   - Modal closes automatically and Stripe Financial Connections popup appears
+   - User logs into their bank securely for instant verification (no 1-2 day micro-deposit wait)
+   - Uses `stripe.collectBankAccountForSetup()` with `financial_connections` enabled
+
+**Technical Implementation**:
+
+- **Setup Intent Configuration**: Server-side Financial Connections enabled via:
+  ```typescript
+  payment_method_options: {
+    us_bank_account: {
+      financial_connections: {
+        permissions: ['payment_method', 'balances'],
+      },
+      verification_method: 'instant',
+    },
+  }
+  ```
+
+- **Mobile Positioning Fix**: Body scroll locked at position:fixed top:0 before Stripe initialization to prevent iframe offset issues on mobile
+- **Modal Rendering**: UpdatePaymentModal uses React Portal (`createPortal`) to render at `document.body` level, avoiding parent modal transform/positioning conflicts
+- **Dual Display**:
+  - **Admin Panel** (`/admin/members/[accountId]`): Shows default payment method on subscription card above 4% fee toggle
+  - **Member Portal** (`/member/dashboard`): Payment Methods modal lists all saved methods with set default/delete actions
+
+**Important**: ACH button directly triggers bank verification flow - no intermediate explanation screens for streamlined UX. Stripe Financial Connections must be enabled in Stripe Dashboard under Settings → Payment methods → ACH Direct Debit → Link Financial Connections.
+
+**API Endpoints**:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/stripe/payment-methods/setup-intent` | POST | Create SetupIntent with Financial Connections for instant ACH or card |
+| `/api/stripe/payment-methods/set-default` | PUT | Set payment method as default on Stripe customer |
+| `/api/stripe/payment-methods/list` | GET | List all payment methods for account with default flag |
+| `/api/stripe/payment-methods/detach` | DELETE | Remove payment method from Stripe customer |
+| `/api/accounts/update-credit-card-fee` | PUT | Toggle 4% credit card fee setting for account |
+
 **Related Files**:
-- `src/components/MemberSubscriptionCard.tsx` - Subscription management UI
-- `src/components/SubscriptionTransactionHistory.tsx` - Stripe invoices display
+- `src/components/MemberSubscriptionCard.tsx` - Subscription management UI, displays default payment method
+- `src/components/SubscriptionTransactionHistory.tsx` - Stripe invoices with "(incl. 4% CC fee)" indicator
 - `src/components/UpdatePlanModal.tsx` - Plan upgrade/downgrade modal
-- `src/components/UpdatePaymentModal.tsx` - Payment method update
-- `src/styles/MemberSubscriptionCard.module.css` - Subscription card styles
+- `src/components/UpdatePaymentModal.tsx` - Unified payment method update (Card/ACH with instant verification)
+- `src/components/member/PaymentMethodModal.tsx` - Member portal payment methods list modal
+- `src/components/ui/dialog.tsx` - Base dialog component (flexbox centering, no transforms for Stripe compatibility)
+- `src/pages/api/stripe/payment-methods/setup-intent.ts` - Creates SetupIntent with Financial Connections config
+- `src/app/globals.css` - Stripe modal CSS exceptions (body.stripe-ach-active class)
+- `src/styles/UpdatePaymentModal.module.css` - Payment modal styles with mobile responsiveness
 
 ### 6.2. Beverage Credit System
 

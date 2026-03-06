@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon, CreditCard, Settings, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon, CreditCard, CalendarDays } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import MemberNav from '@/components/member/MemberNav';
 import { useMemberAuth } from '@/context/MemberAuthContext';
@@ -16,7 +16,6 @@ import BalanceModal from '@/components/member/BalanceModal';
 import ReservationsModal from '@/components/member/ReservationsModal';
 import ProfileModal from '@/components/member/ProfileModal';
 import PaymentMethodModal from '@/components/member/PaymentMethodModal';
-import AccountSettingsModal from '@/components/member/AccountSettingsModal';
 import UpcomingEventsModal from '@/components/member/UpcomingEventsModal';
 
 export default function MemberDashboardPage() {
@@ -59,7 +58,6 @@ export default function MemberDashboardPage() {
   const [isReservationsListModalOpen, setIsReservationsListModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
-  const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
   const [isUpcomingEventsModalOpen, setIsUpcomingEventsModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [baseDays, setBaseDays] = useState<number[]>([]);
@@ -423,37 +421,6 @@ export default function MemberDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Account Settings Card */}
-            <Card
-              className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-              onClick={() => setIsAccountSettingsModalOpen(true)}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <Settings className="w-5 h-5 text-[#A59480]" />
-                  <span className="text-xl font-semibold text-[#1F1F1F]">
-                    Account Settings
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between py-2 border-b border-[#ECEAE5]">
-                    <p className="text-sm text-[#5A5A5A]">Email Notifications</p>
-                    <Badge className="bg-[#4CAF50] text-white text-xs">On</Badge>
-                  </div>
-                  <div className="flex items-center justify-between py-2 border-b border-[#ECEAE5]">
-                    <p className="text-sm text-[#5A5A5A]">SMS Alerts</p>
-                    <Badge className="bg-[#DAD7D0] text-[#5A5A5A] text-xs">Off</Badge>
-                  </div>
-                  <div className="flex items-center justify-between py-2">
-                    <p className="text-sm text-[#5A5A5A]">Two-Factor Auth</p>
-                    <Badge className="bg-[#DAD7D0] text-[#5A5A5A] text-xs">Off</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Upcoming Events Card */}
             <Card
               className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
@@ -567,12 +534,6 @@ export default function MemberDashboardPage() {
         isOpen={isPaymentMethodModalOpen}
         onClose={() => setIsPaymentMethodModalOpen(false)}
         accountId={member?.account_id}
-      />
-
-      {/* Account Settings Modal */}
-      <AccountSettingsModal
-        isOpen={isAccountSettingsModalOpen}
-        onClose={() => setIsAccountSettingsModalOpen(false)}
       />
 
       {/* Upcoming Events Modal */}
