@@ -21,11 +21,15 @@ export default async function handler(
   }
 
   try {
+    console.log('[VERIFY-OTP] Request body:', { phone: req.body.phone, code: req.body.code });
+
     const { phone, code } = requestSchema.parse(req.body);
 
     // Normalize phone number (remove all non-digits, then take last 10 digits)
     const digitsOnly = phone.replace(/\D/g, '');
     const normalizedPhone = digitsOnly.slice(-10);
+
+    console.log('[VERIFY-OTP] Normalized phone:', normalizedPhone, 'Code length:', code.length);
 
     // Get client IP address
     const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
@@ -240,7 +244,11 @@ export default async function handler(
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.issues[0].message });
+      console.error('[VERIFY-OTP] Validation error:', error.issues);
+      return res.status(400).json({
+        error: error.issues[0].message,
+        details: error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ')
+      });
     }
 
     console.error('Verify phone OTP error:', error);
