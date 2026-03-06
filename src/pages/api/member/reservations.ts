@@ -47,7 +47,7 @@ export default async function handler(
       .select('*, private_events(title)');
 
     // Build OR condition based on available contact info
-    const conditions = [];
+    const conditions: string[] = [];
     if (member.phone) conditions.push(`phone.eq.${member.phone}`);
     if (member.email) conditions.push(`email.eq.${member.email}`);
 
