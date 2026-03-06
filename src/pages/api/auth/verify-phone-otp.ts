@@ -185,6 +185,9 @@ export default async function handler(
       console.log('[VERIFY-OTP] First time login - creating Supabase Auth user for member:', member.member_id);
 
       try {
+        let authUserId: string | null = null;
+
+        // Try to create auth user
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
           email: member.email || `${member.phone}@noirkc.com`,
           phone: member.phone.startsWith('+') ? member.phone : `+1${normalizedPhone}`,
@@ -198,18 +201,45 @@ export default async function handler(
         });
 
         if (authError) {
-          console.error('[VERIFY-OTP] Failed to create auth user:', authError);
-          return res.status(500).json({
-            error: 'Failed to create account. Please try again.',
-          });
-        }
+          // If email already exists, try to find existing auth user by email
+          if (authError.message?.includes('email address has already been registered') || authError.code === 'email_exists') {
+            console.log('[VERIFY-OTP] Email exists, finding existing auth user by email:', member.email);
 
-        console.log('[VERIFY-OTP] Created auth user:', authData.user.id);
+            const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+
+            if (listError) {
+              console.error('[VERIFY-OTP] Failed to list users:', listError);
+              return res.status(500).json({
+                error: 'Failed to set up account. Please contact support.',
+              });
+            }
+
+            const existingUser = existingUsers.users.find(u => u.email === member.email);
+
+            if (existingUser) {
+              console.log('[VERIFY-OTP] Found existing auth user:', existingUser.id);
+              authUserId = existingUser.id;
+            } else {
+              console.error('[VERIFY-OTP] Email exists but user not found');
+              return res.status(500).json({
+                error: 'Failed to set up account. Please contact support.',
+              });
+            }
+          } else {
+            console.error('[VERIFY-OTP] Failed to create auth user:', authError);
+            return res.status(500).json({
+              error: 'Failed to create account. Please try again.',
+            });
+          }
+        } else {
+          authUserId = authData.user.id;
+          console.log('[VERIFY-OTP] Created new auth user:', authUserId);
+        }
 
         // Link auth user to member
         const { error: linkError } = await supabaseAdmin
           .from('members')
-          .update({ auth_user_id: authData.user.id })
+          .update({ auth_user_id: authUserId })
           .eq('member_id', member.member_id);
 
         if (linkError) {
@@ -219,7 +249,7 @@ export default async function handler(
           });
         }
 
-        member.auth_user_id = authData.user.id;
+        member.auth_user_id = authUserId;
         console.log('[VERIFY-OTP] Successfully linked auth user to member');
       } catch (createError: any) {
         console.error('[VERIFY-OTP] Error during auth user creation:', createError);
