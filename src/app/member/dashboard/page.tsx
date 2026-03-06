@@ -361,7 +361,7 @@ export default function MemberDashboardPage() {
                     {/* Next Reservation - One Line OR Make Reservation Button */}
                     {nextReservation ? (
                       <div
-                        className="flex items-center justify-between gap-3 py-1 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
+                        className="flex items-center gap-3 py-1 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
                         onClick={(e) => {
                           e.stopPropagation();
                           setIsReservationsListModalOpen(true);
@@ -374,15 +374,12 @@ export default function MemberDashboardPage() {
                           })}
                         </p>
                         <p className="text-xs font-medium text-[#1F1F1F] flex-1 truncate">
-                          {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
+                          {nextReservation.special_requests || 'Reservation'} • {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
                             hour: 'numeric',
                             minute: '2-digit',
                             hour12: true,
                           })} • Party of {nextReservation.party_size}
                         </p>
-                        <Badge className="text-xs px-2 py-0.5 bg-[#4CAF50] text-white">
-                          {nextReservation.status}
-                        </Badge>
                       </div>
                     ) : (
                       <Button
@@ -400,7 +397,7 @@ export default function MemberDashboardPage() {
                     {pastVisits.map((visit, index) => (
                       <div
                         key={visit.id || index}
-                        className="flex items-center justify-between gap-3 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
+                        className="flex items-center gap-3 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
                         onClick={(e) => {
                           e.stopPropagation();
                           setIsReservationsListModalOpen(true);
@@ -413,11 +410,12 @@ export default function MemberDashboardPage() {
                           })}
                         </p>
                         <p className="text-xs text-[#5A5A5A] flex-1 truncate">
-                          Party of {visit.party_size}
+                          {visit.special_requests || 'Visit'} • {new Date(visit.start_time).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                          })} • Party of {visit.party_size}
                         </p>
-                        <Badge className="text-xs px-2 py-0.5 bg-[#DAD7D0] text-[#5A5A5A]">
-                          {visit.status}
-                        </Badge>
                       </div>
                     ))}
                   </>
