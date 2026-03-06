@@ -216,7 +216,11 @@ export default function MemberDetailAdmin() {
         const res = await fetch(`/api/ledger?account_id=${accountId}`);
         const result = await res.json();
         if (result.error) throw new Error(result.error);
-        setLedger(result.data || []);
+        // Sort by date descending (most recent first)
+        const sortedLedger = (result.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+        setLedger(sortedLedger);
       } catch (err: any) {
         console.error('Ledger fetch error:', err);
         toast({
@@ -847,9 +851,11 @@ export default function MemberDetailAdmin() {
   };
 
   // Calculate running balance
+  // Since ledger is sorted descending (newest first), we need to sum from the end (oldest) to current index
   const calculateRunningBalance = (transactions: LedgerTransaction[], currentIndex: number) => {
     if (!transactions || currentIndex < 0) return 0;
-    return transactions.slice(0, currentIndex + 1).reduce((acc, t) => acc + Number(t.amount), 0);
+    // Sum all transactions from current index to end (includes all older transactions)
+    return transactions.slice(currentIndex).reduce((acc, t) => acc + Number(t.amount), 0);
   };
 
   // Calculate LTV (Lifetime Value) for a member - sum of all payment transactions
