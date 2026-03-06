@@ -977,7 +977,7 @@ export async function handler(req, res) {
   // Handle "MEMBER" and "MEMBERSHIP" messages for waitlist
   if (text.toLowerCase().trim() === 'member' || text.toLowerCase().trim() === 'membership') {
     console.log('Processing MEMBER/MEMBERSHIP message for waitlist');
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirsandiego.com';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
     const waitlistMessage = `Thank you for seeking information about becoming a member of Noir.\n\nTo learn more please respond directly to this message with any questions.\n\nTo request an invitation, please complete the following form.\n\nWe typically respond within 24 hours. 🖤\n\n${baseUrl}/apply`;
     await sendSMS(from, waitlistMessage);
     return res.status(200).json({ message: 'Sent waitlist invitation message' });
@@ -986,33 +986,151 @@ export async function handler(req, res) {
   // Handle "INVITATION" messages for membership signup
   if (text.toLowerCase().trim() === 'invitation') {
     console.log('Processing INVITATION message for membership signup');
-    const invitationMessage = `Thank you for requesting an invitation to join Noir and we are excited to formally invite you to become a member of Noir.
+
+    try {
+      // Check if waitlist entry already exists for this phone
+      const { data: existingEntry } = await supabase
+        .from('waitlist')
+        .select('id, agreement_token, application_expires_at')
+        .eq('phone', from)
+        .eq('status', 'approved')
+        .single();
+
+      let signupToken;
+      if (existingEntry && existingEntry.agreement_token && new Date(existingEntry.application_expires_at) > new Date()) {
+        // Use existing valid token
+        signupToken = existingEntry.agreement_token;
+        console.log('Using existing invitation token for phone:', from);
+      } else {
+        // Generate new application token (24-hour expiration)
+        signupToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
+        if (existingEntry) {
+          // Update existing entry with new token
+          await supabase
+            .from('waitlist')
+            .update({
+              agreement_token: signupToken,
+              agreement_token_created_at: new Date().toISOString(),
+              application_expires_at: expiresAt.toISOString(),
+              application_link_sent_at: new Date().toISOString()
+            })
+            .eq('id', existingEntry.id);
+        } else {
+          // Create new waitlist entry with status='approved'
+          await supabase
+            .from('waitlist')
+            .insert({
+              phone: from,
+              status: 'approved',
+              agreement_token: signupToken,
+              agreement_token_created_at: new Date().toISOString(),
+              application_expires_at: expiresAt.toISOString(),
+              application_link_sent_at: new Date().toISOString(),
+              submitted_at: new Date().toISOString()
+            });
+        }
+        console.log('Created/updated invitation with token for phone:', from);
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
+      const signupUrl = `${baseUrl}/signup/${signupToken}`;
+
+      const invitationMessage = `Thank you for requesting an invitation to join Noir and we are excited to formally invite you to become a member of Noir.
 
 To officially join, please complete the following:
 
-https://skylineandco.typeform.com/noirkc-signup#auth_code=tw
+${signupUrl}
 
 The link expires in 24 hours, so please respond to this text with any questions.
 
 Thank you.`;
-    await sendSMS(from, invitationMessage);
-    return res.status(200).json({ message: 'Sent invitation signup message' });
+
+      await sendSMS(from, invitationMessage);
+      return res.status(200).json({ message: 'Sent invitation signup link' });
+    } catch (error) {
+      console.error('Error processing INVITATION request:', error);
+      await sendSMS(from, 'We encountered an error processing your invitation request. Please try again later or contact us directly.');
+      return res.status(500).json({ error: 'Failed to process invitation request' });
+    }
   }
 
   // Handle "SKYLINE" messages for Skyline membership signup
   if (text.toLowerCase().trim() === 'skyline') {
     console.log('Processing SKYLINE message for Skyline membership signup');
-    const skylineMessage = `Thank you for requesting an invitation. We are excited to formally invite you to become a Skyline Member of Noir.
+
+    try {
+      // Check if waitlist entry already exists for this phone
+      const { data: existingEntry } = await supabase
+        .from('waitlist')
+        .select('id, agreement_token, application_expires_at')
+        .eq('phone', from)
+        .eq('status', 'approved')
+        .single();
+
+      let signupToken;
+      if (existingEntry && existingEntry.agreement_token && new Date(existingEntry.application_expires_at) > new Date()) {
+        // Use existing valid token
+        signupToken = existingEntry.agreement_token;
+        console.log('Using existing Skyline token for phone:', from);
+      } else {
+        // Generate new application token (24-hour expiration)
+        signupToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
+        if (existingEntry) {
+          // Update existing entry with new token and Skyline selection
+          await supabase
+            .from('waitlist')
+            .update({
+              agreement_token: signupToken,
+              agreement_token_created_at: new Date().toISOString(),
+              application_expires_at: expiresAt.toISOString(),
+              application_link_sent_at: new Date().toISOString(),
+              selected_membership: 'Skyline'
+            })
+            .eq('id', existingEntry.id);
+        } else {
+          // Create new waitlist entry with status='approved' and Skyline pre-selected
+          await supabase
+            .from('waitlist')
+            .insert({
+              phone: from,
+              status: 'approved',
+              selected_membership: 'Skyline',
+              agreement_token: signupToken,
+              agreement_token_created_at: new Date().toISOString(),
+              application_expires_at: expiresAt.toISOString(),
+              application_link_sent_at: new Date().toISOString(),
+              submitted_at: new Date().toISOString()
+            });
+        }
+        console.log('Created/updated Skyline invitation with token for phone:', from);
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
+      const signupUrl = `${baseUrl}/skyline/${signupToken}`;
+
+      const skylineMessage = `Thank you for requesting an invitation. We are excited to formally invite you to become a Skyline Member of Noir.
 
 To officially join, please complete the following:
 
-https://skylineandco.typeform.com/noirkc-signup#auth_code=skyline
+${signupUrl}
 
 The link expires in 24 hours, so please respond to this text with any questions.
 
 Thank you.`;
-    await sendSMS(from, skylineMessage);
-    return res.status(200).json({ message: 'Sent Skyline membership signup message' });
+
+      await sendSMS(from, skylineMessage);
+      return res.status(200).json({ message: 'Sent Skyline membership signup link' });
+    } catch (error) {
+      console.error('Error processing SKYLINE request:', error);
+      await sendSMS(from, 'We encountered an error processing your Skyline invitation request. Please try again later or contact us directly.');
+      return res.status(500).json({ error: 'Failed to process Skyline request' });
+    }
   }
 
   // Handle "BALANCE" messages for ledger PDF

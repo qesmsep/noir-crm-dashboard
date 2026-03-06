@@ -1,0 +1,231 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  VStack,
+  Container,
+  useToast,
+  Text,
+  Progress,
+  Image,
+  HStack,
+  Badge,
+  Icon
+} from '@chakra-ui/react';
+import { useRouter, useParams } from 'next/navigation';
+import { Crown } from 'lucide-react';
+import AnimatedQuestionnaire from '@/components/AnimatedQuestionnaire';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+const SKYLINE_QUESTIONNAIRE_ID = '22222222-2222-2222-2222-222222222222';
+
+export default function SkylineSignupPage() {
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [validToken, setValidToken] = useState(false);
+  const [waitlistId, setWaitlistId] = useState<string>('');
+  const router = useRouter();
+  const params = useParams();
+  const toast = useToast();
+  const token = params?.token as string;
+
+  useEffect(() => {
+    validateToken();
+  }, [token]);
+
+  const validateToken = async () => {
+    try {
+      // Validate that token exists in waitlist
+      const { data, error } = await supabase
+        .from('waitlist')
+        .select('id, questionnaire_completed_at')
+        .eq('agreement_token', token)
+        .single();
+
+      if (error || !data) {
+        throw new Error('Invalid or expired token');
+      }
+
+      // Check if already completed
+      if (data.questionnaire_completed_at) {
+        // Already filled out, redirect to onboard
+        router.push(`/onboard/${token}`);
+        return;
+      }
+
+      setWaitlistId(data.id);
+      setValidToken(true);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Invalid or expired signup link',
+        status: 'error',
+        duration: 5000,
+      });
+      router.push('/');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleComplete = async (responses: Record<string, any>) => {
+    setSubmitting(true);
+
+    try {
+      // Extract data from responses
+      const questionData: Record<string, any> = {};
+      let photoUrl = '';
+
+      for (const [questionId, response] of Object.entries(responses)) {
+        if (response.type === 'file' && response.file_url) {
+          photoUrl = response.file_url;
+        } else if (response.response_text) {
+          // Map question order to field names
+          const questionOrder = parseInt(questionId.split('-')[1] || '0');
+          switch (questionOrder) {
+            case 1:
+              questionData.first_name = response.response_text;
+              break;
+            case 2:
+              questionData.last_name = response.response_text;
+              break;
+            case 3:
+              questionData.email = response.response_text;
+              break;
+            case 4:
+              questionData.phone = response.response_text;
+              break;
+            case 5:
+              questionData.company = response.response_text;
+              break;
+            case 6:
+              questionData.occupation = response.response_text;
+              break;
+            case 7:
+              questionData.city_state = response.response_text;
+              break;
+            case 8:
+              questionData.referral = response.response_text;
+              break;
+            case 9:
+              questionData.why_noir = response.response_text;
+              break;
+          }
+        }
+      }
+
+      // Update waitlist with intake data + Skyline membership selection
+      const { error: updateError } = await supabase
+        .from('waitlist')
+        .update({
+          ...questionData,
+          photo_url: photoUrl || undefined,
+          selected_membership: 'Skyline', // Auto-select Skyline
+          questionnaire_completed_at: new Date().toISOString()
+        })
+        .eq('id', waitlistId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      toast({
+        title: 'Success!',
+        description: 'Moving to next step...',
+        status: 'success',
+        duration: 2000,
+      });
+
+      // Redirect to onboarding wizard
+      setTimeout(() => {
+        router.push(`/onboard/${token}`);
+      }, 1000);
+
+    } catch (error: any) {
+      console.error('Skyline signup submission error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to submit. Please try again.',
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box minH="100vh" bg="#1F1F1F" display="flex" alignItems="center" justifyContent="center">
+        <Text color="white" fontSize="lg">Validating your Skyline invitation...</Text>
+      </Box>
+    );
+  }
+
+  if (!validToken) {
+    return null;
+  }
+
+  return (
+    <Box minH="100vh" bg="#1F1F1F" py={12}>
+      <Container maxW="container.md">
+        {/* Header */}
+        <VStack spacing={4} mb={12} textAlign="center">
+          <Box mb={4}>
+            <Image
+              src="/images/noir-wedding-day.png"
+              alt="Noir"
+              h="120px"
+              w="auto"
+              mx="auto"
+            />
+          </Box>
+          <HStack spacing={3} justify="center">
+            <Icon as={Crown} color="#FFD700" boxSize={8} />
+            <Badge
+              bg="#FFD700"
+              color="#1F1F1F"
+              px={4}
+              py={2}
+              borderRadius="full"
+              fontSize="lg"
+              fontWeight="bold"
+            >
+              SKYLINE MEMBERSHIP
+            </Badge>
+          </HStack>
+          <Text fontSize="2xl" fontWeight="bold" color="#ECEDE8">
+            Welcome to Noir Skyline
+          </Text>
+          <Text fontSize="md" color="gray.400" maxW="500px">
+            Complete your exclusive Skyline membership application
+          </Text>
+          <Progress
+            value={33}
+            size="sm"
+            colorScheme="yellow"
+            bg="#2D2D2D"
+            w="full"
+            borderRadius="full"
+            mt={4}
+          />
+          <Text fontSize="sm" color="gray.500">
+            Step 1 of 3: Application
+          </Text>
+        </VStack>
+
+        {/* Animated Questionnaire */}
+        <AnimatedQuestionnaire
+          questionnaireId={SKYLINE_QUESTIONNAIRE_ID}
+          onComplete={handleComplete}
+        />
+      </Container>
+    </Box>
+  );
+}

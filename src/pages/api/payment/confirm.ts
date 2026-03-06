@@ -153,7 +153,7 @@ Your ${waitlist.selected_membership} membership is now active.
 To make a reservation, text "RESERVATION" to this number anytime.
 
 You can also manage your membership at:
-https://noirsandiego.com/member
+https://noirkc.com/member
 
 Questions? Just reply to this text.
 

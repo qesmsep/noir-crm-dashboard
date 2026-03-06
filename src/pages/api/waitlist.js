@@ -286,10 +286,10 @@ export default async function handler(req, res) {
       // Note: archived status does not send SMS
       let smsMessage = '';
       if (status === 'approved') {
-        // Generate application token for agreement signing (7-day expiration)
+        // Generate application token for agreement signing (24-hour expiration)
         const applicationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7);
+        expiresAt.setHours(expiresAt.getHours() + 24);
 
         // Update waitlist with agreement token (renamed from application_token for clarity)
         await supabase
@@ -302,10 +302,10 @@ export default async function handler(req, res) {
           })
           .eq('id', id);
 
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirsandiego.com';
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
         const onboardingUrl = `${baseUrl}/onboard/${applicationToken}`;
 
-        smsMessage = `Hi {firstName} - We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nComplete your onboarding here:\n\n${onboardingUrl}\n\nYou'll sign the agreement, select your membership, and complete payment—all in one smooth flow. The link expires in 7 days.\n\nQuestions? Just reply to this text.\n\nThank you. 🖤`;
+        smsMessage = `Hi {firstName} - We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nComplete your onboarding here:\n\n${onboardingUrl}\n\nYou'll sign the agreement, select your membership, and complete payment—all in one smooth flow. The link expires in 24 hours.\n\nQuestions? Just reply to this text.\n\nThank you. 🖤`;
       } else if (status === 'waitlisted') {
         smsMessage = "Hi {firstName} - We appreciate your request.\n\nNoir is intentionally intimate—each additional member carefully considered to preserve the experience we value most at Noir.\n\nAt this time, we aren't able to extend an invitation. However, you've been added to our waitlist, and as space allows, your request will be revisited and you'll be notified.\n\nThank you for your patience. We hope to welcome you, when the time is right.";
       } else if (status === 'denied') {
