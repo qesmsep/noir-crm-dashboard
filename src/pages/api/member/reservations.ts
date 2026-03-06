@@ -41,9 +41,10 @@ export default async function handler(
     }
 
     // Get all reservations for this member (match by phone or email)
+    // Include private_events data for event reservations
     const { data: reservations, error: reservationsError } = await supabaseAdmin
       .from('reservations')
-      .select('*')
+      .select('*, private_events(title, name)')
       .or(`phone.eq.${member.phone},email.eq.${member.email}`)
       .order('start_time', { ascending: false });
 

@@ -374,7 +374,7 @@ export default function MemberDashboardPage() {
                           })}
                         </p>
                         <p className="text-xs font-medium text-[#1F1F1F] flex-1 truncate">
-                          {nextReservation.special_requests || 'Reservation'} • {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
+                          {nextReservation.private_events?.title || nextReservation.private_events?.name || nextReservation.special_requests || 'Reservation'} • {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
                             hour: 'numeric',
                             minute: '2-digit',
                             hour12: true,
@@ -410,7 +410,7 @@ export default function MemberDashboardPage() {
                           })}
                         </p>
                         <p className="text-xs text-[#5A5A5A] flex-1 truncate">
-                          {visit.special_requests || 'Visit'} • {new Date(visit.start_time).toLocaleTimeString('en-US', {
+                          {visit.private_events?.title || visit.private_events?.name || visit.special_requests || 'Visit'} • {new Date(visit.start_time).toLocaleTimeString('en-US', {
                             hour: 'numeric',
                             minute: '2-digit',
                             hour12: true,
