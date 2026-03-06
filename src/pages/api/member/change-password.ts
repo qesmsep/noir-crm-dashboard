@@ -6,7 +6,7 @@ import { parse } from 'cookie';
 import { logAuthEvent, getClientIP, getUserAgent } from '@/lib/security';
 
 const requestSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
+  currentPassword: z.string().optional(), // Optional for first-time password setup
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
@@ -49,24 +49,32 @@ export default async function handler(
 
     const member = Array.isArray(session.members) ? session.members[0] : session.members;
 
-    if (!member || !member.password_hash) {
-      return res.status(400).json({ error: 'No password set for this account' });
+    if (!member) {
+      return res.status(400).json({ error: 'Member not found' });
     }
 
-    // Verify current password
-    const passwordMatch = await bcrypt.compare(currentPassword, member.password_hash);
+    const isFirstTimeSetup = !member.password_hash;
 
-    if (!passwordMatch) {
-      await logAuthEvent({
-        memberId: member.member_id,
-        phone: member.phone,
-        eventType: 'login_failed',
-        ipAddress,
-        userAgent,
-        metadata: { reason: 'incorrect_current_password', action: 'password_change' },
-      });
+    // If not first-time setup, verify current password
+    if (!isFirstTimeSetup) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required' });
+      }
 
-      return res.status(401).json({ error: 'Current password is incorrect' });
+      const passwordMatch = await bcrypt.compare(currentPassword, member.password_hash);
+
+      if (!passwordMatch) {
+        await logAuthEvent({
+          memberId: member.member_id,
+          phone: member.phone,
+          eventType: 'login_failed',
+          ipAddress,
+          userAgent,
+          metadata: { reason: 'incorrect_current_password', action: 'password_change' },
+        });
+
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
     }
 
     // Hash new password
@@ -87,14 +95,17 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to update password' });
     }
 
-    // Log successful password change
+    // Log successful password change or first-time setup
     await logAuthEvent({
       memberId: member.member_id,
       phone: member.phone,
       eventType: 'password_reset',
       ipAddress,
       userAgent,
-      metadata: { initiated_by: 'member', action: 'password_change' },
+      metadata: {
+        initiated_by: 'member',
+        action: isFirstTimeSetup ? 'first_time_password_setup' : 'password_change',
+      },
     });
 
     res.status(200).json({

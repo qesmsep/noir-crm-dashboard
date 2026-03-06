@@ -13,7 +13,7 @@ import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const { toast } = useToast();
+  const { toast} = useToast();
   const { member, loading } = useMemberAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -22,12 +22,34 @@ export default function ChangePasswordPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
 
   useEffect(() => {
     if (!loading && !member) {
       router.push('/member/login');
     }
   }, [loading, member, router]);
+
+  // Check if this is first-time password setup
+  useEffect(() => {
+    const checkPasswordStatus = async () => {
+      try {
+        const response = await fetch('/api/member/check-password-status', {
+          credentials: 'include',
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setIsFirstTimeSetup(!data.has_password);
+        }
+      } catch (error) {
+        console.error('Failed to check password status:', error);
+      }
+    };
+
+    if (member) {
+      checkPasswordStatus();
+    }
+  }, [member]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +81,7 @@ export default function ChangePasswordPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          currentPassword,
+          ...(isFirstTimeSetup ? {} : { currentPassword }), // Only include currentPassword if not first-time setup
           newPassword,
         }),
       });
@@ -113,15 +135,17 @@ export default function ChangePasswordPage() {
           <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
             <CardHeader>
               <CardTitle className="text-2xl font-bold text-[#1F1F1F]">
-                Change Your Password
+                {isFirstTimeSetup ? 'Set Your Password' : 'Change Your Password'}
               </CardTitle>
               <p className="text-[#5A5A5A] mt-2 text-sm">
-                Please set a new password for your account
+                {isFirstTimeSetup
+                  ? 'Create a secure password for your account'
+                  : 'Please set a new password for your account'}
               </p>
             </CardHeader>
 
             <CardContent>
-              {member?.password_is_temporary && (
+              {!isFirstTimeSetup && member?.password_is_temporary && (
                 <Alert className="mb-6 bg-yellow-50 border-yellow-200">
                   <AlertTriangle className="h-4 w-4 text-yellow-600" />
                   <AlertDescription className="text-sm text-yellow-800">
@@ -130,31 +154,41 @@ export default function ChangePasswordPage() {
                 </Alert>
               )}
 
+              {isFirstTimeSetup && (
+                <Alert className="mb-6 bg-blue-50 border-blue-200">
+                  <AlertDescription className="text-sm text-blue-800">
+                    Welcome! Please create a password to secure your account. You'll use this password to log in next time.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <form onSubmit={handleSubmit}>
                 <div className="flex flex-col gap-4">
-                  <div>
-                    <Label htmlFor="currentPassword" className="text-[#1F1F1F] text-sm">
-                      Current Password *
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="currentPassword"
-                        type={showCurrent ? 'text' : 'password'}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                        required
-                        className="border-[#DAD7D0] focus:border-[#A59480] focus:ring-[#A59480] pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCurrent(!showCurrent)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                      >
-                        {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
+                  {!isFirstTimeSetup && (
+                    <div>
+                      <Label htmlFor="currentPassword" className="text-[#1F1F1F] text-sm">
+                        Current Password *
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="currentPassword"
+                          type={showCurrent ? 'text' : 'password'}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Enter current password"
+                          required
+                          className="border-[#DAD7D0] focus:border-[#A59480] focus:ring-[#A59480] pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrent(!showCurrent)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        >
+                          {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div>
                     <Label htmlFor="newPassword" className="text-[#1F1F1F] text-sm">
