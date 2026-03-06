@@ -325,6 +325,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Validate against private events that block the date/time
       try {
+        console.log('[PRIVATE EVENT CHECK] Request body times:', {
+          start_time: body.start_time,
+          end_time: body.end_time
+        });
+
         const reservationStart = DateTime.fromISO(body.start_time);
         const reservationEnd = DateTime.fromISO(body.end_time);
         
@@ -342,11 +347,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .select('start_time, end_time, full_day, title')
           .lt('start_time', endOfDayUtc)
           .gt('end_time', startOfDayUtc);
-        
+
+        console.log('[PRIVATE EVENT CHECK] Query params:', { startOfDayUtc, endOfDayUtc });
+        console.log('[PRIVATE EVENT CHECK] Found events:', privateEvents?.length || 0);
+
         if (privateEventsError) {
           console.error('Error checking private events:', privateEventsError);
           // Don't block reservation if we can't check - log and continue
         } else if (privateEvents && privateEvents.length > 0) {
+          console.log('[PRIVATE EVENT CHECK] Events found:', JSON.stringify(privateEvents, null, 2));
           // Check for full-day events
           const fullDayEvent = privateEvents.find(ev => ev.full_day);
           if (fullDayEvent) {
@@ -359,20 +368,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Check for partial-day events that overlap with reservation time
           const reservationStartUtc = reservationStart.toUTC();
           const reservationEndUtc = reservationEnd.toUTC();
-          
+
+          console.log('[PRIVATE EVENT CHECK] Reservation times (UTC):', {
+            start: reservationStartUtc.toISO(),
+            end: reservationEndUtc.toISO()
+          });
+
           const overlappingEvent = privateEvents.find(ev => {
             if (ev.full_day) return false; // Already checked above
             const evStart = DateTime.fromISO(ev.start_time);
             const evEnd = DateTime.fromISO(ev.end_time);
+
+            const overlaps = (reservationStartUtc < evEnd) && (reservationEndUtc > evStart);
+            console.log(`[PRIVATE EVENT CHECK] Checking event "${ev.title}":`, {
+              eventStart: evStart.toISO(),
+              eventEnd: evEnd.toISO(),
+              reservationStart: reservationStartUtc.toISO(),
+              reservationEnd: reservationEndUtc.toISO(),
+              overlaps
+            });
+
             // Check if reservation overlaps with event
-            return (reservationStartUtc < evEnd) && (reservationEndUtc > evStart);
+            return overlaps;
           });
-          
+
           if (overlappingEvent) {
             console.log(`Reservation blocked by private event: ${overlappingEvent.title}`);
-            return res.status(400).json({ 
-              error: `This time slot conflicts with a private event: ${overlappingEvent.title}` 
+            return res.status(400).json({
+              error: `This time slot conflicts with a private event: ${overlappingEvent.title}`
             });
+          } else {
+            console.log('[PRIVATE EVENT CHECK] No overlapping events found - reservation allowed');
           }
         }
       } catch (privateEventCheckError) {
