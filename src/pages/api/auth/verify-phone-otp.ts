@@ -201,28 +201,45 @@ export default async function handler(
         });
 
         if (authError) {
-          // If email already exists, try to find existing auth user by email
+          // If email already exists, try to find existing auth user by email or phone
           if (authError.message?.includes('email address has already been registered') || authError.code === 'email_exists') {
-            console.log('[VERIFY-OTP] Email exists, finding existing auth user by email:', member.email);
+            console.log('[VERIFY-OTP] Email exists, looking up existing auth user');
 
-            const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+            // Try to get user by email first
+            let existingUser = null;
 
-            if (listError) {
-              console.error('[VERIFY-OTP] Failed to list users:', listError);
-              return res.status(500).json({
-                error: 'Failed to set up account. Please contact support.',
-              });
+            if (member.email) {
+              try {
+                const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(member.email);
+                if (!getUserError && userData?.user) {
+                  existingUser = userData.user;
+                  console.log('[VERIFY-OTP] Found existing auth user by email:', existingUser.id);
+                }
+              } catch (e) {
+                console.error('[VERIFY-OTP] getUserByEmail failed:', e);
+              }
             }
 
-            const existingUser = existingUsers.users.find(u => u.email === member.email);
+            // If not found by email, try by phone
+            if (!existingUser) {
+              try {
+                const phone = member.phone.startsWith('+') ? member.phone : `+1${normalizedPhone}`;
+                const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserByPhone(phone);
+                if (!getUserError && userData?.user) {
+                  existingUser = userData.user;
+                  console.log('[VERIFY-OTP] Found existing auth user by phone:', existingUser.id);
+                }
+              } catch (e) {
+                console.error('[VERIFY-OTP] getUserByPhone failed:', e);
+              }
+            }
 
             if (existingUser) {
-              console.log('[VERIFY-OTP] Found existing auth user:', existingUser.id);
               authUserId = existingUser.id;
             } else {
-              console.error('[VERIFY-OTP] Email exists but user not found');
+              console.error('[VERIFY-OTP] Could not find existing auth user');
               return res.status(500).json({
-                error: 'Failed to set up account. Please contact support.',
+                error: 'Account setup conflict. Please contact support.',
               });
             }
           } else {
