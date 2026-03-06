@@ -75,7 +75,7 @@ function AddCardForm({ accountId, onSuccess, onCancel }: { accountId: string; on
 
       // Step 3: Set as default payment method
       const setDefaultResponse = await fetch('/api/stripe/payment-methods/set-default', {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           account_id: accountId,
