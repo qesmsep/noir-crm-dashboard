@@ -477,7 +477,7 @@ export default function MemberProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#ECEDE8] pb-20">
+    <div className="min-h-screen bg-[#ECEDE8] pb-20" style={{ touchAction: 'pan-y pinch-zoom', width: '100vw', maxWidth: '100vw', overflowX: 'hidden', position: 'relative' }}>
       {/* Header - Hidden on mobile */}
       <div className="bg-white border-b border-[#ECEAE5] sticky top-0 z-10 hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -493,31 +493,31 @@ export default function MemberProfilePage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
-        <div className="flex flex-col gap-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6 lg:py-8" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        <div className="flex flex-col gap-6" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           {/* Page Title */}
-          <div>
+          <div className="max-w-full">
             <h1 className="text-3xl md:text-4xl text-[#1F1F1F] mb-2" style={{ fontFamily: 'CONEBARS' }}>
               Welcome back, {member.first_name}
             </h1>
           </div>
 
           {/* Profile Card */}
-          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-14 w-14 bg-[#A59480]">
+          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm" style={{ touchAction: 'pan-y pinch-zoom', width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+            <CardHeader className="pb-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <Avatar className="h-12 w-12 md:h-14 md:w-14 bg-[#A59480] flex-shrink-0">
                     <AvatarImage src={member.profile_photo_url || undefined} />
                     <AvatarFallback className="bg-[#A59480] text-white">
                       {member.first_name[0]}{member.last_name[0]}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <h2 className="text-xl font-semibold text-[#1F1F1F]">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg md:text-xl font-semibold text-[#1F1F1F] truncate">
                       {member.first_name} {member.last_name}
                     </h2>
-                    <Badge className="bg-[#A59480] text-white px-2 py-1 text-xs mt-1">
+                    <Badge className="bg-[#A59480] text-white px-2 py-1 text-xs mt-1 inline-block">
                       {member.membership} Member
                     </Badge>
                   </div>
@@ -526,40 +526,41 @@ export default function MemberProfilePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
+                    className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white flex-shrink-0 text-xs md:text-sm px-2 md:px-3"
                     onClick={() => setEditing(true)}
                   >
-                    Edit Profile
+                    <span className="hidden sm:inline">Edit Profile</span>
+                    <span className="sm:hidden">Edit</span>
                   </Button>
                 )}
               </div>
             </CardHeader>
 
-            <CardContent>
-              <div className="flex flex-col gap-4">
-                <div>
+            <CardContent className="max-w-full">
+              <div className="flex flex-col gap-4 max-w-full">
+                <div className="max-w-full">
                   <Label htmlFor="first_name" className="text-[#1F1F1F] text-sm">First Name</Label>
                   <Input
                     id="first_name"
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                     readOnly={!editing}
-                    className={`border-[#DAD7D0] ${editing ? 'bg-white' : 'bg-[#F6F5F2]'} focus:border-[#A59480] focus:ring-[#A59480]`}
+                    className={`border-[#DAD7D0] ${editing ? 'bg-white' : 'bg-[#F6F5F2]'} focus:border-[#A59480] focus:ring-[#A59480] w-full max-w-full`}
                   />
                 </div>
 
-                <div>
+                <div className="max-w-full">
                   <Label htmlFor="last_name" className="text-[#1F1F1F] text-sm">Last Name</Label>
                   <Input
                     id="last_name"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                     readOnly={!editing}
-                    className={`border-[#DAD7D0] ${editing ? 'bg-white' : 'bg-[#F6F5F2]'} focus:border-[#A59480] focus:ring-[#A59480]`}
+                    className={`border-[#DAD7D0] ${editing ? 'bg-white' : 'bg-[#F6F5F2]'} focus:border-[#A59480] focus:ring-[#A59480] w-full max-w-full`}
                   />
                 </div>
 
-                <div>
+                <div className="max-w-full">
                   <Label htmlFor="email" className="text-[#1F1F1F] text-sm">Email</Label>
                   <Input
                     id="email"
@@ -567,18 +568,18 @@ export default function MemberProfilePage() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     readOnly={!editing}
-                    className={`border-[#DAD7D0] ${editing ? 'bg-white' : 'bg-[#F6F5F2]'} focus:border-[#A59480] focus:ring-[#A59480]`}
+                    className={`border-[#DAD7D0] ${editing ? 'bg-white' : 'bg-[#F6F5F2]'} focus:border-[#A59480] focus:ring-[#A59480] w-full max-w-full`}
                   />
                 </div>
 
-                <div>
+                <div className="max-w-full">
                   <Label htmlFor="phone" className="text-[#1F1F1F] text-sm">Phone Number</Label>
                   <Input
                     id="phone"
                     type="tel"
                     value={formData.phone}
                     readOnly
-                    className="border-[#DAD7D0] bg-[#F6F5F2] cursor-not-allowed"
+                    className="border-[#DAD7D0] bg-[#F6F5F2] cursor-not-allowed w-full max-w-full"
                   />
                   <p className="text-xs text-[#8C7C6D] mt-1">
                     Phone number cannot be changed. Contact support if needed.
@@ -665,40 +666,40 @@ export default function MemberProfilePage() {
           </Card>
 
           {/* Payment Methods Card */}
-          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm" style={{ touchAction: 'pan-y pinch-zoom', width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-[#A59480]" />
-                  <CardTitle className="text-xl font-semibold text-[#1F1F1F]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <CreditCard className="w-5 h-5 text-[#A59480] flex-shrink-0" />
+                  <CardTitle className="text-lg md:text-xl font-semibold text-[#1F1F1F] truncate">
                     Payment Methods
                   </CardTitle>
                 </div>
                 {!showAddCard && !showAddBankAccount && !loadingPaymentMethods && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 md:gap-2 flex-shrink-0">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
+                      className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white text-xs px-2 md:px-3"
                       onClick={() => setShowAddCard(true)}
                     >
-                      <CreditCard className="w-4 h-4 mr-1" />
-                      Add Card
+                      <CreditCard className="w-3 h-3 md:w-4 md:h-4 md:mr-1" />
+                      <span className="hidden sm:inline">Add Card</span>
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
+                      className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white text-xs px-2 md:px-3"
                       onClick={() => setShowAddBankAccount(true)}
                     >
-                      <Building2 className="w-4 h-4 mr-1" />
-                      Add Bank
+                      <Building2 className="w-3 h-3 md:w-4 md:h-4 md:mr-1" />
+                      <span className="hidden sm:inline">Add Bank</span>
                     </Button>
                   </div>
                 )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="max-w-full">
               {loadingPaymentMethods ? (
                 <div className="flex justify-center py-4">
                   <Spinner className="text-[#A59480]" />
@@ -734,15 +735,15 @@ export default function MemberProfilePage() {
                     return (
                       <div
                         key={pm.id}
-                        className="flex items-center justify-between p-3 border border-[#ECEAE5] rounded-lg bg-[#F6F5F2]"
+                        className="flex items-center justify-between gap-2 p-3 border border-[#ECEAE5] rounded-lg bg-[#F6F5F2]"
                       >
-                        <div className="flex items-center gap-3">
-                          {isCard && <CreditCard className="w-5 h-5 text-[#5A5A5A]" />}
-                          {isBankAccount && <Building2 className="w-5 h-5 text-[#5A5A5A]" />}
-                          <div>
+                        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                          {isCard && <CreditCard className="w-4 h-4 md:w-5 md:h-5 text-[#5A5A5A] flex-shrink-0" />}
+                          {isBankAccount && <Building2 className="w-4 h-4 md:w-5 md:h-5 text-[#5A5A5A] flex-shrink-0" />}
+                          <div className="min-w-0 flex-1">
                             {isCard && (
                               <>
-                                <p className="text-sm font-medium text-[#1F1F1F]">
+                                <p className="text-sm font-medium text-[#1F1F1F] truncate">
                                   {pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1)} •••• {pm.card.last4}
                                 </p>
                                 <p className="text-xs text-[#8C7C6D]">
@@ -752,7 +753,7 @@ export default function MemberProfilePage() {
                             )}
                             {isBankAccount && (
                               <>
-                                <p className="text-sm font-medium text-[#1F1F1F]">
+                                <p className="text-sm font-medium text-[#1F1F1F] truncate">
                                   {pm.us_bank_account.bank_name || 'Bank Account'} •••• {pm.us_bank_account.last4}
                                 </p>
                                 <p className="text-xs text-[#8C7C6D]">
@@ -763,7 +764,7 @@ export default function MemberProfilePage() {
                           </div>
                         </div>
                         {defaultPaymentMethod === pm.id && (
-                          <Badge className="bg-[#4CAF50] text-white px-2 py-1 text-xs">
+                          <Badge className="bg-[#4CAF50] text-white px-2 py-1 text-xs flex-shrink-0">
                             Default
                           </Badge>
                         )}
@@ -789,7 +790,7 @@ export default function MemberProfilePage() {
 
           {/* Referral Tracking Card */}
           {member.referral_code && (
-            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm" style={{ touchAction: 'pan-y pinch-zoom', width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Share2 className="w-5 h-5 text-[#A59480]" />
@@ -847,7 +848,7 @@ export default function MemberProfilePage() {
           )}
 
           {/* Account Settings Card */}
-          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm">
+          <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm" style={{ touchAction: 'pan-y pinch-zoom', width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-[#1F1F1F]">
                 Account Settings
