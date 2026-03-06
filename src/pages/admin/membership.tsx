@@ -13,7 +13,7 @@ export default function AdminMembership() {
   const [activeTab, setActiveTab] = useState(0);
 
   const tabs = [
-    { id: 0, name: 'Subscription Plans', icon: Settings, component: SubscriptionPlansManager },
+    { id: 0, name: 'Membership Plans', icon: Settings, component: SubscriptionPlansManager },
     { id: 1, name: 'Waitlist', icon: List, component: WaitlistManager },
     { id: 2, name: 'Applications', icon: Users, component: ApplicationManager },
     { id: 3, name: 'Questionnaires', icon: FileText, component: QuestionnaireManager },

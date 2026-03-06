@@ -72,7 +72,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   if (error) {
     console.error('Error fetching subscription plans:', error);
-    return res.status(500).json({ error: 'Failed to fetch subscription plans' });
+    return res.status(500).json({ error: 'Failed to fetch membership plans' });
   }
 
   return res.status(200).json({ data: plans });
@@ -133,10 +133,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   if (error) {
     console.error('Error creating subscription plan:', error);
-    return res.status(500).json({ error: 'Failed to create subscription plan' });
+    return res.status(500).json({ error: 'Failed to create membership plan' });
   }
 
-  return res.status(201).json({ data: plan, message: 'Subscription plan created successfully' });
+  return res.status(201).json({ data: plan, message: 'Membership plan created successfully' });
 }
 
 /**
@@ -189,14 +189,14 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
 
   if (error) {
     console.error('Error updating subscription plan:', error);
-    return res.status(500).json({ error: 'Failed to update subscription plan' });
+    return res.status(500).json({ error: 'Failed to update membership plan' });
   }
 
   if (!plan) {
-    return res.status(404).json({ error: 'Subscription plan not found' });
+    return res.status(404).json({ error: 'Membership plan not found' });
   }
 
-  return res.status(200).json({ data: plan, message: 'Subscription plan updated successfully' });
+  return res.status(200).json({ data: plan, message: 'Membership plan updated successfully' });
 }
 
 /**
@@ -235,8 +235,8 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
 
   if (error) {
     console.error('Error deleting subscription plan:', error);
-    return res.status(500).json({ error: 'Failed to delete subscription plan' });
+    return res.status(500).json({ error: 'Failed to delete membership plan' });
   }
 
-  return res.status(200).json({ message: 'Subscription plan deleted successfully' });
+  return res.status(200).json({ message: 'Membership plan deleted successfully' });
 }
