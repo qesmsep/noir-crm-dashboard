@@ -271,6 +271,7 @@ export default function SimpleReservationRequestModal({
                       borderRadius="lg"
                       bg="white"
                       readOnly
+                      inputMode="none"
                     />
                   }
                   popperPlacement="bottom-start"
@@ -293,6 +294,7 @@ export default function SimpleReservationRequestModal({
                 fontSize="md"
                 borderRadius="lg"
                 isDisabled={!date || loadingTimes || availableTimeSlots.length === 0}
+                sx={{ 'select': { inputMode: 'none' } }}
               >
                 {availableTimeSlots.map((slot) => (
                   <option key={slot} value={slot}>
