@@ -436,7 +436,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <p className="text-xs text-[#5A5A5A] font-semibold">Subscription</p>
+                <p className="text-xs text-[#5A5A5A] font-semibold">Membership</p>
                 <p className="text-xs text-[#1F1F1F] font-medium">
                   {(member as any)?.subscription_name || (member as any)?.membership_type || 'Standard Membership'}
                 </p>
