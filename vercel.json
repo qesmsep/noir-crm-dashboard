@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/cron/monthly-billing",
-      "schedule": "0 22 * * *"
+      "schedule": "0 14 * * *"
     },
     {
       "path": "/api/cron/retry-failed-payments",
