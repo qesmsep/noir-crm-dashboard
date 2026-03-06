@@ -47,6 +47,7 @@ export default async function handler(
           credit_renewal_date,
           deactivated,
           auth_user_id,
+          photo,
           profile_photo_url,
           password_is_temporary,
           password_hash,
