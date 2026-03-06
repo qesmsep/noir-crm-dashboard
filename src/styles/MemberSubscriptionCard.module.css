@@ -17,6 +17,16 @@
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid #ECEAE5;
+  transition: background-color 0.2s ease;
+  padding: 12px;
+  margin: -12px -12px 20px -12px;
+  border-radius: 12px 12px 0 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .header:hover {
+    background: #F9FAFB;
+  }
 }
 
 .title {

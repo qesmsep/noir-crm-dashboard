@@ -56,13 +56,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select(`
         id,
         title,
-        name,
         event_type,
         start_time,
         end_time,
         event_description,
-        description,
-        location,
         max_guests,
         total_attendees_maximum,
         rsvp_enabled,
@@ -82,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Format the events for display
     const formattedEvents = events?.map(event => ({
       id: event.id,
-      title: event.title || event.name,
+      title: event.title,
       start_time: event.start_time,
       end_time: event.end_time,
       date: new Date(event.start_time).toLocaleDateString('en-US', {
@@ -96,8 +93,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         minute: '2-digit',
         hour12: true
       }),
-      description: event.event_description || event.description,
-      location: event.location,
+      description: event.event_description,
+      location: null, // Location field doesn't exist in schema
       maxGuests: event.max_guests,
       totalAttendees: event.total_attendees_maximum,
       rsvpEnabled: event.rsvp_enabled,

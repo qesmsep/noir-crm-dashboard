@@ -9,6 +9,7 @@ import InlineAttachments from '../../../components/InlineAttachments';
 import MemberSubscriptionCard from '../../../components/MemberSubscriptionCard';
 import SubscriptionTransactionHistory from '../../../components/SubscriptionTransactionHistory';
 import AddSecondaryMemberModal from '../../../components/AddSecondaryMemberModal';
+import PhotoCropUpload from '../../../components/PhotoCropUpload';
 import styles from '../../../styles/MemberDetail.module.css';
 
 interface Member {
@@ -128,6 +129,21 @@ export default function MemberDetailAdmin() {
   // Credit card fee toggle
   const [creditCardFeeEnabled, setCreditCardFeeEnabled] = useState(false);
   const [updatingFeeToggle, setUpdatingFeeToggle] = useState(false);
+
+  // Member card expansion
+  const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set());
+
+  const toggleMemberExpansion = (memberId: string) => {
+    setExpandedMemberIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(memberId)) {
+        newSet.delete(memberId);
+      } else {
+        newSet.add(memberId);
+      }
+      return newSet;
+    });
+  };
 
   // Fetch members and account settings
   useEffect(() => {
@@ -756,6 +772,80 @@ export default function MemberDetailAdmin() {
     }
   };
 
+  // Handle photo update
+  const handlePhotoUpdate = async (memberId: string, photoDataUrl: string) => {
+    try {
+      console.log('Updating photo for member:', memberId);
+      const supabase = getSupabaseClient();
+
+      // Convert data URL to blob
+      const response = await fetch(photoDataUrl);
+      const blob = await response.blob();
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const fileName = `member-${memberId}-${timestamp}.jpg`;
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('member-photos')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('member-photos')
+        .getPublicUrl(fileName);
+
+      const photoUrl = urlData.publicUrl;
+
+      console.log('Updating member_id:', memberId, 'with photo URL:', photoUrl);
+
+      // Update member record
+      const { data: updateData, error: updateError } = await supabase
+        .from('members')
+        .update({ photo: photoUrl })
+        .eq('member_id', memberId)
+        .select();
+
+      if (updateError) throw updateError;
+
+      console.log('Update result:', updateData);
+
+      // Refetch members to ensure we have the latest data
+      const { data: updatedMembers, error: fetchError } = await supabase
+        .from('members')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('member_type', { ascending: false }); // Primary first
+
+      if (fetchError) throw fetchError;
+
+      if (updatedMembers) {
+        setMembers(updatedMembers);
+      }
+
+      toast({
+        title: 'Photo updated',
+        description: 'Member photo has been updated successfully',
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (err: any) {
+      console.error('Error updating photo:', err);
+      toast({
+        title: 'Error updating photo',
+        description: err.message || 'Failed to update photo',
+        status: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
   // Calculate running balance
   const calculateRunningBalance = (transactions: LedgerTransaction[], currentIndex: number) => {
     if (!transactions || currentIndex < 0) return 0;
@@ -1266,32 +1356,65 @@ export default function MemberDetailAdmin() {
                   {members.map(member => (
                   <div key={member.member_id} className={styles.memberCard}>
                     {/* Member Header */}
-                    <div className={styles.memberHeader}>
-                      {member.photo ? (
-                        <div className={styles.memberPhoto}>
-                          <Image
-                            src={member.photo}
-                            alt={`${member.first_name} ${member.last_name}`}
-                            width={150}
-                            height={150}
-                            style={{ objectFit: 'cover', borderRadius: '50%' }}
-                            loading="lazy"
+                    <div className={styles.memberHeader} style={{ cursor: 'pointer' }} onClick={() => toggleMemberExpansion(member.member_id)}>
+                      <div style={{ position: 'relative' }}>
+                        {member.photo ? (
+                          <div className={styles.memberPhoto}>
+                            <Image
+                              src={member.photo}
+                              alt={`${member.first_name} ${member.last_name}`}
+                              width={150}
+                              height={150}
+                              style={{ objectFit: 'cover', borderRadius: '50%' }}
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <div className={styles.photoPlaceholder}>
+                            {member.first_name?.[0]}{member.last_name?.[0]}
+                          </div>
+                        )}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '5px',
+                            right: '5px',
+                            zIndex: 10
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <PhotoCropUpload
+                            currentPhoto={member.photo}
+                            onPhotoSelected={(photoDataUrl) => handlePhotoUpdate(member.member_id, photoDataUrl)}
+                            buttonClassName={styles.photoEditButton}
                           />
                         </div>
-                      ) : (
-                        <div className={styles.photoPlaceholder}>
-                          {member.first_name?.[0]}{member.last_name?.[0]}
-                        </div>
-                      )}
+                      </div>
                       <div className={styles.memberInfo}>
-                        <h3 className={styles.memberName}>
-                          {member.first_name} {member.last_name}
-                          {member.member_type === 'primary' && (
-                            <span className={styles.primaryBadge}>Primary</span>
-                          )}
-                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <h3 className={styles.memberName}>
+                            {member.first_name} {member.last_name}
+                            {member.member_type === 'primary' && (
+                              <span className={styles.primaryBadge}>Primary</span>
+                            )}
+                          </h3>
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            style={{
+                              transform: expandedMemberIds.has(member.member_id) ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                              flexShrink: 0,
+                              marginLeft: '0.5rem'
+                            }}
+                          >
+                            <path d="M5 7.5L10 12.5L15 7.5" stroke="#86868b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
                         {editingMemberId === member.member_id ? (
-                          <div className={styles.memberDetailsInline}>
+                          <div className={styles.memberDetailsInline} onClick={(e) => e.stopPropagation()}>
                             <input
                               type="email"
                               placeholder="Email"
@@ -1400,41 +1523,37 @@ export default function MemberDetailAdmin() {
                               </div>
                             )}
                             {member.dob && (
-                              <div className={styles.detailRow}>
-                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                                </svg>
-                                <span>{formatDate(member.dob)}</span>
+                              <div className={styles.detailRowWithAction}>
+                                <div className={styles.detailRow}>
+                                  <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                  </svg>
+                                  <span>{formatDate(member.dob)}</span>
+                                </div>
+                                {editingMemberId !== member.member_id && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingMemberId(member.member_id);
+                                      setEditingMemberData(member);
+                                    }}
+                                    className={styles.iconButton}
+                                    title="Edit Member"
+                                  >
+                                    <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                    </svg>
+                                  </button>
+                                )}
                               </div>
                             )}
-                            <div className={styles.detailRowWithAction}>
-                              <div className={styles.detailRow}>
-                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.343 1.152V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.344-1.152V5z" clipRule="evenodd" />
-                                </svg>
-                                <span>LTV: {formatCurrency(calculateMemberLTV(member.member_id))}</span>
-                              </div>
-                              {editingMemberId !== member.member_id && (
-                                <button
-                                  onClick={() => {
-                                    setEditingMemberId(member.member_id);
-                                    setEditingMemberData(member);
-                                  }}
-                                  className={styles.iconButton}
-                                  title="Edit Member"
-                                >
-                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
                           </div>
                         )}
                       </div>
                     </div>
 
+                    {expandedMemberIds.has(member.member_id) && (
+                      <>
                     {/* Attributes Section */}
                     <div className={styles.section}>
                       <h4 className={styles.subsectionTitle}>Attributes</h4>
@@ -1635,53 +1754,26 @@ export default function MemberDetailAdmin() {
                         </button>
                       </div>
                     </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
-
-              {/* Subscription Card - Account-level subscription */}
-              <MemberSubscriptionCard
-                accountId={accountId as string}
-                creditCardFeeEnabled={creditCardFeeEnabled}
-                updatingFeeToggle={updatingFeeToggle}
-                onToggleCreditCardFee={handleToggleCreditCardFee}
-              />
             </div>
             </div>
 
             <div className={styles.ledgerColumn}>
-            {/* Ledger Section */}
-            <div className={styles.ledgerSection}>
-              <div className={styles.ledgerHeader}>
-                <h2 className={styles.sectionTitle}>Account Ledger</h2>
-                <div className={styles.ledgerHeaderActions}>
-                  {!ledgerLoading && ledger.length > 0 && (
-                    <>
-                      <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, ledger.length - 1) < 0 ? styles.balance : styles.credit}`}>
-                        {calculateRunningBalance(ledger, ledger.length - 1) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, ledger.length - 1)))}
-                      </div>
-                      {calculateRunningBalance(ledger, ledger.length - 1) < 0 && (
-                        <button
-                          onClick={handlePayBalance}
-                          disabled={isProcessingPayment}
-                          className={styles.payBalanceButton}
-                        >
-                          {isProcessingPayment ? 'Processing...' : 'Pay Balance'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
+            {/* Subscription Card - Account-level subscription */}
+            <MemberSubscriptionCard
+              accountId={accountId as string}
+              creditCardFeeEnabled={creditCardFeeEnabled}
+              updatingFeeToggle={updatingFeeToggle}
+              onToggleCreditCardFee={handleToggleCreditCardFee}
+              totalLTV={members.reduce((sum, member) => sum + calculateMemberLTV(member.member_id), 0)}
+            />
 
-              {ledgerLoading ? (
-            <div className={styles.sectionLoading}>
-              <Spinner size="md" />
-            </div>
-          ) : (
-            <>
-              {/* Ledger Actions Card */}
-              <div className={styles.ledgerActionsCard}>
+            {/* Quick Actions Card - Between Subscription and Ledger */}
+            <div className={styles.ledgerActionsCard}>
                 <button
                   className={styles.ledgerActionsHeader}
                   onClick={() => setIsLedgerActionsExpanded(!isLedgerActionsExpanded)}
@@ -1799,6 +1891,36 @@ export default function MemberDetailAdmin() {
                 )}
               </div>
 
+            {/* Ledger Section */}
+            <div className={styles.ledgerSection}>
+              <div className={styles.ledgerHeader}>
+                <h2 className={styles.sectionTitle}>Account Ledger</h2>
+                <div className={styles.ledgerHeaderActions}>
+                  {!ledgerLoading && ledger.length > 0 && (
+                    <>
+                      <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, ledger.length - 1) < 0 ? styles.balance : styles.credit}`}>
+                        {calculateRunningBalance(ledger, ledger.length - 1) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, ledger.length - 1)))}
+                      </div>
+                      {calculateRunningBalance(ledger, ledger.length - 1) < 0 && (
+                        <button
+                          onClick={handlePayBalance}
+                          disabled={isProcessingPayment}
+                          className={styles.payBalanceButton}
+                        >
+                          {isProcessingPayment ? 'Processing...' : 'Pay Balance'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {ledgerLoading ? (
+                <div className={styles.sectionLoading}>
+                  <Spinner size="md" />
+                </div>
+              ) : (
+                <>
               {(newTransaction.member_id || newTransaction.type || newTransaction.date) && (
                 <div className={styles.compactForm}>
                   <select
@@ -2026,13 +2148,12 @@ export default function MemberDetailAdmin() {
             <SubscriptionTransactionHistory
               accountId={accountId as string}
             />
-          </div>
-          </div>
 
-          <div className={styles.messagesColumn}>
             {/* Messages Section */}
             <div className={styles.messagesSection}>
-              <h2 className={styles.sectionTitle}>Messages</h2>
+              <div className={styles.cardHeader}>
+                <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Messages</h2>
+              </div>
               {messagesLoading ? (
                 <div className={styles.sectionLoading}>
                   <Spinner size="md" />
@@ -2060,6 +2181,7 @@ export default function MemberDetailAdmin() {
                 </div>
               )}
             </div>
+          </div>
           </div>
         </div>
       </div>

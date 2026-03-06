@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon, CreditCard, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon, CreditCard, CalendarDays, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import MemberNav from '@/components/member/MemberNav';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import { Modal, ModalOverlay, ModalContent, ModalBody, ModalCloseButton } from '@chakra-ui/react';
 import ReservationForm from '@/components/ReservationForm';
@@ -15,8 +14,9 @@ import { getSupabaseClient } from '@/pages/api/supabaseClient';
 import BalanceModal from '@/components/member/BalanceModal';
 import ReservationsModal from '@/components/member/ReservationsModal';
 import ProfileModal from '@/components/member/ProfileModal';
-import PaymentMethodModal from '@/components/member/PaymentMethodModal';
+import SubscriptionModal from '@/components/member/SubscriptionModal';
 import UpcomingEventsModal from '@/components/member/UpcomingEventsModal';
+import RSVPModal from '@/components/member/RSVPModal';
 
 export default function MemberDashboardPage() {
   const router = useRouter();
@@ -57,8 +57,10 @@ export default function MemberDashboardPage() {
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [isReservationsListModalOpen, setIsReservationsListModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isPaymentMethodModalOpen, setIsPaymentMethodModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isUpcomingEventsModalOpen, setIsUpcomingEventsModalOpen] = useState(false);
+  const [isRSVPModalOpen, setIsRSVPModalOpen] = useState(false);
+  const [selectedRSVPUrl, setSelectedRSVPUrl] = useState<string>('');
   const [mounted, setMounted] = useState(false);
   const [baseDays, setBaseDays] = useState<number[]>([]);
   const [bookingStartDate, setBookingStartDate] = useState<Date | undefined>(undefined);
@@ -68,6 +70,8 @@ export default function MemberDashboardPage() {
   const [pastVisits, setPastVisits] = useState<any[]>([]);
   const [nextEvent, setNextEvent] = useState<any>(null);
   const [upcomingEventsCount, setUpcomingEventsCount] = useState<number>(0);
+  const [accountMembers, setAccountMembers] = useState<any[]>([]);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -116,6 +120,8 @@ export default function MemberDashboardPage() {
     fetchNextReservation();
     fetchCurrentBalance();
     fetchUpcomingEvents();
+    fetchAccountMembers();
+    fetchSubscriptionData();
   }, [member]);
 
   const fetchNextReservation = async () => {
@@ -201,6 +207,45 @@ export default function MemberDashboardPage() {
     }
   };
 
+  const fetchAccountMembers = async () => {
+    try {
+      const response = await fetch('/api/member/account-members', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const members = data.members || [];
+        setAccountMembers(members);
+
+        // Count only secondary members (matching admin logic)
+        const secondaryMembers = members.filter((m: any) => m.member_type === 'secondary');
+        console.log('Secondary members:', secondaryMembers.length, 'Total members:', members.length);
+      }
+    } catch (error) {
+      console.error('Error fetching account members:', error);
+    }
+  };
+
+  const fetchSubscriptionData = async () => {
+    try {
+      const response = await fetch('/api/member/account-subscription', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionData({
+          ...data.subscription,
+          baseMRR: data.baseMRR,
+          secondaryMemberCount: data.secondaryMemberCount,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching subscription data:', error);
+    }
+  };
+
   const handleReservationCreated = useCallback(() => {
     // Refresh the next reservation after creating a new one
     fetchNextReservation();
@@ -227,7 +272,7 @@ export default function MemberDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#ECEDE8] pb-20 relative">
+    <div className="min-h-screen bg-[#ECEDE8] relative">
       {/* Watermark Logo */}
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-0">
         <img
@@ -288,11 +333,22 @@ export default function MemberDashboardPage() {
               onClick={() => setIsReservationsListModalOpen(true)}
             >
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-[#A59480]" />
-                  <span className="text-xl font-semibold text-[#1F1F1F]">
-                    Reservations
-                  </span>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-[#A59480]" />
+                    <span className="text-xl font-semibold text-[#1F1F1F]">
+                      Reservations
+                    </span>
+                  </div>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsReservationModalOpen(true);
+                    }}
+                    className="bg-[#A59480] text-white hover:bg-[#8C7C6D] h-8 text-xs px-3"
+                  >
+                    Book Now
+                  </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-0 pt-0 pb-4">
@@ -429,31 +485,81 @@ export default function MemberDashboardPage() {
 
           {/* Additional Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Payment Method Card */}
+            {/* Subscription Card */}
             <Card
               className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-              onClick={() => setIsPaymentMethodModalOpen(true)}
+              onClick={() => setIsSubscriptionModalOpen(true)}
             >
               <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-[#A59480]" />
+                  <Users className="w-5 h-5 text-[#A59480]" />
                   <span className="text-xl font-semibold text-[#1F1F1F]">
-                    Payment Method
+                    Subscription
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="bg-[#F6F5F2] rounded-lg p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CreditCard className="w-8 h-8 text-[#A59480]" />
-                    <div>
-                      <p className="text-sm font-medium text-[#1F1F1F]">•••• 4242</p>
-                      <p className="text-xs text-[#5A5A5A]">Expires 12/24</p>
-                    </div>
+                <div className="bg-[#F6F5F2] rounded-lg p-3">
+                  {(() => {
+                    // Use API-provided values (matching admin logic exactly)
+                    const baseMRR = subscriptionData?.baseMRR || 0;
+                    const secondaryMemberCount = subscriptionData?.secondaryMemberCount || 0;
+                    const additionalMemberFees = secondaryMemberCount * 25;
+                    const total = baseMRR + additionalMemberFees;
+
+                    return (
+                      <>
+                        {/* Base + Additional Members breakdown */}
+                        <div className="space-y-1 mb-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-[#8C7C6D]">Base Subscription</span>
+                            <span className="text-[#5A5A5A] font-medium">${baseMRR.toFixed(2)}/mo</span>
+                          </div>
+                          {secondaryMemberCount > 0 && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-[#8C7C6D]">Additional Members ({secondaryMemberCount} × $25)</span>
+                              <span className="text-[#5A5A5A] font-medium">${additionalMemberFees.toFixed(2)}/mo</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Total */}
+                        <div className="flex items-center justify-between pt-2 border-t border-[#E8E6E1]">
+                          <p className="text-sm font-semibold text-[#1F1F1F]">Total</p>
+                          <p className="text-xl font-bold text-[#1F1F1F]">${total.toFixed(2)}/mo</p>
+                        </div>
+                      </>
+                    );
+                  })()}
+
+                  <div className="flex items-center justify-between text-xs text-[#5A5A5A] pt-2 border-t border-[#E8E6E1]">
+                    <span>{accountMembers.length} {accountMembers.length === 1 ? 'Member' : 'Members'}</span>
+                    <Badge className={`text-white text-xs ${
+                      subscriptionData?.subscription_status === 'active' ? 'bg-[#4CAF50]' :
+                      subscriptionData?.subscription_status === 'past_due' ? 'bg-[#FF9800]' :
+                      subscriptionData?.subscription_status === 'canceled' ? 'bg-[#F44336]' :
+                      'bg-[#4CAF50]'
+                    }`}>
+                      {subscriptionData?.subscription_status ?
+                        subscriptionData.subscription_status.charAt(0).toUpperCase() + subscriptionData.subscription_status.slice(1).replace('_', ' ')
+                        : 'Active'}
+                    </Badge>
                   </div>
-                  <Badge className="bg-[#4CAF50] text-white text-xs">Default</Badge>
+
+                  {subscriptionData?.payment_method_last4 && (
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#E8E6E1]">
+                      <CreditCard className="w-3 h-3 text-[#8C7C6D]" />
+                      <p className="text-xs text-[#5A5A5A]">
+                        {subscriptionData.payment_method_type === 'card' ? (
+                          <>{subscriptionData.payment_method_brand} •••• {subscriptionData.payment_method_last4}</>
+                        ) : (
+                          <>Bank •••• {subscriptionData.payment_method_last4}</>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-[#8C7C6D]">Click to manage payment methods</p>
+                <p className="text-xs text-[#8C7C6D]">Click to manage subscription & members</p>
               </CardContent>
             </Card>
 
@@ -474,8 +580,24 @@ export default function MemberDashboardPage() {
                 {nextEvent ? (
                   <div className="space-y-2">
                     <div className="bg-[#F6F5F2] rounded-lg p-3">
-                      <p className="text-xs text-[#8C7C6D]">Next Event</p>
-                      <p className="text-sm font-medium text-[#1F1F1F] mt-1">{nextEvent.title}</p>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-[#8C7C6D] mb-1">Next Event</p>
+                          <p className="text-sm font-medium text-[#1F1F1F] truncate">{nextEvent.title}</p>
+                        </div>
+                        {nextEvent.rsvpEnabled && nextEvent.rsvpUrl && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRSVPUrl(nextEvent.rsvpUrl);
+                              setIsRSVPModalOpen(true);
+                            }}
+                            className="flex-shrink-0 h-8 px-4 flex items-center justify-center text-xs font-bold text-white bg-[#A59480] hover:bg-[#8C7C6D] rounded-lg transition-colors"
+                          >
+                            RSVP
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-[#5A5A5A]">
                         {new Date(nextEvent.start_time).toLocaleDateString('en-US', {
                           weekday: 'short',
@@ -505,13 +627,6 @@ export default function MemberDashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* Bottom Navigation */}
-      <MemberNav
-        onBookClick={handleBookClick}
-        onBalanceClick={() => setIsBalanceModalOpen(true)}
-        onReservationsClick={() => setIsReservationsListModalOpen(true)}
-      />
 
       {/* Reservation Modal */}
       <Modal
@@ -581,9 +696,15 @@ export default function MemberDashboardPage() {
       />
 
       {/* Payment Method Modal */}
-      <PaymentMethodModal
-        isOpen={isPaymentMethodModalOpen}
-        onClose={() => setIsPaymentMethodModalOpen(false)}
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        isOpen={isSubscriptionModalOpen}
+        onClose={() => {
+          setIsSubscriptionModalOpen(false);
+          // Refresh data after modal closes
+          fetchAccountMembers();
+          fetchSubscriptionData();
+        }}
         accountId={member?.account_id}
       />
 
@@ -595,6 +716,20 @@ export default function MemberDashboardPage() {
           setIsUpcomingEventsModalOpen(false);
           setIsReservationModalOpen(true);
         }}
+        onRSVP={(rsvpUrl) => {
+          setSelectedRSVPUrl(rsvpUrl);
+          setIsRSVPModalOpen(true);
+        }}
+      />
+
+      {/* RSVP Modal */}
+      <RSVPModal
+        isOpen={isRSVPModalOpen}
+        onClose={() => {
+          setIsRSVPModalOpen(false);
+          setSelectedRSVPUrl('');
+        }}
+        rsvpUrl={selectedRSVPUrl}
       />
     </div>
   );

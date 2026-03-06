@@ -31,13 +31,15 @@ interface Props {
   creditCardFeeEnabled?: boolean;
   updatingFeeToggle?: boolean;
   onToggleCreditCardFee?: () => void;
+  totalLTV?: number;
 }
 
 export default function MemberSubscriptionCard({
   accountId,
   creditCardFeeEnabled = false,
   updatingFeeToggle = false,
-  onToggleCreditCardFee
+  onToggleCreditCardFee,
+  totalLTV = 0
 }: Props) {
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
@@ -48,6 +50,7 @@ export default function MemberSubscriptionCard({
   const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false);
   const [additionalMembersCount, setAdditionalMembersCount] = useState(0);
   const [baseMRR, setBaseMRR] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (accountId) {
@@ -353,9 +356,40 @@ export default function MemberSubscriptionCard({
 
   return (
     <div className={styles.card}>
-      <div className={styles.header}>
-        <h3 className={styles.title}>Subscription</h3>
-        <div className={styles.badges}>
+      <div className={styles.header} style={{ cursor: 'pointer' }} onClick={() => setIsExpanded(!isExpanded)}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <h3 className={styles.title}>Subscription</h3>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            style={{
+              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              flexShrink: 0,
+            }}
+          >
+            <path d="M5 7.5L10 12.5L15 7.5" stroke="#86868b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <div className={styles.content}>
+        {/* Compact MRR and LTV Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Total MRR</div>
+            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>{formatCurrency(baseMRR + (additionalMembersCount * 25))}/mo</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Account LTV</div>
+            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>{formatCurrency(totalLTV)}</div>
+          </div>
+        </div>
+
+        {/* Status Badges */}
+        <div className={styles.badges} style={{ marginBottom: '0.75rem' }}>
           {paymentStatus?.last_payment_status === 'failed' && (
             <span className={styles.paymentFailedBadge}>
               PAYMENT FAILED
@@ -365,69 +399,63 @@ export default function MemberSubscriptionCard({
             {statusText}
           </span>
         </div>
-      </div>
 
-      <div className={styles.content}>
-        {/* Base Subscription */}
-        <div className={styles.row}>
-          <span className={styles.label}>Base Subscription</span>
-          <span className={styles.value}>{formatCurrency(baseMRR)}/mo</span>
-        </div>
+        <div className={styles.divider} style={{ margin: '0.75rem 0' }} />
 
-        {/* Additional Members */}
-        {additionalMembersCount > 0 && (
-          <div className={styles.row}>
-            <span className={styles.label}>
-              Additional Members ({additionalMembersCount} × $25)
-            </span>
-            <span className={styles.value}>{formatCurrency(additionalMembersCount * 25)}/mo</span>
+        {/* Key Info - Always Visible */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8125rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#6B7280', fontWeight: '500' }}>Start Date</span>
+            <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.subscription_start_date)}</span>
           </div>
-        )}
-
-        {/* Total MRR */}
-        <div className={styles.rowTotal}>
-          <span className={styles.labelBold}>Total MRR</span>
-          <span className={styles.valueBold}>{formatCurrency(baseMRR + (additionalMembersCount * 25))}/mo</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#6B7280', fontWeight: '500' }}>Next Renewal</span>
+            <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.next_renewal_date)}</span>
+          </div>
+          {subscription.payment_method_type && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#6B7280', fontWeight: '500' }}>Payment Method</span>
+              <span style={{ color: '#1F1F1F', fontWeight: '600' }}>
+                {subscription.payment_method_type === 'card' ? (
+                  <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
+                ) : (
+                  <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className={styles.divider} />
+        {isExpanded && (
+          <>
+            <div className={styles.divider} style={{ marginTop: '0.75rem' }} />
 
-        <div className={styles.row}>
-          <span className={styles.label}>Start Date</span>
-          <span className={styles.value}>{formatDate(subscription.subscription_start_date)}</span>
-        </div>
+            {/* Base Subscription */}
+            <div className={styles.row}>
+              <span className={styles.label}>Base Subscription</span>
+              <span className={styles.value}>{formatCurrency(baseMRR)}/mo</span>
+            </div>
 
-        <div className={styles.row}>
-          <span className={styles.label}>Next Renewal</span>
-          <span className={styles.value}>{formatDate(subscription.next_renewal_date)}</span>
-        </div>
+            {/* Additional Members */}
+            {additionalMembersCount > 0 && (
+              <div className={styles.row}>
+                <span className={styles.label}>
+                  Additional Members ({additionalMembersCount} × $25)
+                </span>
+                <span className={styles.value}>{formatCurrency(additionalMembersCount * 25)}/mo</span>
+              </div>
+            )}
 
         {subscription.subscription_cancel_at && (
-          <div className={styles.row}>
-            <span className={styles.label}>Cancels On</span>
-            <span className={styles.valueWarning}>{formatDate(subscription.subscription_cancel_at)}</span>
-          </div>
+          <>
+            <div className={styles.divider} />
+            <div className={styles.row}>
+              <span className={styles.label}>Cancels On</span>
+              <span className={styles.valueWarning}>{formatDate(subscription.subscription_cancel_at)}</span>
+            </div>
+          </>
         )}
-
-        {subscription.payment_method_type && (
-          <div className={styles.row}>
-            <span className={styles.label}>Payment Method</span>
-            <span className={styles.value}>
-              {subscription.payment_method_type === 'card' ? (
-                <>
-                  {subscription.payment_method_brand} •••• {subscription.payment_method_last4}
-                </>
-              ) : (
-                <>
-                  {subscription.payment_method_brand} •••• {subscription.payment_method_last4}
-                </>
-              )}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className={styles.actions}>
+            <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
         {subscription.subscription_cancel_at ? (
           <button
             className={styles.reactivateButton}
@@ -473,7 +501,7 @@ export default function MemberSubscriptionCard({
 
       {/* Payment Settings */}
       {onToggleCreditCardFee && (
-        <div className={styles.paymentSettings}>
+        <div className={styles.paymentSettings} onClick={(e) => e.stopPropagation()}>
           <div className={styles.settingsDivider} />
           <div className={styles.settingsTitle}>Payment Settings</div>
 
@@ -524,6 +552,9 @@ export default function MemberSubscriptionCard({
           </button>
         </div>
       )}
+          </>
+        )}
+      </div>
 
       {showUpdatePlanModal && (
         <UpdatePlanModal

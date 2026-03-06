@@ -50,10 +50,29 @@
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.04),
     0 2px 8px rgba(0, 0, 0, 0.06);
-  max-height: 400px;
+  max-height: 250px;
   overflow-y: auto;
   padding: 0;
   margin: 0;
+  scroll-behavior: smooth;
+}
+
+.invoiceList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.invoiceList::-webkit-scrollbar-track {
+  background: #f5f5f7;
+  border-radius: 4px;
+}
+
+.invoiceList::-webkit-scrollbar-thumb {
+  background: #d1d1d6;
+  border-radius: 4px;
+}
+
+.invoiceList::-webkit-scrollbar-thumb:hover {
+  background: #b4b4b9;
 }
 
 .invoiceRow {
@@ -271,43 +290,39 @@
 
 /* Mobile responsive */
 @media (max-width: 768px) {
-  .header {
-    padding: 20px 16px;
-  }
-
-  .title {
-    font-size: 16px;
-  }
-
-  .count {
-    font-size: 13px;
-  }
-
   .invoiceRow {
-    flex-wrap: wrap;
-    padding: 14px 16px;
-    gap: 12px;
+    flex-wrap: nowrap;
+    padding: 0.5rem 0.625rem;
+    gap: 0.625rem;
+    justify-content: space-between;
   }
 
   .invoiceDescription {
-    width: 100%;
-    order: 1;
+    flex: 1;
+    min-width: 0;
+    order: 2;
   }
 
   .invoiceDate {
-    order: 2;
-    min-width: auto;
+    order: 1;
+    min-width: 70px;
   }
 
   .amount {
     order: 3;
-    margin-left: auto;
+    margin-left: 0;
+    min-width: 65px;
+  }
+
+  .statusBadge {
+    display: none;
   }
 
   .invoiceActions {
     order: 4;
-    width: 100%;
-    justify-content: flex-start;
+    width: auto;
+    margin-left: 0;
+    flex-shrink: 0;
   }
 
   .actionLink {

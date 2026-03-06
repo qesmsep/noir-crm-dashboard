@@ -17,6 +17,7 @@ interface UpcomingEventsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onMakeReservation?: () => void;
+  onRSVP?: (rsvpUrl: string) => void;
 }
 
 interface Event {
@@ -29,9 +30,11 @@ interface Event {
   status?: string;
   partySize?: number;
   description?: string;
+  rsvpUrl?: string;
+  rsvpEnabled?: boolean;
 }
 
-export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation }: UpcomingEventsModalProps) {
+export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation, onRSVP }: UpcomingEventsModalProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -99,6 +102,8 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
           location: event.location || 'Noir KC',
           type: 'event' as const,
           description: event.description || event.event_description,
+          rsvpUrl: event.rsvpUrl,
+          rsvpEnabled: event.rsvpEnabled,
         }));
 
         allEvents.push(...formattedMemberEvents);
@@ -234,7 +239,7 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
                           className={`
                             h-12 relative border rounded-lg transition-all
                             ${isToday ? 'bg-[#A59480]/10 border-[#A59480]' : 'border-[#ECEAE5]'}
-                            ${isSelected ? 'bg-[#A59480] text-white' : 'bg-white hover:bg-[#FBFBFA]'}
+                            ${isSelected ? 'bg-[#A59480] text-white' : hasEvents ? 'bg-[#A59480]/20 hover:bg-[#A59480]/30' : 'bg-white hover:bg-[#FBFBFA]'}
                           `}
                         >
                           <span className={`text-sm ${isSelected ? 'font-semibold' : ''}`}>
@@ -257,10 +262,10 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
                         Events on {selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                       </h4>
                       {selectedDateEvents.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {selectedDateEvents.map(event => (
                             <div key={event.id} className="bg-white rounded-lg p-3 border border-[#ECEAE5]">
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between mb-2">
                                 <p className="text-sm font-medium text-[#1F1F1F]">{event.title}</p>
                                 <Badge className={`text-xs ${
                                   event.type === 'reservation' ? 'bg-[#4CAF50] text-white' :
@@ -270,7 +275,7 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
                                   {event.type}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-[#5A5A5A] mt-1">
+                              <p className="text-xs text-[#5A5A5A] mb-1">
                                 <Clock className="inline w-3 h-3 mr-1" />
                                 {event.time}
                                 {event.location && (
@@ -280,6 +285,22 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
                                   </>
                                 )}
                               </p>
+                              {event.description && (
+                                <p className="text-xs text-[#5A5A5A] mt-2 line-clamp-2">
+                                  {event.description}
+                                </p>
+                              )}
+                              {event.type === 'event' && event.rsvpUrl && onRSVP && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRSVP(event.rsvpUrl!);
+                                  }}
+                                  className="inline-block mt-2 text-xs font-medium text-white bg-[#A59480] hover:bg-[#8C7C6D] px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                  RSVP Now
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -312,8 +333,25 @@ export default function UpcomingEventsModal({ isOpen, onClose, onMakeReservation
                           {event.partySize && (
                             <p className="text-xs text-[#5A5A5A] mt-1">
                               <Users className="inline w-3 h-3 mr-1" />
-                              Party of {event.partySize}
+                              {event.status === 'confirmed' ? (
+                                <span className="text-[#4CAF50] font-medium">
+                                  Signed up: Party of {event.partySize}
+                                </span>
+                              ) : (
+                                <span>Party of {event.partySize}</span>
+                              )}
                             </p>
+                          )}
+                          {event.type === 'event' && event.rsvpEnabled && event.rsvpUrl && onRSVP && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRSVP(event.rsvpUrl!);
+                              }}
+                              className="inline-block mt-2 text-xs font-medium text-white bg-[#A59480] hover:bg-[#8C7C6D] px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              RSVP Now
+                            </button>
                           )}
                         </div>
                       ))}
