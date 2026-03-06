@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -55,7 +56,7 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
   const [remainingSpots, setRemainingSpots] = useState<number | null>(null);
 
   const [formData, setFormData] = useState<RSVPForm>({
-    party_size: 1,
+    party_size: 0,
     time_selected: '',
     special_requests: ''
   });
@@ -104,6 +105,12 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
       return;
     }
 
+    if (formData.party_size < 1) {
+      setError('Please select a party size');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/rsvp', {
         method: 'POST',
@@ -132,7 +139,7 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
       setTimeout(() => {
         setSuccess(false);
         setFormData({
-          party_size: 1,
+          party_size: 0,
           time_selected: '',
           special_requests: ''
         });
@@ -230,20 +237,20 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
             {/* Form Fields */}
             <div>
               <Label htmlFor="party_size" className="text-xs">Party Size *</Label>
-              <Input
+              <Select
                 id="party_size"
-                type="number"
-                min={1}
-                max={event.max_guests}
-                value={formData.party_size}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  setFormData({ ...formData, party_size: isNaN(value) ? 1 : value });
-                }}
-                required
+                value={formData.party_size > 0 ? formData.party_size.toString() : ''}
+                onChange={(e) => setFormData({ ...formData, party_size: parseInt(e.target.value) || 0 })}
                 disabled={submitting}
                 className="h-8 text-sm"
-              />
+              >
+                <option value="" disabled>Select party size</option>
+                {Array.from({ length: event.max_guests }, (_, i) => i + 1).map((size) => (
+                  <option key={size} value={size.toString()}>
+                    {size} {size === 1 ? 'guest' : 'guests'}
+                  </option>
+                ))}
+              </Select>
             </div>
 
             <div>

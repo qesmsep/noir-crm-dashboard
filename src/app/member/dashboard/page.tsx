@@ -83,6 +83,7 @@ export default function MemberDashboardPage() {
   const [pastVisits, setPastVisits] = useState<any[]>([]);
   const [nextEvent, setNextEvent] = useState<any>(null);
   const [upcomingEventsCount, setUpcomingEventsCount] = useState<number>(0);
+  const [upcomingEventsThisMonth, setUpcomingEventsThisMonth] = useState<any[]>([]);
   const [accountMembers, setAccountMembers] = useState<any[]>([]);
   const [subscriptionData, setSubscriptionData] = useState<any>(null);
 
@@ -189,32 +190,72 @@ export default function MemberDashboardPage() {
 
   const fetchUpcomingEvents = async () => {
     try {
-      const response = await fetch('/api/noir-member-events', {
-        credentials: 'include',
-      });
+      // Fetch both Noir events and private events
+      const [noirResponse, reservationsResponse] = await Promise.all([
+        fetch('/api/noir-member-events', { credentials: 'include' }),
+        fetch('/api/member/reservations', { credentials: 'include' })
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
-        const events = data.events || [];
-        const now = new Date();
+      const now = new Date();
+      let allEvents: any[] = [];
+      const rsvpdEventIds = new Set<string>();
 
-        // Get upcoming events (from now onwards)
-        const upcoming = events.filter(
-          (e: any) => new Date(e.start_time) >= now
-        );
+      // Get reservations first to track RSVP'd events
+      let reservations: any[] = [];
+      if (reservationsResponse.ok) {
+        const reservationsData = await reservationsResponse.json();
+        reservations = reservationsData.reservations || [];
 
-        // Set the next upcoming event
-        setNextEvent(upcoming[0] || null);
-
-        // Count events in current month
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        const thisMonthEvents = upcoming.filter((e: any) => {
-          const eventDate = new Date(e.start_time);
-          return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+        // Track which private events the member has RSVP'd to
+        reservations.forEach((r: any) => {
+          if (r.private_event_id) {
+            rsvpdEventIds.add(r.private_event_id);
+          }
         });
-        setUpcomingEventsCount(thisMonthEvents.length);
       }
+
+      // Get Noir events
+      if (noirResponse.ok) {
+        const noirData = await noirResponse.json();
+        const noirEvents = (noirData.events || []).map((e: any) => ({
+          ...e,
+          eventType: 'noir',
+          displayTitle: e.title,
+          hasRSVPd: false // Noir events don't track RSVPs in reservations
+        }));
+        allEvents = [...allEvents, ...noirEvents];
+      }
+
+      // Get private events from reservations
+      const privateEvents = reservations
+        .filter((r: any) => r.private_events && r.private_events.title)
+        .map((r: any) => ({
+          ...r,
+          title: r.private_events.title,
+          eventType: 'private',
+          displayTitle: 'Private Event',
+          end_time: r.end_time,
+          hasRSVPd: true
+        }));
+      allEvents = [...allEvents, ...privateEvents];
+
+      // Filter for upcoming events and sort by start time
+      const upcoming = allEvents
+        .filter((e: any) => new Date(e.start_time) >= now)
+        .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      // Set the next upcoming event
+      setNextEvent(upcoming[0] || null);
+
+      // Get events in current month
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const thisMonthEvents = upcoming.filter((e: any) => {
+        const eventDate = new Date(e.start_time);
+        return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+      });
+      setUpcomingEventsCount(thisMonthEvents.length);
+      setUpcomingEventsThisMonth(thisMonthEvents);
     } catch (error) {
       console.error('Error fetching upcoming events:', error);
     }
@@ -350,7 +391,7 @@ export default function MemberDashboardPage() {
                   <div className="flex items-center gap-3">
                     <Calendar className="w-5 h-5 text-[#A59480]" />
                     <span className="text-xl font-semibold text-[#1F1F1F]">
-                      Reservations
+                      My Reservations
                     </span>
                   </div>
                   <Button
@@ -371,29 +412,87 @@ export default function MemberDashboardPage() {
                   </div>
                 ) : (
                   <>
-                    {/* Next Reservation - One Line OR Make Reservation Button */}
-                    {nextReservation ? (
-                      <div
-                        className="flex items-center gap-3 py-1 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsReservationsListModalOpen(true);
-                        }}
-                      >
-                        <p className="text-xs text-[#8C7C6D] flex-shrink-0">
-                          {new Date(nextReservation.start_time).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </p>
-                        <p className="text-xs font-medium text-[#1F1F1F] flex-1 truncate">
-                          {nextReservation.private_events?.title || nextReservation.special_requests || 'Reservation'} • {new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true,
-                          })} • Party of {nextReservation.party_size}
-                        </p>
-                      </div>
+                    {(nextReservation || pastVisits.length > 0) ? (
+                      <>
+                        {/* Column Headers */}
+                        <div className="grid grid-cols-[60px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5]">
+                          <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase">Date</p>
+                          <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase">Event</p>
+                          <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase text-right">Time</p>
+                          <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase text-center">Guests</p>
+                        </div>
+
+                        {/* Next Reservation */}
+                        {nextReservation && (
+                          <div
+                            className="grid grid-cols-[60px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5] cursor-pointer hover:bg-[#FBFBFA]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsReservationsListModalOpen(true);
+                            }}
+                          >
+                            <p className="text-xs text-[#8C7C6D]">
+                              {new Date(nextReservation.start_time).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                            <p className="text-xs font-medium text-[#1F1F1F] truncate">
+                              {(nextReservation.private_events?.title || nextReservation.special_requests || 'Reservation').substring(0, 35)}
+                              {((nextReservation.private_events?.title || nextReservation.special_requests || 'Reservation').length > 35) ? '...' : ''}
+                            </p>
+                            <p className="text-xs text-[#5A5A5A] text-right">
+                              {(() => {
+                                const time = new Date(nextReservation.start_time).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                  hour12: true,
+                                });
+                                return time.replace(' PM', ' P').replace(' AM', ' A');
+                              })()}
+                            </p>
+                            <p className="text-xs text-[#5A5A5A] text-center">
+                              {nextReservation.party_size}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Past Visits Preview */}
+                        {pastVisits.map((visit, index) => (
+                          <div
+                            key={visit.id || index}
+                            className="grid grid-cols-[60px_1fr_60px_50px] gap-2 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsReservationsListModalOpen(true);
+                            }}
+                          >
+                            <p className="text-xs text-[#8C7C6D]">
+                              {new Date(visit.start_time).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                            <p className="text-xs text-[#5A5A5A] truncate">
+                              {(visit.private_events?.title || visit.special_requests || 'Visit').substring(0, 35)}
+                              {((visit.private_events?.title || visit.special_requests || 'Visit').length > 35) ? '...' : ''}
+                            </p>
+                            <p className="text-xs text-[#5A5A5A] text-right">
+                              {(() => {
+                                const time = new Date(visit.start_time).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                  hour12: true,
+                                });
+                                return time.replace(' PM', ' P').replace(' AM', ' A');
+                              })()}
+                            </p>
+                            <p className="text-xs text-[#5A5A5A] text-center">
+                              {visit.party_size}
+                            </p>
+                          </div>
+                        ))}
+                      </>
                     ) : (
                       <Button
                         className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D]"
@@ -405,32 +504,6 @@ export default function MemberDashboardPage() {
                         Make Reservation
                       </Button>
                     )}
-
-                    {/* Past Visits Preview */}
-                    {pastVisits.map((visit, index) => (
-                      <div
-                        key={visit.id || index}
-                        className="flex items-center gap-3 py-1 border-b border-[#ECEAE5] last:border-0 cursor-pointer hover:bg-[#FBFBFA]"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsReservationsListModalOpen(true);
-                        }}
-                      >
-                        <p className="text-xs text-[#8C7C6D] flex-shrink-0">
-                          {new Date(visit.start_time).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </p>
-                        <p className="text-xs text-[#5A5A5A] flex-1 truncate">
-                          {visit.private_events?.title || visit.special_requests || 'Visit'} • {new Date(visit.start_time).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true,
-                          })} • Party of {visit.party_size}
-                        </p>
-                      </div>
-                    ))}
                   </>
                 )}
               </CardContent>
@@ -583,54 +656,95 @@ export default function MemberDashboardPage() {
                 <CardTitle className="flex items-center gap-3">
                   <CalendarDays className="w-5 h-5 text-[#A59480]" />
                   <span className="text-xl font-semibold text-[#1F1F1F]">
-                    Calendar
+                    Event Calendar
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {nextEvent ? (
-                  <div className="space-y-2">
-                    <div className="bg-[#F6F5F2] rounded-lg p-3">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-[#8C7C6D] mb-1">Next Event</p>
-                          <p className="text-sm font-medium text-[#1F1F1F] truncate">{nextEvent.title}</p>
+              <CardContent className="space-y-0 pt-0 pb-4">
+                {upcomingEventsThisMonth.length > 0 ? (
+                  <>
+                    {/* Column Headers */}
+                    <div className="grid grid-cols-[48px_42px_1fr_55px] gap-2 py-2 border-b border-[#ECEAE5]">
+                      <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase">Date</p>
+                      <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase">Time</p>
+                      <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase">Event</p>
+                      <p className="text-[10px] font-semibold text-[#8C7C6D] uppercase text-right">RSVP</p>
+                    </div>
+
+                    {/* Events List */}
+                    {upcomingEventsThisMonth.map((event, index) => {
+                      // Format time as "6-8P" or "6:30-8P"
+                      const formatTime = (start: Date, end?: Date) => {
+                        const startHour = start.getHours();
+                        const startMin = start.getMinutes();
+                        const startPeriod = startHour >= 12 ? 'P' : 'A';
+                        const startHour12 = startHour % 12 || 12;
+
+                        let startStr = `${startHour12}`;
+                        if (startMin !== 0) {
+                          startStr += `:${startMin.toString().padStart(2, '0')}`;
+                        }
+
+                        if (!end) return `${startStr}${startPeriod}`;
+
+                        const endHour = end.getHours();
+                        const endMin = end.getMinutes();
+                        const endPeriod = endHour >= 12 ? 'P' : 'A';
+                        const endHour12 = endHour % 12 || 12;
+
+                        let endStr = `${endHour12}`;
+                        if (endMin !== 0) {
+                          endStr += `:${endMin.toString().padStart(2, '0')}`;
+                        }
+
+                        return `${startStr}-${endStr}${endPeriod}`;
+                      };
+
+                      return (
+                        <div
+                          key={event.id || index}
+                          className="grid grid-cols-[48px_42px_1fr_55px] gap-2 py-2 border-b border-[#ECEAE5] last:border-0 hover:bg-[#FBFBFA] items-start"
+                        >
+                          <p className="text-xs text-[#8C7C6D] leading-tight">
+                            {new Date(event.start_time).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </p>
+                          <p className="text-xs text-[#5A5A5A] leading-tight">
+                            {formatTime(
+                              new Date(event.start_time),
+                              event.end_time ? new Date(event.end_time) : undefined
+                            )}
+                          </p>
+                          <p className="text-xs text-[#5A5A5A] truncate leading-tight">
+                            {event.displayTitle || event.title}
+                          </p>
+                          <p className="text-xs text-right whitespace-nowrap leading-tight m-0">
+                            {event.hasRSVPd ? (
+                              <span className="text-[#4CAF50]">RSVP'd</span>
+                            ) : event.rsvpEnabled && event.rsvpUrl && event.eventType === 'noir' ? (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedRSVPUrl(event.rsvpUrl);
+                                  setIsRSVPModalOpen(true);
+                                }}
+                                className="text-[#A59480] hover:text-[#8C7C6D] underline cursor-pointer"
+                              >
+                                RSVP
+                              </span>
+                            ) : (
+                              <span className="text-[#E0E0E0]">-</span>
+                            )}
+                          </p>
                         </div>
-                        {nextEvent.rsvpEnabled && nextEvent.rsvpUrl && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedRSVPUrl(nextEvent.rsvpUrl);
-                              setIsRSVPModalOpen(true);
-                            }}
-                            className="flex-shrink-0 h-8 px-4 flex items-center justify-center text-xs font-bold text-white bg-[#A59480] hover:bg-[#8C7C6D] rounded-lg transition-colors"
-                          >
-                            RSVP
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#5A5A5A]">
-                        {new Date(nextEvent.start_time).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric'
-                        })} at {new Date(nextEvent.start_time).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })}
-                      </p>
-                    </div>
-                    <p className="text-xs text-[#8C7C6D]">
-                      {upcomingEventsCount} {upcomingEventsCount === 1 ? 'event' : 'events'} this month
-                    </p>
-                  </div>
+                      );
+                    })}
+                  </>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="bg-[#F6F5F2] rounded-lg p-3">
-                      <p className="text-sm text-[#5A5A5A] text-center py-2">No upcoming events</p>
-                    </div>
-                    <p className="text-xs text-[#8C7C6D]">Check back later for new events</p>
+                  <div className="text-center py-8">
+                    <p className="text-xs text-[#5A5A5A]">No upcoming events this month</p>
                   </div>
                 )}
               </CardContent>
