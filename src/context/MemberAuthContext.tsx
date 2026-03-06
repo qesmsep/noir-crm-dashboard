@@ -42,7 +42,7 @@ interface MemberAuthContextType {
 
   // Phone/SMS OTP Auth
   signInWithPhone: (phone: string) => Promise<void>;
-  verifyOTP: (phone: string, token: string) => Promise<void>;
+  verifyOTP: (phone: string, token: string) => Promise<boolean>;
 
   // Phone + Password Auth
   signInWithPassword: (phone: string, password: string) => Promise<boolean>;
@@ -393,7 +393,7 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   // Verify OTP code (custom implementation)
-  const verifyOTP = useCallback(async (phone: string, token: string) => {
+  const verifyOTP = useCallback(async (phone: string, token: string): Promise<boolean> => {
     const response = await fetch('/api/auth/verify-phone-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -409,6 +409,9 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
 
     // Refresh member data from session
     await fetchMemberFromSession();
+
+    // Return whether member needs to set up password
+    return data.needsPasswordSetup || false;
   }, [fetchMemberFromSession]);
 
   // Sign in with phone + password

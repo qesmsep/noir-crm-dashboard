@@ -10,6 +10,7 @@ const requestSchema = z.object({
 
 const MAX_ATTEMPTS = 5;
 const SESSION_DURATION_DAYS = 7;
+const MAX_FAILED_VERIFICATIONS_15MIN = 5;
 
 export default async function handler(
   req: NextApiRequest,
@@ -25,6 +26,41 @@ export default async function handler(
     // Normalize phone number (remove all non-digits, then take last 10 digits)
     const digitsOnly = phone.replace(/\D/g, '');
     const normalizedPhone = digitsOnly.slice(-10);
+
+    // Get client IP address
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+                     (req.headers['x-real-ip'] as string) ||
+                     req.socket.remoteAddress ||
+                     'unknown';
+
+    // ACCOUNT LOCKOUT: Check for too many failed verification attempts (5 in 15 minutes)
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const { data: recentFailedAttempts, error: failedCheckError } = await supabaseAdmin
+      .from('phone_otp_codes')
+      .select('attempts')
+      .or(`phone.eq.${normalizedPhone},phone.eq.+1${normalizedPhone}`)
+      .gte('created_at', fifteenMinutesAgo.toISOString());
+
+    if (failedCheckError) {
+      console.error('Failed to check account lockout:', failedCheckError);
+    } else if (recentFailedAttempts) {
+      const totalFailedAttempts = recentFailedAttempts.reduce((sum, record) => sum + (record.attempts || 0), 0);
+      if (totalFailedAttempts >= MAX_FAILED_VERIFICATIONS_15MIN) {
+        // AUDIT LOG: Account locked due to too many failed attempts
+        console.log('[AUTH-AUDIT] Account Locked', {
+          event: 'account_locked',
+          phone: normalizedPhone,
+          ip_address: clientIp,
+          failed_attempts: totalFailedAttempts,
+          timestamp: new Date().toISOString(),
+        });
+
+        return res.status(429).json({
+          error: 'Account temporarily locked due to too many failed attempts. Please try again in 15 minutes or contact support.',
+          retryAfter: 900, // 15 minutes
+        });
+      }
+    }
 
     // Find the most recent OTP for this phone (try both with and without +1)
     let otpRecords: any = null;
@@ -83,6 +119,16 @@ export default async function handler(
 
     // Verify code
     if (otpRecord.code !== code) {
+      // AUDIT LOG: Failed verification attempt
+      console.log('[AUTH-AUDIT] OTP Verification Failed', {
+        event: 'otp_verification_failed',
+        phone: normalizedPhone,
+        ip_address: clientIp,
+        user_agent: req.headers['user-agent'],
+        attempts: otpRecord.attempts + 1,
+        timestamp: new Date().toISOString(),
+      });
+
       return res.status(400).json({
         error: 'Invalid verification code. Please try again.',
       });
@@ -99,7 +145,7 @@ export default async function handler(
 
     const result1 = await supabaseAdmin
       .from('members')
-      .select('member_id, auth_user_id, email, first_name, last_name, phone')
+      .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, password_is_temporary')
       .eq('phone', normalizedPhone)
       .limit(1);
 
@@ -111,7 +157,7 @@ export default async function handler(
     } else {
       const result2 = await supabaseAdmin
         .from('members')
-        .select('member_id, auth_user_id, email, first_name, last_name, phone')
+        .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, password_is_temporary')
         .eq('phone', `+1${normalizedPhone}`)
         .limit(1);
 
@@ -167,8 +213,23 @@ export default async function handler(
       }),
     ]);
 
+    // Check if member needs to set a password
+    const needsPassword = !member.password_hash || member.password_is_temporary;
+
+    // AUDIT LOG: Successful OTP verification and login
+    console.log('[AUTH-AUDIT] OTP Verification Success', {
+      event: 'otp_verification_success',
+      member_id: member.member_id,
+      phone: normalizedPhone,
+      ip_address: clientIp,
+      user_agent: req.headers['user-agent'],
+      needs_password: needsPassword,
+      timestamp: new Date().toISOString(),
+    });
+
     res.status(200).json({
       success: true,
+      needsPasswordSetup: needsPassword,
       member: {
         id: member.member_id,
         email: member.email,

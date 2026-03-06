@@ -14,11 +14,13 @@ import { Fingerprint } from 'lucide-react';
 export default function MemberLoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [showOtpInput, setShowOtpInput] = useState(false);
 
-  const { signInWithPassword, signInWithBiometric, isBiometricAvailable, member } = useMemberAuth();
+  const { signInWithPassword, signInWithBiometric, signInWithPhone, verifyOTP, isBiometricAvailable, member } = useMemberAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -42,7 +44,76 @@ export default function MemberLoginPage() {
   // Handle going back to dial pad
   const handleBackToDialPad = () => {
     setShowPasswordInput(false);
+    setShowOtpInput(false);
     setPassword('');
+    setOtp('');
+  };
+
+  // Handle request OTP
+  const handleRequestOTP = async () => {
+    if (!phone || phone.length < 10) {
+      toast({
+        title: 'Phone number required',
+        description: 'Please enter your 10-digit phone number',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await signInWithPhone(phone);
+      setShowOtpInput(true);
+      toast({
+        title: 'Code sent',
+        description: 'Check your phone for a 6-digit verification code',
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to send code',
+        description: error.message || 'Please try again',
+        variant: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle OTP login
+  const handleOtpLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const needsPassword = await verifyOTP(phone, otp);
+
+      // If member needs to set password, redirect to change password page
+      if (needsPassword) {
+        toast({
+          title: 'Welcome!',
+          description: 'Please set a password for your account to continue.',
+          variant: 'success',
+        });
+        router.push('/member/change-password');
+      } else {
+        toast({
+          title: 'Welcome back',
+          description: 'You are now signed in.',
+          variant: 'success',
+        });
+        router.push('/member/dashboard');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Verification failed',
+        description: error.message || 'Invalid code. Please try again.',
+        variant: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle password login
@@ -124,13 +195,13 @@ export default function MemberLoginPage() {
               className="h-12 mx-auto mb-6"
             />
             <p className="text-[#5A5A5A] text-sm">
-              {showPasswordInput ? 'Enter your password' : 'Dial your phone number'}
+              {showPasswordInput ? 'Enter your password' : showOtpInput ? 'Enter verification code' : 'Dial your phone number'}
             </p>
           </div>
 
           {/* Login Card */}
           <div className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm p-6 md:p-8">
-            {!showPasswordInput ? (
+            {!showPasswordInput && !showOtpInput ? (
               /* Phone Dial Pad View */
               <div className="flex flex-col gap-6">
                 <PhoneDialPad
@@ -138,6 +209,22 @@ export default function MemberLoginPage() {
                   onChange={setPhone}
                   onCall={handleCall}
                 />
+
+                {/* OTP Option */}
+                {phone.length === 10 && (
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      size="lg"
+                      variant="outline"
+                      className="w-full border-2 border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white transition-all hover:-translate-y-0.5 active:translate-y-0"
+                      disabled={loading}
+                      onClick={handleRequestOTP}
+                    >
+                      {loading ? 'Sending code...' : 'Sign in with Code'}
+                    </Button>
+                  </div>
+                )}
 
                 {/* Biometric Option */}
                 {biometricAvailable && phone.length === 10 && (
@@ -156,6 +243,66 @@ export default function MemberLoginPage() {
                   </div>
                 )}
               </div>
+            ) : showOtpInput ? (
+              /* OTP Input View */
+              <form onSubmit={handleOtpLogin}>
+                <div className="flex flex-col gap-5">
+                  {/* OTP Input */}
+                  <div>
+                    <Label htmlFor="otp" className="text-[#2C2C2C] font-medium text-center block">
+                      Verification Code
+                    </Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="123456"
+                      required
+                      autoFocus
+                      maxLength={6}
+                      className="h-14 border-[#DAD7D0] focus:border-[#A59480] focus:ring-[#A59480] text-center text-2xl tracking-widest font-semibold"
+                    />
+                    <p className="text-xs text-[#8C7C6D] mt-2 text-center">
+                      Enter the 6-digit code sent to your phone
+                    </p>
+                  </div>
+
+                  {/* Submit Button */}
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="bg-[#A59480] text-white hover:bg-[#8f7e6b] transition-all hover:-translate-y-0.5 active:translate-y-0 mt-2"
+                    disabled={loading || otp.length !== 6}
+                  >
+                    {loading ? 'Verifying...' : 'Verify Code'}
+                  </Button>
+
+                  {/* Resend Code */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-[#A59480] hover:bg-transparent"
+                    onClick={handleRequestOTP}
+                    disabled={loading}
+                  >
+                    Resend Code
+                  </Button>
+
+                  {/* Back to Dial Pad */}
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="ghost"
+                    className="text-[#5A5A5A] hover:text-[#1F1F1F]"
+                    onClick={handleBackToDialPad}
+                    disabled={loading}
+                  >
+                    ← Change Phone Number
+                  </Button>
+                </div>
+              </form>
             ) : (
               /* Password Input View */
               <form onSubmit={handleLogin}>
