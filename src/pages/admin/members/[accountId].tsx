@@ -872,12 +872,18 @@ export default function MemberDetailAdmin() {
         .from('members')
         .select('*')
         .eq('account_id', accountId)
-        .order('member_type', { ascending: false }); // Primary first
+        .eq('deactivated', false);
 
       if (fetchError) throw fetchError;
 
       if (updatedMembers) {
-        setMembers(updatedMembers);
+        // Sort members: primary first
+        const sorted = (updatedMembers || []).sort((a, b) => {
+          if (a.member_type === 'primary' && b.member_type !== 'primary') return -1;
+          if (a.member_type !== 'primary' && b.member_type === 'primary') return 1;
+          return 0;
+        });
+        setMembers(sorted);
       }
 
       toast({
