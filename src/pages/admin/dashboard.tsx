@@ -48,6 +48,20 @@ interface FinancialMetrics {
     breakdown: any[];
     description: string;
   };
+  ytdRevenue: {
+    total: number;
+    description: string;
+  };
+  lastYearRevenue: {
+    total: number;
+    description: string;
+  };
+  averageMonthlyRevenue: {
+    total: number;
+    description: string;
+    monthsWithRevenue: number;
+    totalLast3Months: number;
+  };
 }
 
 interface Stats {
@@ -399,16 +413,16 @@ export default function Dashboard() {
         <div className={styles.cardsGrid}>
           <DashboardCard label="Total Members" value={totalMembers} />
           
-          <DashboardCard 
-            label="Monthly Memberships" 
+          <DashboardCard
+            label="Monthly Memberships"
             value={`$${stats.financialMetrics?.monthlyRecurringRevenue?.total?.toFixed(2) || totalDues.toFixed(2)}`}
             description={stats.financialMetrics?.monthlyRecurringRevenue?.description}
             breakdown={stats.financialMetrics?.monthlyRecurringRevenue?.breakdown}
             breakdownTitle="MRR Breakdown"
           />
-          
-          <DashboardCard 
-            label="Outstanding Balances" 
+
+          <DashboardCard
+            label="Outstanding Balances"
             value={`$${stats.financialMetrics?.outstandingBalances?.total?.toFixed(2) || stats.outstanding?.toFixed(2)}`}
             description={stats.financialMetrics?.outstandingBalances?.description}
             breakdown={stats.financialMetrics?.outstandingBalances?.breakdown}
@@ -445,6 +459,24 @@ export default function Dashboard() {
             label="Failed Payments"
             value={stats.failedPaymentsCount || 0}
             description="Accounts with failed last payment attempt"
+          />
+
+          <DashboardCard
+            label="Active Members"
+            value={totalMembers}
+            description="Members with active accounts (not deactivated)"
+          />
+
+          <DashboardCard
+            label="YTD Total Revenue"
+            value={`$${stats.financialMetrics?.ytdRevenue?.total?.toFixed(2) || '0.00'}`}
+            description={stats.financialMetrics?.ytdRevenue?.description || `Total revenue received in ${thisYear}`}
+          />
+
+          <DashboardCard
+            label={`${thisYear - 1} Total Revenue`}
+            value={`$${stats.financialMetrics?.lastYearRevenue?.total?.toFixed(2) || '0.00'}`}
+            description={stats.financialMetrics?.lastYearRevenue?.description || `Total revenue received in ${thisYear - 1}`}
           />
         </div>
         

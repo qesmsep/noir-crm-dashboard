@@ -109,7 +109,7 @@ export default async function handler(req, res) {
       const { data, error } = await supabase
         .from('members')
         .select('*')
-        .eq('deactivated', false);
+        .eq('status', 'active');
       if (error) {
         Logger.error('Supabase error fetching members', error, { requestId });
         throw error;

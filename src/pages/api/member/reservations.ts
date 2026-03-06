@@ -35,29 +35,83 @@ export default async function handler(
     }
 
     const member = Array.isArray(session.members) ? session.members[0] : session.members;
+    const memberId = session.member_id;
 
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Get all reservations for this member (match by phone or email)
-    // Include private_events data for event reservations
-    let query = supabaseAdmin
+    // Get member's account_id
+    const { data: memberData } = await supabaseAdmin
+      .from('members')
+      .select('account_id')
+      .eq('member_id', memberId)
+      .single();
+
+    const accountId = memberData?.account_id;
+
+    // Get all reservations for this member/account
+    // Query by member_id and account_id (most reliable)
+
+    // Query 1: By member_id
+    const { data: reservationsByMemberId } = await supabaseAdmin
       .from('reservations')
-      .select('*, private_events(title)');
-
-    // Build OR condition based on available contact info
-    const conditions: string[] = [];
-    if (member.phone) conditions.push(`phone.eq.${member.phone}`);
-    if (member.email) conditions.push(`email.eq.${member.email}`);
-
-    if (conditions.length === 0) {
-      return res.status(400).json({ error: 'Member has no contact information' });
-    }
-
-    const { data: reservations, error: reservationsError } = await query
-      .or(conditions.join(','))
+      .select('*, private_events(title)')
+      .eq('member_id', memberId)
       .order('start_time', { ascending: false });
+
+    // Query 2: By account_id (for reservations made by other members on same account)
+    const { data: reservationsByAccountId } = accountId
+      ? await supabaseAdmin
+          .from('reservations')
+          .select('*, private_events(title)')
+          .eq('account_id', accountId)
+          .order('start_time', { ascending: false })
+      : { data: [] };
+
+    // Query 3: By phone (for old reservations without member_id/account_id)
+    const phoneDigits = member.phone ? member.phone.replace(/\D/g, '') : '';
+    const { data: reservationsByPhone } = phoneDigits
+      ? await supabaseAdmin
+          .from('reservations')
+          .select('*, private_events(title)')
+          .or(`phone.eq.${member.phone},phone.eq.${phoneDigits},phone.eq.+1${phoneDigits.slice(-10)},phone.eq.${phoneDigits.slice(-10)}`)
+          .is('member_id', null)
+          .is('account_id', null)
+          .order('start_time', { ascending: false })
+      : { data: [] };
+
+    // Query 4: By email (for old reservations without member_id/account_id)
+    const { data: reservationsByEmail } = member.email
+      ? await supabaseAdmin
+          .from('reservations')
+          .select('*, private_events(title)')
+          .eq('email', member.email)
+          .is('member_id', null)
+          .is('account_id', null)
+          .order('start_time', { ascending: false })
+      : { data: [] };
+
+    // Merge and deduplicate
+    const allReservations = [
+      ...(reservationsByMemberId || []),
+      ...(reservationsByAccountId || []),
+      ...(reservationsByPhone || []),
+      ...(reservationsByEmail || []),
+    ];
+
+    // Deduplicate by ID
+    const uniqueReservationsMap = new Map();
+    allReservations.forEach(res => {
+      if (!uniqueReservationsMap.has(res.id)) {
+        uniqueReservationsMap.set(res.id, res);
+      }
+    });
+
+    const reservations = Array.from(uniqueReservationsMap.values())
+      .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+
+    const reservationsError = null;
 
     if (reservationsError) {
       console.error('Error fetching reservations:', reservationsError);

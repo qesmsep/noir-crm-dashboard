@@ -185,17 +185,53 @@ function BarChart({ data, dataKey, color, height = 160 }: {
   if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
 
   const values = data.map(d => Number(d[dataKey]) || 0);
-  const maxVal = Math.max(...values, 1);
+  const maxDataVal = Math.max(...values, 1);
   const barWidth = Math.min(40, Math.floor(600 / data.length) - 8);
-  const chartWidth = data.length * (barWidth + 8);
+  const yAxisWidth = 60; // Space for y-axis labels
+  const chartWidth = data.length * (barWidth + 8) + yAxisWidth;
+
+  // Generate y-axis tick values in $3k increments
+  const tickIncrement = 3000;
+  const maxVal = Math.ceil(maxDataVal / tickIncrement) * tickIncrement; // Round up to nearest $3k
+  const numTicks = Math.floor(maxVal / tickIncrement) + 1;
+  const yTicks = Array.from({ length: numTicks }, (_, i) => i * tickIncrement);
 
   return (
     <div className={styles.chartContainer}>
       <svg width={chartWidth} height={height + 30} viewBox={`0 0 ${chartWidth} ${height + 30}`}>
+        {/* Y-axis grid lines and labels */}
+        {yTicks.map((tickValue, i) => {
+          const y = height - (tickValue / maxVal) * height;
+          return (
+            <g key={i}>
+              <line
+                x1={yAxisWidth}
+                y1={y}
+                x2={chartWidth}
+                y2={y}
+                stroke="rgba(0,0,0,0.06)"
+                strokeWidth={1}
+                strokeDasharray="2,2"
+              />
+              <text
+                x={yAxisWidth - 8}
+                y={y + 3}
+                textAnchor="end"
+                fontSize="10"
+                fill="#86868b"
+                fontWeight="500"
+              >
+                {fmtCurrency(tickValue)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
         {data.map((d, i) => {
           const val = Number(d[dataKey]) || 0;
           const barH = (val / maxVal) * height;
-          const x = i * (barWidth + 8) + 4;
+          const x = yAxisWidth + i * (barWidth + 8) + 4;
           const y = height - barH;
           return (
             <g key={d.month}>
@@ -337,6 +373,12 @@ export default function BusinessDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [activeAccountCount, setActiveAccountCount] = useState<number | null>(null);
+  const [activeMemberCount, setActiveMemberCount] = useState<number | null>(null);
+  const [avgMonthlyRevenue, setAvgMonthlyRevenue] = useState<number | null>(null);
+  const [currentMonthRevenue, setCurrentMonthRevenue] = useState<number | null>(null);
+  const [lastMonthRevenue, setLastMonthRevenue] = useState<number | null>(null);
+  const [monthlyRevenueBreakdown, setMonthlyRevenueBreakdown] = useState<{ month: string; revenue: number }[]>([]);
+  const [showRevenueModal, setShowRevenueModal] = useState(false);
 
   const monthOptions = useMemo(() => generateMonthOptions(), []);
 
@@ -361,13 +403,14 @@ export default function BusinessDashboard() {
         return res.json();
       };
 
-      const [summaryRes, seriesRes, cohortsRes, churnRes, expRes, attachRes] = await Promise.all([
+      const [summaryRes, seriesRes, cohortsRes, churnRes, expRes, attachRes, financialRes] = await Promise.all([
         safeFetch(`/api/admin/business-summary?month=${month}`),
         safeFetch(`/api/admin/business-series?month=${month}&months=12`),
         safeFetch(`/api/admin/business-cohorts?month=${month}&months=12`),
         safeFetch(`/api/admin/business-drilldown?type=churned&month=${month}`),
         safeFetch(`/api/admin/business-drilldown?type=expansion&month=${month}`),
         safeFetch(`/api/admin/business-drilldown?type=attach&month=${month}`),
+        safeFetch(`/api/financial-metrics`),
       ]);
 
       setSummary(summaryRes.data);
@@ -376,14 +419,34 @@ export default function BusinessDashboard() {
       setDrillChurn(churnRes.data || []);
       setDrillExpansion(expRes.data || []);
       setDrillAttach(attachRes.data || []);
+      setAvgMonthlyRevenue(financialRes.averageMonthlyRevenue?.total ?? null);
+      setCurrentMonthRevenue(financialRes.julyRevenue?.total ?? null);
 
-      // Fetch distinct active account count (accounts can have multiple members)
-      const { count } = await supabase
+      const breakdown = financialRes.averageMonthlyRevenue?.monthlyBreakdown ?? [];
+      setMonthlyRevenueBreakdown(breakdown);
+
+      // Last month is the most recent complete month (last item in breakdown)
+      if (breakdown.length > 0) {
+        setLastMonthRevenue(breakdown[breakdown.length - 1].revenue);
+      }
+
+      // Fetch total active members count (individual people) - using status field
+      const { count: memberCount } = await supabase
         .from('members')
-        .select('account_id', { count: 'exact', head: true })
-        .eq('status', 'active')
-        .or('deactivated.is.null,deactivated.eq.false');
-      setActiveAccountCount(count ?? null);
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+      setActiveMemberCount(memberCount ?? null);
+
+      // Fetch active accounts count (distinct accounts with Skyline, Solo, or Duo memberships)
+      const { data: accountData } = await supabase
+        .from('members')
+        .select('account_id')
+        .eq('member_type', 'primary')
+        .in('membership', ['Skyline', 'Solo', 'Duo'])
+        .eq('status', 'active');
+
+      const uniqueAccounts = new Set(accountData?.map(m => m.account_id) || []);
+      setActiveAccountCount(uniqueAccounts.size);
     } catch (err: any) {
       console.error('Business dashboard fetch error:', err);
       setError(err.message || 'Failed to load dashboard data');
@@ -426,6 +489,20 @@ export default function BusinessDashboard() {
   }
 
   const s = summary;
+
+  // Transform monthlyRevenueBreakdown to match SeriesPoint format for BarChart
+  const revenueChartData = monthlyRevenueBreakdown.map(item => ({
+    month: item.month + '-01', // Add -01 to match expected format
+    mrr: item.revenue, // Use mrr as the dataKey (will display as revenue)
+    activeMembers: 0,
+    attachRevenue: 0,
+    newMrr: 0,
+    expansionMrr: 0,
+    contractionMrr: 0,
+    churnedMrr: 0,
+    pausedMrr: 0,
+    netNewMrr: 0,
+  }));
 
   return (
     <AdminLayout>
@@ -476,6 +553,31 @@ export default function BusinessDashboard() {
                 <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
                 <div className={styles.kpiLabel}>ARR</div>
                 <div className={styles.kpiHint}>Annual Recurring Revenue — MRR × 12. A forward-looking projection of yearly revenue if nothing changes.</div>
+              </div>
+              <div
+                className={styles.kpiTile}
+                onClick={() => setShowRevenueModal(true)}
+                style={{ cursor: 'pointer' }}
+                title="Click to view 12-month trend"
+              >
+                <div className={styles.kpiValue}>{currentMonthRevenue !== null ? fmtCurrency(currentMonthRevenue) : '--'}</div>
+                <div className={styles.kpiLabel}>Current Month Total Revenue</div>
+                <div className={styles.kpiHint}>Total revenue from all member payments (dues + purchases) in the current month. Includes membership fees and all other member spending. Click to view trend.</div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{lastMonthRevenue !== null ? fmtCurrency(lastMonthRevenue) : '--'}</div>
+                <div className={styles.kpiLabel}>Last Month Total Revenue</div>
+                <div className={styles.kpiHint}>Total revenue from all member payments (dues + purchases) in the previous month. Complete month data.</div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{activeMemberCount ?? '--'}</div>
+                <div className={styles.kpiLabel}>Active Members</div>
+                <div className={styles.kpiHint}>Total number of individual members (people) across all accounts who are active, paying, and not archived/paused/deactivated.</div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{activeAccountCount ?? '--'}</div>
+                <div className={styles.kpiLabel}>Active Accounts</div>
+                <div className={styles.kpiHint}>Total number of accounts with primary membership as Skyline, Noir Solo, or Noir Duo that are active and not archived/paused/deactivated.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.nrr)}</div>
@@ -746,6 +848,26 @@ export default function BusinessDashboard() {
               </div>
             </div>
           </>
+        )}
+
+        {/* Revenue Trend Modal */}
+        {showRevenueModal && (
+          <div className={styles.modalOverlay} onClick={() => setShowRevenueModal(false)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Monthly Total Revenue (Last 12 Months)</h2>
+                <button className={styles.modalClose} onClick={() => setShowRevenueModal(false)}>×</button>
+              </div>
+              <div className={styles.modalBody}>
+                <div className={styles.chartCard} style={{ marginTop: '2rem' }}>
+                  <BarChart data={revenueChartData} dataKey="mrr" color="#bca892" height={320} />
+                </div>
+                <div className={styles.modalHint}>
+                  Total revenue from all member payments (dues + purchases) for each month.
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </AdminLayout>

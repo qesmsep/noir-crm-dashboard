@@ -90,6 +90,20 @@ interface FinancialMetrics {
     breakdown: any[];
     description: string;
   };
+  ytdRevenue: {
+    total: number;
+    description: string;
+  };
+  lastYearRevenue: {
+    total: number;
+    description: string;
+  };
+  averageMonthlyRevenue: {
+    total: number;
+    description: string;
+    monthsWithRevenue: number;
+    totalLast3Months: number;
+  };
 }
 
 interface Stats {
@@ -568,7 +582,7 @@ export default function DashboardV2() {
 
           <div className={styles.metricCard}>
             <div className={styles.metricHeader}>
-              <span>Revenue Overview</span>
+              <span>Revenue Overview (MRR)</span>
               <div className={styles.toggleGroup}>
                 <button className={`${styles.toggleButton} ${styles.toggleButtonActive}`}>Accrual</button>
                 <button className={styles.toggleButton}>Cash</button>
@@ -583,6 +597,24 @@ export default function DashboardV2() {
             <div className={styles.metricStatRow}>
               <span>Open Invoices</span>
               <strong>${stats.financialMetrics?.outstandingBalances?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}</strong>
+            </div>
+          </div>
+
+          <div className={styles.metricCard}>
+            <div className={styles.metricHeader}>
+              <span>Avg Monthly Total Revenue</span>
+            </div>
+            <div className={styles.metricValueLarge}>
+              ${stats.financialMetrics?.averageMonthlyRevenue?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}
+            </div>
+            <div className={styles.metricSubtitle}>
+              All member payments (last 3 full months)
+            </div>
+            <div className={styles.metricStatRow}>
+              <span>vs MRR</span>
+              <strong>{stats.financialMetrics?.monthlyRecurringRevenue?.total && stats.financialMetrics?.averageMonthlyRevenue?.total
+                ? `${Math.round((stats.financialMetrics.averageMonthlyRevenue.total / stats.financialMetrics.monthlyRecurringRevenue.total - 1) * 100)}%`
+                : '0%'}</strong>
             </div>
           </div>
 
@@ -604,6 +636,43 @@ export default function DashboardV2() {
             <div className={styles.metricStatRow}>
               <span>Per Event</span>
               <strong>${reservationDetails.length ? Math.round((stats.financialMetrics?.julyRevenue?.total || Math.abs(purchases)) / reservationDetails.length).toLocaleString() : '0'}</strong>
+            </div>
+          </div>
+
+          <div className={styles.metricCard}>
+            <div className={styles.metricHeader}>
+              <span>Active Members</span>
+            </div>
+            <div className={styles.metricValueLarge}>
+              {totalMembers}
+            </div>
+            <div className={styles.metricSubtitle}>
+              Members with active accounts
+            </div>
+          </div>
+
+          <div className={styles.metricCard}>
+            <div className={styles.metricHeader}>
+              <span>YTD Total Revenue</span>
+              <span style={{ fontSize: '0.8rem' }}>{thisYear}</span>
+            </div>
+            <div className={styles.metricValueLarge}>
+              ${stats.financialMetrics?.ytdRevenue?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}
+            </div>
+            <div className={styles.metricSubtitle}>
+              Total revenue year-to-date
+            </div>
+          </div>
+
+          <div className={styles.metricCard}>
+            <div className={styles.metricHeader}>
+              <span>{thisYear - 1} Total Revenue</span>
+            </div>
+            <div className={styles.metricValueLarge}>
+              ${stats.financialMetrics?.lastYearRevenue?.total?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || '0'}
+            </div>
+            <div className={styles.metricSubtitle}>
+              Last year total revenue
             </div>
           </div>
         </div>

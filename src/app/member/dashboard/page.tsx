@@ -8,8 +8,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon, CreditCard, CalendarDays, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemberAuth } from '@/context/MemberAuthContext';
-import { Modal, ModalOverlay, ModalContent, ModalBody, ModalCloseButton } from '@chakra-ui/react';
-import ReservationForm from '@/components/ReservationForm';
 import { getSupabaseClient } from '@/pages/api/supabaseClient';
 import BalanceModal from '@/components/member/BalanceModal';
 import ReservationsModal from '@/components/member/ReservationsModal';
@@ -17,6 +15,7 @@ import ProfileModal from '@/components/member/ProfileModal';
 import SubscriptionModal from '@/components/member/SubscriptionModal';
 import UpcomingEventsModal from '@/components/member/UpcomingEventsModal';
 import RSVPModal from '@/components/member/RSVPModal';
+import SimpleReservationRequestModal from '@/components/member/SimpleReservationRequestModal';
 
 export default function MemberDashboardPage() {
   const router = useRouter();
@@ -72,9 +71,6 @@ export default function MemberDashboardPage() {
   const [isRSVPModalOpen, setIsRSVPModalOpen] = useState(false);
   const [selectedRSVPUrl, setSelectedRSVPUrl] = useState<string>('');
   const [mounted, setMounted] = useState(false);
-  const [baseDays, setBaseDays] = useState<number[]>([]);
-  const [bookingStartDate, setBookingStartDate] = useState<Date | undefined>(undefined);
-  const [bookingEndDate, setBookingEndDate] = useState<Date | undefined>(undefined);
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [pastVisits, setPastVisits] = useState<any[]>([]);
@@ -88,26 +84,6 @@ export default function MemberDashboardPage() {
     setMounted(true);
   }, []);
 
-  // Fetch booking configuration (baseDays, booking window) - EXACT COPY FROM LANDING PAGE
-  useEffect(() => {
-    async function fetchConfig() {
-      const supabase = getSupabaseClient();
-      const { data: settingsData } = await supabase
-        .from('settings')
-        .select('booking_start_date, booking_end_date')
-        .single();
-      const { data: baseData } = await supabase
-        .from('venue_hours')
-        .select('day_of_week')
-        .eq('type', 'base')
-        .gte('time_ranges', '[]');
-
-      setBookingStartDate(settingsData && settingsData.booking_start_date ? new Date(settingsData.booking_start_date) : new Date());
-      setBookingEndDate(settingsData && settingsData.booking_end_date ? new Date(settingsData.booking_end_date) : (() => { const d = new Date(); d.setDate(d.getDate() + 60); return d; })());
-      setBaseDays(Array.isArray(baseData) ? baseData.map(r => typeof r.day_of_week === 'string' ? Number(r.day_of_week) : r.day_of_week) : []);
-    }
-    fetchConfig();
-  }, []);
 
   // Handle authentication redirects
   useEffect(() => {
@@ -754,42 +730,18 @@ export default function MemberDashboardPage() {
         </div>
       </div>
 
-      {/* Reservation Modal */}
-      <Modal
+      {/* Reservation Request Modal */}
+      <SimpleReservationRequestModal
         isOpen={isReservationModalOpen}
-        onClose={() => setIsReservationModalOpen(false)}
-        size="md"
-        isCentered
-      >
-        <ModalOverlay bg="blackAlpha.700" />
-        <ModalContent
-          bg="white"
-          borderRadius="2xl"
-          boxShadow="2xl"
-          maxW="500px"
-          mx={4}
-        >
-          <ModalCloseButton zIndex={10} top={2} right={2} />
-          <ModalBody p={{ base: 4, sm: 6, md: 8 }} pt={{ base: 16, sm: 16, md: 16 }}>
-            <ReservationForm
-              isMember={true}
-              baseDays={baseDays}
-              bookingStartDate={bookingStartDate}
-              bookingEndDate={bookingEndDate}
-              memberData={member ? {
-                phone: member.phone,
-                email: member.email,
-                first_name: member.first_name,
-                last_name: member.last_name,
-              } : undefined}
-              onClose={() => {
-                setIsReservationModalOpen(false);
-                handleReservationCreated();
-              }}
-            />
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+        onClose={() => {
+          setIsReservationModalOpen(false);
+        }}
+        onReservationCreated={handleReservationCreated}
+        memberName={member ? `${member.first_name} ${member.last_name}` : ''}
+        memberPhone={member?.phone || ''}
+        memberId={member?.member_id}
+        accountId={member?.account_id}
+      />
 
       {/* Balance Modal */}
       <BalanceModal

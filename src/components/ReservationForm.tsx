@@ -1177,6 +1177,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   maxDate={calendarMaxDate}
                   dateFormat="MMMM d, yyyy"
                   popperPlacement="bottom-start"
+                  openToDate={new Date()}
                   dayClassName={(d: Date) => {
                     const dateStr = DateTime.fromJSDate(d).toFormat('yyyy-MM-dd');
 
@@ -1189,7 +1190,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     // Check if date is a valid venue day (base day or exceptional open)
                     const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
                     const isExceptionalOpen = exceptionalOpens.includes(dateStr);
-                    const isBaseDay = effectiveBaseDays.includes(d.getDay());
+                    const isBaseDay = effectiveBaseDays.length > 0 ? effectiveBaseDays.includes(d.getDay()) : true; // Allow all if not loaded yet
                     const isClosed = exceptionalClosures.includes(dateStr);
                     const isPrivateEvent = privateEventDates.includes(dateStr);
 
@@ -1247,7 +1248,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                     const dateStr = DateTime.fromJSDate(d).toFormat('yyyy-MM-dd');
                     const effectiveBaseDays = baseDays.length > 0 ? baseDays : internalBaseDays;
                     const isExceptionalOpen = exceptionalOpens.includes(dateStr);
-                    const isBaseDay = effectiveBaseDays.includes(d.getDay());
+                    const isBaseDay = effectiveBaseDays.length > 0 ? effectiveBaseDays.includes(d.getDay()) : true; // Allow all if not loaded yet
                     const isClosed = exceptionalClosures.includes(dateStr);
                     const isPrivateEvent = privateEventDates.includes(dateStr);
 

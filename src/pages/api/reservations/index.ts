@@ -584,6 +584,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(tableId && { table_id: tableId }),
         // member_id - include if available
         ...(memberId && { member_id: memberId }),
+        // account_id - include if provided
+        ...(body.account_id && { account_id: body.account_id }),
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));

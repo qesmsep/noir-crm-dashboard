@@ -258,6 +258,72 @@ export default async function handler(req, res) {
       return dateA.getTime() - dateB.getTime();
     });
 
+    // Calculate YTD (Year-to-Date) Total Revenue
+    const ytdRevenue = ledgerData
+      .filter(tx => tx.type === 'payment' && new Date(tx.date).getFullYear() === targetYear)
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+    // Calculate Last Year Total Revenue
+    const lastYearRevenue = ledgerData
+      .filter(tx => tx.type === 'payment' && new Date(tx.date).getFullYear() === (targetYear - 1))
+      .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+    // Calculate Average Monthly Revenue (last 3 FULL months, including all member payments)
+    const now12Months = new Date();
+    // Start from the beginning of the current month, then go back 3 months
+    const startOfCurrentMonth = new Date(now12Months.getFullYear(), now12Months.getMonth(), 1);
+    const startOfLast3Months = new Date(startOfCurrentMonth.getFullYear(), startOfCurrentMonth.getMonth() - 3, 1);
+    const endOfLast3Months = new Date(startOfCurrentMonth.getTime() - 1); // Last millisecond before current month
+
+    // Group payments by month for the last 3 full months
+    const monthlyRevenues = {};
+    let monthsWithRevenue = 0;
+
+    ledgerData
+      .filter(tx => {
+        if (tx.type !== 'payment') return false;
+        const txDate = new Date(tx.date);
+        return txDate >= startOfLast3Months && txDate <= endOfLast3Months;
+      })
+      .forEach(tx => {
+        const txDate = new Date(tx.date);
+        const monthKey = `${txDate.getFullYear()}-${txDate.getMonth()}`;
+        if (!monthlyRevenues[monthKey]) {
+          monthlyRevenues[monthKey] = 0;
+          monthsWithRevenue++;
+        }
+        monthlyRevenues[monthKey] += Number(tx.amount) || 0;
+      });
+
+    const totalLast3Months = Object.values(monthlyRevenues).reduce((sum, amt) => sum + amt, 0);
+    // Always divide by 3 for last 3 full months, even if some months had zero revenue
+    const averageMonthlyRevenue = totalLast3Months / 3;
+
+    // Calculate monthly revenue breakdown for last 12 months (for charting)
+    const startOfLast12Months = new Date(startOfCurrentMonth.getFullYear(), startOfCurrentMonth.getMonth() - 12, 1);
+    const monthlyRevenueBreakdown = [];
+
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = new Date(startOfCurrentMonth.getFullYear(), startOfCurrentMonth.getMonth() - i - 1, 1);
+      const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+      const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59);
+
+      const monthRevenue = ledgerData
+        .filter(tx => {
+          if (tx.type !== 'payment') return false;
+          const txDate = new Date(tx.date);
+          return txDate >= monthStart && txDate <= monthEnd;
+        })
+        .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+      monthlyRevenueBreakdown.push({
+        month: monthKey,
+        revenue: monthRevenue
+      });
+    }
+    // Array is already in chronological order (oldest to newest)
+
     // July Payments Received (Toast Revenue)
     const julyPaymentsReceived = {
       total: toastRevenue,
@@ -286,6 +352,21 @@ export default async function handler(req, res) {
         total: totalOutstanding,
         breakdown: outstandingBreakdown,
         description: "Total amount owed by all members with negative account balances - represents outstanding debt across all accounts"
+      },
+      ytdRevenue: {
+        total: ytdRevenue,
+        description: `Total revenue from payments received in ${targetYear} (Year-to-Date)`
+      },
+      lastYearRevenue: {
+        total: lastYearRevenue,
+        description: `Total revenue from payments received in ${targetYear - 1}`
+      },
+      averageMonthlyRevenue: {
+        total: averageMonthlyRevenue,
+        description: `Average monthly total revenue (all member payments) over the last 3 full months`,
+        monthsWithRevenue: 3,
+        totalLast3Months: totalLast3Months,
+        monthlyBreakdown: monthlyRevenueBreakdown
       },
       month: targetMonth,
       year: targetYear

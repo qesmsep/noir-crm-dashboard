@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import styles from '../styles/MemberSubscriptionCard.module.css';
 import UpdatePlanModal from './UpdatePlanModal';
 import UpdatePaymentModal from './UpdatePaymentModal';
+import CreateSubscriptionModal from './CreateSubscriptionModal';
 
 interface SubscriptionData {
   stripe_subscription_id: string | null;
@@ -48,6 +49,7 @@ export default function MemberSubscriptionCard({
   const [actionLoading, setActionLoading] = useState(false);
   const [showUpdatePlanModal, setShowUpdatePlanModal] = useState(false);
   const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false);
+  const [showCreateSubscriptionModal, setShowCreateSubscriptionModal] = useState(false);
   const [additionalMembersCount, setAdditionalMembersCount] = useState(0);
   const [baseMRR, setBaseMRR] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -321,9 +323,10 @@ export default function MemberSubscriptionCard({
         </div>
         <div className={styles.noSubscription}>
           <p>No active subscription</p>
-          <button className={styles.createButton} onClick={() => {
-            toast({ title: 'Info', description: 'Create subscription functionality coming soon' });
-          }}>
+          <button
+            className={styles.createButton}
+            onClick={() => setShowCreateSubscriptionModal(true)}
+          >
             Create Subscription
           </button>
         </div>
