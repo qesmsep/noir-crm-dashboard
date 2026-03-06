@@ -298,6 +298,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   onPhotoSelected={handlePhotoSelected}
                   currentPhoto={(member?.photo || member?.profile_photo_url) || undefined}
                   buttonClassName="absolute -bottom-1 right-0 bg-[#A59480] hover:bg-[#8C7C6D] text-white w-10 h-10 rounded-full transition-colors flex items-center justify-center"
+                  showEditButton={true}
                 />
               )}
             </div>

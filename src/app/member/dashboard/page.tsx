@@ -187,9 +187,8 @@ export default function MemberDashboardPage() {
 
   const fetchUpcomingEvents = async () => {
     try {
-      // Fetch Noir events, all private events, and member's reservations
-      const [noirResponse, privateEventsResponse, reservationsResponse] = await Promise.all([
-        fetch('/api/noir-member-events', { credentials: 'include' }),
+      // Fetch all private events and member's reservations
+      const [privateEventsResponse, reservationsResponse] = await Promise.all([
         fetch('/api/member/private-events', { credentials: 'include' }),
         fetch('/api/member/reservations', { credentials: 'include' })
       ]);
@@ -197,7 +196,6 @@ export default function MemberDashboardPage() {
       const now = new Date();
       const eventMap = new Map<string, any>(); // Use map to deduplicate by ID
       const rsvpdEventIds = new Set<string>();
-      const noirEventIds = new Set<string>();
 
       // Get reservations to track which events the member has RSVP'd to
       let reservations: any[] = [];
@@ -206,6 +204,7 @@ export default function MemberDashboardPage() {
         reservations = reservationsData.reservations || [];
 
         // Track which events the member has RSVP'd to (exclude cancelled)
+        // Note: undefined/null status means 'confirmed' (old reservations before status was added)
         reservations.forEach((r: any) => {
           if (r.private_event_id && r.status !== 'cancelled') {
             rsvpdEventIds.add(r.private_event_id);
@@ -213,33 +212,23 @@ export default function MemberDashboardPage() {
         });
       }
 
-      // Get Noir events first (they take priority)
-      if (noirResponse.ok) {
-        const noirData = await noirResponse.json();
-        (noirData.events || []).forEach((e: any) => {
-          noirEventIds.add(e.id);
-          eventMap.set(e.id, {
-            ...e,
-            eventType: 'noir',
-            displayTitle: e.title,
-            hasRSVPd: rsvpdEventIds.has(e.id)
-          });
-        });
-      }
-
-      // Get private events - only add if NOT already in Noir events (to avoid duplicates)
+      // Get all private events
       if (privateEventsResponse.ok) {
         const privateData = await privateEventsResponse.json();
         (privateData.events || []).forEach((e: any) => {
-          // Only add if this event is NOT a Noir event
-          if (!noirEventIds.has(e.id)) {
-            eventMap.set(e.id, {
-              ...e,
-              eventType: 'private',
-              displayTitle: 'Private Event',
-              hasRSVPd: rsvpdEventIds.has(e.id)
-            });
-          }
+          // If is_member_event is true, show real details, otherwise show "Private Event"
+          const shouldShowDetails = e.is_member_event === true;
+          eventMap.set(e.id, {
+            ...e,
+            eventType: 'private',
+            displayTitle: shouldShowDetails ? e.title : 'Private Event',
+            title: shouldShowDetails ? e.title : 'Private Event',
+            isVisible: shouldShowDetails, // Track if event details are visible to member
+            hasRSVPd: rsvpdEventIds.has(e.id),
+            canRSVP: shouldShowDetails && e.rsvp_enabled === true,
+            showDash: shouldShowDetails && e.rsvp_enabled === false,
+            rsvpUrl: shouldShowDetails ? e.rsvp_url : null,
+          });
         });
       }
 
@@ -729,15 +718,11 @@ export default function MemberDashboardPage() {
                             {event.displayTitle || event.title}
                           </p>
                           <p className="text-xs text-right whitespace-nowrap leading-tight m-0">
-                            {event.eventType === 'private' ? (
-                              event.hasRSVPd ? (
-                                <span className="text-[#4CAF50]">RSVP'd</span>
-                              ) : (
-                                <span className="text-[#8C7C6D]">Closed</span>
-                              )
+                            {!event.isVisible ? (
+                              <span className="text-[#8C7C6D]">Closed</span>
                             ) : event.hasRSVPd ? (
                               <span className="text-[#4CAF50]">RSVP'd</span>
-                            ) : event.rsvpEnabled && event.rsvpUrl ? (
+                            ) : event.canRSVP && event.rsvpUrl ? (
                               <span
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -748,8 +733,10 @@ export default function MemberDashboardPage() {
                               >
                                 RSVP
                               </span>
+                            ) : event.showDash ? (
+                              <span className="text-[#8C7C6D]">--</span>
                             ) : (
-                              <span className="text-[#E0E0E0]">-</span>
+                              <span className="text-[#8C7C6D]">Closed</span>
                             )}
                           </p>
                         </div>

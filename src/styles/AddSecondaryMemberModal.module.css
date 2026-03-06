@@ -66,6 +66,22 @@
   background: #F6F5F2;
 }
 
+.uploadNewButton {
+  background: #A59480;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.uploadNewButton:hover {
+  background: #8C7C6D;
+}
+
 /* Form */
 .form {
   display: flex;

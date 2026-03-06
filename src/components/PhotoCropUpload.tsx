@@ -7,12 +7,14 @@ interface PhotoCropUploadProps {
   onPhotoSelected: (photoDataUrl: string) => void;
   currentPhoto?: string;
   buttonClassName?: string;
+  showEditButton?: boolean; // Show edit button for existing photo
 }
 
 export default function PhotoCropUpload({
   onPhotoSelected,
   currentPhoto,
-  buttonClassName
+  buttonClassName,
+  showEditButton = false
 }: PhotoCropUploadProps) {
   const { toast } = useToast();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -21,6 +23,7 @@ export default function PhotoCropUpload({
   const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
   const cropPreviewRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -121,6 +124,8 @@ export default function PhotoCropUpload({
     if (!tempImage || !cropPreviewRef.current) return;
 
     const img = new Image();
+    // Set crossOrigin to avoid CORS issues with external images
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const SIZE = 400; // Good size for profile photos
@@ -193,6 +198,18 @@ export default function PhotoCropUpload({
     setScale(1);
   };
 
+  const handleEditCurrentPhoto = () => {
+    if (!currentPhoto) return;
+    setTempImage(currentPhoto);
+    setCropPosition({ x: 0, y: 0 });
+    setScale(1);
+    setShowCropModal(true);
+  };
+
+  const handleUploadNewPhoto = () => {
+    fileInputRef.current?.click();
+  };
+
   // Add touch event listener with { passive: false } to allow preventDefault
   useEffect(() => {
     const element = cropPreviewRef.current;
@@ -230,21 +247,35 @@ export default function PhotoCropUpload({
 
   return (
     <>
-      {/* Upload Button */}
-      <label
-        htmlFor="photo-crop-upload"
-        className={buttonClassName || styles.uploadButton}
-      >
-        {uploadingPhoto ? 'Uploading...' : <Camera className="w-5 h-5" />}
-        <input
-          type="file"
-          id="photo-crop-upload"
-          accept="image/*"
-          onChange={handleFileUpload}
-          className={styles.fileInput}
-          disabled={uploadingPhoto}
-        />
-      </label>
+      {/* Edit or Upload Button */}
+      {showEditButton && currentPhoto ? (
+        <button
+          onClick={handleEditCurrentPhoto}
+          className={buttonClassName || styles.uploadButton}
+          type="button"
+        >
+          <Camera className="w-5 h-5" />
+        </button>
+      ) : (
+        <label
+          htmlFor="photo-crop-upload"
+          className={buttonClassName || styles.uploadButton}
+        >
+          {uploadingPhoto ? 'Uploading...' : <Camera className="w-5 h-5" />}
+        </label>
+      )}
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        id="photo-crop-upload"
+        accept="image/*"
+        onChange={handleFileUpload}
+        className={styles.fileInput}
+        disabled={uploadingPhoto}
+        style={{ display: 'none' }}
+      />
 
       {/* Crop Modal */}
       {showCropModal && tempImage && (
@@ -252,13 +283,24 @@ export default function PhotoCropUpload({
           <div className={styles.cropModalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.cropModalHeader}>
               <h3 className={styles.cropModalTitle}>Position Your Photo</h3>
-              <button
-                onClick={handleCropCancel}
-                className={styles.closeButton}
-                aria-label="Close"
-              >
-                ✕
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {showEditButton && (
+                  <button
+                    onClick={handleUploadNewPhoto}
+                    className={styles.uploadNewButton}
+                    type="button"
+                  >
+                    Upload New
+                  </button>
+                )}
+                <button
+                  onClick={handleCropCancel}
+                  className={styles.closeButton}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             <div className={styles.cropContainer}>

@@ -7,7 +7,6 @@ import { getSupabaseClient } from "../../api/supabaseClient";
 import AdminLayout from '../../../components/layouts/AdminLayout';
 import InlineAttachments from '../../../components/InlineAttachments';
 import MemberSubscriptionCard from '../../../components/MemberSubscriptionCard';
-import SubscriptionTransactionHistory from '../../../components/SubscriptionTransactionHistory';
 import AddSecondaryMemberModal from '../../../components/AddSecondaryMemberModal';
 import PhotoCropUpload from '../../../components/PhotoCropUpload';
 import styles from '../../../styles/MemberDetail.module.css';
@@ -99,6 +98,11 @@ export default function MemberDetailAdmin() {
   const [newAttribute, setNewAttribute] = useState<Record<string, { key: string; value: string }>>({});
   const [editingAttributeId, setEditingAttributeId] = useState<Record<string, string | null>>({});
   const [editingAttributeData, setEditingAttributeData] = useState<Record<string, { key: string; value: string }>>({});
+
+  // Search state
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberSearchResults, setMemberSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   // Note states (per member)
   const [newNote, setNewNote] = useState<Record<string, string>>({});
@@ -362,6 +366,36 @@ export default function MemberDetailAdmin() {
     }).format(amount);
   };
 
+  // Search members
+  const handleMemberSearch = async (query: string) => {
+    setMemberSearch(query);
+
+    if (!query || query.length < 2) {
+      setMemberSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+      const searchLower = query.toLowerCase();
+
+      // Search members by name, email, or phone
+      const { data, error } = await supabase
+        .from('members')
+        .select('member_id, account_id, first_name, last_name, email, phone, member_type')
+        .or(`first_name.ilike.%${searchLower}%,last_name.ilike.%${searchLower}%,email.ilike.%${searchLower}%,phone.ilike.%${searchLower}%`)
+        .limit(10);
+
+      if (!error && data) {
+        setMemberSearchResults(data);
+        setShowSearchResults(true);
+      }
+    } catch (error) {
+      console.error('Error searching members:', error);
+    }
+  };
+
   // Member update handler
   const handleUpdateMember = async (memberId: string) => {
     try {
@@ -473,7 +507,11 @@ export default function MemberDetailAdmin() {
       const res = await fetch(`/api/ledger?account_id=${accountId}`);
       const ledgerResult = await res.json();
       if (ledgerResult.error) throw new Error(ledgerResult.error);
-      setLedger(ledgerResult.data || []);
+      // Sort by date descending (most recent first)
+      const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+      setLedger(sortedLedger);
 
       toast({
         title: 'Transaction added',
@@ -511,7 +549,11 @@ export default function MemberDetailAdmin() {
       const res = await fetch(`/api/ledger?account_id=${accountId}`);
       const ledgerResult = await res.json();
       if (ledgerResult.error) throw new Error(ledgerResult.error);
-      setLedger(ledgerResult.data || []);
+      // Sort by date descending (most recent first)
+      const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+      setLedger(sortedLedger);
 
       toast({
         title: 'Transaction updated',
@@ -543,7 +585,11 @@ export default function MemberDetailAdmin() {
       const res = await fetch(`/api/ledger?account_id=${accountId}`);
       const ledgerResult = await res.json();
       if (ledgerResult.error) throw new Error(ledgerResult.error);
-      setLedger(ledgerResult.data || []);
+      // Sort by date descending (most recent first)
+      const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+      setLedger(sortedLedger);
 
       toast({
         title: 'Transaction deleted',
@@ -1334,14 +1380,93 @@ export default function MemberDetailAdmin() {
   return (
     <AdminLayout>
       <div className={styles.container}>
-        {/* Header */}
-        <div className={styles.header}>
-          <button
-            onClick={() => router.push('/admin/members')}
-            className={styles.backButton}
-          >
-            ← Back to Members
-          </button>
+        {/* Header with Back Button and Search */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              onClick={() => router.push('/admin/members')}
+              className={styles.backButton}
+            >
+              ← Members
+            </button>
+
+            {/* Member Search */}
+            <div style={{ position: 'relative', width: '500px' }}>
+              <input
+                type="text"
+                placeholder="Search members..."
+                value={memberSearch}
+                onChange={(e) => handleMemberSearch(e.target.value)}
+                onFocus={() => memberSearchResults.length > 0 && setShowSearchResults(true)}
+                onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  outline: 'none',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                }}
+              />
+
+              {/* Search Results Dropdown */}
+              {showSearchResults && memberSearchResults.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '0.25rem',
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    zIndex: 50,
+                  }}
+                >
+                  {memberSearchResults.map((member) => (
+                    <div
+                      key={member.member_id}
+                      onClick={() => {
+                        router.push(`/admin/members/${member.account_id}`);
+                        setMemberSearch('');
+                        setShowSearchResults(false);
+                      }}
+                      style={{
+                        padding: '0.75rem 1rem',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #f3f4f6',
+                        transition: 'background-color 0.15s',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                    >
+                      <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                        {member.first_name} {member.last_name}
+                        {member.member_type === 'primary' && (
+                          <span style={{
+                            marginLeft: '0.5rem',
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            fontWeight: 400
+                          }}>
+                            (Primary)
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.125rem' }}>
+                        {member.email || member.phone || 'No contact info'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className={styles.contentLayout}>
@@ -1394,6 +1519,7 @@ export default function MemberDetailAdmin() {
                             currentPhoto={member.photo}
                             onPhotoSelected={(photoDataUrl) => handlePhotoUpdate(member.member_id, photoDataUrl)}
                             buttonClassName={styles.photoEditButton}
+                            showEditButton={true}
                           />
                         </div>
                       </div>
@@ -2150,11 +2276,6 @@ export default function MemberDetailAdmin() {
             </>
               )}
             </div>
-
-            {/* Transaction History Card - Stripe invoices */}
-            <SubscriptionTransactionHistory
-              accountId={accountId as string}
-            />
 
             {/* Messages Section */}
             <div className={styles.messagesSection}>
