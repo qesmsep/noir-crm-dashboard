@@ -7,6 +7,7 @@ import Image from "next/image";
 import { getSupabaseClient } from "../api/supabaseClient";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import AddMemberModal from '../../components/members/AddMemberModal';
+import ArchivedMembersModal from '../../components/ArchivedMembersModal';
 import styles from '../../styles/Members.module.css';
 
 interface Member {
@@ -41,6 +42,7 @@ export default function MembersAdmin() {
   const [error, setError] = useState<string | null>(null);
   const [lookupQuery, setLookupQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isArchivedModalOpen, setIsArchivedModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sortField, setSortField] = useState<SortField>(() => {
     if (typeof window !== 'undefined') {
@@ -498,6 +500,16 @@ export default function MembersAdmin() {
                 <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
+            <button
+              onClick={() => setIsArchivedModalOpen(true)}
+              className={styles.iconButton}
+              title="View Archived Members"
+              aria-label="View archived members"
+            >
+              <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 8h10M5 8a2 2 0 110-4h10a2 2 0 110 4M5 8v10a2 2 0 002 2h6a2 2 0 002-2V8m-3 4h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -827,6 +839,15 @@ export default function MembersAdmin() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleSaveMember}
+      />
+
+      <ArchivedMembersModal
+        isOpen={isArchivedModalOpen}
+        onClose={() => setIsArchivedModalOpen(false)}
+        onUnarchiveSuccess={() => {
+          // Refresh the members list when a member is unarchived
+          fetchMembers();
+        }}
       />
 
       {/* Bulk Message Modal */}

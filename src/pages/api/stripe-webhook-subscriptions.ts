@@ -648,6 +648,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       date: transactionDate,
       stripe_charge_id: chargeId || null,
       stripe_invoice_id: invoiceId || null,
+      stripe_invoice_pdf_url: invoice.invoice_pdf || null,
     });
 
   if (paymentError) {

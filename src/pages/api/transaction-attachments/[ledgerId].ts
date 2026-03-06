@@ -28,7 +28,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to fetch attachments' });
       }
 
-      return res.status(200).json({ data: attachments || [] });
+      // Also fetch the Stripe invoice PDF URL from the ledger entry
+      const { data: ledgerEntry, error: ledgerError } = await supabase
+        .from('ledger')
+        .select('stripe_invoice_pdf_url')
+        .eq('id', ledgerId)
+        .single();
+
+      const allAttachments = [...(attachments || [])];
+
+      // If there's a Stripe invoice PDF, add it as a virtual attachment
+      if (!ledgerError && ledgerEntry?.stripe_invoice_pdf_url) {
+        allAttachments.unshift({
+          id: `stripe-pdf-${ledgerId}`,
+          ledger_id: ledgerId,
+          file_name: 'Stripe Invoice.pdf',
+          file_url: ledgerEntry.stripe_invoice_pdf_url,
+          file_size: 0, // Unknown size
+          uploaded_at: new Date().toISOString(),
+          is_stripe_invoice: true, // Flag to prevent deletion
+        });
+      }
+
+      return res.status(200).json({ data: allAttachments });
     }
 
     if (req.method === 'DELETE') {

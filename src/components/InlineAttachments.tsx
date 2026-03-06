@@ -14,6 +14,7 @@ interface Attachment {
   file_url: string;
   file_size: number;
   uploaded_at: string;
+  is_stripe_invoice?: boolean;
 }
 
 const InlineAttachments: React.FC<InlineAttachmentsProps> = ({ ledgerId, memberId, accountId }) => {
@@ -316,13 +317,15 @@ const InlineAttachments: React.FC<InlineAttachmentsProps> = ({ ledgerId, memberI
                 >
                   ↗
                 </button>
-                <button
-                  onClick={handleDelete}
-                  className={`${styles.actionButton} ${styles.delete}`}
-                  title="Delete"
-                >
-                  🗑
-                </button>
+                {!viewingAttachment.is_stripe_invoice && (
+                  <button
+                    onClick={handleDelete}
+                    className={`${styles.actionButton} ${styles.delete}`}
+                    title="Delete"
+                  >
+                    🗑
+                  </button>
+                )}
               </div>
             </div>
             <div className={styles.viewerBody}>
