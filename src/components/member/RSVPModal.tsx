@@ -177,7 +177,7 @@ export default function RSVPModal({ isOpen, onClose, rsvpUrl }: RSVPModalProps) 
             <p className="text-[#5A5A5A]">Loading event details...</p>
           </div>
         ) : error || !event ? (
-          <Alert variant="destructive">
+          <Alert variant="error">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               {error || 'This RSVP link is invalid or the event has been cancelled.'}
