@@ -29,8 +29,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Security: Verify this is from cron (Vercel adds special headers)
   const authHeader = req.headers.authorization;
   const cronSecret = process.env.CRON_SECRET;
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (isProduction && cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     console.error('❌ Unauthorized cron request');
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -49,12 +50,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const today = getTodayLocalDate();
+    const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
 
-    // Find accounts due for billing today
+    // Find accounts due for billing today (using date range to match timestamps)
     const { data: accountsToBill, error: fetchError } = await supabase
       .from('accounts')
       .select('*')
-      .eq('next_billing_date', today)
+      .gte('next_billing_date', today + 'T00:00:00')
+      .lt('next_billing_date', tomorrow + 'T00:00:00')
       .eq('subscription_status', 'active');
 
     if (fetchError) {
