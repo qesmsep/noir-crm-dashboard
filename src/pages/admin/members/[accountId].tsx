@@ -27,6 +27,10 @@ interface Member {
   referred_by?: string;
   next_renewal?: string;
   ledger_notifications_enabled?: boolean;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
 }
 
 interface Message {
@@ -1581,6 +1585,34 @@ export default function MemberDetailAdmin() {
                               value={editingMemberData.dob || ''}
                               onChange={(e) => setEditingMemberData({ ...editingMemberData, dob: e.target.value })}
                             />
+                            <input
+                              type="text"
+                              placeholder="Address"
+                              className={styles.input}
+                              value={editingMemberData.address || ''}
+                              onChange={(e) => setEditingMemberData({ ...editingMemberData, address: e.target.value })}
+                            />
+                            <input
+                              type="text"
+                              placeholder="City"
+                              className={styles.input}
+                              value={editingMemberData.city || ''}
+                              onChange={(e) => setEditingMemberData({ ...editingMemberData, city: e.target.value })}
+                            />
+                            <input
+                              type="text"
+                              placeholder="State"
+                              className={styles.input}
+                              value={editingMemberData.state || ''}
+                              onChange={(e) => setEditingMemberData({ ...editingMemberData, state: e.target.value })}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Zip Code"
+                              className={styles.input}
+                              value={editingMemberData.zip_code || ''}
+                              onChange={(e) => setEditingMemberData({ ...editingMemberData, zip_code: e.target.value })}
+                            />
                             <div className={styles.editActions}>
                               <button
                                 onClick={() => handleUpdateMember(member.member_id)}
@@ -1662,28 +1694,51 @@ export default function MemberDetailAdmin() {
                               </div>
                             )}
                             {member.dob && (
+                              <div className={styles.detailRow}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                </svg>
+                                <span>{formatDate(member.dob)}</span>
+                              </div>
+                            )}
+                            {member.address && (
+                              <div className={styles.detailRow}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                </svg>
+                                <span>{member.address}</span>
+                              </div>
+                            )}
+                            {(member.city || member.state || member.zip_code) && (
+                              <div className={styles.detailRow}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                </svg>
+                                <span>
+                                  {member.city && member.city}
+                                  {member.city && member.state && ', '}
+                                  {member.state && member.state}
+                                  {(member.city || member.state) && member.zip_code && ' '}
+                                  {member.zip_code && member.zip_code}
+                                </span>
+                              </div>
+                            )}
+                            {(member.email || member.phone || member.company || member.dob || member.address || member.city || member.state || member.zip_code) && editingMemberId !== member.member_id && (
                               <div className={styles.detailRowWithAction}>
-                                <div className={styles.detailRow}>
-                                  <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingMemberId(member.member_id);
+                                    setEditingMemberData(member);
+                                  }}
+                                  className={styles.iconButton}
+                                  title="Edit Member"
+                                  style={{ marginLeft: 'auto' }}
+                                >
+                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                                   </svg>
-                                  <span>{formatDate(member.dob)}</span>
-                                </div>
-                                {editingMemberId !== member.member_id && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingMemberId(member.member_id);
-                                      setEditingMemberData(member);
-                                    }}
-                                    className={styles.iconButton}
-                                    title="Edit Member"
-                                  >
-                                    <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                    </svg>
-                                  </button>
-                                )}
+                                </button>
                               </div>
                             )}
                           </div>
