@@ -24,8 +24,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const firstName = findResponseByQuestionText(responses, questions, 'First Name');
     const lastName = findResponseByQuestionText(responses, questions, 'Last Name');
     const email = findResponseByQuestionText(responses, questions, 'Email');
-    const phone = findResponseByQuestionText(responses, questions, 'Phone');
-    const company = findResponseByQuestionText(responses, questions, 'Company');
+    const phone = findResponseByQuestionText(responses, questions, 'Phone SMS')
+      || findResponseByQuestionText(responses, questions, 'Phone'); // Fallback for older data
+    const company = findResponseByQuestionText(responses, questions, 'Company (Owned or Employed by)')
+      || findResponseByQuestionText(responses, questions, 'Company'); // Fallback for older data
     const howDidYouHear = findResponseByQuestionText(responses, questions, 'Who referred you to Noir?')
       || findResponseByQuestionText(responses, questions, 'How did you hear about Noir?'); // Fallback for existing data
     const whyNoir = findResponseByQuestionText(responses, questions, 'Why are you interested in joining Noir?');
@@ -99,12 +101,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 // Helper function to get question map
 async function getQuestionMap(questionnaireId: string): Promise<Record<string, any>> {
+  // First try to get from questionnaire_templates (current schema)
+  const { data: template } = await supabase
+    .from('questionnaire_templates')
+    .select('questions')
+    .eq('id', questionnaireId)
+    .single();
+
+  const map: Record<string, any> = {};
+
+  if (template && Array.isArray(template.questions)) {
+    template.questions.forEach((q: any) => {
+      map[q.id] = q;
+    });
+    return map;
+  }
+
+  // Fallback to questionnaire_questions table
   const { data: questions } = await supabase
     .from('questionnaire_questions')
     .select('*')
     .eq('questionnaire_id', questionnaireId);
 
-  const map: Record<string, any> = {};
   questions?.forEach(q => {
     map[q.id] = q;
   });

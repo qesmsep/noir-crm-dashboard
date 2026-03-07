@@ -82,41 +82,43 @@ export default function SkylineSignupPage() {
       const questionData: Record<string, any> = {};
       let photoUrl = '';
 
-      for (const [questionId, response] of Object.entries(responses)) {
-        if (response.type === 'file' && response.file_url) {
-          photoUrl = response.file_url;
-        } else if (response.response_text) {
-          // Map question order to field names
-          const questionOrder = parseInt(questionId.split('-')[1] || '0');
-          switch (questionOrder) {
-            case 1:
-              questionData.first_name = response.response_text;
-              break;
-            case 2:
-              questionData.last_name = response.response_text;
-              break;
-            case 3:
-              questionData.email = response.response_text;
-              break;
-            case 4:
-              questionData.phone = response.response_text;
-              break;
-            case 5:
-              questionData.company = response.response_text;
-              break;
-            case 6:
-              questionData.occupation = response.response_text;
-              break;
-            case 7:
-              questionData.city_state = response.response_text;
-              break;
-            case 8:
-              questionData.referral = response.response_text;
-              break;
-            case 9:
-              questionData.why_noir = response.response_text;
-              break;
-          }
+      for (const [questionId, value] of Object.entries(responses)) {
+        // Check if it's a file URL
+        if (typeof value === 'string' && value.startsWith('http')) {
+          photoUrl = value;
+          continue;
+        }
+
+        // Map question IDs to field names (q1, q2, etc.)
+        const questionOrder = parseInt(questionId.replace('q', ''));
+        switch (questionOrder) {
+          case 1:
+            questionData.first_name = value;
+            break;
+          case 2:
+            questionData.last_name = value;
+            break;
+          case 3:
+            questionData.email = value;
+            break;
+          case 4:
+            questionData.phone = value;
+            break;
+          case 5:
+            questionData.company = value;
+            break;
+          case 6:
+            questionData.occupation = value;
+            break;
+          case 7:
+            questionData.city_state = value;
+            break;
+          case 8:
+            questionData.how_did_you_hear = value;
+            break;
+          case 9:
+            questionData.why_noir = value;
+            break;
         }
       }
 
