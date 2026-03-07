@@ -146,6 +146,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               email: additionalMember.email,
               phone: additionalMember.phone,
               dob: additionalMember.dob,
+              photo_url: additionalMember.photo || null,
               is_primary: false,
               member_type: 'secondary'
             });
@@ -234,7 +235,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { sendSMS } = await import('@/lib/sms');
       await sendSMS({
         to: waitlist.phone,
-        content: `Welcome to Noir, ${waitlist.first_name}! Your ${membership_type} membership is now active. Check your messages for login instructions. 🖤`
+        content: `Welcome to Noir, ${waitlist.first_name}! Your ${membership_type} membership is now active. You will be recieving a text message shortly to access your Member Portal. Welcome to Noir. 🖤`
       });
     } catch (smsError) {
       console.error('Failed to send welcome SMS:', smsError);

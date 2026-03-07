@@ -13,13 +13,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { token, signer_name, signer_email, signature_data, agreement_id } = req.body;
+  const { token, signer_name, signer_email, signature_data, photo_url, agreement_id } = req.body;
 
   console.log('[AGREEMENT SIGN] Parsed data:', {
     hasToken: !!token,
     hasName: !!signer_name,
     hasEmail: !!signer_email,
     hasSignature: !!signature_data,
+    hasPhoto: !!photo_url,
     hasAgreement: !!agreement_id
   });
 
@@ -81,6 +82,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (signatureError) throw signatureError;
 
+      // Update photo if provided
+      if (photo_url) {
+        await supabase
+          .from('waitlist')
+          .update({ photo_url })
+          .eq('id', waitlist.id);
+      }
+
       return res.status(200).json({
         success: true,
         signature_id: signature.id,
@@ -112,23 +121,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (signatureError) throw signatureError;
 
     // Update waitlist entry
+    const updateData: any = {
+      agreement_signed_at: new Date().toISOString(),
+      status: 'approved' // Move to approved status after signing
+    };
+
+    // Add photo if provided
+    if (photo_url) {
+      updateData.photo_url = photo_url;
+    }
+
     const { error: updateError } = await supabase
       .from('waitlist')
-      .update({
-        agreement_signed_at: new Date().toISOString(),
-        status: 'approved' // Move to approved status after signing
-      })
+      .update(updateData)
       .eq('id', waitlist.id);
 
     if (updateError) throw updateError;
-
-    // Send SMS notification (optional)
-    try {
-      await sendSignatureConfirmationSMS(waitlist.phone, waitlist.first_name);
-    } catch (smsError) {
-      console.error('Failed to send SMS:', smsError);
-      // Don't fail the request if SMS fails
-    }
 
     return res.status(200).json({
       success: true,
@@ -139,21 +147,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error: any) {
     console.error('Agreement signing error:', error);
     return res.status(500).json({ error: error.message || 'Internal server error' });
-  }
-}
-
-// Helper function to send confirmation SMS
-async function sendSignatureConfirmationSMS(phone: string, firstName: string): Promise<void> {
-  const message = `Hi ${firstName}! Your membership agreement has been signed. Next step: Complete payment to activate your membership. You'll receive a link shortly. 🖤`;
-
-  // Send SMS using shared utility
-  const { sendSMS } = await import('@/lib/sms');
-  const result = await sendSMS({
-    to: phone,
-    content: message
-  });
-
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to send SMS');
   }
 }
