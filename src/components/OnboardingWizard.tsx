@@ -22,8 +22,9 @@ import {
   Image
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, FileText, CreditCard, DollarSign, User, Upload, Building2, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, FileText, CreditCard, DollarSign, User, Upload, Building2, UserPlus, Edit2, Trash2, Award } from 'lucide-react';
 import SignatureCanvas from '@/components/SignatureCanvas';
+import AdditionalMemberModal from '@/components/AdditionalMemberModal';
 import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
@@ -39,11 +40,12 @@ interface OnboardingWizardProps {
 }
 
 const STEPS = [
-  { id: 1, name: 'Agreement', icon: FileText },
-  { id: 2, name: 'Membership', icon: CreditCard },
-  { id: 3, name: 'Additional Members', icon: UserPlus },
-  { id: 4, name: 'Payment', icon: DollarSign },
-  { id: 5, name: 'Profile', icon: User }
+  { id: 1, name: 'Contact Info', icon: User },
+  { id: 2, name: 'Agreement', icon: FileText },
+  { id: 3, name: 'Membership', icon: Award },
+  { id: 4, name: 'Additional Members', icon: UserPlus },
+  { id: 5, name: 'Payment', icon: DollarSign },
+  { id: 6, name: 'Profile', icon: Check }
 ];
 
 function PaymentForm({ token, selectedMembership, onSuccess, clientSecret, waitlistData }: any) {
@@ -419,30 +421,45 @@ export default function OnboardingWizard({
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const toast = useToast();
 
-  // Step 1: Agreement
+  // Step 1: Contact Info
+  const [firstName, setFirstName] = useState(waitlistData.first_name || '');
+  const [lastName, setLastName] = useState(waitlistData.last_name || '');
+  const [email, setEmail] = useState(waitlistData.email || '');
+  const [phone, setPhone] = useState(waitlistData.phone || '');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [primaryMemberPhoto, setPrimaryMemberPhoto] = useState('');
+  const [uploadingPrimaryPhoto, setUploadingPrimaryPhoto] = useState(false);
+
+  // Step 2: Agreement
   const [signerName, setSignerName] = useState(`${waitlistData.first_name} ${waitlistData.last_name}`);
   const [signerEmail, setSignerEmail] = useState(waitlistData.email);
   const [signatureData, setSignatureData] = useState('');
   const [agreed, setAgreed] = useState(false);
 
-  // Step 2: Membership
+  // Step 3: Membership
   const [selectedMembership, setSelectedMembership] = useState(
     waitlistData.selected_membership || membershipPlans[0]?.type || ''
   );
 
-  // Step 3: Additional Members
+  // Step 4: Additional Members
   const [additionalMembers, setAdditionalMembers] = useState<Array<{
     first_name: string;
     last_name: string;
     email: string;
     phone: string;
     dob: string;
+    photo?: string;
   }>>([]);
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [editingMemberIndex, setEditingMemberIndex] = useState<number | undefined>(undefined);
 
-  // Step 4: Payment
+  // Step 5: Payment
   const [clientSecret, setClientSecret] = useState('');
 
-  // Step 5: Profile
+  // Step 6: Profile
   const [photoUrl, setPhotoUrl] = useState('');
   const [bio, setBio] = useState('');
   const [preferences, setPreferences] = useState({
@@ -454,26 +471,35 @@ export default function OnboardingWizard({
 
   const handleNext = async () => {
     if (currentStep === 1) {
-      if (await validateAndSaveAgreement()) {
+      // Contact info step
+      if (await validateAndSaveContactInfo()) {
         setDirection('forward');
         setCurrentStep(2);
       }
     } else if (currentStep === 2) {
-      if (await validateMembershipSelection()) {
+      // Agreement step
+      if (await validateAndSaveAgreement()) {
         setDirection('forward');
         setCurrentStep(3);
       }
     } else if (currentStep === 3) {
+      // Membership selection step
+      if (await validateMembershipSelection()) {
+        setDirection('forward');
+        setCurrentStep(4);
+      }
+    } else if (currentStep === 4) {
       // Additional members step - save and continue to payment
       if (await saveAdditionalMembers()) {
         if (await validateAndCreatePaymentIntent()) {
           setDirection('forward');
-          setCurrentStep(4);
+          setCurrentStep(5);
         }
       }
-    } else if (currentStep === 4) {
-      // Payment handled by PaymentForm
     } else if (currentStep === 5) {
+      // Payment handled by PaymentForm
+    } else if (currentStep === 6) {
+      // Profile step
       await handleCompleteProfile();
     }
   };
@@ -482,6 +508,75 @@ export default function OnboardingWizard({
     if (currentStep > 1) {
       setDirection('backward');
       setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  const validateAndSaveContactInfo = async (): Promise<boolean> => {
+    if (!firstName || !lastName || !email || !phone) {
+      toast({
+        title: 'Required Fields',
+        description: 'Please provide your name, email, and phone number',
+        status: 'warning',
+        duration: 3000,
+      });
+      return false;
+    }
+
+    if (!address || !city || !state || !zipCode) {
+      toast({
+        title: 'Address Required',
+        description: 'Please complete your address',
+        status: 'warning',
+        duration: 3000,
+      });
+      return false;
+    }
+
+    if (!primaryMemberPhoto) {
+      toast({
+        title: 'Photo Required',
+        description: 'Please upload your profile photo',
+        status: 'warning',
+        duration: 3000,
+      });
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/onboard/save-contact-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          first_name: firstName,
+          last_name: lastName,
+          email,
+          phone,
+          address,
+          city,
+          state,
+          zip_code: zipCode,
+          photo_url: primaryMemberPhoto
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save contact information');
+      }
+
+      // Update signer name and email for agreement step
+      setSignerName(`${firstName} ${lastName}`);
+      setSignerEmail(email);
+
+      return true;
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save contact information. Please try again.',
+        status: 'error',
+        duration: 5000,
+      });
+      return false;
     }
   };
 
@@ -620,6 +715,99 @@ export default function OnboardingWizard({
     }
   };
 
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 400;
+
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = (height * MAX_WIDTH) / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = (width * MAX_HEIGHT) / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePrimaryPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid File',
+        description: 'Please select an image file',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: 'File Too Large',
+        description: 'Image must be less than 10MB',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    setUploadingPrimaryPhoto(true);
+
+    try {
+      const compressedDataUrl = await compressImage(file);
+      setPrimaryMemberPhoto(compressedDataUrl);
+      toast({
+        title: 'Photo Added',
+        description: 'Profile photo has been set',
+        status: 'success',
+        duration: 2000,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Upload Failed',
+        description: error.message || 'Failed to upload photo',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setUploadingPrimaryPhoto(false);
+    }
+  };
+
   const handleCompleteProfile = async () => {
     // Optional profile completion - can skip
     onComplete();
@@ -627,7 +815,7 @@ export default function OnboardingWizard({
 
   const handlePaymentSuccess = () => {
     setDirection('forward');
-    setCurrentStep(5);
+    setCurrentStep(6);
   };
 
   const today = new Date().toLocaleDateString('en-US', {
@@ -667,6 +855,189 @@ export default function OnboardingWizard({
     switch (currentStep) {
       case 1:
         return (
+          <VStack spacing={3} align="stretch">
+            {/* Profile Photo - Required */}
+            <FormControl isRequired>
+              {primaryMemberPhoto ? (
+                <HStack spacing={4}>
+                  <Image
+                    src={primaryMemberPhoto}
+                    alt="Your photo"
+                    boxSize="100px"
+                    borderRadius="full"
+                    objectFit="cover"
+                    border="3px solid"
+                    borderColor="#A59480"
+                  />
+                  <VStack align="start" flex={1}>
+                    <Text fontSize="sm" color="green.600" fontWeight="medium">
+                      ✓ Photo uploaded successfully
+                    </Text>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      colorScheme="red"
+                      onClick={() => setPrimaryMemberPhoto('')}
+                    >
+                      Remove Photo
+                    </Button>
+                  </VStack>
+                </HStack>
+              ) : (
+                <Button
+                  as="label"
+                  htmlFor="primary-photo-upload"
+                  leftIcon={<Icon as={Upload} />}
+                  variant="outline"
+                  borderWidth="2px"
+                  borderColor="#A59480"
+                  color="#A59480"
+                  _hover={{ bg: '#A5948010' }}
+                  isLoading={uploadingPrimaryPhoto}
+                  cursor="pointer"
+                  size="lg"
+                  w="full"
+                >
+                  Upload Your Photo
+                  <Input
+                    id="primary-photo-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePrimaryPhotoUpload}
+                    display="none"
+                  />
+                </Button>
+              )}
+            </FormControl>
+
+            {/* Name Fields */}
+            <HStack spacing={1}>
+              <FormControl isRequired>
+                <Input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First Name"
+                  size="lg"
+                  bg="white"
+                  borderWidth="2px"
+                  _focus={{ borderColor: '#A59480' }}
+                />
+              </FormControl>
+
+              <FormControl isRequired>
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last Name"
+                  size="lg"
+                  bg="white"
+                  borderWidth="2px"
+                  _focus={{ borderColor: '#A59480' }}
+                />
+              </FormControl>
+            </HStack>
+
+            {/* Contact Fields */}
+            <FormControl isRequired>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email Address"
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <Input
+                type="tel"
+                value={phone}
+                onChange={(e) => {
+                  const input = e.target.value.replace(/\D/g, '');
+                  let formatted = '';
+                  if (input.length > 0) {
+                    formatted = '(' + input.substring(0, 3);
+                    if (input.length >= 3) {
+                      formatted += ') ' + input.substring(3, 6);
+                    }
+                    if (input.length >= 6) {
+                      formatted += '-' + input.substring(6, 10);
+                    }
+                  }
+                  setPhone(formatted);
+                }}
+                placeholder="(555) 555-5555"
+                maxLength={14}
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+              />
+            </FormControl>
+
+            {/* Address Fields */}
+            <FormControl isRequired>
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Street Address"
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+              />
+            </FormControl>
+
+            <HStack spacing={1} align="flex-start">
+              <VStack spacing={1} align="stretch" flex={2}>
+                <FormControl isRequired>
+                  <Input
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    size="lg"
+                    bg="white"
+                    borderWidth="2px"
+                    _focus={{ borderColor: '#A59480' }}
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <Input
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value)}
+                    placeholder="ZIP Code"
+                    maxLength={5}
+                    size="lg"
+                    bg="white"
+                    borderWidth="2px"
+                    _focus={{ borderColor: '#A59480' }}
+                  />
+                </FormControl>
+              </VStack>
+
+              <FormControl isRequired flex={1}>
+                <Input
+                  value={state}
+                  onChange={(e) => setState(e.target.value.toUpperCase())}
+                  placeholder="State"
+                  maxLength={2}
+                  textTransform="uppercase"
+                  size="lg"
+                  bg="white"
+                  borderWidth="2px"
+                  _focus={{ borderColor: '#A59480' }}
+                />
+              </FormControl>
+            </HStack>
+          </VStack>
+        );
+
+      case 2:
+        return (
           <VStack spacing={4} align="stretch">
             <Box
               maxH={{ base: "400px", md: "300px" }}
@@ -684,47 +1055,6 @@ export default function OnboardingWizard({
               </Text>
             </Box>
 
-            <Divider />
-
-            <VStack spacing={3} align="stretch">
-              <FormControl isRequired>
-                <FormLabel>Full Name</FormLabel>
-                <Input
-                  value={signerName}
-                  onChange={(e) => setSignerName(e.target.value)}
-                  size="lg"
-                  bg="white"
-                  borderWidth="2px"
-                  _focus={{ borderColor: '#A59480' }}
-                />
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel>Email Address</FormLabel>
-                <Input
-                  type="email"
-                  value={signerEmail}
-                  onChange={(e) => setSignerEmail(e.target.value)}
-                  size="lg"
-                  bg="white"
-                  borderWidth="2px"
-                  _focus={{ borderColor: '#A59480' }}
-                />
-              </FormControl>
-            </VStack>
-
-            <Box
-              p={4}
-              bg="#A5948010"
-              borderRadius="md"
-              borderLeftWidth="4px"
-              borderLeftColor="#A59480"
-            >
-              <Text fontSize="sm" color="#353535" fontWeight="medium">
-                ⚖️ Electronic signature has the same legal effect as handwritten
-              </Text>
-            </Box>
-
             <VStack spacing={3} align="stretch">
               <Text fontSize="sm" color="gray.600">
                 Hold and drag to sign
@@ -737,7 +1067,7 @@ export default function OnboardingWizard({
           </VStack>
         );
 
-      case 2:
+      case 3:
         return (
           <VStack spacing={6} align="stretch">
             <Text fontSize="xl" fontWeight="bold" color="#353535">
@@ -759,26 +1089,24 @@ export default function OnboardingWizard({
                     _hover={{ borderColor: '#A59480', transform: 'translateY(-2px)' }}
                     onClick={() => setSelectedMembership(plan.type)}
                   >
-                    <HStack justify="space-between" align="start">
-                      <Radio value={plan.type} colorScheme="orange" size="lg">
-                        <VStack align="start" spacing={1}>
-                          <Text fontSize="lg" fontWeight="bold">
-                            {plan.type}
-                          </Text>
-                          <Text fontSize="sm" color="gray.600">
-                            {plan.description}
-                          </Text>
-                        </VStack>
-                      </Radio>
-                      <VStack align="end" spacing={0}>
-                        <Text fontSize="2xl" fontWeight="bold" color="#A59480">
-                          ${plan.base_fee}
+                    <Radio value={plan.type} colorScheme="orange" size="lg" w="full">
+                      <VStack align="start" spacing={2} w="full">
+                        <Text fontSize="lg" fontWeight="bold">
+                          {plan.type}
                         </Text>
-                        <Text fontSize="xs" color="gray.500">
-                          one-time fee
+                        <Text fontSize="sm" color="gray.600">
+                          {plan.description}
                         </Text>
+                        <HStack spacing={2} align="baseline">
+                          <Text fontSize="2xl" fontWeight="bold" color="#A59480">
+                            ${plan.base_fee}
+                          </Text>
+                          <Text fontSize="xs" color="gray.500">
+                            one-time fee
+                          </Text>
+                        </HStack>
                       </VStack>
-                    </HStack>
+                    </Radio>
                   </Box>
                 ))}
               </VStack>
@@ -786,145 +1114,104 @@ export default function OnboardingWizard({
           </VStack>
         );
 
-      case 3:
+      case 4:
         return (
           <VStack spacing={6} align="stretch">
-            <Text fontSize="xl" fontWeight="bold" color="#353535">
-              Add Additional Members (Optional)
-            </Text>
-
             <Text fontSize="sm" color="gray.600">
               {selectedMembership === 'Skyline'
                 ? 'Skyline members can add unlimited additional members at no extra cost!'
                 : 'Add additional members to your account for $25/month each.'}
             </Text>
 
-            {/* Display existing additional members */}
-            {additionalMembers.map((member, index) => (
-              <Box
-                key={index}
-                p={4}
-                borderWidth="2px"
-                borderColor="#A59480"
-                borderRadius="lg"
-                bg="#A5948010"
-              >
-                <HStack justify="space-between" mb={3}>
-                  <Text fontSize="md" fontWeight="bold" color="#353535">
-                    Additional Member #{index + 1}
-                  </Text>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    color="red.500"
-                    onClick={() => {
-                      const newMembers = [...additionalMembers];
-                      newMembers.splice(index, 1);
-                      setAdditionalMembers(newMembers);
-                    }}
+            {/* Display existing additional members - clean list view */}
+            {additionalMembers.length > 0 && (
+              <VStack spacing={3} align="stretch">
+                {additionalMembers.map((member, index) => (
+                  <Box
+                    key={index}
+                    p={4}
+                    borderWidth="2px"
+                    borderColor="#A59480"
+                    borderRadius="lg"
+                    bg="white"
+                    transition="all 0.2s"
+                    _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
                   >
-                    Remove
-                  </Button>
-                </HStack>
+                    <HStack spacing={4} justify="space-between">
+                      <HStack spacing={4}>
+                        {member.photo ? (
+                          <Image
+                            src={member.photo}
+                            alt={`${member.first_name} ${member.last_name}`}
+                            boxSize="50px"
+                            borderRadius="full"
+                            objectFit="cover"
+                            border="2px solid"
+                            borderColor="#A59480"
+                          />
+                        ) : (
+                          <Box
+                            boxSize="50px"
+                            borderRadius="full"
+                            bg="#A5948010"
+                            border="2px solid"
+                            borderColor="#A59480"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            <Icon as={User} boxSize={6} color="#A59480" />
+                          </Box>
+                        )}
+                        <VStack align="start" spacing={0}>
+                          <Text fontSize="md" fontWeight="bold" color="#353535">
+                            {member.first_name} {member.last_name}
+                          </Text>
+                          <Text fontSize="sm" color="gray.600">
+                            {member.email}
+                          </Text>
+                        </VStack>
+                      </HStack>
 
-                <VStack spacing={3}>
-                  <HStack spacing={3} w="full">
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm">First Name</FormLabel>
-                      <Input
-                        value={member.first_name}
-                        onChange={(e) => {
-                          const newMembers = [...additionalMembers];
-                          newMembers[index].first_name = e.target.value;
-                          setAdditionalMembers(newMembers);
-                        }}
-                        size="md"
-                        bg="white"
-                        borderWidth="2px"
-                        _focus={{ borderColor: '#A59480' }}
-                      />
-                    </FormControl>
-
-                    <FormControl isRequired>
-                      <FormLabel fontSize="sm">Last Name</FormLabel>
-                      <Input
-                        value={member.last_name}
-                        onChange={(e) => {
-                          const newMembers = [...additionalMembers];
-                          newMembers[index].last_name = e.target.value;
-                          setAdditionalMembers(newMembers);
-                        }}
-                        size="md"
-                        bg="white"
-                        borderWidth="2px"
-                        _focus={{ borderColor: '#A59480' }}
-                      />
-                    </FormControl>
-                  </HStack>
-
-                  <FormControl isRequired>
-                    <FormLabel fontSize="sm">Email</FormLabel>
-                    <Input
-                      type="email"
-                      value={member.email}
-                      onChange={(e) => {
-                        const newMembers = [...additionalMembers];
-                        newMembers[index].email = e.target.value;
-                        setAdditionalMembers(newMembers);
-                      }}
-                      size="md"
-                      bg="white"
-                      borderWidth="2px"
-                      _focus={{ borderColor: '#A59480' }}
-                    />
-                  </FormControl>
-
-                  <FormControl isRequired>
-                    <FormLabel fontSize="sm">Phone</FormLabel>
-                    <Input
-                      type="tel"
-                      value={member.phone}
-                      onChange={(e) => {
-                        const newMembers = [...additionalMembers];
-                        newMembers[index].phone = e.target.value;
-                        setAdditionalMembers(newMembers);
-                      }}
-                      size="md"
-                      bg="white"
-                      borderWidth="2px"
-                      _focus={{ borderColor: '#A59480' }}
-                      placeholder="(555) 555-5555"
-                    />
-                  </FormControl>
-
-                  <FormControl isRequired>
-                    <FormLabel fontSize="sm">Date of Birth</FormLabel>
-                    <Input
-                      type="date"
-                      value={member.dob}
-                      onChange={(e) => {
-                        const newMembers = [...additionalMembers];
-                        newMembers[index].dob = e.target.value;
-                        setAdditionalMembers(newMembers);
-                      }}
-                      size="md"
-                      bg="white"
-                      borderWidth="2px"
-                      _focus={{ borderColor: '#A59480' }}
-                    />
-                  </FormControl>
-                </VStack>
-              </Box>
-            ))}
+                      <HStack spacing={2}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          color="#A59480"
+                          onClick={() => {
+                            setEditingMemberIndex(index);
+                            setIsAddMemberModalOpen(true);
+                          }}
+                          leftIcon={<Icon as={Edit2} boxSize={4} />}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="red"
+                          onClick={() => {
+                            const newMembers = [...additionalMembers];
+                            newMembers.splice(index, 1);
+                            setAdditionalMembers(newMembers);
+                          }}
+                          leftIcon={<Icon as={Trash2} boxSize={4} />}
+                        >
+                          Remove
+                        </Button>
+                      </HStack>
+                    </HStack>
+                  </Box>
+                ))}
+              </VStack>
+            )}
 
             {/* Add member button */}
             <Button
               leftIcon={<Icon as={UserPlus} />}
               onClick={() => {
-                setAdditionalMembers([
-                  ...additionalMembers,
-                  { first_name: '', last_name: '', email: '', phone: '', dob: '' }
-                ]);
+                setEditingMemberIndex(undefined);
+                setIsAddMemberModalOpen(true);
               }}
               variant="outline"
               borderWidth="2px"
@@ -977,7 +1264,7 @@ export default function OnboardingWizard({
           </VStack>
         );
 
-      case 4:
+      case 5:
         return (
           <VStack spacing={6} align="stretch">
             <Text fontSize="xl" fontWeight="bold" color="#353535">
@@ -1038,7 +1325,7 @@ export default function OnboardingWizard({
           </VStack>
         );
 
-      case 5:
+      case 6:
         return (
           <VStack spacing={6} align="stretch">
             <VStack spacing={2} align="center">
@@ -1135,9 +1422,9 @@ export default function OnboardingWizard({
             bg="#ECEDE8"
           >
             <CardBody p={8}>
-              <VStack spacing={6} align="stretch">
+              <VStack spacing={4} align="stretch">
                 {/* Step Header */}
-                <HStack spacing={3} mb={4}>
+                <HStack spacing={3}>
                   <Box
                     bg="#A59480"
                     borderRadius="full"
@@ -1165,7 +1452,7 @@ export default function OnboardingWizard({
                 {renderStepContent()}
 
                 {/* Navigation Buttons (not for payment or final step) */}
-                {currentStep !== 4 && (
+                {currentStep !== 5 && (
                   <HStack spacing={3} pt={4}>
                     <Button
                       leftIcon={<Icon as={ArrowLeft} />}
@@ -1184,7 +1471,7 @@ export default function OnboardingWizard({
                       Back
                     </Button>
 
-                    {currentStep !== 5 && (
+                    {currentStep !== 6 && (
                       <Button
                         rightIcon={<Icon as={ArrowRight} />}
                         onClick={handleNext}
@@ -1196,7 +1483,7 @@ export default function OnboardingWizard({
                         _hover={{ bg: '#8F7F6B' }}
                         boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
                       >
-                        {currentStep === 1 ? 'I Accept' : 'Continue'}
+                        {currentStep === 1 ? 'Next' : currentStep === 2 ? 'I Accept' : 'Continue'}
                       </Button>
                     )}
                   </HStack>
@@ -1211,32 +1498,24 @@ export default function OnboardingWizard({
       <VStack spacing={3} mt={6} align="stretch">
         <HStack justify="space-between">
           {STEPS.map((step, index) => (
-            <VStack key={step.id} spacing={1} flex={1} align="center">
-              <Box
-                w={10}
-                h={10}
-                borderRadius="full"
-                bg={currentStep >= step.id ? '#A59480' : 'gray.300'}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                transition="all 0.3s"
-              >
-                <Icon
-                  as={currentStep > step.id ? Check : step.icon}
-                  color="white"
-                  w={5}
-                  h={5}
-                />
-              </Box>
-              <Text
-                fontSize="xs"
-                fontWeight="medium"
-                color={currentStep >= step.id ? '#A59480' : 'gray.500'}
-              >
-                {step.name}
-              </Text>
-            </VStack>
+            <Box
+              key={step.id}
+              w={10}
+              h={10}
+              borderRadius="full"
+              bg={currentStep >= step.id ? '#A59480' : 'gray.300'}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              transition="all 0.3s"
+            >
+              <Icon
+                as={currentStep > step.id ? Check : step.icon}
+                color="white"
+                w={5}
+                h={5}
+              />
+            </Box>
           ))}
         </HStack>
         <Progress
@@ -1251,6 +1530,29 @@ export default function OnboardingWizard({
           h="6px"
         />
       </VStack>
+
+      {/* Additional Member Modal */}
+      <AdditionalMemberModal
+        isOpen={isAddMemberModalOpen}
+        onClose={() => {
+          setIsAddMemberModalOpen(false);
+          setEditingMemberIndex(undefined);
+        }}
+        onSave={(member) => {
+          if (editingMemberIndex !== undefined) {
+            // Edit existing member
+            const newMembers = [...additionalMembers];
+            newMembers[editingMemberIndex] = member;
+            setAdditionalMembers(newMembers);
+          } else {
+            // Add new member
+            setAdditionalMembers([...additionalMembers, member]);
+          }
+          setEditingMemberIndex(undefined);
+        }}
+        editingMember={editingMemberIndex !== undefined ? additionalMembers[editingMemberIndex] : undefined}
+        editingIndex={editingMemberIndex}
+      />
     </Box>
   );
 }

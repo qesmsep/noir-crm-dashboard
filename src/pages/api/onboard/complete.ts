@@ -118,6 +118,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: waitlist.email,
         phone: waitlist.phone,
         photo_url: waitlist.photo_url,
+        address: waitlist.address,
+        city: waitlist.city,
+        state: waitlist.state,
+        zip_code: waitlist.zip_code,
         is_primary: true,
         member_type: 'primary'
       })
