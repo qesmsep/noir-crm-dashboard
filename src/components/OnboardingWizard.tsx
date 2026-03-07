@@ -426,11 +426,11 @@ export default function OnboardingWizard({
   const [lastName, setLastName] = useState(waitlistData.last_name || '');
   const [email, setEmail] = useState(waitlistData.email || '');
   const [phone, setPhone] = useState(waitlistData.phone || '');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [zipCode, setZipCode] = useState('');
-  const [primaryMemberPhoto, setPrimaryMemberPhoto] = useState('');
+  const [address, setAddress] = useState(waitlistData.address || '');
+  const [city, setCity] = useState(waitlistData.city || '');
+  const [state, setState] = useState(waitlistData.state || '');
+  const [zipCode, setZipCode] = useState(waitlistData.zip_code || '');
+  const [primaryMemberPhoto, setPrimaryMemberPhoto] = useState(waitlistData.photo_url || '');
   const [uploadingPrimaryPhoto, setUploadingPrimaryPhoto] = useState(false);
 
   // Step 2: Agreement
@@ -1129,6 +1129,7 @@ export default function OnboardingWizard({
                 {additionalMembers.map((member, index) => (
                   <Box
                     key={index}
+                    position="relative"
                     p={4}
                     borderWidth="2px"
                     borderColor="#A59480"
@@ -1137,69 +1138,56 @@ export default function OnboardingWizard({
                     transition="all 0.2s"
                     _hover={{ transform: 'translateY(-2px)', boxShadow: 'md' }}
                   >
-                    <HStack spacing={4} justify="space-between">
-                      <HStack spacing={4}>
-                        {member.photo ? (
-                          <Image
-                            src={member.photo}
-                            alt={`${member.first_name} ${member.last_name}`}
-                            boxSize="50px"
-                            borderRadius="full"
-                            objectFit="cover"
-                            border="2px solid"
-                            borderColor="#A59480"
-                          />
-                        ) : (
-                          <Box
-                            boxSize="50px"
-                            borderRadius="full"
-                            bg="#A5948010"
-                            border="2px solid"
-                            borderColor="#A59480"
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                          >
-                            <Icon as={User} boxSize={6} color="#A59480" />
-                          </Box>
-                        )}
-                        <VStack align="start" spacing={0}>
-                          <Text fontSize="md" fontWeight="bold" color="#353535">
-                            {member.first_name} {member.last_name}
-                          </Text>
-                          <Text fontSize="sm" color="gray.600">
-                            {member.email}
-                          </Text>
-                        </VStack>
-                      </HStack>
+                    <Button
+                      position="absolute"
+                      top={2}
+                      right={2}
+                      size="sm"
+                      variant="ghost"
+                      color="#A59480"
+                      onClick={() => {
+                        setEditingMemberIndex(index);
+                        setIsAddMemberModalOpen(true);
+                      }}
+                      minW="auto"
+                      p={2}
+                    >
+                      <Icon as={Edit2} boxSize={4} />
+                    </Button>
 
-                      <HStack spacing={2}>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          color="#A59480"
-                          onClick={() => {
-                            setEditingMemberIndex(index);
-                            setIsAddMemberModalOpen(true);
-                          }}
-                          leftIcon={<Icon as={Edit2} boxSize={4} />}
+                    <HStack spacing={4}>
+                      {member.photo ? (
+                        <Image
+                          src={member.photo}
+                          alt={`${member.first_name} ${member.last_name}`}
+                          boxSize="50px"
+                          borderRadius="full"
+                          objectFit="cover"
+                          border="2px solid"
+                          borderColor="#A59480"
+                        />
+                      ) : (
+                        <Box
+                          boxSize="50px"
+                          borderRadius="full"
+                          bg="#A5948010"
+                          border="2px solid"
+                          borderColor="#A59480"
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          colorScheme="red"
-                          onClick={() => {
-                            const newMembers = [...additionalMembers];
-                            newMembers.splice(index, 1);
-                            setAdditionalMembers(newMembers);
-                          }}
-                          leftIcon={<Icon as={Trash2} boxSize={4} />}
-                        >
-                          Remove
-                        </Button>
-                      </HStack>
+                          <Icon as={User} boxSize={6} color="#A59480" />
+                        </Box>
+                      )}
+                      <VStack align="start" spacing={0}>
+                        <Text fontSize="md" fontWeight="bold" color="#353535">
+                          {member.first_name} {member.last_name}
+                        </Text>
+                        <Text fontSize="sm" color="gray.600">
+                          {member.email}
+                        </Text>
+                      </VStack>
                     </HStack>
                   </Box>
                 ))}
