@@ -48,7 +48,7 @@ const STEPS = [
   { id: 6, name: 'Profile', icon: Check }
 ];
 
-function PaymentForm({ token, selectedMembership, onSuccess, clientSecret, waitlistData }: any) {
+function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCount, waitlistData }: any) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -68,8 +68,25 @@ function PaymentForm({ token, selectedMembership, onSuccess, clientSecret, waitl
         throw new Error('Card element not found');
       }
 
+      // Create payment intent when user submits payment
+      const intentResponse = await fetch('/api/payment/create-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          membership_type: selectedMembership,
+          additional_members_count: additionalMembersCount
+        })
+      });
+
+      if (!intentResponse.ok) {
+        throw new Error('Failed to create payment intent');
+      }
+
+      const intentData = await intentResponse.json();
+
       // Confirm card payment
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      const { error, paymentIntent } = await stripe.confirmCardPayment(intentData.client_secret, {
         payment_method: {
           card: cardElement,
           billing_details: {
@@ -124,6 +141,23 @@ function PaymentForm({ token, selectedMembership, onSuccess, clientSecret, waitl
     setSubmitting(true);
 
     try {
+      // Create payment intent when user submits payment
+      const intentResponse = await fetch('/api/payment/create-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          membership_type: selectedMembership,
+          additional_members_count: additionalMembersCount
+        })
+      });
+
+      if (!intentResponse.ok) {
+        throw new Error('Failed to create payment intent');
+      }
+
+      const intentData = await intentResponse.json();
+
       // Lock scroll position during Financial Connections flow
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
@@ -137,7 +171,7 @@ function PaymentForm({ token, selectedMembership, onSuccess, clientSecret, waitl
 
       // Use Financial Connections to collect bank account
       const { error, paymentIntent } = await stripe.collectBankAccountForPayment({
-        clientSecret: clientSecret,
+        clientSecret: intentData.client_secret,
         params: {
           payment_method_type: 'us_bank_account',
           payment_method_data: {
@@ -460,7 +494,6 @@ export default function OnboardingWizard({
   const [editingMemberIndex, setEditingMemberIndex] = useState<number | undefined>(undefined);
 
   // Step 5: Payment
-  const [clientSecret, setClientSecret] = useState('');
 
   // Step 6: Profile
   const [photoUrl, setPhotoUrl] = useState('');
@@ -495,10 +528,8 @@ export default function OnboardingWizard({
     } else if (currentStep === 4) {
       // Additional members step - save and continue to payment
       if (await saveAdditionalMembers()) {
-        if (await validateAndCreatePaymentIntent()) {
-          setDirection('forward');
-          setCurrentStep(5);
-        }
+        setDirection('forward');
+        setCurrentStep(5);
       }
     } else if (currentStep === 5) {
       // Payment handled by PaymentForm
@@ -687,36 +718,6 @@ export default function OnboardingWizard({
       toast({
         title: 'Error',
         description: 'Failed to save additional members. Please try again.',
-        status: 'error',
-        duration: 5000,
-      });
-      return false;
-    }
-  };
-
-  const validateAndCreatePaymentIntent = async (): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/payment/create-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          membership_type: selectedMembership,
-          additional_members_count: additionalMembers.length
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create payment intent');
-      }
-
-      const data = await response.json();
-      setClientSecret(data.client_secret);
-      return true;
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to initialize payment',
         status: 'error',
         duration: 5000,
       });
@@ -1309,17 +1310,15 @@ export default function OnboardingWizard({
               </VStack>
             </Box>
 
-            {clientSecret && (
-              <Elements stripe={stripePromise} options={{ clientSecret }}>
-                <PaymentForm
-                  token={token}
-                  selectedMembership={selectedMembership}
-                  onSuccess={handlePaymentSuccess}
-                  clientSecret={clientSecret}
-                  waitlistData={waitlistData}
-                />
-              </Elements>
-            )}
+            <Elements stripe={stripePromise}>
+              <PaymentForm
+                token={token}
+                selectedMembership={selectedMembership}
+                onSuccess={handlePaymentSuccess}
+                additionalMembersCount={additionalMembers.length}
+                waitlistData={waitlistData}
+              />
+            </Elements>
           </VStack>
         );
 
