@@ -185,6 +185,7 @@ export default function AgreementPage() {
 
   const agreementContent = agreement.content
     .replace(/{{name}}/g, signerName)
+    .replace(/MEMBER_NAME/g, signerName)
     .replace(/{{email}}/g, signerEmail)
     .replace(/{{membership}}/g, waitlistData.selected_membership || 'Standard')
     .replace(/{{date}}/g, today);

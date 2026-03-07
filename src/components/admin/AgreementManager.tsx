@@ -262,13 +262,22 @@ export default function AgreementManager() {
 
             <div>
               <Label htmlFor="content" className="text-xs font-semibold text-[#353535]">Content (HTML)</Label>
+              <div className="mt-1 mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                <p className="font-semibold mb-1">Available Variables:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-gray-700">
+                  <li><code className="bg-white px-1 rounded">MEMBER_NAME</code> or <code className="bg-white px-1 rounded">{'{{name}}'}</code> - Member's full name</li>
+                  <li><code className="bg-white px-1 rounded">{'{{email}}'}</code> - Member's email address</li>
+                  <li><code className="bg-white px-1 rounded">{'{{membership}}'}</code> - Membership type</li>
+                  <li><code className="bg-white px-1 rounded">{'{{date}}'}</code> - Today's date</li>
+                </ul>
+              </div>
               <Textarea
                 id="content"
                 value={editingAgreement?.content || ''}
                 onChange={(e) => setEditingAgreement(prev => ({ ...prev!, content: e.target.value }))}
                 placeholder="Enter agreement content (HTML supported)"
                 rows={12}
-                className="mt-1 text-sm"
+                className="mt-1 text-sm font-mono"
               />
             </div>
           </div>

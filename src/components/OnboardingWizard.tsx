@@ -305,6 +305,7 @@ export default function OnboardingWizard({
 
   const agreementContent = agreement?.content
     ?.replace(/{{name}}/g, signerName)
+    ?.replace(/MEMBER_NAME/g, signerName)
     ?.replace(/{{email}}/g, signerEmail)
     ?.replace(/{{membership}}/g, selectedMembership || 'Standard')
     ?.replace(/{{date}}/g, today);
