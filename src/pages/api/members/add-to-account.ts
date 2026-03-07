@@ -94,28 +94,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Other plans: $25/member
     let updatedSubscription: any = null;
     try {
-      // Get current monthly dues and subscription from account
+      // Get current account info including membership plan
       const { data: currentAccount } = await supabase
         .from('accounts')
-        .select('monthly_dues, stripe_subscription_id')
+        .select('monthly_dues, membership_plan_id')
         .eq('account_id', account_id)
         .single();
 
       const currentMonthlyDues = currentAccount?.monthly_dues || 0;
 
-      // Determine additional member fee based on plan
-      let additionalMemberFee = 25; // Default for most plans
+      // Determine additional member fee based on membership plan
+      // Fetch the plan to check if it's Skyline
       let isSkylinePlan = false;
+      if (currentAccount?.membership_plan_id) {
+        const { data: plan } = await supabase
+          .from('subscription_plans')
+          .select('plan_name')
+          .eq('id', currentAccount.membership_plan_id)
+          .single();
 
-      if (currentAccount?.stripe_subscription_id) {
-        const subscription = await stripe.subscriptions.retrieve(currentAccount.stripe_subscription_id);
+        isSkylinePlan = plan?.plan_name?.toLowerCase() === 'skyline';
+      }
 
-        // Check if this is Skyline plan ($10/month base)
-        if (subscription.items.data[0]?.price?.unit_amount === 1000) {
-          additionalMemberFee = 0;
-          isSkylinePlan = true;
-          console.log('[Add Member] Skyline plan detected - additional members are FREE');
-        }
+      const additionalMemberFee = isSkylinePlan ? 0 : 25;
+
+      if (isSkylinePlan) {
+        console.log('[Add Member] Skyline membership detected - additional members are FREE');
       }
 
       const newMonthlyDues = currentMonthlyDues + additionalMemberFee;
@@ -128,124 +132,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
         .eq('account_id', account_id);
 
-      // CRITICAL: Update Stripe subscription to charge for additional member
-      // Skip this for Skyline members (free additional members)
-      if (currentAccount?.stripe_subscription_id && !isSkylinePlan) {
-        try {
-          const subscription = await stripe.subscriptions.retrieve(currentAccount.stripe_subscription_id);
-
-          // Find the "Additional Member" price from Stripe
-          const prices = await stripe.prices.list({
-            active: true,
-            expand: ['data.product'],
-          });
-
-          const additionalMemberPrice = prices.data.find(p => {
-            const product = p.product as any;
-            return product.name?.toLowerCase().includes('additional') &&
-                   product.name?.toLowerCase().includes('member') &&
-                   p.recurring?.interval === 'month';
-          });
-
-          if (!additionalMemberPrice) {
-            console.error('Additional Member price not found in Stripe - cannot charge for additional member');
-          } else {
-            // Check if additional member line item already exists
-            const existingMemberItem = subscription.items.data.find(
-              item => item.price.id === additionalMemberPrice.id
-            );
-
-            const secondaryMemberCount = existingMembers.filter(m => m.member_type === 'secondary').length + 1; // +1 for new member
-
-            if (existingMemberItem) {
-              // Update quantity
-              await stripe.subscriptionItems.update(existingMemberItem.id, {
-                quantity: secondaryMemberCount,
-              });
-            } else {
-              // Add new line item
-              await stripe.subscriptionItems.create({
-                subscription: currentAccount.stripe_subscription_id,
-                price: additionalMemberPrice.id,
-                quantity: secondaryMemberCount,
-              });
-            }
-
-            updatedSubscription = await stripe.subscriptions.retrieve(currentAccount.stripe_subscription_id);
-          }
-        } catch (stripeError: any) {
-          console.error('Error updating Stripe subscription for additional member:', stripeError);
-          // Don't fail the entire request
-        }
-      } else if (isSkylinePlan) {
-        console.log('[Add Member] Skipping Stripe update - Skyline members get free additional members');
-      }
-
-      // If new_price_id provided, also update the subscription tier
-      if (new_price_id && account.stripe_subscription_id) {
-        try {
-          const currentSubscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
-          const currentItem = currentSubscription.items.data[0];
-
-          if (currentItem) {
-            const subscription = await stripe.subscriptions.update(account.stripe_subscription_id, {
-              items: [
-                {
-                  id: currentItem.id,
-                  price: new_price_id,
-                },
-              ],
-              proration_behavior: 'create_prorations',
-            });
-
-            // Get price details
-            const newPrice = await stripe.prices.retrieve(new_price_id);
-
-            // Log subscription event
-            await supabase.from('subscription_events').insert({
-              account_id,
-              event_type: 'upgrade',
-              stripe_subscription_id: account.stripe_subscription_id,
-              previous_plan: currentItem.price.product as string,
-              new_plan: newPrice.product as string,
-              new_mrr: newMonthlyDues,
-              effective_date: new Date().toISOString(),
-              metadata: {
-                reason: additionalMemberFee > 0
-                  ? `Added member to account (+$${additionalMemberFee} administration fee)`
-                  : `Added member to account (free - Skyline benefit)`,
-                updated_via_api: true,
-                member_count: existingMembers.length + 1,
-              },
-            });
-
-            updatedSubscription = subscription;
-          }
-        } catch (stripeError: any) {
-          console.error('Error updating subscription:', stripeError);
-          // Don't fail the entire request if subscription update fails
-          // Member was already created successfully
-        }
-      } else {
-        // Log the monthly dues increase even if no Stripe subscription change
-        await supabase.from('subscription_events').insert({
-          account_id,
-          event_type: 'upgrade',
-          stripe_subscription_id: account.stripe_subscription_id,
-          previous_plan: null,
-          new_plan: null,
-          new_mrr: newMonthlyDues,
-          effective_date: new Date().toISOString(),
-          metadata: {
-            reason: additionalMemberFee > 0
-              ? `Added member to account (+$${additionalMemberFee} administration fee)`
-              : `Added member to account (free - Skyline benefit)`,
-            updated_via_api: true,
-            member_count: existingMembers.length + 1,
-            previous_mrr: currentMonthlyDues,
-          },
-        });
-      }
+      // Log subscription event for additional member
+      // No Stripe subscription update needed - app manages pricing
+      await supabase.from('subscription_events').insert({
+        account_id,
+        event_type: 'upgrade',
+        previous_mrr: currentMonthlyDues,
+        new_mrr: newMonthlyDues,
+        effective_date: new Date().toISOString(),
+        metadata: {
+          reason: additionalMemberFee > 0
+            ? `Added member to account (+$${additionalMemberFee} administration fee)`
+            : `Added member to account (free - Skyline benefit)`,
+          updated_via_api: true,
+          member_count: existingMembers.length + 1,
+        },
+      });
     } catch (updateError: any) {
       console.error('Error updating monthly dues:', updateError);
       // Don't fail the entire request if MRR update fails

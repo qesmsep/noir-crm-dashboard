@@ -20,7 +20,7 @@ const supabase = createClient(
  *
  * Body:
  *   - member_id: UUID
- *   - price_id: string (Stripe Price ID from subscription_plans table)
+ *   - plan_id: UUID (ID from subscription_plans table)
  *   - payment_method_id?: string (optional, if already collected)
  *   - charge_immediately?: boolean (optional, charge first month now - requires payment method)
  *
@@ -34,10 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { member_id, price_id, payment_method_id, charge_immediately } = req.body;
+  const { member_id, plan_id, payment_method_id, charge_immediately } = req.body;
 
-  if (!member_id || !price_id) {
-    return res.status(400).json({ error: 'member_id and price_id are required' });
+  if (!member_id || !plan_id) {
+    return res.status(400).json({ error: 'member_id and plan_id are required' });
   }
 
   try {
@@ -122,9 +122,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Get price details to calculate monthly dues
-    const selectedPrice = await stripe.prices.retrieve(price_id);
-    const basePriceAmount = selectedPrice.unit_amount ? selectedPrice.unit_amount / 100 : 0;
+    // Get price details from subscription_plans table (app is source of truth)
+    const { data: selectedPlan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('monthly_price, plan_name')
+      .eq('id', plan_id)
+      .single();
+
+    if (planError || !selectedPlan) {
+      return res.status(404).json({ error: 'Subscription plan not found' });
+    }
+
+    const basePriceAmount = selectedPlan.monthly_price;
 
     // Count secondary members to include additional member fees
     const { data: secondaryMembers } = await supabase
@@ -151,7 +160,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const today = getTodayLocalDate();
     const nextBillingDate = addMonths(today, 1);
 
-    // Update account with subscription info
+    // Update account with membership info
     const { data: updatedAccount, error: updateError } = await supabase
       .from('accounts')
       .update({
@@ -159,6 +168,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         subscription_start_date: new Date().toISOString(),
         next_billing_date: nextBillingDate,
         monthly_dues: totalMonthlyDues,
+        membership_plan_id: plan_id,
         billing_retry_count: 0,
         last_payment_failed_at: null,
       })

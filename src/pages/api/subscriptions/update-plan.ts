@@ -19,7 +19,7 @@ const supabase = createClient(
  *
  * Body:
  *   - account_id: UUID
- *   - new_price_id: string (Stripe Price ID)
+ *   - new_plan_id: UUID (ID from subscription_plans table)
  *
  * Returns:
  *   - account: Updated account data
@@ -30,10 +30,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, new_price_id } = req.body;
+  const { account_id, new_plan_id } = req.body;
 
-  if (!account_id || !new_price_id) {
-    return res.status(400).json({ error: 'account_id and new_price_id are required' });
+  if (!account_id || !new_plan_id) {
+    return res.status(400).json({ error: 'account_id and new_plan_id are required' });
   }
 
   try {
@@ -52,9 +52,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Can only update plan for active subscriptions' });
     }
 
-    // Get new price details
-    const newPrice = await stripe.prices.retrieve(new_price_id);
-    const basePriceAmount = newPrice.unit_amount ? newPrice.unit_amount / 100 : 0;
+    // Get new price details from subscription_plans table (app is source of truth)
+    const { data: newPlan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('monthly_price, plan_name')
+      .eq('id', new_plan_id)
+      .single();
+
+    if (planError || !newPlan) {
+      return res.status(404).json({ error: 'Subscription plan not found' });
+    }
+
+    const basePriceAmount = newPlan.monthly_price;
 
     // Count secondary members to recalculate monthly dues
     const { data: secondaryMembers } = await supabase
@@ -82,11 +91,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`   New MRR: $${newMonthlyDues}`);
     console.log(`   Event type: ${eventType}`);
 
-    // Update account with new monthly dues
+    // Update account with new monthly dues and membership plan
     const { data: updatedAccount, error: updateError } = await supabase
       .from('accounts')
       .update({
         monthly_dues: newMonthlyDues,
+        membership_plan_id: new_plan_id,
       })
       .eq('account_id', account_id)
       .select()
