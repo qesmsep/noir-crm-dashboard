@@ -114,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       new_mrr: newMonthlyDues,
       effective_date: new Date().toISOString(),
       metadata: {
-        new_price_id,
+        new_plan_id,
         base_price: basePriceAmount,
         secondary_members: secondaryMemberCount,
         additional_member_fee: additionalMemberFee,
