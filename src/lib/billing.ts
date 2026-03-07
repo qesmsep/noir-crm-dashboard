@@ -166,12 +166,12 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     const entries: any[] = [];
 
-    // 1. Log the payment as a "credit" (negative amount = reduces balance owed)
+    // 1. Log the payment as a "credit" (positive amount = increases their credit balance)
     entries.push({
       member_id: primaryMember.member_id,
       account_id: account.account_id,
       type: 'credit',
-      amount: -baseAmount,
+      amount: baseAmount,
       date: getTodayLocalDate(),
       note: `Monthly dues - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
       stripe_charge_id: charge?.id,
@@ -194,7 +194,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     await supabase.from('ledger').insert(entries);
 
-    console.log(`✅ Logged payment to ledger for account ${account.account_id}: -$${baseAmount} credit, +$${feeAmount} fee`);
+    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} credit, +$${feeAmount} fee`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
   }
