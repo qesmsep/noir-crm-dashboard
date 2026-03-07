@@ -444,6 +444,9 @@ export default function OnboardingWizard({
     waitlistData.selected_membership || membershipPlans[0]?.type || ''
   );
 
+  // Check if this is a Skyline-only flow
+  const isSkylineFlow = waitlistData.selected_membership === 'Skyline';
+
   // Step 4: Additional Members
   const [additionalMembers, setAdditionalMembers] = useState<Array<{
     first_name: string;
@@ -480,7 +483,8 @@ export default function OnboardingWizard({
       // Agreement step
       if (await validateAndSaveAgreement()) {
         setDirection('forward');
-        setCurrentStep(3);
+        // Skip membership selection for Skyline flow
+        setCurrentStep(isSkylineFlow ? 4 : 3);
       }
     } else if (currentStep === 3) {
       // Membership selection step
@@ -507,7 +511,12 @@ export default function OnboardingWizard({
   const handleBack = () => {
     if (currentStep > 1) {
       setDirection('backward');
-      setCurrentStep(prev => prev - 1);
+      // Skip step 3 when going back from step 4 in Skyline flow
+      if (currentStep === 4 && isSkylineFlow) {
+        setCurrentStep(2);
+      } else {
+        setCurrentStep(prev => prev - 1);
+      }
     }
   };
 
@@ -1119,7 +1128,7 @@ export default function OnboardingWizard({
           <VStack spacing={6} align="stretch">
             <Text fontSize="sm" color="gray.600">
               {selectedMembership === 'Skyline'
-                ? 'Skyline members can add unlimited additional members at no extra cost!'
+                ? 'Skyline members can add 1 additional member at no extra cost!'
                 : 'Add additional members to your account for $25/month each.'}
             </Text>
 
@@ -1207,8 +1216,9 @@ export default function OnboardingWizard({
               color="#A59480"
               _hover={{ bg: '#A5948010' }}
               size="lg"
+              isDisabled={selectedMembership === 'Skyline' && additionalMembers.length >= 1}
             >
-              Add Member
+              {selectedMembership === 'Skyline' && additionalMembers.length >= 1 ? 'Maximum Members Reached' : 'Add Member'}
             </Button>
 
             {/* Pricing summary */}
