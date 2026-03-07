@@ -39,17 +39,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Onboarding already completed' });
     }
 
-    // Get membership plan details
-    const membershipPlans: Record<string, any> = {
-      Solo: { base_fee: 500, monthly_credit: 50 },
-      Duo: { base_fee: 750, monthly_credit: 75 },
-      Skyline: { base_fee: 1000, monthly_credit: 100 },
-      Annual: { base_fee: 1200, monthly_credit: 100 }
-    };
+    // Get membership plan details from database
+    const { data: plan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('plan_name', membership_type)
+      .eq('is_active', true)
+      .single();
 
-    const plan = membershipPlans[membership_type];
-    if (!plan) {
-      return res.status(400).json({ error: 'Invalid membership type' });
+    let base_fee: number;
+    let monthly_credit: number;
+
+    if (planError || !plan) {
+      // Fallback to hardcoded values for legacy support
+      console.log('[ONBOARD COMPLETE] Using fallback plan for:', membership_type);
+      const membershipPlans: Record<string, any> = {
+        Solo: { base_fee: 500, monthly_price: 50 },
+        Duo: { base_fee: 750, monthly_price: 75 },
+        Skyline: { base_fee: 1000, monthly_price: 100 },
+        Annual: { base_fee: 1200, monthly_price: 100 }
+      };
+
+      const fallbackPlan = membershipPlans[membership_type];
+      if (!fallbackPlan) {
+        return res.status(400).json({ error: 'Invalid membership type' });
+      }
+
+      base_fee = fallbackPlan.base_fee;
+      monthly_credit = fallbackPlan.monthly_price;
+    } else {
+      // Convert monthly_price to cents if needed
+      base_fee = Math.round(plan.monthly_price * 100);
+      monthly_credit = plan.monthly_price;
+      console.log('[ONBOARD COMPLETE] Using database plan:', { plan_name: plan.plan_name, base_fee, monthly_credit });
     }
 
     // Create Stripe customer if not exists
@@ -86,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Failed to create account');
     }
 
-    // Create member
+    // Create primary member
     const { data: member, error: memberError } = await supabase
       .from('members')
       .insert({
@@ -96,7 +118,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: waitlist.email,
         phone: waitlist.phone,
         photo_url: waitlist.photo_url,
-        is_primary: true
+        is_primary: true,
+        member_type: 'primary'
       })
       .select()
       .single();
@@ -107,14 +130,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Failed to create member');
     }
 
+    // Create additional members if any
+    const additionalMembers = waitlist.additional_members || [];
+    if (Array.isArray(additionalMembers) && additionalMembers.length > 0) {
+      console.log('[ONBOARD COMPLETE] Creating', additionalMembers.length, 'additional members');
+
+      for (const additionalMember of additionalMembers) {
+        try {
+          await supabase
+            .from('members')
+            .insert({
+              account_id: account.id,
+              first_name: additionalMember.first_name,
+              last_name: additionalMember.last_name,
+              email: additionalMember.email,
+              phone: additionalMember.phone,
+              dob: additionalMember.dob,
+              is_primary: false,
+              member_type: 'secondary'
+            });
+        } catch (error) {
+          console.error('Failed to create additional member:', error);
+          // Continue creating other members even if one fails
+        }
+      }
+    }
+
+    // Calculate additional members fee
+    const additionalMemberFee = membership_type === 'Skyline' ? 0 : 25;
+    const additionalMembersTotalFee = additionalMembers.length * additionalMemberFee;
+    const totalInitialFee = base_fee + additionalMembersTotalFee;
+
     // Create ledger entry for membership fee
     const { error: ledgerError } = await supabase
       .from('ledger_entries')
       .insert({
         account_id: account.id,
         entry_type: 'charge',
-        amount: plan.base_fee,
-        balance_after: -plan.base_fee,
+        amount: base_fee,
+        balance_after: -base_fee,
         description: `${membership_type} Membership - Initial Fee`,
         created_by: 'system'
       });
@@ -123,15 +177,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Failed to create ledger entry:', ledgerError);
     }
 
+    // Create ledger entry for additional members if applicable
+    if (additionalMembersTotalFee > 0) {
+      const { error: additionalFeeLedgerError } = await supabase
+        .from('ledger_entries')
+        .insert({
+          account_id: account.id,
+          entry_type: 'charge',
+          amount: additionalMembersTotalFee,
+          balance_after: -totalInitialFee,
+          description: `Additional Members Fee - ${additionalMembers.length} member${additionalMembers.length > 1 ? 's' : ''} @ $${additionalMemberFee}/month`,
+          created_by: 'system'
+        });
+
+      if (additionalFeeLedgerError) {
+        console.error('Failed to create additional members ledger entry:', additionalFeeLedgerError);
+      }
+    }
+
     // Create initial credit if applicable
-    if (plan.monthly_credit > 0) {
-      const { error: creditError } = await supabase
+    if (monthly_credit > 0) {
+      const { error: creditError} = await supabase
         .from('ledger_entries')
         .insert({
           account_id: account.id,
           entry_type: 'credit',
-          amount: plan.monthly_credit,
-          balance_after: -plan.base_fee + plan.monthly_credit,
+          amount: monthly_credit,
+          balance_after: -totalInitialFee + monthly_credit,
           description: `${membership_type} Membership - Initial Monthly Credit`,
           created_by: 'system'
         });
@@ -148,7 +220,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         member_id: member.id,
         selected_membership: membership_type,
         payment_completed_at: new Date().toISOString(),
-        payment_amount: plan.base_fee,
+        payment_amount: totalInitialFee,
         stripe_customer_id: stripeCustomerId
       })
       .eq('id', waitlist.id);

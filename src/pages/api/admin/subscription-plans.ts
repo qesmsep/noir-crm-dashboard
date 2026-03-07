@@ -89,6 +89,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     monthly_price,
     interval,
     is_active,
+    show_in_onboarding,
     display_order,
     description
   } = req.body;
@@ -125,6 +126,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       monthly_price: parseFloat(monthly_price),
       interval,
       is_active: is_active !== undefined ? is_active : true,
+      show_in_onboarding: show_in_onboarding !== undefined ? show_in_onboarding : true,
       display_order: display_order !== undefined ? display_order : 0,
       description: description || null
     })
@@ -151,6 +153,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     monthly_price,
     interval,
     is_active,
+    show_in_onboarding,
     display_order,
     description
   } = req.body;
@@ -172,6 +175,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     updateData.interval = interval;
   }
   if (is_active !== undefined) updateData.is_active = is_active;
+  if (show_in_onboarding !== undefined) updateData.show_in_onboarding = show_in_onboarding;
   if (display_order !== undefined) updateData.display_order = display_order;
   if (description !== undefined) updateData.description = description;
 

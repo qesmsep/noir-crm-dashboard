@@ -22,9 +22,9 @@ import {
   Image
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, FileText, CreditCard, DollarSign, User, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, FileText, CreditCard, DollarSign, User, Upload, Building2, UserPlus } from 'lucide-react';
 import SignatureCanvas from '@/components/SignatureCanvas';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -41,17 +41,19 @@ interface OnboardingWizardProps {
 const STEPS = [
   { id: 1, name: 'Agreement', icon: FileText },
   { id: 2, name: 'Membership', icon: CreditCard },
-  { id: 3, name: 'Payment', icon: DollarSign },
-  { id: 4, name: 'Profile', icon: User }
+  { id: 3, name: 'Additional Members', icon: UserPlus },
+  { id: 4, name: 'Payment', icon: DollarSign },
+  { id: 5, name: 'Profile', icon: User }
 ];
 
-function PaymentForm({ token, selectedMembership, onSuccess }: any) {
+function PaymentForm({ token, selectedMembership, onSuccess, clientSecret, waitlistData }: any) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
+  const [paymentType, setPaymentType] = useState<'card' | 'ach' | null>(null);
   const toast = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!stripe || !elements) return;
@@ -59,26 +61,35 @@ function PaymentForm({ token, selectedMembership, onSuccess }: any) {
     setSubmitting(true);
 
     try {
-      const { error } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/onboard/success`,
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+
+      // Confirm card payment
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            name: `${waitlistData.first_name} ${waitlistData.last_name}`,
+            email: waitlistData.email,
+          },
         },
-        redirect: 'if_required'
       });
 
       if (error) {
         throw error;
       }
 
+      if (paymentIntent?.status !== 'succeeded') {
+        throw new Error('Payment was not successful');
+      }
+
       // Confirm member creation on backend
-      const response = await fetch('/api/onboard/complete', {
+      const response = await fetch('/api/payment/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          membership_type: selectedMembership
-        })
+        body: JSON.stringify({ token })
       });
 
       if (!response.ok) {
@@ -105,26 +116,295 @@ function PaymentForm({ token, selectedMembership, onSuccess }: any) {
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <VStack spacing={6} align="stretch">
-        <PaymentElement />
-        <Button
-          type="submit"
-          size="lg"
-          bg="#A59480"
-          color="white"
-          _hover={{ bg: '#8F7F6B' }}
-          isLoading={submitting}
-          isDisabled={!stripe}
-          leftIcon={<Icon as={Check} />}
-          boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
-          minH="56px"
+  const handleAchSubmit = async () => {
+    if (!stripe) return;
+
+    setSubmitting(true);
+
+    try {
+      // Lock scroll position during Financial Connections flow
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      document.body.style.position = 'fixed';
+      document.body.style.top = '0';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+
+      // Use Financial Connections to collect bank account
+      const { error, paymentIntent } = await stripe.collectBankAccountForPayment({
+        clientSecret: clientSecret,
+        params: {
+          payment_method_type: 'us_bank_account',
+          payment_method_data: {
+            billing_details: {
+              name: `${waitlistData.first_name} ${waitlistData.last_name}`,
+              email: waitlistData.email,
+            },
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+        // Payment might be processing - check with backend
+        const response = await fetch('/api/payment/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to complete onboarding');
+        }
+      }
+
+      toast({
+        title: 'Success! 🎉',
+        description: 'Your membership is now active',
+        status: 'success',
+        duration: 5000,
+      });
+
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: 'Payment Failed',
+        description: error.message || 'Please try again',
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      // Unlock body scroll
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      setSubmitting(false);
+    }
+  };
+
+  if (!paymentType) {
+    return (
+      <VStack spacing={4} align="stretch">
+        <Text fontSize="md" fontWeight="semibold" color="#353535" mb={2}>
+          Choose Payment Method
+        </Text>
+
+        {/* ACH Option */}
+        <Box
+          as="button"
+          type="button"
+          onClick={() => setPaymentType('ach')}
+          p={5}
+          borderWidth="1px"
+          borderColor="#D1D5DB"
+          borderRadius="lg"
+          bg="white"
+          boxShadow="0 2px 4px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05)"
+          _hover={{
+            borderColor: '#A59480',
+            bg: '#FBFBFA',
+            boxShadow: "0 4px 8px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.08)"
+          }}
+          transition="all 0.2s"
+          textAlign="left"
         >
-          Complete Payment
-        </Button>
+          <HStack spacing={3}>
+            <Icon as={Building2} boxSize={7} color="#A59480" />
+            <VStack align="start" spacing={0.5} flex={1}>
+              <Text fontSize="md" fontWeight="semibold" color="#1F1F1F">
+                US Bank Account (ACH)
+              </Text>
+              <Text fontSize="xs" color="#5A5A5A">
+                Direct debit from your bank
+              </Text>
+              <Text fontSize="xs" color="#4CAF50" fontWeight="bold" mt={1}>
+                No processing fee
+              </Text>
+            </VStack>
+          </HStack>
+        </Box>
+
+        {/* Credit Card Option */}
+        <Box
+          as="button"
+          type="button"
+          onClick={() => setPaymentType('card')}
+          p={5}
+          borderWidth="1px"
+          borderColor="#D1D5DB"
+          borderRadius="lg"
+          bg="white"
+          boxShadow="0 2px 4px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05)"
+          _hover={{
+            borderColor: '#A59480',
+            bg: '#FBFBFA',
+            boxShadow: "0 4px 8px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.08)"
+          }}
+          transition="all 0.2s"
+          textAlign="left"
+        >
+          <HStack spacing={3}>
+            <Icon as={CreditCard} boxSize={7} color="#A59480" />
+            <VStack align="start" spacing={0.5} flex={1}>
+              <Text fontSize="md" fontWeight="semibold" color="#1F1F1F">
+                Credit or Debit Card
+              </Text>
+              <Text fontSize="xs" color="#5A5A5A">
+                Visa, Mastercard, Amex, Discover
+              </Text>
+              <Text fontSize="xs" color="#DC2626" fontWeight="bold" mt={1}>
+                + 4% processing fee
+              </Text>
+            </VStack>
+          </HStack>
+        </Box>
       </VStack>
-    </form>
+    );
+  }
+
+  if (paymentType === 'card') {
+    return (
+      <form onSubmit={handleCardSubmit}>
+        <VStack spacing={6} align="stretch">
+          <Box>
+            <VStack align="stretch" spacing={2} mb={4}>
+              <Text fontSize="lg" fontWeight="semibold" color="#353535">
+                Card Information
+              </Text>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setPaymentType(null)}
+                color="#5A5A5A"
+                alignSelf="flex-start"
+                px={0}
+              >
+                Change Payment Method
+              </Button>
+            </VStack>
+
+            <Box
+              p={4}
+              borderWidth="1px"
+              borderColor="#ECEAE5"
+              borderRadius="lg"
+              bg="white"
+            >
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '16px',
+                      color: '#1F1F1F',
+                      '::placeholder': {
+                        color: '#8C7C6D',
+                      },
+                    },
+                  },
+                }}
+              />
+            </Box>
+
+            <Text fontSize="xs" color="#DC2626" mt={2}>
+              Note: A 4% processing fee will be added to credit card payments. To avoid this charge,{' '}
+              <Text
+                as="span"
+                textDecoration="underline"
+                cursor="pointer"
+                fontWeight="bold"
+                onClick={() => setPaymentType(null)}
+              >
+                use ACH
+              </Text>
+              {' '}instead.
+            </Text>
+          </Box>
+
+          <Button
+            type="submit"
+            size="lg"
+            bg="#A59480"
+            color="white"
+            _hover={{ bg: '#8F7F6B' }}
+            isLoading={submitting}
+            isDisabled={!stripe}
+            leftIcon={<Icon as={Check} />}
+            boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
+            minH="56px"
+          >
+            Complete Payment
+          </Button>
+        </VStack>
+      </form>
+    );
+  }
+
+  // ACH payment - uses Financial Connections
+  return (
+    <VStack spacing={6} align="stretch">
+      <Box>
+        <VStack align="stretch" spacing={2} mb={4}>
+          <Text fontSize="lg" fontWeight="semibold" color="#353535">
+            US Bank Account (ACH)
+          </Text>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setPaymentType(null)}
+            color="#5A5A5A"
+            alignSelf="flex-start"
+            px={0}
+          >
+            Change Payment Method
+          </Button>
+        </VStack>
+
+        <Box
+          p={6}
+          borderWidth="1px"
+          borderColor="#ECEAE5"
+          borderRadius="lg"
+          bg="#FBFBFA"
+          textAlign="center"
+        >
+          <Icon as={Building2} boxSize={12} color="#A59480" mb={3} />
+          <Text fontSize="sm" color="#1F1F1F" fontWeight="medium" mb={2}>
+            Connect Your Bank Account
+          </Text>
+          <Text fontSize="xs" color="#5A5A5A" mb={3}>
+            Click below to securely link your bank account using Stripe's secure connection.
+          </Text>
+          <Text fontSize="xs" color="#4CAF50" fontWeight="bold">
+            ✓ No processing fee for ACH payments
+          </Text>
+        </Box>
+      </Box>
+
+      <Button
+        onClick={handleAchSubmit}
+        size="lg"
+        bg="#A59480"
+        color="white"
+        _hover={{ bg: '#8F7F6B' }}
+        isLoading={submitting}
+        isDisabled={!stripe}
+        leftIcon={<Icon as={Building2} />}
+        boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
+        minH="56px"
+      >
+        {submitting ? 'Connecting...' : 'Connect Bank Account'}
+      </Button>
+    </VStack>
   );
 }
 
@@ -150,10 +430,19 @@ export default function OnboardingWizard({
     waitlistData.selected_membership || membershipPlans[0]?.type || ''
   );
 
-  // Step 3: Payment
+  // Step 3: Additional Members
+  const [additionalMembers, setAdditionalMembers] = useState<Array<{
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    dob: string;
+  }>>([]);
+
+  // Step 4: Payment
   const [clientSecret, setClientSecret] = useState('');
 
-  // Step 4: Profile
+  // Step 5: Profile
   const [photoUrl, setPhotoUrl] = useState('');
   const [bio, setBio] = useState('');
   const [preferences, setPreferences] = useState({
@@ -170,13 +459,21 @@ export default function OnboardingWizard({
         setCurrentStep(2);
       }
     } else if (currentStep === 2) {
-      if (await validateAndCreatePaymentIntent()) {
+      if (await validateMembershipSelection()) {
         setDirection('forward');
         setCurrentStep(3);
       }
     } else if (currentStep === 3) {
-      // Payment handled by PaymentForm
+      // Additional members step - save and continue to payment
+      if (await saveAdditionalMembers()) {
+        if (await validateAndCreatePaymentIntent()) {
+          setDirection('forward');
+          setCurrentStep(4);
+        }
+      }
     } else if (currentStep === 4) {
+      // Payment handled by PaymentForm
+    } else if (currentStep === 5) {
       await handleCompleteProfile();
     }
   };
@@ -203,16 +500,6 @@ export default function OnboardingWizard({
       toast({
         title: 'Signature Required',
         description: 'Please sign the agreement',
-        status: 'warning',
-        duration: 3000,
-      });
-      return false;
-    }
-
-    if (!agreed) {
-      toast({
-        title: 'Agreement Required',
-        description: 'Please agree to the terms',
         status: 'warning',
         duration: 3000,
       });
@@ -248,7 +535,7 @@ export default function OnboardingWizard({
     }
   };
 
-  const validateAndCreatePaymentIntent = async (): Promise<boolean> => {
+  const validateMembershipSelection = async (): Promise<boolean> => {
     if (!selectedMembership) {
       toast({
         title: 'Select Membership',
@@ -258,14 +545,60 @@ export default function OnboardingWizard({
       });
       return false;
     }
+    return true;
+  };
 
+  const saveAdditionalMembers = async (): Promise<boolean> => {
+    // Validate additional members if any were added
+    for (let i = 0; i < additionalMembers.length; i++) {
+      const member = additionalMembers[i];
+      if (!member.first_name || !member.last_name || !member.email || !member.phone || !member.dob) {
+        toast({
+          title: 'Incomplete Member Info',
+          description: `Please complete all fields for additional member #${i + 1}`,
+          status: 'warning',
+          duration: 3000,
+        });
+        return false;
+      }
+    }
+
+    // Save to waitlist record
+    try {
+      const response = await fetch('/api/onboard/save-additional-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          additional_members: additionalMembers
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save additional members');
+      }
+
+      return true;
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save additional members. Please try again.',
+        status: 'error',
+        duration: 5000,
+      });
+      return false;
+    }
+  };
+
+  const validateAndCreatePaymentIntent = async (): Promise<boolean> => {
     try {
       const response = await fetch('/api/payment/create-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,
-          membership_type: selectedMembership
+          membership_type: selectedMembership,
+          additional_members_count: additionalMembers.length
         })
       });
 
@@ -294,7 +627,7 @@ export default function OnboardingWizard({
 
   const handlePaymentSuccess = () => {
     setDirection('forward');
-    setCurrentStep(4);
+    setCurrentStep(5);
   };
 
   const today = new Date().toLocaleDateString('en-US', {
@@ -334,23 +667,17 @@ export default function OnboardingWizard({
     switch (currentStep) {
       case 1:
         return (
-          <VStack spacing={6} align="stretch">
-            <HStack justify="space-between" flexWrap="wrap" gap={2}>
-              <Badge colorScheme="purple" fontSize="sm" px={3} py={1}>
-                {waitlistData.first_name} {waitlistData.last_name}
-              </Badge>
-            </HStack>
-
-            <Divider />
-
+          <VStack spacing={4} align="stretch">
             <Box
-              maxH="300px"
+              maxH={{ base: "400px", md: "300px" }}
               overflowY="auto"
-              p={4}
+              p={{ base: 6, md: 4 }}
               bg="white"
               borderRadius="md"
               borderWidth="2px"
               borderColor="gray.300"
+              mx={{ base: -4, md: 0 }}
+              width={{ base: "calc(100% + 32px)", md: "100%" }}
             >
               <Text whiteSpace="pre-wrap" fontSize="sm" lineHeight="tall" color="#353535">
                 {agreementContent}
@@ -359,30 +686,32 @@ export default function OnboardingWizard({
 
             <Divider />
 
-            <FormControl isRequired>
-              <FormLabel>Full Name</FormLabel>
-              <Input
-                value={signerName}
-                onChange={(e) => setSignerName(e.target.value)}
-                size="lg"
-                bg="white"
-                borderWidth="2px"
-                _focus={{ borderColor: '#A59480' }}
-              />
-            </FormControl>
+            <VStack spacing={3} align="stretch">
+              <FormControl isRequired>
+                <FormLabel>Full Name</FormLabel>
+                <Input
+                  value={signerName}
+                  onChange={(e) => setSignerName(e.target.value)}
+                  size="lg"
+                  bg="white"
+                  borderWidth="2px"
+                  _focus={{ borderColor: '#A59480' }}
+                />
+              </FormControl>
 
-            <FormControl isRequired>
-              <FormLabel>Email Address</FormLabel>
-              <Input
-                type="email"
-                value={signerEmail}
-                onChange={(e) => setSignerEmail(e.target.value)}
-                size="lg"
-                bg="white"
-                borderWidth="2px"
-                _focus={{ borderColor: '#A59480' }}
-              />
-            </FormControl>
+              <FormControl isRequired>
+                <FormLabel>Email Address</FormLabel>
+                <Input
+                  type="email"
+                  value={signerEmail}
+                  onChange={(e) => setSignerEmail(e.target.value)}
+                  size="lg"
+                  bg="white"
+                  borderWidth="2px"
+                  _focus={{ borderColor: '#A59480' }}
+                />
+              </FormControl>
+            </VStack>
 
             <Box
               p={4}
@@ -405,17 +734,6 @@ export default function OnboardingWizard({
                 disabled={false}
               />
             </VStack>
-
-            <Checkbox
-              isChecked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              colorScheme="orange"
-              size="lg"
-            >
-              <Text fontSize="md" fontWeight="medium" color="#353535">
-                I agree to the terms of this agreement
-              </Text>
-            </Checkbox>
           </VStack>
         );
 
@@ -430,7 +748,7 @@ export default function OnboardingWizard({
               <VStack spacing={4} align="stretch">
                 {membershipPlans.map(plan => (
                   <Box
-                    key={plan.type}
+                    key={plan.id || plan.type}
                     p={5}
                     borderRadius="lg"
                     borderWidth="2px"
@@ -465,8 +783,161 @@ export default function OnboardingWizard({
                 ))}
               </VStack>
             </RadioGroup>
+          </VStack>
+        );
 
-            {selectedPlan && (
+      case 3:
+        return (
+          <VStack spacing={6} align="stretch">
+            <Text fontSize="xl" fontWeight="bold" color="#353535">
+              Add Additional Members (Optional)
+            </Text>
+
+            <Text fontSize="sm" color="gray.600">
+              {selectedMembership === 'Skyline'
+                ? 'Skyline members can add unlimited additional members at no extra cost!'
+                : 'Add additional members to your account for $25/month each.'}
+            </Text>
+
+            {/* Display existing additional members */}
+            {additionalMembers.map((member, index) => (
+              <Box
+                key={index}
+                p={4}
+                borderWidth="2px"
+                borderColor="#A59480"
+                borderRadius="lg"
+                bg="#A5948010"
+              >
+                <HStack justify="space-between" mb={3}>
+                  <Text fontSize="md" fontWeight="bold" color="#353535">
+                    Additional Member #{index + 1}
+                  </Text>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    color="red.500"
+                    onClick={() => {
+                      const newMembers = [...additionalMembers];
+                      newMembers.splice(index, 1);
+                      setAdditionalMembers(newMembers);
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </HStack>
+
+                <VStack spacing={3}>
+                  <HStack spacing={3} w="full">
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm">First Name</FormLabel>
+                      <Input
+                        value={member.first_name}
+                        onChange={(e) => {
+                          const newMembers = [...additionalMembers];
+                          newMembers[index].first_name = e.target.value;
+                          setAdditionalMembers(newMembers);
+                        }}
+                        size="md"
+                        bg="white"
+                        borderWidth="2px"
+                        _focus={{ borderColor: '#A59480' }}
+                      />
+                    </FormControl>
+
+                    <FormControl isRequired>
+                      <FormLabel fontSize="sm">Last Name</FormLabel>
+                      <Input
+                        value={member.last_name}
+                        onChange={(e) => {
+                          const newMembers = [...additionalMembers];
+                          newMembers[index].last_name = e.target.value;
+                          setAdditionalMembers(newMembers);
+                        }}
+                        size="md"
+                        bg="white"
+                        borderWidth="2px"
+                        _focus={{ borderColor: '#A59480' }}
+                      />
+                    </FormControl>
+                  </HStack>
+
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">Email</FormLabel>
+                    <Input
+                      type="email"
+                      value={member.email}
+                      onChange={(e) => {
+                        const newMembers = [...additionalMembers];
+                        newMembers[index].email = e.target.value;
+                        setAdditionalMembers(newMembers);
+                      }}
+                      size="md"
+                      bg="white"
+                      borderWidth="2px"
+                      _focus={{ borderColor: '#A59480' }}
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">Phone</FormLabel>
+                    <Input
+                      type="tel"
+                      value={member.phone}
+                      onChange={(e) => {
+                        const newMembers = [...additionalMembers];
+                        newMembers[index].phone = e.target.value;
+                        setAdditionalMembers(newMembers);
+                      }}
+                      size="md"
+                      bg="white"
+                      borderWidth="2px"
+                      _focus={{ borderColor: '#A59480' }}
+                      placeholder="(555) 555-5555"
+                    />
+                  </FormControl>
+
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">Date of Birth</FormLabel>
+                    <Input
+                      type="date"
+                      value={member.dob}
+                      onChange={(e) => {
+                        const newMembers = [...additionalMembers];
+                        newMembers[index].dob = e.target.value;
+                        setAdditionalMembers(newMembers);
+                      }}
+                      size="md"
+                      bg="white"
+                      borderWidth="2px"
+                      _focus={{ borderColor: '#A59480' }}
+                    />
+                  </FormControl>
+                </VStack>
+              </Box>
+            ))}
+
+            {/* Add member button */}
+            <Button
+              leftIcon={<Icon as={UserPlus} />}
+              onClick={() => {
+                setAdditionalMembers([
+                  ...additionalMembers,
+                  { first_name: '', last_name: '', email: '', phone: '', dob: '' }
+                ]);
+              }}
+              variant="outline"
+              borderWidth="2px"
+              borderColor="#A59480"
+              color="#A59480"
+              _hover={{ bg: '#A5948010' }}
+              size="lg"
+            >
+              Add Member
+            </Button>
+
+            {/* Pricing summary */}
+            {additionalMembers.length > 0 && (
               <Box
                 p={4}
                 bg="#A5948010"
@@ -474,15 +945,39 @@ export default function OnboardingWizard({
                 borderLeftWidth="4px"
                 borderLeftColor="#A59480"
               >
-                <Text fontSize="sm" fontWeight="medium">
-                  ✨ Selected: {selectedPlan.type} Membership - ${selectedPlan.base_fee}
-                </Text>
+                <VStack align="stretch" spacing={2}>
+                  <HStack justify="space-between">
+                    <Text fontSize="sm" fontWeight="medium">
+                      Base Membership ({selectedPlan?.type})
+                    </Text>
+                    <Text fontSize="sm" fontWeight="bold">
+                      ${selectedPlan?.base_fee}
+                    </Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text fontSize="sm" fontWeight="medium">
+                      Additional Members ({additionalMembers.length} × ${selectedMembership === 'Skyline' ? '0' : '25'})
+                    </Text>
+                    <Text fontSize="sm" fontWeight="bold">
+                      ${selectedMembership === 'Skyline' ? 0 : additionalMembers.length * 25}
+                    </Text>
+                  </HStack>
+                  <Divider />
+                  <HStack justify="space-between">
+                    <Text fontSize="md" fontWeight="bold" color="#353535">
+                      Total
+                    </Text>
+                    <Text fontSize="xl" fontWeight="bold" color="#A59480">
+                      ${selectedPlan?.base_fee + (selectedMembership === 'Skyline' ? 0 : additionalMembers.length * 25)}
+                    </Text>
+                  </HStack>
+                </VStack>
               </Box>
             )}
           </VStack>
         );
 
-      case 3:
+      case 4:
         return (
           <VStack spacing={6} align="stretch">
             <Text fontSize="xl" fontWeight="bold" color="#353535">
@@ -496,14 +991,37 @@ export default function OnboardingWizard({
               borderWidth="2px"
               borderColor="gray.300"
             >
-              <HStack justify="space-between">
-                <Text fontSize="md" fontWeight="medium">
-                  {selectedPlan?.type} Membership
-                </Text>
-                <Text fontSize="xl" fontWeight="bold" color="#A59480">
-                  ${selectedPlan?.base_fee}
-                </Text>
-              </HStack>
+              <VStack align="stretch" spacing={2}>
+                <HStack justify="space-between">
+                  <Text fontSize="md" fontWeight="medium">
+                    {selectedPlan?.type} Membership
+                  </Text>
+                  <Text fontSize="md" fontWeight="bold" color="#A59480">
+                    ${selectedPlan?.base_fee}
+                  </Text>
+                </HStack>
+                {additionalMembers.length > 0 && (
+                  <>
+                    <HStack justify="space-between">
+                      <Text fontSize="sm" color="gray.600">
+                        Additional Members ({additionalMembers.length})
+                      </Text>
+                      <Text fontSize="sm" fontWeight="medium">
+                        ${selectedMembership === 'Skyline' ? 0 : additionalMembers.length * 25}
+                      </Text>
+                    </HStack>
+                    <Divider />
+                    <HStack justify="space-between">
+                      <Text fontSize="lg" fontWeight="bold">
+                        Total
+                      </Text>
+                      <Text fontSize="xl" fontWeight="bold" color="#A59480">
+                        ${selectedPlan?.base_fee + (selectedMembership === 'Skyline' ? 0 : additionalMembers.length * 25)}
+                      </Text>
+                    </HStack>
+                  </>
+                )}
+              </VStack>
             </Box>
 
             {clientSecret && (
@@ -512,13 +1030,15 @@ export default function OnboardingWizard({
                   token={token}
                   selectedMembership={selectedMembership}
                   onSuccess={handlePaymentSuccess}
+                  clientSecret={clientSecret}
+                  waitlistData={waitlistData}
                 />
               </Elements>
             )}
           </VStack>
         );
 
-      case 4:
+      case 5:
         return (
           <VStack spacing={6} align="stretch">
             <VStack spacing={2} align="center">
@@ -645,7 +1165,7 @@ export default function OnboardingWizard({
                 {renderStepContent()}
 
                 {/* Navigation Buttons (not for payment or final step) */}
-                {currentStep !== 3 && (
+                {currentStep !== 4 && (
                   <HStack spacing={3} pt={4}>
                     <Button
                       leftIcon={<Icon as={ArrowLeft} />}
@@ -664,7 +1184,7 @@ export default function OnboardingWizard({
                       Back
                     </Button>
 
-                    {currentStep !== 4 && (
+                    {currentStep !== 5 && (
                       <Button
                         rightIcon={<Icon as={ArrowRight} />}
                         onClick={handleNext}
@@ -676,7 +1196,7 @@ export default function OnboardingWizard({
                         _hover={{ bg: '#8F7F6B' }}
                         boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
                       >
-                        Continue
+                        {currentStep === 1 ? 'I Accept' : 'Continue'}
                       </Button>
                     )}
                   </HStack>

@@ -22,6 +22,7 @@ export default function SubscriptionPlansManager() {
     monthly_price: '',
     interval: 'month',
     is_active: true,
+    show_in_onboarding: true,
     display_order: 0,
     description: ''
   });
@@ -71,6 +72,7 @@ export default function SubscriptionPlansManager() {
       monthly_price: '',
       interval: 'month',
       is_active: true,
+      show_in_onboarding: true,
       display_order: plans.length,
       description: ''
     });
@@ -86,6 +88,7 @@ export default function SubscriptionPlansManager() {
       monthly_price: plan.monthly_price.toString(),
       interval: plan.interval,
       is_active: plan.is_active,
+      show_in_onboarding: (plan as any).show_in_onboarding ?? true,
       display_order: plan.display_order,
       description: plan.description || ''
     });
@@ -221,6 +224,11 @@ export default function SubscriptionPlansManager() {
                   <span className={`${styles.planStatus} ${plan.is_active ? styles.active : styles.inactive}`}>
                     {plan.is_active ? 'Active' : 'Inactive'}
                   </span>
+                  {(plan as any).show_in_onboarding && (
+                    <span className={`${styles.planStatus} ${styles.onboarding}`} title="Visible in onboarding">
+                      📋 Onboarding
+                    </span>
+                  )}
                   <div className={styles.planPrice}>
                     <DollarSign size={14} />
                     ${plan.monthly_price.toFixed(2)}/{plan.interval}
@@ -428,6 +436,18 @@ export default function SubscriptionPlansManager() {
                   />
                   <label htmlFor="is_active" style={{ fontWeight: '500' }}>
                     Active (available for new subscriptions)
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.show_in_onboarding}
+                    onChange={(e) => setFormData({ ...formData, show_in_onboarding: e.target.checked })}
+                    id="show_in_onboarding"
+                  />
+                  <label htmlFor="show_in_onboarding" style={{ fontWeight: '500' }}>
+                    Show in onboarding (visible to new members during signup)
                   </label>
                 </div>
               </div>

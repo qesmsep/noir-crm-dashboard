@@ -6,13 +6,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Hardcoded membership plans (can move to database later)
-const MEMBERSHIP_PLANS = [
-  { type: 'Solo', base_fee: 50000, description: 'Individual membership - Perfect for solo professionals' },
-  { type: 'Duo', base_fee: 75000, description: 'Two-person membership - Ideal for partners' },
-  { type: 'Skyline', base_fee: 100000, description: 'Premium membership with exclusive benefits' },
-  { type: 'Annual', base_fee: 120000, description: 'Annual membership with best value' },
-];
+// Note: Membership plans are now pulled from database in the handler
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -55,6 +49,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Payment already completed' });
     }
 
+    // Get membership plans from database
+    const { data: membership_plans, error: plansError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('is_active', true)
+      .eq('show_in_onboarding', true)
+      .order('display_order', { ascending: true });
+
+    // Map to expected format
+    const formattedPlans = (membership_plans || []).map(plan => ({
+      type: plan.plan_name,
+      base_fee: Math.round(plan.monthly_price * 100), // Convert to cents
+      description: plan.description
+    }));
+
+    // Fallback if no plans found
+    const plans = formattedPlans.length > 0 ? formattedPlans : [
+      { type: 'Solo', base_fee: 50000, description: 'Individual membership' },
+      { type: 'Duo', base_fee: 75000, description: 'Two-person membership' }
+    ];
+
     return res.status(200).json({
       waitlist: {
         id: waitlist.id,
@@ -64,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         phone: waitlist.phone,
         selected_membership: waitlist.selected_membership
       },
-      membership_plans: MEMBERSHIP_PLANS
+      membership_plans: plans
     });
 
   } catch (error: any) {

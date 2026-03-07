@@ -11,21 +11,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
 });
 
-const MEMBERSHIP_FEES: Record<string, number> = {
-  'Solo': 50000,
-  'Duo': 75000,
-  'Skyline': 100000,
-  'Annual': 120000,
-};
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log('[CREATE INTENT] Request:', { method: req.method, body: req.body });
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { token, membership_type } = req.body;
+  const { token, membership_type, additional_members_count = 0 } = req.body;
 
   if (!token || !membership_type) {
+    console.log('[CREATE INTENT] Missing fields');
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -34,18 +30,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: waitlist, error: waitlistError } = await supabase
       .from('waitlist')
       .select('*')
-      .eq('application_token', token)
+      .or(`application_token.eq.${token},agreement_token.eq.${token}`)
       .single();
 
     if (waitlistError || !waitlist) {
+      console.log('[CREATE INTENT] Waitlist not found:', waitlistError);
       return res.status(404).json({ error: 'Invalid token' });
     }
 
-    // Get membership fee
-    const amount = MEMBERSHIP_FEES[membership_type];
-    if (!amount) {
+    console.log('[CREATE INTENT] Waitlist found:', waitlist.id);
+
+    // Get membership plan from database
+    const { data: plan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('plan_name', membership_type)
+      .eq('is_active', true)
+      .single();
+
+    if (planError || !plan) {
+      console.log('[CREATE INTENT] Plan not found:', membership_type);
       return res.status(400).json({ error: 'Invalid membership type' });
     }
+
+    // Convert monthly_price to cents
+    const basePlanAmount = Math.round(plan.monthly_price * 100);
+
+    // Calculate additional members fee ($25/month each, $0 for Skyline)
+    const additionalMemberFee = membership_type === 'Skyline' ? 0 : 25;
+    const additionalMembersAmount = Math.round(additional_members_count * additionalMemberFee * 100);
+
+    const amount = basePlanAmount + additionalMembersAmount;
+    console.log('[CREATE INTENT] Base amount:', basePlanAmount, 'Additional members:', additional_members_count, 'Additional amount:', additionalMembersAmount, 'Total:', amount);
 
     // Create or get Stripe customer
     let customerId = waitlist.stripe_customer_id;
@@ -83,11 +99,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         waitlist_id: waitlist.id,
         membership_type,
         token,
-        base_amount: amount,
+        base_amount: basePlanAmount,
+        additional_members_count: additional_members_count.toString(),
+        additional_members_amount: additionalMembersAmount.toString(),
         credit_card_fee: 0,
         fee_enabled: 'false'
       },
-      description: `Noir ${membership_type} Membership - ${waitlist.first_name} ${waitlist.last_name}`,
+      description: additional_members_count > 0
+        ? `Noir ${membership_type} Membership + ${additional_members_count} Additional Member${additional_members_count > 1 ? 's' : ''} - ${waitlist.first_name} ${waitlist.last_name}`
+        : `Noir ${membership_type} Membership - ${waitlist.first_name} ${waitlist.last_name}`,
       automatic_payment_methods: {
         enabled: true,
       },
@@ -106,7 +126,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       client_secret: paymentIntent.client_secret,
       amount,
-      baseAmount: amount,
+      baseAmount: basePlanAmount,
+      additionalMembersAmount,
+      additionalMembersCount: additional_members_count,
       creditCardFee: 0,
       feeMessage: 'No processing fee for initial membership payment'
     });

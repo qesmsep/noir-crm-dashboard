@@ -58,7 +58,7 @@ export default function OnboardPage() {
 
   if (loading) {
     return (
-      <Box minH="100vh" bg="#1F1F1F" display="flex" alignItems="center" justifyContent="center">
+      <Box minH="100vh" bg="#1F1F1F" display="flex" alignItems="center" justifyContent="center" suppressHydrationWarning>
         <Text color="white" fontSize="lg">Loading your onboarding...</Text>
       </Box>
     );
@@ -69,11 +69,11 @@ export default function OnboardPage() {
   }
 
   return (
-    <Box minH="100vh" bg="#1F1F1F" py={12}>
+    <Box minH="100vh" bg="#1F1F1F" py={{ base: 4, md: 12 }} suppressHydrationWarning>
       <Container maxW="container.lg">
         {/* Header */}
-        <VStack spacing={4} mb={12} textAlign="center">
-          <Box mb={4}>
+        <VStack spacing={2} mb={{ base: 6, md: 12 }} textAlign="center">
+          <Box mb={{ base: 2, md: 4 }}>
             <img
               src="/images/noir-wedding-day.png"
               alt="Noir"

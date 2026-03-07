@@ -54,38 +54,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'No active agreement found' });
     }
 
-    // Get membership plans (from config or database)
-    const membership_plans = [
-      {
-        type: 'Solo',
-        base_fee: 500,
-        monthly_credit: 50,
-        description: 'Individual membership for one'
-      },
-      {
-        type: 'Duo',
-        base_fee: 750,
-        monthly_credit: 75,
-        description: 'Membership for two people'
-      },
-      {
-        type: 'Skyline',
-        base_fee: 1000,
-        monthly_credit: 100,
-        description: 'Premium tier membership'
-      },
-      {
-        type: 'Annual',
-        base_fee: 1200,
-        monthly_credit: 100,
-        description: 'Annual prepay membership'
-      }
-    ];
+    // Get membership plans from database (only those marked to show in onboarding)
+    const { data: membership_plans, error: plansError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('is_active', true)
+      .eq('show_in_onboarding', true)
+      .order('display_order', { ascending: true });
+
+    if (plansError) {
+      console.error('Error fetching membership plans:', plansError);
+      // Fallback to default plans if database fails
+      const fallbackPlans = [
+        {
+          type: 'Solo',
+          plan_name: 'Solo',
+          base_fee: 500,
+          monthly_credit: 50,
+          description: 'Individual membership for one'
+        },
+        {
+          type: 'Duo',
+          plan_name: 'Duo',
+          base_fee: 750,
+          monthly_credit: 75,
+          description: 'Membership for two people'
+        }
+      ];
+      return res.status(200).json({
+        waitlist,
+        agreement,
+        membership_plans: fallbackPlans
+      });
+    }
+
+    // Map subscription_plans to expected format (plan_name -> type, monthly_price -> base_fee)
+    const formattedPlans = (membership_plans || []).map(plan => ({
+      ...plan,
+      type: plan.plan_name, // Map plan_name to type for backwards compatibility
+      base_fee: plan.monthly_price // Map monthly_price to base_fee for backwards compatibility
+    }));
 
     return res.status(200).json({
       waitlist,
       agreement,
-      membership_plans
+      membership_plans: formattedPlans
     });
   } catch (error: any) {
     console.error('Onboard validation error:', error);

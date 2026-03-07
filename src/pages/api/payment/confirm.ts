@@ -107,7 +107,7 @@ async function createMemberFromWaitlist(waitlist: any) {
       email: waitlist.email,
       phone: waitlist.phone,
       membership: waitlist.selected_membership || 'Solo',
-      monthly_credit: getMonthlyCreditForMembership(waitlist.selected_membership),
+      monthly_credit: await getMonthlyCreditForMembership(waitlist.selected_membership),
       stripe_customer_id: waitlist.stripe_customer_id,
       photo_url: waitlist.photo_url,
       deactivated: false
@@ -134,7 +134,19 @@ async function createMemberFromWaitlist(waitlist: any) {
 }
 
 // Helper function to get monthly credit based on membership
-function getMonthlyCreditForMembership(membership: string): number {
+async function getMonthlyCreditForMembership(membership: string): Promise<number> {
+  // Try to get from database first
+  const { data: plan } = await supabase
+    .from('subscription_plans')
+    .select('monthly_price')
+    .eq('plan_name', membership)
+    .single();
+
+  if (plan && plan.monthly_price) {
+    return plan.monthly_price;
+  }
+
+  // Fallback for legacy data
   const credits: Record<string, number> = {
     'Solo': 50,
     'Duo': 75,
