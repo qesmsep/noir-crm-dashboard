@@ -1,22 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Send, ExternalLink, Clock, Check, X, Eye, Info, AlertTriangle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Spinner } from '@/components/ui/spinner';
-import { Select } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from '@/components/ui/sheet';
-import { useToast } from '@/hooks/useToast';
+import React, { useState, useEffect, useCallback } from 'react';
+import WaitlistReviewDrawer from '../WaitlistReviewDrawer';
+import styles from '../../styles/Waitlist.module.css';
 
 interface WaitlistEntry {
   id: string;
@@ -25,163 +9,111 @@ interface WaitlistEntry {
   email: string;
   phone: string;
   company?: string;
-  occupation?: string;
-  industry?: string;
   referral?: string;
   how_did_you_hear?: string;
   why_noir?: string;
-  status: 'review' | 'approved' | 'denied' | 'waitlisted' | 'link_sent';
-  submitted_at: string;
-  reviewed_at?: string;
-  review_notes?: string;
+  occupation?: string;
+  industry?: string;
+  city_state?: string;
+  visit_frequency?: string;
+  go_to_drink?: string;
   application_token?: string;
   application_link_sent_at?: string;
   application_expires_at?: string;
   application_link_opened_at?: string;
+  status: 'review' | 'approved' | 'denied' | 'waitlisted' | 'archived';
+  submitted_at: string;
+  reviewed_at?: string;
+  review_notes?: string;
+  typeform_response_id?: string;
+}
+
+interface StatusCounts {
+  status: string;
+  count: number;
+}
+
+interface ToastState {
+  show: boolean;
+  message: string;
+  type: 'success' | 'error';
 }
 
 export default function WaitlistManager() {
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
+  const [statusCounts, setStatusCounts] = useState<StatusCounts[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<WaitlistEntry | null>(null);
-  const [reviewNotes, setReviewNotes] = useState('');
-  const [sendingSMS, setSendingSMS] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [toast, setToast] = useState<ToastState>({ show: false, message: '', type: 'success' });
 
-  const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [isLinkOpen, setIsLinkOpen] = useState(false);
-  const [isViewOpen, setIsViewOpen] = useState(false);
-  const { toast } = useToast();
+  const ITEMS_PER_PAGE = 20;
 
-  useEffect(() => {
-    loadWaitlistEntries();
-  }, [statusFilter]);
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
 
-  const loadWaitlistEntries = async () => {
+  const fetchWaitlist = useCallback(async () => {
+    setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter);
+      const params = new URLSearchParams({
+        limit: ITEMS_PER_PAGE.toString(),
+        offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString()
+      });
+
+      if (statusFilter) params.append('status', statusFilter);
+
+      const response = await fetch(`/api/waitlist?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-cache',
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (parseError) {
+          errorData = { error: errorText || 'Failed to fetch waitlist' };
+        }
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch waitlist`);
       }
 
-      const response = await fetch(`/api/waitlist/manage?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setWaitlistEntries(data.data);
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to load waitlist entries',
-          status: 'error',
-        });
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
       }
+
+      setWaitlistEntries(data.data || []);
+      setTotalCount(data.count || 0);
+      setStatusCounts(data.statusCounts || []);
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load waitlist entries',
-        status: 'error',
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch waitlist entries';
+      showToast(errorMessage, 'error');
+      setWaitlistEntries([]);
+      setTotalCount(0);
+      setStatusCounts([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, statusFilter]);
 
-  const handleReview = (entry: WaitlistEntry) => {
-    setSelectedEntry(entry);
-    setReviewNotes(entry.review_notes || '');
-    setIsReviewOpen(true);
-  };
+  useEffect(() => {
+    fetchWaitlist();
+  }, [fetchWaitlist]);
 
-  const handleGenerateLink = (entry: WaitlistEntry) => {
-    setSelectedEntry(entry);
-    setIsLinkOpen(true);
-  };
-
-  const handleViewEntry = (entry: WaitlistEntry) => {
-    setSelectedEntry(entry);
-    setIsViewOpen(true);
-  };
-
-  const submitReview = async (status: 'approved' | 'denied' | 'waitlisted') => {
-    if (!selectedEntry) return;
-
-    try {
-      const response = await fetch('/api/waitlist/manage', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedEntry.id,
-          status,
-          review_notes: reviewNotes
-        })
-      });
-
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: `Entry ${status} successfully`,
-          status: 'success',
-        });
-        setIsReviewOpen(false);
-        loadWaitlistEntries();
-      } else {
-        throw new Error('Failed to update entry');
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update entry',
-        status: 'error',
-      });
-    }
-  };
-
-  const generateAndSendLink = async () => {
-    if (!selectedEntry) return;
-
-    setSendingSMS(true);
-    try {
-      const response = await fetch('/api/waitlist/manage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedEntry.id,
-          action: 'generate_link'
-        })
-      });
-
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Application link generated and sent successfully',
-          status: 'success',
-        });
-        setIsLinkOpen(false);
-        loadWaitlistEntries();
-      } else {
-        throw new Error('Failed to generate link');
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to generate and send link',
-        status: 'error',
-      });
-    } finally {
-      setSendingSMS(false);
-    }
-  };
-
-  const getStatusVariant = (status: string): 'default' | 'secondary' | 'success' | 'error' | 'warning' => {
-    switch (status) {
-      case 'review': return 'warning';
-      case 'approved': return 'success';
-      case 'denied': return 'error';
-      case 'waitlisted': return 'secondary';
-      case 'link_sent': return 'default';
-      default: return 'secondary';
-    }
+  const handleStatusUpdate = () => {
+    fetchWaitlist();
+    showToast('Waitlist updated successfully', 'success');
   };
 
   const formatDate = (dateString: string) => {
@@ -194,525 +126,283 @@ export default function WaitlistManager() {
     });
   };
 
+  const formatPhone = (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    return phone;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'review': return styles.statusReview;
+      case 'approved': return styles.statusApproved;
+      case 'waitlisted': return styles.statusWaitlisted;
+      case 'denied': return styles.statusDenied;
+      case 'archived': return styles.statusArchived;
+      default: return '';
+    }
+  };
+
   const filteredEntries = waitlistEntries.filter(entry => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      entry.first_name.toLowerCase().includes(searchLower) ||
-      entry.last_name.toLowerCase().includes(searchLower) ||
-      entry.email.toLowerCase().includes(searchLower) ||
-      entry.phone.includes(searchTerm) ||
-      (entry.company && entry.company.toLowerCase().includes(searchLower))
-    );
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        entry.first_name.toLowerCase().includes(searchLower) ||
+        entry.last_name.toLowerCase().includes(searchLower) ||
+        entry.email.toLowerCase().includes(searchLower) ||
+        entry.company?.toLowerCase().includes(searchLower) ||
+        entry.occupation?.toLowerCase().includes(searchLower)
+      );
+    }
+    return true;
   });
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 py-8">
-        <Spinner size="lg" />
-        <p className="text-text-muted">Loading waitlist entries...</p>
-      </div>
-    );
-  }
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-2 w-full">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-          <Input
-            placeholder="Search entries..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Waitlist</h1>
+        <button onClick={fetchWaitlist} className={styles.refreshButton}>
+          <svg className={styles.refreshIcon} viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+          </svg>
+        </button>
+      </div>
+
+      <div className={styles.statusGrid}>
+        {statusCounts
+          .filter((statusCount) => statusCount.status !== 'waitlisted')
+          .map((statusCount) => (
+            <div key={statusCount.status} className={styles.statusCard}>
+              <div className={styles.statusLabel}>
+                {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
+              </div>
+              <div className={styles.statusNumber}>{statusCount.count}</div>
+            </div>
+          ))}
+      </div>
+
+      <div className={styles.filters}>
+        <div className={styles.filterButtons}>
+          <button
+            onClick={() => setStatusFilter('review')}
+            className={`${styles.filterButton} ${statusFilter === 'review' ? styles.filterButtonActive : ''}`}
+          >
+            Review
+          </button>
+          <button
+            onClick={() => setStatusFilter('approved')}
+            className={`${styles.filterButton} ${statusFilter === 'approved' ? styles.filterButtonActive : ''}`}
+          >
+            Approved
+          </button>
+          <button
+            onClick={() => setStatusFilter('archived')}
+            className={`${styles.filterButton} ${statusFilter === 'archived' ? styles.filterButtonActive : ''}`}
+          >
+            Archived
+          </button>
+          <button
+            onClick={() => setStatusFilter('')}
+            className={`${styles.filterButton} ${statusFilter === '' ? styles.filterButtonActive : ''}`}
+          >
+            All
+          </button>
         </div>
 
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="flex-1 md:max-w-[200px]"
-        >
-          <option value="all">All Statuses</option>
-          <option value="review">Review</option>
-          <option value="approved">Approved</option>
-          <option value="denied">Denied</option>
-          <option value="waitlisted">Waitlisted</option>
-          <option value="link_sent">Link Sent</option>
-        </Select>
+        <div className={styles.searchContainer}>
+          <svg className={styles.searchIcon} viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={styles.searchInput}
+          />
+        </div>
       </div>
 
-      {/* Desktop Table View */}
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-border-cream-1">
-        <table className="w-full">
-          <thead className="bg-bg-cream-1 border-b border-border-cream-1">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Name</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Contact</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Details</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Submitted</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Link Status</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-[#1F1F1F]">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white">
-            {filteredEntries.map((entry) => (
-              <tr key={entry.id} className="border-b border-border-cream-1 hover:bg-bg-cream-1/50 transition-colors">
-                <td className="px-4 py-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-semibold text-[#1F1F1F]">
-                      {entry.first_name} {entry.last_name}
-                    </span>
-                    {entry.company && (
-                      <span className="text-xs text-text-muted">{entry.company}</span>
-                    )}
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm text-[#1F1F1F]">{entry.email}</span>
-                    <span className="text-sm text-text-muted">{entry.phone}</span>
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  <div className="flex flex-col gap-1">
-                    {entry.occupation && (
-                      <span className="text-xs text-[#1F1F1F]">{entry.occupation}</span>
-                    )}
-                    {entry.referral && (
-                      <span className="text-xs text-blue-600">Ref: {entry.referral}</span>
-                    )}
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  <Badge variant={getStatusVariant(entry.status)}>
-                    {entry.status.replace('_', ' ')}
-                  </Badge>
-                </td>
-
-                <td className="px-4 py-4">
-                  <span className="text-sm text-[#1F1F1F]">{formatDate(entry.submitted_at)}</span>
-                </td>
-
-                <td className="px-4 py-4">
-                  <div className="flex flex-col gap-1">
-                    {entry.application_link_sent_at && (
-                      <span className="text-xs text-green-600">
-                        Sent {formatDate(entry.application_link_sent_at)}
-                      </span>
-                    )}
-                    {entry.application_link_opened_at && (
-                      <span className="text-xs text-blue-600">
-                        Opened {formatDate(entry.application_link_opened_at)}
-                      </span>
-                    )}
-                    {entry.application_expires_at && (
-                      <span className="text-xs text-orange-600">
-                        Expires {formatDate(entry.application_expires_at)}
-                      </span>
-                    )}
-                  </div>
-                </td>
-
-                <td className="px-4 py-4">
-                  <div className="flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => handleViewEntry(entry)}
-                      aria-label="View entry details"
-                      className="h-9 w-9"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-
-                    {entry.status === 'review' && (
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => handleReview(entry)}
-                        aria-label="Review entry"
-                        className="h-9 w-9 border-yellow-500 text-yellow-700 hover:bg-yellow-50"
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    )}
-
-                    {(entry.status === 'approved' || entry.status === 'link_sent') && (
-                      <Button
-                        size="icon"
-                        variant={entry.status === 'link_sent' ? 'outline' : 'default'}
-                        onClick={() => handleGenerateLink(entry)}
-                        aria-label="Generate and send application link"
-                        className="h-9 w-9"
-                        title="Generate and send application link"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {filteredEntries.length === 0 && (
-          <div className="py-8 text-center">
-            <p className="text-text-muted">No waitlist entries found</p>
+      <div className={styles.content}>
+        {loading ? (
+          <div className={styles.loading}>
+            <div className={styles.spinner} />
           </div>
-        )}
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="flex flex-col gap-3 md:hidden">
-        {filteredEntries.length === 0 ? (
-          <div className="py-8 text-center w-full">
-            <p className="text-text-muted">No waitlist entries found</p>
-          </div>
+        ) : filteredEntries.length === 0 ? (
+          <div className={styles.empty}>No waitlist entries found</div>
         ) : (
-          filteredEntries.map((entry) => (
-            <div
-              key={entry.id}
-              className="p-4 rounded-xl border border-border-cream-1 bg-white shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex flex-col gap-3">
-                {/* Name */}
-                <div>
-                  <span className="text-sm text-text-muted mb-1 block">Name</span>
-                  <p className="font-semibold text-base text-[#1F1F1F]">
+          <div className={styles.entriesList}>
+            {filteredEntries.map((entry) => (
+              <div key={entry.id} className={styles.entryCard}>
+                <div
+                  className={styles.entryCol}
+                  onClick={() => {
+                    setSelectedEntry(entry);
+                    setIsModalOpen(true);
+                  }}
+                >
+                  <div className={styles.entryName}>
                     {entry.first_name} {entry.last_name}
-                  </p>
-                  {entry.company && (
-                    <p className="text-xs text-text-muted">{entry.company}</p>
-                  )}
+                  </div>
+                  <span className={`${styles.statusBadge} ${getStatusColor(entry.status)}`}>
+                    {entry.status.toUpperCase()}
+                  </span>
                 </div>
-
-                {/* Contact */}
-                <div>
-                  <span className="text-sm text-text-muted mb-1 block">Contact</span>
-                  <p className="text-sm text-[#1F1F1F]">{entry.email}</p>
-                  <p className="text-sm text-text-muted">{entry.phone}</p>
+                <div
+                  className={styles.entryCol}
+                  onClick={() => {
+                    setSelectedEntry(entry);
+                    setIsModalOpen(true);
+                  }}
+                >
+                  {formatPhone(entry.phone)}
                 </div>
-
-                {/* Details */}
-                {(entry.occupation || entry.referral) && (
-                  <div>
-                    <span className="text-sm text-text-muted mb-1 block">Details</span>
-                    {entry.occupation && (
-                      <p className="text-sm text-[#1F1F1F]">{entry.occupation}</p>
-                    )}
-                    {entry.referral && (
-                      <p className="text-sm text-blue-600">Ref: {entry.referral}</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Status & Submitted */}
-                <div className="flex justify-between flex-wrap gap-2">
-                  <div>
-                    <span className="text-sm text-text-muted mb-1 block">Status</span>
-                    <Badge variant={getStatusVariant(entry.status)}>
-                      {entry.status.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                  <div>
-                    <span className="text-sm text-text-muted mb-1 block">Submitted</span>
-                    <p className="text-sm text-[#1F1F1F]">{formatDate(entry.submitted_at)}</p>
-                  </div>
+                <div
+                  className={styles.entryCol}
+                  onClick={() => {
+                    setSelectedEntry(entry);
+                    setIsModalOpen(true);
+                  }}
+                >
+                  {entry.referral || entry.how_did_you_hear || '-'}
                 </div>
-
-                {/* Link Status */}
-                {(entry.application_link_sent_at || entry.application_link_opened_at || entry.application_expires_at) && (
-                  <div>
-                    <span className="text-sm text-text-muted mb-1 block">Link Status</span>
-                    <div className="flex flex-col gap-1">
-                      {entry.application_link_sent_at && (
-                        <span className="text-xs text-green-600">
-                          Sent {formatDate(entry.application_link_sent_at)}
-                        </span>
-                      )}
-                      {entry.application_link_opened_at && (
-                        <span className="text-xs text-blue-600">
-                          Opened {formatDate(entry.application_link_opened_at)}
-                        </span>
-                      )}
-                      {entry.application_expires_at && (
-                        <span className="text-xs text-orange-600">
-                          Expires {formatDate(entry.application_expires_at)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t border-border-cream-1">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => handleViewEntry(entry)}
-                    aria-label="View entry details"
-                    className="h-11 w-11"
-                  >
-                    <Eye className="h-5 w-5" />
-                  </Button>
-
+                <div
+                  className={styles.entryCol}
+                  onClick={() => {
+                    setSelectedEntry(entry);
+                    setIsModalOpen(true);
+                  }}
+                >
+                  {formatDate(entry.submitted_at)}
+                </div>
+                <div className={styles.entryColActions}>
                   {entry.status === 'review' && (
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => handleReview(entry)}
-                      aria-label="Review entry"
-                      className="h-11 w-11 border-yellow-500 text-yellow-700 hover:bg-yellow-50"
-                    >
-                      <Check className="h-5 w-5" />
-                    </Button>
-                  )}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Approve ${entry.first_name} ${entry.last_name}?`)) {
+                          try {
+                            const response = await fetch('/api/waitlist', {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                id: entry.id,
+                                status: 'approved'
+                              }),
+                            });
 
-                  {(entry.status === 'approved' || entry.status === 'link_sent') && (
-                    <Button
-                      size="icon"
-                      variant={entry.status === 'link_sent' ? 'outline' : 'default'}
-                      onClick={() => handleGenerateLink(entry)}
-                      aria-label="Generate and send application link"
-                      className="h-11 w-11"
-                      title="Generate and send application link"
+                            const data = await response.json();
+
+                            if (response.ok) {
+                              showToast('Entry approved successfully', 'success');
+                              fetchWaitlist();
+                            } else {
+                              const errorMessage = data.message || data.error || 'Failed to approve entry';
+                              throw new Error(errorMessage);
+                            }
+                          } catch (error) {
+                            const errorMessage = error instanceof Error ? error.message : 'Failed to approve entry';
+                            showToast(errorMessage, 'error');
+                          }
+                        }
+                      }}
+                      className={styles.approveButton}
+                      title="Approve"
+                      aria-label="Approve entry"
                     >
-                      <Send className="h-5 w-5" />
-                    </Button>
+                      <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Approve
+                    </button>
+                  )}
+                  {entry.status !== 'archived' && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Archive ${entry.first_name} ${entry.last_name}? This will archive the inquiry and filter it out from the main view.`)) {
+                          try {
+                            const response = await fetch('/api/waitlist', {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                id: entry.id,
+                                status: 'archived'
+                              }),
+                            });
+
+                            const data = await response.json();
+
+                            if (response.ok) {
+                              showToast('Entry archived successfully', 'success');
+                              fetchWaitlist();
+                            } else {
+                              const errorMessage = data.message || data.error || 'Failed to archive entry';
+                              throw new Error(errorMessage);
+                            }
+                          } catch (error) {
+                            const errorMessage = error instanceof Error ? error.message : 'Failed to archive entry';
+                            showToast(errorMessage, 'error');
+                          }
+                        }
+                      }}
+                      className={styles.archiveIconButton}
+                      title="Archive"
+                      aria-label="Archive entry"
+                    >
+                      <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3.33334 5.83334H16.6667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M7.5 9.16667H12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M4.16667 5.83334L4.58334 14.1667C4.58334 15.0871 5.32959 15.8333 6.25001 15.8333H13.75C14.6704 15.8333 15.4167 15.0871 15.4167 14.1667L15.8333 5.83334" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M7.5 5.83334V4.16667C7.5 3.70643 7.8731 3.33334 8.33334 3.33334H11.6667C12.1269 3.33334 12.5 3.70643 12.5 4.16667V5.83334" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
                   )}
                 </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Review Sheet */}
-      <Sheet open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-        <SheetContent className="bg-[#ECEDE8] text-[#353535] w-full sm:max-w-[540px]">
-          <SheetHeader>
-            <SheetTitle className="text-[#353535]">
-              Review Waitlist Entry: {selectedEntry?.first_name} {selectedEntry?.last_name}
-            </SheetTitle>
-          </SheetHeader>
+      {totalPages > 1 && (
+        <div className={styles.pagination}>
+          <button
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className={styles.paginationButton}
+          >
+            Previous
+          </button>
+          <span className={styles.paginationText}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className={styles.paginationButton}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
-          <div className="flex flex-col gap-4 mt-6">
-            {selectedEntry && (
-              <div className="bg-white p-4 rounded-lg border border-gray-300">
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm"><strong>Email:</strong> {selectedEntry.email}</p>
-                  <p className="text-sm"><strong>Phone:</strong> {selectedEntry.phone}</p>
-                  {selectedEntry.company && (
-                    <p className="text-sm"><strong>Company:</strong> {selectedEntry.company}</p>
-                  )}
-                  {selectedEntry.occupation && (
-                    <p className="text-sm"><strong>Occupation:</strong> {selectedEntry.occupation}</p>
-                  )}
-                  {selectedEntry.why_noir && (
-                    <p className="text-sm"><strong>Why Noir:</strong> {selectedEntry.why_noir}</p>
-                  )}
-                </div>
-              </div>
-            )}
+      {toast.show && (
+        <div className={`${styles.toast} ${styles[toast.type]}`}>
+          {toast.message}
+        </div>
+      )}
 
-            <div className="space-y-2">
-              <Label htmlFor="review-notes" className="text-[#353535]">Review Notes</Label>
-              <Textarea
-                id="review-notes"
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder="Add notes about this review..."
-                rows={3}
-                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <SheetFooter className="mt-6 gap-3 sm:gap-3">
-            <Button
-              variant="destructive"
-              onClick={() => submitReview('denied')}
-              className="flex items-center gap-2"
-            >
-              <X className="h-4 w-4" />
-              Deny
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => submitReview('waitlisted')}
-            >
-              Waitlist
-            </Button>
-            <Button
-              variant="default"
-              onClick={() => submitReview('approved')}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-            >
-              <Check className="h-4 w-4" />
-              Approve
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      {/* Application Link Sheet */}
-      <Sheet open={isLinkOpen} onOpenChange={setIsLinkOpen}>
-        <SheetContent className="bg-[#ECEDE8] text-[#353535] w-full sm:max-w-[540px]">
-          <SheetHeader>
-            <SheetTitle className="text-[#353535]">
-              Send Application Link: {selectedEntry?.first_name} {selectedEntry?.last_name}
-            </SheetTitle>
-          </SheetHeader>
-
-          <div className="flex flex-col gap-4 mt-6">
-            <Alert variant="info">
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                <div className="flex flex-col gap-1">
-                  <p className="font-bold text-[#353535]">
-                    Generate and send application link via SMS
-                  </p>
-                  <p className="text-sm text-[#353535]">
-                    This will create a unique application link that expires in 7 days and send it to {selectedEntry?.phone}
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
-
-            {selectedEntry?.application_link_sent_at && (
-              <Alert variant="warning">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <p className="text-sm text-[#353535]">
-                    A link was previously sent on {formatDate(selectedEntry.application_link_sent_at)}.
-                    Sending a new link will invalidate the previous one.
-                  </p>
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <SheetFooter className="mt-6 gap-3 sm:gap-3">
-            <Button onClick={() => setIsLinkOpen(false)} variant="outline">
-              Cancel
-            </Button>
-            <Button
-              onClick={generateAndSendLink}
-              disabled={sendingSMS}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-            >
-              {sendingSMS ? (
-                <>
-                  <Spinner size="sm" variant="light" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4" />
-                  Generate & Send Link
-                </>
-              )}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      {/* View Entry Sheet */}
-      <Sheet open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <SheetContent className="bg-[#ECEDE8] text-[#353535] w-full sm:max-w-[540px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="text-[#353535]">
-              Entry Details: {selectedEntry?.first_name} {selectedEntry?.last_name}
-            </SheetTitle>
-          </SheetHeader>
-
-          {selectedEntry && (
-            <div className="flex flex-col gap-4 mt-6">
-              <div className="bg-white p-4 rounded-lg border border-gray-300">
-                <p className="font-bold mb-3 text-[#353535]">Contact Information</p>
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm"><strong>Name:</strong> {selectedEntry.first_name} {selectedEntry.last_name}</p>
-                  <p className="text-sm"><strong>Email:</strong> {selectedEntry.email}</p>
-                  <p className="text-sm"><strong>Phone:</strong> {selectedEntry.phone}</p>
-                  {selectedEntry.company && (
-                    <p className="text-sm"><strong>Company:</strong> {selectedEntry.company}</p>
-                  )}
-                  {selectedEntry.occupation && (
-                    <p className="text-sm"><strong>Occupation:</strong> {selectedEntry.occupation}</p>
-                  )}
-                  {selectedEntry.industry && (
-                    <p className="text-sm"><strong>Industry:</strong> {selectedEntry.industry}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-lg border border-gray-300">
-                <p className="font-bold mb-3 text-[#353535]">Application Details</p>
-                <div className="flex flex-col gap-2">
-                  {selectedEntry.referral && (
-                    <p className="text-sm"><strong>Referral:</strong> {selectedEntry.referral}</p>
-                  )}
-                  {selectedEntry.how_did_you_hear && (
-                    <p className="text-sm"><strong>How did you hear:</strong> {selectedEntry.how_did_you_hear}</p>
-                  )}
-                  {selectedEntry.why_noir && (
-                    <p className="text-sm"><strong>Why Noir:</strong> {selectedEntry.why_noir}</p>
-                  )}
-                  <p className="text-sm flex items-center gap-2">
-                    <strong>Status:</strong>
-                    <Badge variant={getStatusVariant(selectedEntry.status)}>
-                      {selectedEntry.status.replace('_', ' ')}
-                    </Badge>
-                  </p>
-                  <p className="text-sm"><strong>Submitted:</strong> {formatDate(selectedEntry.submitted_at)}</p>
-                  {selectedEntry.reviewed_at && (
-                    <p className="text-sm"><strong>Reviewed:</strong> {formatDate(selectedEntry.reviewed_at)}</p>
-                  )}
-                </div>
-              </div>
-
-              {selectedEntry.review_notes && (
-                <div className="bg-white p-4 rounded-lg border border-gray-300">
-                  <p className="font-bold mb-3 text-[#353535]">Review Notes</p>
-                  <p className="text-sm">{selectedEntry.review_notes}</p>
-                </div>
-              )}
-
-              <div className="bg-white p-4 rounded-lg border border-gray-300">
-                <p className="font-bold mb-3 text-[#353535]">Application Link Status</p>
-                <div className="flex flex-col gap-2">
-                  {selectedEntry.application_link_sent_at ? (
-                    <>
-                      <p className="text-sm text-green-600">✓ Link sent on {formatDate(selectedEntry.application_link_sent_at)}</p>
-                      {selectedEntry.application_link_opened_at && (
-                        <p className="text-sm text-blue-600">✓ Link opened on {formatDate(selectedEntry.application_link_opened_at)}</p>
-                      )}
-                      {selectedEntry.application_expires_at && (
-                        <p className="text-sm text-orange-600">⚠ Expires on {formatDate(selectedEntry.application_expires_at)}</p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-sm text-text-muted">No application link sent yet</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <SheetFooter className="mt-6">
-            <Button onClick={() => setIsViewOpen(false)} variant="outline">
-              Close
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      <WaitlistReviewDrawer
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        entry={selectedEntry}
+        onStatusUpdate={handleStatusUpdate}
+      />
     </div>
   );
 }
