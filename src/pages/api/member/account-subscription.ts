@@ -67,17 +67,40 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to fetch subscription data' });
     }
 
-    // Count secondary members to calculate additional member fees
-    const { data: members, error: membersError } = await supabaseAdmin
+    // Get all members for this account to determine pricing
+    const { data: allMembers, error: membersError } = await supabaseAdmin
       .from('members')
-      .select('member_id, member_type')
+      .select('member_id, member_type, membership')
       .eq('account_id', member.account_id)
-      .eq('member_type', 'secondary')
       .eq('deactivated', false);
 
-    const actualSecondaryCount = members?.length || 0;
+    if (membersError) {
+      console.error('Error fetching members:', membersError);
+      return res.status(500).json({ error: 'Failed to fetch member data' });
+    }
 
-    // Fetch Stripe subscription to get actual base price
+    // Find primary member to get membership type
+    const primaryMember = allMembers?.find(m => m.member_type === 'primary');
+    const membershipType = primaryMember?.membership;
+
+    // Count secondary members
+    const actualSecondaryCount = allMembers?.filter(m => m.member_type === 'secondary').length || 0;
+
+    // Determine base MRR from membership type
+    const getMembershipPrice = (membershipType: string | null | undefined): number => {
+      switch (membershipType) {
+        case 'Skyline':
+          return 250; // Base Skyline price
+        case 'Duo':
+          return 175; // Duo price
+        case 'Solo':
+          return 150; // Solo price
+        default:
+          return 0;
+      }
+    };
+
+    // Fetch Stripe subscription to get actual base price, or fall back to membership type pricing
     let baseMRR = 0;
     let secondaryMemberCount = actualSecondaryCount;
 
@@ -90,16 +113,17 @@ export default async function handler(
         if (subscription?.items?.data?.[0]?.price?.unit_amount) {
           baseMRR = subscription.items.data[0].price.unit_amount / 100;
         } else {
-          console.error('Stripe subscription missing price data:', account.stripe_subscription_id);
-          return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
+          console.warn('Stripe subscription missing price data, using membership type pricing:', account.stripe_subscription_id);
+          baseMRR = getMembershipPrice(membershipType);
         }
       } catch (err: any) {
-        console.error('Error fetching subscription price:', err);
-        return res.status(500).json({ error: 'Unable to fetch subscription pricing from Stripe' });
+        console.warn('Error fetching subscription price from Stripe, using membership type pricing:', err.message);
+        // Fall back to membership type pricing if Stripe fails
+        baseMRR = getMembershipPrice(membershipType);
       }
     } else {
-      // No subscription ID
-      return res.status(404).json({ error: 'No subscription found for this account' });
+      // No subscription ID, use membership type pricing
+      baseMRR = getMembershipPrice(membershipType);
     }
 
     res.status(200).json({
