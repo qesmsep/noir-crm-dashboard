@@ -65,15 +65,21 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to fetch member data' });
     }
 
-    // Find primary member
+    // Find primary member for renewal date and membership type
     const primaryMember = allMembers?.find(m => m.member_type === 'primary');
+    const membershipType = primaryMember?.membership;
 
-    // Calculate base MRR from primary member's monthly_dues
-    const baseMRR = primaryMember?.monthly_dues || 0;
+    // Base MRR comes from ACCOUNT table only
+    const baseMRR = account.monthly_dues || 0;
 
-    // Count secondary members and calculate their total
+    // Count secondary members
     const secondaryMembers = allMembers?.filter(m => m.member_type === 'secondary') || [];
     const secondaryMemberCount = secondaryMembers.length;
+
+    // Calculate additional member fees based on membership type
+    // Skyline: 1 additional member at $0/month (unlimited members included)
+    // Solo/Duo: $25/month per additional member
+    const additionalMemberFee = membershipType === 'Skyline' ? 0 : 25;
 
     // Get next renewal date from primary member or account
     const nextRenewalDate = primaryMember?.next_renewal_date || account.next_billing_date;
@@ -85,6 +91,8 @@ export default async function handler(
       },
       baseMRR: Number(baseMRR),
       secondaryMemberCount,
+      additionalMemberFee, // $0 for Skyline, $25 for Solo/Duo
+      membershipType,
     });
   } catch (error) {
     console.error('Account subscription error:', error);

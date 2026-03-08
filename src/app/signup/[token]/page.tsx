@@ -164,7 +164,7 @@ export default function SignupPage() {
 
   if (loading) {
     return (
-      <Box minH="100vh" bg="#1F1F1F" display="flex" alignItems="center" justifyContent="center">
+      <Box minH="100vh" bg="#1F1F1F" display="flex" alignItems="center" justifyContent="center" suppressHydrationWarning>
         <Text color="white" fontSize="lg">Validating your invitation...</Text>
       </Box>
     );
@@ -175,7 +175,7 @@ export default function SignupPage() {
   }
 
   return (
-    <Box minH="100vh" bg="#1F1F1F" py={12}>
+    <Box minH="100vh" bg="#1F1F1F" py={12} suppressHydrationWarning>
       <Container maxW="container.md">
         {/* Header */}
         <VStack spacing={4} mb={12} textAlign="center">

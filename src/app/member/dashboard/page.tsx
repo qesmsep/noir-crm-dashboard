@@ -613,10 +613,11 @@ export default function MemberDashboardPage() {
               <CardContent className="space-y-3">
                 <div className="bg-[#F6F5F2] rounded-lg p-3">
                   {(() => {
-                    // Use API-provided values (matching admin logic exactly)
+                    // Use API-provided values - everything from database
                     const baseMRR = subscriptionData?.baseMRR || 0;
                     const secondaryMemberCount = subscriptionData?.secondaryMemberCount || 0;
-                    const additionalMemberFees = secondaryMemberCount * 25;
+                    const additionalMemberFee = subscriptionData?.additionalMemberFee || 0; // $0 for Skyline, $25 for Solo/Duo
+                    const additionalMemberFees = secondaryMemberCount * additionalMemberFee;
                     const total = baseMRR + additionalMemberFees;
 
                     return (
@@ -629,7 +630,9 @@ export default function MemberDashboardPage() {
                           </div>
                           {secondaryMemberCount > 0 && (
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-[#8C7C6D]">Additional Members ({secondaryMemberCount} × $25)</span>
+                              <span className="text-[#8C7C6D]">
+                                Additional Members ({secondaryMemberCount} × ${additionalMemberFee.toFixed(0)})
+                              </span>
                               <span className="text-[#5A5A5A] font-medium">${additionalMemberFees.toFixed(2)}/mo</span>
                             </div>
                           )}
