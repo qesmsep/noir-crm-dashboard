@@ -73,17 +73,17 @@ export default async function handler(
     }
 
     // Calculate running balance for each transaction (same logic as admin)
+    // NOTE: In the database, purchase amounts are stored as negative values
+    // So we just sum the amounts directly without flipping signs
     let runningBalance = 0;
     const transactionsWithBalance = (transactions || []).map((transaction) => {
       const amount = parseFloat(transaction.amount.toString());
 
-      // Determine if this is a credit or debit
-      // Credits: payment, credit (add to balance)
-      // Debits: purchase, charge, debit (subtract from balance)
-      const isCredit = transaction.type === 'payment' || transaction.type === 'credit';
-      const signedAmount = isCredit ? amount : -amount;
+      // Add amount directly (purchases are already negative in DB)
+      runningBalance += amount;
 
-      runningBalance += signedAmount;
+      // Determine transaction_type for display based on actual sign
+      const isCredit = amount > 0;
 
       return {
         ...transaction,
