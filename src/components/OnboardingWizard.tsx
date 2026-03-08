@@ -995,7 +995,7 @@ export default function OnboardingWizard({
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email Address"
+                placeholder="youremail@email.com"
                 size="lg"
                 bg="white"
                 borderWidth="2px"
@@ -1021,7 +1021,7 @@ export default function OnboardingWizard({
                   }
                   setPhone(formatted);
                 }}
-                placeholder="(555) 555-5555"
+                placeholder="(987) 654-3210"
                 maxLength={14}
                 size="lg"
                 bg="white"
@@ -1031,11 +1031,11 @@ export default function OnboardingWizard({
             </FormControl>
 
             <FormControl isRequired>
+              <FormLabel fontSize="sm" color="#5A5A5A" mb={1}>Date of Birth</FormLabel>
               <Input
                 type="date"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
-                placeholder="Date of Birth"
                 size="lg"
                 bg="white"
                 borderWidth="2px"

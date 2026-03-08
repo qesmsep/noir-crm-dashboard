@@ -318,12 +318,12 @@ export default function AdditionalMemberModal({
             </FormControl>
 
             <FormControl isRequired>
+              <FormLabel fontSize="sm" color="#5A5A5A" mb={1}>Date of Birth</FormLabel>
               <Input
                 type="date"
                 name="dob"
                 value={formData.dob}
                 onChange={handleInputChange}
-                placeholder="Date of Birth"
                 bg="white"
                 borderWidth="2px"
                 _focus={{ borderColor: '#A59480' }}
