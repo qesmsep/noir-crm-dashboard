@@ -586,7 +586,7 @@ export default function MemberDashboardPage() {
                 {/* Referral Link */}
                 {member?.referral_code && (
                   <a
-                    href={`sms:?&body=Join me at NOIR KC! Use my referral link: https://noirkc.com/refer/${member.referral_code}`}
+                    href={`sms:?&body=Please join me as a member of Noir. Use the following link to bypass the waitlist and we both receive an additional $50 credit to enjoy: https://noirkc.com/refer/${member.referral_code}`}
                     onClick={(e) => e.stopPropagation()}
                     className="block bg-gradient-to-r from-[#A59480] to-[#8C7C6D] hover:from-[#8C7C6D] hover:to-[#7A6B5D] text-white rounded-lg p-4 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)]"
                   >
