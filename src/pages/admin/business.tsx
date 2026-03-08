@@ -519,7 +519,7 @@ export default function BusinessDashboard() {
               onChange={e => setSelectedMonth(e.target.value)}
             >
               {monthOptions.map(m => (
-                <option key={m} value={m}>{fmtMonthLabel(m)}</option>
+                <option key={m} value={m}>{fmtMonthRange(m)}</option>
               ))}
             </select>
             <button
