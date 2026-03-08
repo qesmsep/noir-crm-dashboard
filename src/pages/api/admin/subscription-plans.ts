@@ -95,9 +95,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   } = req.body;
 
   // Validation
-  if (!plan_name || !stripe_product_id || !stripe_price_id || !monthly_price || !interval) {
+  if (!plan_name || !monthly_price || !interval) {
     return res.status(400).json({
-      error: 'Missing required fields: plan_name, stripe_product_id, stripe_price_id, monthly_price, interval'
+      error: 'Missing required fields: plan_name, monthly_price, interval'
     });
   }
 
@@ -121,8 +121,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     .from('subscription_plans')
     .insert({
       plan_name,
-      stripe_product_id,
-      stripe_price_id,
+      stripe_product_id: stripe_product_id || null,
+      stripe_price_id: stripe_price_id || null,
       monthly_price: parseFloat(monthly_price),
       interval,
       is_active: is_active !== undefined ? is_active : true,
