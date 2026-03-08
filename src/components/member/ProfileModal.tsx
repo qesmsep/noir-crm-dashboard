@@ -43,6 +43,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [loading, setLoading] = useState(false);
   const [accountMembers, setAccountMembers] = useState<AccountMember[]>([]);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     first_name: member?.first_name || '',
@@ -57,10 +58,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     confirmPassword: '',
   });
 
-  // Fetch account members when modal opens
+  // Fetch account members and subscription data when modal opens
   useEffect(() => {
     if (isOpen && member) {
       fetchAccountMembers();
+      fetchSubscriptionData();
     }
   }, [isOpen, member]);
 
@@ -76,6 +78,21 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       }
     } catch (error) {
       console.error('Error fetching account members:', error);
+    }
+  };
+
+  const fetchSubscriptionData = async () => {
+    try {
+      const response = await fetch('/api/member/account-subscription', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionData(data.subscription);
+      }
+    } catch (error) {
+      console.error('Error fetching subscription data:', error);
     }
   };
 
@@ -471,7 +488,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <div>
                 <p className="text-xs text-[#5A5A5A] font-semibold">Next Renewal</p>
                 <p className="text-xs text-[#1F1F1F] font-medium">
-                  {(member as any)?.next_renewal_date ? new Date((member as any).next_renewal_date).toLocaleDateString('en-US', {
+                  {subscriptionData?.next_renewal_date ? new Date(subscriptionData.next_renewal_date).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric'

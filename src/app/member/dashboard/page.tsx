@@ -341,14 +341,14 @@ export default function MemberDashboardPage() {
         <div className="flex flex-col gap-6">
           {/* Welcome Header */}
           <div>
-            <h1 className="text-3xl md:text-4xl text-[#1F1F1F] mb-2" style={{ fontFamily: 'CONEBARS' }}>
+            <h1 className="text-3xl md:text-4xl text-[#1F1F1F] -mb-2" style={{ fontFamily: 'CONEBARS' }}>
               Welcome back, {member.first_name}
             </h1>
           </div>
 
           {/* Profile Card - Moved to Top */}
           <Card
-            className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+            className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer pt-0 pb-0"
             onClick={() => setIsProfileModalOpen(true)}
           >
             <CardHeader className="pb-0">
@@ -660,7 +660,6 @@ export default function MemberDashboardPage() {
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-[#8C7C6D]">Click to manage membership & members</p>
               </CardContent>
             </Card>
 

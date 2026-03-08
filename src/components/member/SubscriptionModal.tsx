@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/useToast';
 import { CreditCard, Users, Plus } from 'lucide-react';
+import { useMemberAuth } from '@/context/MemberAuthContext';
 import UpdatePaymentModal from '../UpdatePaymentModal';
 import AddSecondaryMemberModal from '../AddSecondaryMemberModal';
 
@@ -24,6 +25,7 @@ interface SubscriptionModalProps {
 
 function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionModalProps) {
   const { toast } = useToast();
+  const { member } = useMemberAuth();
   const [loading, setLoading] = useState(true);
   const [subscriptionData, setSubscriptionData] = useState<any>(null);
   const [accountMembers, setAccountMembers] = useState<any[]>([]);
@@ -31,6 +33,7 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
   const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
+  const [copiedReferralLink, setCopiedReferralLink] = useState(false);
 
   useEffect(() => {
     if (isOpen && accountId) {
@@ -116,9 +119,24 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
     return `$${amount.toFixed(2)}`;
   };
 
+  const handleCopyReferralLink = async () => {
+    if (!member?.referral_code) return;
+
+    const referralLink = `https://noirkc.com/refer/${member.referral_code}`;
+
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopiedReferralLink(true);
+      setTimeout(() => setCopiedReferralLink(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy referral link:', err);
+    }
+  };
+
   const baseMRR = subscriptionData?.baseMRR || 0;
   const secondaryMemberCount = subscriptionData?.secondaryMemberCount || 0;
-  const additionalMemberFees = secondaryMemberCount * 25;
+  const additionalMemberFee = subscriptionData?.additionalMemberFee || 0; // $0 for Skyline, $25 for Solo/Duo
+  const additionalMemberFees = secondaryMemberCount * additionalMemberFee;
   const total = baseMRR + additionalMemberFees;
 
   return (
@@ -164,7 +182,7 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
                     {secondaryMemberCount > 0 && (
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-[#8C7C6D]">
-                          Additional Members ({secondaryMemberCount} × $25)
+                          Additional Members ({secondaryMemberCount} × ${additionalMemberFee.toFixed(0)})
                         </span>
                         <span className="text-xs font-medium text-[#1F1F1F]">{formatCurrency(additionalMemberFees)}/mo</span>
                       </div>
@@ -213,6 +231,21 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
                   </div>
                 </div>
 
+                {/* Referral Link */}
+                {member?.referral_code && (
+                  <a
+                    href={`sms:?&body=Join me at NOIR KC! Use my referral link: https://noirkc.com/refer/${member.referral_code}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="block bg-gradient-to-r from-[#A59480] to-[#8C7C6D] hover:from-[#8C7C6D] hover:to-[#7A6B5D] text-white rounded-lg p-4 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)]"
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <p className="text-2xl" style={{ fontFamily: 'CONEBARS' }}>Share Noir</p>
+                      <p className="text-xs font-normal">(click here to send text)</p>
+                      <p className="text-[10px] font-normal"><span className="font-bold">Referral Link:</span> noirkc.com/refer/{member.referral_code}</p>
+                    </div>
+                  </a>
+                )}
+
                 {/* Members Section */}
                 <div className="bg-white rounded-xl p-4 border border-[#ECEAE5]">
                   <div className="flex items-center justify-between mb-3">
@@ -247,7 +280,9 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
                         {member.member_type === 'primary' ? (
                           <Badge className="bg-[#4CAF50] text-white text-[10px] px-2 py-0.5">Primary</Badge>
                         ) : (
-                          <Badge className="bg-[#DAD7D0] text-[#5A5A5A] text-[10px] px-2 py-0.5">+$25/mo</Badge>
+                          <Badge className="bg-[#DAD7D0] text-[#5A5A5A] text-[10px] px-2 py-0.5">
+                            {additionalMemberFee > 0 ? `+$${additionalMemberFee.toFixed(0)}/mo` : 'Included'}
+                          </Badge>
                         )}
                       </div>
                     ))}

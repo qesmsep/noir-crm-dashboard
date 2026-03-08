@@ -130,7 +130,7 @@ export default function BalanceModal({ isOpen, onClose, memberId, accountId }: B
             <DialogTitle className="text-2xl font-semibold text-[#1F1F1F]">
               Account Balance
             </DialogTitle>
-            <DialogDescription className="text-sm text-[#5A5A5A] mt-1">
+            <DialogDescription className="sr-only">
               View your current balance and transaction history
             </DialogDescription>
           </DialogHeader>
