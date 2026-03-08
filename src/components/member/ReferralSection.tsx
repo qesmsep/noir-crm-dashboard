@@ -18,7 +18,8 @@ export default function ReferralSection({ referralCode, referralCount, memberId 
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const referralLink = `https://noirbk.com/refer/${referralCode}`;
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const referralLink = `${baseUrl}/refer/${referralCode}`;
 
   const copyToClipboard = async () => {
     try {

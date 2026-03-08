@@ -518,7 +518,8 @@ export default function MemberDetailAdmin() {
 
   // Copy referral link handler
   const handleCopyReferralLink = async (memberId: string, referralCode: string) => {
-    const referralLink = `https://noirbk.com/refer/${referralCode}`;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const referralLink = `${baseUrl}/refer/${referralCode}`;
 
     try {
       await navigator.clipboard.writeText(referralLink);
@@ -1789,7 +1790,9 @@ export default function MemberDetailAdmin() {
                                 <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
                                   <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
                                 </svg>
-                                <span style={{ flex: 1 }}>noirbk.com/refer/{member.referral_code}</span>
+                                <span style={{ flex: 1 }}>
+                                  {typeof window !== 'undefined' && window.location.host}/refer/{member.referral_code}
+                                </span>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
