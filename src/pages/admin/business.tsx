@@ -590,7 +590,7 @@ export default function BusinessDashboard() {
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.revenueChurnRate)}</div>
                 <div className={styles.kpiLabel}>Rev Churn %</div>
-                <div className={styles.kpiHint}>Revenue Churn ({fmtMonthLabel(s.month)}) — Churned MRR ÷ Starting MRR. What % of last month's revenue was lost to cancellations this month.</div>
+                <div className={styles.kpiHint}>Revenue Churn ({fmtMonthLabel(s.priorMonth)} → {fmtMonthLabel(s.month)}) — Churned MRR ÷ Starting MRR. What % of last month's revenue was lost to cancellations this month.</div>
               </div>
             </div>
 
@@ -603,7 +603,7 @@ export default function BusinessDashboard() {
                   {deltaStr(s.memberCounts.activeMembers, s.priorMemberCounts.activeMembers, 'number').text}
                 </div>
                 <div className={styles.kpiHint}>
-                  Count of individual people (member rows) with active status and monthly dues &gt; $0 in {fmtMonthLabel(s.month)}'s snapshot.
+                  Count of individual people (member rows) with active status and monthly dues &gt; $0 in {fmtMonthLabel(s.month)}'s snapshot (compared to {fmtMonthLabel(s.priorMonth)}).
                   {activeAccountCount !== null && (
                     <> Across <strong>{activeAccountCount}</strong> accounts — accounts can have multiple members (e.g. Duo/Skyline plans).</>
                   )}
@@ -617,7 +617,7 @@ export default function BusinessDashboard() {
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.logoChurnRate)}</div>
                 <div className={styles.kpiLabel}>Logo Churn %</div>
-                <div className={styles.kpiHint}>"Logo" = one member (borrowed from SaaS: a logo = one customer). Churned members in {fmtMonthLabel(s.month)} ÷ prior month's active members. What % of your people cancelled this month.</div>
+                <div className={styles.kpiHint}>"Logo" = one member (borrowed from SaaS: a logo = one customer). Churned members in {fmtMonthLabel(s.month)} ÷ {fmtMonthLabel(s.priorMonth)}'s active members. What % of your people cancelled this month.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{s.memberCounts.pausedMembers}</div>
@@ -634,7 +634,7 @@ export default function BusinessDashboard() {
                 <div className={`${styles.kpiDelta} ${deltaStr(s.attach.attachRevenue, s.priorAttach.attachRevenue).cls}`}>
                   {deltaStr(s.attach.attachRevenue, s.priorAttach.attachRevenue).text}
                 </div>
-                <div className={styles.kpiHint}>Revenue from Toast (food &amp; beverage) transactions linked to a member in {fmtMonthLabel(s.month)}. This is spend beyond their membership dues.</div>
+                <div className={styles.kpiHint}>Revenue from Toast (food &amp; beverage) transactions linked to a member in {fmtMonthLabel(s.month)} (compared to {fmtMonthLabel(s.priorMonth)}). This is spend beyond their membership dues.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.attach.attachRate)}</div>
@@ -647,7 +647,7 @@ export default function BusinessDashboard() {
                 <div className={`${styles.kpiDelta} ${deltaStr(s.attach.allInArpm, s.priorAttach.allInArpm).cls}`}>
                   {deltaStr(s.attach.allInArpm, s.priorAttach.allInArpm).text}
                 </div>
-                <div className={styles.kpiHint}>Average Revenue Per Member ({fmtMonthLabel(s.month)}) — (MRR + Attach Revenue) ÷ active members. Your true revenue per person including what they spend at the bar.</div>
+                <div className={styles.kpiHint}>Average Revenue Per Member ({fmtMonthLabel(s.month)}, compared to {fmtMonthLabel(s.priorMonth)}) — (MRR + Attach Revenue) ÷ active members. Your true revenue per person including what they spend at the bar.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{s.failedPayments30d}</div>
