@@ -16,7 +16,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    db: { schema: 'public' },
+    global: { headers: { 'x-client-info': 'supabase-js-web' } }
+  }
 );
 
 const INVITATION_QUESTIONNAIRE_ID = '11111111-1111-1111-1111-111111111111';
@@ -42,9 +46,10 @@ export default function SignupPage() {
         .from('waitlist')
         .select('id, questionnaire_completed_at')
         .eq('agreement_token', token)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
+        console.error('Validation error:', error);
         throw new Error('Invalid or expired token');
       }
 

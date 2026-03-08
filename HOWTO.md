@@ -18,7 +18,7 @@
 
 ## 📋 Summary
 
-**Last Updated**: 2026-03-05
+**Last Updated**: 2026-03-06
 
 This 100-line summary provides a high-level overview of the Noir CRM Dashboard system architecture, key concepts, and how to use this reference manual efficiently.
 
@@ -42,7 +42,7 @@ A comprehensive restaurant/membership management system for Noir, a private memb
 
 **Backend**: Node.js 22.x, Next.js API Routes, Supabase (PostgreSQL + Auth + Storage + RLS)
 
-**External Services**: OpenPhone (SMS), Stripe (payments), Typeform (waitlist), Vercel Analytics
+**External Services**: OpenPhone (SMS), Stripe (payments), Vercel Analytics
 
 **Key Libraries**: Zod 4.1.12 (validation), Winston 3.18.3 (logging), PDFKit (PDF generation), Lucide React (icons)
 
@@ -65,7 +65,10 @@ A comprehensive restaurant/membership management system for Noir, a private memb
 - `campaign_sends` - Individual SMS sends with status tracking
 - `ledger_entries` - Financial transactions (charges, credits, payments)
 - `private_events` - Event definitions with RSVP system
-- `waitlist_applications` - New member applications from Typeform
+- `waitlist` - Member applications and signup tracking
+- `questionnaires` - Dynamic form templates for signup flows
+- `questionnaire_questions` - Questions for each questionnaire
+- `questionnaire_responses` - User responses to questionnaire questions
 
 **Member Portal Tables** (Phase 1):
 - `member_portal_sessions` - Session tracking
@@ -270,7 +273,6 @@ grep "^## Troubleshooting Guide" HOWTO.md -A 100
 - **SMS**: OpenPhone API
 - **Payments**: Stripe (Payment Intents for holds, charges)
 - **Storage**: Supabase Storage (images, attachments)
-- **Forms**: Typeform (waitlist applications)
 - **Analytics**: Vercel Analytics
 
 ### Key Libraries
@@ -485,6 +487,14 @@ Every user action MUST have immediate visual response:
 - **Phase 2** (Refinement): Replace text with icons where intuitive
 - **Always**: Provide tooltips/labels on icon hover/long-press
 - **Best Practice**: Icon + text for primary actions, icon-only for secondary
+
+**Terminology Guidelines** ⭐ NEW 2026-03-06:
+- **User-facing UI**: Use "Membership" (not "Subscription")
+  - Examples: "Membership Card", "Base Membership", "Manage Membership"
+- **Backend/code**: Use "Subscription" (for Stripe API compatibility)
+  - Variables: `subscriptionData`, `stripe_subscription_id`
+  - Database columns: `subscription_status`, `subscription_start_date`
+- **Rationale**: "Membership" is friendlier and aligns with business model
 
 **Information Density**:
 - Mobile: Minimal density, focus on primary info
@@ -1108,30 +1118,60 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 - `src/components/PrivateEventBooking.tsx` - RSVP form component
 - `README/PRIVATE_EVENTS_SETUP.md` - Full documentation
 
-### 5. Waitlist System
+### 5. Member Signup & Onboarding System
 
-**Location**: `src/pages/api/waitlist/`, `src/pages/admin/waitlist.tsx`
+**Location**: `src/app/signup/`, `src/app/skyline/`, `src/app/apply/`, `src/pages/admin/membership.tsx`
 
-**Flow**:
-1. User texts "MEMBER" to 913.777.4488
-2. OpenPhone webhook sends Typeform link
-3. User completes Typeform application
-4. Typeform webhook processes submission
-5. Entry stored in `waitlist` table with status 'review'
-6. Admin reviews and approves/denies
-7. SMS sent to applicant with result
+**Three Signup Flows**:
 
-**Features**:
-- Dynamic field mapping (`config/typeform-mapping.js`)
+1. **MEMBERSHIP Flow (Waitlist)**:
+   - User texts "MEMBERSHIP" or "MEMBER" → Receives link to `/apply`
+   - Fills out custom AnimatedQuestionnaire (one question per screen)
+   - Entry stored in `waitlist` table with status 'review'
+   - Admin reviews in `/admin/membership` → Waitlist tab
+   - If approved → User receives `/onboard/{token}` link (24hr expiration)
+   - Complete: Agreement → Membership Selection → Payment → Profile
+
+2. **INVITATION Flow (Pre-approved Regular Signup)**:
+   - User texts "INVITATION" → Receives `/signup/{token}` link (24hr expiration)
+   - Fills out AnimatedQuestionnaire with profile photo (REQUIRED)
+   - Auto-redirect to `/onboard/{token}`
+   - Complete: Agreement → Membership Selection → Payment → Profile
+
+3. **SKYLINE Flow (Pre-approved Skyline Signup)**:
+   - User texts "SKYLINE" → Receives `/skyline/{token}` link (24hr expiration)
+   - Fills out AnimatedQuestionnaire with Skyline branding
+   - Skyline membership pre-selected
+   - Auto-redirect to `/onboard/{token}`
+   - Complete: Agreement → Payment → Profile
+
+**Key Features**:
+- All forms use AnimatedQuestionnaire component (consistent UX)
+- One question per screen with smooth animations (Framer Motion)
+- Profile photo required on all signup forms
+- Token-based security with 24-hour expiration
+- Admin-configurable questions via `/admin/membership` → Questionnaires tab
 - Status tracking: review, approved, denied, waitlisted
-- Automated SMS responses
-- Duplicate detection
+- Automated SMS responses with personalized links
+
+**Database Tables**:
+- `waitlist` - Stores all applications (columns: `agreement_token`, `agreement_token_created_at`, `questionnaire_completed_at`, `selected_membership`, `photo_url`)
+- `questionnaires` - Form templates (types: 'waitlist', 'invitation', 'skyline')
+- `questionnaire_questions` - Dynamic questions for each form
+- `questionnaire_responses` - User responses linked to waitlist entries
+- `agreements` - Agreement templates with version tracking
+- `agreement_signatures` - Digital signatures with IP/timestamp
 
 **Related Files**:
-- `src/pages/api/waitlist-webhook.ts` - Typeform webhook handler
-- `src/pages/api/openphoneWebhook.js` - OpenPhone webhook (MEMBER keyword)
-- `config/typeform-mapping.js` - Field mapping configuration
-- `README/WAITLIST_SETUP.md` - Full documentation
+- `src/app/apply/page.tsx` - Waitlist application form
+- `src/app/signup/[token]/page.tsx` - INVITATION signup form
+- `src/app/skyline/[token]/page.tsx` - SKYLINE signup form
+- `src/app/onboard/[token]/page.tsx` - Onboarding wizard (agreement, payment, profile)
+- `src/components/AnimatedQuestionnaire.tsx` - Reusable questionnaire component
+- `src/components/OnboardingWizard.tsx` - Multi-step onboarding flow
+- `src/pages/api/openphoneWebhook.js` - Handles SMS keywords (MEMBERSHIP, INVITATION, SKYLINE)
+- `src/pages/api/waitlist.js` - Admin approval endpoint
+- `README/WAITLIST_SETUP.md` - Legacy documentation (pre-custom forms)
 
 ### 6. Member Management
 
@@ -1749,10 +1789,12 @@ const handleExportCSV = () => {
   - If not: charges full outstanding balance
   - Records payment in ledger with `stripe_payment_intent_id` for deduplication
 
-**Waitlist**:
+**Waitlist & Onboarding**:
 - `GET /api/waitlist` - List waitlist entries
-- `PATCH /api/waitlist` - Update waitlist entry
-- `POST /api/waitlist-webhook` - Typeform webhook
+- `PATCH /api/waitlist` - Update waitlist entry status (approve/deny)
+- `POST /api/waitlist/submit` - Submit questionnaire response
+- `GET /api/onboard/validate?token={token}` - Validate onboarding token
+- `POST /api/onboard/complete` - Complete onboarding (create member)
 
 **Other**:
 - `POST /api/openphoneWebhook` - OpenPhone SMS webhook
@@ -1978,9 +2020,13 @@ Database-level security via Supabase RLS:
 
 **Webhook**: `src/pages/api/openphoneWebhook.js`
 - Handles incoming SMS
-- Keywords: "MEMBER" → sends Typeform link
-- Reservation booking via SMS
-- Natural language date parsing
+- SMS Keywords:
+  - "MEMBERSHIP" / "MEMBER" → Sends link to `/apply` (waitlist form)
+  - "INVITATION" → Creates approved waitlist entry, sends `/signup/{token}` link (24hr)
+  - "SKYLINE" → Creates approved waitlist entry with Skyline pre-selected, sends `/skyline/{token}` link (24hr)
+  - "RESERVATION" → Reservation booking via SMS
+  - "BALANCE" → Sends ledger PDF
+- Reservation booking via SMS with natural language date parsing
 
 **Sending SMS**: `src/utils/openphoneUtils.ts`
 - `sendSMS()` function
@@ -2030,19 +2076,32 @@ Database-level security via Supabase RLS:
   - Admin UI toggle in subscription card Payment Settings section
   - Returns breakdown: base amount, fee amount, total charged
 
-### Typeform Integration
+### Custom Forms System (AnimatedQuestionnaire)
 
-**Purpose**: Waitlist applications
+**Purpose**: Member signup and application forms
 
-**Webhook**: `src/pages/api/waitlist-webhook.ts`
-- Processes form submissions
-- Maps fields via `config/typeform-mapping.js`
-- Stores in `waitlist` table
+**Component**: `src/components/AnimatedQuestionnaire.tsx`
+- One question per screen with smooth animations
+- Supports: text, email, phone, textarea, file uploads
+- Progress bar and navigation
+- Mobile-first responsive design
+- Framer Motion animations (card flips/slides)
 
-**Field Mapping**: `config/typeform-mapping.js`
-- Dynamic mapping configuration
-- Supports multiple field identifiers
-- Easy to update without code changes
+**Admin Management**: `/admin/membership` → Questionnaires tab
+- Create/edit questionnaire templates
+- Add/remove/reorder questions
+- Set question types and validation
+- Toggle active status
+
+**Questionnaire Types**:
+- `waitlist` - MEMBERSHIP flow (ID: `a201cee3-3e34-459d-83c8-25b073fd26f7`)
+- `invitation` - INVITATION flow (ID: `11111111-1111-1111-1111-111111111111`)
+- `skyline` - SKYLINE flow (ID: `22222222-2222-2222-2222-222222222222`)
+
+**Database**:
+- `questionnaires` - Form templates
+- `questionnaire_questions` - Questions with order_index
+- `questionnaire_responses` - User answers linked to waitlist_id
 
 ### Supabase Integration
 
@@ -2196,14 +2255,19 @@ ALTER TABLE members ADD COLUMN:
 All pages use Noir design system and are fully mobile-responsive with bottom navigation.
 
 #### 1. Login Page (`/member/login`)
-- Phone dial pad for 10-digit number entry
-- **Three login options** (shown based on phone entry): ⭐ NEW
-  1. **"Sign in with Code"** button - Request SMS OTP (passwordless)
-  2. **"Call"** button - Use password authentication
+- Phone dial pad for 10-digit number entry with checkmark submit button ⭐ UPDATED
+- **Two-step login flow** (phone verification first): ⭐ NEW 2026-03-06
+  1. **Step 1**: Enter phone → verify phone exists via `/api/member/verify-phone`
+  2. **Step 2**: Show personalized "Welcome back, [FirstName]" with login options
+- **Login options** (shown after phone verification):
+  1. **Password input** - Primary method for returning users (with show/hide toggle)
+  2. **"One-Time Password" button** - Request SMS OTP (passwordless)
   3. **Biometric button** - Face ID/Touch ID (if available)
-- **OTP Input View**: 6-digit code entry with resend option ⭐ NEW
-- **Password Input View**: Password entry with show/hide toggle
-- Redirects to password change if temporary password OR first OTP login ⭐ NEW
+- **First-time user detection**: Green notice box prompts new users to request OTP ⭐ NEW
+- **Unrecognized phone handling**: Red error box with support contact (913-777-4488) ⭐ NEW
+- **OTP Input View**: 6-digit code entry with resend option
+- **Password setup redirect**: First-time OTP users redirected to `/member/change-password` ⭐ NEW
+- Redirects to password change if temporary password
 - Links to forgot password flow
 - Toast notifications for errors/success
 - Mobile-first responsive design
@@ -2245,10 +2309,13 @@ All pages use Noir design system and are fully mobile-responsive with bottom nav
 - **Scrollbar Hidden**: Clean appearance with `.scrollbar-hide` utility
 
 **API**:
+- `POST /api/member/verify-phone` - Verifies phone exists, returns member info ⭐ NEW 2026-03-06
 - `POST /api/member/update-profile` - Updates member info
 - `POST /api/member/set-photo` - Uploads profile photo
-- `POST /api/member/change-password` - Changes password
+- `POST /api/member/change-password` - Changes password (currentPassword optional for first-time setup) ⭐ UPDATED
+- `GET /api/member/check-password-status` - Returns `{ has_password: boolean }` ⭐ NEW 2026-03-06
 - `GET /api/member/account-members` - Fetches all members on same account
+- `GET /api/auth/check-session` - Returns member with `has_password` field ⭐ UPDATED 2026-03-06
 
 **UI/UX Notes**:
 - All cards use small font sizes (text-xs) for compact display
@@ -2293,14 +2360,22 @@ All pages use Noir design system and are fully mobile-responsive with bottom nav
 
 #### 7. Change Password Page (`/member/change-password`)
 **Features**:
-- Current password verification
-- New password (min 8 characters)
-- Password confirmation
-- Show/hide password toggles
-- Warning alert if using temporary password
+- **First-time setup mode**: Detects if member has no password via `member.has_password` ⭐ NEW 2026-03-06
+  - Shows "Set Your Password" title (instead of "Change Your Password")
+  - Blue welcome message: "Welcome! Please create a password..."
+  - Hides "Current Password" field entirely
+  - Only shows "New Password" and "Confirm Password"
+- **Existing user mode**:
+  - Shows all 3 fields: Current Password, New Password, Confirm Password
+  - Current password verification required
+  - Yellow warning alert if using temporary password
+- New password requirements: min 8 characters
+- Password confirmation validation
+- Show/hide password toggles on all fields
 - Cannot bypass if `password_is_temporary` is true
+- Redirects to dashboard after successful password set
 
-**API**: `POST /api/member/change-password` updates password and clears temp flag
+**API**: `POST /api/member/change-password` (currentPassword optional for first-time setup) ⭐ UPDATED
 
 ### Features Overview
 
@@ -4270,3 +4345,291 @@ node scripts/sync-payment-methods.js
 - **Scope**: Affects admin panel ACH setup only (member portal uses Stripe Checkout, which handles this correctly)
 
 **Status**: Complete and committed (commit 11ad328)
+
+---
+
+### 2026-03-06 (PM) - Member Login UX Improvements & First-Time Login Auto-Provisioning
+
+**Session Summary**: Enhanced member login experience with phone verification, personalized messaging, and automatic Supabase Auth user creation on first login.
+
+**Problem**: Members logging in for the first time encountered multiple friction points:
+1. No phone verification before showing password screen
+2. Generic, impersonal login messages
+3. No guidance for first-time users without passwords
+4. Members without `auth_user_id` couldn't log in (500 error)
+5. Phone dial pad used confusing "phone call" icon instead of submit icon
+
+**Solution**: Implemented comprehensive login flow improvements and automatic user provisioning.
+
+---
+
+#### Login Flow Improvements
+
+**1. Phone Verification Step**
+- Added `/api/member/verify-phone` endpoint to validate phone number before showing login options
+- Checks if phone exists in members table
+- Returns member info (first_name, has_password status) if found
+- Shows friendly error if phone not recognized
+
+**2. Personalized Welcome Messages**
+- After phone verification, displays: **"Welcome back, [FirstName]"**
+- Subtitle: "Please enter your password to access your member portal"
+- Creates warm, personalized experience vs generic login screen
+
+**3. First-Time Login Detection**
+- System detects if member has never set a password (`password_hash` is null)
+- Shows green notice box: "First time logging in?"
+- Prompts: "It looks like you haven't logged in yet. Please request a one-time password to get started."
+- Provides **"Request One-Time Password"** button for easy activation
+
+**4. Unrecognized Phone Handling**
+- Red error box appears if phone number not found
+- Message: "Our apologies, but we do not recognize this phone number. Please text us at 913-777-4488 so we can remedy this issue immediately."
+- Includes clickable SMS link (`sms:913-777-4488`)
+
+**5. Alternative Login Options**
+- After phone verification, show:
+  - "Or sign in with" divider
+  - **"One-Time Password"** button
+  - **"Face ID / Touch ID"** button (if biometric available)
+- Previously showed these options immediately after entering 10th digit (confusing UX)
+
+**6. Dial Pad Icon Update**
+- Changed submit button from phone icon (🤙) to checkmark icon (✓)
+- More intuitive - indicates "confirm/submit" rather than "call"
+
+---
+
+#### Auto-Provisioning: Supabase Auth User Creation
+
+**Critical Fix**: Members without `auth_user_id` could not log in, causing 400/500 errors.
+
+**Root Cause**: The system required members to have a Supabase Auth user linked (`auth_user_id` column), but new members didn't have this set up automatically.
+
+**Solution**: Automatic Auth User Creation on First Login
+
+When a member verifies their OTP for the first time and `auth_user_id` is null:
+
+1. **Create Supabase Auth User**:
+   ```javascript
+   await supabaseAdmin.auth.admin.createUser({
+     email: member.email || `${phone}@noirkc.com`,
+     phone: `+1${normalizedPhone}`,
+     email_confirm: true,
+     phone_confirm: true,
+     user_metadata: {
+       first_name, last_name, member_id
+     }
+   });
+   ```
+
+2. **Handle Existing Auth Users**:
+   - If email already has an auth user registered → Search for existing user by email
+   - Link existing auth user to member (prevents duplicate auth accounts)
+   - Uses paginated `listUsers()` (100 users at a time, max 10 pages/1000 users)
+   - Avoids timeout issues with large user bases
+
+3. **Link Auth User to Member**:
+   ```sql
+   UPDATE members 
+   SET auth_user_id = [new_auth_user_id]
+   WHERE member_id = [member_id];
+   ```
+
+4. **Create Session & Log In**:
+   - Generate session token
+   - Set httpOnly cookie with correct domain (`.noirkc.com`)
+   - Redirect to member portal
+
+**Impact**:
+- **Before**: First-time login failed with "Account not set up for portal access" error
+- **After**: Seamless first-time login - auth user created automatically, member logged in immediately
+- **Benefits**: Zero manual setup required, members can self-activate portal access
+
+---
+
+#### Cookie Configuration Fixes
+
+**Issue**: Session cookies weren't being set/read properly after successful authentication.
+
+**Cookie Settings** (Production):
+```javascript
+{
+  httpOnly: true,           // Prevent XSS attacks
+  secure: true,             // HTTPS only
+  sameSite: 'lax',          // CSRF protection
+  domain: '.noirkc.com',    // Works on all subdomains (CRITICAL FIX)
+  path: '/',                // Available everywhere
+  maxAge: 7 * 24 * 60 * 60  // 7 days
+}
+```
+
+**Key Fix**: Added explicit `domain: '.noirkc.com'` in production to ensure cookie works across:
+- `noirkc.com`
+- `www.noirkc.com`
+- Any subdomain
+
+**Logging**: Added detailed cookie setting logs to troubleshoot issues:
+```javascript
+console.log('[VERIFY-OTP] Setting cookie:', {
+  name: 'member_session',
+  options: cookieOptions,
+  cookieString: cookie.split(';').slice(0, 2).join(';')
+});
+```
+
+---
+
+#### SMS Message Update
+
+**OTP SMS Message**:
+```
+Your One Time Password to access your member portal for Noir is: [code]
+
+This code expires in 10 minutes.
+```
+
+More descriptive than previous "Your Noir verification code is: [code]"
+
+---
+
+#### Database Schema Update
+
+**Added Columns to `phone_otp_codes` Table**:
+```sql
+ALTER TABLE phone_otp_codes 
+ADD COLUMN IF NOT EXISTS ip_address TEXT,
+ADD COLUMN IF NOT EXISTS user_agent TEXT;
+
+CREATE INDEX idx_phone_otp_codes_ip_address 
+ON phone_otp_codes(ip_address, created_at);
+```
+
+**Purpose**: Enables IP-based rate limiting for OTP requests (10 per IP per hour).
+
+---
+
+#### API Endpoints
+
+**New Endpoint**: `POST /api/member/verify-phone`
+- **Purpose**: Verify phone number exists and return member info
+- **Body**: `{ phone: string }`
+- **Returns**:
+  ```javascript
+  {
+    exists: boolean,
+    member?: {
+      first_name: string,
+      member_id: string,
+      has_password: boolean  // For first-time login detection
+    },
+    message: string
+  }
+  ```
+
+**Updated Endpoints**:
+- `POST /api/auth/verify-phone-otp` - Now auto-creates Supabase Auth users on first login
+- `POST /api/auth/login-phone-password` - Updated cookie settings with explicit domain
+- `POST /api/auth/send-phone-otp` - Updated SMS message text
+
+---
+
+#### UI Components Updated
+
+**`src/app/member/login/page.tsx`**:
+- Added phone verification step before showing password/OTP options
+- Personalized welcome message with member's first name
+- First-time login detection with OTP prompt
+- Unrecognized phone error with support contact
+- Alternative login options moved to password screen
+- State management for `memberInfo`, `phoneNotRecognized`
+
+**`src/components/member/PhoneDialPad.tsx`**:
+- Changed submit button icon from `Phone` to `Check`
+- Updated button label comment from "Call Button" to "Submit Button"
+- Larger, bolder checkmark (w-7 h-7 stroke-[3])
+
+---
+
+#### Files Created
+
+- `src/pages/api/member/verify-phone.ts` - Phone verification endpoint (76 lines)
+
+#### Files Modified
+
+- `src/app/member/login/page.tsx` - Login flow improvements (256 insertions, 80 deletions)
+- `src/components/member/PhoneDialPad.tsx` - Icon change (6 changes)
+- `src/pages/api/auth/verify-phone-otp.ts` - Auto-provisioning + error handling (94 insertions, 14 deletions)
+- `src/pages/api/auth/login-phone-password.ts` - Cookie domain fix (19 insertions, 7 deletions)
+- `src/pages/api/auth/send-phone-otp.ts` - SMS message update (2 changes)
+
+---
+
+#### Testing Recommendations
+
+1. **First-Time Login Flow**:
+   - Enter phone number of member without `auth_user_id` → Should see "First time logging in?" prompt
+   - Request OTP → Enter code → Should auto-create auth user and log in successfully
+   - Check database: `auth_user_id` should now be populated
+
+2. **Returning Member Flow**:
+   - Enter phone number → Should see "Welcome back, [FirstName]"
+   - Enter password → Should log in successfully
+   - Try "One-Time Password" option → Should work as alternative
+
+3. **Error Cases**:
+   - Enter unrecognized phone → Should see error with support contact
+   - Enter wrong password → Should show "Invalid phone number or password"
+   - Try OTP with used code → Should prompt for new code
+
+4. **Cookie Persistence**:
+   - Log in successfully → Close browser → Reopen → Should still be logged in
+   - Check browser DevTools → Cookie should have `domain=.noirkc.com`
+
+5. **Existing Auth User Handling**:
+   - Member with email already in auth.users → Should link to existing auth user, not error
+   - Check logs for "[VERIFY-OTP] Found existing auth user by email"
+
+---
+
+#### Commits (9 total)
+
+1. `25d787e` - Improve member login experience with phone verification and personalized flow
+2. `e5ba6f3` - Add debug logging to OTP verification endpoint
+3. `486d652` - Fix cookie settings for member authentication
+4. `4301fb6` - Auto-create Supabase Auth user on first OTP login
+5. `1e2d60b` - Handle existing auth users when linking members on first login
+6. `7b0a611` - Replace listUsers with efficient getUserByEmail/getUserByPhone lookups
+7. `51a138c` - Fix: Use correct Supabase Admin API with pagination for user lookup
+8. `5764604` - Fix TypeScript error in user lookup
+9. `fe47aba` - Fix TypeScript destructuring and type inference issues
+
+---
+
+#### Impact
+
+**User Experience**:
+- ✅ Personalized, welcoming login experience
+- ✅ Clear guidance for first-time users
+- ✅ Helpful error messages with support contact
+- ✅ Intuitive dial pad icon (checkmark vs phone)
+- ✅ Alternative login methods shown at appropriate time
+
+**Technical**:
+- ✅ Zero-touch member activation (auto-provisioning)
+- ✅ Proper cookie domain handling for multi-subdomain setup
+- ✅ Efficient user lookup (pagination prevents timeouts)
+- ✅ Handles edge cases (existing auth users, null emails, duplicate prevention)
+
+**Before vs After**:
+| Aspect | Before | After |
+|--------|--------|-------|
+| Phone verification | None - directly show password | Verify phone first, personalized welcome |
+| First-time login | 500 error: "Account not set up" | Auto-create auth user, seamless login |
+| Error messaging | Generic errors | Helpful, actionable error messages |
+| UX flow | Confusing - all options shown at once | Clear 2-step flow with guidance |
+| Cookie domain | Implicit (may not work on subdomains) | Explicit `.noirkc.com` (works everywhere) |
+| Dial pad icon | Phone icon (confusing) | Checkmark (intuitive) |
+
+**Status**: Complete and deployed (commit fe47aba)
+
