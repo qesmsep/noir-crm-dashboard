@@ -455,11 +455,30 @@ export default function OnboardingWizard({
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const toast = useToast();
 
+  // Helper function to format phone number
+  const formatPhoneNumber = (phoneValue: string) => {
+    // Strip all non-digits and limit to 10 digits
+    const input = phoneValue.replace(/\D/g, '').substring(0, 10);
+
+    // Progressive formatting as user types
+    let formatted = '';
+    if (input.length > 0) {
+      formatted = '(' + input.substring(0, 3);
+      if (input.length >= 3) {
+        formatted += ') ' + input.substring(3, 6);
+      }
+      if (input.length >= 6) {
+        formatted += '-' + input.substring(6, 10);
+      }
+    }
+    return formatted;
+  };
+
   // Step 1: Contact Info (includes waitlist intake fields)
   const [firstName, setFirstName] = useState(waitlistData.first_name || '');
   const [lastName, setLastName] = useState(waitlistData.last_name || '');
   const [email, setEmail] = useState(waitlistData.email || '');
-  const [phone, setPhone] = useState(waitlistData.phone || '');
+  const [phone, setPhone] = useState(formatPhoneNumber(waitlistData.phone || ''));
   const [dateOfBirth, setDateOfBirth] = useState(waitlistData.date_of_birth || '');
   const [address, setAddress] = useState(waitlistData.address || '');
   const [city, setCity] = useState(waitlistData.city || '');

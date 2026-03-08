@@ -58,9 +58,22 @@ export default function AdditionalMemberModal({
   );
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  const formatPhoneNumber = (value: string) => {
+    // Strip all non-digits and limit to 10 digits
+    const phone = value.replace(/\D/g, '').substring(0, 10);
+
+    // Progressive formatting
+    const match = phone.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+    if (match) {
+      return !match[2] ? match[1] : `(${match[1]}) ${match[2]}${match[3] ? `-${match[3]}` : ''}`;
+    }
+    return value;
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const finalValue = name === 'phone' ? formatPhoneNumber(value) : value;
+    setFormData(prev => ({ ...prev, [name]: finalValue }));
   };
 
   const compressImage = (file: File): Promise<string> => {
@@ -296,7 +309,7 @@ export default function AdditionalMemberModal({
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                placeholder="Phone Number"
+                placeholder="(555) 555-5555"
                 bg="white"
                 borderWidth="2px"
                 _focus={{ borderColor: '#A59480' }}

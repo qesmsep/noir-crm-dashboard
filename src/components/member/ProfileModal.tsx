@@ -192,9 +192,20 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   const formatPhone = (phone?: string) => {
     if (!phone) return '';
+    // Strip all non-digits and take last 10 digits (handles any prefix)
     const cleaned = phone.replace(/\D/g, '').slice(-10);
-    if (cleaned.length !== 10) return phone;
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+
+    if (cleaned.length === 10) {
+      return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6, 10)}`;
+    }
+
+    // Progressive formatting for partial input
+    const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+    if (match) {
+      return !match[2] ? match[1] : `(${match[1]}) ${match[2]}${match[3] ? `-${match[3]}` : ''}`;
+    }
+
+    return phone;
   };
 
   const handlePasswordChange = async () => {
