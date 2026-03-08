@@ -369,30 +369,33 @@ export default function MemberDashboardPage() {
                   <p className="text-sm text-[#5A5A5A]">{member?.email}</p>
                   <p className="text-sm text-[#5A5A5A]">{formatPhone(member?.phone)}</p>
                   {member?.referral_code && (
-                    <div
-                      className="flex items-center gap-2 text-sm text-[#5A5A5A] hover:text-[#A59480] transition-colors cursor-pointer group"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopyReferralLink();
-                      }}
-                      title="Click to copy referral link"
-                    >
-                      <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-                      </svg>
-                      <span className="flex-1">
-                        {typeof window !== 'undefined' && window.location.host}/refer/{member.referral_code}
-                      </span>
-                      {copiedReferralLink ? (
-                        <svg className="w-4 h-4 text-[#4CAF50] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    <div className="flex items-start gap-2 text-sm">
+                      <span className="text-[#5A5A5A] font-medium whitespace-nowrap">Referral Link:</span>
+                      <div
+                        className="flex items-center gap-2 text-[#5A5A5A] hover:text-[#A59480] transition-colors cursor-pointer group flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyReferralLink();
+                        }}
+                        title="Click to copy referral link"
+                      >
+                        <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
                         </svg>
-                      ) : (
-                        <svg className="w-4 h-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                        </svg>
-                      )}
+                        <span className="flex-1">
+                          {typeof window !== 'undefined' && window.location.host}/refer/{member.referral_code}
+                        </span>
+                        {copiedReferralLink ? (
+                          <svg className="w-4 h-4 text-[#4CAF50] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                            <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                          </svg>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
