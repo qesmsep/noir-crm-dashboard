@@ -1338,30 +1338,11 @@ export default function OnboardingWizard({
             <Divider />
 
             <FormControl>
-              <FormLabel>Profile Photo (Optional)</FormLabel>
-              <Button
-                as="label"
-                htmlFor="photo-upload"
-                leftIcon={<Icon as={Upload} />}
-                variant="outline"
-                w="full"
-              >
-                Upload Photo
-              </Button>
-              <Input
-                id="photo-upload"
-                type="file"
-                accept="image/*"
-                display="none"
-              />
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Bio (Optional)</FormLabel>
+              <FormLabel>Please let us know if you have any special requests. (Optional)</FormLabel>
               <Textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell us about yourself..."
+                placeholder="Any special requests or preferences..."
                 rows={4}
                 bg="white"
                 borderWidth="2px"
@@ -1377,16 +1358,9 @@ export default function OnboardingWizard({
               onClick={onComplete}
               boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
               minH="56px"
+              w="full"
             >
               Complete Onboarding
-            </Button>
-
-            <Button
-              variant="ghost"
-              onClick={onComplete}
-              color="gray.600"
-            >
-              Skip for now
             </Button>
           </VStack>
         );
@@ -1449,7 +1423,7 @@ export default function OnboardingWizard({
                 {renderStepContent()}
 
                 {/* Navigation Buttons (not for payment or final step) */}
-                {currentStep !== 5 && (
+                {currentStep !== 5 && currentStep !== 6 && (
                   <HStack spacing={3} pt={4}>
                     <Button
                       leftIcon={<Icon as={ArrowLeft} />}
@@ -1468,21 +1442,19 @@ export default function OnboardingWizard({
                       Back
                     </Button>
 
-                    {currentStep !== 6 && (
-                      <Button
-                        rightIcon={<Icon as={ArrowRight} />}
-                        onClick={handleNext}
-                        bg="#A59480"
-                        color="white"
-                        flex={2}
-                        size="lg"
-                        minH="56px"
-                        _hover={{ bg: '#8F7F6B' }}
-                        boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
-                      >
-                        {currentStep === 1 ? 'Next' : currentStep === 2 ? 'I Accept' : 'Continue'}
-                      </Button>
-                    )}
+                    <Button
+                      rightIcon={<Icon as={ArrowRight} />}
+                      onClick={handleNext}
+                      bg="#A59480"
+                      color="white"
+                      flex={2}
+                      size="lg"
+                      minH="56px"
+                      _hover={{ bg: '#8F7F6B' }}
+                      boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
+                    >
+                      {currentStep === 1 ? 'Next' : currentStep === 2 ? 'I Accept' : 'Continue'}
+                    </Button>
                   </HStack>
                 )}
               </VStack>

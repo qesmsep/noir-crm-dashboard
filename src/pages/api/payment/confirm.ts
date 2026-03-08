@@ -156,9 +156,11 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   if (accountError) throw accountError;
 
   // Create member
+  const memberId = crypto.randomUUID();
   const { data: member, error: memberError } = await supabase
     .from('members')
     .insert({
+      member_id: memberId,
       account_id: account.account_id,
       first_name: waitlist.first_name,
       last_name: waitlist.last_name,
@@ -259,12 +261,12 @@ async function getMonthlyCreditForMembership(membership: string): Promise<number
 async function sendWelcomeSMS(waitlist: any): Promise<void> {
   const message = `Welcome to Noir, ${waitlist.first_name}! 🖤
 
-Your ${waitlist.selected_membership} membership is now active.
+Your membership to Noir is now active.
 
-To make a reservation, text "RESERVATION" to this number anytime.
+We HIGHLY recommend saving this number as "Noir"—this is how we stay in touch. To make a reservation, text "Reservation + Date/time + # of Guests" to this number anytime.
 
 You can also manage your membership at:
-https://noirkc.com/member
+https://noirkc.com/member/login
 
 Questions? Just reply to this text.
 
