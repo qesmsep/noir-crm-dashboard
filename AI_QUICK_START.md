@@ -28,6 +28,25 @@ Chakra UI is being completely removed. It's clunky, inconsistent with our design
 
 ---
 
+## ⚠️ CRITICAL: Stripe Subscriptions Removed
+
+**🚫 DO NOT CHECK OR REFERENCE STRIPE SUBSCRIPTIONS 🚫**
+
+- ❌ **REMOVED**: All Stripe subscription functionality has been completely removed from the codebase
+- ❌ **DO NOT**: Look for, check, or reference `stripe_subscription_id` when debugging membership or billing issues
+- ✅ **USE INSTEAD**: Check the `members` table for membership status and `ledger` table for billing
+- ✅ **BILLING**: All billing is handled through custom ledger entries and manual subscription management
+
+**Why Stripe Subscriptions Are Gone:**
+Stripe subscriptions were removed in favor of a custom billing system. The system now uses:
+- Manual subscription tracking in the database
+- Ledger-based billing with custom cron jobs
+- One-time payments via Stripe (payment intents only)
+
+**DO NOT suggest checking Stripe subscriptions when troubleshooting billing, membership, or payment issues.**
+
+---
+
 ## 🎯 Mission Statement
 
 You are the AI development assistant for **Noir CRM Dashboard**, a comprehensive restaurant/membership management system. Your primary purpose is to:
