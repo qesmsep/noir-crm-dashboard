@@ -253,6 +253,102 @@ function BarChart({ data, dataKey, color, height = 160 }: {
   );
 }
 
+function LineChart({ data, dataKey, color, height = 160 }: {
+  data: SeriesPoint[];
+  dataKey: keyof SeriesPoint;
+  color: string;
+  height?: number;
+}) {
+  if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
+
+  const values = data.map(d => Number(d[dataKey]) || 0);
+  const maxDataVal = Math.max(...values, 1);
+  const minDataVal = Math.min(...values, 0);
+  const yAxisWidth = 60;
+  const chartWidth = 800;
+  const padding = 20;
+
+  // Generate y-axis tick values
+  const tickIncrement = 3000;
+  const maxVal = Math.ceil(maxDataVal / tickIncrement) * tickIncrement;
+  const minVal = Math.floor(minDataVal / tickIncrement) * tickIncrement;
+  const range = maxVal - minVal;
+  const numTicks = Math.floor(range / tickIncrement) + 1;
+  const yTicks = Array.from({ length: numTicks }, (_, i) => minVal + i * tickIncrement);
+
+  // Calculate line points
+  const pointSpacing = (chartWidth - yAxisWidth - padding * 2) / (data.length - 1 || 1);
+  const points = data.map((d, i) => {
+    const val = Number(d[dataKey]) || 0;
+    const x = yAxisWidth + padding + i * pointSpacing;
+    const y = height - ((val - minVal) / range) * height;
+    return { x, y, val, month: d.month };
+  });
+
+  const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
+
+  return (
+    <div className={styles.chartContainer}>
+      <svg width={chartWidth} height={height + 40} viewBox={`0 0 ${chartWidth} ${height + 40}`}>
+        {/* Y-axis grid lines and labels */}
+        {yTicks.map((tickValue, i) => {
+          const y = height - ((tickValue - minVal) / range) * height;
+          return (
+            <g key={i}>
+              <line
+                x1={yAxisWidth}
+                y1={y}
+                x2={chartWidth}
+                y2={y}
+                stroke="rgba(0,0,0,0.06)"
+                strokeWidth={1}
+                strokeDasharray="2,2"
+              />
+              <text
+                x={yAxisWidth - 8}
+                y={y + 3}
+                textAnchor="end"
+                fontSize="10"
+                fill="#86868b"
+                fontWeight="500"
+              >
+                {fmtCurrency(tickValue)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Line */}
+        <path
+          d={pathData}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Points and labels */}
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r={4} fill={color} opacity={0.9} />
+            <text
+              x={p.x}
+              y={height + 20}
+              textAnchor="middle"
+              fontSize="9"
+              fill="#86868b"
+            >
+              {fmtMonthLabel(p.month)}
+            </text>
+            <title>{fmtMonthLabel(p.month)}: {fmtCurrency(p.val)}</title>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function StackedBarChart({ data, keys, colors, height = 160 }: {
   data: SeriesPoint[];
   keys: (keyof SeriesPoint)[];
@@ -390,6 +486,7 @@ export default function BusinessDashboard() {
     accessLog: any[];
   }>({ monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
   const [showPortalAccessModal, setShowPortalAccessModal] = useState(false);
+  const [showMrrModal, setShowMrrModal] = useState(false);
 
   const monthOptions = useMemo(() => generateMonthOptions(), []);
 
@@ -539,13 +636,13 @@ export default function BusinessDashboard() {
             {/* KPI Tiles */}
             <h2 className={styles.sectionTitle}>Revenue Health</h2>
             <div className={styles.kpiGrid}>
-              <div className={styles.kpiTile}>
+              <div className={styles.kpiTile} onClick={() => setShowMrrModal(true)} style={{ cursor: 'pointer' }}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.mrr)}</div>
                 <div className={styles.kpiLabel}>MRR</div>
                 <div className={`${styles.kpiDelta} ${deltaStr(s.mrr, s.priorMrr).cls}`}>
                   {deltaStr(s.mrr, s.priorMrr).text}
                 </div>
-                <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of all active members' monthly dues for {fmtMonthRange(s.month)}.</div>
+                <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of all active members' monthly dues for {fmtMonthRange(s.month)}. Click to view trend.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.mrrBridge.netNewMrr)}</div>
@@ -872,6 +969,26 @@ export default function BusinessDashboard() {
                 </div>
                 <div className={styles.modalHint}>
                   Total revenue from all member payments (dues + purchases) for each month.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MRR Trend Modal */}
+        {showMrrModal && (
+          <div className={styles.modalOverlay} onClick={() => setShowMrrModal(false)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>MRR Trend (Last 12 Months)</h2>
+                <button className={styles.modalClose} onClick={() => setShowMrrModal(false)}>×</button>
+              </div>
+              <div className={styles.modalBody}>
+                <div className={styles.chartCard} style={{ marginTop: '2rem' }}>
+                  <LineChart data={series} dataKey="mrr" color="#bca892" height={320} />
+                </div>
+                <div className={styles.modalHint}>
+                  Monthly Recurring Revenue over time showing the sum of all active members' monthly dues for each month.
                 </div>
               </div>
             </div>
