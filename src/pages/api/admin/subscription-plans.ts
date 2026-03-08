@@ -213,21 +213,21 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'Plan ID is required in query params' });
   }
 
-  // Check if any members are using this plan
-  const { data: members, error: memberError } = await supabase
-    .from('members')
-    .select('member_id')
-    .eq('membership', id)
+  // Check if any accounts are using this plan
+  const { data: accounts, error: accountError } = await supabase
+    .from('accounts')
+    .select('account_id')
+    .eq('membership_plan_id', id)
     .limit(1);
 
-  if (memberError) {
-    console.error('Error checking member usage:', memberError);
+  if (accountError) {
+    console.error('Error checking account usage:', accountError);
     return res.status(500).json({ error: 'Failed to verify plan usage' });
   }
 
-  if (members && members.length > 0) {
+  if (accounts && accounts.length > 0) {
     return res.status(400).json({
-      error: 'Cannot delete plan that is currently assigned to members. Deactivate it instead.'
+      error: 'Cannot delete plan that is currently assigned to accounts. Deactivate it instead.'
     });
   }
 

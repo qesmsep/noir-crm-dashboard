@@ -76,11 +76,19 @@ export default async function handler(
     let runningBalance = 0;
     const transactionsWithBalance = (transactions || []).map((transaction) => {
       const amount = parseFloat(transaction.amount.toString());
-      runningBalance += amount; // Amount is already signed (positive for payment, negative for purchase)
+
+      // Determine if this is a credit or debit
+      // Credits: payment, credit (add to balance)
+      // Debits: purchase, charge, debit (subtract from balance)
+      const isCredit = transaction.type === 'payment' || transaction.type === 'credit';
+      const signedAmount = isCredit ? amount : -amount;
+
+      runningBalance += signedAmount;
+
       return {
         ...transaction,
         description: transaction.note, // Map 'note' to 'description' for display
-        transaction_type: transaction.type === 'payment' ? 'credit' : 'debit', // Map 'type' to 'transaction_type'
+        transaction_type: isCredit ? 'credit' : 'debit', // Map 'type' to 'transaction_type'
         running_balance: runningBalance,
         created_at: transaction.date, // Use date instead of created_at
         attachments: attachmentMap[transaction.id] || [], // Add attachments
