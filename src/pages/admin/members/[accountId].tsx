@@ -1767,6 +1767,14 @@ export default function MemberDetailAdmin() {
                                 <span>{member.company}</span>
                               </div>
                             )}
+                            {member.referred_by && (
+                              <div className={styles.detailRow}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                                </svg>
+                                <span>Referred by: {member.referred_by}</span>
+                              </div>
+                            )}
                             {member.dob && (
                               <div className={styles.detailRow}>
                                 <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
@@ -2084,6 +2092,27 @@ export default function MemberDetailAdmin() {
                 ))}
               </div>
             </div>
+
+            {/* Portal Access Card - Moved below members */}
+            <div className={styles.memberCard} style={{ marginTop: '1.5rem' }}>
+              <div className={styles.memberHeader} style={{ paddingBottom: '1rem', borderBottom: '1px solid #f0f0f0' }}>
+                <h3 className={styles.memberName}>Member Portal Access</h3>
+              </div>
+              <div style={{ padding: '1rem' }}>
+                <div className={styles.subscriptionRow}>
+                  <span className={styles.subscriptionLabel}>Last Access</span>
+                  <span className={styles.subscriptionValue}>
+                    {portalAccessData.lastAccess
+                      ? new Date(portalAccessData.lastAccess).toLocaleString()
+                      : 'Never'}
+                  </span>
+                </div>
+                <div className={styles.subscriptionRow}>
+                  <span className={styles.subscriptionLabel}>Total Sessions</span>
+                  <span className={styles.subscriptionValue}>{portalAccessData.totalSessions}</span>
+                </div>
+              </div>
+            </div>
             </div>
 
             <div className={styles.ledgerColumn}>
@@ -2095,27 +2124,6 @@ export default function MemberDetailAdmin() {
               onToggleCreditCardFee={handleToggleCreditCardFee}
               totalLTV={members.reduce((sum, member) => sum + calculateMemberLTV(member.member_id), 0)}
             />
-
-            {/* Portal Access Card */}
-            <div className={styles.membershipCard}>
-              <div className={styles.subscriptionHeader}>
-                <span className={styles.subscriptionTitle}>Member Portal Access</span>
-              </div>
-              <div className={styles.subscriptionDetails}>
-                <div className={styles.subscriptionRow}>
-                  <span className={styles.subscriptionLabel}>Last Access:</span>
-                  <span className={styles.subscriptionValue}>
-                    {portalAccessData.lastAccess
-                      ? new Date(portalAccessData.lastAccess).toLocaleString()
-                      : 'Never'}
-                  </span>
-                </div>
-                <div className={styles.subscriptionRow}>
-                  <span className={styles.subscriptionLabel}>Total Sessions:</span>
-                  <span className={styles.subscriptionValue}>{portalAccessData.totalSessions}</span>
-                </div>
-              </div>
-            </div>
 
             {/* Quick Actions Card - Between Membership and Ledger */}
             <div className={styles.ledgerActionsCard}>
@@ -2238,29 +2246,30 @@ export default function MemberDetailAdmin() {
 
             {/* Ledger Section */}
             <div className={styles.ledgerSection}>
-              <div className={styles.ledgerHeader}>
-                <h2 className={styles.sectionTitle}>Account Ledger</h2>
-                <div className={styles.ledgerHeaderActions}>
-                  {!ledgerLoading && ledger.length > 0 && (
-                    <>
-                      <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, 0) < 0 ? styles.balance : styles.credit}`}>
-                        {calculateRunningBalance(ledger, 0) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, 0)))}
-                      </div>
-                      {calculateRunningBalance(ledger, 0) < 0 && (
-                        <button
-                          onClick={handlePayBalance}
-                          disabled={isProcessingPayment}
-                          className={styles.payBalanceButton}
-                        >
-                          {isProcessingPayment ? 'Processing...' : 'Pay Balance'}
-                        </button>
-                      )}
-                    </>
-                  )}
+              <div className={styles.memberCard}>
+                <div className={styles.memberHeader} style={{ paddingBottom: '1rem', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className={styles.memberName}>Account Ledger</h3>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    {!ledgerLoading && ledger.length > 0 && (
+                      <>
+                        <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, 0) < 0 ? styles.balance : styles.credit}`}>
+                          {calculateRunningBalance(ledger, 0) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, 0)))}
+                        </div>
+                        {calculateRunningBalance(ledger, 0) < 0 && (
+                          <button
+                            onClick={handlePayBalance}
+                            disabled={isProcessingPayment}
+                            className={styles.payBalanceButton}
+                          >
+                            {isProcessingPayment ? 'Processing...' : 'Pay Balance'}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {ledgerLoading ? (
+                {ledgerLoading ? (
                 <div className={styles.sectionLoading}>
                   <Spinner size="md" />
                 </div>
@@ -2487,6 +2496,7 @@ export default function MemberDetailAdmin() {
               )}
             </>
               )}
+              </div>
             </div>
 
             {/* Messages Section */}
