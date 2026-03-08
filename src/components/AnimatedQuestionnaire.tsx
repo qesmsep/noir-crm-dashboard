@@ -64,6 +64,7 @@ export default function AnimatedQuestionnaire({
   const [loading, setLoading] = useState(true);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const toast = useToast();
 
@@ -199,6 +200,9 @@ export default function AnimatedQuestionnaire({
   };
 
   const handleSubmit = async () => {
+    // Prevent double submission
+    if (submitting) return;
+
     // Validate all questions
     let isValid = true;
     const newErrors: Record<string, string> = {};
@@ -222,6 +226,7 @@ export default function AnimatedQuestionnaire({
       return;
     }
 
+    setSubmitting(true);
     onComplete(responses);
   };
 
@@ -504,6 +509,8 @@ export default function AnimatedQuestionnaire({
                     minH="56px"
                     _hover={{ bg: '#8F7F6B' }}
                     boxShadow="0 2px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1)"
+                    isLoading={isLastQuestion && submitting}
+                    isDisabled={submitting}
                   >
                     {isLastQuestion ? 'Submit' : 'Next'}
                   </Button>
