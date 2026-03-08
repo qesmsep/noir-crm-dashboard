@@ -118,6 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       automatic_payment_methods: {
         enabled: true,
       },
+      setup_future_usage: 'off_session', // Save payment method for recurring billing
     });
 
     // Update waitlist with payment intent ID and selected membership

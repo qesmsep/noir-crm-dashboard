@@ -51,12 +51,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Payment not completed' });
     }
 
-    // Set the payment method as default for the customer (already attached during payment)
+    // Attach the payment method to the customer and set as default
     if (paymentIntent.payment_method && waitlist.stripe_customer_id) {
       try {
+        const paymentMethodId = paymentIntent.payment_method as string;
+
+        // First, check if payment method is already attached to the customer
+        const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+
+        // If not attached (customer is null), attach it now
+        if (!paymentMethod.customer) {
+          await stripe.paymentMethods.attach(paymentMethodId, {
+            customer: waitlist.stripe_customer_id,
+          });
+          console.log('Payment method attached to customer:', waitlist.stripe_customer_id);
+        }
+
+        // Now set it as the default payment method
         await stripe.customers.update(waitlist.stripe_customer_id, {
           invoice_settings: {
-            default_payment_method: paymentIntent.payment_method as string,
+            default_payment_method: paymentMethodId,
           },
         });
 
