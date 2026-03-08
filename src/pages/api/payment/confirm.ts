@@ -238,7 +238,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       account_id: account.account_id,
       member_id: member.member_id,
       type: 'debit',
-      amount: feeAmount.toFixed(2),
+      amount: (-feeAmount).toFixed(2), // Negative amount for debit
       date: getTodayLocalDate(),
       note: 'Credit card processing fee (4%)',
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id
