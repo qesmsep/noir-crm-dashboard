@@ -17,8 +17,6 @@ export default function SubscriptionPlansManager() {
   // Form state
   const [formData, setFormData] = useState({
     plan_name: '',
-    stripe_product_id: '',
-    stripe_price_id: '',
     monthly_price: '',
     interval: 'month',
     is_active: true,
@@ -67,8 +65,6 @@ export default function SubscriptionPlansManager() {
     setEditingPlan(null);
     setFormData({
       plan_name: '',
-      stripe_product_id: '',
-      stripe_price_id: '',
       monthly_price: '',
       interval: 'month',
       is_active: true,
@@ -83,8 +79,6 @@ export default function SubscriptionPlansManager() {
     setEditingPlan(plan);
     setFormData({
       plan_name: plan.plan_name,
-      stripe_product_id: plan.stripe_product_id,
-      stripe_price_id: plan.stripe_price_id,
       monthly_price: plan.monthly_price.toString(),
       interval: plan.interval,
       is_active: plan.is_active,
@@ -235,21 +229,6 @@ export default function SubscriptionPlansManager() {
                   </div>
                 </div>
 
-                {/* Row 2: Stripe IDs */}
-                <div className={styles.planRow2}>
-                  <div className={styles.stripeId}>
-                    <span className={styles.stripeIdLabel}>Product:</span>
-                    <span className={plan.stripe_product_id.startsWith('REPLACE') ? styles.stripeIdWarning : styles.stripeIdValue}>
-                      {plan.stripe_product_id.startsWith('REPLACE') ? '⚠️ Not configured' : plan.stripe_product_id}
-                    </span>
-                  </div>
-                  <div className={styles.stripeId}>
-                    <span className={styles.stripeIdLabel}>Price:</span>
-                    <span className={plan.stripe_price_id.startsWith('REPLACE') ? styles.stripeIdWarning : styles.stripeIdValue}>
-                      {plan.stripe_price_id.startsWith('REPLACE') ? '⚠️ Not configured' : plan.stripe_price_id}
-                    </span>
-                  </div>
-                </div>
               </div>
 
               <div className={styles.planActions}>
@@ -319,52 +298,6 @@ export default function SubscriptionPlansManager() {
                       borderRadius: '6px',
                     }}
                   />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Stripe Product ID *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.stripe_product_id}
-                    onChange={(e) => setFormData({ ...formData, stripe_product_id: e.target.value })}
-                    required
-                    placeholder="prod_xxxxxxxxxxxxx"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontFamily: 'monospace',
-                    }}
-                  />
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                    Find this in Stripe Dashboard → Products
-                  </p>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Stripe Price ID *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.stripe_price_id}
-                    onChange={(e) => setFormData({ ...formData, stripe_price_id: e.target.value })}
-                    required
-                    placeholder="price_xxxxxxxxxxxxx"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontFamily: 'monospace',
-                    }}
-                  />
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                    Find this under the product in Stripe Dashboard
-                  </p>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
