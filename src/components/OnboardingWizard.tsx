@@ -455,7 +455,7 @@ export default function OnboardingWizard({
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const toast = useToast();
 
-  // Step 1: Contact Info
+  // Step 1: Contact Info (includes waitlist intake fields)
   const [firstName, setFirstName] = useState(waitlistData.first_name || '');
   const [lastName, setLastName] = useState(waitlistData.last_name || '');
   const [email, setEmail] = useState(waitlistData.email || '');
@@ -467,6 +467,12 @@ export default function OnboardingWizard({
   const [zipCode, setZipCode] = useState(waitlistData.zip_code || '');
   const [primaryMemberPhoto, setPrimaryMemberPhoto] = useState(waitlistData.photo_url || '');
   const [uploadingPrimaryPhoto, setUploadingPrimaryPhoto] = useState(false);
+
+  // Waitlist intake fields
+  const [company, setCompany] = useState(waitlistData.company || '');
+  const [cityState, setCityState] = useState(waitlistData.city_state || '');
+  const [howDidYouHear, setHowDidYouHear] = useState(waitlistData.how_did_you_hear || '');
+  const [whyNoir, setWhyNoir] = useState(waitlistData.why_noir || '');
 
   // Step 2: Agreement
   const [signerName, setSignerName] = useState(`${waitlistData.first_name} ${waitlistData.last_name}`);
@@ -583,6 +589,17 @@ export default function OnboardingWizard({
       return false;
     }
 
+    // Validate waitlist intake fields
+    if (!company || !cityState || !howDidYouHear || !whyNoir) {
+      toast({
+        title: 'Additional Information Required',
+        description: 'Please complete all fields about your background',
+        status: 'warning',
+        duration: 3000,
+      });
+      return false;
+    }
+
     try {
       const response = await fetch('/api/onboard/save-contact-info', {
         method: 'POST',
@@ -598,7 +615,11 @@ export default function OnboardingWizard({
           city,
           state,
           zip_code: zipCode,
-          photo_url: primaryMemberPhoto
+          photo_url: primaryMemberPhoto,
+          company,
+          city_state: cityState,
+          how_did_you_hear: howDidYouHear,
+          why_noir: whyNoir
         })
       });
 
@@ -1058,6 +1079,59 @@ export default function OnboardingWizard({
                 />
               </FormControl>
             </HStack>
+
+            {/* Divider for waitlist intake section */}
+            <Divider my={2} />
+
+            {/* Waitlist Intake Fields */}
+            <FormControl isRequired>
+              <Input
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Company / Organization"
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <Input
+                value={cityState}
+                onChange={(e) => setCityState(e.target.value)}
+                placeholder="City, State (e.g., Kansas City, MO)"
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <Input
+                value={howDidYouHear}
+                onChange={(e) => setHowDidYouHear(e.target.value)}
+                placeholder="How did you hear about Noir?"
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <Textarea
+                value={whyNoir}
+                onChange={(e) => setWhyNoir(e.target.value)}
+                placeholder="Why do you want to join Noir?"
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+                rows={3}
+              />
+            </FormControl>
           </VStack>
         );
 

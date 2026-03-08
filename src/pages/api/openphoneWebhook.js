@@ -1039,7 +1039,7 @@ export async function handler(req, res) {
       }
 
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
-      const signupUrl = `${baseUrl}/signup/${signupToken}`;
+      const signupUrl = `${baseUrl}/onboard/${signupToken}`;
 
       const invitationMessage = `Thank you for requesting an invitation to join Noir and we are excited to formally invite you to become a member of Noir.
 
@@ -1118,7 +1118,7 @@ Thank you.`;
       }
 
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
-      const signupUrl = `${baseUrl}/skyline/${signupToken}`;
+      const signupUrl = `${baseUrl}/onboard/${signupToken}`;
 
       const skylineMessage = `Thank you for requesting an invitation. We are excited to formally invite you to become a Skyline Member of Noir.
 

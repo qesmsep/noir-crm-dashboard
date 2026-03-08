@@ -13,7 +13,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { token, first_name, last_name, email, phone, address, city, state, zip_code, photo_url } = req.body;
+  const {
+    token,
+    first_name,
+    last_name,
+    email,
+    phone,
+    address,
+    city,
+    state,
+    zip_code,
+    photo_url,
+    date_of_birth,
+    company,
+    city_state,
+    how_did_you_hear,
+    why_noir
+  } = req.body;
 
   console.log('[SAVE CONTACT INFO] Parsed data:', {
     hasToken: !!token,
@@ -25,7 +41,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     hasCity: !!city,
     hasState: !!state,
     hasZipCode: !!zip_code,
-    hasPhoto: !!photo_url
+    hasPhoto: !!photo_url,
+    hasDateOfBirth: !!date_of_birth,
+    hasCompany: !!company,
+    hasCityState: !!city_state,
+    hasHowDidYouHear: !!how_did_you_hear,
+    hasWhyNoir: !!why_noir
   });
 
   if (!token || !first_name || !last_name || !email || !phone || !address || !city || !state || !zip_code) {
@@ -48,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('[SAVE CONTACT INFO] Waitlist found:', { id: waitlist.id });
 
-    // Update waitlist with contact info and address
+    // Update waitlist with contact info, address, and intake fields
     const { error: updateError } = await supabase
       .from('waitlist')
       .update({
@@ -60,7 +81,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         city,
         state,
         zip_code,
-        photo_url
+        photo_url,
+        date_of_birth,
+        company,
+        city_state,
+        how_did_you_hear,
+        why_noir
       })
       .eq('id', waitlist.id);
 
