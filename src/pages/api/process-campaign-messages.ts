@@ -711,12 +711,90 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             continue;
           }
 
+          // Update OpenPhone contact with member info (with 🖤 prefix for members)
+          // Skip contact update for virtual members (guests from reservations)
+          if (member.member_type !== 'guest' && member.member_type !== 'specific_phone') {
+            try {
+              console.log('📇 Updating OpenPhone contact for member...');
+
+              // Create contact name with 🖤 prefix for Quo identification
+              const openphoneFirstName = `🖤${member.first_name || 'Member'}`;
+              const openphoneLastName = member.last_name || '';
+
+              // Search for existing contact
+              const searchResponse = await fetch(`https://api.openphone.com/v1/contacts?phone_number=${formattedPhone}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': process.env.OPENPHONE_API_KEY || '',
+                  'Accept': 'application/json'
+                }
+              });
+
+              let contactId: string | null = null;
+              if (searchResponse.ok) {
+                const searchResult = await searchResponse.json();
+                if (searchResult.data && searchResult.data.length > 0) {
+                  contactId = searchResult.data[0].id;
+                  console.log('📇 Found existing OpenPhone contact:', contactId);
+                }
+              }
+
+              // Prepare contact data
+              const contactPayload = {
+                first_name: openphoneFirstName,
+                last_name: openphoneLastName,
+                phone_number: formattedPhone,
+                email: member.email || '',
+                company: '',
+                notes: ''
+              };
+
+              // Update or create contact
+              let contactResponse: Response;
+              if (contactId) {
+                console.log('📇 Updating existing contact with member info');
+                contactResponse = await fetch(`https://api.openphone.com/v1/contacts/${contactId}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': process.env.OPENPHONE_API_KEY || '',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify(contactPayload)
+                });
+              } else {
+                console.log('📇 Creating new contact with member info');
+                contactResponse = await fetch('https://api.openphone.com/v1/contacts', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': process.env.OPENPHONE_API_KEY || '',
+                    'Accept': 'application/json'
+                  },
+                  body: JSON.stringify(contactPayload)
+                });
+              }
+
+              if (contactResponse.ok) {
+                console.log('✅ OpenPhone contact updated successfully');
+              } else {
+                const errorText = await contactResponse.text();
+                console.error('⚠️  Failed to update OpenPhone contact:', errorText);
+                // Continue sending message even if contact update fails
+              }
+            } catch (contactError) {
+              console.error('⚠️  Error updating OpenPhone contact:', contactError);
+              // Continue sending message even if contact update fails
+            }
+          }
+
           // Send SMS via OpenPhone API
           console.log('📤 Sending SMS via OpenPhone API...');
           console.log('🔑 OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
           console.log('📱 Recipient phone:', formattedPhone);
           console.log('📄 Message content:', messageContent);
-          
+
           const openphoneResponse = await fetch('https://api.openphone.com/v1/messages', {
             method: 'POST',
             headers: {
