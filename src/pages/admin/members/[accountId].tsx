@@ -31,6 +31,8 @@ interface Member {
   city?: string;
   state?: string;
   zip?: string;
+  referral_code?: string;
+  referral_count?: number;
 }
 
 interface Message {
@@ -147,6 +149,9 @@ export default function MemberDetailAdmin() {
     lastAccess: string | null;
     totalSessions: number;
   }>({ lastAccess: null, totalSessions: 0 });
+
+  // Referral code copy state
+  const [copiedReferralCode, setCopiedReferralCode] = useState<string | null>(null);
 
   const toggleMemberExpansion = (memberId: string) => {
     setExpandedMemberIds(prev => {
@@ -508,6 +513,31 @@ export default function MemberDetailAdmin() {
       });
     } finally {
       setSendingLoginInfo(false);
+    }
+  };
+
+  // Copy referral link handler
+  const handleCopyReferralLink = async (memberId: string, referralCode: string) => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const referralLink = `${baseUrl}/refer/${referralCode}`;
+
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopiedReferralCode(memberId);
+      toast({
+        title: 'Copied!',
+        description: 'Referral link copied to clipboard',
+        status: 'success',
+        duration: 2000,
+      });
+      setTimeout(() => setCopiedReferralCode(null), 2000);
+    } catch (err) {
+      toast({
+        title: 'Failed to copy',
+        description: 'Please try again',
+        status: 'error',
+        duration: 3000,
+      });
     }
   };
 
@@ -1752,6 +1782,48 @@ export default function MemberDetailAdmin() {
                                   {member.state && member.state}
                                   {(member.city || member.state) && member.zip && ' '}
                                   {member.zip && member.zip}
+                                </span>
+                              </div>
+                            )}
+                            {member.referral_code && (
+                              <div className={styles.detailRow} style={{ backgroundColor: '#FFF9F0', padding: '8px', borderRadius: '6px', border: '1px solid #A59480' }}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                                </svg>
+                                <span style={{ flex: 1, fontWeight: '600', color: '#2C2C2C' }}>
+                                  {typeof window !== 'undefined' && `${window.location.origin}/refer/${member.referral_code}`}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyReferralLink(member.member_id, member.referral_code!);
+                                  }}
+                                  className={styles.copyButton}
+                                  title="Copy referral link"
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #A59480',
+                                    backgroundColor: copiedReferralCode === member.member_id ? '#4CAF50' : '#A59480',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    transition: 'background-color 0.2s',
+                                    marginLeft: '8px',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {copiedReferralCode === member.member_id ? '✓ Copied' : 'Copy Link'}
+                                </button>
+                              </div>
+                            )}
+                            {member.referral_code && member.referral_count !== undefined && member.referral_count > 0 && (
+                              <div className={styles.detailRow} style={{ fontSize: '12px', color: '#8C7C6D' }}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20" style={{ width: '14px', height: '14px' }}>
+                                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                                </svg>
+                                <span style={{ fontStyle: 'italic' }}>
+                                  {member.referral_count} successful {member.referral_count === 1 ? 'referral' : 'referrals'}
                                 </span>
                               </div>
                             )}
