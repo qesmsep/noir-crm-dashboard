@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { LogOut, CreditCard, Share2, Copy, Check, Building2 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
+import ReferralSection from '@/components/member/ReferralSection';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -322,10 +323,13 @@ export default function MemberProfilePage() {
   const [showAddBankAccount, setShowAddBankAccount] = useState(false);
   const [paymentMethodType, setPaymentMethodType] = useState<'card' | 'us_bank_account'>('card');
 
-  // Referral tracking state
-  const [referralStats, setReferralStats] = useState({ total: 0, active: 0 });
+  // Referral info state
+  const [referralInfo, setReferralInfo] = useState<{
+    referral_code: string;
+    referral_count: number;
+    referrals: any[];
+  } | null>(null);
   const [loadingReferrals, setLoadingReferrals] = useState(true);
-  const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
     if (!loading && !member) {
@@ -362,37 +366,29 @@ export default function MemberProfilePage() {
   };
 
   const fetchReferralStats = async () => {
-    if (!member?.referral_code) {
-      setLoadingReferrals(false);
-      return;
-    }
-
     try {
-      const response = await fetch(`/api/member/referrals?code=${member.referral_code}`, {
-        credentials: 'include',
+      // Get auth token from Supabase
+      const { data: { session } } = await (await import('@/lib/supabase')).supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setLoadingReferrals(false);
+        return;
+      }
+
+      const response = await fetch('/api/member/referral-info', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
-      const data = await response.json();
 
       if (response.ok) {
-        setReferralStats(data.stats || { total: 0, active: 0 });
+        const data = await response.json();
+        setReferralInfo(data);
       }
     } catch (error) {
-      console.error('Error fetching referral stats:', error);
+      console.error('Error fetching referral info:', error);
     } finally {
       setLoadingReferrals(false);
-    }
-  };
-
-  const copyReferralCode = () => {
-    if (member?.referral_code) {
-      navigator.clipboard.writeText(member.referral_code);
-      setCopiedCode(true);
-      toast({
-        title: 'Copied!',
-        description: 'Referral code copied to clipboard',
-        variant: 'success',
-      });
-      setTimeout(() => setCopiedCode(false), 2000);
     }
   };
 
@@ -788,63 +784,15 @@ export default function MemberProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Referral Tracking Card */}
-          {member.referral_code && (
-            <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-sm" style={{ touchAction: 'pan-y pinch-zoom', width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Share2 className="w-5 h-5 text-[#A59480]" />
-                  <CardTitle className="text-xl font-semibold text-[#1F1F1F]">
-                    Referral Program
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {loadingReferrals ? (
-                  <div className="flex justify-center py-4">
-                    <Spinner className="text-[#A59480]" />
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between p-4 bg-[#F6F5F2] rounded-lg border border-[#ECEAE5]">
-                      <div>
-                        <p className="text-xs text-[#8C7C6D] mb-1">Your Referral Code</p>
-                        <p className="text-xl font-semibold text-[#1F1F1F] tracking-wider">
-                          {member.referral_code}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-[#A59480] text-[#A59480] hover:bg-[#A59480] hover:text-white"
-                        onClick={copyReferralCode}
-                      >
-                        {copiedCode ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-[#FBFBFA] rounded-lg border border-[#ECEAE5]">
-                        <p className="text-xs text-[#8C7C6D] mb-1">Total Referrals</p>
-                        <p className="text-2xl font-bold text-[#A59480]">{referralStats.total}</p>
-                      </div>
-                      <div className="p-4 bg-[#FBFBFA] rounded-lg border border-[#ECEAE5]">
-                        <p className="text-xs text-[#8C7C6D] mb-1">Active Members</p>
-                        <p className="text-2xl font-bold text-[#4CAF50]">{referralStats.active}</p>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-[#8C7C6D]">
-                      Share your referral code with friends. When they join Noir using your code, you'll both receive benefits!
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          {/* Referral Section */}
+          {!loadingReferrals && referralInfo && (
+            <div style={{ touchAction: 'pan-y pinch-zoom', width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+              <ReferralSection
+                referralCode={referralInfo.referral_code}
+                referralCount={referralInfo.referral_count}
+                memberId={member.member_id}
+              />
+            </div>
           )}
 
           {/* Account Settings Card */}
