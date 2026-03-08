@@ -179,6 +179,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       state: waitlist.state,
       zip: waitlist.zip_code,
       photo: waitlist.photo_url,
+      join_date: startDate.toISOString(),
       deactivated: false
     })
     .select()
