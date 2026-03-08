@@ -15,8 +15,8 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
   const [lastY, setLastY] = useState(0);
 
   // Canvas internal resolution
-  const CANVAS_WIDTH = 400;
-  const CANVAS_HEIGHT = 200;
+  const CANVAS_WIDTH = 600;
+  const CANVAS_HEIGHT = 300;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -45,8 +45,8 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
     if (!canvas) return { x: 0, y: 0 };
 
     const rect = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_WIDTH / rect.width;
-    const scaleY = CANVAS_HEIGHT / rect.height;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
     const clientX = e.clientX;
     const clientY = e.clientY;
@@ -100,7 +100,6 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
   // Touch event handlers
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (disabled) return;
-    e.preventDefault();
 
     const touch = e.touches[0];
     const { x, y } = getCanvasCoordinates(touch);
@@ -112,7 +111,6 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing || disabled) return;
-    e.preventDefault();
 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -150,21 +148,6 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
 
   return (
     <VStack spacing={3} align="stretch" w="100%">
-      {/* Drawing mode indicator */}
-      {isDrawing && (
-        <Box
-          p={2}
-          bg="blue.50"
-          borderRadius="md"
-          textAlign="center"
-          fontSize="sm"
-          color="blue.700"
-          fontWeight="medium"
-        >
-          Drawing mode active - click to finish
-        </Box>
-      )}
-
       {/* Canvas */}
       <Box
         position="relative"
@@ -179,6 +162,13 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
         bg="white"
         opacity={disabled ? 0.5 : 1}
         cursor={disabled ? 'not-allowed' : 'crosshair'}
+        sx={{
+          '& canvas': {
+            width: '100% !important',
+            height: 'auto !important',
+            display: 'block'
+          }
+        }}
       >
         <canvas
           ref={canvasRef}
@@ -190,9 +180,6 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           style={{
-            width: '100%',
-            height: 'auto',
-            display: 'block',
             touchAction: 'none' // Prevent scrolling on mobile
           }}
         />
@@ -201,9 +188,7 @@ export default function SignatureCanvas({ onSignatureComplete, disabled = false 
       {/* Instructions & Clear button */}
       <HStack justify="space-between" align="center">
         <Text fontSize="sm" color="gray.600">
-          {isDrawing
-            ? '✍️ Drawing...'
-            : 'Click to start, move to draw, click to finish'}
+          Sign above with your finger or mouse
         </Text>
         <Button
           size="sm"

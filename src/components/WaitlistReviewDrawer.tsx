@@ -10,6 +10,9 @@ interface WaitlistEntry {
   company?: string;
   city_state?: string;
   referral?: string;
+  how_did_you_hear?: string;
+  why_noir?: string;
+  occupation?: string;
   visit_frequency?: string;
   go_to_drink?: string;
   status: 'review' | 'approved' | 'denied' | 'waitlisted' | 'archived';
@@ -151,46 +154,54 @@ const WaitlistReviewDrawer: React.FC<WaitlistReviewDrawerProps> = ({
             </div>
           </div>
 
-          {(entry.company || entry.city_state || entry.referral || entry.visit_frequency || entry.go_to_drink) && (
-            <>
-              <div className={styles.divider} />
-              <div className={styles.section}>
-                <h4 className={styles.sectionTitle}>Additional Information</h4>
-                <div className={styles.additionalInfo}>
-                  {entry.company && (
-                    <div className={styles.infoItem}>
-                      <div className={styles.infoLabel}>Company</div>
-                      <div className={styles.infoText}>{entry.company}</div>
-                    </div>
-                  )}
-                  {entry.city_state && (
-                    <div className={styles.infoItem}>
-                      <div className={styles.infoLabel}>Location</div>
-                      <div className={styles.infoText}>{entry.city_state}</div>
-                    </div>
-                  )}
-                  {entry.referral && (
-                    <div className={styles.infoItem}>
-                      <div className={styles.infoLabel}>Referral</div>
-                      <div className={styles.infoText}>{entry.referral}</div>
-                    </div>
-                  )}
-                  {entry.visit_frequency && (
-                    <div className={styles.infoItem}>
-                      <div className={styles.infoLabel}>Visit Frequency</div>
-                      <div className={styles.infoText}>{entry.visit_frequency}</div>
-                    </div>
-                  )}
-                  {entry.go_to_drink && (
-                    <div className={styles.infoItem}>
-                      <div className={styles.infoLabel}>Go-to Drink</div>
-                      <div className={styles.infoText}>{entry.go_to_drink}</div>
-                    </div>
-                  )}
+          <div className={styles.divider} />
+          <div className={styles.section}>
+            <h4 className={styles.sectionTitle}>Additional Information</h4>
+            <div className={styles.additionalInfo}>
+              {entry.company && (
+                <div className={styles.infoItem}>
+                  <div className={styles.infoLabel}>Company</div>
+                  <div className={styles.infoText}>{entry.company}</div>
                 </div>
-              </div>
-            </>
-          )}
+              )}
+              {entry.occupation && (
+                <div className={styles.infoItem}>
+                  <div className={styles.infoLabel}>Occupation</div>
+                  <div className={styles.infoText}>{entry.occupation}</div>
+                </div>
+              )}
+              {entry.city_state && (
+                <div className={styles.infoItem}>
+                  <div className={styles.infoLabel}>Location</div>
+                  <div className={styles.infoText}>{entry.city_state}</div>
+                </div>
+              )}
+              {(entry.referral || entry.how_did_you_hear) && (
+                <div className={styles.infoItem}>
+                  <div className={styles.infoLabel}>Who referred you / How did you hear</div>
+                  <div className={styles.infoText}>{entry.referral || entry.how_did_you_hear}</div>
+                </div>
+              )}
+              {entry.why_noir && (
+                <div className={styles.infoItem}>
+                  <div className={styles.infoLabel}>Why do you want to join Noir?</div>
+                  <div className={styles.infoText}>{entry.why_noir}</div>
+                </div>
+              )}
+              {entry.visit_frequency && (
+                <div className={styles.infoItem}>
+                  <div className={styles.infoLabel}>Visit Frequency</div>
+                  <div className={styles.infoText}>{entry.visit_frequency}</div>
+                </div>
+              )}
+              {entry.go_to_drink && (
+                <div className={styles.infoItem}>
+                  <div className={styles.infoLabel}>Go-to Drink</div>
+                  <div className={styles.infoText}>{entry.go_to_drink}</div>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className={styles.divider} />
 

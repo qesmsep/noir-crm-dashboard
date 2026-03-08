@@ -152,6 +152,12 @@ export default async function handler(req, res) {
 
         if (status) {
           query = query.eq('status', status);
+
+          // For "approved" status, only show those who haven't completed onboarding yet
+          // (i.e., those who don't have a member_id)
+          if (status === 'approved') {
+            query = query.is('member_id', null);
+          }
         }
 
         console.log('[WAITLIST API] Executing database query...');
@@ -182,22 +188,34 @@ export default async function handler(req, res) {
           totalCount: count
         });
 
-        // Get count by status - handle RPC errors gracefully
+        // Get count by status
         let statusCounts = [];
         try {
           console.log('[WAITLIST API] Fetching status counts...');
-          const { data: counts, error: rpcError } = await supabase
-            .rpc('get_waitlist_count_by_status');
-          
-          if (rpcError) {
-            console.error('[WAITLIST API] RPC error (non-fatal):', rpcError);
-            // Continue without status counts rather than failing
-          } else {
-            statusCounts = counts || [];
-            console.log('[WAITLIST API] Status counts retrieved:', statusCounts.length);
-          }
+
+          // Get counts for each status
+          const statuses = ['review', 'approved', 'waitlisted', 'denied', 'archived'];
+          const counts = await Promise.all(
+            statuses.map(async (s) => {
+              let countQuery = supabase
+                .from('waitlist')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', s);
+
+              // For approved, only count those who haven't completed onboarding
+              if (s === 'approved') {
+                countQuery = countQuery.is('member_id', null);
+              }
+
+              const { count } = await countQuery;
+              return { status: s, count: count || 0 };
+            })
+          );
+
+          statusCounts = counts;
+          console.log('[WAITLIST API] Status counts retrieved:', statusCounts);
         } catch (rpcErr) {
-          console.error('[WAITLIST API] Exception in RPC call (non-fatal):', rpcErr);
+          console.error('[WAITLIST API] Exception fetching status counts (non-fatal):', rpcErr);
           // Continue without status counts
         }
 
@@ -223,6 +241,86 @@ export default async function handler(req, res) {
         });
       }
     }
+
+  if (req.method === 'POST') {
+    try {
+      const { id, action } = req.body;
+
+      if (!id || action !== 'generate_link') {
+        return res.status(400).json({ error: 'Invalid request' });
+      }
+
+      // Get the waitlist entry
+      const { data: waitlistEntry, error: fetchError } = await supabase
+        .from('waitlist')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !waitlistEntry) {
+        return res.status(404).json({ error: 'Waitlist entry not found' });
+      }
+
+      // Generate new application token
+      const applicationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
+
+      // Update waitlist with new token
+      await supabase
+        .from('waitlist')
+        .update({
+          agreement_token: applicationToken,
+          agreement_token_created_at: new Date().toISOString(),
+          application_link_sent_at: new Date().toISOString(),
+          application_expires_at: expiresAt.toISOString(),
+          status: 'link_sent'
+        })
+        .eq('id', id);
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
+      const signupUrl = `${baseUrl}/signup/${applicationToken}`;
+
+      const smsMessage = `Hi {firstName} - Your Noir membership application link:\n\n${signupUrl}\n\nThis link expires in 7 days. Complete your profile to continue.\n\nQuestions? Just reply. 🖤`;
+
+      // Prepare contact data for OpenPhone
+      const contactData = {
+        first_name: waitlistEntry.first_name || '',
+        last_name: waitlistEntry.last_name || '',
+        email: waitlistEntry.email || '',
+        company: waitlistEntry.company || '',
+        notes: `Application link sent - ${waitlistEntry.city_state || ''} - ${waitlistEntry.referral || ''}`
+      };
+
+      // Update OpenPhone contact and send personalized message
+      let result;
+      try {
+        result = await updateContactAndSendPersonalizedMessage(
+          waitlistEntry.phone,
+          contactData,
+          smsMessage
+        );
+      } catch (smsError) {
+        console.error('[WAITLIST API] Error sending personalized SMS:', smsError);
+        result = { success: false, error: smsError.message };
+      }
+
+      if (!result.success) {
+        console.error('Failed to send personalized SMS:', result.error);
+        // Fallback to regular SMS
+        await sendSMS(waitlistEntry.phone, smsMessage.replace(/\{firstName\}/g, waitlistEntry.first_name || 'there'));
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Application link generated and sent successfully'
+      });
+
+    } catch (error) {
+      console.error('Error in waitlist POST:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
 
   if (req.method === 'PATCH') {
     try {
@@ -356,7 +454,7 @@ export default async function handler(req, res) {
   }
 
     // Method not allowed
-    res.setHeader('Allow', ['GET', 'PATCH']);
+    res.setHeader('Allow', ['GET', 'POST', 'PATCH']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   } catch (error) {
     // Catch any unhandled errors (like Supabase initialization failures)

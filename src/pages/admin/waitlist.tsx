@@ -227,18 +227,32 @@ export default function WaitlistPage() {
         </div>
 
         <div className={styles.filters}>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={styles.select}
-          >
-            <option value="">All Statuses</option>
-            <option value="review">Review</option>
-            <option value="approved">Approved</option>
-            <option value="waitlisted">Waitlisted</option>
-            <option value="denied">Denied</option>
-            <option value="archived">Archived</option>
-          </select>
+          <div className={styles.filterButtons}>
+            <button
+              onClick={() => setStatusFilter('review')}
+              className={`${styles.filterButton} ${statusFilter === 'review' ? styles.filterButtonActive : ''}`}
+            >
+              Review
+            </button>
+            <button
+              onClick={() => setStatusFilter('approved')}
+              className={`${styles.filterButton} ${statusFilter === 'approved' ? styles.filterButtonActive : ''}`}
+            >
+              Approved
+            </button>
+            <button
+              onClick={() => setStatusFilter('archived')}
+              className={`${styles.filterButton} ${statusFilter === 'archived' ? styles.filterButtonActive : ''}`}
+            >
+              Archived
+            </button>
+            <button
+              onClick={() => setStatusFilter('')}
+              className={`${styles.filterButton} ${statusFilter === '' ? styles.filterButtonActive : ''}`}
+            >
+              All
+            </button>
+          </div>
 
           <div className={styles.searchContainer}>
             <svg className={styles.searchIcon} viewBox="0 0 20 20" fill="currentColor">
@@ -265,91 +279,94 @@ export default function WaitlistPage() {
             <div className={styles.entriesList}>
               {filteredEntries.map((entry) => (
                 <div key={entry.id} className={styles.entryCard}>
-                  <div className={styles.entryHeader}>
-                    <div>
-                      <h3 className={styles.entryName}>
-                        {entry.first_name} {entry.last_name}
-                      </h3>
-                      <span className={`${styles.statusBadge} ${getStatusColor(entry.status)}`}>
-                        {entry.status.toUpperCase()}
-                      </span>
+                  <div
+                    className={styles.entryCol}
+                    onClick={() => {
+                      setSelectedEntry(entry);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    <div className={styles.entryName}>
+                      {entry.first_name} {entry.last_name}
                     </div>
-                    <div className={styles.entryDate}>{formatDate(entry.submitted_at)}</div>
+                    <span className={`${styles.statusBadge} ${getStatusColor(entry.status)}`}>
+                      {entry.status.toUpperCase()}
+                    </span>
                   </div>
+                  <div
+                    className={styles.entryCol}
+                    onClick={() => {
+                      setSelectedEntry(entry);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    {formatPhone(entry.phone)}
+                  </div>
+                  <div
+                    className={styles.entryCol}
+                    onClick={() => {
+                      setSelectedEntry(entry);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    {entry.referral || entry.how_did_you_hear || '-'}
+                  </div>
+                  <div
+                    className={styles.entryCol}
+                    onClick={() => {
+                      setSelectedEntry(entry);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    {formatDate(entry.submitted_at)}
+                  </div>
+                  <div className={styles.entryColActions}>
+                    {entry.status === 'review' && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`Approve ${entry.first_name} ${entry.last_name}?`)) {
+                            try {
+                              const response = await fetch('/api/waitlist', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  id: entry.id,
+                                  status: 'approved'
+                                }),
+                              });
 
-                  <div className={styles.entryInfo}>
-                    <div className={styles.infoRow}>
-                      <svg className={styles.infoIcon} viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                        <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                      </svg>
-                      <span className={styles.infoText}>{entry.email}</span>
-                    </div>
-                    <div className={styles.infoRow}>
-                      <svg className={styles.infoIcon} viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                      </svg>
-                      <span className={styles.infoText}>{formatPhone(entry.phone)}</span>
-                    </div>
-                    {(entry.company || entry.city_state) && (
-                      <div className={styles.infoRow}>
-                        <svg className={styles.infoIcon} viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                              const data = await response.json();
+
+                              if (response.ok) {
+                                showToast('Entry approved successfully', 'success');
+                                fetchWaitlist();
+                              } else {
+                                const errorMessage = data.message || data.error || 'Failed to approve entry';
+                                console.error('Approve error:', data);
+                                throw new Error(errorMessage);
+                              }
+                            } catch (error) {
+                              console.error('Error approving entry:', error);
+                              const errorMessage = error instanceof Error ? error.message : 'Failed to approve entry';
+                              showToast(errorMessage, 'error');
+                            }
+                          }
+                        }}
+                        className={styles.approveButton}
+                        title="Approve"
+                        aria-label="Approve entry"
+                      >
+                        <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <div className={styles.infoText}>
-                          {entry.company || '-'}
-                          {entry.company && entry.city_state && (
-                            <span className={styles.infoSubtext}>{entry.city_state}</span>
-                          )}
-                        </div>
-                      </div>
+                        Approve
+                      </button>
                     )}
-                  </div>
-
-                  {(entry.why_noir || entry.occupation || entry.how_did_you_hear) && (
-                    <details className={styles.details}>
-                      <summary className={styles.detailsToggle}>More Details</summary>
-                      <div className={styles.detailsContent}>
-                        {entry.why_noir && (
-                          <div className={styles.detailItem}>
-                            <div className={styles.detailLabel}>Why Noir?</div>
-                            <div className={styles.detailValue}>{entry.why_noir}</div>
-                          </div>
-                        )}
-                        {entry.occupation && (
-                          <div className={styles.detailItem}>
-                            <div className={styles.detailLabel}>Occupation</div>
-                            <div className={styles.detailValue}>{entry.occupation}</div>
-                          </div>
-                        )}
-                        {entry.how_did_you_hear && (
-                          <div className={styles.detailItem}>
-                            <div className={styles.detailLabel}>How did you hear about us?</div>
-                            <div className={styles.detailValue}>{entry.how_did_you_hear}</div>
-                          </div>
-                        )}
-                      </div>
-                    </details>
-                  )}
-
-                  <div className={styles.entryActions}>
-                    <button
-                      onClick={() => {
-                        setSelectedEntry(entry);
-                        setIsModalOpen(true);
-                      }}
-                      className={styles.iconButton}
-                      title="Review"
-                      aria-label="Review entry"
-                    >
-                      <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M10 3.33334C6.66667 3.33334 3.91667 5.41667 2.5 8.33334C3.91667 11.25 6.66667 13.3333 10 13.3333C13.3333 13.3333 16.0833 11.25 17.5 8.33334C16.0833 5.41667 13.3333 3.33334 10 3.33334Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
                     {entry.status !== 'archived' && (
                       <button
-                        onClick={async () => {
+                        onClick={async (e) => {
+                          e.stopPropagation();
                           if (confirm(`Archive ${entry.first_name} ${entry.last_name}? This will archive the inquiry and filter it out from the main view.`)) {
                             try {
                               const response = await fetch('/api/waitlist', {

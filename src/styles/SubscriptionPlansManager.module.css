@@ -220,6 +220,11 @@
   color: #991b1b;
 }
 
+.planStatus.onboarding {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
 .planPrice {
   display: flex;
   align-items: center;
