@@ -82,6 +82,13 @@ export default function MemberSubscriptionCard({
       // Extract subscription data from account
       const account = result.data;
 
+      console.log('[MemberSubscriptionCard] Account data:', {
+        subscription_start_date: account.subscription_start_date,
+        next_billing_date: account.next_billing_date,
+        subscription_status: account.subscription_status,
+        monthly_dues: account.monthly_dues
+      });
+
       // Fetch member count to calculate additional member fees
       let secondaryMemberCount = 0;
       try {
@@ -144,7 +151,7 @@ export default function MemberSubscriptionCard({
       setBaseMRR(calculatedBaseMRR);
       setAdditionalMemberFeeRate(feeRate);
 
-      setSubscription({
+      const subscriptionData = {
         stripe_subscription_id: account.stripe_subscription_id || null,
         subscription_status: account.subscription_status || null,
         subscription_start_date: account.subscription_start_date || null,
@@ -156,7 +163,14 @@ export default function MemberSubscriptionCard({
         payment_method_brand: account.payment_method_brand || null,
         current_price_id: currentPriceId,
         is_paused: isPaused,
+      };
+
+      console.log('[MemberSubscriptionCard] Subscription data set:', {
+        subscription_start_date: subscriptionData.subscription_start_date,
+        next_renewal_date: subscriptionData.next_renewal_date,
       });
+
+      setSubscription(subscriptionData);
     } catch (error: any) {
       console.error('Error fetching subscription data:', error);
       toast({
