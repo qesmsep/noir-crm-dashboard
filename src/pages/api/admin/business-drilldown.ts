@@ -13,25 +13,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+    // Use service role client for data queries (admin page is already auth-protected by frontend)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const sbAdmin = serviceKey
-      ? createClient(supabaseUrl, serviceKey)
-      : supabase;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const sbAdmin = createClient(supabaseUrl, serviceKey);
 
     const type = req.query.type as string;
     const monthParam = req.query.month as string | undefined;

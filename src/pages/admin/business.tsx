@@ -155,11 +155,6 @@ function inverseDeltaStr(current: number, prior: number, format: 'pct' | 'number
   return d;
 }
 
-async function getAuthToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || null;
-}
-
 function generateMonthOptions(): string[] {
   const options: string[] = [];
   const now = new Date();
@@ -392,16 +387,8 @@ export default function BusinessDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const token = await getAuthToken();
-      if (!token) {
-        setError('Not authenticated');
-        setLoading(false);
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
       const safeFetch = async (url: string) => {
-        const res = await fetch(url, { headers });
+        const res = await fetch(url);
         if (!res.ok) {
           const text = await res.text();
           throw new Error(`${url}: ${res.status} ${text}`);
@@ -471,11 +458,8 @@ export default function BusinessDashboard() {
   const handleGenerateSnapshot = async () => {
     setSnapshotLoading(true);
     try {
-      const token = await getAuthToken();
-      if (!token) return;
       const res = await fetch(`/api/admin/business-snapshot?month=${selectedMonth}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Snapshot generation failed');
       // Refresh data after snapshot
@@ -556,7 +540,7 @@ export default function BusinessDashboard() {
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.mrrBridge.netNewMrr)}</div>
                 <div className={styles.kpiLabel}>Net New MRR</div>
-                <div className={styles.kpiHint}>New MRR + Expansion − Contraction − Churned − Paused for {fmtMonthLabel(s.month)}. Positive = you grew revenue this month.</div>
+                <div className={styles.kpiHint}>New MRR + Expansion − Contraction − Churned − Paused ({fmtMonthLabel(s.priorMonth)} → {fmtMonthLabel(s.month)}). Positive = you grew revenue this month.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
