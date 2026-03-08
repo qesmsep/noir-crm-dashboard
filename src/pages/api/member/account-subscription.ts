@@ -4,6 +4,7 @@ import { parse } from 'cookie';
 
 /**
  * Get subscription details for the logged-in member's account
+ * Uses ONLY database data - no Stripe calls
  */
 export default async function handler(
   req: NextApiRequest,
@@ -43,19 +44,19 @@ export default async function handler(
     // Get account data
     const { data: account, error: accountError } = await supabaseAdmin
       .from('accounts')
-      .select('account_id, next_renewal_date, monthly_dues')
+      .select('account_id, next_billing_date, monthly_dues')
       .eq('account_id', member.account_id)
       .single();
 
     if (accountError) {
-      console.error('Error fetching account subscription:', accountError);
-      return res.status(500).json({ error: 'Failed to fetch subscription data' });
+      console.error('Error fetching account:', accountError);
+      return res.status(500).json({ error: 'Failed to fetch account data' });
     }
 
-    // Get all members for this account to determine pricing
+    // Get all members for this account
     const { data: allMembers, error: membersError } = await supabaseAdmin
       .from('members')
-      .select('member_id, member_type, membership')
+      .select('member_id, member_type, membership, monthly_dues, next_renewal_date')
       .eq('account_id', member.account_id)
       .eq('deactivated', false);
 
@@ -64,33 +65,25 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to fetch member data' });
     }
 
-    // Find primary member to get membership type
+    // Find primary member
     const primaryMember = allMembers?.find(m => m.member_type === 'primary');
-    const membershipType = primaryMember?.membership;
 
-    // Count secondary members
-    const actualSecondaryCount = allMembers?.filter(m => m.member_type === 'secondary').length || 0;
+    // Calculate base MRR from primary member's monthly_dues
+    const baseMRR = primaryMember?.monthly_dues || 0;
 
-    // Calculate base MRR from membership type
-    const getMembershipPrice = (membershipType: string | null | undefined): number => {
-      switch (membershipType) {
-        case 'Skyline':
-          return 250;
-        case 'Duo':
-          return 175;
-        case 'Solo':
-          return 150;
-        default:
-          return 0;
-      }
-    };
+    // Count secondary members and calculate their total
+    const secondaryMembers = allMembers?.filter(m => m.member_type === 'secondary') || [];
+    const secondaryMemberCount = secondaryMembers.length;
 
-    const baseMRR = getMembershipPrice(membershipType);
-    const secondaryMemberCount = actualSecondaryCount;
+    // Get next renewal date from primary member or account
+    const nextRenewalDate = primaryMember?.next_renewal_date || account.next_billing_date;
 
     res.status(200).json({
-      subscription: account || null,
-      baseMRR,
+      subscription: {
+        next_renewal_date: nextRenewalDate,
+        monthly_dues: account.monthly_dues,
+      },
+      baseMRR: Number(baseMRR),
       secondaryMemberCount,
     });
   } catch (error) {
