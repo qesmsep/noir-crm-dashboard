@@ -226,9 +226,19 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (accounts && accounts.length > 0) {
-    return res.status(400).json({
-      error: 'Cannot delete plan that is currently assigned to accounts. Deactivate it instead.'
-    });
+    // Instead of blocking deletion, set membership_plan_id to NULL for affected accounts
+    // The account still has monthly_dues, subscription_status, etc. stored independently
+    const { error: updateError } = await supabase
+      .from('accounts')
+      .update({ membership_plan_id: null })
+      .eq('membership_plan_id', id);
+
+    if (updateError) {
+      console.error('Error clearing plan from accounts:', updateError);
+      return res.status(500).json({ error: 'Failed to clear plan from accounts before deletion' });
+    }
+
+    console.log(`Cleared membership_plan_id from ${accounts.length} account(s) before deleting plan`);
   }
 
   // Delete plan
