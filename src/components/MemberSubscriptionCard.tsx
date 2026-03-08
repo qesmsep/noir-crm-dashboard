@@ -99,7 +99,7 @@ export default function MemberSubscriptionCard({
         console.error('Error fetching members:', err);
       }
 
-      // If there's a subscription, fetch actual base amount from Stripe
+      // Calculate base MRR from Stripe subscription OR monthly_dues field
       let currentPriceId = null;
       let stripeBaseMRR = 0;
       let isPaused = false;
@@ -127,13 +127,12 @@ export default function MemberSubscriptionCard({
         }
       }
 
-      // Use Stripe base MRR - no fallback!
+      // Use Stripe base MRR if available, otherwise use monthly_dues from account
       let calculatedBaseMRR = stripeBaseMRR;
 
-      // If we couldn't get base MRR from Stripe, that's an error state
-      if (calculatedBaseMRR === 0 && account.stripe_subscription_id) {
-        console.error('Failed to fetch base MRR from Stripe for subscription:', account.stripe_subscription_id);
-        // Set to 0 and let the UI show error state
+      // For non-Stripe memberships, use monthly_dues field
+      if (calculatedBaseMRR === 0 && account.monthly_dues) {
+        calculatedBaseMRR = Number(account.monthly_dues);
       }
 
       // Determine additional member fee rate based on plan
@@ -150,7 +149,7 @@ export default function MemberSubscriptionCard({
         subscription_status: account.subscription_status || null,
         subscription_start_date: account.subscription_start_date || null,
         subscription_cancel_at: account.subscription_cancel_at || null,
-        next_renewal_date: account.next_renewal_date || null,
+        next_renewal_date: account.next_billing_date || account.next_renewal_date || null,
         monthly_dues: account.monthly_dues || null,
         payment_method_type: account.payment_method_type || null,
         payment_method_last4: account.payment_method_last4 || null,
@@ -335,7 +334,12 @@ export default function MemberSubscriptionCard({
     );
   }
 
-  if (!subscription || !subscription.stripe_subscription_id) {
+  // Check if there's an active membership (Stripe or non-Stripe)
+  const hasActiveMembership = subscription &&
+    (subscription.stripe_subscription_id ||
+     (subscription.subscription_status === 'active' && subscription.monthly_dues));
+
+  if (!subscription || !hasActiveMembership) {
     return (
       <>
         <div className={styles.card}>

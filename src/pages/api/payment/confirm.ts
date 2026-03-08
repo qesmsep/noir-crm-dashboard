@@ -24,11 +24,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Get waitlist entry
+    // Get waitlist entry (check both application_token and agreement_token)
     const { data: waitlist, error: waitlistError } = await supabase
       .from('waitlist')
       .select('*')
-      .eq('application_token', token)
+      .or(`application_token.eq.${token},agreement_token.eq.${token}`)
       .single();
 
     if (waitlistError || !waitlist) {
@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true, message: 'Already processed' });
     }
 
-    // Verify payment with Stripe
+    // Verify payment with Stripe (we use Stripe for payment processing only, not subscriptions)
     if (!waitlist.stripe_payment_intent_id) {
       return res.status(400).json({ error: 'No payment intent found' });
     }
@@ -51,8 +51,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Payment not completed' });
     }
 
+    // Save the payment method to the customer for future charges
+    if (paymentIntent.payment_method && waitlist.stripe_customer_id) {
+      try {
+        // Attach the payment method to the customer if not already attached
+        await stripe.paymentMethods.attach(
+          paymentIntent.payment_method as string,
+          { customer: waitlist.stripe_customer_id }
+        );
+
+        // Set it as the default payment method for the customer
+        await stripe.customers.update(waitlist.stripe_customer_id, {
+          invoice_settings: {
+            default_payment_method: paymentIntent.payment_method as string,
+          },
+        });
+
+        console.log('Payment method saved as default for customer:', waitlist.stripe_customer_id);
+      } catch (error: any) {
+        // If payment method is already attached, that's fine
+        if (error.code !== 'resource_already_exists') {
+          console.error('Error saving payment method:', error);
+        }
+      }
+    }
+
     // Create member and account
-    const memberData = await createMemberFromWaitlist(waitlist);
+    const memberData = await createMemberFromWaitlist(waitlist, paymentIntent);
 
     // Update waitlist with completion data
     await supabase
@@ -84,13 +109,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 // Helper function to create member from waitlist
-async function createMemberFromWaitlist(waitlist: any) {
+async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
+  // Get membership plan details
+  const { data: plan } = await supabase
+    .from('subscription_plans')
+    .select('id, monthly_price')
+    .eq('plan_name', waitlist.selected_membership)
+    .single();
+
+  const monthlyDues = plan?.monthly_price || 50;
+  const membershipPlanId = plan?.id || null;
+
+  // Calculate next billing date (1 month from now)
+  const startDate = new Date();
+  const nextBillingDate = new Date(startDate);
+  nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
+  // Extract payment method details from the payment intent
+  let paymentMethodType = null;
+  let paymentMethodLast4 = null;
+  let paymentMethodBrand = null;
+
+  if (paymentIntent.payment_method) {
+    const pm = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+    if (pm.card) {
+      paymentMethodType = 'card';
+      paymentMethodLast4 = pm.card.last4;
+      paymentMethodBrand = pm.card.brand;
+    } else if (pm.us_bank_account) {
+      paymentMethodType = 'us_bank_account';
+      paymentMethodLast4 = pm.us_bank_account.last4;
+      paymentMethodBrand = pm.us_bank_account.bank_name;
+    }
+  }
+
   // Create account first
   const { data: account, error: accountError } = await supabase
     .from('accounts')
     .insert({
-      account_name: `${waitlist.first_name} ${waitlist.last_name}`,
-      status: 'active'
+      stripe_customer_id: waitlist.stripe_customer_id,
+      subscription_status: 'active',
+      subscription_start_date: startDate.toISOString(),
+      next_billing_date: nextBillingDate.toISOString(),
+      monthly_dues: monthlyDues,
+      membership_plan_id: membershipPlanId,
+      payment_method_type: paymentMethodType,
+      payment_method_last4: paymentMethodLast4,
+      payment_method_brand: paymentMethodBrand
     })
     .select()
     .single();
@@ -101,15 +166,19 @@ async function createMemberFromWaitlist(waitlist: any) {
   const { data: member, error: memberError } = await supabase
     .from('members')
     .insert({
-      account_id: account.id,
+      account_id: account.account_id,
       first_name: waitlist.first_name,
       last_name: waitlist.last_name,
       email: waitlist.email,
       phone: waitlist.phone,
       membership: waitlist.selected_membership || 'Solo',
-      monthly_credit: await getMonthlyCreditForMembership(waitlist.selected_membership),
+      monthly_credit: monthlyDues,
       stripe_customer_id: waitlist.stripe_customer_id,
-      photo_url: waitlist.photo_url,
+      address: waitlist.address,
+      city: waitlist.city,
+      state: waitlist.state,
+      zip: waitlist.zip_code,
+      photo: waitlist.photo_url,
       deactivated: false
     })
     .select()
@@ -119,9 +188,9 @@ async function createMemberFromWaitlist(waitlist: any) {
 
   // Create initial ledger entry for membership payment
   await supabase
-    .from('ledger_entries')
+    .from('ledger')
     .insert({
-      account_id: account.id,
+      account_id: account.account_id,
       member_id: member.member_id,
       type: 'payment',
       amount: (waitlist.payment_amount / 100).toFixed(2), // Convert cents to dollars
@@ -130,7 +199,7 @@ async function createMemberFromWaitlist(waitlist: any) {
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id
     });
 
-  return { member_id: member.member_id, account_id: account.id };
+  return { member_id: member.member_id, account_id: account.account_id };
 }
 
 // Helper function to get monthly credit based on membership
