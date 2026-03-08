@@ -194,12 +194,6 @@ export default function DashboardV2() {
   const [reservationDetails, setReservationDetails] = useState<any[]>([]);
   const [selectedWaitlistEntry, setSelectedWaitlistEntry] = useState<any>(null);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
-  const [portalAccessStats, setPortalAccessStats] = useState<{
-    monthlyAccessCount: number;
-    totalSessions: number;
-    accessLog: any[];
-  }>({ monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
-  const [showPortalAccessModal, setShowPortalAccessModal] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setStats(s => ({ ...s, loading: true }));
@@ -236,8 +230,7 @@ export default function DashboardV2() {
         financialResult,
         waitlistResult,
         waitlistedResult,
-        privateEventsResult,
-        portalAccessResult
+        privateEventsResult
       ] = await Promise.all([
         safeFetch("/api/members"),
         safeFetch("/api/ledger"),
@@ -251,8 +244,7 @@ export default function DashboardV2() {
           const startDate = now.toISOString();
           const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
           return safeFetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
-        })(),
-        safeFetch("/api/admin/portal-access-stats")
+        })()
       ]);
 
       // Debug: Log API responses to understand format
@@ -312,10 +304,6 @@ export default function DashboardV2() {
         ? privateEventsResult
         : { data: privateEventsResult.data || privateEventsResult || [] };
 
-      const portalAccessData = portalAccessResult.error || portalAccessResult.success === false
-        ? { monthlyAccessCount: 0, totalSessions: 0, accessLog: [] }
-        : portalAccessResult;
-
       setStats({
         members: membersData.data || [],
         ledger: ledgerData.data || [],
@@ -330,7 +318,6 @@ export default function DashboardV2() {
         privateEvents: privateEventsData.data || [],
       });
       setReservationDetails(reservationsData.data || []);
-      setPortalAccessStats(portalAccessData);
     } catch (err) {
       console.error('Error fetching stats:', err);
       setStats({ members: [], ledger: [], reservations: 0, outstanding: 0, loading: false, waitlistCount: 0, waitlistEntries: [], invitationRequestsCount: 0, invitationRequests: [], privateEvents: [] });
@@ -685,26 +672,6 @@ export default function DashboardV2() {
             </div>
           </div>
 
-          <div
-            className={styles.metricCard}
-            onClick={() => setShowPortalAccessModal(true)}
-            style={{ cursor: 'pointer' }}
-          >
-            <div className={styles.metricHeader}>
-              <span>Monthly Portal Access</span>
-            </div>
-            <div className={styles.metricValueLarge}>
-              {portalAccessStats.monthlyAccessCount}
-            </div>
-            <div className={styles.metricSubtitle}>
-              Unique members accessed in last 30 days
-            </div>
-            <div className={styles.metricStatRow}>
-              <span>Total Sessions</span>
-              <strong>{portalAccessStats.totalSessions}</strong>
-            </div>
-          </div>
-
           <div className={styles.metricCard}>
             <div className={styles.metricHeader}>
               <span>YTD Total Revenue</span>
@@ -831,54 +798,6 @@ export default function DashboardV2() {
           entry={selectedWaitlistEntry}
           onStatusUpdate={fetchStats}
         />
-
-        {/* Portal Access Modal */}
-        {showPortalAccessModal && (
-          <div className={styles.modalOverlay} onClick={() => setShowPortalAccessModal(false)}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h2>Member Portal Access Log (Last 30 Days)</h2>
-                <button className={styles.modalClose} onClick={() => setShowPortalAccessModal(false)}>✕</button>
-              </div>
-              <div className={styles.modalBody}>
-                <div style={{ marginBottom: '20px' }}>
-                  <strong>Total Unique Members:</strong> {portalAccessStats.monthlyAccessCount} |
-                  <strong style={{ marginLeft: '20px' }}>Total Sessions:</strong> {portalAccessStats.totalSessions}
-                </div>
-                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #ddd', textAlign: 'left' }}>
-                        <th style={{ padding: '12px' }}>Member</th>
-                        <th style={{ padding: '12px' }}>Email</th>
-                        <th style={{ padding: '12px' }}>First Access</th>
-                        <th style={{ padding: '12px' }}>Last Activity</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {portalAccessStats.accessLog.map((log, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: '12px' }}>
-                            <Link href={`/admin/members/${log.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
-                              {log.member_name}
-                            </Link>
-                          </td>
-                          <td style={{ padding: '12px', color: '#666' }}>{log.email}</td>
-                          <td style={{ padding: '12px', color: '#666' }}>
-                            {new Date(log.first_access).toLocaleString()}
-                          </td>
-                          <td style={{ padding: '12px', color: '#666' }}>
-                            {new Date(log.last_activity).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </AdminLayout>
   );

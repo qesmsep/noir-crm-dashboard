@@ -379,6 +379,12 @@ export default function BusinessDashboard() {
   const [lastMonthRevenue, setLastMonthRevenue] = useState<number | null>(null);
   const [monthlyRevenueBreakdown, setMonthlyRevenueBreakdown] = useState<{ month: string; revenue: number }[]>([]);
   const [showRevenueModal, setShowRevenueModal] = useState(false);
+  const [portalAccessStats, setPortalAccessStats] = useState<{
+    monthlyAccessCount: number;
+    totalSessions: number;
+    accessLog: any[];
+  }>({ monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
+  const [showPortalAccessModal, setShowPortalAccessModal] = useState(false);
 
   const monthOptions = useMemo(() => generateMonthOptions(), []);
 
@@ -403,7 +409,7 @@ export default function BusinessDashboard() {
         return res.json();
       };
 
-      const [summaryRes, seriesRes, cohortsRes, churnRes, expRes, attachRes, financialRes] = await Promise.all([
+      const [summaryRes, seriesRes, cohortsRes, churnRes, expRes, attachRes, financialRes, portalAccessRes] = await Promise.all([
         safeFetch(`/api/admin/business-summary?month=${month}`),
         safeFetch(`/api/admin/business-series?month=${month}&months=12`),
         safeFetch(`/api/admin/business-cohorts?month=${month}&months=12`),
@@ -411,6 +417,7 @@ export default function BusinessDashboard() {
         safeFetch(`/api/admin/business-drilldown?type=expansion&month=${month}`),
         safeFetch(`/api/admin/business-drilldown?type=attach&month=${month}`),
         safeFetch(`/api/financial-metrics`),
+        safeFetch(`/api/admin/portal-access-stats`),
       ]);
 
       setSummary(summaryRes.data);
@@ -421,6 +428,7 @@ export default function BusinessDashboard() {
       setDrillAttach(attachRes.data || []);
       setAvgMonthlyRevenue(financialRes.averageMonthlyRevenue?.total ?? null);
       setCurrentMonthRevenue(financialRes.julyRevenue?.total ?? null);
+      setPortalAccessStats(portalAccessRes || { monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
 
       const breakdown = financialRes.averageMonthlyRevenue?.monthlyBreakdown ?? [];
       setMonthlyRevenueBreakdown(breakdown);
@@ -579,6 +587,11 @@ export default function BusinessDashboard() {
                 <div className={styles.kpiValue}>{activeAccountCount ?? '--'}</div>
                 <div className={styles.kpiLabel}>Active Accounts</div>
                 <div className={styles.kpiHint}>Total number of accounts with primary membership as Skyline, Noir Solo, or Noir Duo that are active and not archived/paused/deactivated.</div>
+              </div>
+              <div className={styles.kpiTile} onClick={() => setShowPortalAccessModal(true)} style={{ cursor: 'pointer' }}>
+                <div className={styles.kpiValue}>{portalAccessStats.monthlyAccessCount}</div>
+                <div className={styles.kpiLabel}>Monthly Portal Access</div>
+                <div className={styles.kpiHint}>Unique members who accessed the member portal in the last 30 days. Total sessions: {portalAccessStats.totalSessions}. Click for details.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.nrr)}</div>
@@ -865,6 +878,54 @@ export default function BusinessDashboard() {
                 </div>
                 <div className={styles.modalHint}>
                   Total revenue from all member payments (dues + purchases) for each month.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Portal Access Modal */}
+        {showPortalAccessModal && (
+          <div className={styles.modalOverlay} onClick={() => setShowPortalAccessModal(false)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Member Portal Access Log (Last 30 Days)</h2>
+                <button className={styles.modalClose} onClick={() => setShowPortalAccessModal(false)}>×</button>
+              </div>
+              <div className={styles.modalBody}>
+                <div style={{ marginBottom: '20px' }}>
+                  <strong>Total Unique Members:</strong> {portalAccessStats.monthlyAccessCount} |
+                  <strong style={{ marginLeft: '20px' }}>Total Sessions:</strong> {portalAccessStats.totalSessions}
+                </div>
+                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #ddd', textAlign: 'left' }}>
+                        <th style={{ padding: '12px' }}>Member</th>
+                        <th style={{ padding: '12px' }}>Email</th>
+                        <th style={{ padding: '12px' }}>First Access</th>
+                        <th style={{ padding: '12px' }}>Last Activity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {portalAccessStats.accessLog.map((log, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '12px' }}>
+                            <a href={`/admin/members/${log.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
+                              {log.member_name}
+                            </a>
+                          </td>
+                          <td style={{ padding: '12px', color: '#666' }}>{log.email}</td>
+                          <td style={{ padding: '12px', color: '#666' }}>
+                            {new Date(log.first_access).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '12px', color: '#666' }}>
+                            {new Date(log.last_activity).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
