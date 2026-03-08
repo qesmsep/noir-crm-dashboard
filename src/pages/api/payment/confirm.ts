@@ -196,7 +196,15 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   const feeAmount = creditCardFee / 100; // Convert cents to dollars
 
   // Create ledger entries
-  const ledgerEntries = [];
+  const ledgerEntries: Array<{
+    account_id: string;
+    member_id: string;
+    type: string;
+    amount: string;
+    date: string;
+    note: string;
+    stripe_payment_intent_id: string;
+  }> = [];
 
   // 1. Payment entry (full amount charged)
   ledgerEntries.push({
