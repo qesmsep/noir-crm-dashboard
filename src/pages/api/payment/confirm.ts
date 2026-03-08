@@ -134,6 +134,12 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     }
   }
 
+  // Get credit card fee from payment intent metadata (check early to set on account)
+  let creditCardFee = 0;
+  if (paymentIntent.metadata?.credit_card_fee) {
+    creditCardFee = parseInt(paymentIntent.metadata.credit_card_fee);
+  }
+
   // Create account first
   const accountId = crypto.randomUUID();
   const { data: account, error: accountError } = await supabase
@@ -148,7 +154,8 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       membership_plan_id: membershipPlanId,
       payment_method_type: paymentMethodType,
       payment_method_last4: paymentMethodLast4,
-      payment_method_brand: paymentMethodBrand
+      payment_method_brand: paymentMethodBrand,
+      credit_card_fee_enabled: creditCardFee > 0 // Enable fee if it was charged during signup
     })
     .select()
     .single();
@@ -182,12 +189,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
 
   if (memberError) throw memberError;
 
-  // Get credit card fee from payment intent metadata
-  let creditCardFee = 0;
-  if (paymentIntent.metadata?.credit_card_fee) {
-    creditCardFee = parseInt(paymentIntent.metadata.credit_card_fee);
-  }
-
+  // creditCardFee already retrieved above before account creation
   const totalPaid = waitlist.payment_amount / 100; // Convert cents to dollars
   const feeAmount = creditCardFee / 100; // Convert cents to dollars
 
