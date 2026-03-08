@@ -66,34 +66,24 @@ export default async function handler(
       });
     }
 
-    // Check if member exists with this phone (try both with and without +1 prefix)
-    let member: any = null;
-
-    const result1 = await supabaseAdmin
+    // Check if member exists with this phone number
+    // Get all active members and normalize phone numbers in-memory to handle various formats
+    const { data: members, error: memberError } = await supabaseAdmin
       .from('members')
-      .select('member_id, first_name, email, phone')
-      .eq('phone', normalizedPhone)
-      .limit(1);
+      .select('member_id, first_name, email, phone, deactivated')
+      .eq('deactivated', false)
+      .not('phone', 'is', null);
 
-    if (result1.data && result1.data.length > 0) {
-      member = result1.data[0];
-      if (result1.data.length > 1) {
-        console.warn('[SEND-OTP] WARNING: Multiple members found with phone:', normalizedPhone);
-      }
-    } else {
-      const result2 = await supabaseAdmin
-        .from('members')
-        .select('member_id, first_name, email, phone')
-        .eq('phone', `+1${normalizedPhone}`)
-        .limit(1);
-
-      if (result2.data && result2.data.length > 0) {
-        member = result2.data[0];
-        if (result2.data.length > 1) {
-          console.warn('[SEND-OTP] WARNING: Multiple members found with phone:', `+1${normalizedPhone}`);
-        }
-      }
+    if (memberError) {
+      console.error('Failed to fetch members:', memberError);
+      return res.status(500).json({ error: 'Failed to verify phone number' });
     }
+
+    // Find member by normalizing database phone numbers (last 10 digits match)
+    const member = members?.find(m => {
+      const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
+      return dbPhone === normalizedPhone;
+    });
 
     if (!member) {
       return res.status(404).json({
