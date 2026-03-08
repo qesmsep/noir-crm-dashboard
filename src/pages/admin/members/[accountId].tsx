@@ -142,6 +142,12 @@ export default function MemberDetailAdmin() {
   // Member card expansion
   const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set());
 
+  // Portal access tracking
+  const [portalAccessData, setPortalAccessData] = useState<{
+    lastAccess: string | null;
+    totalSessions: number;
+  }>({ lastAccess: null, totalSessions: 0 });
+
   const toggleMemberExpansion = (memberId: string) => {
     setExpandedMemberIds(prev => {
       const newSet = new Set(prev);
@@ -337,6 +343,32 @@ export default function MemberDetailAdmin() {
       fetchMemberNotes(member.member_id);
     });
   }, [members]);
+
+  // Fetch portal access data for primary member
+  useEffect(() => {
+    if (!accountId || members.length === 0) return;
+
+    const primaryMember = members.find(m => m.member_type === 'primary');
+    if (!primaryMember) return;
+
+    async function fetchPortalAccess() {
+      try {
+        const response = await fetch(`/api/admin/member-portal-access?member_id=${primaryMember!.member_id}`);
+        const result = await response.json();
+
+        if (response.ok) {
+          setPortalAccessData({
+            lastAccess: result.lastAccess,
+            totalSessions: result.totalSessions,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching portal access:', err);
+      }
+    }
+
+    fetchPortalAccess();
+  }, [accountId, members]);
 
   // Helper functions
   const formatDate = (date?: string) => {
@@ -1965,6 +1997,27 @@ export default function MemberDetailAdmin() {
               onToggleCreditCardFee={handleToggleCreditCardFee}
               totalLTV={members.reduce((sum, member) => sum + calculateMemberLTV(member.member_id), 0)}
             />
+
+            {/* Portal Access Card */}
+            <div className={styles.membershipCard}>
+              <div className={styles.subscriptionHeader}>
+                <span className={styles.subscriptionTitle}>Member Portal Access</span>
+              </div>
+              <div className={styles.subscriptionDetails}>
+                <div className={styles.subscriptionRow}>
+                  <span className={styles.subscriptionLabel}>Last Access:</span>
+                  <span className={styles.subscriptionValue}>
+                    {portalAccessData.lastAccess
+                      ? new Date(portalAccessData.lastAccess).toLocaleString()
+                      : 'Never'}
+                  </span>
+                </div>
+                <div className={styles.subscriptionRow}>
+                  <span className={styles.subscriptionLabel}>Total Sessions:</span>
+                  <span className={styles.subscriptionValue}>{portalAccessData.totalSessions}</span>
+                </div>
+              </div>
+            </div>
 
             {/* Quick Actions Card - Between Membership and Ledger */}
             <div className={styles.ledgerActionsCard}>
