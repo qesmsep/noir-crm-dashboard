@@ -31,31 +31,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Normalize phone number (remove all non-digits)
-    const normalizedPhone = phone.replace(/\D/g, '');
+    // Normalize phone number (remove all non-digits, keep last 10 digits)
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
 
-    // Search for member by phone (check both with and without country code)
+    // Get all active members and filter in memory (since we need to normalize database phone numbers)
     const { data: members, error } = await supabase
       .from('members')
       .select('member_id, first_name, last_name, phone, password_hash, deactivated')
-      .or(`phone.eq.${normalizedPhone},phone.eq.+1${normalizedPhone},phone.eq.1${normalizedPhone}`)
       .eq('deactivated', false)
-      .limit(1);
+      .not('phone', 'is', null);
 
     if (error) {
       console.error('Error verifying phone:', error);
       throw error;
     }
 
+    // Filter members by normalized phone number (last 10 digits match)
+    const matchingMember = members?.find(m => {
+      const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
+      return dbPhone === normalizedPhone;
+    });
+
     // If no member found
-    if (!members || members.length === 0) {
+    if (!matchingMember) {
       return res.json({
         exists: false,
         message: 'Phone number not recognized',
       });
     }
 
-    const member = members[0];
+    const member = matchingMember;
 
     // Check if member has set a password (first-time login check)
     const hasPassword = !!member.password_hash;
