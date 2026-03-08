@@ -155,6 +155,16 @@ function inverseDeltaStr(current: number, prior: number, format: 'pct' | 'number
   return d;
 }
 
+/** Format month as "Month 1 - Month 31" */
+function fmtMonthRange(monthStr: string): string {
+  const date = new Date(monthStr);
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const monthName = date.toLocaleString('en-US', { month: 'long' });
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return `${monthName} 1 - ${monthName} ${lastDay}, ${year}`;
+}
+
 function generateMonthOptions(): string[] {
   const options: string[] = [];
   const now = new Date();
@@ -535,17 +545,17 @@ export default function BusinessDashboard() {
                 <div className={`${styles.kpiDelta} ${deltaStr(s.mrr, s.priorMrr).cls}`}>
                   {deltaStr(s.mrr, s.priorMrr).text}
                 </div>
-                <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of all active members' monthly dues for {fmtMonthLabel(s.month)}.</div>
+                <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of all active members' monthly dues for {fmtMonthRange(s.month)}.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.mrrBridge.netNewMrr)}</div>
                 <div className={styles.kpiLabel}>Net New MRR</div>
-                <div className={styles.kpiHint}>New MRR + Expansion − Contraction − Churned − Paused ({fmtMonthLabel(s.priorMonth)} → {fmtMonthLabel(s.month)}). Positive = you grew revenue this month.</div>
+                <div className={styles.kpiHint}>New MRR + Expansion − Contraction − Churned − Paused ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}). Positive = you grew revenue this month.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
                 <div className={styles.kpiLabel}>ARR</div>
-                <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthLabel(s.month)}) — MRR × 12. A forward-looking projection of yearly revenue if nothing changes.</div>
+                <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthRange(s.month)}) — MRR × 12. A forward-looking projection of yearly revenue if nothing changes.</div>
               </div>
               <div
                 className={styles.kpiTile}
@@ -580,17 +590,17 @@ export default function BusinessDashboard() {
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.nrr)}</div>
                 <div className={styles.kpiLabel}>NRR</div>
-                <div className={styles.kpiHint}>Net Revenue Retention ({fmtMonthLabel(s.priorMonth)} → {fmtMonthLabel(s.month)}) — (Starting MRR + Expansion − Contraction − Churned) ÷ Starting MRR. &gt;100% means existing members are growing revenue even after losses.</div>
+                <div className={styles.kpiHint}>Net Revenue Retention ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}) — (Starting MRR + Expansion − Contraction − Churned) ÷ Starting MRR. &gt;100% means existing members are growing revenue even after losses.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.grr)}</div>
                 <div className={styles.kpiLabel}>GRR</div>
-                <div className={styles.kpiHint}>Gross Revenue Retention ({fmtMonthLabel(s.priorMonth)} → {fmtMonthLabel(s.month)}) — (Starting MRR − Contraction − Churned) ÷ Starting MRR. Like NRR but ignores upsells. Shows pure retention health. 100% = no one left.</div>
+                <div className={styles.kpiHint}>Gross Revenue Retention ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}) — (Starting MRR − Contraction − Churned) ÷ Starting MRR. Like NRR but ignores upsells. Shows pure retention health. 100% = no one left.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.revenueChurnRate)}</div>
                 <div className={styles.kpiLabel}>Rev Churn %</div>
-                <div className={styles.kpiHint}>Revenue Churn ({fmtMonthLabel(s.priorMonth)} → {fmtMonthLabel(s.month)}) — Churned MRR ÷ Starting MRR. What % of last month's revenue was lost to cancellations this month.</div>
+                <div className={styles.kpiHint}>Revenue Churn ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}) — Churned MRR ÷ Starting MRR. What % of last month's revenue was lost to cancellations this month.</div>
               </div>
             </div>
 
@@ -603,7 +613,7 @@ export default function BusinessDashboard() {
                   {deltaStr(s.memberCounts.activeMembers, s.priorMemberCounts.activeMembers, 'number').text}
                 </div>
                 <div className={styles.kpiHint}>
-                  Count of individual people (member rows) with active status and monthly dues &gt; $0 in {fmtMonthLabel(s.month)}'s snapshot (compared to {fmtMonthLabel(s.priorMonth)}).
+                  Count of individual people (member rows) with active status and monthly dues &gt; $0 in {fmtMonthRange(s.month)}'s snapshot (compared to {fmtMonthRange(s.priorMonth)}).
                   {activeAccountCount !== null && (
                     <> Across <strong>{activeAccountCount}</strong> accounts — accounts can have multiple members (e.g. Duo/Skyline plans).</>
                   )}
@@ -612,17 +622,17 @@ export default function BusinessDashboard() {
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{s.memberCounts.newMembers}</div>
                 <div className={styles.kpiLabel}>New Members</div>
-                <div className={styles.kpiHint}>Individual members whose join date falls within {fmtMonthLabel(s.month)}. Does not include reactivations.</div>
+                <div className={styles.kpiHint}>Individual members whose join date falls within {fmtMonthRange(s.month)}. Does not include reactivations.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.rates.logoChurnRate)}</div>
                 <div className={styles.kpiLabel}>Logo Churn %</div>
-                <div className={styles.kpiHint}>"Logo" = one member (borrowed from SaaS: a logo = one customer). Churned members in {fmtMonthLabel(s.month)} ÷ {fmtMonthLabel(s.priorMonth)}'s active members. What % of your people cancelled this month.</div>
+                <div className={styles.kpiHint}>"Logo" = one member (borrowed from SaaS: a logo = one customer). Churned members in {fmtMonthRange(s.month)} ÷ {fmtMonthRange(s.priorMonth)}'s active members. What % of your people cancelled this month.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{s.memberCounts.pausedMembers}</div>
                 <div className={styles.kpiLabel}>Paused</div>
-                <div className={styles.kpiHint}>Members with inactive status in {fmtMonthLabel(s.month)} but not fully cancelled — they have $0 MRR this month but are expected to return. Not counted in churn.</div>
+                <div className={styles.kpiHint}>Members with inactive status in {fmtMonthRange(s.month)} but not fully cancelled — they have $0 MRR this month but are expected to return. Not counted in churn.</div>
               </div>
             </div>
 
@@ -634,12 +644,12 @@ export default function BusinessDashboard() {
                 <div className={`${styles.kpiDelta} ${deltaStr(s.attach.attachRevenue, s.priorAttach.attachRevenue).cls}`}>
                   {deltaStr(s.attach.attachRevenue, s.priorAttach.attachRevenue).text}
                 </div>
-                <div className={styles.kpiHint}>Revenue from Toast (food &amp; beverage) transactions linked to a member in {fmtMonthLabel(s.month)} (compared to {fmtMonthLabel(s.priorMonth)}). This is spend beyond their membership dues.</div>
+                <div className={styles.kpiHint}>Revenue from Toast (food &amp; beverage) transactions linked to a member in {fmtMonthRange(s.month)} (compared to {fmtMonthRange(s.priorMonth)}). This is spend beyond their membership dues.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtPct(s.attach.attachRate)}</div>
                 <div className={styles.kpiLabel}>Attach Rate</div>
-                <div className={styles.kpiHint}>% of active members who had at least one Toast transaction in {fmtMonthLabel(s.month)}. Higher = more members actually spending at the venue.</div>
+                <div className={styles.kpiHint}>% of active members who had at least one Toast transaction in {fmtMonthRange(s.month)}. Higher = more members actually spending at the venue.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrencyDec(s.attach.allInArpm)}</div>
@@ -647,7 +657,7 @@ export default function BusinessDashboard() {
                 <div className={`${styles.kpiDelta} ${deltaStr(s.attach.allInArpm, s.priorAttach.allInArpm).cls}`}>
                   {deltaStr(s.attach.allInArpm, s.priorAttach.allInArpm).text}
                 </div>
-                <div className={styles.kpiHint}>Average Revenue Per Member ({fmtMonthLabel(s.month)}, compared to {fmtMonthLabel(s.priorMonth)}) — (MRR + Attach Revenue) ÷ active members. Your true revenue per person including what they spend at the bar.</div>
+                <div className={styles.kpiHint}>Average Revenue Per Member ({fmtMonthRange(s.month)}, compared to {fmtMonthRange(s.priorMonth)}) — (MRR + Attach Revenue) ÷ active members. Your true revenue per person including what they spend at the bar.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{s.failedPayments30d}</div>
