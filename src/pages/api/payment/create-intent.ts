@@ -60,8 +60,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const additionalMemberFee = membership_type === 'Skyline' ? 0 : 25;
     const additionalMembersAmount = Math.round(additional_members_count * additionalMemberFee * 100);
 
-    const amount = basePlanAmount + additionalMembersAmount;
-    console.log('[CREATE INTENT] Base amount:', basePlanAmount, 'Additional members:', additional_members_count, 'Additional amount:', additionalMembersAmount, 'Total:', amount);
+    // Calculate subtotal before credit card fee
+    const subtotal = basePlanAmount + additionalMembersAmount;
+
+    // Calculate 4% credit card processing fee (applied by default for new memberships)
+    const creditCardFee = Math.round(subtotal * 0.04);
+
+    // Total amount including credit card fee
+    const totalAmount = subtotal + creditCardFee;
+
+    console.log('[CREATE INTENT] Base amount:', basePlanAmount, 'Additional members:', additional_members_count, 'Additional amount:', additionalMembersAmount, 'Subtotal:', subtotal, 'Credit card fee:', creditCardFee, 'Total:', totalAmount);
 
     // Create or get Stripe customer
     let customerId = waitlist.stripe_customer_id;
@@ -86,13 +94,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('id', waitlist.id);
     }
 
-    // Note: Credit card fees are NOT applied to initial membership payments
-    // Only recurring charges and balance payments are subject to the 4% fee
-    // This can be adjusted per account using the credit_card_fee_enabled toggle
-
-    // Create payment intent
+    // Create payment intent with 4% credit card fee included
+    // Note: Fee is charged upfront for credit card payments (default)
+    // If customer pays via ACH, they can request a refund of the processing fee
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
+      amount: totalAmount,
       currency: 'usd',
       customer: customerId,
       metadata: {
@@ -102,8 +108,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         base_amount: basePlanAmount,
         additional_members_count: additional_members_count.toString(),
         additional_members_amount: additionalMembersAmount.toString(),
-        credit_card_fee: 0,
-        fee_enabled: 'false'
+        subtotal: subtotal.toString(),
+        credit_card_fee: creditCardFee.toString(),
+        fee_enabled: 'true'
       },
       description: additional_members_count > 0
         ? `Noir ${membership_type} Membership + ${additional_members_count} Additional Member${additional_members_count > 1 ? 's' : ''} - ${waitlist.first_name} ${waitlist.last_name}`
@@ -119,18 +126,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .update({
         stripe_payment_intent_id: paymentIntent.id,
         selected_membership: membership_type,
-        payment_amount: amount
+        payment_amount: totalAmount
       })
       .eq('id', waitlist.id);
 
     return res.status(200).json({
       client_secret: paymentIntent.client_secret,
-      amount,
+      amount: totalAmount,
       baseAmount: basePlanAmount,
       additionalMembersAmount,
       additionalMembersCount: additional_members_count,
-      creditCardFee: 0,
-      feeMessage: 'No processing fee for initial membership payment'
+      subtotal: subtotal,
+      creditCardFee: creditCardFee,
+      feeMessage: '4% credit card processing fee included'
     });
 
   } catch (error: any) {

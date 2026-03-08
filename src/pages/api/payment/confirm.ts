@@ -186,18 +186,46 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
 
   if (memberError) throw memberError;
 
-  // Create initial ledger entry for membership payment
-  await supabase
-    .from('ledger')
-    .insert({
+  // Get credit card fee from payment intent metadata
+  let creditCardFee = 0;
+  if (paymentIntent.metadata?.credit_card_fee) {
+    creditCardFee = parseInt(paymentIntent.metadata.credit_card_fee);
+  }
+
+  const totalPaid = waitlist.payment_amount / 100; // Convert cents to dollars
+  const feeAmount = creditCardFee / 100; // Convert cents to dollars
+
+  // Create ledger entries
+  const ledgerEntries = [];
+
+  // 1. Payment entry (full amount charged)
+  ledgerEntries.push({
+    account_id: account.account_id,
+    member_id: member.member_id,
+    type: 'payment',
+    amount: totalPaid.toFixed(2),
+    date: getTodayLocalDate(),
+    note: `Initial ${waitlist.selected_membership} membership payment`,
+    stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+  });
+
+  // 2. Processing fee debit (if fee exists)
+  if (creditCardFee > 0) {
+    ledgerEntries.push({
       account_id: account.account_id,
       member_id: member.member_id,
-      type: 'payment',
-      amount: (waitlist.payment_amount / 100).toFixed(2), // Convert cents to dollars
+      type: 'debit',
+      amount: feeAmount.toFixed(2),
       date: getTodayLocalDate(),
-      note: `Initial ${waitlist.selected_membership} membership payment`,
+      note: 'Credit card processing fee (4%)',
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id
     });
+  }
+
+  // Insert all ledger entries
+  await supabase
+    .from('ledger')
+    .insert(ledgerEntries);
 
   return { member_id: member.member_id, account_id: account.account_id };
 }
