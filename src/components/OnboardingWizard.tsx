@@ -460,6 +460,7 @@ export default function OnboardingWizard({
   const [lastName, setLastName] = useState(waitlistData.last_name || '');
   const [email, setEmail] = useState(waitlistData.email || '');
   const [phone, setPhone] = useState(waitlistData.phone || '');
+  const [dateOfBirth, setDateOfBirth] = useState(waitlistData.date_of_birth || '');
   const [address, setAddress] = useState(waitlistData.address || '');
   const [city, setCity] = useState(waitlistData.city || '');
   const [state, setState] = useState(waitlistData.state || '');
@@ -552,10 +553,10 @@ export default function OnboardingWizard({
   };
 
   const validateAndSaveContactInfo = async (): Promise<boolean> => {
-    if (!firstName || !lastName || !email || !phone) {
+    if (!firstName || !lastName || !email || !phone || !dateOfBirth) {
       toast({
         title: 'Required Fields',
-        description: 'Please provide your name, email, and phone number',
+        description: 'Please provide your name, email, phone number, and date of birth',
         status: 'warning',
         duration: 3000,
       });
@@ -592,6 +593,7 @@ export default function OnboardingWizard({
           last_name: lastName,
           email,
           phone,
+          date_of_birth: dateOfBirth,
           address,
           city,
           state,
@@ -981,6 +983,19 @@ export default function OnboardingWizard({
                 }}
                 placeholder="(555) 555-5555"
                 maxLength={14}
+                size="lg"
+                bg="white"
+                borderWidth="2px"
+                _focus={{ borderColor: '#A59480' }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <Input
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                placeholder="Date of Birth"
                 size="lg"
                 bg="white"
                 borderWidth="2px"

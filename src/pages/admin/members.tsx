@@ -20,7 +20,7 @@ interface Member {
   phone?: string;
   photo?: string;
   join_date?: string;
-  primary?: boolean;
+  member_type?: string;
   dob?: string;
 }
 
@@ -591,7 +591,11 @@ export default function MembersAdmin() {
 
             <div className={styles.mobileList}>
               {sortedAccounts.map((account) => {
-                const sortedMembers = account.allMembers.sort((a, b) => a.primary === b.primary ? 0 : a.primary ? -1 : 1);
+                const sortedMembers = account.allMembers.sort((a, b) => {
+                  if (a.member_type === 'primary' && b.member_type !== 'primary') return -1;
+                  if (a.member_type !== 'primary' && b.member_type === 'primary') return 1;
+                  return 0;
+                });
                 const member1 = sortedMembers[0];
                 const member2 = sortedMembers[1] || null;
 
@@ -771,7 +775,11 @@ export default function MembersAdmin() {
               </thead>
               <tbody>
                 {sortedAccounts.map((account) => {
-                  const sortedMembers = account.allMembers.sort((a, b) => a.primary === b.primary ? 0 : a.primary ? -1 : 1);
+                  const sortedMembers = account.allMembers.sort((a, b) => {
+                    if (a.member_type === 'primary' && b.member_type !== 'primary') return -1;
+                    if (a.member_type !== 'primary' && b.member_type === 'primary') return 1;
+                    return 0;
+                  });
                   const member1 = sortedMembers[0];
                   const member2 = sortedMembers[1] || null;
                   
@@ -810,7 +818,7 @@ export default function MembersAdmin() {
                             <div className={styles.memberInfo}>
                               <div className={styles.primaryName}>
                                 {member1.first_name} {member1.last_name}
-                                {member1.primary && (
+                                {member1.member_type === 'primary' && (
                                   <span className={styles.primaryBadge}>Primary</span>
                                 )}
                               </div>
@@ -856,7 +864,7 @@ export default function MembersAdmin() {
                             <div className={styles.memberInfo}>
                               <div className={styles.primaryName}>
                                 {member2.first_name} {member2.last_name}
-                                {member2.primary && (
+                                {member2.member_type === 'primary' && (
                                   <span className={styles.primaryBadge}>Primary</span>
                                 )}
                               </div>
@@ -981,7 +989,7 @@ export default function MembersAdmin() {
                                   />
                                   <span className={styles.memberCheckboxText}>
                                     {member.first_name} {member.last_name}
-                                    {member.primary && <span className={styles.primaryBadgeSmall}>Primary</span>}
+                                    {member.member_type === 'primary' && <span className={styles.primaryBadgeSmall}>Primary</span>}
                                   </span>
                                 </label>
                               ))}

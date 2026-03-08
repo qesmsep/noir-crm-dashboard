@@ -30,7 +30,7 @@ interface Member {
   address?: string;
   city?: string;
   state?: string;
-  zip_code?: string;
+  zip?: string;
 }
 
 interface Message {
@@ -1709,7 +1709,7 @@ export default function MemberDetailAdmin() {
                                 <span>{member.address}</span>
                               </div>
                             )}
-                            {(member.city || member.state || member.zip_code) && (
+                            {(member.city || member.state || member.zip) && (
                               <div className={styles.detailRow}>
                                 <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
@@ -1718,12 +1718,12 @@ export default function MemberDetailAdmin() {
                                   {member.city && member.city}
                                   {member.city && member.state && ', '}
                                   {member.state && member.state}
-                                  {(member.city || member.state) && member.zip_code && ' '}
-                                  {member.zip_code && member.zip_code}
+                                  {(member.city || member.state) && member.zip && ' '}
+                                  {member.zip && member.zip}
                                 </span>
                               </div>
                             )}
-                            {(member.email || member.phone || member.company || member.dob || member.address || member.city || member.state || member.zip_code) && editingMemberId !== member.member_id && (
+                            {(member.email || member.phone || member.company || member.dob || member.address || member.city || member.state || member.zip) && editingMemberId !== member.member_id && (
                               <div className={styles.detailRowWithAction}>
                                 <button
                                   onClick={(e) => {

@@ -173,6 +173,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       last_name: waitlist.last_name,
       email: waitlist.email,
       phone: waitlist.phone,
+      member_type: 'primary',
       membership: waitlist.selected_membership || 'Solo',
       monthly_credit: monthlyDues,
       stripe_customer_id: waitlist.stripe_customer_id,
@@ -180,6 +181,8 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       city: waitlist.city,
       state: waitlist.state,
       zip: waitlist.zip_code,
+      company: waitlist.company,
+      dob: waitlist.date_of_birth,
       photo: waitlist.photo_url,
       join_date: startDate.toISOString(),
       deactivated: false
