@@ -248,7 +248,7 @@ export default function MembersAdmin() {
       return acc;
     }, {} as { [accountId: string]: Member[] })
   ).map(([accountId, accountMembers]) => {
-    const primary = accountMembers.find(m => m.primary) || accountMembers[0];
+    const primary = accountMembers.find(m => m.member_type === 'primary') || accountMembers[0];
     return {
       account_id: accountId,
       primaryMember: primary,
@@ -631,7 +631,7 @@ export default function MembersAdmin() {
                         <div className={styles.mobileMemberInfo}>
                           <div className={styles.mobileMemberName}>
                             {member1?.first_name} {member1?.last_name}
-                            {member1?.primary && (
+                            {member1?.member_type === 'primary' && (
                               <span className={styles.mobilePrimaryBadge}>Primary</span>
                             )}
                           </div>

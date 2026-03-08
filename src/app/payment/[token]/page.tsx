@@ -273,12 +273,6 @@ export default function PaymentPage() {
                   spacingUnit: '4px',
                   borderRadius: '6px',
                 },
-              },
-              layout: {
-                type: 'accordion',
-                defaultCollapsed: false,
-                radios: true,
-                spacedAccordionItems: true
               }
             }}
           >

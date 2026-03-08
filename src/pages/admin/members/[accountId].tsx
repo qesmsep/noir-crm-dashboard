@@ -1610,8 +1610,8 @@ export default function MemberDetailAdmin() {
                               type="text"
                               placeholder="Zip Code"
                               className={styles.input}
-                              value={editingMemberData.zip_code || ''}
-                              onChange={(e) => setEditingMemberData({ ...editingMemberData, zip_code: e.target.value })}
+                              value={editingMemberData.zip || ''}
+                              onChange={(e) => setEditingMemberData({ ...editingMemberData, zip: e.target.value })}
                             />
                             <div className={styles.editActions}>
                               <button
