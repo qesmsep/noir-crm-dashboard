@@ -17,7 +17,8 @@ import {
   TrendingUp,
   CreditCard,
   Package,
-  UserPlus
+  UserPlus,
+  MessageSquare
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -148,6 +149,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/reservations', label: 'Reservations', icon: CalendarDays },
     { href: '/admin/members', label: 'Members', icon: Users },
     { href: '/admin/membership', label: 'Membership', icon: UserPlus },
+    { href: '/admin/communication', label: 'Campaigns', icon: MessageSquare },
     { href: '/admin/event-calendar', label: 'Events', icon: Calendar },
     { href: '/admin/inventory', label: 'Inventory', icon: Package },
     { href: '/admin/homepage', label: 'Home', icon: Home },
