@@ -126,9 +126,9 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
 
   // Extract payment method details from the payment intent
-  let paymentMethodType = null;
-  let paymentMethodLast4 = null;
-  let paymentMethodBrand = null;
+  let paymentMethodType: string | null = null;
+  let paymentMethodLast4: string | null = null;
+  let paymentMethodBrand: string | null = null;
 
   if (paymentIntent.payment_method) {
     const pm = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
@@ -139,7 +139,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     } else if (pm.us_bank_account) {
       paymentMethodType = 'us_bank_account';
       paymentMethodLast4 = pm.us_bank_account.last4;
-      paymentMethodBrand = pm.us_bank_account.bank_name;
+      paymentMethodBrand = pm.us_bank_account.bank_name || null;
     }
   }
 
