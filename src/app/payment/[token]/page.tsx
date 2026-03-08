@@ -263,7 +263,25 @@ export default function PaymentPage() {
 
         {/* Payment Form */}
         {clientSecret && (
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
+          <Elements
+            stripe={stripePromise}
+            options={{
+              clientSecret,
+              appearance: {
+                theme: 'stripe',
+                variables: {
+                  spacingUnit: '4px',
+                  borderRadius: '6px',
+                },
+              },
+              layout: {
+                type: 'accordion',
+                defaultCollapsed: false,
+                radios: true,
+                spacedAccordionItems: true
+              }
+            }}
+          >
             <PaymentForm
               token={token}
               waitlistData={waitlistData}
