@@ -1785,63 +1785,11 @@ export default function MemberDetailAdmin() {
                               </div>
                             )}
                             {member.referral_code && (
-                              <div
-                                className={styles.detailRow}
-                                style={{
-                                  background: 'linear-gradient(135deg, #FFF9F0 0%, #FFFBF5 100%)',
-                                  padding: '12px 14px',
-                                  borderRadius: '8px',
-                                  border: '1px solid #DAD7D0',
-                                  marginTop: '8px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '10px',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                                }}
-                              >
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '10px',
-                                  flex: 1,
-                                  minWidth: 0
-                                }}>
-                                  <svg
-                                    style={{
-                                      width: '18px',
-                                      height: '18px',
-                                      flexShrink: 0,
-                                      color: '#A59480'
-                                    }}
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-                                  </svg>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{
-                                      fontSize: '10px',
-                                      color: '#8C7C6D',
-                                      fontWeight: '600',
-                                      letterSpacing: '0.5px',
-                                      textTransform: 'uppercase',
-                                      marginBottom: '4px'
-                                    }}>
-                                      Referral Link
-                                    </div>
-                                    <div style={{
-                                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                                      fontSize: '13px',
-                                      color: '#2C2C2C',
-                                      fontWeight: '500',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap'
-                                    }}>
-                                      noirbk.com/refer/{member.referral_code}
-                                    </div>
-                                  </div>
-                                </div>
+                              <div className={styles.detailRow}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                                </svg>
+                                <span style={{ flex: 1 }}>noirbk.com/refer/{member.referral_code}</span>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1849,83 +1797,43 @@ export default function MemberDetailAdmin() {
                                   }}
                                   title="Copy referral link"
                                   style={{
-                                    padding: '6px 12px',
-                                    borderRadius: '6px',
+                                    padding: '4px',
                                     border: 'none',
-                                    backgroundColor: copiedReferralCode === member.member_id ? '#4CAF50' : '#A59480',
-                                    color: 'white',
+                                    backgroundColor: 'transparent',
                                     cursor: 'pointer',
-                                    fontSize: '12px',
-                                    fontWeight: '600',
-                                    transition: 'all 0.2s ease',
-                                    flexShrink: 0,
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                    justifyContent: 'center',
+                                    borderRadius: '4px',
+                                    transition: 'background-color 0.2s ease',
+                                    marginLeft: '8px',
                                   }}
                                   onMouseEnter={(e) => {
-                                    if (copiedReferralCode !== member.member_id) {
-                                      e.currentTarget.style.backgroundColor = '#8C7C6D';
-                                      e.currentTarget.style.transform = 'translateY(-1px)';
-                                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
-                                    }
+                                    e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
                                   }}
                                   onMouseLeave={(e) => {
-                                    if (copiedReferralCode !== member.member_id) {
-                                      e.currentTarget.style.backgroundColor = '#A59480';
-                                      e.currentTarget.style.transform = 'translateY(0)';
-                                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
-                                    }
+                                    e.currentTarget.style.backgroundColor = 'transparent';
                                   }}
                                 >
                                   {copiedReferralCode === member.member_id ? (
-                                    <>
-                                      <svg style={{ width: '14px', height: '14px' }} fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                      </svg>
-                                      Copied
-                                    </>
+                                    <svg style={{ width: '16px', height: '16px', color: '#4CAF50' }} fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
                                   ) : (
-                                    <>
-                                      <svg style={{ width: '14px', height: '14px' }} fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                                      </svg>
-                                      Copy
-                                    </>
+                                    <svg style={{ width: '16px', height: '16px', color: '#86868b' }} fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                      <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                                    </svg>
                                   )}
                                 </button>
                               </div>
                             )}
                             {member.referral_code && member.referral_count !== undefined && member.referral_count > 0 && (
-                              <div
-                                style={{
-                                  fontSize: '12px',
-                                  color: '#5A5A5A',
-                                  padding: '6px 10px',
-                                  backgroundColor: '#F8F8F8',
-                                  borderRadius: '6px',
-                                  marginTop: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  border: '1px solid #ECEAE5'
-                                }}
-                              >
-                                <svg
-                                  style={{
-                                    width: '16px',
-                                    height: '16px',
-                                    flexShrink: 0,
-                                    color: '#4CAF50'
-                                  }}
-                                  fill="currentColor"
-                                  viewBox="0 0 20 20"
-                                >
+                              <div className={styles.detailRow}>
+                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
                                   <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                                 </svg>
-                                <span style={{ fontWeight: '500' }}>
+                                <span>
                                   {member.referral_count} successful {member.referral_count === 1 ? 'referral' : 'referrals'}
                                 </span>
                               </div>
