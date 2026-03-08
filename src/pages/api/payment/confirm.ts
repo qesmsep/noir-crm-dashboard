@@ -51,28 +51,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Payment not completed' });
     }
 
-    // Save the payment method to the customer for future charges
+    // Set the payment method as default for the customer (already attached during payment)
     if (paymentIntent.payment_method && waitlist.stripe_customer_id) {
       try {
-        // Attach the payment method to the customer if not already attached
-        await stripe.paymentMethods.attach(
-          paymentIntent.payment_method as string,
-          { customer: waitlist.stripe_customer_id }
-        );
-
-        // Set it as the default payment method for the customer
         await stripe.customers.update(waitlist.stripe_customer_id, {
           invoice_settings: {
             default_payment_method: paymentIntent.payment_method as string,
           },
         });
 
-        console.log('Payment method saved as default for customer:', waitlist.stripe_customer_id);
+        console.log('Payment method set as default for customer:', waitlist.stripe_customer_id);
       } catch (error: any) {
-        // If payment method is already attached, that's fine
-        if (error.code !== 'resource_already_exists') {
-          console.error('Error saving payment method:', error);
-        }
+        console.error('Error setting default payment method:', error);
+        // Non-fatal error, continue with member creation
       }
     }
 
@@ -144,9 +135,11 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   }
 
   // Create account first
+  const accountId = crypto.randomUUID();
   const { data: account, error: accountError } = await supabase
     .from('accounts')
     .insert({
+      account_id: accountId,
       stripe_customer_id: waitlist.stripe_customer_id,
       subscription_status: 'active',
       subscription_start_date: startDate.toISOString(),
