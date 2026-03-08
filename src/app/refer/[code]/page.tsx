@@ -74,33 +74,38 @@ export default function ReferralPage() {
 
   const validateReferralCode = async () => {
     try {
-      const response = await fetch(`/api/referral/validate?code=${referralCode}`);
+      // Create onboard token and redirect to onboard flow
+      const response = await fetch('/api/referral/create-onboard', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ referralCode }),
+      });
+
       if (!response.ok) {
         throw new Error('Invalid referral code');
       }
+
       const data = await response.json();
-      setReferrerName(data.referrer_name);
-      setReferrerId(data.referrer_id);
-      setFormData(prev => ({
-        ...prev,
-        referral: data.referrer_name
-      }));
-      setLoading(false);
+
+      // Redirect to onboard flow
+      router.push(data.onboardUrl);
     } catch (error) {
       toast({
         title: 'Invalid Referral Link',
-        description: 'This referral link is invalid or expired. Redirecting to application...',
+        description: 'This referral link is invalid or expired.',
         status: 'error',
         duration: 3000,
       });
-      setTimeout(() => router.push('/invitation'), 3000);
+      setTimeout(() => router.push('/'), 3000);
     }
   };
 
   const steps = [
     {
-      title: `${referrerName ? referrerName + ' invited you to Noir!' : "You're invited!"}`,
-      description: `Complete this short questionnaire to request membership. ${referrerName ? 'Your application will be marked as referred by ' + referrerName + '.' : ''}`,
+      title: referrerName || "You're invited!",
+      description: referrerName ? 'has invited you to become a member of Noir.\n\nComplete this short questionnaire to request membership. Your application will be marked as referred by ' + referrerName + '.' : "Complete this short questionnaire to request membership.",
       type: 'intro'
     },
     {
@@ -463,7 +468,7 @@ export default function ReferralPage() {
             color="#ECEDE8"
             fontFamily="IvyJournal-Thin, sans-serif"
             textAlign="center"
-            mb={2}
+            mb={0}
           >
             {currentStepData.title}
           </Heading>
@@ -475,6 +480,7 @@ export default function ReferralPage() {
             opacity={0.8}
             mb={6}
             padding="25px"
+            paddingTop="5px"
             whiteSpace="pre-line"
           >
             {currentStepData.description}
