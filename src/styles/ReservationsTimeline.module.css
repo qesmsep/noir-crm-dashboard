@@ -124,6 +124,7 @@
     top: 0;
     z-index: 10;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    flex-shrink: 0;
   }
 
   .mobileNavButton {
@@ -210,10 +211,11 @@
 
   .calendarContainer {
     flex: 1;
-    overflow: hidden;
+    overflow: auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    -webkit-overflow-scrolling: touch;
   }
 
   .reservationEvent {

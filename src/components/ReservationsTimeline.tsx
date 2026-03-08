@@ -781,7 +781,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           eventResize={handleEventResize}
           eventClick={handleEventClick}
           select={handleSlotClick}
-          height={isMobile ? 'calc(100vh - 80px)' : 'auto'}
+          height={isMobile ? 'auto' : 'auto'}
           
           scrollTime={scrollTime}
           scrollTimeReset={false}
