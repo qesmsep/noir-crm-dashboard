@@ -1,11 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { parse } from 'cookie';
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
 
 /**
  * Get subscription details for the logged-in member's account
@@ -45,20 +40,10 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Get account subscription data
+    // Get account data
     const { data: account, error: accountError } = await supabaseAdmin
       .from('accounts')
-      .select(`
-        stripe_subscription_id,
-        subscription_status,
-        subscription_start_date,
-        next_renewal_date,
-        monthly_dues,
-        payment_method_type,
-        payment_method_last4,
-        payment_method_brand,
-        stripe_customer_id
-      `)
+      .select('account_id, next_renewal_date, monthly_dues')
       .eq('account_id', member.account_id)
       .single();
 
@@ -86,45 +71,22 @@ export default async function handler(
     // Count secondary members
     const actualSecondaryCount = allMembers?.filter(m => m.member_type === 'secondary').length || 0;
 
-    // Determine base MRR from membership type
+    // Calculate base MRR from membership type
     const getMembershipPrice = (membershipType: string | null | undefined): number => {
       switch (membershipType) {
         case 'Skyline':
-          return 250; // Base Skyline price
+          return 250;
         case 'Duo':
-          return 175; // Duo price
+          return 175;
         case 'Solo':
-          return 150; // Solo price
+          return 150;
         default:
           return 0;
       }
     };
 
-    // Fetch Stripe subscription to get actual base price, or fall back to membership type pricing
-    let baseMRR = 0;
-    let secondaryMemberCount = actualSecondaryCount;
-
-    if (account?.stripe_subscription_id) {
-      try {
-        const subscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id, {
-          expand: ['items.data.price'],
-        });
-
-        if (subscription?.items?.data?.[0]?.price?.unit_amount) {
-          baseMRR = subscription.items.data[0].price.unit_amount / 100;
-        } else {
-          console.warn('Stripe subscription missing price data, using membership type pricing:', account.stripe_subscription_id);
-          baseMRR = getMembershipPrice(membershipType);
-        }
-      } catch (err: any) {
-        console.warn('Error fetching subscription price from Stripe, using membership type pricing:', err.message);
-        // Fall back to membership type pricing if Stripe fails
-        baseMRR = getMembershipPrice(membershipType);
-      }
-    } else {
-      // No subscription ID, use membership type pricing
-      baseMRR = getMembershipPrice(membershipType);
-    }
+    const baseMRR = getMembershipPrice(membershipType);
+    const secondaryMemberCount = actualSecondaryCount;
 
     res.status(200).json({
       subscription: account || null,
