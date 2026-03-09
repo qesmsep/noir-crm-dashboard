@@ -1067,6 +1067,18 @@ export default function MemberDetailAdmin() {
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
   };
 
+  // Calculate Member Spend - sum of all purchase transactions (absolute value)
+  const calculateMemberSpend = (memberId: string) => {
+    if (!ledger || ledger.length === 0) return 0;
+    return ledger
+      .filter(tx =>
+        tx.member_id === memberId &&
+        tx.type === 'purchase' &&
+        tx.amount < 0
+      )
+      .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
+  };
+
   // Handle Stripe payment for outstanding balance
   const handlePayBalance = async () => {
     if (!accountId) {
@@ -1750,8 +1762,8 @@ export default function MemberDetailAdmin() {
                             </div>
                             <div style={{ textAlign: 'center' }}>
                               <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Member Spend</div>
-                              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0) >= 0 ? '#10B981' : '#1F1F1F' }}>
-                                {formatCurrency(Math.abs(calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)))}
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                                {formatCurrency(calculateMemberSpend(member.member_id))}
                               </div>
                             </div>
                           </div>
