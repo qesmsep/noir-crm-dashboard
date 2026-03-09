@@ -504,8 +504,18 @@
 
 @media (max-width: 768px) {
   .checkbox {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  .checkboxLabel {
+    min-height: 44px;
+  }
+
+  .memberCheckbox {
+    min-height: 44px;
   }
 }
 
