@@ -153,7 +153,15 @@ export default function MemberDetailAdmin() {
   // Referral code copy state
   const [copiedReferralCode, setCopiedReferralCode] = useState<string | null>(null);
 
-  const toggleMemberExpansion = (memberId: string) => {
+  // Referral details state
+  const [referralDetails, setReferralDetails] = useState<Record<string, {
+    referredMembers: Array<{ member_id: string; first_name: string; last_name: string }>;
+    referredByMember: { member_id: string; first_name: string; last_name: string } | null;
+  }>>({});
+
+  const toggleMemberExpansion = async (memberId: string) => {
+    const isExpanding = !expandedMemberIds.has(memberId);
+
     setExpandedMemberIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(memberId)) {
@@ -163,6 +171,41 @@ export default function MemberDetailAdmin() {
       }
       return newSet;
     });
+
+    // Fetch referral details when expanding
+    if (isExpanding && !referralDetails[memberId]) {
+      try {
+        const supabase = getSupabaseClient();
+
+        // Get members this person referred
+        const { data: referred } = await supabase
+          .from('members')
+          .select('member_id, first_name, last_name')
+          .eq('referred_by', members.find(m => m.member_id === memberId)?.referral_code || '');
+
+        // Get who referred this person
+        const member = members.find(m => m.member_id === memberId);
+        let referredBy = null;
+        if (member?.referred_by) {
+          const { data: referrer } = await supabase
+            .from('members')
+            .select('member_id, first_name, last_name')
+            .ilike('referral_code', member.referred_by)
+            .single();
+          referredBy = referrer;
+        }
+
+        setReferralDetails(prev => ({
+          ...prev,
+          [memberId]: {
+            referredMembers: referred || [],
+            referredByMember: referredBy
+          }
+        }));
+      } catch (error) {
+        console.error('Error fetching referral details:', error);
+      }
+    }
   };
 
   // Fetch members and account settings
@@ -1805,62 +1848,6 @@ export default function MemberDetailAdmin() {
                                 </span>
                               </div>
                             )}
-                            {member.referral_code && (
-                              <div className={styles.detailRow}>
-                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-                                </svg>
-                                <span style={{ flex: 1 }}>
-                                  {typeof window !== 'undefined' && window.location.host}/refer/{member.referral_code}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCopyReferralLink(member.member_id, member.referral_code!);
-                                  }}
-                                  title="Copy referral link"
-                                  style={{
-                                    padding: '4px',
-                                    border: 'none',
-                                    backgroundColor: 'transparent',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '4px',
-                                    transition: 'background-color 0.2s ease',
-                                    marginLeft: '8px',
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent';
-                                  }}
-                                >
-                                  {copiedReferralCode === member.member_id ? (
-                                    <svg style={{ width: '16px', height: '16px', color: '#4CAF50' }} fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  ) : (
-                                    <svg style={{ width: '16px', height: '16px', color: '#86868b' }} fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                                      <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                                    </svg>
-                                  )}
-                                </button>
-                              </div>
-                            )}
-                            {member.referral_code && member.referral_count !== undefined && member.referral_count > 0 && (
-                              <div className={styles.detailRow}>
-                                <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                                </svg>
-                                <span>
-                                  {member.referral_count} successful {member.referral_count === 1 ? 'referral' : 'referrals'}
-                                </span>
-                              </div>
-                            )}
                             {(member.email || member.phone || member.company || member.dob || member.address || member.city || member.state || member.zip) && editingMemberId !== member.member_id && (
                               <div className={styles.detailRowWithAction}>
                                 <button
@@ -1886,6 +1873,96 @@ export default function MemberDetailAdmin() {
 
                     {expandedMemberIds.has(member.member_id) && (
                       <>
+                    {/* Referrals Section */}
+                    <div className={styles.section}>
+                      <h4 className={styles.subsectionTitle}>Referrals</h4>
+
+                      {/* Referral Link */}
+                      {member.referral_code && (
+                        <div className={styles.detailRow}>
+                          <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                          </svg>
+                          <span style={{ flex: 1, fontSize: '0.875rem' }}>
+                            {typeof window !== 'undefined' && window.location.host}/refer/{member.referral_code}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyReferralLink(member.member_id, member.referral_code!);
+                            }}
+                            title="Copy referral link"
+                            style={{
+                              padding: '4px',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                              transition: 'background-color 0.2s ease',
+                              marginLeft: '8px',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            {copiedReferralCode === member.member_id ? (
+                              <svg style={{ width: '16px', height: '16px', color: '#4CAF50' }} fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <svg style={{ width: '16px', height: '16px', color: '#86868b' }} fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Referred By */}
+                      {referralDetails[member.member_id]?.referredByMember && (
+                        <div className={styles.detailRow}>
+                          <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
+                          </svg>
+                          <span style={{ fontSize: '0.875rem' }}>
+                            Referred by: <strong>{referralDetails[member.member_id].referredByMember.first_name} {referralDetails[member.member_id].referredByMember.last_name}</strong>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Members Referred */}
+                      {referralDetails[member.member_id]?.referredMembers && referralDetails[member.member_id].referredMembers.length > 0 && (
+                        <div>
+                          <div className={styles.detailRow}>
+                            <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                            </svg>
+                            <span style={{ fontSize: '0.875rem' }}>
+                              <strong>{referralDetails[member.member_id].referredMembers.length}</strong> successful {referralDetails[member.member_id].referredMembers.length === 1 ? 'referral' : 'referrals'}:
+                            </span>
+                          </div>
+                          <div style={{ paddingLeft: '2rem', marginTop: '0.5rem' }}>
+                            {referralDetails[member.member_id].referredMembers.map((referred) => (
+                              <div key={referred.member_id} style={{ fontSize: '0.875rem', padding: '0.25rem 0' }}>
+                                • {referred.first_name} {referred.last_name}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {!member.referral_code && !referralDetails[member.member_id]?.referredByMember && !referralDetails[member.member_id]?.referredMembers?.length && (
+                        <p style={{ fontSize: '0.875rem', color: '#86868b', fontStyle: 'italic' }}>No referral activity</p>
+                      )}
+                    </div>
+
                     {/* Attributes Section */}
                     <div className={styles.section}>
                       <h4 className={styles.subsectionTitle}>Attributes</h4>
