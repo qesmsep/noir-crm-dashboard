@@ -18,7 +18,7 @@
 
 ## 📋 Summary
 
-**Last Updated**: 2026-03-06
+**Last Updated**: 2026-03-08
 
 This 100-line summary provides a high-level overview of the Noir CRM Dashboard system architecture, key concepts, and how to use this reference manual efficiently.
 
@@ -1622,7 +1622,59 @@ Three quick action types in a single collapsible card interface:
 
 **Context**: `src/context/SettingsContext.tsx` provides settings throughout app
 
-### 11. Inventory Management System
+### 11. Business Dashboard & Analytics
+
+**Location**: `src/pages/admin/business.tsx`, `src/pages/api/admin/business-*`, `src/lib/businessMetrics.ts`
+
+**Overview**: Comprehensive business intelligence dashboard for tracking MRR, member growth, retention, and financial metrics.
+
+**Data Source**: Uses `accounts.monthly_dues` (source of truth) and `member_subscription_snapshots` table for point-in-time historical data.
+
+**Key Metrics**:
+
+1. **Revenue Health**
+   - **MRR** (Monthly Recurring Revenue): Sum of all active members' `accounts.monthly_dues`
+   - **Net New MRR**: New + Expansion - Contraction - Churned - Paused
+   - **ARR** (Annual Recurring Revenue): MRR × 12
+   - **Current Month Total Revenue**: All member payments (dues + purchases)
+   - **Last Month Total Revenue**: Previous complete month data
+
+2. **MRR Bridge Components**
+   - **New MRR**: Members whose `join_date` is in current month with MRR > 0
+   - **Expansion MRR**: Existing members who increased MRR OR reactivated (had $0, now >$0, but joined previously)
+   - **Contraction MRR**: Members who decreased MRR (but still >$0)
+   - **Churned MRR**: Members who went from MRR >$0 to $0 (not paused)
+   - **Paused MRR**: Members who went to $0 with status='paused'
+
+3. **Member Counts**
+   - Active Members: `members.status='active'` AND `accounts.monthly_dues>0`
+   - New Members: Count of members with `join_date` in current month
+   - Churned Members: Members who cancelled this month
+   - Paused Members: Members with status='paused'
+
+**Snapshot System**:
+- Historical data stored in `member_subscription_snapshots` table
+- Snapshots capture: member_id, snapshot_month, mrr, subscription_status, signup_date (from join_date)
+- Snapshots filter by `join_date <= end_of_month` to ensure historical accuracy
+- Monthly snapshots should be generated at month-end and not modified
+- "Regenerate Snapshot" button available for backfilling/fixing incorrect data
+
+**API Endpoints**:
+- `GET /api/admin/business-summary?month=YYYY-MM-01` - Get single month metrics
+- `GET /api/admin/business-series?month=YYYY-MM-01&months=12` - Get time series data
+- `GET /api/admin/business-drilldown?type=churned|expansion|attach|new|paused&month=YYYY-MM-01` - Get member lists
+- `POST /api/admin/business-snapshot?month=YYYY-MM-01` - Generate/regenerate snapshot
+
+**Important Notes**:
+- Uses `accounts.monthly_dues` NOT `members.monthly_dues` (accounts is source of truth)
+- New members identified by `signup_date` matching current month
+- Reactivations (had $0, now >$0, but signed up earlier) count as Expansion, not New
+- MTD (Month-to-Date) label shows for current month
+- Month selector limited to October 2025 onwards
+
+**Net New MRR Modal**: Click Net New MRR card to see detailed breakdown with member lists for each component (new, expansion, contraction, churned, paused).
+
+### 12. Inventory Management System
 
 **Location**: `src/pages/admin/inventory.tsx`, `src/pages/api/inventory/`
 

@@ -24,6 +24,7 @@ interface Member {
   dob?: string;
   accounts?: {
     subscription_cancel_at?: string | null;
+    subscription_status?: string | null;
   };
 }
 
@@ -110,12 +111,17 @@ export default function MembersAdmin() {
     }
   }
 
+  // Helper to check if account is cancelled
+  const isAccountCancelled = (account: { accounts?: { subscription_cancel_at?: string | null; subscription_status?: string | null } }) => {
+    return account.accounts?.subscription_status === 'canceled' || !!account.accounts?.subscription_cancel_at;
+  };
+
   // Initialize selected members when modal opens
   useEffect(() => {
     if (isBulkMessageModalOpen && selectAll) {
       const allMemberIds = new Set(
         sortedAccounts
-          .filter(account => !account.accounts?.subscription_cancel_at) // Exclude cancelled memberships
+          .filter(account => !isAccountCancelled(account)) // Exclude cancelled memberships
           .flatMap(account => account.allMembers.map(m => m.member_id))
       );
       setSelectedMemberIds(allMemberIds);
@@ -130,7 +136,8 @@ export default function MembersAdmin() {
         .select(`
           *,
           accounts!inner(
-            subscription_cancel_at
+            subscription_cancel_at,
+            subscription_status
           )
         `)
         .eq('deactivated', false)
@@ -258,6 +265,7 @@ export default function MembersAdmin() {
     renewal_date: Date | null;
     accounts?: {
       subscription_cancel_at?: string | null;
+      subscription_status?: string | null;
     };
   }
 
@@ -337,7 +345,7 @@ export default function MembersAdmin() {
     if (isBulkMessageModalOpen && selectAll) {
       const allMemberIds = new Set(
         sortedAccounts
-          .filter(account => !account.accounts?.subscription_cancel_at) // Exclude cancelled memberships
+          .filter(account => !isAccountCancelled(account)) // Exclude cancelled memberships
           .flatMap(account => account.allMembers.map(m => m.member_id))
       );
       setSelectedMemberIds(allMemberIds);
@@ -351,7 +359,7 @@ export default function MembersAdmin() {
     } else {
       const allMemberIds = new Set(
         sortedAccounts
-          .filter(account => !account.accounts?.subscription_cancel_at) // Exclude cancelled memberships
+          .filter(account => !isAccountCancelled(account)) // Exclude cancelled memberships
           .flatMap(account => account.allMembers.map(m => m.member_id))
       );
       setSelectedMemberIds(allMemberIds);
@@ -1028,7 +1036,7 @@ export default function MembersAdmin() {
                               className={styles.checkbox}
                             />
                             <span className={styles.checkboxText}>
-                              Select All Active ({sortedAccounts.filter(acc => !acc.accounts?.subscription_cancel_at).reduce((sum, acc) => sum + acc.allMembers.length, 0)} members)
+                              Select All Active ({sortedAccounts.filter(acc => !isAccountCancelled(acc)).reduce((sum, acc) => sum + acc.allMembers.length, 0)} members)
                             </span>
                           </label>
                         </div>

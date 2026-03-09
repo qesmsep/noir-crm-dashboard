@@ -143,6 +143,7 @@ export default function MemberDetailAdmin() {
 
   // Account subscription status
   const [subscriptionCancelAt, setSubscriptionCancelAt] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
 
   // Member card expansion
   const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set());
@@ -250,7 +251,7 @@ export default function MemberDetailAdmin() {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('accounts')
-          .select('credit_card_fee_enabled, subscription_cancel_at')
+          .select('credit_card_fee_enabled, subscription_cancel_at, subscription_status')
           .eq('account_id', accountId)
           .single();
 
@@ -264,6 +265,7 @@ export default function MemberDetailAdmin() {
 
         setCreditCardFeeEnabled(data?.credit_card_fee_enabled || false);
         setSubscriptionCancelAt(data?.subscription_cancel_at || null);
+        setSubscriptionStatus(data?.subscription_status || null);
       } catch (err: any) {
         console.error('Error fetching account settings:', err);
       }
@@ -1690,7 +1692,7 @@ export default function MemberDetailAdmin() {
                             {member.first_name} {member.last_name}
                           </h3>
                           {/* Status Badge */}
-                          {subscriptionCancelAt && (
+                          {(subscriptionStatus === 'canceled' || subscriptionCancelAt) && (
                             <span style={{
                               padding: '2px 8px',
                               borderRadius: '4px',
