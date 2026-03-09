@@ -1735,7 +1735,7 @@ export default function MemberDetailAdmin() {
                         {editingMemberId !== member.member_id && (
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gridTemplateColumns: 'repeat(2, 1fr)',
                             gap: '0.75rem',
                             width: '100%',
                             padding: '1rem 0',
@@ -1749,23 +1749,9 @@ export default function MemberDetailAdmin() {
                               </div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Renewal</div>
-                              <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
-                                {member.next_renewal ? new Date(member.next_renewal).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }).replace(/\//g, '.') : 'N/A'}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>LTV</div>
-                              <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
-                                {formatCurrency(members.reduce((sum, m) => sum + calculateMemberLTV(m.member_id), 0))}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                                {member.member_type === 'primary' ? 'Account Balance' : 'Member Spend'}
-                              </div>
-                              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: (member.member_type === 'primary' ? calculateRunningBalance(ledger, 0) : calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)) >= 0 ? '#10B981' : '#1F1F1F' }}>
-                                {formatCurrency(Math.abs(member.member_type === 'primary' ? calculateRunningBalance(ledger, 0) : calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)))}
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Member Spend</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0) >= 0 ? '#10B981' : '#1F1F1F' }}>
+                                {formatCurrency(Math.abs(calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)))}
                               </div>
                             </div>
                           </div>
