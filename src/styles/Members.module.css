@@ -221,7 +221,7 @@
 @media (max-width: 768px) {
   .modalOverlay {
     align-items: flex-start;
-    padding-top: 80px;
+    padding-top: 100px;
   }
 }
 
