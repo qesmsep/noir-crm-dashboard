@@ -157,7 +157,7 @@ function inverseDeltaStr(current: number, prior: number, format: 'pct' | 'number
 
 /** Format month as "Month Year" or "MTD" for current month */
 function fmtMonthRange(monthStr: string): string {
-  const date = new Date(monthStr);
+  const date = new Date(monthStr + 'T00:00:00');
   const now = new Date();
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -174,19 +174,21 @@ function fmtMonthRange(monthStr: string): string {
 function generateMonthOptions(): string[] {
   const options: string[] = [];
   const now = new Date();
+  const stopDate = new Date(2025, 9, 1); // October 2025 (month is 0-indexed)
 
-  // Add MTD (Month-to-Date) as first option - current month
-  const currentYear = now.getFullYear();
-  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-  options.push(`${currentYear}-${currentMonth}-01`);
+  // Start with current month
+  let currentDate = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Add previous 23 months (total 24 months including current)
-  for (let i = 1; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
+  // Generate months from now back to October 2025
+  while (currentDate >= stopDate) {
+    const y = currentDate.getFullYear();
+    const m = String(currentDate.getMonth() + 1).padStart(2, '0');
     options.push(`${y}-${m}-01`);
+
+    // Move to previous month
+    currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
   }
+
   return options;
 }
 
@@ -535,6 +537,8 @@ export default function BusinessDashboard() {
       setSummary(summaryRes.data);
       setSeries(seriesRes.data || []);
       console.log('Series data:', seriesRes.data);
+      console.log('Summary data:', summaryRes.data);
+      console.log('MRR Bridge:', summaryRes.data?.mrrBridge);
       setCohorts(cohortsRes.data || []);
       setDrillChurn(churnRes.data || []);
       setDrillExpansion(expRes.data || []);
@@ -640,6 +644,13 @@ export default function BusinessDashboard() {
                 <option key={m} value={m}>{fmtMonthRange(m)}</option>
               ))}
             </select>
+            <button
+              className={styles.snapshotBtn}
+              onClick={handleGenerateSnapshot}
+              disabled={snapshotLoading}
+            >
+              {snapshotLoading ? 'Regenerating...' : 'Regenerate Snapshot'}
+            </button>
           </div>
         </div>
 

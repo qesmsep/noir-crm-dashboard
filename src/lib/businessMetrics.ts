@@ -42,6 +42,7 @@ export interface MemberSnapshot {
   stripe_subscription_id: string | null;
   stripe_customer_id: string | null;
   first_paid_date: string | null;
+  signup_date: string | null;
 }
 
 export interface MrrBridge {
@@ -244,46 +245,74 @@ export function getSupabaseAdmin(): SupabaseClient {
 export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): Promise<number> {
   const supabase = sb || getSupabaseAdmin();
 
-  // Fetch all non-deactivated members with their subscription data
-  const { data: members, error} = await supabase
-    .from('members')
-    .select('member_id, account_id, monthly_dues, status, join_date, stripe_customer_id, stripe_subscription_id, subscription_status, subscription_start_date, deactivated')
-    .or('deactivated.is.null,deactivated.eq.false');
+  // Fetch all non-deactivated members with their account subscription data
+  const { data: members, error } = await supabase.rpc('get_members_with_account_dues', {})
+    .then(async (result) => {
+      if (result.error) {
+        // Fallback: use raw query
+        const endOfMonth = monthEnd(monthStr);
+        return await supabase.from('members').select(`
+          member_id,
+          account_id,
+          status,
+          join_date,
+          deactivated
+        `)
+        .or('deactivated.is.null,deactivated.eq.false')
+        .lte('join_date', endOfMonth)
+        .then(async (membersResult) => {
+          if (membersResult.error) throw membersResult.error;
+
+          // Get all account IDs
+          const accountIds = membersResult.data?.map(m => m.account_id) || [];
+
+          // Fetch accounts separately
+          const { data: accounts } = await supabase
+            .from('accounts')
+            .select('account_id, monthly_dues, subscription_status')
+            .in('account_id', accountIds);
+
+          // Map accounts to members
+          const accountMap = new Map(accounts?.map(a => [a.account_id, a]) || []);
+
+          return {
+            data: membersResult.data?.map(m => ({
+              ...m,
+              accounts: accountMap.get(m.account_id)
+            })),
+            error: null
+          };
+        });
+      }
+      return result;
+    });
 
   if (error) throw new Error(`Failed to fetch members: ${error.message}`);
   if (!members || members.length === 0) return 0;
 
   const rows = members.map((m: any) => {
-    // Use real subscription status if available, otherwise fall back to monthly_dues proxy
-    const hasSubscription = m.stripe_subscription_id && m.subscription_status;
-    const dues = Number(m.monthly_dues) || 0;
+    // Use accounts.monthly_dues (the hard-coded amount on the account)
+    const accountDues = Number(m.accounts?.monthly_dues) || 0;
+    const accountStatus = m.accounts?.subscription_status || null;
 
-    let mrr = 0;
-    let status = 'canceled';
+    const isActive = m.status === 'active' && accountDues > 0;
+    const isPaused = m.status === 'inactive' && !m.deactivated;
 
-    if (hasSubscription) {
-      // Use real Stripe subscription data
-      status = m.subscription_status;
-      mrr = (status === 'active' || status === 'trialing') ? dues : 0;
-    } else {
-      // Fall back to legacy proxy logic
-      const isActive = m.status === 'active' && dues > 0;
-      const isPaused = m.status === 'inactive' && !m.deactivated;
-      mrr = isActive ? dues : 0;
-      status = isActive ? 'active' : (isPaused ? 'paused' : 'canceled');
-    }
+    const mrr = isActive ? accountDues : 0;
+    const status = accountStatus || (isActive ? 'active' : (isPaused ? 'paused' : 'canceled'));
 
     return {
       member_id: m.member_id,
       snapshot_month: monthStr,
       mrr,
-      plan_name: dues > 0 ? 'Membership' : null,
+      plan_name: accountDues > 0 ? 'Membership' : null,
       plan_interval: 'month',
-      plan_amount: dues,
+      plan_amount: accountDues,
       subscription_status: status,
-      stripe_subscription_id: m.stripe_subscription_id || null,
-      stripe_customer_id: m.stripe_customer_id || null,
-      first_paid_date: m.subscription_start_date || m.join_date || null,
+      stripe_subscription_id: null,
+      stripe_customer_id: null,
+      first_paid_date: m.join_date || null,
+      signup_date: m.join_date || null,
     };
   });
 
@@ -357,14 +386,13 @@ export function computeMrrBridge(
     if (priorMrr === 0 && currMrr > 0) {
       // New MRR: member had no MRR in prior month and has MRR now
       // Check if this is their first-ever month (new) vs. reactivation
-      // For simplicity, treat all zero-to-positive as "new" since first_paid_date
-      // may not be perfectly tracked. The snapshot month of first_paid_date determines true new.
+      // Use signup_date to determine if this is a truly new member
       const currentMonth = currentSnapshots.length > 0 ? currentSnapshots[0].snapshot_month : '';
-      const firstPaidMonth = curr.first_paid_date
-        ? curr.first_paid_date.substring(0, 7) + '-01'
+      const signupMonth = curr.signup_date
+        ? monthStart(new Date(curr.signup_date + 'T00:00:00'))
         : null;
-      // True "new" = first paid date falls within the current month
-      if (firstPaidMonth && monthStart(new Date(curr.first_paid_date + 'T00:00:00')) === currentMonth) {
+      // True "new" = signup date falls within the current month
+      if (signupMonth === currentMonth) {
         newMrr += currMrr;
       } else {
         // Reactivation - counts as expansion (returning member)
@@ -423,12 +451,12 @@ export function computeMemberCounts(
     s => s.mrr === 0 && s.subscription_status === 'paused'
   ).length;
 
-  // New members: first_paid_date falls within the current snapshot month
+  // New members: signup_date falls within the current snapshot month
   const currentMonth = currentSnapshots.length > 0 ? currentSnapshots[0]?.snapshot_month : '';
   const newMembers = currentSnapshots.filter(s => {
     if (s.mrr <= 0) return false;
-    if (!s.first_paid_date) return false;
-    return monthStart(new Date(s.first_paid_date + 'T00:00:00')) === currentMonth;
+    if (!s.signup_date) return false;
+    return monthStart(new Date(s.signup_date + 'T00:00:00')) === currentMonth;
   }).length;
 
   // Churned members: had MRR in prior, zero now, and not paused
@@ -728,11 +756,11 @@ export async function getDrilldownExpansionContraction(
     // Also include reactivations (went from $0 to positive, but not a true new member)
     else if (priorMrr === 0 && curr.mrr > 0) {
       const currentMonth = currentSnapshots.length > 0 ? currentSnapshots[0].snapshot_month : '';
-      const firstPaidMonth = curr.first_paid_date
-        ? monthStart(new Date(curr.first_paid_date + 'T00:00:00'))
+      const signupMonth = curr.signup_date
+        ? monthStart(new Date(curr.signup_date + 'T00:00:00'))
         : null;
-      // Only count as expansion if first_paid_date is NOT in the current month (reactivation)
-      if (firstPaidMonth !== currentMonth) {
+      // Only count as expansion if signup_date is NOT in the current month (reactivation)
+      if (signupMonth !== currentMonth) {
         memberIds.push(curr.member_id);
         results.push({
           member_id: curr.member_id,
@@ -836,11 +864,11 @@ export async function getDrilldownNew(
   const supabase = sb || getSupabaseAdmin();
   const snapshots = await getSnapshots(monthStr, supabase);
 
-  // New members: have MRR > 0 and first_paid_date falls within the month
+  // New members: have MRR > 0 and signup_date falls within the month
   const newMembers = snapshots.filter(s => {
     if (s.mrr <= 0) return false;
-    if (!s.first_paid_date) return false;
-    return monthStart(new Date(s.first_paid_date + 'T00:00:00')) === monthStr;
+    if (!s.signup_date) return false;
+    return monthStart(new Date(s.signup_date + 'T00:00:00')) === monthStr;
   });
 
   const memberIds = newMembers.map(s => s.member_id);
