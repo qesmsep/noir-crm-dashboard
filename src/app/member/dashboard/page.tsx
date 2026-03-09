@@ -80,6 +80,7 @@ export default function MemberDashboardPage() {
   const [accountMembers, setAccountMembers] = useState<any[]>([]);
   const [subscriptionData, setSubscriptionData] = useState<any>(null);
   const [copiedReferralLink, setCopiedReferralLink] = useState(false);
+  const [referralCount, setReferralCount] = useState<number>(0);
 
   useEffect(() => {
     setMounted(true);
@@ -123,6 +124,7 @@ export default function MemberDashboardPage() {
     fetchUpcomingEvents();
     fetchAccountMembers();
     fetchSubscriptionData();
+    fetchReferralCount();
   }, [member]);
 
   const fetchNextReservation = async () => {
@@ -295,6 +297,23 @@ export default function MemberDashboardPage() {
       }
     } catch (error) {
       console.error('Error fetching subscription data:', error);
+    }
+  };
+
+  const fetchReferralCount = async () => {
+    if (!member?.referral_code) return;
+
+    try {
+      const response = await fetch(`/api/member/referral-count?code=${member.referral_code}`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setReferralCount(data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching referral count:', error);
     }
   };
 
@@ -569,6 +588,54 @@ export default function MemberDashboardPage() {
 
           {/* Additional Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Referrals Card */}
+            {member?.referral_code && (
+              <Card className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <svg className="w-5 h-5 text-[#A59480]" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                    </svg>
+                    <span className="text-xl font-semibold text-[#1F1F1F]">
+                      Referrals
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Share Noir Button */}
+                  <a
+                    href={`sms:?&body=Please join me as a member of Noir. Use the following link to bypass the waitlist and we both receive an additional $50 credit to enjoy: https://noirkc.com/refer/${member.referral_code}`}
+                    className="block bg-gradient-to-r from-[#A59480] to-[#8C7C6D] hover:from-[#8C7C6D] hover:to-[#7A6B5D] text-white rounded-lg p-4 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)]"
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <p className="text-2xl" style={{ fontFamily: 'CONEBARS' }}>Share Noir</p>
+                      <p className="text-xs font-normal">(click here to send text)</p>
+                    </div>
+                  </a>
+
+                  {/* Referral URL Display */}
+                  <div
+                    className="bg-[#F6F5F2] rounded-lg px-2 py-3 cursor-pointer hover:bg-[#EDEAE3] transition-colors text-center"
+                    onClick={handleCopyReferralLink}
+                  >
+                    <p className="text-xs text-[#1F1F1F] break-all">
+                      <span className="font-semibold">Your Link:</span> https://noirkc.com/refer/{member.referral_code}
+                    </p>
+                    <p className="text-[10px] text-[#8C7C6D] mt-0.5">
+                      {copiedReferralLink ? '✓ Copied!' : '(click here to copy)'}
+                    </p>
+                  </div>
+
+                  {/* Members Referred Count */}
+                  <div className="bg-[#F6F5F2] rounded-lg p-3">
+                    <p className="text-sm text-[#1F1F1F] text-center">
+                      You've referred <span className="font-semibold text-[#A59480]">{referralCount}</span> {referralCount === 1 ? 'member' : 'members'}.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Membership Card */}
             <Card
               className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
@@ -583,20 +650,6 @@ export default function MemberDashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Referral Link */}
-                {member?.referral_code && (
-                  <a
-                    href={`sms:?&body=Please join me as a member of Noir. Use the following link to bypass the waitlist and we both receive an additional $50 credit to enjoy: https://noirkc.com/refer/${member.referral_code}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="block bg-gradient-to-r from-[#A59480] to-[#8C7C6D] hover:from-[#8C7C6D] hover:to-[#7A6B5D] text-white rounded-lg p-4 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)]"
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <p className="text-2xl" style={{ fontFamily: 'CONEBARS' }}>Share Noir</p>
-                      <p className="text-xs font-normal">(click here to send text)</p>
-                      <p className="text-[10px] font-normal"><span className="font-bold">Referral Link:</span> noirkc.com/refer/{member.referral_code}</p>
-                    </div>
-                  </a>
-                )}
                 <div className="bg-[#F6F5F2] rounded-lg p-3">
                   {(() => {
                     // Use API-provided values - everything from database
