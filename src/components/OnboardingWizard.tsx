@@ -457,8 +457,16 @@ export default function OnboardingWizard({
 
   // Helper function to format phone number
   const formatPhoneNumber = (phoneValue: string) => {
-    // Strip all non-digits and limit to 10 digits
-    const input = phoneValue.replace(/\D/g, '').substring(0, 10);
+    // Strip all non-digits
+    let digitsOnly = phoneValue.replace(/\D/g, '');
+
+    // Remove leading 1 if present (country code)
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+      digitsOnly = digitsOnly.substring(1);
+    }
+
+    // Limit to 10 digits
+    const input = digitsOnly.substring(0, 10);
 
     // Progressive formatting as user types
     let formatted = '';
@@ -475,9 +483,10 @@ export default function OnboardingWizard({
   };
 
   // Step 1: Contact Info (includes waitlist intake fields)
-  const [firstName, setFirstName] = useState(waitlistData.first_name || '');
-  const [lastName, setLastName] = useState(waitlistData.last_name || '');
-  const [email, setEmail] = useState(waitlistData.email || '');
+  // Treat single space as empty (used to satisfy NOT NULL constraints while keeping fields functionally empty)
+  const [firstName, setFirstName] = useState((waitlistData.first_name || '').trim());
+  const [lastName, setLastName] = useState((waitlistData.last_name || '').trim());
+  const [email, setEmail] = useState((waitlistData.email || '').trim());
   const [phone, setPhone] = useState(formatPhoneNumber(waitlistData.phone || ''));
   const [dateOfBirth, setDateOfBirth] = useState(waitlistData.date_of_birth || '');
   const [address, setAddress] = useState(waitlistData.address || '');
@@ -584,6 +593,37 @@ export default function OnboardingWizard({
         description: 'Please provide your name, email, phone number, and date of birth',
         status: 'warning',
         duration: 3000,
+      });
+      return false;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address',
+        status: 'warning',
+        duration: 3000,
+      });
+      return false;
+    }
+
+    // Validate age (must be 21+)
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    if (age < 21) {
+      toast({
+        title: 'Age Requirement',
+        description: 'You must be at least 21 years old to join Noir',
+        status: 'warning',
+        duration: 5000,
       });
       return false;
     }

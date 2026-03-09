@@ -1020,13 +1020,14 @@ export async function handler(req, res) {
             .eq('id', existingEntry.id);
         } else {
           // Create new waitlist entry with status='approved'
+          // Use space character to satisfy NOT NULL constraint while keeping fields functionally empty
           await supabase
             .from('waitlist')
             .insert({
               phone: from,
-              first_name: '',
-              last_name: '',
-              email: '',
+              first_name: ' ',
+              last_name: ' ',
+              email: ' ',
               status: 'approved',
               agreement_token: signupToken,
               agreement_token_created_at: new Date().toISOString(),
@@ -1098,13 +1099,14 @@ Thank you.`;
             .eq('id', existingEntry.id);
         } else {
           // Create new waitlist entry with status='approved' and Skyline pre-selected
+          // Use space character to satisfy NOT NULL constraint while keeping fields functionally empty
           await supabase
             .from('waitlist')
             .insert({
               phone: from,
-              first_name: '',
-              last_name: '',
-              email: '',
+              first_name: ' ',
+              last_name: ' ',
+              email: ' ',
               status: 'approved',
               selected_membership: 'Skyline',
               agreement_token: signupToken,
