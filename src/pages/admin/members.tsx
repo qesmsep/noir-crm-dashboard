@@ -32,6 +32,7 @@ interface LedgerTransaction {
   running_balance?: number;
   date?: string;
   created_at?: string;
+  note?: string;
 }
 
 type SortField = 'name' | 'join_date' | 'renewal_date' | 'ltv' | 'balance' | null;
