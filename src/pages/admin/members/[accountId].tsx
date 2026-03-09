@@ -122,14 +122,17 @@ export default function MemberDetailAdmin() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [customChargeAmount, setCustomChargeAmount] = useState('');
   const [customChargeDescription, setCustomChargeDescription] = useState('');
+  const [customChargeDate, setCustomChargeDate] = useState('');
 
   // Credit states
   const [creditAmount, setCreditAmount] = useState('');
   const [creditDescription, setCreditDescription] = useState('');
+  const [creditDate, setCreditDate] = useState('');
 
   // Manual charge states
   const [chargeAmount, setChargeAmount] = useState('');
   const [chargeDescription, setChargeDescription] = useState('');
+  const [chargeDate, setChargeDate] = useState('');
 
   // Ledger actions card expansion
   const [isLedgerActionsExpanded, setIsLedgerActionsExpanded] = useState(false);
@@ -1158,6 +1161,7 @@ export default function MemberDetailAdmin() {
           account_id: accountId,
           custom_amount: amount,
           custom_description: customChargeDescription.trim(),
+          custom_date: customChargeDate || new Date().toISOString().split('T')[0],
         }),
       });
 
@@ -1177,6 +1181,7 @@ export default function MemberDetailAdmin() {
       // Clear form
       setCustomChargeAmount('');
       setCustomChargeDescription('');
+      setCustomChargeDate('');
 
       // Refresh the ledger
       const res = await fetch(`/api/ledger?account_id=${accountId}`);
@@ -1286,7 +1291,7 @@ export default function MemberDetailAdmin() {
           type: 'payment',
           amount: amount,
           note: creditDescription.trim(),
-          date: new Date().toISOString().split('T')[0],
+          date: creditDate || new Date().toISOString().split('T')[0],
         }),
       });
 
@@ -1303,6 +1308,7 @@ export default function MemberDetailAdmin() {
       // Clear form
       setCreditAmount('');
       setCreditDescription('');
+      setCreditDate('');
 
       // Refresh the ledger
       const res = await fetch(`/api/ledger?account_id=${accountId}`);
@@ -1369,7 +1375,7 @@ export default function MemberDetailAdmin() {
           type: 'purchase',
           amount: -amount, // Negative amount for charges
           note: chargeDescription.trim(),
-          date: new Date().toISOString().split('T')[0],
+          date: chargeDate || new Date().toISOString().split('T')[0],
         }),
       });
 
@@ -1386,6 +1392,7 @@ export default function MemberDetailAdmin() {
       // Clear form
       setChargeAmount('');
       setChargeDescription('');
+      setChargeDate('');
 
       // Refresh the ledger
       const res = await fetch(`/api/ledger?account_id=${accountId}`);
@@ -2288,6 +2295,12 @@ export default function MemberDetailAdmin() {
                           value={customChargeDescription}
                           onChange={(e) => setCustomChargeDescription(e.target.value)}
                         />
+                        <input
+                          type="date"
+                          className={styles.actionInput}
+                          value={customChargeDate}
+                          onChange={(e) => setCustomChargeDate(e.target.value)}
+                        />
                         <button
                           onClick={handleCustomCharge}
                           disabled={isProcessingPayment || !customChargeAmount || !customChargeDescription}
@@ -2320,6 +2333,12 @@ export default function MemberDetailAdmin() {
                           value={creditDescription}
                           onChange={(e) => setCreditDescription(e.target.value)}
                         />
+                        <input
+                          type="date"
+                          className={styles.actionInput}
+                          value={creditDate}
+                          onChange={(e) => setCreditDate(e.target.value)}
+                        />
                         <button
                           onClick={handleAddCredit}
                           disabled={!creditAmount || !creditDescription}
@@ -2351,6 +2370,12 @@ export default function MemberDetailAdmin() {
                           className={styles.actionInput}
                           value={chargeDescription}
                           onChange={(e) => setChargeDescription(e.target.value)}
+                        />
+                        <input
+                          type="date"
+                          className={styles.actionInput}
+                          value={chargeDate}
+                          onChange={(e) => setChargeDate(e.target.value)}
                         />
                         <button
                           onClick={handleAddCharge}

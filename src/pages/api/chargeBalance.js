@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, custom_amount, custom_description } = req.body;
+  const { account_id, custom_amount, custom_description, custom_date } = req.body;
   if (!account_id) {
     return res.status(400).json({ error: 'account_id is required' });
   }
@@ -151,7 +151,7 @@ export default async function handler(req, res) {
   }
 
   // 6) Log payment in ledger (include both account_id and member_id)
-  const transactionDate = new Date().toISOString().split('T')[0];
+  const transactionDate = custom_date || new Date().toISOString().split('T')[0];
   const baseAmountDollars = baseAmount / 100;
   const creditCardFeeDollars = creditCardFee / 100;
 

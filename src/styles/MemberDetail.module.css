@@ -1794,7 +1794,7 @@
 
 .actionForm {
   display: grid;
-  grid-template-columns: 90px 1fr auto;
+  grid-template-columns: 90px 2fr 130px auto;
   gap: 0.5rem;
   align-items: center;
 }
@@ -1872,7 +1872,7 @@
   }
 
   .actionForm {
-    grid-template-columns: 80px 1fr auto;
+    grid-template-columns: 70px 1.5fr 110px auto;
     gap: 0.375rem;
   }
 
