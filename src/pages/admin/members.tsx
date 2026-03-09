@@ -131,19 +131,37 @@ export default function MembersAdmin() {
   async function fetchMembers() {
     try {
       const supabase = getSupabaseClient();
-      const { data, error} = await supabase
+
+      // Fetch members
+      const { data: membersData, error: membersError } = await supabase
         .from('members')
-        .select(`
-          *,
-          accounts(
-            subscription_cancel_at,
-            subscription_status
-          )
-        `)
+        .select('*')
         .eq('deactivated', false)
         .neq('status', 'pending'); // Exclude pending members from main list
-      if (error) throw error;
-      setMembers(data || []);
+
+      if (membersError) throw membersError;
+
+      // Fetch all unique account IDs
+      const accountIds = [...new Set(membersData?.map(m => m.account_id) || [])];
+
+      // Fetch account subscription data
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('accounts')
+        .select('account_id, subscription_cancel_at, subscription_status')
+        .in('account_id', accountIds);
+
+      if (accountsError) throw accountsError;
+
+      // Map accounts data by account_id
+      const accountsMap = new Map(accountsData?.map(acc => [acc.account_id, acc]) || []);
+
+      // Merge data
+      const membersWithAccounts = membersData?.map(member => ({
+        ...member,
+        accounts: accountsMap.get(member.account_id)
+      })) || [];
+
+      setMembers(membersWithAccounts);
     } catch (err: any) {
       setError(err.message);
     } finally {
