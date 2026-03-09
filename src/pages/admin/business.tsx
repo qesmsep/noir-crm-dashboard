@@ -505,6 +505,12 @@ export default function BusinessDashboard() {
   const [showNetNewMrrModal, setShowNetNewMrrModal] = useState(false);
   const [drillNew, setDrillNew] = useState<any[]>([]);
   const [drillPaused, setDrillPaused] = useState<any[]>([]);
+  const [partySizeMetrics, setPartySizeMetrics] = useState<{
+    avgPartySize: number | null;
+    pctWithGuests: number | null;
+    soloVisits: number | null;
+    totalReservations: number;
+  }>({ avgPartySize: null, pctWithGuests: null, soloVisits: null, totalReservations: 0 });
 
   const monthOptions = useMemo(() => generateMonthOptions(), []);
 
@@ -575,6 +581,26 @@ export default function BusinessDashboard() {
 
       const uniqueAccounts = new Set(accountData?.map(m => m.account_id) || []);
       setActiveAccountCount(uniqueAccounts.size);
+
+      // Fetch party size metrics from completed/confirmed reservations
+      const { data: reservationData } = await supabase
+        .from('reservations')
+        .select('party_size')
+        .in('status', ['confirmed', 'completed']);
+
+      if (reservationData && reservationData.length > 0) {
+        const total = reservationData.length;
+        const sum = reservationData.reduce((acc, r) => acc + (r.party_size || 1), 0);
+        const avg = sum / total;
+        const withGuests = reservationData.filter(r => (r.party_size || 1) >= 2).length;
+        const solo = reservationData.filter(r => (r.party_size || 1) === 1).length;
+        setPartySizeMetrics({
+          avgPartySize: Math.round(avg * 10) / 10,
+          pctWithGuests: Math.round((withGuests / total) * 1000) / 10,
+          soloVisits: solo,
+          totalReservations: total,
+        });
+      }
     } catch (err: any) {
       console.error('Business dashboard fetch error:', err);
       setError(err.message || 'Failed to load dashboard data');
@@ -785,6 +811,26 @@ export default function BusinessDashboard() {
                 <div className={styles.kpiValue}>{s.failedPayments30d}</div>
                 <div className={styles.kpiLabel}>Failed Payments (30d)</div>
                 <div className={styles.kpiHint}>Number of Stripe payment failures in the last 30 days. These are members whose dues didn't process — follow up to prevent involuntary churn.</div>
+              </div>
+            </div>
+
+            {/* Party Size Analytics */}
+            <h2 className={styles.sectionTitle}>Reservation Insights</h2>
+            <div className={styles.kpiGrid}>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{partySizeMetrics.avgPartySize ?? '--'}</div>
+                <div className={styles.kpiLabel}>Avg Party Size</div>
+                <div className={styles.kpiHint}>Average party size per reservation — true parking liability per visit.</div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{partySizeMetrics.pctWithGuests !== null ? `${partySizeMetrics.pctWithGuests}%` : '--'}</div>
+                <div className={styles.kpiLabel}>Reservations with 2+ Guests</div>
+                <div className={styles.kpiHint}>% of reservations with 2 or more in party — how often guests are present.</div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{partySizeMetrics.soloVisits ?? '--'}</div>
+                <div className={styles.kpiLabel}>Solo Visits</div>
+                <div className={styles.kpiHint}>Visits where member is solo — your true 1-car baseline. Out of {partySizeMetrics.totalReservations} total reservations.</div>
               </div>
             </div>
 
