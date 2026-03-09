@@ -218,6 +218,13 @@
   padding: 1rem;
 }
 
+@media (max-width: 768px) {
+  .modalOverlay {
+    align-items: flex-start;
+    padding-top: 80px;
+  }
+}
+
 .modalContent {
   background: #ffffff;
   border-radius: 12px;
@@ -511,11 +518,11 @@
   }
 
   .checkboxLabel {
-    min-height: 44px;
+    min-height: 30px;
   }
 
   .memberCheckbox {
-    min-height: 44px;
+    min-height: 30px;
   }
 }
 
