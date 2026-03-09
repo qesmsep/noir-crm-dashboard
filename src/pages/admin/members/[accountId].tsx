@@ -141,6 +141,9 @@ export default function MemberDetailAdmin() {
   const [creditCardFeeEnabled, setCreditCardFeeEnabled] = useState(false);
   const [updatingFeeToggle, setUpdatingFeeToggle] = useState(false);
 
+  // Account subscription status
+  const [subscriptionCancelAt, setSubscriptionCancelAt] = useState<string | null>(null);
+
   // Member card expansion
   const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set());
 
@@ -247,7 +250,7 @@ export default function MemberDetailAdmin() {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('accounts')
-          .select('credit_card_fee_enabled')
+          .select('credit_card_fee_enabled, subscription_cancel_at')
           .eq('account_id', accountId)
           .single();
 
@@ -260,6 +263,7 @@ export default function MemberDetailAdmin() {
         }
 
         setCreditCardFeeEnabled(data?.credit_card_fee_enabled || false);
+        setSubscriptionCancelAt(data?.subscription_cancel_at || null);
       } catch (err: any) {
         console.error('Error fetching account settings:', err);
       }
@@ -1685,6 +1689,20 @@ export default function MemberDetailAdmin() {
                           <h3 className={styles.memberName} style={{ margin: 0 }}>
                             {member.first_name} {member.last_name}
                           </h3>
+                          {/* Status Badge */}
+                          {subscriptionCancelAt && (
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              backgroundColor: '#fee',
+                              color: '#c00',
+                              border: '1px solid #fcc'
+                            }}>
+                              Cancelled
+                            </span>
+                          )}
                           <svg
                             width="20"
                             height="20"

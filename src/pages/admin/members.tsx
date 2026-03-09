@@ -22,6 +22,9 @@ interface Member {
   join_date?: string;
   member_type?: string;
   dob?: string;
+  accounts?: {
+    subscription_cancel_at?: string | null;
+  };
 }
 
 interface LedgerTransaction {
@@ -111,7 +114,9 @@ export default function MembersAdmin() {
   useEffect(() => {
     if (isBulkMessageModalOpen && selectAll) {
       const allMemberIds = new Set(
-        sortedAccounts.flatMap(account => account.allMembers.map(m => m.member_id))
+        sortedAccounts
+          .filter(account => !account.accounts?.subscription_cancel_at) // Exclude cancelled memberships
+          .flatMap(account => account.allMembers.map(m => m.member_id))
       );
       setSelectedMemberIds(allMemberIds);
     }
@@ -122,7 +127,12 @@ export default function MembersAdmin() {
       const supabase = getSupabaseClient();
       const { data, error} = await supabase
         .from('members')
-        .select('*')
+        .select(`
+          *,
+          accounts!inner(
+            subscription_cancel_at
+          )
+        `)
         .eq('deactivated', false)
         .neq('status', 'pending'); // Exclude pending members from main list
       if (error) throw error;
@@ -246,6 +256,9 @@ export default function MembersAdmin() {
     balance: number;
     join_date?: string;
     renewal_date: Date | null;
+    accounts?: {
+      subscription_cancel_at?: string | null;
+    };
   }
 
   const accounts: AccountSummary[] = Object.entries(
@@ -264,6 +277,7 @@ export default function MembersAdmin() {
       balance: calculateAccountBalance(accountId),
       join_date: primary.join_date,
       renewal_date: getNextRenewal(primary.join_date),
+      accounts: primary.accounts, // Pass through subscription_cancel_at from member data
     };
   });
 
@@ -322,7 +336,9 @@ export default function MembersAdmin() {
   useEffect(() => {
     if (isBulkMessageModalOpen && selectAll) {
       const allMemberIds = new Set(
-        sortedAccounts.flatMap(account => account.allMembers.map(m => m.member_id))
+        sortedAccounts
+          .filter(account => !account.accounts?.subscription_cancel_at) // Exclude cancelled memberships
+          .flatMap(account => account.allMembers.map(m => m.member_id))
       );
       setSelectedMemberIds(allMemberIds);
     }
@@ -334,7 +350,9 @@ export default function MembersAdmin() {
       setSelectAll(false);
     } else {
       const allMemberIds = new Set(
-        sortedAccounts.flatMap(account => account.allMembers.map(m => m.member_id))
+        sortedAccounts
+          .filter(account => !account.accounts?.subscription_cancel_at) // Exclude cancelled memberships
+          .flatMap(account => account.allMembers.map(m => m.member_id))
       );
       setSelectedMemberIds(allMemberIds);
       setSelectAll(true);
@@ -1010,7 +1028,7 @@ export default function MembersAdmin() {
                               className={styles.checkbox}
                             />
                             <span className={styles.checkboxText}>
-                              Select All ({sortedAccounts.reduce((sum, acc) => sum + acc.allMembers.length, 0)} members)
+                              Select All Active ({sortedAccounts.filter(acc => !acc.accounts?.subscription_cancel_at).reduce((sum, acc) => sum + acc.allMembers.length, 0)} members)
                             </span>
                           </label>
                         </div>
