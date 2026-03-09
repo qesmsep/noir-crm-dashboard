@@ -1932,24 +1932,24 @@ export default function MemberDetailAdmin() {
                             <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
                           </svg>
                           <span style={{ fontSize: '0.875rem' }}>
-                            Referred by: <strong>{referralDetails[member.member_id].referredByMember.first_name} {referralDetails[member.member_id].referredByMember.last_name}</strong>
+                            Referred by: <strong>{referralDetails[member.member_id]?.referredByMember?.first_name} {referralDetails[member.member_id]?.referredByMember?.last_name}</strong>
                           </span>
                         </div>
                       )}
 
                       {/* Members Referred */}
-                      {referralDetails[member.member_id]?.referredMembers && referralDetails[member.member_id].referredMembers.length > 0 && (
+                      {referralDetails[member.member_id]?.referredMembers && referralDetails[member.member_id]?.referredMembers.length > 0 && (
                         <div>
                           <div className={styles.detailRow}>
                             <svg className={styles.detailIcon} fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                             </svg>
                             <span style={{ fontSize: '0.875rem' }}>
-                              <strong>{referralDetails[member.member_id].referredMembers.length}</strong> successful {referralDetails[member.member_id].referredMembers.length === 1 ? 'referral' : 'referrals'}:
+                              <strong>{referralDetails[member.member_id]?.referredMembers.length}</strong> successful {referralDetails[member.member_id]?.referredMembers.length === 1 ? 'referral' : 'referrals'}:
                             </span>
                           </div>
                           <div style={{ paddingLeft: '2rem', marginTop: '0.5rem' }}>
-                            {referralDetails[member.member_id].referredMembers.map((referred) => (
+                            {referralDetails[member.member_id]?.referredMembers.map((referred) => (
                               <div key={referred.member_id} style={{ fontSize: '0.875rem', padding: '0.25rem 0' }}>
                                 • {referred.first_name} {referred.last_name}
                               </div>
