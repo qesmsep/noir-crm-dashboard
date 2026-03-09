@@ -1032,11 +1032,17 @@ export default function MemberDetailAdmin() {
     return transactions.slice(currentIndex).reduce((acc, t) => acc + Number(t.amount), 0);
   };
 
-  // Calculate LTV (Lifetime Value) for a member - sum of all payment transactions
+  // Calculate LTV (Lifetime Value) for a member - sum of all payment transactions, excluding 4% fees
   const calculateMemberLTV = (memberId: string) => {
     if (!ledger || ledger.length === 0) return 0;
     return ledger
-      .filter(tx => tx.member_id === memberId && tx.type === 'payment' && tx.amount > 0)
+      .filter(tx =>
+        tx.member_id === memberId &&
+        tx.type === 'payment' &&
+        tx.amount > 0 &&
+        !tx.note?.includes('4%') &&
+        !tx.note?.toLowerCase().includes('processing fee')
+      )
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
   };
 
@@ -1613,9 +1619,27 @@ export default function MemberDetailAdmin() {
                 </div>
                 <div className={styles.membersGrid}>
                   {members.map(member => (
-                  <div key={member.member_id} className={styles.memberCard}>
+                  <div key={member.member_id} className={styles.memberCard} style={{ position: 'relative' }}>
+                    {/* Edit Icon - Top Right */}
+                    {editingMemberId !== member.member_id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingMemberId(member.member_id);
+                          setEditingMemberData(member);
+                        }}
+                        className={styles.iconButton}
+                        title="Edit Member"
+                        style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 10 }}
+                      >
+                        <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+                    )}
+
                     {/* Member Header */}
-                    <div className={styles.memberHeader} style={{ cursor: 'pointer' }} onClick={() => toggleMemberExpansion(member.member_id)}>
+                    <div className={styles.memberHeader} style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }} onClick={() => toggleMemberExpansion(member.member_id)}>
                       <div style={{ position: 'relative' }}>
                         {member.photo ? (
                           <div className={styles.memberPhoto}>
@@ -1633,30 +1657,33 @@ export default function MemberDetailAdmin() {
                             {member.first_name?.[0]}{member.last_name?.[0]}
                           </div>
                         )}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            bottom: '5px',
-                            right: '5px',
-                            zIndex: 10
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <PhotoCropUpload
-                            currentPhoto={member.photo}
-                            onPhotoSelected={(photoDataUrl) => handlePhotoUpdate(member.member_id, photoDataUrl)}
-                            buttonClassName={styles.photoEditButton}
-                            showEditButton={true}
-                          />
-                        </div>
+                        {editingMemberId === member.member_id && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: '5px',
+                              right: '5px',
+                              zIndex: 10
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <PhotoCropUpload
+                              currentPhoto={member.photo}
+                              onPhotoSelected={(photoDataUrl) => handlePhotoUpdate(member.member_id, photoDataUrl)}
+                              buttonClassName={styles.photoEditButton}
+                              showEditButton={true}
+                            />
+                          </div>
+                        )}
+                        {/* Badge - Bottom Right of Photo */}
+                        {member.member_type === 'primary' && (
+                          <span className={styles.primaryBadge} style={{ position: 'absolute', bottom: '0', right: '-10px' }}>Primary</span>
+                        )}
                       </div>
-                      <div className={styles.memberInfo}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                          <h3 className={styles.memberName}>
+                      <div className={styles.memberInfo} style={{ width: '100%', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '0.5rem' }}>
+                          <h3 className={styles.memberName} style={{ margin: 0 }}>
                             {member.first_name} {member.last_name}
-                            {member.member_type === 'primary' && (
-                              <span className={styles.primaryBadge}>Primary</span>
-                            )}
                           </h3>
                           <svg
                             width="20"
@@ -1666,13 +1693,51 @@ export default function MemberDetailAdmin() {
                             style={{
                               transform: expandedMemberIds.has(member.member_id) ? 'rotate(180deg)' : 'rotate(0deg)',
                               transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                              flexShrink: 0,
-                              marginLeft: '0.5rem'
+                              flexShrink: 0
                             }}
                           >
                             <path d="M5 7.5L10 12.5L15 7.5" stroke="#86868b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
+
+                        {/* Member Summary Stats - Always visible when not editing */}
+                        {editingMemberId !== member.member_id && (
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gap: '0.75rem',
+                            width: '100%',
+                            padding: '1rem 0',
+                            borderTop: '1px solid #f0f0f0',
+                            marginTop: '1rem'
+                          }}>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Sign Up</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                                {member.join_date ? new Date(member.join_date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }).replace(/\//g, '.') : 'N/A'}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Renewal</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                                {member.next_renewal ? new Date(member.next_renewal).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }).replace(/\//g, '.') : 'N/A'}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>LTV</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                                {formatCurrency(calculateMemberLTV(member.member_id))}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Balance</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0) >= 0 ? '#10B981' : '#1F1F1F' }}>
+                                {formatCurrency(Math.abs(calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {editingMemberId === member.member_id ? (
                           <div className={styles.memberDetailsInline} onClick={(e) => e.stopPropagation()}>
                             <input
@@ -1846,24 +1911,6 @@ export default function MemberDetailAdmin() {
                                   {(member.city || member.state) && member.zip && ' '}
                                   {member.zip && member.zip}
                                 </span>
-                              </div>
-                            )}
-                            {(member.email || member.phone || member.company || member.dob || member.address || member.city || member.state || member.zip) && editingMemberId !== member.member_id && (
-                              <div className={styles.detailRowWithAction}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingMemberId(member.member_id);
-                                    setEditingMemberData(member);
-                                  }}
-                                  className={styles.iconButton}
-                                  title="Edit Member"
-                                  style={{ marginLeft: 'auto' }}
-                                >
-                                  <svg className={styles.iconButtonIcon} fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                  </svg>
-                                </button>
                               </div>
                             )}
                           </div>
@@ -2167,27 +2214,6 @@ export default function MemberDetailAdmin() {
                     )}
                   </div>
                 ))}
-              </div>
-            </div>
-
-            {/* Portal Access Card - Moved below members */}
-            <div className={styles.memberCard} style={{ marginTop: '1.5rem' }}>
-              <div className={styles.memberHeader} style={{ paddingBottom: '1rem', borderBottom: '1px solid #f0f0f0' }}>
-                <h3 className={styles.memberName}>Member Portal Access</h3>
-              </div>
-              <div style={{ padding: '1rem' }}>
-                <div className={styles.subscriptionRow}>
-                  <span className={styles.subscriptionLabel}>Last Access</span>
-                  <span className={styles.subscriptionValue}>
-                    {portalAccessData.lastAccess
-                      ? new Date(portalAccessData.lastAccess).toLocaleString()
-                      : 'Never'}
-                  </span>
-                </div>
-                <div className={styles.subscriptionRow}>
-                  <span className={styles.subscriptionLabel}>Total Sessions</span>
-                  <span className={styles.subscriptionValue}>{portalAccessData.totalSessions}</span>
-                </div>
               </div>
             </div>
             </div>
@@ -2607,6 +2633,27 @@ export default function MemberDetailAdmin() {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Portal Access Card - Last card */}
+            <div className={styles.memberCard} style={{ marginTop: '1.5rem' }}>
+              <div className={styles.memberHeader} style={{ paddingBottom: '1rem', borderBottom: '1px solid #f0f0f0' }}>
+                <h3 className={styles.memberName}>Member Portal Access</h3>
+              </div>
+              <div style={{ padding: '1rem' }}>
+                <div className={styles.subscriptionRow}>
+                  <span className={styles.subscriptionLabel}>Last Access</span>
+                  <span className={styles.subscriptionValue}>
+                    {portalAccessData.lastAccess
+                      ? new Date(portalAccessData.lastAccess).toLocaleString()
+                      : 'Never'}
+                  </span>
+                </div>
+                <div className={styles.subscriptionRow}>
+                  <span className={styles.subscriptionLabel}>Total Sessions</span>
+                  <span className={styles.subscriptionValue}>{portalAccessData.totalSessions}</span>
+                </div>
+              </div>
             </div>
           </div>
           </div>

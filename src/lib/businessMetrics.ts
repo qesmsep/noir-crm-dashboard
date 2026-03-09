@@ -710,6 +710,8 @@ export async function getDrilldownExpansionContraction(
   for (const curr of currentSnapshots) {
     const ps = priorMap.get(curr.member_id);
     const priorMrr = ps?.mrr ?? 0;
+
+    // Include regular expansion/contraction (both had MRR > 0)
     if (priorMrr > 0 && curr.mrr > 0 && curr.mrr !== priorMrr) {
       memberIds.push(curr.member_id);
       results.push({
@@ -722,6 +724,27 @@ export async function getDrilldownExpansionContraction(
         delta: curr.mrr - priorMrr,
         type: curr.mrr > priorMrr ? 'expansion' : 'contraction',
       });
+    }
+    // Also include reactivations (went from $0 to positive, but not a true new member)
+    else if (priorMrr === 0 && curr.mrr > 0) {
+      const currentMonth = currentSnapshots.length > 0 ? currentSnapshots[0].snapshot_month : '';
+      const firstPaidMonth = curr.first_paid_date
+        ? monthStart(new Date(curr.first_paid_date + 'T00:00:00'))
+        : null;
+      // Only count as expansion if first_paid_date is NOT in the current month (reactivation)
+      if (firstPaidMonth !== currentMonth) {
+        memberIds.push(curr.member_id);
+        results.push({
+          member_id: curr.member_id,
+          first_name: '',
+          last_name: '',
+          email: null,
+          prior_mrr: priorMrr,
+          current_mrr: curr.mrr,
+          delta: curr.mrr - priorMrr,
+          type: 'expansion',
+        });
+      }
     }
   }
 
@@ -799,6 +822,94 @@ export async function getDrilldownTopAttach(
       email: m?.email || null,
       attach_revenue: agg.total,
       transaction_count: agg.count,
+    };
+  });
+}
+
+/**
+ * Get drilldown for new members in a month
+ */
+export async function getDrilldownNew(
+  monthStr: string,
+  sb?: SupabaseClient
+): Promise<any[]> {
+  const supabase = sb || getSupabaseAdmin();
+  const snapshots = await getSnapshots(monthStr, supabase);
+
+  // New members: have MRR > 0 and first_paid_date falls within the month
+  const newMembers = snapshots.filter(s => {
+    if (s.mrr <= 0) return false;
+    if (!s.first_paid_date) return false;
+    return monthStart(new Date(s.first_paid_date + 'T00:00:00')) === monthStr;
+  });
+
+  const memberIds = newMembers.map(s => s.member_id);
+  if (memberIds.length === 0) return [];
+
+  const { data: members } = await supabase
+    .from('members')
+    .select('member_id, first_name, last_name, membership')
+    .in('member_id', memberIds);
+
+  const memberMap = new Map<string, any>();
+  for (const m of members || []) memberMap.set(m.member_id, m);
+
+  return newMembers.map(s => {
+    const m = memberMap.get(s.member_id);
+    return {
+      member_id: s.member_id,
+      first_name: m?.first_name || '',
+      last_name: m?.last_name || '',
+      mrr: s.mrr,
+      plan_name: m?.membership || null,
+    };
+  });
+}
+
+/**
+ * Get drilldown for paused members in a month
+ */
+export async function getDrilldownPaused(
+  monthStr: string,
+  sb?: SupabaseClient
+): Promise<any[]> {
+  const supabase = sb || getSupabaseAdmin();
+  const currentSnapshots = await getSnapshots(monthStr, supabase);
+  const priorMonth = priorMonthStart(monthStr);
+  const priorSnapshots = await getSnapshots(priorMonth, supabase);
+
+  // Build map of prior snapshots
+  const priorMap = new Map<string, MemberSnapshot>();
+  for (const s of priorSnapshots) priorMap.set(s.member_id, s);
+
+  // Paused: had MRR > 0 in prior month, now MRR = 0 and status = paused
+  const paused = currentSnapshots.filter(curr => {
+    if (curr.mrr !== 0) return false;
+    if (curr.subscription_status !== 'paused') return false;
+    const prior = priorMap.get(curr.member_id);
+    return prior && prior.mrr > 0;
+  });
+
+  const memberIds = paused.map(s => s.member_id);
+  if (memberIds.length === 0) return [];
+
+  const { data: members } = await supabase
+    .from('members')
+    .select('member_id, first_name, last_name, membership')
+    .in('member_id', memberIds);
+
+  const memberMap = new Map<string, any>();
+  for (const m of members || []) memberMap.set(m.member_id, m);
+
+  return paused.map(curr => {
+    const prior = priorMap.get(curr.member_id);
+    const m = memberMap.get(curr.member_id);
+    return {
+      member_id: curr.member_id,
+      first_name: m?.first_name || '',
+      last_name: m?.last_name || '',
+      prior_mrr: prior?.mrr || 0,
+      plan_name: m?.membership || null,
     };
   });
 }

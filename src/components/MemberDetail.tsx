@@ -475,11 +475,16 @@ const MemberDetail: React.FC<MemberDetailProps> = ({
     setEditMember((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Calculate LTV (Lifetime Value) - sum of all payment transactions
+  // Calculate LTV (Lifetime Value) - sum of all payment transactions, excluding 4% fees
   const calculateLTV = () => {
     if (!ledger || ledger.length === 0) return 0;
     return ledger
-      .filter(tx => tx.type === 'payment' && tx.amount > 0)
+      .filter(tx =>
+        tx.type === 'payment' &&
+        tx.amount > 0 &&
+        !tx.note?.includes('4%') &&
+        !tx.note?.toLowerCase().includes('processing fee')
+      )
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
   };
 

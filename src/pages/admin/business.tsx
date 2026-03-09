@@ -155,20 +155,33 @@ function inverseDeltaStr(current: number, prior: number, format: 'pct' | 'number
   return d;
 }
 
-/** Format month as "Month 1 - Month 31" */
+/** Format month as "Month Year" or "MTD" for current month */
 function fmtMonthRange(monthStr: string): string {
   const date = new Date(monthStr);
+  const now = new Date();
   const year = date.getFullYear();
   const month = date.getMonth();
   const monthName = date.toLocaleString('en-US', { month: 'long' });
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  return `${monthName} 1 - ${monthName} ${lastDay}, ${year}`;
+
+  // Check if this is the current month
+  if (year === now.getFullYear() && month === now.getMonth()) {
+    return `${monthName} ${year} (MTD)`;
+  }
+
+  return `${monthName} ${year}`;
 }
 
 function generateMonthOptions(): string[] {
   const options: string[] = [];
   const now = new Date();
-  for (let i = 0; i < 24; i++) {
+
+  // Add MTD (Month-to-Date) as first option - current month
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  options.push(`${currentYear}-${currentMonth}-01`);
+
+  // Add previous 23 months (total 24 months including current)
+  for (let i = 1; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -265,7 +278,7 @@ function LineChart({ data, dataKey, color, height = 160 }: {
   const maxDataVal = Math.max(...values, 1);
   const minDataVal = Math.min(...values, 0);
   const yAxisWidth = 60;
-  const chartWidth = 800;
+  const chartWidth = 600; // Fixed width to fit 6 months comfortably
   const padding = 20;
 
   // Generate y-axis tick values
@@ -289,7 +302,7 @@ function LineChart({ data, dataKey, color, height = 160 }: {
 
   return (
     <div className={styles.chartContainer}>
-      <svg width={chartWidth} height={height + 40} viewBox={`0 0 ${chartWidth} ${height + 40}`}>
+      <svg width="100%" height={height + 40} viewBox={`0 0 ${chartWidth} ${height + 40}`} preserveAspectRatio="xMidYMid meet" style={{ maxWidth: '100%' }}>
         {/* Y-axis grid lines and labels */}
         {yTicks.map((tickValue, i) => {
           const y = height - ((tickValue - minVal) / range) * height;
@@ -308,7 +321,7 @@ function LineChart({ data, dataKey, color, height = 160 }: {
                 x={yAxisWidth - 8}
                 y={y + 3}
                 textAnchor="end"
-                fontSize="10"
+                fontSize="14"
                 fill="#86868b"
                 fontWeight="500"
               >
@@ -487,6 +500,9 @@ export default function BusinessDashboard() {
   }>({ monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
   const [showPortalAccessModal, setShowPortalAccessModal] = useState(false);
   const [showMrrModal, setShowMrrModal] = useState(false);
+  const [showNetNewMrrModal, setShowNetNewMrrModal] = useState(false);
+  const [drillNew, setDrillNew] = useState<any[]>([]);
+  const [drillPaused, setDrillPaused] = useState<any[]>([]);
 
   const monthOptions = useMemo(() => generateMonthOptions(), []);
 
@@ -503,23 +519,28 @@ export default function BusinessDashboard() {
         return res.json();
       };
 
-      const [summaryRes, seriesRes, cohortsRes, churnRes, expRes, attachRes, financialRes, portalAccessRes] = await Promise.all([
+      const [summaryRes, seriesRes, cohortsRes, churnRes, expRes, attachRes, newRes, pausedRes, financialRes, portalAccessRes] = await Promise.all([
         safeFetch(`/api/admin/business-summary?month=${month}`),
         safeFetch(`/api/admin/business-series?month=${month}&months=12`),
         safeFetch(`/api/admin/business-cohorts?month=${month}&months=12`),
         safeFetch(`/api/admin/business-drilldown?type=churned&month=${month}`),
         safeFetch(`/api/admin/business-drilldown?type=expansion&month=${month}`),
         safeFetch(`/api/admin/business-drilldown?type=attach&month=${month}`),
+        safeFetch(`/api/admin/business-drilldown?type=new&month=${month}`),
+        safeFetch(`/api/admin/business-drilldown?type=paused&month=${month}`),
         safeFetch(`/api/financial-metrics`),
         safeFetch(`/api/admin/portal-access-stats`),
       ]);
 
       setSummary(summaryRes.data);
       setSeries(seriesRes.data || []);
+      console.log('Series data:', seriesRes.data);
       setCohorts(cohortsRes.data || []);
       setDrillChurn(churnRes.data || []);
       setDrillExpansion(expRes.data || []);
       setDrillAttach(attachRes.data || []);
+      setDrillNew(newRes.data || []);
+      setDrillPaused(pausedRes.data || []);
       setAvgMonthlyRevenue(financialRes.averageMonthlyRevenue?.total ?? null);
       setCurrentMonthRevenue(financialRes.julyRevenue?.total ?? null);
       setPortalAccessStats(portalAccessRes || { monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
@@ -619,13 +640,6 @@ export default function BusinessDashboard() {
                 <option key={m} value={m}>{fmtMonthRange(m)}</option>
               ))}
             </select>
-            <button
-              className={styles.snapshotBtn}
-              onClick={handleGenerateSnapshot}
-              disabled={snapshotLoading}
-            >
-              {snapshotLoading ? 'Generating...' : 'Refresh Snapshot'}
-            </button>
           </div>
         </div>
 
@@ -644,10 +658,10 @@ export default function BusinessDashboard() {
                 </div>
                 <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of all active members' monthly dues for {fmtMonthRange(s.month)}. Click to view trend.</div>
               </div>
-              <div className={styles.kpiTile}>
+              <div className={styles.kpiTile} onClick={() => setShowNetNewMrrModal(true)} style={{ cursor: 'pointer' }}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.mrrBridge.netNewMrr)}</div>
                 <div className={styles.kpiLabel}>Net New MRR</div>
-                <div className={styles.kpiHint}>New MRR + Expansion − Contraction − Churned − Paused ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}). Positive = you grew revenue this month.</div>
+                <div className={styles.kpiHint}>New MRR + Expansion − Contraction − Churned − Paused ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}). Positive = you grew revenue this month. Click for details.</div>
               </div>
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
@@ -980,16 +994,23 @@ export default function BusinessDashboard() {
           <div className={styles.modalOverlay} onClick={() => setShowMrrModal(false)}>
             <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
               <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>MRR Trend (Last 12 Months)</h2>
+                <h2 className={styles.modalTitle}>MRR Trend (Last 6 Months)</h2>
                 <button className={styles.modalClose} onClick={() => setShowMrrModal(false)}>×</button>
               </div>
               <div className={styles.modalBody}>
-                <div className={styles.chartCard} style={{ marginTop: '2rem' }}>
-                  <LineChart data={series} dataKey="mrr" color="#bca892" height={320} />
-                </div>
-                <div className={styles.modalHint}>
-                  Monthly Recurring Revenue over time showing the sum of all active members' monthly dues for each month.
-                </div>
+                {series.length === 0 ? (
+                  <div className={styles.emptyState}>No snapshot data available. Generate snapshots for previous months to see the MRR trend.</div>
+                ) : (
+                  <>
+                    <div className={styles.chartCard} style={{ marginTop: '1rem' }}>
+                      <LineChart data={series.slice(-6)} dataKey="mrr" color="#bca892" height={200} />
+                    </div>
+                    <div className={styles.modalHint}>
+                      Monthly Recurring Revenue over time showing the sum of all active members' monthly dues for the last 6 months.
+                      {series.filter(s => s.mrr === 0).length > 0 && ' Note: Months with $0 MRR may not have snapshots generated yet.'}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1037,6 +1058,177 @@ export default function BusinessDashboard() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Net New MRR Breakdown Modal */}
+        {showNetNewMrrModal && s && (
+          <div className={styles.modalOverlay} onClick={() => setShowNetNewMrrModal(false)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Net New MRR Breakdown — {fmtMonthLabel(selectedMonth)}</h2>
+                <button className={styles.modalClose} onClick={() => setShowNetNewMrrModal(false)}>×</button>
+              </div>
+              <div className={styles.modalBody}>
+                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f5f5f7', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1d1d1f', marginBottom: '0.5rem' }}>
+                    {fmtCurrency(s.mrrBridge.netNewMrr)}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#6e6e73' }}>
+                    = New ({fmtCurrency(s.mrrBridge.newMrr)}) + Expansion ({fmtCurrency(s.mrrBridge.expansionMrr)}) − Contraction ({fmtCurrency(s.mrrBridge.contractionMrr)}) − Churned ({fmtCurrency(s.mrrBridge.churnedMrr)}) − Paused ({fmtCurrency(s.mrrBridge.pausedMrr)})
+                  </div>
+                </div>
+
+                {/* New Members */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    New Members ({drillNew.length}) — +{fmtCurrency(s.mrrBridge.newMrr)}
+                  </h3>
+                  {drillNew.length === 0 ? (
+                    <div className={styles.emptyState}>No new members this month</div>
+                  ) : (
+                    <table className={styles.dataTable}>
+                      <thead>
+                        <tr>
+                          <th>Member</th>
+                          <th>MRR</th>
+                          <th>Plan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drillNew.map((r: any) => (
+                          <tr key={r.member_id}>
+                            <td>{r.first_name} {r.last_name}</td>
+                            <td style={{ color: '#34c759' }}>{fmtCurrencyDec(r.mrr)}</td>
+                            <td>{r.plan_name || '--'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Expansion */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Expansion ({drillExpansion.filter((r: any) => r.type === 'expansion').length}) — +{fmtCurrency(s.mrrBridge.expansionMrr)}
+                  </h3>
+                  {drillExpansion.filter((r: any) => r.type === 'expansion').length === 0 ? (
+                    <div className={styles.emptyState}>No expansions this month</div>
+                  ) : (
+                    <table className={styles.dataTable}>
+                      <thead>
+                        <tr>
+                          <th>Member</th>
+                          <th>Prior</th>
+                          <th>Current</th>
+                          <th>Delta</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drillExpansion.filter((r: any) => r.type === 'expansion').map((r: any) => (
+                          <tr key={r.member_id}>
+                            <td>{r.first_name} {r.last_name}</td>
+                            <td>{fmtCurrencyDec(r.prior_mrr)}</td>
+                            <td>{fmtCurrencyDec(r.current_mrr)}</td>
+                            <td style={{ color: '#34c759' }}>+{fmtCurrencyDec(r.delta)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Contraction */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Contraction ({drillExpansion.filter((r: any) => r.type === 'contraction').length}) — −{fmtCurrency(s.mrrBridge.contractionMrr)}
+                  </h3>
+                  {drillExpansion.filter((r: any) => r.type === 'contraction').length === 0 ? (
+                    <div className={styles.emptyState}>No contractions this month</div>
+                  ) : (
+                    <table className={styles.dataTable}>
+                      <thead>
+                        <tr>
+                          <th>Member</th>
+                          <th>Prior</th>
+                          <th>Current</th>
+                          <th>Delta</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drillExpansion.filter((r: any) => r.type === 'contraction').map((r: any) => (
+                          <tr key={r.member_id}>
+                            <td>{r.first_name} {r.last_name}</td>
+                            <td>{fmtCurrencyDec(r.prior_mrr)}</td>
+                            <td>{fmtCurrencyDec(r.current_mrr)}</td>
+                            <td style={{ color: '#ff9500' }}>{fmtCurrencyDec(r.delta)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Churned */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Churned ({drillChurn.length}) — −{fmtCurrency(s.mrrBridge.churnedMrr)}
+                  </h3>
+                  {drillChurn.length === 0 ? (
+                    <div className={styles.emptyState}>No churned members this month</div>
+                  ) : (
+                    <table className={styles.dataTable}>
+                      <thead>
+                        <tr>
+                          <th>Member</th>
+                          <th>Prior MRR</th>
+                          <th>Tenure</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drillChurn.map((r: any) => (
+                          <tr key={r.member_id}>
+                            <td>{r.first_name} {r.last_name}</td>
+                            <td style={{ color: '#ff3b30' }}>{fmtCurrencyDec(r.prior_mrr)}</td>
+                            <td>{r.tenure_months}mo</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Paused */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                    Paused ({drillPaused.length}) — −{fmtCurrency(s.mrrBridge.pausedMrr)}
+                  </h3>
+                  {drillPaused.length === 0 ? (
+                    <div className={styles.emptyState}>No paused members this month</div>
+                  ) : (
+                    <table className={styles.dataTable}>
+                      <thead>
+                        <tr>
+                          <th>Member</th>
+                          <th>Prior MRR</th>
+                          <th>Plan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drillPaused.map((r: any) => (
+                          <tr key={r.member_id}>
+                            <td>{r.first_name} {r.last_name}</td>
+                            <td style={{ color: '#af52de' }}>{fmtCurrencyDec(r.prior_mrr)}</td>
+                            <td>{r.plan_name || '--'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             </div>

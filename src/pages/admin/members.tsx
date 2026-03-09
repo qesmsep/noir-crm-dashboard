@@ -175,16 +175,22 @@ export default function MembersAdmin() {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'short',
+      month: 'numeric',
       day: 'numeric'
-    });
+    }).replace(/\//g, '.');
   };
 
-  // Calculate LTV for an account (sum of all payment transactions)
+  // Calculate LTV for an account (sum of all payment transactions, excluding 4% fees)
   const calculateAccountLTV = (accountId: string) => {
     if (!ledger || ledger.length === 0) return 0;
     return ledger
-      .filter(tx => tx.account_id === accountId && tx.type === 'payment' && tx.amount > 0)
+      .filter(tx =>
+        tx.account_id === accountId &&
+        tx.type === 'payment' &&
+        tx.amount > 0 &&
+        !tx.note?.includes('4%') &&
+        !tx.note?.toLowerCase().includes('processing fee')
+      )
       .reduce((sum, tx) => sum + Number(tx.amount), 0);
   };
 
@@ -494,14 +500,44 @@ export default function MembersAdmin() {
             <h1 className={styles.pageTitle}>Members</h1>
             <span className={styles.memberCount}>{members.length} {members.length === 1 ? 'member' : 'members'}</span>
           </div>
-          <div className={styles.searchContainer}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Search by name, email, or phone..."
-              value={lookupQuery}
-              onChange={(e) => setLookupQuery(e.target.value)}
-            />
+          <div className={styles.searchAndSortContainer}>
+            <div className={styles.searchContainer}>
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Search"
+                value={lookupQuery}
+                onChange={(e) => setLookupQuery(e.target.value)}
+              />
+            </div>
+            {/* Sort dropdown for mobile */}
+            <select
+              className={styles.mobileSortDropdown}
+              value={sortField || ''}
+              onChange={(e) => handleSort(e.target.value as SortField)}
+            >
+              <option value="">Sort</option>
+              <option value="name">Name</option>
+              <option value="join_date">Sign Up</option>
+              <option value="renewal_date">Renewal</option>
+              <option value="ltv">LTV</option>
+              <option value="balance">Balance</option>
+            </select>
+            {sortField && (
+              <button
+                className={styles.sortDirectionButton}
+                onClick={() => {
+                  const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                  setSortDirection(newDirection);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('membersSortDirection', newDirection);
+                  }
+                }}
+                aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+              >
+                {sortDirection === 'asc' ? '↑' : '↓'}
+              </button>
+            )}
           </div>
           <div className={styles.headerButtons}>
             <button
@@ -514,6 +550,7 @@ export default function MembersAdmin() {
                 <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              <span className={styles.buttonText}>Message</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
@@ -525,6 +562,7 @@ export default function MembersAdmin() {
               <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              <span className={styles.buttonText}>Add</span>
             </button>
             <button
               onClick={() => setIsArchivedModalOpen(true)}
@@ -535,6 +573,7 @@ export default function MembersAdmin() {
               <svg className={styles.iconButtonIcon} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M5 8h10M5 8a2 2 0 110-4h10a2 2 0 110 4M5 8v10a2 2 0 002 2h6a2 2 0 002-2V8m-3 4h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              <span className={styles.buttonText}>Archive</span>
             </button>
             <button
               onClick={() => setIsPendingModalOpen(true)}
@@ -546,6 +585,7 @@ export default function MembersAdmin() {
                 <path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M10 6v4l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              <span className={styles.buttonText}>Pending</span>
             </button>
           </div>
         </div>
@@ -617,9 +657,9 @@ export default function MembersAdmin() {
                             <Image
                               src={member1.photo}
                               alt={`${member1.first_name} ${member1.last_name}`}
-                              width={48}
-                              height={48}
-                              style={{ width: 'auto', height: 'auto', objectFit: 'cover', borderRadius: '10px' }}
+                              width={96}
+                              height={96}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px' }}
                               loading="lazy"
                             />
                           </div>
@@ -642,9 +682,6 @@ export default function MembersAdmin() {
                             {member1?.phone ? formatPhone(member1.phone) : '—'}
                           </div>
                         </div>
-                      </div>
-                      <div className={styles.mobileLtv}>
-                        {formatCurrency(account.ltv)}
                       </div>
                     </div>
 

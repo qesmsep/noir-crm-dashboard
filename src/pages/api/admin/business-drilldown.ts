@@ -4,6 +4,8 @@ import {
   getDrilldownChurned,
   getDrilldownExpansionContraction,
   getDrilldownTopAttach,
+  getDrilldownNew,
+  getDrilldownPaused,
   monthStart,
 } from '../../../lib/businessMetrics';
 
@@ -34,8 +36,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'attach':
         data = await getDrilldownTopAttach(month, sbAdmin);
         break;
+      case 'new':
+        data = await getDrilldownNew(month, sbAdmin);
+        break;
+      case 'paused':
+        data = await getDrilldownPaused(month, sbAdmin);
+        break;
       default:
-        return res.status(400).json({ error: 'Invalid drilldown type. Use: churned, expansion, attach' });
+        return res.status(400).json({ error: 'Invalid drilldown type. Use: churned, expansion, attach, new, paused' });
     }
 
     res.status(200).json({

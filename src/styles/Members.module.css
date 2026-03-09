@@ -58,11 +58,20 @@
   align-items: center;
 }
 
-/* Search Container */
-.searchContainer {
+/* Search and Sort Container */
+.searchAndSortContainer {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
   flex: 1;
   min-width: 200px;
   max-width: 600px;
+}
+
+/* Search Container */
+.searchContainer {
+  flex: 1;
+  min-width: 150px;
   position: relative;
 }
 
@@ -123,11 +132,43 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.375rem;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
   -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
+}
+
+.buttonText {
+  display: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1d1d1f;
+  white-space: nowrap;
+}
+
+/* Mobile sort dropdown - separate button */
+.mobileSortDropdown {
+  display: none;
+  height: 40px;
+  padding: 0 0.5rem;
+  background: rgba(53, 53, 53, 0.08);
+  border: 1px solid rgba(53, 53, 53, 0.12);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.mobileSortDropdown:focus {
+  outline: none;
+  border-color: #A59480;
+  background: rgba(165, 148, 128, 0.1);
 }
 
 .iconButtonIcon {
@@ -1052,8 +1093,8 @@
 }
 
 .mobileAvatar {
-  width: 48px;
-  height: 48px;
+  width: 96px;
+  height: 96px;
   border-radius: 10px;
   overflow: hidden;
   background: #f5f5f7;
@@ -1061,14 +1102,14 @@
 }
 
 .mobileAvatarPlaceholder {
-  width: 48px;
-  height: 48px;
+  width: 96px;
+  height: 96px;
   border-radius: 10px;
   background: linear-gradient(135deg, #f5f5f7 0%, #e5e5e7 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9375rem;
+  font-size: 1.875rem;
   font-weight: 600;
   color: #86868b;
   flex-shrink: 0;
@@ -1183,7 +1224,7 @@
 
 .mobileMetaRow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.5rem;
   padding-top: 0.75rem;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -1414,7 +1455,38 @@
 /* Responsive table - Phone */
 @media (max-width: 640px) {
   .mobileSortControls {
-    display: flex;
+    display: none;
+  }
+
+  .mobileSortDropdown {
+    display: block;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchAndSortContainer {
+    order: 2;
+    max-width: 100%;
+  }
+
+  .headerButtons {
+    order: 3;
+    width: 100%;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .iconButton {
+    flex: 1;
+    width: auto;
+    padding: 0 0.75rem;
+  }
+
+  .buttonText {
+    display: inline;
   }
 
   .mobileList {
