@@ -1024,9 +1024,9 @@ export async function handler(req, res) {
             .from('waitlist')
             .insert({
               phone: from,
-              first_name: 'First_Name',
-              last_name: 'Last_Name',
-              email: 'EmailAddress@email.com',
+              first_name: '',
+              last_name: '',
+              email: '',
               status: 'approved',
               agreement_token: signupToken,
               agreement_token_created_at: new Date().toISOString(),
@@ -1102,9 +1102,9 @@ Thank you.`;
             .from('waitlist')
             .insert({
               phone: from,
-              first_name: 'First_Name',
-              last_name: 'Last_Name',
-              email: 'EmailAddress@email.com',
+              first_name: '',
+              last_name: '',
+              email: '',
               status: 'approved',
               selected_membership: 'Skyline',
               agreement_token: signupToken,
