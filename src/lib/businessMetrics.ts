@@ -287,7 +287,7 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
       return result;
     });
 
-  if (error) throw new Error(`Failed to fetch members: ${error.message}`);
+  if (error) throw new Error(`Failed to fetch members: ${(error as any)?.message || 'Unknown error'}`);
   if (!members || members.length === 0) return 0;
 
   const rows = members.map((m: any) => {
