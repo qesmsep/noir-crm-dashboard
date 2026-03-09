@@ -5,8 +5,7 @@ import WaitlistManager from '../../components/admin/WaitlistManager';
 import ApplicationManager from '../../components/admin/ApplicationManager';
 import QuestionnaireManager from '../../components/admin/QuestionnaireManager';
 import AgreementManager from '../../components/admin/AgreementManager';
-import PaymentSettingsManager from '../../components/admin/PaymentSettingsManager';
-import { Settings, List, Users, FileText, CheckSquare, CreditCard } from 'lucide-react';
+import { Settings, List, Users, FileText, CheckSquare } from 'lucide-react';
 import styles from '../../styles/Membership.module.css';
 
 export default function AdminMembership() {
@@ -18,7 +17,6 @@ export default function AdminMembership() {
     { id: 2, name: 'Applications', icon: Users, component: ApplicationManager },
     { id: 3, name: 'Questionnaires', icon: FileText, component: QuestionnaireManager },
     { id: 4, name: 'Agreements', icon: CheckSquare, component: AgreementManager },
-    { id: 5, name: 'Payment Settings', icon: CreditCard, component: PaymentSettingsManager },
   ];
 
   const ActiveComponent = tabs[activeTab].component;
@@ -40,7 +38,7 @@ export default function AdminMembership() {
           <div className={styles.headerTitle}>
             <h1 className={styles.pageTitle}>Membership Management</h1>
             <p className={styles.subtitle}>
-              Manage membership applications, questionnaires, agreements, and payment settings
+              Manage membership applications, questionnaires, and agreements
             </p>
           </div>
         </div>
