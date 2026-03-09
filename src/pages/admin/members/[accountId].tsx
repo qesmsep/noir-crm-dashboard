@@ -1757,12 +1757,12 @@ export default function MemberDetailAdmin() {
                             <div style={{ textAlign: 'center' }}>
                               <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>LTV</div>
                               <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
-                                {formatCurrency(calculateMemberLTV(member.member_id))}
+                                {formatCurrency(members.reduce((sum, m) => sum + calculateMemberLTV(m.member_id), 0))}
                               </div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
                               <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                                {member.member_type === 'primary' ? 'Account Balance' : 'Member Balance'}
+                                {member.member_type === 'primary' ? 'Account Balance' : 'Member Spend'}
                               </div>
                               <div style={{ fontSize: '0.875rem', fontWeight: '600', color: (member.member_type === 'primary' ? calculateRunningBalance(ledger, 0) : calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)) >= 0 ? '#10B981' : '#1F1F1F' }}>
                                 {formatCurrency(Math.abs(member.member_type === 'primary' ? calculateRunningBalance(ledger, 0) : calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)))}
