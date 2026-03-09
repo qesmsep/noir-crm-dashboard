@@ -893,7 +893,7 @@ While focusing on aesthetics, maintain accessibility:
 - `subscription_status` (TEXT) - 'active', 'canceled', 'past_due', 'paused'
 - `subscription_start_date` (DATE)
 - `subscription_cancel_at` (DATE)
-- `next_renewal_date` (DATE)
+- `next_billing_date` (DATE) - **Source of truth** for when account should be billed next (used by cron job)
 - `monthly_dues` (DECIMAL) - Total MRR including base subscription + additional member fees
 - `payment_method_type` (TEXT) - 'card', 'us_bank_account'
 - `payment_method_last4` (TEXT) - Last 4 digits of payment method
@@ -3697,6 +3697,48 @@ This section maintains a running log of all significant commits and changes to t
 **Documentation**: See [Section Name](#section-link)
 **Git Commit**: `git commit message`
 ```
+
+---
+
+### 2026-03-09 - Member Account Management Improvements
+
+**Changes**:
+- **UI**: Added date input fields to all Quick Actions (Charge Card, Add Credit, Add Purchase)
+- **UI**: Updated Quick Actions layout to single-line grid (amount, description, date, button)
+- **UI**: Responsive grid columns - Desktop: 90px 2fr 130px auto, Mobile: 70px 1.5fr 110px auto
+- **Ledger**: Fixed sorting issue - ledger now stays sorted newest-first after all transactions
+- **Ledger**: Created `refreshLedger()` helper function for consistent sorting
+- **Balance Display**: Primary member card now shows "Account Balance" (total for all members)
+- **Balance Display**: Secondary member cards show "Member Spend" (individual purchases only)
+- **Member Cards**: Simplified to show only Sign Up date and Member Spend
+- **Member Cards**: Removed Renewal, LTV, and Account Balance from individual member cards
+- **Metrics**: Member Spend now correctly calculates sum of purchases (not balance)
+- **Metrics**: Created `calculateMemberSpend()` function to track individual member purchases
+- **API**: Updated `/api/chargeBalance` to accept optional `custom_date` parameter for backdating transactions
+- **Mobile**: Optimized bulk message modal checkbox sizing (18px) with 30px touch targets
+- **Mobile**: Positioned bulk message modal below header (100px top padding on mobile)
+- **Status**: Show "CANCELLED" badge on MemberSubscriptionCard when `subscription_cancel_at` is set
+- **Status**: Show "Cancelled" badge on member detail page for cancelled subscriptions
+- **Members Page**: Filter "Select All Active" to exclude cancelled members from bulk messages
+- **Data Integrity**: Deactivated duplicate Eric Korth account (subscription already cancelled in Stripe)
+
+**Key Behavioral Changes**:
+- Transactions can now be backdated using the date picker in Quick Actions
+- Ledger always displays newest-first regardless of how transactions are added
+- Account balance is shown only on primary member (represents total account)
+- Member Spend shows individual purchases per member for analytics
+- Cancelled members (subscription_cancel_at set OR status='canceled') excluded from active member lists
+- Member cards simplified to 2-column layout (Sign Up, Member Spend)
+
+**Files Modified**:
+- `src/pages/admin/members.tsx` - Added subscription status tracking, filtered cancelled members
+- `src/pages/admin/members/[accountId].tsx` - Added date inputs, fixed sorting, updated balance display
+- `src/pages/api/chargeBalance.js` - Added custom_date parameter support
+- `src/components/MemberSubscriptionCard.tsx` - Show cancelled badge for pending cancellations
+- `src/styles/Members.module.css` - Mobile optimizations for bulk message modal
+- `src/styles/MemberDetail.module.css` - Quick Actions grid layout updates
+
+**Documentation**: See [Ledger & Financial Management](#ledger--financial-management), [Member Management](#member-management)
 
 ---
 

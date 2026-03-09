@@ -25,6 +25,7 @@ interface Member {
   accounts?: {
     subscription_cancel_at?: string | null;
     subscription_status?: string | null;
+    next_billing_date?: string | null;
   };
 }
 
@@ -147,7 +148,7 @@ export default function MembersAdmin() {
       // Fetch account subscription data
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
-        .select('account_id, subscription_cancel_at, subscription_status')
+        .select('account_id, subscription_cancel_at, subscription_status, next_billing_date')
         .in('account_id', accountIds);
 
       if (accountsError) throw accountsError;
@@ -245,21 +246,10 @@ export default function MembersAdmin() {
     return balance;
   };
 
-  // Calculate next renewal date from join_date
-  const getNextRenewal = (joinDate?: string): Date | null => {
-    if (!joinDate) return null;
-    const jd = new Date(joinDate);
-    const today = new Date();
-    let year = today.getFullYear();
-    let month = today.getMonth();
-    const day = jd.getDate();
-    let candidate = new Date(year, month, day);
-    if (candidate < today) {
-      if (month === 11) { year += 1; month = 0; }
-      else { month += 1; }
-      candidate = new Date(year, month, day);
-    }
-    return candidate;
+  // Get next billing date from accounts table (single source of truth)
+  const getNextBillingDate = (member: Member): Date | null => {
+    if (!member.accounts?.next_billing_date) return null;
+    return new Date(member.accounts.next_billing_date);
   };
 
   const filteredMembers = members.filter(member => {
@@ -302,7 +292,7 @@ export default function MembersAdmin() {
       ltv: calculateAccountLTV(accountId),
       balance: calculateAccountBalance(accountId),
       join_date: primary.join_date,
-      renewal_date: getNextRenewal(primary.join_date),
+      renewal_date: getNextBillingDate(primary),
       accounts: primary.accounts, // Pass through subscription_cancel_at from member data
     };
   });
