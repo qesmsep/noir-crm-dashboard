@@ -387,12 +387,15 @@ export default function MemberSubscriptionCard({
 
   const statusBadgeClass =
     subscription.is_paused ? styles.statusPaused :
+    (subscription.subscription_status === 'canceled' || subscription.subscription_cancel_at) ? styles.statusCanceled :
     subscription.subscription_status === 'active' ? styles.statusActive :
-    subscription.subscription_status === 'canceled' ? styles.statusCanceled :
     subscription.subscription_status === 'past_due' ? styles.statusPastDue :
     styles.statusDefault;
 
-  const statusText = subscription.is_paused ? 'PAUSED' : subscription.subscription_status?.toUpperCase();
+  const statusText =
+    subscription.is_paused ? 'PAUSED' :
+    (subscription.subscription_status === 'canceled' || subscription.subscription_cancel_at) ? 'CANCELLED' :
+    subscription.subscription_status?.toUpperCase();
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
