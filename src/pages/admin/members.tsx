@@ -135,7 +135,7 @@ export default function MembersAdmin() {
         .from('members')
         .select(`
           *,
-          accounts!inner(
+          accounts(
             subscription_cancel_at,
             subscription_status
           )
