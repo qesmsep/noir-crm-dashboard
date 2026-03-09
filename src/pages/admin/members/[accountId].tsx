@@ -1033,6 +1033,18 @@ export default function MemberDetailAdmin() {
     }
   };
 
+  // Helper to refresh and sort ledger
+  const refreshLedger = async () => {
+    const res = await fetch(`/api/ledger?account_id=${accountId}`);
+    const ledgerResult = await res.json();
+    if (ledgerResult.error) throw new Error(ledgerResult.error);
+    // Sort by date descending (most recent first)
+    const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+    setLedger(sortedLedger);
+  };
+
   // Calculate running balance
   // Since ledger is sorted descending (newest first), we need to sum from the end (oldest) to current index
   const calculateRunningBalance = (transactions: LedgerTransaction[], currentIndex: number) => {
@@ -1093,9 +1105,7 @@ export default function MemberDetailAdmin() {
       });
 
       // Refresh the ledger
-      const res = await fetch(`/api/ledger?account_id=${accountId}`);
-      const ledgerResult = await res.json();
-      setLedger(ledgerResult.data || []);
+      await refreshLedger();
     } catch (error: any) {
       toast({
         title: 'Payment Failed',
@@ -1184,9 +1194,7 @@ export default function MemberDetailAdmin() {
       setCustomChargeDate('');
 
       // Refresh the ledger
-      const res = await fetch(`/api/ledger?account_id=${accountId}`);
-      const ledgerResult = await res.json();
-      setLedger(ledgerResult.data || []);
+      await refreshLedger();
     } catch (error: any) {
       toast({
         title: 'Charge Failed',
@@ -1311,9 +1319,7 @@ export default function MemberDetailAdmin() {
       setCreditDate('');
 
       // Refresh the ledger
-      const res = await fetch(`/api/ledger?account_id=${accountId}`);
-      const ledgerResult = await res.json();
-      setLedger(ledgerResult.data || []);
+      await refreshLedger();
     } catch (error: any) {
       toast({
         title: 'Error Adding Credit',
@@ -1395,9 +1401,7 @@ export default function MemberDetailAdmin() {
       setChargeDate('');
 
       // Refresh the ledger
-      const res = await fetch(`/api/ledger?account_id=${accountId}`);
-      const ledgerResult = await res.json();
-      setLedger(ledgerResult.data || []);
+      await refreshLedger();
     } catch (error: any) {
       toast({
         title: 'Error Adding Charge',
@@ -1757,9 +1761,11 @@ export default function MemberDetailAdmin() {
                               </div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Balance</div>
-                              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0) >= 0 ? '#10B981' : '#1F1F1F' }}>
-                                {formatCurrency(Math.abs(calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)))}
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                {member.member_type === 'primary' ? 'Account Balance' : 'Member Balance'}
+                              </div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: (member.member_type === 'primary' ? calculateRunningBalance(ledger, 0) : calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)) >= 0 ? '#10B981' : '#1F1F1F' }}>
+                                {formatCurrency(Math.abs(member.member_type === 'primary' ? calculateRunningBalance(ledger, 0) : calculateRunningBalance(ledger.filter(tx => tx.member_id === member.member_id), 0)))}
                               </div>
                             </div>
                           </div>
