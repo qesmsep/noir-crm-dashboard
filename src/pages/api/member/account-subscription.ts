@@ -41,10 +41,19 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Get account data
+    // Get account data with plan details
     const { data: account, error: accountError } = await supabaseAdmin
       .from('accounts')
-      .select('account_id, next_billing_date, monthly_dues')
+      .select(`
+        account_id,
+        next_billing_date,
+        monthly_dues,
+        membership_plan_id,
+        subscription_plans!membership_plan_id (
+          plan_name,
+          interval
+        )
+      `)
       .eq('account_id', member.account_id)
       .single();
 
@@ -69,17 +78,31 @@ export default async function handler(
     const primaryMember = allMembers?.find(m => m.member_type === 'primary');
     const membershipType = primaryMember?.membership;
 
-    // Base MRR comes from ACCOUNT table only
-    const baseMRR = account.monthly_dues || 0;
+    // Get plan details
+    const plan = (account as any).subscription_plans;
+    const billingInterval = plan?.interval || 'month';
+    const planName = plan?.plan_name || membershipType || '';
 
     // Count secondary members
     const secondaryMembers = allMembers?.filter(m => m.member_type === 'secondary') || [];
     const secondaryMemberCount = secondaryMembers.length;
 
-    // Calculate additional member fees based on membership type
-    // Skyline: 1 additional member at $0/month (unlimited members included)
-    // Solo/Duo: $25/month per additional member
-    const additionalMemberFee = membershipType === 'Skyline' ? 0 : 25;
+    // Calculate base MRR and additional member fees
+    let totalDues = account.monthly_dues || 0;
+    let baseMRR = totalDues;
+
+    // For annual plans, subtract additional member fees to get base
+    if (billingInterval === 'year' && secondaryMemberCount > 0) {
+      const annualAdditionalFees = secondaryMemberCount * 25 * 12; // $25/mo × 12 × count
+      baseMRR = totalDues - annualAdditionalFees;
+    }
+
+    // Calculate additional member fee based on plan type and interval
+    // Skyline: $0 (unlimited members included)
+    // Annual plans: $300/year per member ($25/mo × 12)
+    // Monthly plans: $25/month per member
+    const isSkyline = planName.toLowerCase() === 'skyline';
+    const additionalMemberFee = isSkyline ? 0 : (billingInterval === 'year' ? 300 : 25);
 
     // Get next renewal date from primary member or account
     const nextRenewalDate = primaryMember?.next_renewal_date || account.next_billing_date;
@@ -91,8 +114,9 @@ export default async function handler(
       },
       baseMRR: Number(baseMRR),
       secondaryMemberCount,
-      additionalMemberFee, // $0 for Skyline, $25 for Solo/Duo
+      additionalMemberFee, // $0 for Skyline, $300 for Annual, $25 for Monthly
       membershipType,
+      billingInterval, // 'month' or 'year'
     });
   } catch (error) {
     console.error('Account subscription error:', error);

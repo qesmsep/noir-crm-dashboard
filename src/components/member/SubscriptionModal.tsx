@@ -63,6 +63,8 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
           ...data.subscription,
           baseMRR: data.baseMRR,
           secondaryMemberCount: data.secondaryMemberCount,
+          additionalMemberFee: data.additionalMemberFee,
+          billingInterval: data.billingInterval,
         });
       }
     } catch (error) {
@@ -135,7 +137,9 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
 
   const baseMRR = subscriptionData?.baseMRR || 0;
   const secondaryMemberCount = subscriptionData?.secondaryMemberCount || 0;
-  const additionalMemberFee = subscriptionData?.additionalMemberFee || 0; // $0 for Skyline, $25 for Solo/Duo
+  const additionalMemberFee = subscriptionData?.additionalMemberFee || 0;
+  const billingInterval = subscriptionData?.billingInterval || 'month';
+  const intervalLabel = billingInterval === 'year' ? '/yr' : '/mo';
   const additionalMemberFees = secondaryMemberCount * additionalMemberFee;
   const total = baseMRR + additionalMemberFees;
 
@@ -176,7 +180,7 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-[#8C7C6D]">Base Membership</span>
-                      <span className="text-xs font-medium text-[#1F1F1F]">{formatCurrency(baseMRR)}/mo</span>
+                      <span className="text-xs font-medium text-[#1F1F1F]">{formatCurrency(baseMRR)}{intervalLabel}</span>
                     </div>
 
                     {secondaryMemberCount > 0 && (
@@ -184,13 +188,13 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
                         <span className="text-xs text-[#8C7C6D]">
                           Additional Members ({secondaryMemberCount} × ${additionalMemberFee.toFixed(0)})
                         </span>
-                        <span className="text-xs font-medium text-[#1F1F1F]">{formatCurrency(additionalMemberFees)}/mo</span>
+                        <span className="text-xs font-medium text-[#1F1F1F]">{formatCurrency(additionalMemberFees)}{intervalLabel}</span>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between pt-2 border-t border-[#E8E6E1]">
                       <span className="text-sm font-semibold text-[#1F1F1F]">Total</span>
-                      <span className="text-base font-bold text-[#1F1F1F]">{formatCurrency(total)}/mo</span>
+                      <span className="text-base font-bold text-[#1F1F1F]">{formatCurrency(total)}{intervalLabel}</span>
                     </div>
 
                     <div className="pt-2 border-t border-[#E8E6E1] space-y-1.5">
@@ -281,7 +285,7 @@ function SubscriptionModalContent({ isOpen, onClose, accountId }: SubscriptionMo
                           <Badge className="bg-[#4CAF50] text-white text-[10px] px-2 py-0.5">Primary</Badge>
                         ) : (
                           <Badge className="bg-[#DAD7D0] text-[#5A5A5A] text-[10px] px-2 py-0.5">
-                            {additionalMemberFee > 0 ? `+$${additionalMemberFee.toFixed(0)}/mo` : 'Included'}
+                            {additionalMemberFee > 0 ? `+$${additionalMemberFee.toFixed(0)}${intervalLabel}` : 'Included'}
                           </Badge>
                         )}
                       </div>

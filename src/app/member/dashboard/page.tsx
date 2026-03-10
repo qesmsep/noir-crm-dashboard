@@ -655,7 +655,9 @@ export default function MemberDashboardPage() {
                     // Use API-provided values - everything from database
                     const baseMRR = subscriptionData?.baseMRR || 0;
                     const secondaryMemberCount = subscriptionData?.secondaryMemberCount || 0;
-                    const additionalMemberFee = subscriptionData?.additionalMemberFee || 0; // $0 for Skyline, $25 for Solo/Duo
+                    const additionalMemberFee = subscriptionData?.additionalMemberFee || 0;
+                    const billingInterval = subscriptionData?.billingInterval || 'month';
+                    const intervalLabel = billingInterval === 'year' ? '/yr' : '/mo';
                     const additionalMemberFees = secondaryMemberCount * additionalMemberFee;
                     const total = baseMRR + additionalMemberFees;
 
@@ -665,14 +667,14 @@ export default function MemberDashboardPage() {
                         <div className="space-y-1 mb-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-[#8C7C6D]">Base Membership</span>
-                            <span className="text-[#5A5A5A] font-medium">${baseMRR.toFixed(2)}/mo</span>
+                            <span className="text-[#5A5A5A] font-medium">${baseMRR.toFixed(2)}{intervalLabel}</span>
                           </div>
                           {secondaryMemberCount > 0 && (
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-[#8C7C6D]">
                                 Additional Members ({secondaryMemberCount} × ${additionalMemberFee.toFixed(0)})
                               </span>
-                              <span className="text-[#5A5A5A] font-medium">${additionalMemberFees.toFixed(2)}/mo</span>
+                              <span className="text-[#5A5A5A] font-medium">${additionalMemberFees.toFixed(2)}{intervalLabel}</span>
                             </div>
                           )}
                         </div>
@@ -680,7 +682,7 @@ export default function MemberDashboardPage() {
                         {/* Total */}
                         <div className="flex items-center justify-between pt-2 border-t border-[#E8E6E1]">
                           <p className="text-sm font-semibold text-[#1F1F1F]">Total</p>
-                          <p className="text-xl font-bold text-[#1F1F1F]">${total.toFixed(2)}/mo</p>
+                          <p className="text-xl font-bold text-[#1F1F1F]">${total.toFixed(2)}{intervalLabel}</p>
                         </div>
                       </>
                     );
