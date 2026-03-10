@@ -92,7 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('account_id', account_id);
 
       // Send success notification
-      await sendPaymentSuccessNotification(account, chargeResult.paymentIntent.amount / 100);
+      await sendPaymentSuccessNotification(account);
 
       return res.json({
         success: true,
