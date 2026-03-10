@@ -36,34 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // Create a waitlist entry for referral (bypasses waitlist approval, goes straight to onboarding)
-    const { data: onboardEntry, error: onboardError } = await supabase
-      .from('waitlist')
-      .insert({
-        first_name: '',
-        last_name: '',
-        phone: '',
-        email: '',
-        company: '',
-        city_state: '',
-        referral: `Referred by ${referrer.first_name} ${referrer.last_name}`,
-        visit_frequency: '',
-        go_to_drink: '',
-        agreement_token: applicationToken,
-        agreement_token_created_at: new Date().toISOString(),
-        referral_code: referralCode.toUpperCase(),
-        referred_by_member_id: referrer.member_id,
-        status: 'approved' // Mark as approved so it bypasses waitlist
-      })
-      .select()
-      .single();
-
-    if (onboardError) {
-      console.error('Error creating onboard entry:', onboardError);
-      return res.status(500).json({ error: 'Failed to create onboard link' });
-    }
-
-    const onboardUrl = `/onboard/${applicationToken}`;
+    // Don't create waitlist entry yet - we'll create it when they submit the form
+    // For now, just pass the referral info in the URL
+    const onboardUrl = `/onboard/${applicationToken}?ref=${referralCode.toUpperCase()}&refId=${referrer.member_id}`;
 
     return res.status(200).json({
       success: true,
