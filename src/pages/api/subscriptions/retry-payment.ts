@@ -64,12 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('✅ Payment succeeded!');
 
       // Log to ledger
-      await logPaymentToLedger(
-        account,
-        chargeResult.paymentIntent.id,
-        chargeResult.paymentIntent.amount / 100,
-        'Monthly membership dues'
-      );
+      await logPaymentToLedger(account, chargeResult.paymentIntent);
 
       // Update subscription status based on payment type
       // ACH payments are 'processing' and take 3-5 days
