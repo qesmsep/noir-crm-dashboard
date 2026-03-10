@@ -65,17 +65,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: [...cards.data, ...bankAccounts.data],
     };
 
-    // Get default payment method from subscription or customer
+    // Get default payment method from customer (not subscription - we're app-managed)
     let defaultPaymentMethod: string | null = null;
 
-    if (account.stripe_subscription_id) {
-      const subscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
-      defaultPaymentMethod = subscription.default_payment_method as string;
-    } else {
-      const customer = await stripe.customers.retrieve(account.stripe_customer_id);
-      if ('invoice_settings' in customer) {
-        defaultPaymentMethod = customer.invoice_settings?.default_payment_method as string;
-      }
+    const customer = await stripe.customers.retrieve(account.stripe_customer_id);
+    if ('invoice_settings' in customer) {
+      defaultPaymentMethod = customer.invoice_settings?.default_payment_method as string;
     }
 
     return res.json({
