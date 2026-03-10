@@ -63,12 +63,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // Update subscription default payment method if exists
-    if (account.stripe_subscription_id) {
-      await stripe.subscriptions.update(account.stripe_subscription_id, {
-        default_payment_method: payment_method_id,
-      });
-    }
+    // NOTE: We no longer manage subscriptions in Stripe - all subscriptions are app-managed
+    // Don't update Stripe subscription (it may be canceled in Stripe but active in our app)
 
     // Update account payment method info in database
     const updatedPaymentMethod = await stripe.paymentMethods.retrieve(payment_method_id);
