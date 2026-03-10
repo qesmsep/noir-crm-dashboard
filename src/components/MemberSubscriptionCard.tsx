@@ -54,6 +54,7 @@ export default function MemberSubscriptionCard({
   const [baseMRR, setBaseMRR] = useState(0);
   const [additionalMemberFeeRate, setAdditionalMemberFeeRate] = useState(25);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
 
   useEffect(() => {
     if (accountId) {
@@ -89,8 +90,11 @@ export default function MemberSubscriptionCard({
         monthly_dues: account.monthly_dues
       });
 
-      // Fetch member count to calculate additional member fees
+      // Fetch member count and plan details to calculate fees
       let secondaryMemberCount = 0;
+      let planInterval = 'month'; // Default to monthly
+      let planName = '';
+
       try {
         const { data: members, error: membersError } = await supabase
           .from('members')
@@ -106,62 +110,60 @@ export default function MemberSubscriptionCard({
         console.error('Error fetching members:', err);
       }
 
-      // Calculate base MRR from Stripe subscription OR monthly_dues field
-      let currentPriceId = null;
-      let stripeBaseMRR = 0;
-      let isPaused = false;
-
-      if (account.stripe_subscription_id) {
+      // Get plan details to check if it's annual
+      if (account.membership_plan_id) {
         try {
-          const subResponse = await fetch(`/api/subscriptions/${account.stripe_subscription_id}`);
-          const subData = await subResponse.json();
-          if (subData.subscription) {
-            // Check if subscription is paused
-            isPaused = !!subData.subscription.pause_collection;
+          const { data: plan, error: planError } = await supabase
+            .from('subscription_plans')
+            .select('interval, plan_name')
+            .eq('id', account.membership_plan_id)
+            .single();
 
-            if (subData.subscription.items?.data?.[0]) {
-              const priceData = subData.subscription.items.data[0].price;
-              currentPriceId = priceData.id;
-
-              // Get the actual base subscription amount from Stripe
-              if (priceData.unit_amount) {
-                stripeBaseMRR = priceData.unit_amount / 100; // Convert cents to dollars
-              }
-            }
+          if (!planError && plan) {
+            planInterval = plan.interval || 'month';
+            planName = plan.plan_name || '';
           }
         } catch (err) {
-          console.error('Error fetching subscription price:', err);
+          console.error('Error fetching plan:', err);
         }
       }
 
-      // Use Stripe base MRR if available, otherwise use monthly_dues from account
-      let calculatedBaseMRR = stripeBaseMRR;
+      // All subscriptions are now app-managed (no Stripe subscriptions)
+      let isPaused = account.subscription_status === 'paused';
 
-      // For non-Stripe memberships, use monthly_dues field
-      if (calculatedBaseMRR === 0 && account.monthly_dues) {
-        calculatedBaseMRR = Number(account.monthly_dues);
+      // Get base amount from monthly_dues field (contains total: base + additional member fees)
+      let calculatedBaseMRR = account.monthly_dues ? Number(account.monthly_dues) : 0;
+
+      // For annual plans, the monthly_dues field contains the full annual amount
+      // We need to subtract the additional member fees to get the base plan amount
+      if (planInterval === 'year' && secondaryMemberCount > 0) {
+        const annualAdditionalMemberFees = secondaryMemberCount * 25 * 12;
+        calculatedBaseMRR = calculatedBaseMRR - annualAdditionalMemberFees;
       }
 
       // Determine additional member fee rate based on plan
-      // Skyline Membership ($10/month) has $0 additional member fees
-      // Other plans have $25/month per additional member
-      const feeRate = calculatedBaseMRR === 10 ? 0 : 25;
+      // Skyline Membership ($10/month base) has $0 additional member fees
+      // Annual plans: $25/month × 12 = $300/year per additional member
+      // Monthly plans: $25/month per additional member
+      const isSkyline = planName.toLowerCase() === 'skyline' || calculatedBaseMRR === 10;
+      const feeRate = isSkyline ? 0 : (planInterval === 'year' ? 300 : 25);
 
       setAdditionalMembersCount(secondaryMemberCount);
       setBaseMRR(calculatedBaseMRR);
       setAdditionalMemberFeeRate(feeRate);
+      setBillingInterval(planInterval as 'month' | 'year');
 
       const subscriptionData = {
-        stripe_subscription_id: account.stripe_subscription_id || null,
+        stripe_subscription_id: null, // No longer using Stripe subscriptions
         subscription_status: account.subscription_status || null,
         subscription_start_date: account.subscription_start_date || null,
         subscription_cancel_at: account.subscription_cancel_at || null,
-        next_renewal_date: account.next_billing_date || account.next_renewal_date || null,
+        next_renewal_date: account.next_billing_date || null,
         monthly_dues: account.monthly_dues || null,
         payment_method_type: account.payment_method_type || null,
         payment_method_last4: account.payment_method_last4 || null,
         payment_method_brand: account.payment_method_brand || null,
-        current_price_id: currentPriceId,
+        current_price_id: null, // No longer using Stripe price IDs
         is_paused: isPaused,
       };
 
@@ -348,10 +350,10 @@ export default function MemberSubscriptionCard({
     );
   }
 
-  // Check if there's an active membership (Stripe or non-Stripe)
+  // Check if there's an active membership (app-managed only)
   const hasActiveMembership = subscription &&
-    (subscription.stripe_subscription_id ||
-     (subscription.subscription_status === 'active' && subscription.monthly_dues));
+    subscription.subscription_status === 'active' &&
+    subscription.monthly_dues;
 
   if (!subscription || !hasActiveMembership) {
     return (
@@ -433,11 +435,15 @@ export default function MemberSubscriptionCard({
       </div>
 
       <div className={styles.content}>
-        {/* Compact MRR and LTV Row */}
+        {/* Compact MRR/ARR and LTV Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Total MRR</div>
-            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>{formatCurrency(baseMRR + (additionalMembersCount * additionalMemberFeeRate))}/mo</div>
+            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>
+              {billingInterval === 'year' ? 'Total ARR' : 'Total MRR'}
+            </div>
+            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>
+              {formatCurrency(baseMRR + (additionalMembersCount * additionalMemberFeeRate))}/{billingInterval === 'year' ? 'yr' : 'mo'}
+            </div>
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Account LTV</div>
@@ -490,7 +496,9 @@ export default function MemberSubscriptionCard({
             {/* Base Membership */}
             <div className={styles.row}>
               <span className={styles.label}>Base Membership</span>
-              <span className={styles.value}>{formatCurrency(baseMRR)}/mo</span>
+              <span className={styles.value}>
+                {formatCurrency(baseMRR)}/{billingInterval === 'year' ? 'yr' : 'mo'}
+              </span>
             </div>
 
             {/* Additional Members */}
@@ -499,7 +507,9 @@ export default function MemberSubscriptionCard({
                 <span className={styles.label}>
                   Additional Members ({additionalMembersCount} × ${additionalMemberFeeRate})
                 </span>
-                <span className={styles.value}>{formatCurrency(additionalMembersCount * additionalMemberFeeRate)}/mo</span>
+                <span className={styles.value}>
+                  {formatCurrency(additionalMembersCount * additionalMemberFeeRate)}/{billingInterval === 'year' ? 'yr' : 'mo'}
+                </span>
               </div>
             )}
 

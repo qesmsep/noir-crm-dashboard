@@ -118,17 +118,34 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   // Get membership plan details
   const { data: plan } = await supabase
     .from('subscription_plans')
-    .select('id, monthly_price')
+    .select('id, monthly_price, interval')
     .eq('plan_name', waitlist.selected_membership)
     .single();
 
-  const monthlyDues = plan?.monthly_price || 50;
+  const basePriceAmount = plan?.monthly_price || 50;
   const membershipPlanId = plan?.id || null;
+  const billingInterval = plan?.interval || 'month';
 
-  // Calculate next billing date (1 month from now)
+  // Calculate next billing date based on billing interval
   const startDate = new Date();
   const nextBillingDate = new Date(startDate);
-  nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
+  if (billingInterval === 'year') {
+    // Annual membership: renew in 1 year
+    nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+  } else {
+    // Monthly membership: renew in 1 month
+    nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+  }
+
+  // Check if there are additional members being added during signup
+  // For annual plans, multiply additional member fee by 12
+  const additionalMembers = waitlist.additional_members || [];
+  const additionalMemberCount = additionalMembers.length;
+  const isSkylinePlan = basePriceAmount === 10;
+  const additionalMemberFee = isSkylinePlan ? 0 : 25;
+  const feeMultiplier = billingInterval === 'year' ? 12 : 1;
+  const monthlyDues = basePriceAmount + (additionalMemberCount * additionalMemberFee * feeMultiplier);
 
   // Extract payment method details from the payment intent
   let paymentMethodType: string | null = null;

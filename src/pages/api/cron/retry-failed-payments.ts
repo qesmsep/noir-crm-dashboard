@@ -7,6 +7,7 @@ import {
   sendPaymentSuccessNotification,
   cancelSubscription,
   addMonths,
+  addYears,
   daysBetween,
 } from '@/lib/billing';
 
@@ -53,9 +54,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Find accounts with past_due status and retry_count < 4
+    // Join with subscription_plans to get billing interval
     const { data: failedAccounts, error: fetchError } = await supabase
       .from('accounts')
-      .select('*')
+      .select('*, subscription_plans!membership_plan_id(interval)')
       .eq('subscription_status', 'past_due')
       .lt('billing_retry_count', 4);
 
@@ -110,12 +112,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (result.success) {
           console.log('   ✅ Payment succeeded! Reactivating account...');
 
-          // Reactivate account and move billing date forward
+          // Get billing interval from plan
+          const billingInterval = account.subscription_plans?.interval || 'month';
+          const currentDate = account.next_billing_date || new Date().toISOString().split('T')[0];
+
+          // Reactivate account and move billing date forward based on interval
           const { error: updateError } = await supabase
             .from('accounts')
             .update({
               subscription_status: 'active',
-              next_billing_date: addMonths(account.next_billing_date || new Date().toISOString().split('T')[0], 1),
+              next_billing_date: billingInterval === 'year' ? addYears(currentDate, 1) : addMonths(currentDate, 1),
               billing_retry_count: 0,
               last_billing_attempt: new Date().toISOString(),
               last_payment_failed_at: null,

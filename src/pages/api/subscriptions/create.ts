@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { chargeAccount, logPaymentToLedger, handlePaymentFailure, addMonths } from '@/lib/billing';
+import { chargeAccount, logPaymentToLedger, handlePaymentFailure, addMonths, addYears } from '@/lib/billing';
 import { getTodayLocalDate } from '@/lib/utils';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -125,7 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get price details from subscription_plans table (app is source of truth)
     const { data: selectedPlan, error: planError } = await supabase
       .from('subscription_plans')
-      .select('monthly_price, plan_name')
+      .select('monthly_price, plan_name, interval')
       .eq('id', plan_id)
       .single();
 
@@ -134,6 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const basePriceAmount = selectedPlan.monthly_price;
+    const billingInterval = selectedPlan.interval || 'month';
 
     // Count secondary members to include additional member fees
     const { data: secondaryMembers } = await supabase
@@ -147,18 +148,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Calculate monthly dues: base + (additional members * $25)
     // Exception: Skyline plan ($10/month) gets free additional members
+    // For annual plans: multiply additional member fee by 12
     const isSkylinePlan = basePriceAmount === 10;
     const additionalMemberFee = isSkylinePlan ? 0 : 25;
-    const totalMonthlyDues = basePriceAmount + (secondaryMemberCount * additionalMemberFee);
+    const feeMultiplier = billingInterval === 'year' ? 12 : 1;
+    const totalMonthlyDues = basePriceAmount + (secondaryMemberCount * additionalMemberFee * feeMultiplier);
 
-    console.log('💰 Calculating monthly dues:');
-    console.log(`   Base plan: $${basePriceAmount}`);
-    console.log(`   Additional members: ${secondaryMemberCount} x $${additionalMemberFee} = $${secondaryMemberCount * additionalMemberFee}`);
+    console.log('💰 Calculating dues:');
+    console.log(`   Base plan: $${basePriceAmount} (${billingInterval})`);
+    console.log(`   Additional members: ${secondaryMemberCount} x $${additionalMemberFee} x ${feeMultiplier} = $${secondaryMemberCount * additionalMemberFee * feeMultiplier}`);
     console.log(`   Total: $${totalMonthlyDues}`);
 
-    // Set next billing date to next month from today
+    // Set next billing date based on billing interval
     const today = getTodayLocalDate();
-    const nextBillingDate = addMonths(today, 1);
+    const nextBillingDate = billingInterval === 'year'
+      ? addYears(today, 1)  // Annual: renew in 1 year
+      : addMonths(today, 1); // Monthly: renew in 1 month
 
     // Update account with membership info
     const { data: updatedAccount, error: updateError } = await supabase

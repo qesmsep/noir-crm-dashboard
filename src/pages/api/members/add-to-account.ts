@@ -91,38 +91,120 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Add administration fee to account's monthly dues
     // Skyline members: $0/member (free additional members)
-    // Other plans: $25/member
+    // Monthly plans: $25/member/month
+    // Annual plans: $25/member/month × 12 = $300/year (with pro-rating for mid-year additions)
     let updatedSubscription: any = null;
+    let proratedCharge = 0;
+
     try {
       // Get current account info including membership plan
       const { data: currentAccount } = await supabase
         .from('accounts')
-        .select('monthly_dues, membership_plan_id')
+        .select(`
+          monthly_dues,
+          membership_plan_id,
+          next_billing_date,
+          stripe_customer_id,
+          subscription_plans!membership_plan_id (
+            plan_name,
+            interval
+          )
+        `)
         .eq('account_id', account_id)
         .single();
 
       const currentMonthlyDues = currentAccount?.monthly_dues || 0;
+      const plan = (currentAccount as any)?.subscription_plans;
+      const billingInterval = plan?.interval || 'month';
+      const isSkylinePlan = plan?.plan_name?.toLowerCase() === 'skyline';
 
-      // Determine additional member fee based on membership plan
-      // Fetch the plan to check if it's Skyline
-      let isSkylinePlan = false;
-      if (currentAccount?.membership_plan_id) {
-        const { data: plan } = await supabase
-          .from('subscription_plans')
-          .select('plan_name')
-          .eq('id', currentAccount.membership_plan_id)
-          .single();
-
-        isSkylinePlan = plan?.plan_name?.toLowerCase() === 'skyline';
-      }
-
-      const additionalMemberFee = isSkylinePlan ? 0 : 25;
+      let additionalMemberFee = isSkylinePlan ? 0 : 25;
+      let monthsRemaining = 0;
 
       if (isSkylinePlan) {
         console.log('[Add Member] Skyline membership detected - additional members are FREE');
       }
 
+      // For annual plans, calculate pro-rated charge and update annual fee
+      if (billingInterval === 'year' && additionalMemberFee > 0 && currentAccount?.next_billing_date) {
+        const today = new Date();
+        const nextBilling = new Date(currentAccount.next_billing_date);
+
+        // Calculate months remaining (rounded up)
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const daysRemaining = Math.max(0, Math.ceil((nextBilling.getTime() - today.getTime()) / msPerDay));
+        monthsRemaining = Math.max(1, Math.ceil(daysRemaining / 30));
+
+        // Pro-rated charge for remaining months
+        proratedCharge = additionalMemberFee * monthsRemaining;
+
+        console.log(`[Add Member] Annual plan - Pro-rating additional member fee:`);
+        console.log(`  Days remaining: ${daysRemaining}`);
+        console.log(`  Months remaining: ${monthsRemaining}`);
+        console.log(`  Pro-rated charge: $${proratedCharge} ($${additionalMemberFee}/month × ${monthsRemaining} months)`);
+
+        // For next renewal, charge full year
+        additionalMemberFee = additionalMemberFee * 12;
+        console.log(`  Next renewal fee increase: $${additionalMemberFee}/year`);
+      }
+
       const newMonthlyDues = currentMonthlyDues + additionalMemberFee;
+
+      // If there's a pro-rated charge, charge it immediately
+      if (proratedCharge > 0 && currentAccount?.stripe_customer_id) {
+        console.log(`[Add Member] Charging pro-rated amount: $${proratedCharge}`);
+
+        try {
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(proratedCharge * 100), // Convert to cents
+            currency: 'usd',
+            customer: currentAccount.stripe_customer_id,
+            off_session: true,
+            confirm: true,
+            description: `Pro-rated additional member fee (${monthsRemaining} months)`,
+            metadata: {
+              account_id,
+              type: 'prorated_additional_member',
+              months: monthsRemaining.toString(),
+            },
+          });
+
+          console.log(`[Add Member] Pro-rated charge successful: ${paymentIntent.id}`);
+
+          // Log to ledger
+          const { data: primaryMember } = await supabase
+            .from('members')
+            .select('member_id')
+            .eq('account_id', account_id)
+            .eq('member_type', 'primary')
+            .single();
+
+          if (primaryMember) {
+            await supabase.from('ledger').insert({
+              member_id: primaryMember.member_id,
+              account_id,
+              type: 'charge',
+              amount: proratedCharge,
+              date: new Date().toISOString().split('T')[0],
+              note: `Pro-rated additional member fee (${monthsRemaining} months)`,
+              stripe_payment_intent_id: paymentIntent.id,
+            });
+          }
+        } catch (chargeError: any) {
+          console.error('[Add Member] Pro-rated charge failed:', chargeError);
+          // Continue with member addition but log the error
+          await supabase.from('subscription_events').insert({
+            account_id,
+            event_type: 'payment_failed',
+            effective_date: new Date().toISOString(),
+            metadata: {
+              reason: 'prorated_additional_member_charge_failed',
+              error: chargeError.message,
+              amount: proratedCharge,
+            },
+          });
+        }
+      }
 
       // Update account with new monthly dues
       await supabase

@@ -388,6 +388,15 @@ export function addMonths(dateString: string, months: number): string {
 }
 
 /**
+ * Add years to a date string (YYYY-MM-DD format)
+ */
+export function addYears(dateString: string, years: number): string {
+  const date = new Date(dateString);
+  date.setFullYear(date.getFullYear() + years);
+  return date.toISOString().split('T')[0];
+}
+
+/**
  * Calculate days between two dates
  */
 export function daysBetween(date1: Date | string, date2: Date | string): number {
