@@ -83,14 +83,17 @@ export async function chargeAccount(account: any): Promise<{
     }
 
     // 2. Get payment method
-    const paymentMethod = await getDefaultPaymentMethod(account.stripe_customer_id);
+    const paymentMethodId = await getDefaultPaymentMethod(account.stripe_customer_id);
 
-    if (!paymentMethod) {
+    if (!paymentMethodId) {
       return {
         success: false,
         error: { code: 'no_payment_method', message: 'No payment method on file' }
       };
     }
+
+    // Get full payment method details to check type
+    const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
 
     // 3. Add credit card fee if enabled
     let totalAmount = amount;
@@ -105,11 +108,12 @@ export async function chargeAccount(account: any): Promise<{
     }
 
     // 4. Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntentParams: any = {
       amount: Math.round(totalAmount * 100), // Convert to cents
       currency: 'usd',
       customer: account.stripe_customer_id,
-      payment_method: paymentMethod,
+      payment_method: paymentMethodId,
+      payment_method_types: ['card', 'us_bank_account'], // Allow both cards and ACH
       off_session: true,
       confirm: true,
       expand: ['charges'],
@@ -120,9 +124,29 @@ export async function chargeAccount(account: any): Promise<{
         base_amount: amount.toFixed(2),
         credit_card_fee: creditCardFee.toFixed(2),
       },
-    });
+    };
 
-    if (paymentIntent.status === 'succeeded') {
+    // For ACH payments, provide mandate data and remove off_session
+    if (paymentMethod.type === 'us_bank_account') {
+      delete paymentIntentParams.off_session;
+
+      // Provide mandate acceptance data
+      paymentIntentParams.mandate_data = {
+        customer_acceptance: {
+          type: 'online',
+          online: {
+            ip_address: '0.0.0.0', // Server-initiated payment
+            user_agent: 'Noir Membership Billing System',
+          },
+        },
+      };
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+
+    // ACH payments return 'processing' and take a few days to complete
+    // Cards return 'succeeded' immediately
+    if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing') {
       return { success: true, paymentIntent };
     } else {
       return {

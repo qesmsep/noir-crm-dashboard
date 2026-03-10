@@ -339,6 +339,39 @@ export default function MemberSubscriptionCard({
     }
   };
 
+  const handleRetryPayment = async () => {
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/subscriptions/retry-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account_id: accountId }),
+      });
+
+      const data = await response.json();
+
+      if (data.error || !data.success) {
+        throw new Error(data.error || data.message || 'Payment failed');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Payment processed successfully - subscription reactivated',
+      });
+
+      fetchSubscriptionData();
+      fetchPaymentStatus();
+    } catch (error: any) {
+      toast({
+        title: 'Payment Failed',
+        description: error.message || 'Failed to process payment',
+        variant: 'error',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.card}>
@@ -393,12 +426,14 @@ export default function MemberSubscriptionCard({
     subscription.is_paused ? styles.statusPaused :
     (subscription.subscription_status === 'canceled' || subscription.subscription_cancel_at) ? styles.statusCanceled :
     subscription.subscription_status === 'active' ? styles.statusActive :
+    subscription.subscription_status === 'processing' ? styles.statusActive :
     subscription.subscription_status === 'past_due' ? styles.statusPastDue :
     styles.statusDefault;
 
   const statusText =
     subscription.is_paused ? 'PAUSED' :
     (subscription.subscription_status === 'canceled' || subscription.subscription_cancel_at) ? 'CANCELLED' :
+    subscription.subscription_status === 'processing' ? 'ACH PROCESSING' :
     subscription.subscription_status?.toUpperCase();
 
   const formatDate = (dateStr: string | null) => {
@@ -454,7 +489,7 @@ export default function MemberSubscriptionCard({
         </div>
 
         {/* Status Badges */}
-        <div className={styles.badges} style={{ marginBottom: '0.75rem' }}>
+        <div className={styles.badges} style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {paymentStatus?.last_payment_status === 'failed' && (
             <span className={styles.paymentFailedBadge}>
               PAYMENT FAILED
@@ -463,6 +498,28 @@ export default function MemberSubscriptionCard({
           <span className={statusBadgeClass}>
             {statusText}
           </span>
+          {(subscription.subscription_status === 'past_due' || paymentStatus?.last_payment_status === 'failed') && subscription.subscription_status !== 'processing' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRetryPayment();
+              }}
+              disabled={actionLoading}
+              style={{
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                cursor: actionLoading ? 'not-allowed' : 'pointer',
+                opacity: actionLoading ? 0.6 : 1,
+              }}
+            >
+              {actionLoading ? 'Processing...' : '🔄 Retry Payment'}
+            </button>
+          )}
         </div>
 
         <div className={styles.divider} style={{ margin: '0.75rem 0' }} />
