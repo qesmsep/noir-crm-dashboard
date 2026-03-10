@@ -39,29 +39,101 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Create waitlist entry with referral information
-    const waitlistData = {
-      first_name,
-      last_name,
-      phone,
-      email,
-      company: company || null,
-      city_state: city_state || null,
-      referral: referred_by_member_id
-        ? `Referred by member ${referred_by_member_id}`
-        : null,
-      visit_frequency: visit_frequency || null,
-      go_to_drink: go_to_drink || null,
-      status: 'pending',
-      referral_code: referral_code?.toUpperCase() || null,
-      referred_by_member_id: referred_by_member_id || null
-    };
+    // Check if there's an existing waitlist entry from the referral link click
+    // If so, update it. Otherwise, create a new one.
+    let waitlist;
+    let waitlistError;
 
-    const { data: waitlist, error: waitlistError } = await supabaseAdmin
-      .from('waitlist')
-      .insert(waitlistData)
-      .select()
-      .single();
+    if (referral_code && referred_by_member_id) {
+      // Try to find existing entry
+      const { data: existingEntry } = await supabaseAdmin
+        .from('waitlist')
+        .select('*')
+        .eq('referral_code', referral_code.toUpperCase())
+        .eq('referred_by_member_id', referred_by_member_id)
+        .eq('status', 'link_clicked')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (existingEntry) {
+        // Update existing entry
+        const { data: updated, error: updateError } = await supabaseAdmin
+          .from('waitlist')
+          .update({
+            first_name,
+            last_name,
+            phone,
+            email,
+            company: company || null,
+            city_state: city_state || null,
+            visit_frequency: visit_frequency || null,
+            go_to_drink: go_to_drink || null,
+            status: 'submitted',
+            form_step: 5, // Completed all steps
+          })
+          .eq('id', existingEntry.id)
+          .select()
+          .single();
+
+        waitlist = updated;
+        waitlistError = updateError;
+      } else {
+        // No existing entry, create new one
+        const waitlistData = {
+          first_name,
+          last_name,
+          phone,
+          email,
+          company: company || null,
+          city_state: city_state || null,
+          referral: referred_by_member_id
+            ? `Referred by member ${referred_by_member_id}`
+            : null,
+          visit_frequency: visit_frequency || null,
+          go_to_drink: go_to_drink || null,
+          status: 'submitted',
+          form_step: 5,
+          referral_code: referral_code?.toUpperCase() || null,
+          referred_by_member_id: referred_by_member_id || null
+        };
+
+        const { data: created, error: createError } = await supabaseAdmin
+          .from('waitlist')
+          .insert(waitlistData)
+          .select()
+          .single();
+
+        waitlist = created;
+        waitlistError = createError;
+      }
+    } else {
+      // No referral info, just create new entry
+      const waitlistData = {
+        first_name,
+        last_name,
+        phone,
+        email,
+        company: company || null,
+        city_state: city_state || null,
+        referral: null,
+        visit_frequency: visit_frequency || null,
+        go_to_drink: go_to_drink || null,
+        status: 'submitted',
+        form_step: 5,
+        referral_code: null,
+        referred_by_member_id: null
+      };
+
+      const { data: created, error: createError } = await supabaseAdmin
+        .from('waitlist')
+        .insert(waitlistData)
+        .select()
+        .single();
+
+      waitlist = created;
+      waitlistError = createError;
+    }
 
     if (waitlistError) {
       console.error('Error creating waitlist entry:', waitlistError);

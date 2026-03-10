@@ -3700,6 +3700,80 @@ This section maintains a running log of all significant commits and changes to t
 
 ---
 
+### 2026-03-10 - Annual Membership Billing & Display Fixes
+
+**Commits**:
+- `b68d1fc` - Fix annual membership billing to charge on anniversary date
+- `b673944` - Fix member portal to display annual membership costs correctly
+
+**Problem**: Annual members were incorrectly being charged monthly ($1225) instead of annually ($1500), and their renewal dates were set to next month instead of one year from signup.
+
+**Changes**:
+
+**1. Core Billing Logic**:
+- Added `addYears()` helper function to `src/lib/billing.ts`
+- Annual memberships now renew exactly 1 year from subscription start date
+- Additional member fees for annual plans: $25/month × 12 = $300/year (not $25/month)
+- Fixed calculation in `src/pages/api/subscriptions/create.ts` and `src/pages/api/payment/confirm.ts`
+
+**2. Pro-Rating for Mid-Year Additions**:
+- `src/pages/api/members/add-to-account.ts` now pro-rates additional member fees for annual plans
+- Calculates months remaining until renewal
+- Charges immediately: $25 × months remaining
+- Updates `monthly_dues` to include full $300/year for next renewal
+- Example: Add member 6 months before renewal → Immediate charge: $150, Next renewal increases by $300
+
+**3. Automated Billing Crons**:
+- `src/pages/api/cron/monthly-billing.ts` - Respects billing interval when setting next_billing_date
+- `src/pages/api/cron/retry-failed-payments.ts` - Respects billing interval when recovering from failures
+
+**4. Admin Dashboard Display** (`src/components/MemberSubscriptionCard.tsx`):
+- Removed Stripe subscription logic (all subscriptions now app-managed)
+- Shows "Total ARR" for annual plans (not "Total MRR")
+- Displays `/yr` suffix for annual plans
+- Fixed "PAUSED" status display for app-managed subscriptions
+- Annual example: Base $1200/yr + Additional Members (1 × $300) = $1500/yr
+
+**5. Member Portal Display**:
+- `src/pages/api/member/account-subscription.ts` - Returns `billingInterval` in API response
+- `src/app/member/dashboard/page.tsx` - Displays interval-aware labels (/yr or /mo)
+- `src/components/member/SubscriptionModal.tsx` - Shows correct fees in popup modal
+- Matches admin portal display exactly
+
+**6. Data Migration**:
+- Fixed 2 existing annual members with incorrect data:
+  - Member b6a422e0: Assigned to Annual plan, $1500/yr, renewal 2026-05-31 (anniversary)
+  - Member 75df2103: Fixed renewal date to 2027-03-10 (anniversary)
+
+**Impact**:
+- New annual subscriptions calculate correctly: $1200 base + ($300 × additional members)
+- Existing annual members have correct renewal dates and pricing
+- All displays (admin + member portal) show consistent annual pricing
+- Pro-rating prevents mid-year additions from getting free months
+
+**Testing Recommendations**:
+1. Create new annual subscription with additional members → Verify $1500 charged, renewal in 1 year
+2. Add member mid-year to annual account → Verify pro-rated charge + next renewal increase
+3. Check member portal displays → Verify shows /yr labels and correct amounts
+4. Let monthly billing cron run → Verify annual members don't get charged until anniversary
+
+**Files Modified**:
+- `src/lib/billing.ts`
+- `src/pages/api/subscriptions/create.ts`
+- `src/pages/api/payment/confirm.ts`
+- `src/pages/api/cron/monthly-billing.ts`
+- `src/pages/api/cron/retry-failed-payments.ts`
+- `src/pages/api/members/add-to-account.ts`
+- `src/components/MemberSubscriptionCard.tsx`
+- `src/pages/api/member/account-subscription.ts`
+- `src/app/member/dashboard/page.tsx`
+- `src/components/member/SubscriptionModal.tsx`
+
+**Files Created**:
+- `scripts/fix-existing-annual-members.ts` (data migration script)
+
+---
+
 ### 2026-03-09 - Member Account Management Improvements
 
 **Changes**:
