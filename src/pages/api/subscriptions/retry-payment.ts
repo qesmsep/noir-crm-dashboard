@@ -71,8 +71,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Card payments are 'succeeded' and immediate
       const interval = account.subscription_plans?.interval || 'month';
       const currentBillingDate = account.next_billing_date
-        ? new Date(account.next_billing_date)
-        : new Date();
+        ? account.next_billing_date.split('T')[0] // Convert to YYYY-MM-DD format
+        : new Date().toISOString().split('T')[0];
 
       const nextBillingDate = interval === 'year'
         ? addYears(currentBillingDate, 1)
@@ -84,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .from('accounts')
         .update({
           subscription_status: newStatus,
-          next_billing_date: nextBillingDate.toISOString(),
+          next_billing_date: new Date(nextBillingDate).toISOString(),
           last_billing_attempt: new Date().toISOString(),
           billing_retry_count: 0,
           last_payment_failed_at: null,
