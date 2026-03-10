@@ -351,8 +351,10 @@ export default function MemberSubscriptionCard({
   }
 
   // Check if there's an active membership (app-managed only)
+  // Show membership for active, past_due, paused - basically anything except canceled/null
   const hasActiveMembership = subscription &&
-    subscription.subscription_status === 'active' &&
+    subscription.subscription_status &&
+    subscription.subscription_status !== 'canceled' &&
     subscription.monthly_dues;
 
   if (!subscription || !hasActiveMembership) {
