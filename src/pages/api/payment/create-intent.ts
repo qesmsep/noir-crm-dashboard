@@ -101,6 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       amount: totalAmount,
       currency: 'usd',
       customer: customerId,
+      payment_method_types: ['card', 'us_bank_account'], // Allow both cards and ACH
       metadata: {
         waitlist_id: waitlist.id,
         membership_type,
@@ -115,9 +116,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       description: additional_members_count > 0
         ? `Noir ${membership_type} Membership + ${additional_members_count} Additional Member${additional_members_count > 1 ? 's' : ''} - ${waitlist.first_name} ${waitlist.last_name}`
         : `Noir ${membership_type} Membership - ${waitlist.first_name} ${waitlist.last_name}`,
-      automatic_payment_methods: {
-        enabled: true,
-      },
       setup_future_usage: 'off_session', // Save payment method for recurring billing
     });
 

@@ -86,6 +86,7 @@ async function createPaymentIntent(req: NextApiRequest, res: NextApiResponse) {
       amount: paymentSettings.membership_fee,
       currency: paymentSettings.currency,
       customer: customer.id,
+      payment_method_types: ['card', 'us_bank_account'], // Allow both cards and ACH
       metadata: {
         application_id,
         type: 'membership_fee'
