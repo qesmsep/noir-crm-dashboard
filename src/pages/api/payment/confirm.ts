@@ -47,8 +47,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const paymentIntent = await stripe.paymentIntents.retrieve(waitlist.stripe_payment_intent_id);
 
-    if (paymentIntent.status !== 'succeeded') {
-      return res.status(400).json({ error: 'Payment not completed' });
+    // ACH payments are 'processing' initially and take 3-5 days to settle
+    // Card payments are 'succeeded' immediately
+    const acceptedStatuses = ['succeeded', 'processing'];
+    if (!acceptedStatuses.includes(paymentIntent.status)) {
+      return res.status(400).json({
+        error: 'Payment not completed',
+        status: paymentIntent.status,
+        message: `Payment status is ${paymentIntent.status}. Expected: ${acceptedStatuses.join(' or ')}`
+      });
     }
 
     // Attach the payment method to the customer and set as default
