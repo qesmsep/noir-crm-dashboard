@@ -89,6 +89,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('[CONFIRM] Payment status OK:', paymentIntent.status);
 
+    // If payment requires confirmation (ACH payments), confirm it now
+    if (paymentIntent.status === 'requires_confirmation') {
+      console.log('[CONFIRM] Payment requires confirmation - confirming now...');
+      const confirmedPayment = await stripe.paymentIntents.confirm(paymentIntent.id);
+      console.log('[CONFIRM] Payment confirmed. New status:', confirmedPayment.status);
+
+      // Update the paymentIntent variable with the confirmed version
+      Object.assign(paymentIntent, confirmedPayment);
+    }
+
     // Attach the payment method to the customer and set as default
     if (paymentIntent.payment_method && waitlist.stripe_customer_id) {
       try {
