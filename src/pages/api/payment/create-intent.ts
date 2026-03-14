@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { token, membership_type, additional_members_count = 0 } = req.body;
+  const { token, membership_type, additional_members_count = 0, payment_method_type = 'card' } = req.body;
 
   if (!token || !membership_type) {
     console.log('[CREATE INTENT] Missing fields');
@@ -63,10 +63,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Calculate subtotal before credit card fee
     const subtotal = basePlanAmount + additionalMembersAmount;
 
-    // Calculate 4% credit card processing fee (applied by default for new memberships)
-    const creditCardFee = Math.round(subtotal * 0.04);
+    // Calculate 4% credit card processing fee (only for card payments, not ACH)
+    const creditCardFee = payment_method_type === 'card' ? Math.round(subtotal * 0.04) : 0;
 
-    // Total amount including credit card fee
+    // Total amount including credit card fee (if applicable)
     const totalAmount = subtotal + creditCardFee;
 
     console.log('[CREATE INTENT] Base amount:', basePlanAmount, 'Additional members:', additional_members_count, 'Additional amount:', additionalMembersAmount, 'Subtotal:', subtotal, 'Credit card fee:', creditCardFee, 'Total:', totalAmount);
@@ -94,9 +94,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('id', waitlist.id);
     }
 
-    // Create payment intent with 4% credit card fee included
-    // Note: Fee is charged upfront for credit card payments (default)
-    // If customer pays via ACH, they can request a refund of the processing fee
+    // Create payment intent
+    // For card payments: includes 4% processing fee
+    // For ACH payments: no processing fee
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: 'usd',
@@ -137,7 +137,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       additionalMembersCount: additional_members_count,
       subtotal: subtotal,
       creditCardFee: creditCardFee,
-      feeMessage: '4% credit card processing fee included'
+      feeMessage: payment_method_type === 'card'
+        ? '4% credit card processing fee included'
+        : 'No processing fee for ACH payments'
     });
 
   } catch (error: any) {

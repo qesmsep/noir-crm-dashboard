@@ -75,7 +75,8 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
         body: JSON.stringify({
           token,
           membership_type: selectedMembership,
-          additional_members_count: additionalMembersCount
+          additional_members_count: additionalMembersCount,
+          payment_method_type: 'card'
         })
       });
 
@@ -148,7 +149,8 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
         body: JSON.stringify({
           token,
           membership_type: selectedMembership,
-          additional_members_count: additionalMembersCount
+          additional_members_count: additionalMembersCount,
+          payment_method_type: 'ach'
         })
       });
 
