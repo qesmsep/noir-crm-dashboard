@@ -651,7 +651,7 @@ export default function OnboardingWizard({
     }
 
     // Validate waitlist intake fields
-    if (!company || !cityState || !howDidYouHear || !whyNoir) {
+    if (!company || !howDidYouHear || !whyNoir) {
       toast({
         title: 'Additional Information Required',
         description: 'Please complete all fields about your background',
@@ -662,6 +662,9 @@ export default function OnboardingWizard({
     }
 
     try {
+      // Auto-populate city_state from city and state fields
+      const cityStateValue = city && state ? `${city}, ${state}` : '';
+
       const response = await fetch('/api/onboard/save-contact-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -678,7 +681,7 @@ export default function OnboardingWizard({
           zip_code: zipCode,
           photo_url: primaryMemberPhoto,
           company,
-          city_state: cityState,
+          city_state: cityStateValue,
           how_did_you_hear: howDidYouHear,
           why_noir: whyNoir
         })
@@ -1150,18 +1153,6 @@ export default function OnboardingWizard({
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 placeholder="Company / Organization"
-                size="lg"
-                bg="white"
-                borderWidth="2px"
-                _focus={{ borderColor: '#A59480' }}
-              />
-            </FormControl>
-
-            <FormControl isRequired>
-              <Input
-                value={cityState}
-                onChange={(e) => setCityState(e.target.value)}
-                placeholder="City, State (e.g., Kansas City, MO)"
                 size="lg"
                 bg="white"
                 borderWidth="2px"
