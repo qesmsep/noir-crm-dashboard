@@ -164,7 +164,7 @@ export async function chargeAccount(account: any): Promise<{
 
 /**
  * Log a successful payment to the ledger
- * Creates two entries: payment as "credit" and fee as "charge"
+ * Creates entries: payment as "credit", admin fee as "charge", and cc fee as "charge" (if applicable)
  */
 export async function logPaymentToLedger(account: any, paymentIntent: Stripe.PaymentIntent) {
   try {
@@ -188,6 +188,23 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       return;
     }
 
+    // Get subscription plan to determine beverage credit and admin fee
+    let beverageCredit = 0;
+    let adminFee = 0;
+
+    if (account.membership_plan_id) {
+      const { data: plan } = await supabase
+        .from('subscription_plans')
+        .select('beverage_credit')
+        .eq('id', account.membership_plan_id)
+        .single();
+
+      if (plan && plan.beverage_credit) {
+        beverageCredit = parseFloat(plan.beverage_credit.toString());
+        adminFee = baseAmount - beverageCredit;
+      }
+    }
+
     const entries: any[] = [];
 
     // 1. Log the payment as a "credit" (positive amount = increases their credit balance)
@@ -202,7 +219,21 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       stripe_payment_intent_id: paymentIntent.id,
     });
 
-    // 2. If there's a fee, log it as a "charge" (positive amount = adds to balance)
+    // 2. If there's an admin fee (non-beverage portion), log it as a "charge"
+    if (adminFee > 0) {
+      entries.push({
+        member_id: primaryMember.member_id,
+        account_id: account.account_id,
+        type: 'charge',
+        amount: adminFee,
+        date: getTodayLocalDate(),
+        note: 'Membership administration fee',
+        stripe_charge_id: charge?.id,
+        stripe_payment_intent_id: paymentIntent.id,
+      });
+    }
+
+    // 3. If there's a credit card processing fee, log it as a "charge"
     if (feeAmount > 0) {
       entries.push({
         member_id: primaryMember.member_id,
@@ -218,7 +249,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     await supabase.from('ledger').insert(entries);
 
-    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} credit, +$${feeAmount} fee`);
+    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} credit, +$${adminFee} admin fee, +$${feeAmount} cc fee`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
   }

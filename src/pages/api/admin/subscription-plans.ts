@@ -87,6 +87,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     stripe_product_id,
     stripe_price_id,
     monthly_price,
+    beverage_credit,
     interval,
     is_active,
     show_in_onboarding,
@@ -124,6 +125,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       stripe_product_id: stripe_product_id || null,
       stripe_price_id: stripe_price_id || null,
       monthly_price: parseFloat(monthly_price),
+      beverage_credit: beverage_credit ? parseFloat(beverage_credit) : 0,
       interval,
       is_active: is_active !== undefined ? is_active : true,
       show_in_onboarding: show_in_onboarding !== undefined ? show_in_onboarding : true,
@@ -151,6 +153,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     stripe_product_id,
     stripe_price_id,
     monthly_price,
+    beverage_credit,
     interval,
     is_active,
     show_in_onboarding,
@@ -168,6 +171,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
   if (stripe_product_id !== undefined) updateData.stripe_product_id = stripe_product_id;
   if (stripe_price_id !== undefined) updateData.stripe_price_id = stripe_price_id;
   if (monthly_price !== undefined) updateData.monthly_price = parseFloat(monthly_price);
+  if (beverage_credit !== undefined) updateData.beverage_credit = beverage_credit ? parseFloat(beverage_credit) : 0;
   if (interval !== undefined) {
     if (!['month', 'year'].includes(interval)) {
       return res.status(400).json({ error: 'Invalid interval. Must be "month" or "year"' });

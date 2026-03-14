@@ -54,10 +54,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
 
     // Find accounts due for billing today (using date range to match timestamps)
-    // Join with subscription_plans to get billing interval
+    // Join with subscription_plans to get billing interval and beverage credit
     const { data: accountsToBill, error: fetchError } = await supabase
       .from('accounts')
-      .select('*, subscription_plans!membership_plan_id(interval)')
+      .select('*, subscription_plans!membership_plan_id(interval, beverage_credit)')
       .gte('next_billing_date', today + 'T00:00:00')
       .lt('next_billing_date', tomorrow + 'T00:00:00')
       .eq('subscription_status', 'active');

@@ -18,6 +18,7 @@ export default function SubscriptionPlansManager() {
   const [formData, setFormData] = useState({
     plan_name: '',
     monthly_price: '',
+    beverage_credit: '',
     interval: 'month',
     is_active: true,
     show_in_onboarding: true,
@@ -66,6 +67,7 @@ export default function SubscriptionPlansManager() {
     setFormData({
       plan_name: '',
       monthly_price: '',
+      beverage_credit: '',
       interval: 'month',
       is_active: true,
       show_in_onboarding: true,
@@ -80,6 +82,7 @@ export default function SubscriptionPlansManager() {
     setFormData({
       plan_name: plan.plan_name,
       monthly_price: plan.monthly_price.toString(),
+      beverage_credit: plan.beverage_credit?.toString() || '',
       interval: plan.interval,
       is_active: plan.is_active,
       show_in_onboarding: (plan as any).show_in_onboarding ?? true,
@@ -229,6 +232,14 @@ export default function SubscriptionPlansManager() {
                   </div>
                 </div>
 
+                {/* Beverage Credit & Admin Fee Breakdown */}
+                {plan.beverage_credit !== undefined && plan.beverage_credit !== null && (
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    <div>💳 Beverage Credit: ${plan.beverage_credit.toFixed(2)}</div>
+                    <div>⚙️ Admin Fee: ${(plan.monthly_price - plan.beverage_credit).toFixed(2)}</div>
+                  </div>
+                )}
+
               </div>
 
               <div className={styles.planActions}>
@@ -300,27 +311,27 @@ export default function SubscriptionPlansManager() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                      Interval *
-                    </label>
-                    <select
-                      value={formData.interval}
-                      onChange={(e) => setFormData({ ...formData, interval: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
-                      }}
-                    >
-                      <option value="month">Monthly</option>
-                      <option value="year">Yearly</option>
-                    </select>
-                  </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Interval *
+                  </label>
+                  <select
+                    value={formData.interval}
+                    onChange={(e) => setFormData({ ...formData, interval: e.target.value })}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    <option value="month">Monthly</option>
+                    <option value="year">Yearly</option>
+                  </select>
+                </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
                       {formData.interval === 'month' ? 'Monthly' : 'Yearly'} Price *
@@ -331,6 +342,25 @@ export default function SubscriptionPlansManager() {
                       value={formData.monthly_price}
                       onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value })}
                       required
+                      placeholder="150.00"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                      {formData.interval === 'month' ? 'Monthly' : 'Yearly'} Beverage Credit
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.beverage_credit}
+                      onChange={(e) => setFormData({ ...formData, beverage_credit: e.target.value })}
                       placeholder="100.00"
                       style={{
                         width: '100%',
@@ -339,6 +369,11 @@ export default function SubscriptionPlansManager() {
                         borderRadius: '6px',
                       }}
                     />
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                      Admin fee: ${formData.monthly_price && formData.beverage_credit
+                        ? (parseFloat(formData.monthly_price) - parseFloat(formData.beverage_credit)).toFixed(2)
+                        : '0.00'}
+                    </p>
                   </div>
                 </div>
 

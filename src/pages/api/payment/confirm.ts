@@ -227,6 +227,23 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   const totalPaid = waitlist.payment_amount / 100; // Convert cents to dollars
   const feeAmount = creditCardFee / 100; // Convert cents to dollars
 
+  // Get beverage credit from subscription plan to calculate admin fee
+  let beverageCredit = 0;
+  let adminFee = 0;
+
+  if (plan && plan.id) {
+    const { data: planDetails } = await supabase
+      .from('subscription_plans')
+      .select('beverage_credit')
+      .eq('id', plan.id)
+      .single();
+
+    if (planDetails && planDetails.beverage_credit) {
+      beverageCredit = parseFloat(planDetails.beverage_credit.toString());
+      adminFee = basePriceAmount - beverageCredit;
+    }
+  }
+
   // Create ledger entries
   const ledgerEntries: Array<{
     account_id: string;
@@ -238,26 +255,39 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     stripe_payment_intent_id: string;
   }> = [];
 
-  // 1. Payment entry (full amount charged)
+  // 1. Payment entry (full amount charged as credit)
   ledgerEntries.push({
     account_id: account.account_id,
     member_id: member.member_id,
-    type: 'payment',
-    amount: totalPaid.toFixed(2),
+    type: 'credit',
+    amount: basePriceAmount.toFixed(2),
     date: getTodayLocalDate(),
     note: `Initial ${waitlist.selected_membership} membership payment`,
     stripe_payment_intent_id: waitlist.stripe_payment_intent_id
   });
 
-  // 2. Processing fee debit (if fee exists)
+  // 2. Admin fee charge (non-beverage portion)
+  if (adminFee > 0) {
+    ledgerEntries.push({
+      account_id: account.account_id,
+      member_id: member.member_id,
+      type: 'charge',
+      amount: adminFee.toFixed(2),
+      date: getTodayLocalDate(),
+      note: 'Membership administration fee',
+      stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+    });
+  }
+
+  // 3. Processing fee charge (if fee exists)
   if (creditCardFee > 0) {
     ledgerEntries.push({
       account_id: account.account_id,
       member_id: member.member_id,
-      type: 'debit',
-      amount: (-feeAmount).toFixed(2), // Negative amount for debit
+      type: 'charge',
+      amount: feeAmount.toFixed(2),
       date: getTodayLocalDate(),
-      note: 'Credit card processing fee (4%)',
+      note: 'Credit card processing fee',
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id
     });
   }

@@ -317,6 +317,7 @@ export interface SubscriptionPlan {
   stripe_product_id: string;
   stripe_price_id: string;
   monthly_price: number;
+  beverage_credit?: number;
   interval: 'month' | 'year';
   is_active: boolean;
   display_order: number;
