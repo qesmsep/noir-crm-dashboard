@@ -361,12 +361,12 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     stripe_payment_intent_id: string;
   }> = [];
 
-  // 1. Payment entry (full amount charged as credit)
+  // 1. Payment entry (full amount paid including processing fee as credit)
   ledgerEntries.push({
     account_id: account.account_id,
     member_id: member.member_id,
     type: 'credit',
-    amount: basePriceAmount.toFixed(2),
+    amount: totalPaid.toFixed(2),
     date: getTodayLocalDate(),
     note: `Initial ${waitlist.selected_membership} membership payment`,
     stripe_payment_intent_id: waitlist.stripe_payment_intent_id
