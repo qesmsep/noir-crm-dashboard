@@ -4801,3 +4801,372 @@ ON phone_otp_codes(ip_address, created_at);
 
 **Status**: Complete and deployed (commit fe47aba)
 
+
+---
+
+## Session: March 13, 2026 - Beverage Credit & Admin Fee Tracking
+
+### Overview
+
+Implemented subscription plan fee breakdown to track beverage credits separately from administrative fees. When members pay $150/month, the system now properly tracks that $100 goes toward beverage credit and $50 is an administration fee.
+
+---
+
+### Feature: Subscription Plan Beverage Credit Tracking
+
+**Problem**: All membership fees were treated as 100% beverage credit. No way to track administrative fees or non-beverage portions of membership dues.
+
+**Solution**: Added `beverage_credit` field to subscription plans with automatic ledger entry creation for admin fees.
+
+**How It Works**:
+1. Admin sets subscription plan price (e.g., $150/month)
+2. Admin sets beverage credit amount (e.g., $100/month)
+3. System calculates admin fee automatically ($150 - $100 = $50)
+4. When payment is processed:
+   - **Credit entry**: +$150 (full payment)
+   - **Admin fee charge**: +$50 (non-beverage portion)
+   - **CC fee charge**: +$6 (if 4% processing fee enabled)
+   - **Net beverage credit**: $100 available for purchases
+
+**Database Changes**:
+```sql
+-- Added to subscription_plans table
+ALTER TABLE subscription_plans
+ADD COLUMN beverage_credit DECIMAL(10, 2) DEFAULT 0;
+
+-- All existing plans backfilled with beverage_credit = monthly_price
+-- (assuming 100% went to beverage credit previously)
+```
+
+**Files Created**:
+- `migrations/add_beverage_credit_to_subscription_plans.sql` - Database migration
+- `scripts/add-beverage-credit.ts` - Migration script with verification
+
+**Files Modified**:
+- `src/types/index.ts` - Added `beverage_credit?: number` to SubscriptionPlan interface
+- `src/pages/api/admin/subscription-plans.ts` - POST/PUT endpoints handle beverage_credit field
+- `src/components/admin/SubscriptionPlansManager.tsx` - Admin UI for setting beverage credit
+- `src/lib/billing.ts` - Updated `logPaymentToLedger()` to create admin fee charge entries
+- `src/pages/api/cron/monthly-billing.ts` - Fetches beverage_credit from plan during billing
+- `src/pages/api/payment/confirm.ts` - Onboarding payments create admin fee ledger entries
+
+**Admin UI Features**:
+- Input field for beverage credit amount (adapts to Monthly/Yearly based on interval)
+- Real-time admin fee calculation display: "Admin fee: $50.00"
+- Plan cards show breakdown:
+  - 💳 Beverage Credit: $100.00
+  - ⚙️ Admin Fee: $50.00
+
+**Ledger Entry Logic** (applies to all payment flows):
+
+Before (old behavior):
+```
+Payment: +$150 (credit)
+CC Fee: +$6 (charge)
+Net: $144 beverage credit ❌ INCORRECT
+```
+
+After (new behavior):
+```
+Payment: +$150 (credit)
+Admin Fee: +$50 (charge)
+CC Fee: +$6 (charge)
+Net: $100 beverage credit ✅ CORRECT
+```
+
+**Applies To**:
+- Monthly billing cron (`/api/cron/monthly-billing`)
+- Subscription creation (`/api/subscriptions/create`)
+- Payment retries (`/api/subscriptions/retry-payment`)
+- Failed payment retry cron (`/api/cron/retry-failed-payments`)
+- Onboarding payments (`/api/payment/confirm`)
+
+**Impact**:
+- Accurate beverage credit tracking for all membership plans
+- Proper accounting separation of admin fees vs beverage credits
+- Financial reporting can distinguish revenue sources
+- Supports flexible pricing models (e.g., $150 fee with $100 credit)
+
+**Example Use Cases**:
+1. **Price increase with partial credit**: Raise dues from $100 to $150, but only increase beverage credit to $125 (add $25 admin fee)
+2. **Premium tiers**: Skyline at $200/month with $150 beverage credit ($50 admin fee for premium perks)
+3. **Break-even pricing**: Annual plan $1200/year with $1000 beverage credit ($200/year admin fee)
+
+---
+
+## Session: March 10, 2026 - Payment & Billing System Fixes
+
+### Overview
+
+Major improvements to payment processing, membership status tracking, and referral link handling for app-managed subscriptions.
+
+---
+
+### 1. Payment Method Management Fixes
+
+**Problem**: Members couldn't set ACH/bank accounts as default payment method due to Stripe subscription conflicts.
+
+**Solution**: Removed legacy Stripe subscription updates from payment method APIs since all subscriptions are now app-managed.
+
+**Files Modified**:
+- `src/pages/api/stripe/payment-methods/set-default.ts` - Removed Stripe subscription update that was failing
+- `src/pages/api/stripe/payment-methods/list.ts` - Now only checks Stripe customer's default payment method (not subscription)
+
+**Impact**: Members can now successfully set ACH bank accounts as their default payment method.
+
+---
+
+### 2. Retry Payment Feature for Past Due Subscriptions
+
+**Problem**: No way for admins to manually retry failed payments when members updated payment methods.
+
+**Solution**: Created retry payment system with full ACH support and processing status tracking.
+
+**New API Endpoint**: `POST /api/subscriptions/retry-payment`
+- **Purpose**: Manually retry payment for past_due subscriptions
+- **Body**: `{ account_id: string }`
+- **Returns**:
+  ```javascript
+  {
+    success: boolean,
+    message: string,
+    payment_intent_id?: string
+  }
+  ```
+
+**Files Created**:
+- `src/pages/api/subscriptions/retry-payment.ts` - Retry payment endpoint with ACH mandate handling
+
+**Files Modified**:
+- `src/lib/billing.ts`:
+  - Added support for `us_bank_account` payment method type
+  - Added `payment_method_types: ['card', 'us_bank_account']` to PaymentIntent creation
+  - Handle ACH mandate_data for off-session payments
+  - Accept `processing` status as success (ACH takes 3-5 days to clear)
+- `src/components/MemberSubscriptionCard.tsx`:
+  - Added "🔄 Retry Payment" button for past_due subscriptions
+  - Added "ACH PROCESSING" status badge (green)
+  - Hide retry button when payment is already processing
+  - Added `handleRetryPayment()` function
+
+**Database Changes**:
+- Added `'processing'` to accounts.subscription_status allowed values
+- Column tracks ACH payments that are clearing (3-5 business days)
+
+**Workflow**:
+1. Admin clicks "Retry Payment" on past_due subscription
+2. System charges using account's default payment method (card or ACH)
+3. For ACH: Status set to 'processing', badge shows "ACH PROCESSING"
+4. For Cards: Status set to 'active' immediately
+5. Ledger entry created immediately for both types
+6. Billing date moved forward by 1 month/year
+7. Retry count reset to 0
+
+**Impact**: 
+- Admins can retry failed payments without waiting for cron job
+- ACH payments properly supported with mandate handling
+- Clear visual feedback on payment processing status
+- Immediate ledger entries for accounting accuracy
+
+---
+
+### 3. Membership Plan Assignment Backfill
+
+**Problem**: 110 accounts had NULL `membership_plan_id` after migration to app-managed subscriptions, causing "No active membership" display issues.
+
+**Solution**: Backfilled all accounts based on monthly_dues amount.
+
+**Database Updates**:
+```sql
+-- Assigned plan IDs based on dues amount:
+-- $100 or $125 → Solo plan (Duo = Solo + 1 additional member)
+-- $10 or $1 → Skyline plan  
+-- $1200 → Annual plan
+```
+
+**Accounts Fixed**: 105 accounts (95 Solo, 10 Skyline)
+
+**Files Modified**:
+- Manual database update via SQL (no code changes)
+
+**Impact**: All active memberships now display correctly in admin UI.
+
+---
+
+### 4. Membership Status Display Improvements
+
+**Problem**: Membership card only showed subscriptions with status='active', hiding past_due/processing subscriptions.
+
+**Solution**: Display memberships for all non-canceled statuses.
+
+**Files Modified**:
+- `src/components/MemberSubscriptionCard.tsx`:
+  - Changed condition from `subscription_status === 'active'` to exclude only 'canceled'
+  - Now shows: active, past_due, processing, paused subscriptions
+  - Added status-specific badges with appropriate styling
+
+**Impact**: Admins can see and manage subscriptions that need attention (past_due, processing).
+
+---
+
+### 5. Referral Link Tracking Improvements
+
+**Problem**: Referral links created blank waitlist entries immediately on click, cluttering admin waitlist with incomplete leads.
+
+**Solution**: Track referral clicks as separate status, update entry when form is submitted.
+
+**Files Modified**:
+- `src/pages/api/referral/create-onboard.ts`:
+  - Creates waitlist entry with status `'link_clicked'`
+  - Sets `form_step = 0` to track progress
+  - Records referrer information
+- `src/pages/api/referral/submit.ts`:
+  - Finds existing `link_clicked` entry and updates it
+  - Changes status to `'submitted'` with complete data
+  - Sets `form_step = 5` (completed)
+  - No duplicate entries created
+
+**Database Changes**:
+- Added `form_step INTEGER DEFAULT 0` column to waitlist table
+- Tracks user progress through referral form (0-5)
+
+**New Statuses**:
+- `link_clicked` - User clicked referral link but hasn't submitted form
+- `submitted` - User completed and submitted referral form
+
+**Impact**: 
+- Clean admin waitlist (only see completed applications)
+- Track referral link effectiveness and drop-off rates
+- See which step users abandoned the form
+- No more blank entries with only "Referred by [Name]"
+
+---
+
+### API Endpoints Added
+
+#### POST /api/subscriptions/retry-payment
+Manually retry payment for past_due subscription using account's default payment method.
+
+**Request**:
+```json
+{
+  "account_id": "uuid"
+}
+```
+
+**Response (Success)**:
+```json
+{
+  "success": true,
+  "message": "Payment successful - subscription reactivated",
+  "payment_intent_id": "pi_xxx"
+}
+```
+
+**Response (ACH Processing)**:
+```json
+{
+  "success": true,
+  "message": "Payment successful - subscription reactivated",
+  "payment_intent_id": "pi_xxx"
+}
+```
+Note: Subscription status set to 'processing' for ACH, 'active' for cards.
+
+**Response (Error)**:
+```json
+{
+  "success": false,
+  "message": "Payment failed",
+  "error": "Error message from Stripe"
+}
+```
+
+**Features**:
+- Supports both card and ACH payment methods
+- Handles ACH mandates for off-session payments
+- Creates immediate ledger entry
+- Moves billing date forward
+- Resets retry count
+- Sends success notification SMS
+
+---
+
+### Database Schema Changes
+
+#### accounts table
+```sql
+-- Added new subscription status
+ALTER TABLE accounts DROP CONSTRAINT accounts_subscription_status_check;
+ALTER TABLE accounts ADD CONSTRAINT accounts_subscription_status_check 
+  CHECK (subscription_status = ANY (ARRAY[
+    'active'::text, 
+    'canceled'::text, 
+    'past_due'::text, 
+    'unpaid'::text, 
+    'paused'::text, 
+    'trialing'::text,
+    'processing'::text  -- NEW: For ACH payments clearing
+  ]));
+```
+
+#### waitlist table
+```sql
+-- Added form progress tracking
+ALTER TABLE waitlist ADD COLUMN form_step INTEGER DEFAULT 0;
+
+-- New status values (not enforced by constraint):
+-- 'link_clicked' - Referral link clicked but form not submitted
+-- 'submitted' - Referral form completed and submitted
+-- 'pending' - Regular waitlist application
+-- 'approved' - Approved for membership
+```
+
+---
+
+### Testing Performed
+
+✅ Local build completed successfully (exit code 0)
+✅ All TypeScript errors resolved
+✅ Manual database updates verified
+✅ ACH payment method tested (shows as default in UI)
+✅ Retry payment workflow tested (creates ledger entry, updates status)
+
+---
+
+### Commits (7 total)
+
+1. `d250f90` - Fix membership card to display past_due and paused subscriptions
+2. `35420a0` - Fix set-default payment method API for app-managed subscriptions  
+3. `f926b19` - Fix payment methods list to show correct default for app-managed subscriptions
+4. `5c290bc` - Add retry payment functionality with ACH support and processing status
+5. `bc77d07` - Fix logPaymentToLedger function call signature
+6. `99464b4` - Fix referral links creating blank waitlist entries (REVERTED)
+7. `8c4b7d4` - Fix TypeScript error in retry-payment - convert dates to strings
+8. `eb84156` - Track referral link clicks and form progress in waitlist
+9. `2b1d68a` - Fix sendPaymentSuccessNotification function call
+
+---
+
+### Key Technical Decisions
+
+1. **ACH Support**: Added `payment_method_types: ['card', 'us_bank_account']` to all PaymentIntent creation to support both payment methods.
+
+2. **Processing Status**: Created new 'processing' subscription status for ACH payments that take 3-5 days to clear, allowing immediate subscription reactivation while payment processes.
+
+3. **Mandate Handling**: For ACH off-session payments, provide `mandate_data` with customer acceptance info since Stripe requires explicit authorization.
+
+4. **Referral Tracking**: Track link clicks separately from form submissions to measure funnel effectiveness without cluttering admin UI.
+
+5. **No Stripe Subscription Updates**: Since migrating to app-managed billing, removed all Stripe subscription updates from payment method management APIs.
+
+---
+
+### Future Enhancements Discussed
+
+- Could add step-by-step progress tracking in referral form (update form_step on each page)
+- Could add webhook handler to automatically set subscription to 'active' when ACH payment succeeds
+- Could add partial data capture (save form fields as user progresses through steps)
+
+---
+
