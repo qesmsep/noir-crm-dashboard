@@ -158,10 +158,17 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
       });
 
       if (!intentResponse.ok) {
-        throw new Error('Failed to create payment intent');
+        const errorData = await intentResponse.json();
+        console.error('[ACH] Failed to create payment intent:', errorData);
+        throw new Error('Failed to create payment intent: ' + (errorData.error || 'Unknown error'));
       }
 
       const intentData = await intentResponse.json();
+      console.log('[ACH] Payment intent created:', {
+        client_secret: intentData.client_secret ? 'present' : 'missing',
+        amount: intentData.amount,
+        feeMessage: intentData.feeMessage
+      });
 
       console.log('[ACH] Step 2: Opening Stripe Financial Connections...');
 
