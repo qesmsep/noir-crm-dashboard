@@ -73,9 +73,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('  - Payment method:', paymentIntent.payment_method);
     console.log('  - Payment method types:', paymentIntent.payment_method_types);
 
-    // ACH payments can be 'requires_confirmation' or 'processing' initially and take 3-5 days to settle
+    // ACH payments can be 'requires_confirmation', 'processing', or 'requires_action' (microdeposits) initially
+    // ACH payments take 3-5 days to settle
     // Card payments are 'succeeded' immediately
-    const acceptedStatuses = ['succeeded', 'processing', 'requires_confirmation'];
+    const acceptedStatuses = ['succeeded', 'processing', 'requires_confirmation', 'requires_action'];
     if (!acceptedStatuses.includes(paymentIntent.status)) {
       console.log('[CONFIRM] ERROR: Invalid payment status');
       console.log('  - Current status:', paymentIntent.status);
@@ -92,11 +93,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // If payment requires confirmation (ACH payments), confirm it now
     if (paymentIntent.status === 'requires_confirmation') {
       console.log('[CONFIRM] Payment requires confirmation - confirming now...');
-      const confirmedPayment = await stripe.paymentIntents.confirm(paymentIntent.id);
-      console.log('[CONFIRM] Payment confirmed. New status:', confirmedPayment.status);
 
-      // Update the paymentIntent variable with the confirmed version
-      Object.assign(paymentIntent, confirmedPayment);
+      // For ACH payments with setup_future_usage, mandate_data is required
+      const confirmParams: Stripe.PaymentIntentConfirmParams = {};
+
+      // Check if this is an ACH payment
+      if (paymentIntent.payment_method_types.includes('us_bank_account')) {
+        confirmParams.mandate_data = {
+          customer_acceptance: {
+            type: 'online',
+            online: {
+              ip_address: req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '0.0.0.0',
+              user_agent: req.headers['user-agent'] || 'Unknown'
+            }
+          }
+        };
+        console.log('[CONFIRM] Adding mandate_data for ACH payment');
+      }
+
+      try {
+        const confirmedPayment = await stripe.paymentIntents.confirm(paymentIntent.id, confirmParams);
+        console.log('[CONFIRM] Payment confirmed. New status:', confirmedPayment.status);
+
+        // Update the paymentIntent variable with the confirmed version
+        Object.assign(paymentIntent, confirmedPayment);
+      } catch (confirmError: any) {
+        console.error('[CONFIRM] Error during confirmation:', confirmError.message);
+
+        // If error is about payment method already attached, that's OK - retrieve the latest intent
+        if (confirmError.code === 'resource_already_exists' || confirmError.message?.includes('already attached')) {
+          console.log('[CONFIRM] Payment method already attached - retrieving latest PaymentIntent');
+          const latestIntent = await stripe.paymentIntents.retrieve(paymentIntent.id);
+          Object.assign(paymentIntent, latestIntent);
+        } else {
+          // Re-throw other errors
+          throw confirmError;
+        }
+      }
+    }
+
+    // Handle ACH payments that require verification (microdeposits)
+    if (paymentIntent.status === 'requires_action' && paymentIntent.next_action?.type === 'verify_with_microdeposits') {
+      console.log('[CONFIRM] ⚠️  Payment requires microdeposit verification');
+      console.log('[CONFIRM] Customer will receive microdeposits in 1-2 business days');
+      // Don't fail - just proceed with member creation
+      // Customer will verify later, and we'll handle it via webhook
     }
 
     // Attach the payment method to the customer and set as default
@@ -106,13 +147,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // First, check if payment method is already attached to the customer
         const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+        console.log('[CONFIRM] Payment method details:', {
+          id: paymentMethod.id,
+          type: paymentMethod.type,
+          customer: paymentMethod.customer,
+          alreadyAttached: !!paymentMethod.customer
+        });
 
         // If not attached (customer is null), attach it now
         if (!paymentMethod.customer) {
+          console.log('[CONFIRM] Attaching payment method to customer...');
           await stripe.paymentMethods.attach(paymentMethodId, {
             customer: waitlist.stripe_customer_id,
           });
-          console.log('Payment method attached to customer:', waitlist.stripe_customer_id);
+          console.log('[CONFIRM] ✓ Payment method attached to customer:', waitlist.stripe_customer_id);
+        } else {
+          console.log('[CONFIRM] Payment method already attached to customer');
         }
 
         // Now set it as the default payment method
@@ -122,10 +172,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
 
-        console.log('Payment method set as default for customer:', waitlist.stripe_customer_id);
+        console.log('[CONFIRM] ✓ Payment method set as default for customer:', waitlist.stripe_customer_id);
       } catch (error: any) {
-        console.error('Error setting default payment method:', error);
+        console.error('[CONFIRM] Error setting default payment method:', error.message);
         // Non-fatal error, continue with member creation
+        // Financial Connections usually handles attachment, so this is often not needed
       }
     }
 

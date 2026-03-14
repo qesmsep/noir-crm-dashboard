@@ -211,9 +211,22 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
         throw error;
       }
 
-      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
-        // Payment might be processing - check with backend
-        console.log('[ACH] Step 3: Payment status is', paymentIntent?.status, '- confirming with backend...');
+      // ACH payments can be in various states: succeeded, processing, requires_confirmation, requires_action
+      if (!paymentIntent || !['succeeded', 'processing', 'requires_confirmation', 'requires_action'].includes(paymentIntent.status)) {
+        console.error('[ACH] Unexpected payment status:', paymentIntent?.status);
+        throw new Error('Unexpected payment status: ' + paymentIntent?.status);
+      }
+
+      // For non-succeeded payments, confirm with backend
+      if (paymentIntent.status !== 'succeeded') {
+        console.log('[ACH] Step 3: Payment status is', paymentIntent.status, '- confirming with backend...');
+
+        // Check if microdeposit verification is required
+        if (paymentIntent.status === 'requires_action') {
+          console.log('[ACH] ⚠️  Payment requires microdeposit verification');
+          console.log('[ACH] Customer will receive email with verification instructions');
+        }
+
         const response = await fetch('/api/payment/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
