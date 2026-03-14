@@ -10,13 +10,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Get current date in local timezone as YYYY-MM-DD
+ * Get current date in Kansas City timezone (America/Chicago) as YYYY-MM-DD
  * Avoids timezone conversion issues with toISOString()
  */
 export function getTodayLocalDate(): string {
+  // Use America/Chicago timezone to ensure consistent dates
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const chicagoDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  const year = chicagoDate.getFullYear();
+  const month = String(chicagoDate.getMonth() + 1).padStart(2, '0');
+  const day = String(chicagoDate.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }

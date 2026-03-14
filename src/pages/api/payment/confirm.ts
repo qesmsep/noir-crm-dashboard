@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { getTodayLocalDate } from '@/lib/utils';
+import { DateTime } from 'luxon';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -189,7 +190,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await supabase
       .from('waitlist')
       .update({
-        payment_completed_at: new Date().toISOString(),
+        payment_completed_at: DateTime.now().setZone('America/Chicago').toISO(),
         member_id: memberData.member_id,
         status: 'approved'
       })
@@ -232,17 +233,16 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   const membershipPlanId = plan?.id || null;
   const billingInterval = plan?.interval || 'month';
 
-  // Calculate next billing date based on billing interval
-  const startDate = new Date();
-  const nextBillingDate = new Date(startDate);
+  // Calculate next billing date based on billing interval (using Chicago timezone)
+  const CHICAGO_TZ = 'America/Chicago';
+  const startDateTime = DateTime.now().setZone(CHICAGO_TZ).startOf('day');
+  const nextBillingDateTime = billingInterval === 'year'
+    ? startDateTime.plus({ years: 1 })
+    : startDateTime.plus({ months: 1 });
 
-  if (billingInterval === 'year') {
-    // Annual membership: renew in 1 year
-    nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
-  } else {
-    // Monthly membership: renew in 1 month
-    nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-  }
+  // Convert to ISO strings for database storage
+  const startDate = startDateTime.toISO();
+  const nextBillingDate = nextBillingDateTime.toISO();
 
   // Check if there are additional members being added during signup
   // For annual plans, multiply additional member fee by 12
@@ -285,8 +285,8 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       account_id: accountId,
       stripe_customer_id: waitlist.stripe_customer_id,
       subscription_status: 'active',
-      subscription_start_date: startDate.toISOString(),
-      next_billing_date: nextBillingDate.toISOString(),
+      subscription_start_date: startDate,
+      next_billing_date: nextBillingDate,
       monthly_dues: monthlyDues,
       membership_plan_id: membershipPlanId,
       payment_method_type: paymentMethodType,
@@ -321,7 +321,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       company: waitlist.company,
       dob: waitlist.date_of_birth,
       photo: waitlist.photo_url,
-      join_date: startDate.toISOString(),
+      join_date: startDate,
       deactivated: false
     })
     .select()
