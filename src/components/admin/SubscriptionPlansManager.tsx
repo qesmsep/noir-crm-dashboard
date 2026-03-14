@@ -283,8 +283,13 @@ export default function SubscriptionPlansManager() {
               width: '90%',
               maxHeight: '90vh',
               overflow: 'auto',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              position: 'relative',
             }}
             onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onDragStart={(e) => e.preventDefault()}
           >
             <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
               {editingPlan ? 'Edit Subscription Plan' : 'Create Subscription Plan'}
@@ -307,6 +312,8 @@ export default function SubscriptionPlansManager() {
                       padding: '0.75rem',
                       border: '1px solid #e5e7eb',
                       borderRadius: '6px',
+                      userSelect: 'text',
+                      WebkitUserSelect: 'text',
                     }}
                   />
                 </div>
@@ -324,6 +331,8 @@ export default function SubscriptionPlansManager() {
                       padding: '0.75rem',
                       border: '1px solid #e5e7eb',
                       borderRadius: '6px',
+                      userSelect: 'text',
+                      WebkitUserSelect: 'text',
                     }}
                   >
                     <option value="month">Monthly</option>
@@ -348,6 +357,8 @@ export default function SubscriptionPlansManager() {
                         padding: '0.75rem',
                         border: '1px solid #e5e7eb',
                         borderRadius: '6px',
+                        userSelect: 'text',
+                        WebkitUserSelect: 'text',
                       }}
                     />
                   </div>
@@ -367,6 +378,8 @@ export default function SubscriptionPlansManager() {
                         padding: '0.75rem',
                         border: '1px solid #e5e7eb',
                         borderRadius: '6px',
+                        userSelect: 'text',
+                        WebkitUserSelect: 'text',
                       }}
                     />
                     <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
@@ -391,6 +404,8 @@ export default function SubscriptionPlansManager() {
                       padding: '0.75rem',
                       border: '1px solid #e5e7eb',
                       borderRadius: '6px',
+                      userSelect: 'text',
+                      WebkitUserSelect: 'text',
                     }}
                   />
                 </div>
