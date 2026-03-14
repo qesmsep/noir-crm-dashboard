@@ -265,7 +265,7 @@ export default function Home() {
               MEMBERSHIP
             </h4>
             <div className="text-2xl sm:text-3xl text-[#BCA892] font-semibold mb-3 sm:mb-4">
-              $100<span className="text-base sm:text-lg font-normal">/mo</span>
+              $150<span className="text-base sm:text-lg font-normal">/mo</span>
             </div>
             <ul className="text-[#ECEDE8] text-sm sm:text-base mb-4 sm:mb-6 space-y-1 text-left">
               <li>• $100 Monthly beverage credit</li>
