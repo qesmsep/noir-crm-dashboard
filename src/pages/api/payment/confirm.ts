@@ -73,9 +73,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('  - Payment method:', paymentIntent.payment_method);
     console.log('  - Payment method types:', paymentIntent.payment_method_types);
 
-    // ACH payments are 'processing' initially and take 3-5 days to settle
+    // ACH payments can be 'requires_confirmation' or 'processing' initially and take 3-5 days to settle
     // Card payments are 'succeeded' immediately
-    const acceptedStatuses = ['succeeded', 'processing'];
+    const acceptedStatuses = ['succeeded', 'processing', 'requires_confirmation'];
     if (!acceptedStatuses.includes(paymentIntent.status)) {
       console.log('[CONFIRM] ERROR: Invalid payment status');
       console.log('  - Current status:', paymentIntent.status);
