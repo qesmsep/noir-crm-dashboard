@@ -13,6 +13,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log('\n========== CONFIRM PAYMENT ==========');
+  console.log('[CONFIRM] Method:', req.method);
+  console.log('[CONFIRM] Body:', JSON.stringify(req.body, null, 2));
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -20,6 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { token } = req.body;
 
   if (!token) {
+    console.log('[CONFIRM] ERROR: No token provided');
     return res.status(400).json({ error: 'Token is required' });
   }
 
@@ -32,31 +37,57 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .single();
 
     if (waitlistError || !waitlist) {
+      console.log('[CONFIRM] ERROR: Waitlist not found for token:', token);
+      console.log('[CONFIRM] Error:', waitlistError);
       return res.status(404).json({ error: 'Invalid token' });
     }
 
+    console.log('[CONFIRM] Waitlist found:', {
+      id: waitlist.id,
+      name: `${waitlist.first_name} ${waitlist.last_name}`,
+      email: waitlist.email,
+      membership: waitlist.selected_membership,
+      payment_intent_id: waitlist.stripe_payment_intent_id,
+      member_id: waitlist.member_id
+    });
+
     // Check if payment already processed
     if (waitlist.member_id) {
+      console.log('[CONFIRM] Already processed - member already created');
       return res.status(200).json({ success: true, message: 'Already processed' });
     }
 
     // Verify payment with Stripe (we use Stripe for payment processing only, not subscriptions)
     if (!waitlist.stripe_payment_intent_id) {
+      console.log('[CONFIRM] ERROR: No payment intent ID found on waitlist record');
       return res.status(400).json({ error: 'No payment intent found' });
     }
 
+    console.log('[CONFIRM] Retrieving PaymentIntent:', waitlist.stripe_payment_intent_id);
     const paymentIntent = await stripe.paymentIntents.retrieve(waitlist.stripe_payment_intent_id);
+
+    console.log('[CONFIRM] PaymentIntent details:');
+    console.log('  - ID:', paymentIntent.id);
+    console.log('  - Status:', paymentIntent.status);
+    console.log('  - Amount:', paymentIntent.amount, 'cents ($' + (paymentIntent.amount / 100).toFixed(2) + ')');
+    console.log('  - Payment method:', paymentIntent.payment_method);
+    console.log('  - Payment method types:', paymentIntent.payment_method_types);
 
     // ACH payments are 'processing' initially and take 3-5 days to settle
     // Card payments are 'succeeded' immediately
     const acceptedStatuses = ['succeeded', 'processing'];
     if (!acceptedStatuses.includes(paymentIntent.status)) {
+      console.log('[CONFIRM] ERROR: Invalid payment status');
+      console.log('  - Current status:', paymentIntent.status);
+      console.log('  - Accepted statuses:', acceptedStatuses);
       return res.status(400).json({
         error: 'Payment not completed',
         status: paymentIntent.status,
         message: `Payment status is ${paymentIntent.status}. Expected: ${acceptedStatuses.join(' or ')}`
       });
     }
+
+    console.log('[CONFIRM] Payment status OK:', paymentIntent.status);
 
     // Attach the payment method to the customer and set as default
     if (paymentIntent.payment_method && waitlist.stripe_customer_id) {
@@ -88,8 +119,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    console.log('[CONFIRM] Creating member and account...');
     // Create member and account
     const memberData = await createMemberFromWaitlist(waitlist, paymentIntent);
+    console.log('[CONFIRM] Member created:', memberData.member_id);
 
     // Update waitlist with completion data
     await supabase
@@ -108,6 +141,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Failed to send welcome SMS:', smsError);
     }
 
+    console.log('[CONFIRM] Success! Member onboarding complete');
+    console.log('==========================================\n');
+
     return res.status(200).json({
       success: true,
       member_id: memberData.member_id,
@@ -115,7 +151,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error: any) {
-    console.error('Payment confirmation error:', error);
+    console.error('\n[CONFIRM] ❌ ERROR during confirmation:', error);
+    console.error('Error stack:', error.stack);
+    console.log('==========================================\n');
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }

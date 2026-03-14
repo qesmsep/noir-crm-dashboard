@@ -12,7 +12,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log('[CREATE INTENT] Request:', { method: req.method, body: req.body });
+  console.log('\n========== CREATE PAYMENT INTENT ==========');
+  console.log('[CREATE INTENT] Method:', req.method);
+  console.log('[CREATE INTENT] Body:', JSON.stringify(req.body, null, 2));
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -69,7 +71,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Total amount including credit card fee (if applicable)
     const totalAmount = subtotal + creditCardFee;
 
-    console.log('[CREATE INTENT] Base amount:', basePlanAmount, 'Additional members:', additional_members_count, 'Additional amount:', additionalMembersAmount, 'Subtotal:', subtotal, 'Credit card fee:', creditCardFee, 'Total:', totalAmount);
+    console.log('[CREATE INTENT] Payment calculation:');
+    console.log('  - Payment method type:', payment_method_type);
+    console.log('  - Base amount:', basePlanAmount, 'cents');
+    console.log('  - Additional members:', additional_members_count);
+    console.log('  - Additional amount:', additionalMembersAmount, 'cents');
+    console.log('  - Subtotal:', subtotal, 'cents');
+    console.log('  - Credit card fee:', creditCardFee, 'cents', payment_method_type === 'card' ? '(APPLIED)' : '(SKIPPED for ACH)');
+    console.log('  - Total amount:', totalAmount, 'cents ($' + (totalAmount / 100).toFixed(2) + ')');
 
     // Create or get Stripe customer
     let customerId = waitlist.stripe_customer_id;
@@ -93,6 +102,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .update({ stripe_customer_id: customerId })
         .eq('id', waitlist.id);
     }
+
+    console.log('[CREATE INTENT] Creating PaymentIntent with:');
+    console.log('  - payment_method_types:', ['card', 'us_bank_account']);
+    console.log('  - amount:', totalAmount);
+    console.log('  - customer:', customerId);
 
     // Create payment intent
     // For card payments: includes 4% processing fee
@@ -128,6 +142,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         payment_amount: totalAmount
       })
       .eq('id', waitlist.id);
+
+    console.log('[CREATE INTENT] PaymentIntent created successfully:');
+    console.log('  - ID:', paymentIntent.id);
+    console.log('  - Status:', paymentIntent.status);
+    console.log('  - Amount:', paymentIntent.amount, 'cents');
+    console.log('  - Payment method types:', paymentIntent.payment_method_types);
+    console.log('==========================================\n');
 
     return res.status(200).json({
       client_secret: paymentIntent.client_secret,

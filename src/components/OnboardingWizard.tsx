@@ -140,9 +140,12 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
     if (!stripe) return;
 
     setSubmitting(true);
+    console.log('\n========== ACH PAYMENT FLOW ==========');
+    console.log('[ACH] Starting ACH payment submission');
 
     try {
       // Create payment intent when user submits payment
+      console.log('[ACH] Step 1: Creating payment intent...');
       const intentResponse = await fetch('/api/payment/create-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,6 +162,8 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
       }
 
       const intentData = await intentResponse.json();
+
+      console.log('[ACH] Step 2: Opening Stripe Financial Connections...');
 
       // Lock scroll position during Financial Connections flow
       window.scrollTo(0, 0);
@@ -185,12 +190,23 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
         },
       });
 
+      console.log('[ACH] Financial Connections result:', {
+        error: error ? error.message : 'none',
+        paymentIntent: paymentIntent ? {
+          id: paymentIntent.id,
+          status: paymentIntent.status,
+          payment_method: paymentIntent.payment_method
+        } : 'null'
+      });
+
       if (error) {
+        console.error('[ACH] Financial Connections error:', error);
         throw error;
       }
 
       if (!paymentIntent || paymentIntent.status !== 'succeeded') {
         // Payment might be processing - check with backend
+        console.log('[ACH] Step 3: Payment status is', paymentIntent?.status, '- confirming with backend...');
         const response = await fetch('/api/payment/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -198,9 +214,17 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
         });
 
         if (!response.ok) {
-          throw new Error('Failed to complete onboarding');
+          const errorData = await response.json();
+          console.error('[ACH] Confirmation failed:', errorData);
+          throw new Error('Failed to complete onboarding: ' + (errorData.error || errorData.message || 'Unknown error'));
         }
+
+        const confirmData = await response.json();
+        console.log('[ACH] Confirmation successful:', confirmData);
       }
+
+      console.log('[ACH] ✅ Payment complete!');
+      console.log('==========================================\n');
 
       toast({
         title: 'Success! 🎉',
@@ -211,6 +235,8 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
 
       onSuccess();
     } catch (error: any) {
+      console.error('[ACH] ❌ Error:', error);
+      console.log('==========================================\n');
       toast({
         title: 'Payment Failed',
         description: error.message || 'Please try again',
