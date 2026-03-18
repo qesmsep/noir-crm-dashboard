@@ -288,11 +288,16 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
           }
 
           // Map accounts to members with plan info
-          const accountMap = new Map(accounts?.map(a => [a.account_id, {
-            ...a,
-            plan_interval: a.membership_plan_id ? (planMap.get(a.membership_plan_id)?.interval || 'month') : 'month',
-            plan_name: a.membership_plan_id ? (planMap.get(a.membership_plan_id)?.plan_name || null) : null,
-          }]) || []);
+          const accountMap = new Map(accounts?.map(a => {
+            if (a.membership_plan_id && !planMap.has(a.membership_plan_id)) {
+              console.warn(`[generateSnapshot] Account ${a.account_id} has membership_plan_id ${a.membership_plan_id} but plan not found in subscription_plans — defaulting to monthly interval`);
+            }
+            return [a.account_id, {
+              ...a,
+              plan_interval: a.membership_plan_id ? (planMap.get(a.membership_plan_id)?.interval || 'month') : 'month',
+              plan_name: a.membership_plan_id ? (planMap.get(a.membership_plan_id)?.plan_name || null) : null,
+            }];
+          }) || []);
 
           return {
             data: membersResult.data?.map(m => ({
@@ -318,7 +323,9 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
     const isActive = m.status === 'active' && accountDues > 0;
     const isPaused = m.status === 'inactive' && !m.deactivated;
 
-    // For annual plans, monthly_dues contains the full annual amount.
+    // DATA CONTRACT: For annual plans, accounts.monthly_dues stores the full
+    // annual amount (e.g. $1200), NOT a monthly equivalent. For monthly plans it
+    // stores the monthly amount. This convention is set during onboarding/plan-change.
     // Normalize MRR: annual => amount/12, monthly => amount as-is.
     const isAnnual = interval === 'year';
     const normalizedMrr = isActive ? (isAnnual ? accountDues / 12 : accountDues) : 0;
@@ -384,19 +391,18 @@ export function computeMrrBridge(
   // Apply plan interval filter if specified.
   // This filters to only members on a specific billing interval (e.g. 'month'),
   // so that MRR/Net New MRR calculations exclude annual memberships.
-  if (planIntervalFilter) {
-    priorSnapshots = priorSnapshots.filter(
-      s => s.plan_interval === planIntervalFilter
-    );
-    currentSnapshots = currentSnapshots.filter(
-      s => s.plan_interval === planIntervalFilter
-    );
-  }
+  const filteredPrior = planIntervalFilter
+    ? priorSnapshots.filter(s => s.plan_interval === planIntervalFilter)
+    : priorSnapshots;
+  const filteredCurrent = planIntervalFilter
+    ? currentSnapshots.filter(s => s.plan_interval === planIntervalFilter)
+    : currentSnapshots;
+
   const priorMap = new Map<string, MemberSnapshot>();
-  for (const s of priorSnapshots) priorMap.set(s.member_id, s);
+  for (const s of filteredPrior) priorMap.set(s.member_id, s);
 
   const currentMap = new Map<string, MemberSnapshot>();
-  for (const s of currentSnapshots) currentMap.set(s.member_id, s);
+  for (const s of filteredCurrent) currentMap.set(s.member_id, s);
 
   let startingMrr = 0;
   let endingMrr = 0;
@@ -407,17 +413,17 @@ export function computeMrrBridge(
   let pausedMrr = 0;
 
   // Starting MRR = sum of prior active members' MRR
-  for (const s of priorSnapshots) {
+  for (const s of filteredPrior) {
     if (s.mrr > 0) startingMrr += s.mrr;
   }
 
   // Ending MRR = sum of current active members' MRR
-  for (const s of currentSnapshots) {
+  for (const s of filteredCurrent) {
     if (s.mrr > 0) endingMrr += s.mrr;
   }
 
   // Process current month members
-  for (const curr of currentSnapshots) {
+  for (const curr of filteredCurrent) {
     const prior = priorMap.get(curr.member_id);
     const priorMrr = prior?.mrr ?? 0;
     const currMrr = curr.mrr;
@@ -426,7 +432,7 @@ export function computeMrrBridge(
       // New MRR: member had no MRR in prior month and has MRR now
       // Check if this is their first-ever month (new) vs. reactivation
       // Use signup_date to determine if this is a truly new member
-      const currentMonth = currentSnapshots.length > 0 ? currentSnapshots[0].snapshot_month : '';
+      const currentMonth = filteredCurrent.length > 0 ? filteredCurrent[0].snapshot_month : '';
       const signupMonth = curr.signup_date
         ? monthStart(new Date(curr.signup_date + 'T00:00:00'))
         : null;
@@ -447,7 +453,7 @@ export function computeMrrBridge(
   }
 
   // Process prior month members who are no longer active
-  for (const prior of priorSnapshots) {
+  for (const prior of filteredPrior) {
     if (prior.mrr <= 0) continue;
     const curr = currentMap.get(prior.member_id);
     const currMrr = curr?.mrr ?? 0;
