@@ -103,6 +103,7 @@ export interface BusinessSummary {
 export interface BusinessSeriesPoint {
   month: string;
   mrr: number;
+  arr: number;
   activeMembers: number;
   newMembers: number;
   churnedMembers: number;
@@ -1192,6 +1193,7 @@ export async function getBusinessSeries(
     series.push({
       month: m,
       mrr: bridge.endingMrr,
+      arr: fullBridge.endingMrr * 12,
       activeMembers: counts.activeMembers,
       newMembers: counts.newMembers,
       churnedMembers: counts.churnedMembers,

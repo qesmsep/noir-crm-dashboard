@@ -16,7 +16,13 @@ All metric formulas are implemented server-side in `src/lib/businessMetrics.ts`.
 - **Join key**: `member_subscription_snapshots.member_id` → `members.member_id`
 - **Stripe linkage**: `accounts.stripe_customer_id` → Stripe customer → `accounts.account_id` → `members.member_id`
 
-**Current compromise**: The app does not store Stripe subscription objects directly. Snapshots are generated from `members.monthly_dues` and `members.status`. Enhancement: add a Stripe subscription sync cron that pulls `stripe.subscriptions.list()` and populates `stripe_subscription_id`, plan details, and interval for accurate normalization.
+**Current compromise**: The app does not store Stripe subscription objects directly. Snapshots are generated from `accounts.monthly_dues` and `members.status`, with the plan interval looked up from `subscription_plans` via `accounts.membership_plan_id`. Enhancement: add a Stripe subscription sync cron that pulls `stripe.subscriptions.list()` and populates `stripe_subscription_id`, plan details, and interval for accurate normalization.
+
+**`monthly_dues` data contract**: The `accounts.monthly_dues` field stores **different values depending on the plan interval**:
+- **Monthly plans**: stores the **monthly amount** (e.g. $75 for Duo)
+- **Annual plans**: stores the **full annual amount** (e.g. $1,200 for Annual)
+
+The snapshot generator normalizes annual amounts to monthly (`amount / 12`) and sets `plan_interval = 'year'`. **If an annual member is onboarded with a monthly-equivalent amount instead of the full annual amount, MRR will be understated by 12×.** This convention is enforced by the onboarding and plan-change flows (`/api/onboard/complete`, `/api/subscriptions/create`, `/api/subscriptions/update-plan`) but has no DB-level constraint.
 
 ### Toast Attach Revenue
 - **Table**: `toast_transactions`
@@ -44,16 +50,16 @@ All metric formulas are implemented server-side in `src/lib/businessMetrics.ts`.
 ### A) Stripe Recurring Metrics
 
 #### MRR (Monthly Recurring Revenue)
-- For each member at EOM, compute recurring monthly amount from their subscription:
-  - Monthly plan → `plan_amount`
-  - Annual plan → `plan_amount / 12`
-  - Other intervals → normalize to monthly
-- Sum across all members with `subscription_status = 'active'`
+- **Includes only monthly-interval members** (`plan_interval = 'month'`)
+- Sum of `mrr` for members with `subscription_status = 'active'` and `plan_interval = 'month'`
+- Annual memberships are **excluded** from MRR (see ARR below)
 - **Excludes**: taxes, one-time charges, refunds (MRR is contractual recurring value)
 - **Multiple subscriptions**: If a member has multiple, aggregate to member-level MRR
 
 #### ARR (Annual Recurring Revenue)
-- `ARR = MRR × 12`
+- **Includes all recurring revenue** (monthly and annual memberships)
+- Computed from the full (unfiltered) bridge: `ARR = all_members_ending_MRR × 12`
+- Since annual members' MRR is normalized (`plan_amount / 12`), multiplying by 12 recovers the annual amount
 
 #### Active Members (EOM)
 - Members with `mrr > 0` at end-of-month
@@ -77,6 +83,10 @@ For each member, let `prior` = EOM MRR for prior month, `curr` = EOM MRR for cur
 | **Net New MRR** | `New + Expansion - Contraction - Churned - Paused` |
 
 **Reactivation**: Members with `prior = 0` and `curr > 0` whose `first_paid_date` is NOT in the current month are treated as expansion (reactivation), not new.
+
+**Plan interval filtering**: The MRR bridge used for the MRR and Net New MRR cards is computed with `planIntervalFilter = 'month'`, excluding annual members. A separate unfiltered bridge is computed for retention rates (NRR, GRR) and ARR.
+
+**Plan-interval change edge case**: If a member switches from monthly → annual between snapshot months, they will appear as **churned** in the monthly-only bridge (present in filtered prior, absent from filtered current) and as **new/expansion** in the full bridge for the annual pool. This is expected behavior — a plan type change is a churn from one billing cohort and an acquisition in another. The overall ARR and retention rates remain correct.
 
 **Reconciliation**: `Ending MRR = Starting MRR + Net New MRR`
 
@@ -210,9 +220,9 @@ All endpoints require admin Bearer token authentication.
 
 ## Compromises & TODOs
 
-1. **Subscription data proxy**: MRR is computed from `members.monthly_dues` + `members.status`, not from Stripe subscription objects. TODO: Add Stripe subscription sync (cron/webhook) that stores `stripe_subscription_id`, `plan_interval`, `plan_amount` accurately.
+1. **Subscription data proxy**: MRR is computed from `accounts.monthly_dues` + `members.status`, not from Stripe subscription objects. Plan interval is resolved via `accounts.membership_plan_id` → `subscription_plans.interval`. TODO: Add Stripe subscription sync (cron/webhook) that stores `stripe_subscription_id`, `plan_interval`, `plan_amount` accurately.
 
-2. **Annual plan normalization**: Currently all members are assumed monthly (`plan_interval = 'month'`). When Stripe sync is added, annual plans should be normalized as `amount / 12`.
+2. **`monthly_dues` data contract**: The `accounts.monthly_dues` field stores the monthly amount for monthly plans and the full annual amount for annual plans. This convention has no DB-level constraint — incorrect values at data entry will silently misstate MRR. TODO: Add a CHECK constraint or validation trigger, or migrate to separate `monthly_amount` / `annual_amount` columns.
 
 3. **Failed payments**: Returns 0 because the webhook only handles successful payments. TODO: Add `invoice.payment_failed` webhook handler and store failed events.
 
