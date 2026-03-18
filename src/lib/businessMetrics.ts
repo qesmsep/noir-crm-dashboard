@@ -266,14 +266,33 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
           // Get all account IDs
           const accountIds = membersResult.data?.map(m => m.account_id) || [];
 
-          // Fetch accounts separately
+          // Fetch accounts with plan interval info
           const { data: accounts } = await supabase
             .from('accounts')
-            .select('account_id, monthly_dues, subscription_status')
+            .select('account_id, monthly_dues, subscription_status, membership_plan_id')
             .in('account_id', accountIds);
 
-          // Map accounts to members
-          const accountMap = new Map(accounts?.map(a => [a.account_id, a]) || []);
+          // Fetch subscription plan intervals for accounts that have a plan
+          const planIds = (accounts || [])
+            .map(a => a.membership_plan_id)
+            .filter(Boolean);
+          let planMap = new Map<string, { interval: string; plan_name: string }>();
+          if (planIds.length > 0) {
+            const { data: plans } = await supabase
+              .from('subscription_plans')
+              .select('id, interval, plan_name')
+              .in('id', planIds);
+            for (const p of plans || []) {
+              planMap.set(p.id, { interval: p.interval || 'month', plan_name: p.plan_name || '' });
+            }
+          }
+
+          // Map accounts to members with plan info
+          const accountMap = new Map(accounts?.map(a => [a.account_id, {
+            ...a,
+            plan_interval: a.membership_plan_id ? (planMap.get(a.membership_plan_id)?.interval || 'month') : 'month',
+            plan_name: a.membership_plan_id ? (planMap.get(a.membership_plan_id)?.plan_name || null) : null,
+          }]) || []);
 
           return {
             data: membersResult.data?.map(m => ({
@@ -294,19 +313,23 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
     // Use accounts.monthly_dues (the hard-coded amount on the account)
     const accountDues = Number(m.accounts?.monthly_dues) || 0;
     const accountStatus = m.accounts?.subscription_status || null;
+    const interval = m.accounts?.plan_interval || 'month';
 
     const isActive = m.status === 'active' && accountDues > 0;
     const isPaused = m.status === 'inactive' && !m.deactivated;
 
-    const mrr = isActive ? accountDues : 0;
+    // For annual plans, monthly_dues contains the full annual amount.
+    // Normalize MRR: annual => amount/12, monthly => amount as-is.
+    const isAnnual = interval === 'year';
+    const normalizedMrr = isActive ? (isAnnual ? accountDues / 12 : accountDues) : 0;
     const status = accountStatus || (isActive ? 'active' : (isPaused ? 'paused' : 'canceled'));
 
     return {
       member_id: m.member_id,
       snapshot_month: monthStr,
-      mrr,
-      plan_name: accountDues > 0 ? 'Membership' : null,
-      plan_interval: 'month',
+      mrr: normalizedMrr,
+      plan_name: m.accounts?.plan_name || (accountDues > 0 ? 'Membership' : null),
+      plan_interval: interval,
       plan_amount: accountDues,
       subscription_status: status,
       stripe_subscription_id: null,
@@ -348,11 +371,27 @@ async function getSnapshots(monthStr: string, sb?: SupabaseClient): Promise<Memb
 /**
  * Compute MRR bridge between two months at the member level.
  * See docs/metrics-business-dashboard.md for exact definitions.
+ *
+ * @param planIntervalFilter - If provided, only include members matching this
+ *   plan_interval (e.g. 'month' to exclude annual members from MRR).
+ *   Pass undefined/null to include all members.
  */
 export function computeMrrBridge(
   priorSnapshots: MemberSnapshot[],
-  currentSnapshots: MemberSnapshot[]
+  currentSnapshots: MemberSnapshot[],
+  planIntervalFilter?: string | null
 ): MrrBridge {
+  // Apply plan interval filter if specified.
+  // This filters to only members on a specific billing interval (e.g. 'month'),
+  // so that MRR/Net New MRR calculations exclude annual memberships.
+  if (planIntervalFilter) {
+    priorSnapshots = priorSnapshots.filter(
+      s => s.plan_interval === planIntervalFilter
+    );
+    currentSnapshots = currentSnapshots.filter(
+      s => s.plan_interval === planIntervalFilter
+    );
+  }
   const priorMap = new Map<string, MemberSnapshot>();
   for (const s of priorSnapshots) priorMap.set(s.member_id, s);
 
@@ -1050,7 +1089,12 @@ export async function getBusinessSummary(
     currentSnapshots.push(...refreshed);
   }
 
-  const mrrBridge = computeMrrBridge(priorSnapshots, currentSnapshots);
+  // MRR bridge for the MRR and Net New MRR cards: monthly-only (exclude annual)
+  const mrrBridge = computeMrrBridge(priorSnapshots, currentSnapshots, 'month');
+
+  // Full bridge (all members) for retention rates — retention should cover all revenue
+  const fullBridge = computeMrrBridge(priorSnapshots, currentSnapshots);
+
   const memberCounts = computeMemberCounts(currentSnapshots, priorSnapshots);
   const priorMemberCounts = computeMemberCounts(
     priorSnapshots,
@@ -1058,15 +1102,20 @@ export async function getBusinessSummary(
   );
 
   const priorActiveMembers = priorSnapshots.filter(s => s.mrr > 0).length;
-  const rates = computeRetentionRates(mrrBridge, memberCounts, priorActiveMembers);
+  // Retention rates use the full bridge (all members, including annual)
+  const rates = computeRetentionRates(fullBridge, memberCounts, priorActiveMembers);
 
-  // Toast attach
+  // ARR includes ALL recurring revenue (monthly and annual members).
+  // Since annual members' MRR is already normalized (plan_amount/12), ARR = all MRR × 12.
+  const arr = fullBridge.endingMrr * 12;
+
+  // Toast attach — ARPM uses full MRR (all members) since it measures total revenue per member
   const { memberRevenue, totalRevenue } = await getAttachRevenue(monthStr, supabase);
   const attach = computeAttachMetrics(
     memberRevenue,
     totalRevenue,
     memberCounts.activeMembers,
-    mrrBridge.endingMrr
+    fullBridge.endingMrr
   );
 
   const { memberRevenue: priorMemberRevenue, totalRevenue: priorTotalRevenue } =
@@ -1075,7 +1124,7 @@ export async function getBusinessSummary(
     priorMemberRevenue,
     priorTotalRevenue,
     priorMemberCounts.activeMembers,
-    mrrBridge.startingMrr
+    fullBridge.startingMrr
   );
 
   const failedPayments30d = await getFailedPayments30d(supabase);
@@ -1085,7 +1134,7 @@ export async function getBusinessSummary(
     priorMonth: prior,
     mrr: mrrBridge.endingMrr,
     priorMrr: mrrBridge.startingMrr,
-    arr: mrrBridge.endingMrr * 12,
+    arr,
     mrrBridge,
     memberCounts,
     priorMemberCounts,
@@ -1124,10 +1173,13 @@ export async function getBusinessSeries(
     const currentSnaps = allSnapshots.get(m) || [];
     const priorSnaps = allSnapshots.get(priorMonth) || [];
 
-    const bridge = computeMrrBridge(priorSnaps, currentSnaps);
+    // Monthly-only bridge for MRR/Net New MRR series values
+    const bridge = computeMrrBridge(priorSnaps, currentSnaps, 'month');
+    // Full bridge (all members) for retention rates
+    const fullBridge = computeMrrBridge(priorSnaps, currentSnaps);
     const counts = computeMemberCounts(currentSnaps, priorSnaps);
     const priorActive = priorSnaps.filter(s => s.mrr > 0).length;
-    const rates = computeRetentionRates(bridge, counts, priorActive);
+    const rates = computeRetentionRates(fullBridge, counts, priorActive);
 
     const { totalRevenue } = await getAttachRevenue(m, supabase);
 

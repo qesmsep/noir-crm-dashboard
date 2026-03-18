@@ -37,6 +37,7 @@ function makeSnapshot(overrides: Partial<MemberSnapshot> & { member_id: string; 
     stripe_subscription_id: null,
     stripe_customer_id: null,
     first_paid_date: null,
+    signup_date: null,
     ...overrides,
   };
 }
@@ -484,5 +485,90 @@ describe('MRR bridge reconciliation', () => {
     expect(bridge.netNewMrr).toBe(
       bridge.newMrr + bridge.expansionMrr - bridge.contractionMrr - bridge.churnedMrr - bridge.pausedMrr
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Annual membership filtering tests
+// ---------------------------------------------------------------------------
+
+describe('computeMrrBridge with planIntervalFilter', () => {
+  test('monthly-only filter excludes annual members from MRR', () => {
+    const prior = [
+      makeSnapshot({ member_id: 'm1', snapshot_month: '2026-01-01', mrr: 100, plan_interval: 'month' }),
+      makeSnapshot({ member_id: 'm2', snapshot_month: '2026-01-01', mrr: 100, plan_interval: 'year' }), // annual = $1200/12
+    ];
+    const current = [
+      makeSnapshot({ member_id: 'm1', snapshot_month: '2026-02-01', mrr: 100, plan_interval: 'month' }),
+      makeSnapshot({ member_id: 'm2', snapshot_month: '2026-02-01', mrr: 100, plan_interval: 'year' }),
+    ];
+
+    // Without filter: includes both
+    const fullBridge = computeMrrBridge(prior, current);
+    expect(fullBridge.startingMrr).toBe(200);
+    expect(fullBridge.endingMrr).toBe(200);
+
+    // With monthly filter: excludes annual
+    const monthlyBridge = computeMrrBridge(prior, current, 'month');
+    expect(monthlyBridge.startingMrr).toBe(100);
+    expect(monthlyBridge.endingMrr).toBe(100);
+  });
+
+  test('monthly-only filter excludes new annual members from Net New MRR', () => {
+    const prior = [
+      makeSnapshot({ member_id: 'm1', snapshot_month: '2026-01-01', mrr: 100, plan_interval: 'month' }),
+    ];
+    const current = [
+      makeSnapshot({ member_id: 'm1', snapshot_month: '2026-02-01', mrr: 100, plan_interval: 'month' }),
+      makeSnapshot({ member_id: 'm2', snapshot_month: '2026-02-01', mrr: 100, plan_interval: 'year', first_paid_date: '2026-02-10' }), // new annual
+      makeSnapshot({ member_id: 'm3', snapshot_month: '2026-02-01', mrr: 75, plan_interval: 'month', first_paid_date: '2026-02-05' }), // new monthly
+    ];
+
+    const monthlyBridge = computeMrrBridge(prior, current, 'month');
+    expect(monthlyBridge.newMrr).toBe(75); // only monthly new member
+    expect(monthlyBridge.netNewMrr).toBe(75);
+    expect(monthlyBridge.endingMrr).toBe(175); // 100 + 75
+
+    // Full bridge includes annual
+    const fullBridge = computeMrrBridge(prior, current);
+    expect(fullBridge.newMrr).toBe(175); // 100 (annual) + 75 (monthly)
+    expect(fullBridge.endingMrr).toBe(275);
+  });
+
+  test('annual member churn excluded from monthly-only MRR bridge', () => {
+    const prior = [
+      makeSnapshot({ member_id: 'm1', snapshot_month: '2026-01-01', mrr: 100, plan_interval: 'month' }),
+      makeSnapshot({ member_id: 'm2', snapshot_month: '2026-01-01', mrr: 100, plan_interval: 'year' }),
+    ];
+    const current = [
+      makeSnapshot({ member_id: 'm1', snapshot_month: '2026-02-01', mrr: 100, plan_interval: 'month' }),
+      makeSnapshot({ member_id: 'm2', snapshot_month: '2026-02-01', mrr: 0, plan_interval: 'year', subscription_status: 'canceled' }),
+    ];
+
+    const monthlyBridge = computeMrrBridge(prior, current, 'month');
+    expect(monthlyBridge.churnedMrr).toBe(0); // annual churn not counted in monthly MRR
+    expect(monthlyBridge.startingMrr).toBe(100);
+    expect(monthlyBridge.endingMrr).toBe(100);
+
+    const fullBridge = computeMrrBridge(prior, current);
+    expect(fullBridge.churnedMrr).toBe(100); // annual churn IS counted in full bridge
+  });
+
+  test('ARR calculation: full bridge endingMrr * 12 includes annual members', () => {
+    const prior: MemberSnapshot[] = [];
+    const current = [
+      makeSnapshot({ member_id: 'm1', snapshot_month: '2026-02-01', mrr: 75, plan_interval: 'month', first_paid_date: '2026-02-01' }),
+      makeSnapshot({ member_id: 'm2', snapshot_month: '2026-02-01', mrr: 100, plan_interval: 'year', first_paid_date: '2026-02-01' }), // $1200/yr normalized to $100/mo
+    ];
+
+    const fullBridge = computeMrrBridge(prior, current);
+    const arr = fullBridge.endingMrr * 12;
+
+    // ARR = (75 + 100) * 12 = $2,100
+    expect(arr).toBe(2100);
+
+    // MRR (monthly only) = 75
+    const monthlyBridge = computeMrrBridge(prior, current, 'month');
+    expect(monthlyBridge.endingMrr).toBe(75);
   });
 });
