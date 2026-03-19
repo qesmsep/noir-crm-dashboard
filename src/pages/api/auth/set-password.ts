@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { serialize } from 'cookie';
+import { findMemberByPhone } from '@/lib/security';
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
@@ -69,28 +70,11 @@ export default async function handler(
       .update({ verified: true })
       .eq('id', otpRecord.id);
 
-    // Get member by phone (try both with and without +1 prefix)
-    let member: any = null;
-
-    const result1 = await supabaseAdmin
-      .from('members')
-      .select('member_id, first_name, last_name, email')
-      .eq('phone', normalizedPhone)
-      .limit(1);
-
-    if (result1.data && result1.data.length > 0) {
-      member = result1.data[0];
-    } else {
-      const result2 = await supabaseAdmin
-        .from('members')
-        .select('member_id, first_name, last_name, email')
-        .eq('phone', `+1${normalizedPhone}`)
-        .limit(1);
-
-      if (result2.data && result2.data.length > 0) {
-        member = result2.data[0];
-      }
-    }
+    // Get member by phone (handles all phone formats via normalization)
+    const member = await findMemberByPhone(
+      normalizedPhone,
+      'member_id, first_name, last_name, email'
+    );
 
     if (!member) {
       return res.status(404).json({
@@ -139,13 +123,15 @@ export default async function handler(
     }
 
     // Set httpOnly cookie for session (secure in production)
+    const isProduction = process.env.NODE_ENV === 'production';
     res.setHeader('Set-Cookie', [
       serialize('member_session', sessionToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
         sameSite: 'lax',
         maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
         path: '/',
+        ...(isProduction && { domain: '.noirkc.com' }),
       }),
     ]);
 

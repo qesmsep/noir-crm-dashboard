@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { generateAuthenticationOptions, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
 import { z } from 'zod';
+import { findMemberByPhone } from '@/lib/security';
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
@@ -27,38 +28,13 @@ export default async function handler(
     const digitsOnly = phone.replace(/\D/g, '');
     const normalizedPhone = digitsOnly.slice(-10);
 
-    // Get member by phone (try both with and without +1 prefix)
-    let member: { member_id: string; phone: string; first_name: string; last_name: string } | null = null;
-    let memberError: any = null;
+    // Get member by phone (handles all phone formats via normalization)
+    const member = await findMemberByPhone(
+      normalizedPhone,
+      'member_id, phone, first_name, last_name'
+    );
 
-    const result1 = await supabaseAdmin
-      .from('members')
-      .select('member_id, phone, first_name, last_name')
-      .eq('phone', normalizedPhone)
-      .limit(1);
-
-    if (result1.data && result1.data.length > 0) {
-      member = result1.data[0];
-      if (result1.data.length > 1) {
-        console.warn('[BIOMETRIC-LOGIN] WARNING: Multiple members found with phone:', normalizedPhone);
-      }
-    } else {
-      const result2 = await supabaseAdmin
-        .from('members')
-        .select('member_id, phone, first_name, last_name')
-        .eq('phone', `+1${normalizedPhone}`)
-        .limit(1);
-
-      if (result2.data && result2.data.length > 0) {
-        member = result2.data[0];
-        if (result2.data.length > 1) {
-          console.warn('[BIOMETRIC-LOGIN] WARNING: Multiple members found with phone:', `+1${normalizedPhone}`);
-        }
-      }
-      memberError = result2.error;
-    }
-
-    if (memberError || !member) {
+    if (!member) {
       return res.status(404).json({
         error: 'No member found with this phone number',
       });

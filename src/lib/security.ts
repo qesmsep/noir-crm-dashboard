@@ -25,14 +25,51 @@ export function getUserAgent(req: NextApiRequest): string {
 }
 
 /**
+ * Find a member by normalized phone number.
+ * Handles various phone formats stored in the database by normalizing to last 10 digits.
+ */
+export async function findMemberByPhone(
+  normalizedPhone: string,
+  select: string = 'member_id, phone'
+): Promise<any | null> {
+  // Try exact match first (fastest)
+  const result1 = await supabaseAdmin
+    .from('members')
+    .select(select)
+    .eq('phone', normalizedPhone)
+    .eq('deactivated', false)
+    .limit(1);
+
+  if (result1.data && result1.data.length > 0) return result1.data[0];
+
+  // Try with +1 prefix
+  const result2 = await supabaseAdmin
+    .from('members')
+    .select(select)
+    .eq('phone', `+1${normalizedPhone}`)
+    .eq('deactivated', false)
+    .limit(1);
+
+  if (result2.data && result2.data.length > 0) return result2.data[0];
+
+  // Fallback: fetch all active members and normalize phone numbers in-memory
+  const { data: members } = await supabaseAdmin
+    .from('members')
+    .select(select)
+    .eq('deactivated', false)
+    .not('phone', 'is', null);
+
+  return members?.find(m => {
+    const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
+    return dbPhone === normalizedPhone;
+  }) || null;
+}
+
+/**
  * Check if account is locked
  */
 export async function isAccountLocked(phone: string): Promise<{ locked: boolean; until?: Date }> {
-  const { data: member } = await supabaseAdmin
-    .from('members')
-    .select('account_locked_until, failed_login_count')
-    .eq('phone', phone)
-    .single();
+  const member = await findMemberByPhone(phone, 'member_id, phone, account_locked_until, failed_login_count');
 
   if (!member || !member.account_locked_until) {
     return { locked: false };
@@ -47,7 +84,7 @@ export async function isAccountLocked(phone: string): Promise<{ locked: boolean;
   await supabaseAdmin
     .from('members')
     .update({ account_locked_until: null, failed_login_count: 0 })
-    .eq('phone', phone);
+    .eq('member_id', member.member_id);
 
   return { locked: false };
 }
@@ -78,26 +115,33 @@ export async function recordFailedLogin(
   const failedCount = recentAttempts?.length || 0;
   const attemptsLeft = Math.max(0, MAX_LOGIN_ATTEMPTS - failedCount);
 
+  // Find the member to update by member_id (handles all phone formats)
+  const member = await findMemberByPhone(phone, 'member_id, phone');
+
   // Lock account if too many failed attempts
   if (failedCount >= MAX_LOGIN_ATTEMPTS) {
     const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
 
-    await supabaseAdmin
-      .from('members')
-      .update({
-        account_locked_until: lockedUntil.toISOString(),
-        failed_login_count: failedCount,
-      })
-      .eq('phone', phone);
+    if (member) {
+      await supabaseAdmin
+        .from('members')
+        .update({
+          account_locked_until: lockedUntil.toISOString(),
+          failed_login_count: failedCount,
+        })
+        .eq('member_id', member.member_id);
+    }
 
     return { shouldLock: true, attemptsLeft: 0 };
   }
 
   // Update failed login count
-  await supabaseAdmin
-    .from('members')
-    .update({ failed_login_count: failedCount })
-    .eq('phone', phone);
+  if (member) {
+    await supabaseAdmin
+      .from('members')
+      .update({ failed_login_count: failedCount })
+      .eq('member_id', member.member_id);
+  }
 
   return { shouldLock: false, attemptsLeft };
 }
@@ -113,14 +157,17 @@ export async function recordSuccessfulLogin(phone: string, ipAddress: string): P
     success: true,
   });
 
-  // Reset failed login count
-  await supabaseAdmin
-    .from('members')
-    .update({
-      account_locked_until: null,
-      failed_login_count: 0,
-    })
-    .eq('phone', phone);
+  // Reset failed login count (find by normalized phone to handle all formats)
+  const member = await findMemberByPhone(phone, 'member_id, phone');
+  if (member) {
+    await supabaseAdmin
+      .from('members')
+      .update({
+        account_locked_until: null,
+        failed_login_count: 0,
+      })
+      .eq('member_id', member.member_id);
+  }
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   recordSuccessfulLogin,
   checkRateLimit,
   logAuthEvent,
+  findMemberByPhone,
 } from '@/lib/security';
 import { serialize } from 'cookie';
 
@@ -77,40 +78,13 @@ export default async function handler(
       });
     }
 
-    // Get member by phone (try both with and without +1 prefix)
-    let member: any = null;
-    let memberError: any = null;
+    // Get member by phone (handles all phone formats via normalization)
+    const member = await findMemberByPhone(
+      normalizedPhone,
+      'member_id, auth_user_id, email, first_name, last_name, phone, password_hash, membership, password_is_temporary'
+    );
 
-    // Try exact match with normalized phone
-    const result1 = await supabaseAdmin
-      .from('members')
-      .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, membership, password_is_temporary')
-      .eq('phone', normalizedPhone)
-      .limit(1);
-
-    if (result1.data && result1.data.length > 0) {
-      member = result1.data[0];
-      if (result1.data.length > 1) {
-        console.warn('[LOGIN] WARNING: Multiple members found with phone:', normalizedPhone);
-      }
-    } else {
-      // Try with +1 prefix
-      const result2 = await supabaseAdmin
-        .from('members')
-        .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, membership, password_is_temporary')
-        .eq('phone', `+1${normalizedPhone}`)
-        .limit(1);
-
-      if (result2.data && result2.data.length > 0) {
-        member = result2.data[0];
-        if (result2.data.length > 1) {
-          console.warn('[LOGIN] WARNING: Multiple members found with phone:', `+1${normalizedPhone}`);
-        }
-      }
-      memberError = result2.error;
-    }
-
-    if (memberError || !member) {
+    if (!member) {
       console.log('[LOGIN] Member not found for phone:', normalizedPhone);
       await recordFailedLogin(normalizedPhone, ipAddress);
       await logAuthEvent({

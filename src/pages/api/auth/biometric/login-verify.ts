@@ -132,13 +132,15 @@ export default async function handler(
     });
 
     // Set httpOnly cookie for session
+    const isProduction = process.env.NODE_ENV === 'production';
     res.setHeader('Set-Cookie', [
       serialize('member_session', sessionToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
         sameSite: 'lax',
         maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
         path: '/',
+        ...(isProduction && { domain: '.noirkc.com' }),
       }),
     ]);
 
