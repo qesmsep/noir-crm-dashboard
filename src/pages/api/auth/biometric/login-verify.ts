@@ -116,8 +116,8 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to create session' });
     }
 
-    // Record successful login
-    await recordSuccessfulLogin(member.phone, ipAddress);
+    // Record successful login (pass member_id to skip redundant phone lookup)
+    await recordSuccessfulLogin(member.phone, ipAddress, member.member_id);
     await logAuthEvent({
       memberId: member.member_id,
       phone: member.phone,

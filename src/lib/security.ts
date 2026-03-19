@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase';
+import { Logger } from '@/lib/logger';
 import type { NextApiRequest } from 'next';
 
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -24,8 +25,17 @@ export function getUserAgent(req: NextApiRequest): string {
   return req.headers['user-agent'] || 'unknown';
 }
 
-/** Max rows to fetch in fallback normalization query to prevent unbounded table scans. */
+/**
+ * Max rows to fetch in fallback normalization query to prevent unbounded table scans.
+ * TODO(#phone-normalization): Replace fallback with a phone_normalized indexed column.
+ */
 const FALLBACK_MEMBER_LIMIT = 500;
+
+/** Base shape for all findMemberByPhone results. */
+interface MemberBase {
+  member_id: string;
+  [key: string]: unknown;
+}
 
 /**
  * Normalize a phone string to its last 10 digits.
@@ -48,14 +58,14 @@ function normalizePhone(phone: string): string {
  * @param opts.includeDeactivated - If true, skips the deactivated=false filter (needed for lockout checks)
  * @returns The matched member row, or null
  */
-export async function findMemberByPhone<T extends { member_id: string } = any>(
+export async function findMemberByPhone<T extends MemberBase = MemberBase>(
   phone: string,
   select: string = 'member_id, phone',
   opts?: { includeDeactivated?: boolean }
 ): Promise<T | null> {
   const normalized = normalizePhone(phone);
   if (normalized.length < 10) {
-    console.warn('[findMemberByPhone] Phone too short after normalization:', phone);
+    Logger.warn('findMemberByPhone: phone too short after normalization', { phone });
     return null;
   }
 
@@ -67,11 +77,10 @@ export async function findMemberByPhone<T extends { member_id: string } = any>(
   const result1 = await query1.limit(1);
 
   if (result1.error) {
-    console.error('[findMemberByPhone] Exact match query error:', result1.error);
+    Logger.error('findMemberByPhone: exact match query error', result1.error, { phone: normalized });
   }
   if (result1.data && result1.data.length > 0) {
-    warnOnDuplicatePhone(normalized, result1.data.length);
-    return result1.data[0] as T;
+    return result1.data[0] as unknown as T;
   }
 
   // 2. Try with +1 prefix
@@ -80,15 +89,15 @@ export async function findMemberByPhone<T extends { member_id: string } = any>(
   const result2 = await query2.limit(1);
 
   if (result2.error) {
-    console.error('[findMemberByPhone] +1 prefix query error:', result2.error);
+    Logger.error('findMemberByPhone: +1 prefix query error', result2.error, { phone: normalized });
   }
   if (result2.data && result2.data.length > 0) {
-    warnOnDuplicatePhone(normalized, result2.data.length);
-    return result2.data[0] as T;
+    return result2.data[0] as unknown as T;
   }
 
   // 3. Fallback: fetch members and normalize in-memory.
   //    Capped at FALLBACK_MEMBER_LIMIT to bound memory/transfer.
+  //    TODO(#phone-normalization): Remove once phone_normalized column exists.
   const selectFields = select.split(',').map(s => s.trim());
   const fallbackSelect = selectFields.includes('phone') ? select : `${select}, phone`;
 
@@ -97,30 +106,30 @@ export async function findMemberByPhone<T extends { member_id: string } = any>(
   const result3 = await query3.limit(FALLBACK_MEMBER_LIMIT);
 
   if (result3.error) {
-    console.error('[findMemberByPhone] Fallback query error:', result3.error);
+    Logger.error('findMemberByPhone: fallback query error', result3.error, { phone: normalized });
     return null;
   }
 
   if (result3.data && result3.data.length >= FALLBACK_MEMBER_LIMIT) {
-    console.warn('[findMemberByPhone] Fallback hit limit of', FALLBACK_MEMBER_LIMIT, 'rows — member may not be found. Consider adding a phone_normalized column.');
+    Logger.warn('findMemberByPhone: fallback hit row limit — member may not be found', {
+      limit: FALLBACK_MEMBER_LIMIT,
+      phone: normalized,
+    });
   }
 
-  const match = result3.data?.find((m: any) => {
-    const dbPhone = normalizePhone(m.phone || '');
+  const match = result3.data?.find((m: Record<string, unknown>) => {
+    const dbPhone = normalizePhone(String(m.phone || ''));
     return dbPhone === normalized;
   }) || null;
 
   if (match) {
-    console.warn('[findMemberByPhone] Resolved via fallback normalization for phone:', normalized, '— consider normalizing this phone in the database.');
+    Logger.warn('findMemberByPhone: resolved via fallback normalization — consider normalizing this phone in the DB', {
+      phone: normalized,
+      member_id: match.member_id,
+    });
   }
 
-  return match as T | null;
-}
-
-function warnOnDuplicatePhone(phone: string, count: number): void {
-  if (count > 1) {
-    console.warn('[findMemberByPhone] Multiple members found with phone:', phone, '— returning first match');
-  }
+  return match as unknown as T | null;
 }
 
 /**
@@ -134,7 +143,7 @@ export async function isAccountLocked(phone: string): Promise<{ locked: boolean;
     return { locked: false };
   }
 
-  const lockedUntil = new Date(member.account_locked_until);
+  const lockedUntil = new Date(member.account_locked_until as string);
   if (lockedUntil > new Date()) {
     return { locked: true, until: lockedUntil };
   }
@@ -149,11 +158,16 @@ export async function isAccountLocked(phone: string): Promise<{ locked: boolean;
 }
 
 /**
- * Record failed login attempt and check if account should be locked
+ * Record failed login attempt and check if account should be locked.
+ *
+ * @param phone - Normalized phone number
+ * @param ipAddress - Client IP
+ * @param memberId - If already resolved, pass to skip redundant lookup
  */
 export async function recordFailedLogin(
   phone: string,
-  ipAddress: string
+  ipAddress: string,
+  memberId?: string,
 ): Promise<{ shouldLock: boolean; attemptsLeft: number }> {
   // Record the failed attempt
   await supabaseAdmin.from('login_attempts').insert({
@@ -166,7 +180,7 @@ export async function recordFailedLogin(
   const fifteenMinutesAgo = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
   const { data: recentAttempts } = await supabaseAdmin
     .from('login_attempts')
-    .select('*')
+    .select('created_at')
     .eq('phone', phone)
     .eq('success', false)
     .gte('created_at', fifteenMinutesAgo.toISOString());
@@ -174,12 +188,13 @@ export async function recordFailedLogin(
   const failedCount = recentAttempts?.length || 0;
   const attemptsLeft = Math.max(0, MAX_LOGIN_ATTEMPTS - failedCount);
 
-  // Find the member to update by member_id (handles all phone formats)
-  // Include deactivated — we track lockout regardless of account status
-  const member = await findMemberByPhone(phone, 'member_id, phone', { includeDeactivated: true });
+  // Resolve member_id if not provided
+  const resolvedMemberId = memberId ??
+    (await findMemberByPhone(phone, 'member_id, phone', { includeDeactivated: true }))?.member_id ??
+    null;
 
-  if (!member) {
-    console.warn('[SECURITY] recordFailedLogin: could not find member for phone:', phone, '— lockout tracking skipped');
+  if (!resolvedMemberId) {
+    Logger.warn('recordFailedLogin: could not find member — lockout tracking skipped', { phone });
     // Still report attempts left based on IP-level tracking, but don't claim we locked
     return { shouldLock: false, attemptsLeft };
   }
@@ -194,7 +209,7 @@ export async function recordFailedLogin(
         account_locked_until: lockedUntil.toISOString(),
         failed_login_count: failedCount,
       })
-      .eq('member_id', member.member_id);
+      .eq('member_id', resolvedMemberId);
 
     return { shouldLock: true, attemptsLeft: 0 };
   }
@@ -203,15 +218,23 @@ export async function recordFailedLogin(
   await supabaseAdmin
     .from('members')
     .update({ failed_login_count: failedCount })
-    .eq('member_id', member.member_id);
+    .eq('member_id', resolvedMemberId);
 
   return { shouldLock: false, attemptsLeft };
 }
 
 /**
- * Record successful login and clear failed attempts
+ * Record successful login and clear failed attempts.
+ *
+ * @param phone - Normalized phone number
+ * @param ipAddress - Client IP
+ * @param memberId - If already resolved, pass to skip redundant lookup
  */
-export async function recordSuccessfulLogin(phone: string, ipAddress: string): Promise<void> {
+export async function recordSuccessfulLogin(
+  phone: string,
+  ipAddress: string,
+  memberId?: string,
+): Promise<void> {
   // Record successful attempt
   await supabaseAdmin.from('login_attempts').insert({
     phone,
@@ -219,21 +242,23 @@ export async function recordSuccessfulLogin(phone: string, ipAddress: string): P
     success: true,
   });
 
-  // Reset failed login count (find by normalized phone to handle all formats)
-  // Include deactivated — we clear lockout regardless of account status
-  const member = await findMemberByPhone(phone, 'member_id, phone', { includeDeactivated: true });
-  if (!member) {
-    console.warn('[SECURITY] recordSuccessfulLogin: could not find member for phone:', phone);
+  // Resolve member_id if not provided
+  const resolvedMemberId = memberId ??
+    (await findMemberByPhone(phone, 'member_id, phone', { includeDeactivated: true }))?.member_id ??
+    null;
+
+  if (!resolvedMemberId) {
+    Logger.warn('recordSuccessfulLogin: could not find member — lockout clear skipped', { phone });
+    return;
   }
-  if (member) {
-    await supabaseAdmin
-      .from('members')
-      .update({
-        account_locked_until: null,
-        failed_login_count: 0,
-      })
-      .eq('member_id', member.member_id);
-  }
+
+  await supabaseAdmin
+    .from('members')
+    .update({
+      account_locked_until: null,
+      failed_login_count: 0,
+    })
+    .eq('member_id', resolvedMemberId);
 }
 
 /**
@@ -241,7 +266,7 @@ export async function recordSuccessfulLogin(phone: string, ipAddress: string): P
  */
 export async function checkRateLimit(
   ipAddress: string,
-  endpoint: string
+  _endpoint: string
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
 
@@ -277,7 +302,7 @@ export async function logAuthEvent(params: {
   ipAddress: string;
   userAgent: string;
   deviceFingerprint?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }): Promise<void> {
   await supabaseAdmin.from('auth_audit_logs').insert({
     member_id: params.memberId || null,
@@ -296,8 +321,9 @@ export async function logAuthEvent(params: {
  * Returns undefined in development (cookie scoped to current host).
  */
 export function getSessionCookieDomain(): string | undefined {
-  if (process.env.COOKIE_DOMAIN) {
-    return process.env.COOKIE_DOMAIN;
+  const envDomain = process.env.COOKIE_DOMAIN?.trim();
+  if (envDomain) {
+    return envDomain;
   }
   if (process.env.NODE_ENV === 'production') {
     return '.noirkc.com';

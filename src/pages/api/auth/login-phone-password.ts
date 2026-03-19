@@ -13,6 +13,7 @@ import {
   findMemberByPhone,
   getSessionCookieDomain,
 } from '@/lib/security';
+import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
 
 const requestSchema = z.object({
@@ -39,7 +40,7 @@ export default async function handler(
     // Normalize phone number (remove all non-digits, then take last 10 digits)
     const digitsOnly = phone.replace(/\D/g, '');
     const normalizedPhone = digitsOnly.slice(-10); // Take last 10 digits (removes +1, *1, etc.)
-    console.log('[LOGIN] Attempting login for phone:', normalizedPhone);
+    Logger.auth('Login attempt', undefined, { phone: normalizedPhone });
 
     // Check rate limiting by IP
     const rateLimit = await checkRateLimit(ipAddress, 'login');
@@ -86,7 +87,7 @@ export default async function handler(
     );
 
     if (!member) {
-      console.log('[LOGIN] Member not found for phone:', normalizedPhone);
+      Logger.auth('Login failed: member not found', undefined, { phone: normalizedPhone });
       await recordFailedLogin(normalizedPhone, ipAddress);
       await logAuthEvent({
         phone: normalizedPhone,
@@ -101,7 +102,7 @@ export default async function handler(
       });
     }
 
-    console.log('[LOGIN] Member found:', member.member_id, 'Has password hash:', !!member.password_hash);
+    Logger.auth('Member found', member.member_id, { hasPassword: !!member.password_hash });
 
     // Check if member has password set
     if (!member.password_hash) {
@@ -121,11 +122,10 @@ export default async function handler(
     }
 
     // Verify password
-    const passwordMatch = await bcrypt.compare(password, member.password_hash);
-    console.log('[LOGIN] Password match:', passwordMatch);
+    const passwordMatch = await bcrypt.compare(password, member.password_hash as string);
 
     if (!passwordMatch) {
-      const failedResult = await recordFailedLogin(normalizedPhone, ipAddress);
+      const failedResult = await recordFailedLogin(normalizedPhone, ipAddress, member.member_id);
 
       await logAuthEvent({
         memberId: member.member_id,
@@ -167,12 +167,12 @@ export default async function handler(
       });
 
     if (sessionError) {
-      console.error('Failed to create session:', sessionError);
+      Logger.error('Failed to create session', sessionError);
       return res.status(500).json({ error: 'Failed to create session' });
     }
 
     // Record successful login
-    await recordSuccessfulLogin(normalizedPhone, ipAddress);
+    await recordSuccessfulLogin(normalizedPhone, ipAddress, member.member_id);
     await logAuthEvent({
       memberId: member.member_id,
       phone: normalizedPhone,
@@ -196,12 +196,6 @@ export default async function handler(
 
     const cookieValue = serialize('member_session', sessionToken, cookieOptions);
 
-    console.log('[LOGIN] Setting cookie:', {
-      name: 'member_session',
-      options: cookieOptions,
-      cookieString: cookieValue.split(';').slice(0, 2).join(';'),
-    });
-
     res.setHeader('Set-Cookie', [cookieValue]);
 
     res.status(200).json({
@@ -221,7 +215,7 @@ export default async function handler(
       return res.status(400).json({ error: error.issues[0].message });
     }
 
-    console.error('Login error:', error);
+    Logger.error('Login error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

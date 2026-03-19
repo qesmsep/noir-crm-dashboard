@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { z } from 'zod';
 import { serialize } from 'cookie';
-import { getSessionCookieDomain } from '@/lib/security';
+import { getSessionCookieDomain, findMemberByPhone } from '@/lib/security';
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
@@ -146,23 +146,11 @@ export default async function handler(
       .update({ verified: true })
       .eq('id', otpRecord.id);
 
-    // Get member by phone - normalize phone numbers to handle various formats
-    const { data: members, error: memberError } = await supabaseAdmin
-      .from('members')
-      .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, password_is_temporary, deactivated')
-      .eq('deactivated', false)
-      .not('phone', 'is', null);
-
-    if (memberError) {
-      console.error('Failed to fetch members:', memberError);
-      return res.status(500).json({ error: 'Failed to verify member' });
-    }
-
-    // Find member by normalizing database phone numbers (last 10 digits match)
-    const member = members?.find(m => {
-      const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
-      return dbPhone === normalizedPhone;
-    });
+    // Get member by phone (handles all phone formats via normalization)
+    const member = await findMemberByPhone(
+      normalizedPhone,
+      'member_id, auth_user_id, email, first_name, last_name, phone, password_hash, password_is_temporary'
+    );
 
     if (!member) {
       return res.status(404).json({
