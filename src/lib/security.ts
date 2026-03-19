@@ -36,7 +36,6 @@ const FALLBACK_MEMBER_LIMIT = 5000;
 /** Base shape for all findMemberByPhone results. */
 interface MemberBase {
   member_id: string;
-  [key: string]: unknown;
 }
 
 /**
