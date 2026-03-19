@@ -16,6 +16,15 @@ interface OtpVerifyMember {
   password_is_temporary: boolean | null;
 }
 
+interface OtpRecord {
+  id: string;
+  phone: string;
+  code: string;
+  expires_at: string;
+  attempts: number;
+  verified: boolean;
+}
+
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
   code: z.string().length(6, 'Code must be 6 digits'),
@@ -67,14 +76,6 @@ export default async function handler(
     }
 
     // Find the most recent OTP for this phone (try both with and without +1)
-    interface OtpRecord {
-      id: string;
-      phone: string;
-      code: string;
-      expires_at: string;
-      attempts: number;
-      verified: boolean;
-    }
     let otpRecords: OtpRecord[] | null = null;
 
     const otp1 = await supabaseAdmin

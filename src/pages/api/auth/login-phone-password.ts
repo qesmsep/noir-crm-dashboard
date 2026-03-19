@@ -31,6 +31,8 @@ interface LoginMember {
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
+  // min(1) intentionally: length policy is enforced on password creation/reset (set-password.ts),
+  // not at login. Using a stricter minimum here would lock out members with legacy shorter passwords.
   password: z.string().min(1, 'Password is required'),
 });
 
