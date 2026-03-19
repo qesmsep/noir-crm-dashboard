@@ -40,7 +40,7 @@ export default async function handler(
     // Normalize phone number (remove all non-digits, then take last 10 digits)
     const digitsOnly = phone.replace(/\D/g, '');
     const normalizedPhone = digitsOnly.slice(-10); // Take last 10 digits (removes +1, *1, etc.)
-    Logger.auth('Login attempt', undefined, { phone: normalizedPhone });
+    Logger.auth('Login attempt', undefined, { phone: `***${normalizedPhone.slice(-4)}` });
 
     // Check rate limiting by IP
     const rateLimit = await checkRateLimit(ipAddress, 'login');
@@ -87,7 +87,7 @@ export default async function handler(
     );
 
     if (!member) {
-      Logger.auth('Login failed: member not found', undefined, { phone: normalizedPhone });
+      Logger.auth('Login failed: member not found', undefined, { phone: `***${normalizedPhone.slice(-4)}` });
       await recordFailedLogin(normalizedPhone, ipAddress);
       await logAuthEvent({
         phone: normalizedPhone,

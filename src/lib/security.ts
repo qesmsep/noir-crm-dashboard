@@ -27,9 +27,11 @@ export function getUserAgent(req: NextApiRequest): string {
 
 /**
  * Max rows to fetch in fallback normalization query to prevent unbounded table scans.
- * TODO(#phone-normalization): Replace fallback with a phone_normalized indexed column.
+ * Set high enough to cover the full member base for now.
+ * TODO(#phone-normalization): Replace fallback with a phone_normalized indexed column
+ * and remove this limit entirely.
  */
-const FALLBACK_MEMBER_LIMIT = 500;
+const FALLBACK_MEMBER_LIMIT = 5000;
 
 /** Base shape for all findMemberByPhone results. */
 interface MemberBase {
@@ -42,6 +44,15 @@ interface MemberBase {
  */
 function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '').slice(-10);
+}
+
+/**
+ * Mask a phone number for logging (PII protection).
+ * "5551234567" → "***4567"
+ */
+function maskPhone(phone: string): string {
+  if (phone.length <= 4) return '****';
+  return '***' + phone.slice(-4);
 }
 
 /**
@@ -65,7 +76,7 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
 ): Promise<T | null> {
   const normalized = normalizePhone(phone);
   if (normalized.length < 10) {
-    Logger.warn('findMemberByPhone: phone too short after normalization', { phone });
+    Logger.warn('findMemberByPhone: phone too short after normalization', { phone: maskPhone(phone) });
     return null;
   }
 
@@ -77,7 +88,7 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
   const result1 = await query1.limit(1);
 
   if (result1.error) {
-    Logger.error('findMemberByPhone: exact match query error', result1.error, { phone: normalized });
+    Logger.error('findMemberByPhone: exact match query error', result1.error, { phone: maskPhone(normalized) });
   }
   if (result1.data && result1.data.length > 0) {
     return result1.data[0] as unknown as T;
@@ -89,7 +100,7 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
   const result2 = await query2.limit(1);
 
   if (result2.error) {
-    Logger.error('findMemberByPhone: +1 prefix query error', result2.error, { phone: normalized });
+    Logger.error('findMemberByPhone: +1 prefix query error', result2.error, { phone: maskPhone(normalized) });
   }
   if (result2.data && result2.data.length > 0) {
     return result2.data[0] as unknown as T;
@@ -106,25 +117,26 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
   const result3 = await query3.limit(FALLBACK_MEMBER_LIMIT);
 
   if (result3.error) {
-    Logger.error('findMemberByPhone: fallback query error', result3.error, { phone: normalized });
+    Logger.error('findMemberByPhone: fallback query error', result3.error, { phone: maskPhone(normalized) });
     return null;
   }
 
   if (result3.data && result3.data.length >= FALLBACK_MEMBER_LIMIT) {
-    Logger.warn('findMemberByPhone: fallback hit row limit — member may not be found', {
+    Logger.error('findMemberByPhone: fallback hit row limit — member may not be found. Run phone normalization migration.', undefined, {
       limit: FALLBACK_MEMBER_LIMIT,
       phone: normalized,
     });
   }
 
-  const match = result3.data?.find((m: Record<string, unknown>) => {
+  const rows = result3.data as unknown as Array<Record<string, unknown>>;
+  const match = rows?.find((m) => {
     const dbPhone = normalizePhone(String(m.phone || ''));
     return dbPhone === normalized;
   }) || null;
 
   if (match) {
     Logger.warn('findMemberByPhone: resolved via fallback normalization — consider normalizing this phone in the DB', {
-      phone: normalized,
+      phone: maskPhone(normalized),
       member_id: match.member_id,
     });
   }
@@ -194,7 +206,7 @@ export async function recordFailedLogin(
     null;
 
   if (!resolvedMemberId) {
-    Logger.warn('recordFailedLogin: could not find member — lockout tracking skipped', { phone });
+    Logger.warn('recordFailedLogin: could not find member — lockout tracking skipped', { phone: maskPhone(phone) });
     // Still report attempts left based on IP-level tracking, but don't claim we locked
     return { shouldLock: false, attemptsLeft };
   }
@@ -248,7 +260,7 @@ export async function recordSuccessfulLogin(
     null;
 
   if (!resolvedMemberId) {
-    Logger.warn('recordSuccessfulLogin: could not find member — lockout clear skipped', { phone });
+    Logger.warn('recordSuccessfulLogin: could not find member — lockout clear skipped', { phone: maskPhone(phone) });
     return;
   }
 
@@ -266,7 +278,8 @@ export async function recordSuccessfulLogin(
  */
 export async function checkRateLimit(
   ipAddress: string,
-  _endpoint: string
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  endpoint: string
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
 
