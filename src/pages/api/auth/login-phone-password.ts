@@ -10,12 +10,30 @@ import {
   recordSuccessfulLogin,
   checkRateLimit,
   logAuthEvent,
+  findMemberByPhone,
+  getSessionCookieDomain,
+  normalizePhone,
 } from '@/lib/security';
+import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
+
+interface LoginMember {
+  member_id: string;
+  auth_user_id: string | null;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  password_hash: string | null;
+  membership: string;
+  password_is_temporary: boolean | null;
+}
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  // min(1) intentionally: length policy is enforced on password creation/reset (set-password.ts),
+  // not at login. Using a stricter minimum here would lock out members with legacy shorter passwords.
+  password: z.string().min(1, 'Password is required'),
 });
 
 const SESSION_DURATION_DAYS = 7; // Reduced from 30 days
@@ -34,10 +52,8 @@ export default async function handler(
   try {
     const { phone, password } = requestSchema.parse(req.body);
 
-    // Normalize phone number (remove all non-digits, then take last 10 digits)
-    const digitsOnly = phone.replace(/\D/g, '');
-    const normalizedPhone = digitsOnly.slice(-10); // Take last 10 digits (removes +1, *1, etc.)
-    console.log('[LOGIN] Attempting login for phone:', normalizedPhone);
+    const normalizedPhone = normalizePhone(phone);
+    Logger.auth('Login attempt', undefined, { phone: `***${normalizedPhone.slice(-4)}` });
 
     // Check rate limiting by IP
     const rateLimit = await checkRateLimit(ipAddress, 'login');
@@ -77,41 +93,14 @@ export default async function handler(
       });
     }
 
-    // Get member by phone (try both with and without +1 prefix)
-    let member: any = null;
-    let memberError: any = null;
+    // Get member by phone (handles all phone formats via normalization)
+    const member = await findMemberByPhone<LoginMember>(
+      normalizedPhone,
+      'member_id, auth_user_id, email, first_name, last_name, phone, password_hash, membership, password_is_temporary'
+    );
 
-    // Try exact match with normalized phone
-    const result1 = await supabaseAdmin
-      .from('members')
-      .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, membership, password_is_temporary')
-      .eq('phone', normalizedPhone)
-      .limit(1);
-
-    if (result1.data && result1.data.length > 0) {
-      member = result1.data[0];
-      if (result1.data.length > 1) {
-        console.warn('[LOGIN] WARNING: Multiple members found with phone:', normalizedPhone);
-      }
-    } else {
-      // Try with +1 prefix
-      const result2 = await supabaseAdmin
-        .from('members')
-        .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, membership, password_is_temporary')
-        .eq('phone', `+1${normalizedPhone}`)
-        .limit(1);
-
-      if (result2.data && result2.data.length > 0) {
-        member = result2.data[0];
-        if (result2.data.length > 1) {
-          console.warn('[LOGIN] WARNING: Multiple members found with phone:', `+1${normalizedPhone}`);
-        }
-      }
-      memberError = result2.error;
-    }
-
-    if (memberError || !member) {
-      console.log('[LOGIN] Member not found for phone:', normalizedPhone);
+    if (!member) {
+      Logger.auth('Login failed: member not found', undefined, { phone: `***${normalizedPhone.slice(-4)}` });
       await recordFailedLogin(normalizedPhone, ipAddress);
       await logAuthEvent({
         phone: normalizedPhone,
@@ -126,7 +115,7 @@ export default async function handler(
       });
     }
 
-    console.log('[LOGIN] Member found:', member.member_id, 'Has password hash:', !!member.password_hash);
+    Logger.auth('Member found', member.member_id, { hasPassword: !!member.password_hash });
 
     // Check if member has password set
     if (!member.password_hash) {
@@ -146,11 +135,10 @@ export default async function handler(
     }
 
     // Verify password
-    const passwordMatch = await bcrypt.compare(password, member.password_hash);
-    console.log('[LOGIN] Password match:', passwordMatch);
+    const passwordMatch = await bcrypt.compare(password, member.password_hash!);
 
     if (!passwordMatch) {
-      const failedResult = await recordFailedLogin(normalizedPhone, ipAddress);
+      const failedResult = await recordFailedLogin(normalizedPhone, ipAddress, member.member_id);
 
       await logAuthEvent({
         memberId: member.member_id,
@@ -192,12 +180,12 @@ export default async function handler(
       });
 
     if (sessionError) {
-      console.error('Failed to create session:', sessionError);
+      Logger.error('Failed to create session', sessionError);
       return res.status(500).json({ error: 'Failed to create session' });
     }
 
     // Record successful login
-    await recordSuccessfulLogin(normalizedPhone, ipAddress);
+    await recordSuccessfulLogin(normalizedPhone, ipAddress, member.member_id);
     await logAuthEvent({
       memberId: member.member_id,
       phone: normalizedPhone,
@@ -209,23 +197,17 @@ export default async function handler(
 
     // Set httpOnly cookie for session (secure in production)
     const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = getSessionCookieDomain();
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax' as const,
       maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
       path: '/',
-      // Explicitly set domain for production
-      ...(isProduction && { domain: '.noirkc.com' }),
+      ...(cookieDomain && { domain: cookieDomain }),
     };
 
     const cookieValue = serialize('member_session', sessionToken, cookieOptions);
-
-    console.log('[LOGIN] Setting cookie:', {
-      name: 'member_session',
-      options: cookieOptions,
-      cookieString: cookieValue.split(';').slice(0, 2).join(';'),
-    });
 
     res.setHeader('Set-Cookie', [cookieValue]);
 
@@ -246,7 +228,7 @@ export default async function handler(
       return res.status(400).json({ error: error.issues[0].message });
     }
 
-    console.error('Login error:', error);
+    Logger.error('Login error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

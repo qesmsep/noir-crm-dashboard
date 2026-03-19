@@ -2,6 +2,28 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { z } from 'zod';
 import { serialize } from 'cookie';
+import { getSessionCookieDomain, findMemberByPhone, getClientIP, normalizePhone } from '@/lib/security';
+import { Logger } from '@/lib/logger';
+
+interface OtpVerifyMember {
+  member_id: string;
+  auth_user_id: string | null;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  password_hash: string | null;
+  password_is_temporary: boolean | null;
+}
+
+interface OtpRecord {
+  id: string;
+  phone: string;
+  code: string;
+  expires_at: string;
+  attempts: number;
+  verified: boolean;
+}
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
@@ -21,21 +43,12 @@ export default async function handler(
   }
 
   try {
-    console.log('[VERIFY-OTP] Request body:', { phone: req.body.phone, code: req.body.code });
-
     const { phone, code } = requestSchema.parse(req.body);
 
-    // Normalize phone number (remove all non-digits, then take last 10 digits)
-    const digitsOnly = phone.replace(/\D/g, '');
-    const normalizedPhone = digitsOnly.slice(-10);
+    // Normalize phone for OTP table lookups
+    const normalizedPhone = normalizePhone(phone);
 
-    console.log('[VERIFY-OTP] Normalized phone:', normalizedPhone, 'Code length:', code.length);
-
-    // Get client IP address
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
-                     (req.headers['x-real-ip'] as string) ||
-                     req.socket.remoteAddress ||
-                     'unknown';
+    const clientIp = getClientIP(req);
 
     // ACCOUNT LOCKOUT: Check for too many failed verification attempts (5 in 15 minutes)
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
@@ -46,17 +59,13 @@ export default async function handler(
       .gte('created_at', fifteenMinutesAgo.toISOString());
 
     if (failedCheckError) {
-      console.error('Failed to check account lockout:', failedCheckError);
+      Logger.error('Failed to check account lockout', failedCheckError);
     } else if (recentFailedAttempts) {
       const totalFailedAttempts = recentFailedAttempts.reduce((sum, record) => sum + (record.attempts || 0), 0);
       if (totalFailedAttempts >= MAX_FAILED_VERIFICATIONS_15MIN) {
-        // AUDIT LOG: Account locked due to too many failed attempts
-        console.log('[AUTH-AUDIT] Account Locked', {
-          event: 'account_locked',
-          phone: normalizedPhone,
+        Logger.auth('Account locked due to failed OTP attempts', undefined, {
           ip_address: clientIp,
           failed_attempts: totalFailedAttempts,
-          timestamp: new Date().toISOString(),
         });
 
         return res.status(429).json({
@@ -67,7 +76,7 @@ export default async function handler(
     }
 
     // Find the most recent OTP for this phone (try both with and without +1)
-    let otpRecords: any = null;
+    let otpRecords: OtpRecord[] | null = null;
 
     const otp1 = await supabaseAdmin
       .from('phone_otp_codes')
@@ -78,7 +87,7 @@ export default async function handler(
       .limit(1);
 
     if (otp1.data && otp1.data.length > 0) {
-      otpRecords = otp1.data;
+      otpRecords = otp1.data as unknown as OtpRecord[];
     } else {
       const otp2 = await supabaseAdmin
         .from('phone_otp_codes')
@@ -89,12 +98,12 @@ export default async function handler(
         .limit(1);
 
       if (otp2.data && otp2.data.length > 0) {
-        otpRecords = otp2.data;
+        otpRecords = otp2.data as unknown as OtpRecord[];
       }
     }
 
     if (!otpRecords || otpRecords.length === 0) {
-      console.error('[VERIFY-OTP] No unverified OTP found for phone:', normalizedPhone);
+      Logger.warn('No unverified OTP found for phone');
       return res.status(400).json({
         error: 'No verification code found. Please request a new code.',
       });
@@ -116,22 +125,20 @@ export default async function handler(
       });
     }
 
-    // Increment attempts
+    // Increment attempts BEFORE checking code (prevents timing attacks).
+    // Uses .eq('attempts', otpRecord.attempts) as an optimistic lock — if a concurrent
+    // request already incremented, this update is a no-op and the next read sees the true count.
     await supabaseAdmin
       .from('phone_otp_codes')
       .update({ attempts: otpRecord.attempts + 1 })
-      .eq('id', otpRecord.id);
+      .eq('id', otpRecord.id)
+      .eq('attempts', otpRecord.attempts);
 
     // Verify code
     if (otpRecord.code !== code) {
-      // AUDIT LOG: Failed verification attempt
-      console.log('[AUTH-AUDIT] OTP Verification Failed', {
-        event: 'otp_verification_failed',
-        phone: normalizedPhone,
+      Logger.auth('OTP verification failed', undefined, {
         ip_address: clientIp,
-        user_agent: req.headers['user-agent'],
         attempts: otpRecord.attempts + 1,
-        timestamp: new Date().toISOString(),
       });
 
       return res.status(400).json({
@@ -145,23 +152,11 @@ export default async function handler(
       .update({ verified: true })
       .eq('id', otpRecord.id);
 
-    // Get member by phone - normalize phone numbers to handle various formats
-    const { data: members, error: memberError } = await supabaseAdmin
-      .from('members')
-      .select('member_id, auth_user_id, email, first_name, last_name, phone, password_hash, password_is_temporary, deactivated')
-      .eq('deactivated', false)
-      .not('phone', 'is', null);
-
-    if (memberError) {
-      console.error('Failed to fetch members:', memberError);
-      return res.status(500).json({ error: 'Failed to verify member' });
-    }
-
-    // Find member by normalizing database phone numbers (last 10 digits match)
-    const member = members?.find(m => {
-      const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
-      return dbPhone === normalizedPhone;
-    });
+    // Get member by phone (handles all phone formats via normalization)
+    const member = await findMemberByPhone<OtpVerifyMember>(
+      normalizedPhone,
+      'member_id, auth_user_id, email, first_name, last_name, phone, password_hash, password_is_temporary'
+    );
 
     if (!member) {
       return res.status(404).json({
@@ -171,7 +166,7 @@ export default async function handler(
 
     // If member doesn't have auth_user_id, create Supabase Auth user on first login
     if (!member.auth_user_id) {
-      console.log('[VERIFY-OTP] First time login - creating Supabase Auth user for member:', member.member_id);
+      Logger.auth('First time login — creating Supabase Auth user', member.member_id);
 
       try {
         let authUserId: string | null = null;
@@ -192,9 +187,9 @@ export default async function handler(
         if (authError) {
           // If email already exists, search for existing auth user
           if (authError.message?.includes('email address has already been registered') || authError.code === 'email_exists') {
-            console.log('[VERIFY-OTP] Email exists, searching for existing auth user by email:', member.email);
+            Logger.auth('Email exists, searching for existing auth user', member.member_id);
 
-            let existingUser: any = null;
+            let existingUser: { id: string; email?: string } | null = null;
 
             try {
               // List users with pagination, searching for matching email
@@ -208,18 +203,18 @@ export default async function handler(
                 });
 
                 if (listError || !data) {
-                  console.error('[VERIFY-OTP] Failed to list users:', listError);
+                  Logger.error('Failed to list auth users', listError);
                   break;
                 }
 
-                const foundUser = data.users.find((u: any) => u.email?.toLowerCase() === member.email?.toLowerCase());
+                const foundUser = data.users.find((u: { email?: string }) => u.email?.toLowerCase() === member.email?.toLowerCase());
                 if (foundUser) {
                   existingUser = foundUser;
                 }
 
                 if (existingUser) {
                   found = true;
-                  console.log('[VERIFY-OTP] Found existing auth user by email:', existingUser.id);
+                  Logger.auth('Found existing auth user by email', existingUser.id);
                 } else if (data.users.length < 100) {
                   // Last page reached
                   break;
@@ -231,26 +226,26 @@ export default async function handler(
               if (existingUser) {
                 authUserId = existingUser.id;
               } else {
-                console.error('[VERIFY-OTP] Email exists but could not find auth user');
+                Logger.error('Email exists but could not find auth user');
                 return res.status(500).json({
                   error: 'Account setup conflict. Please contact support.',
                 });
               }
             } catch (e) {
-              console.error('[VERIFY-OTP] Error searching for auth user:', e);
+              Logger.error('Error searching for auth user', e instanceof Error ? e : undefined);
               return res.status(500).json({
                 error: 'Failed to set up account. Please contact support.',
               });
             }
           } else {
-            console.error('[VERIFY-OTP] Failed to create auth user:', authError);
+            Logger.error('Failed to create auth user', authError);
             return res.status(500).json({
               error: 'Failed to create account. Please try again.',
             });
           }
         } else {
           authUserId = authData.user.id;
-          console.log('[VERIFY-OTP] Created new auth user:', authUserId);
+          Logger.auth('Created new auth user', authUserId || undefined);
         }
 
         // Link auth user to member
@@ -260,16 +255,16 @@ export default async function handler(
           .eq('member_id', member.member_id);
 
         if (linkError) {
-          console.error('[VERIFY-OTP] Failed to link auth user to member:', linkError);
+          Logger.error('Failed to link auth user to member', linkError);
           return res.status(500).json({
             error: 'Failed to link account. Please try again.',
           });
         }
 
         member.auth_user_id = authUserId;
-        console.log('[VERIFY-OTP] Successfully linked auth user to member');
-      } catch (createError: any) {
-        console.error('[VERIFY-OTP] Error during auth user creation:', createError);
+        Logger.auth('Successfully linked auth user to member', member.member_id);
+      } catch (createError: unknown) {
+        Logger.error('Error during auth user creation', createError instanceof Error ? createError : undefined);
         return res.status(500).json({
           error: 'Failed to set up account. Please contact support.',
         });
@@ -290,45 +285,30 @@ export default async function handler(
       });
 
     if (sessionError) {
-      console.error('Failed to create session:', sessionError);
+      Logger.error('Failed to create session', sessionError);
       return res.status(500).json({ error: 'Failed to create session' });
     }
 
     // Set httpOnly cookie for session (secure in production)
     const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = getSessionCookieDomain();
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax' as const,
       maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
       path: '/',
-      // Explicitly set domain for production
-      ...(isProduction && { domain: '.noirkc.com' }),
+      ...(cookieDomain && { domain: cookieDomain }),
     };
 
     const cookie = serialize('member_session', sessionToken, cookieOptions);
-
-    console.log('[VERIFY-OTP] Setting cookie:', {
-      name: 'member_session',
-      options: cookieOptions,
-      cookieString: cookie.split(';').slice(0, 2).join(';'), // Log first parts only (not the full token)
-    });
 
     res.setHeader('Set-Cookie', [cookie]);
 
     // Check if member needs to set a password
     const needsPassword = !member.password_hash || member.password_is_temporary;
 
-    // AUDIT LOG: Successful OTP verification and login
-    console.log('[AUTH-AUDIT] OTP Verification Success', {
-      event: 'otp_verification_success',
-      member_id: member.member_id,
-      phone: normalizedPhone,
-      ip_address: clientIp,
-      user_agent: req.headers['user-agent'],
-      needs_password: needsPassword,
-      timestamp: new Date().toISOString(),
-    });
+    Logger.auth('OTP verification success', member.member_id, { needs_password: needsPassword });
 
     res.status(200).json({
       success: true,
@@ -343,14 +323,13 @@ export default async function handler(
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[VERIFY-OTP] Validation error:', error.issues);
       return res.status(400).json({
         error: error.issues[0].message,
         details: error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ')
       });
     }
 
-    console.error('Verify phone OTP error:', error);
+    Logger.error('Verify phone OTP error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -3,10 +3,22 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { generateAuthenticationOptions, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
 import { z } from 'zod';
+import { findMemberByPhone } from '@/lib/security';
+import { Logger } from '@/lib/logger';
+
+interface BiometricChallengeMember {
+  member_id: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+}
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
 });
+
+/** Challenge expires in 2 minutes */
+const CHALLENGE_TTL_MS = 2 * 60 * 1000;
 
 /**
  * Generate WebAuthn authentication challenge
@@ -23,42 +35,13 @@ export default async function handler(
   try {
     const { phone } = requestSchema.parse(req.body);
 
-    // Normalize phone number (remove all non-digits, then take last 10 digits)
-    const digitsOnly = phone.replace(/\D/g, '');
-    const normalizedPhone = digitsOnly.slice(-10);
+    // findMemberByPhone normalizes internally
+    const member = await findMemberByPhone<BiometricChallengeMember>(
+      phone,
+      'member_id, phone, first_name, last_name'
+    );
 
-    // Get member by phone (try both with and without +1 prefix)
-    let member: { member_id: string; phone: string; first_name: string; last_name: string } | null = null;
-    let memberError: any = null;
-
-    const result1 = await supabaseAdmin
-      .from('members')
-      .select('member_id, phone, first_name, last_name')
-      .eq('phone', normalizedPhone)
-      .limit(1);
-
-    if (result1.data && result1.data.length > 0) {
-      member = result1.data[0];
-      if (result1.data.length > 1) {
-        console.warn('[BIOMETRIC-LOGIN] WARNING: Multiple members found with phone:', normalizedPhone);
-      }
-    } else {
-      const result2 = await supabaseAdmin
-        .from('members')
-        .select('member_id, phone, first_name, last_name')
-        .eq('phone', `+1${normalizedPhone}`)
-        .limit(1);
-
-      if (result2.data && result2.data.length > 0) {
-        member = result2.data[0];
-        if (result2.data.length > 1) {
-          console.warn('[BIOMETRIC-LOGIN] WARNING: Multiple members found with phone:', `+1${normalizedPhone}`);
-        }
-      }
-      memberError = result2.error;
-    }
-
-    if (memberError || !member) {
+    if (!member) {
       return res.status(404).json({
         error: 'No member found with this phone number',
       });
@@ -89,9 +72,31 @@ export default async function handler(
       userVerification: 'required',
     });
 
+    // Store challenge server-side (required by WebAuthn spec for anti-replay)
+    // Clean up any existing unused challenges for this member first
+    await supabaseAdmin
+      .from('webauthn_challenges')
+      .delete()
+      .eq('member_id', member.member_id)
+      .eq('type', 'authentication')
+      .eq('used', false);
+
+    const { error: challengeError } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .insert({
+        member_id: member.member_id,
+        challenge: options.challenge,
+        type: 'authentication',
+        expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+      });
+
+    if (challengeError) {
+      Logger.error('Failed to store WebAuthn challenge', challengeError);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
     res.status(200).json({
       options,
-      challenge: options.challenge,
       memberId: member.member_id,
     });
   } catch (error) {
@@ -99,7 +104,7 @@ export default async function handler(
       return res.status(400).json({ error: error.issues[0].message });
     }
 
-    console.error('Login challenge error:', error);
+    Logger.error('Login challenge error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

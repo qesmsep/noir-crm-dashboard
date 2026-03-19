@@ -503,7 +503,7 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
     const credential = await navigator.credentials.get({
       publicKey: {
         ...challengeData.options,
-        challenge: Uint8Array.from(atob(challengeData.challenge), c => c.charCodeAt(0)),
+        challenge: Uint8Array.from(atob(challengeData.options.challenge), c => c.charCodeAt(0)),
         allowCredentials: challengeData.options.allowCredentials?.map((cred: any) => ({
           ...cred,
           id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
@@ -515,7 +515,7 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
       throw new Error('Biometric authentication cancelled');
     }
 
-    // Step 3: Verify with server
+    // Step 3: Verify with server (challenge is stored server-side, not sent from client)
     const verifyResponse = await fetch('/api/auth/biometric/login-verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -533,7 +533,6 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
           },
           type: credential.type,
         },
-        challenge: challengeData.challenge,
         memberId: challengeData.memberId,
       }),
     });
