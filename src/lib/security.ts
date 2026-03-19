@@ -27,51 +27,70 @@ export function getUserAgent(req: NextApiRequest): string {
 /**
  * Find a member by normalized phone number.
  * Handles various phone formats stored in the database by normalizing to last 10 digits.
+ *
+ * @param normalizedPhone - 10-digit normalized phone number
+ * @param select - Supabase select string. Must include 'member_id'.
+ * @param opts.includeDeactivated - If true, skips the deactivated=false filter (needed for lockout checks)
  */
 export async function findMemberByPhone(
   normalizedPhone: string,
-  select: string = 'member_id, phone'
+  select: string = 'member_id, phone',
+  opts?: { includeDeactivated?: boolean }
 ): Promise<any | null> {
-  // Try exact match first (fastest)
-  const result1 = await supabaseAdmin
-    .from('members')
-    .select(select)
-    .eq('phone', normalizedPhone)
-    .eq('deactivated', false)
-    .limit(1);
+  const filterDeactivated = !opts?.includeDeactivated;
 
+  // Try exact match first (fastest)
+  let query1 = supabaseAdmin.from('members').select(select).eq('phone', normalizedPhone);
+  if (filterDeactivated) query1 = query1.eq('deactivated', false);
+  const result1 = await query1.limit(1);
+
+  if (result1.error) {
+    console.error('[findMemberByPhone] Exact match query error:', result1.error);
+  }
   if (result1.data && result1.data.length > 0) return result1.data[0];
 
   // Try with +1 prefix
-  const result2 = await supabaseAdmin
-    .from('members')
-    .select(select)
-    .eq('phone', `+1${normalizedPhone}`)
-    .eq('deactivated', false)
-    .limit(1);
+  let query2 = supabaseAdmin.from('members').select(select).eq('phone', `+1${normalizedPhone}`);
+  if (filterDeactivated) query2 = query2.eq('deactivated', false);
+  const result2 = await query2.limit(1);
 
+  if (result2.error) {
+    console.error('[findMemberByPhone] +1 prefix query error:', result2.error);
+  }
   if (result2.data && result2.data.length > 0) return result2.data[0];
 
-  // Fallback: fetch all active members and normalize phone numbers in-memory
-  // Always include 'phone' in fallback select so we can normalize it
-  const fallbackSelect = select.includes('phone') ? select : `${select}, phone`;
-  const { data: members } = await supabaseAdmin
-    .from('members')
-    .select(fallbackSelect)
-    .eq('deactivated', false)
-    .not('phone', 'is', null);
+  // Fallback: fetch active members with phone set and normalize in-memory.
+  // Always select phone for normalization even if caller didn't request it.
+  const selectFields = select.split(',').map(s => s.trim());
+  const fallbackSelect = selectFields.includes('phone') ? select : `${select}, phone`;
 
-  return members?.find((m: any) => {
+  let query3 = supabaseAdmin.from('members').select(fallbackSelect).not('phone', 'is', null);
+  if (filterDeactivated) query3 = query3.eq('deactivated', false);
+  const result3 = await query3;
+
+  if (result3.error) {
+    console.error('[findMemberByPhone] Fallback query error:', result3.error);
+    return null;
+  }
+
+  const match = result3.data?.find((m: any) => {
     const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
     return dbPhone === normalizedPhone;
   }) || null;
+
+  if (match) {
+    console.log('[findMemberByPhone] Resolved via fallback normalization for phone:', normalizedPhone);
+  }
+
+  return match;
 }
 
 /**
  * Check if account is locked
  */
 export async function isAccountLocked(phone: string): Promise<{ locked: boolean; until?: Date }> {
-  const member = await findMemberByPhone(phone, 'member_id, phone, account_locked_until, failed_login_count');
+  // Include deactivated members — lockout status must be visible regardless of account status
+  const member = await findMemberByPhone(phone, 'member_id, phone, account_locked_until, failed_login_count', { includeDeactivated: true });
 
   if (!member || !member.account_locked_until) {
     return { locked: false };
@@ -118,7 +137,12 @@ export async function recordFailedLogin(
   const attemptsLeft = Math.max(0, MAX_LOGIN_ATTEMPTS - failedCount);
 
   // Find the member to update by member_id (handles all phone formats)
-  const member = await findMemberByPhone(phone, 'member_id, phone');
+  // Include deactivated — we track lockout regardless of account status
+  const member = await findMemberByPhone(phone, 'member_id, phone', { includeDeactivated: true });
+
+  if (!member) {
+    console.warn('[SECURITY] recordFailedLogin: could not find member for phone:', phone);
+  }
 
   // Lock account if too many failed attempts
   if (failedCount >= MAX_LOGIN_ATTEMPTS) {
@@ -160,7 +184,11 @@ export async function recordSuccessfulLogin(phone: string, ipAddress: string): P
   });
 
   // Reset failed login count (find by normalized phone to handle all formats)
-  const member = await findMemberByPhone(phone, 'member_id, phone');
+  // Include deactivated — we clear lockout regardless of account status
+  const member = await findMemberByPhone(phone, 'member_id, phone', { includeDeactivated: true });
+  if (!member) {
+    console.warn('[SECURITY] recordSuccessfulLogin: could not find member for phone:', phone);
+  }
   if (member) {
     await supabaseAdmin
       .from('members')
@@ -224,6 +252,21 @@ export async function logAuthEvent(params: {
     device_fingerprint: params.deviceFingerprint,
     metadata: params.metadata || {},
   });
+}
+
+/**
+ * Get cookie domain for session cookies.
+ * Uses COOKIE_DOMAIN env var if set, otherwise falls back to '.noirkc.com' in production.
+ * Returns undefined in development (cookie scoped to current host).
+ */
+export function getSessionCookieDomain(): string | undefined {
+  if (process.env.COOKIE_DOMAIN) {
+    return process.env.COOKIE_DOMAIN;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return '.noirkc.com';
+  }
+  return undefined;
 }
 
 /**

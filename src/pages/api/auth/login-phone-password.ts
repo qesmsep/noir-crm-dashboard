@@ -11,6 +11,7 @@ import {
   checkRateLimit,
   logAuthEvent,
   findMemberByPhone,
+  getSessionCookieDomain,
 } from '@/lib/security';
 import { serialize } from 'cookie';
 
@@ -183,14 +184,14 @@ export default async function handler(
 
     // Set httpOnly cookie for session (secure in production)
     const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = getSessionCookieDomain();
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax' as const,
       maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
       path: '/',
-      // Explicitly set domain for production
-      ...(isProduction && { domain: '.noirkc.com' }),
+      ...(cookieDomain && { domain: cookieDomain }),
     };
 
     const cookieValue = serialize('member_session', sessionToken, cookieOptions);

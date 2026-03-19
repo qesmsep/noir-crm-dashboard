@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { z } from 'zod';
 import { serialize } from 'cookie';
+import { getSessionCookieDomain } from '@/lib/security';
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
@@ -296,14 +297,14 @@ export default async function handler(
 
     // Set httpOnly cookie for session (secure in production)
     const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = getSessionCookieDomain();
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax' as const,
       maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
       path: '/',
-      // Explicitly set domain for production
-      ...(isProduction && { domain: '.noirkc.com' }),
+      ...(cookieDomain && { domain: cookieDomain }),
     };
 
     const cookie = serialize('member_session', sessionToken, cookieOptions);

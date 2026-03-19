@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
-import { logAuthEvent, getClientIP, getUserAgent, recordSuccessfulLogin } from '@/lib/security';
+import { logAuthEvent, getClientIP, getUserAgent, recordSuccessfulLogin, getSessionCookieDomain } from '@/lib/security';
 import { serialize } from 'cookie';
 
 const SESSION_DURATION_DAYS = 7;
@@ -133,6 +133,7 @@ export default async function handler(
 
     // Set httpOnly cookie for session
     const isProduction = process.env.NODE_ENV === 'production';
+    const cookieDomain = getSessionCookieDomain();
     res.setHeader('Set-Cookie', [
       serialize('member_session', sessionToken, {
         httpOnly: true,
@@ -140,7 +141,7 @@ export default async function handler(
         sameSite: 'lax',
         maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
         path: '/',
-        ...(isProduction && { domain: '.noirkc.com' }),
+        ...(cookieDomain && { domain: cookieDomain }),
       }),
     ]);
 
