@@ -8,6 +8,9 @@
 # testing
 /coverage
 
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+
 # production
 /build
 /.next/

@@ -24,65 +24,103 @@ export function getUserAgent(req: NextApiRequest): string {
   return req.headers['user-agent'] || 'unknown';
 }
 
+/** Max rows to fetch in fallback normalization query to prevent unbounded table scans. */
+const FALLBACK_MEMBER_LIMIT = 500;
+
 /**
- * Find a member by normalized phone number.
- * Handles various phone formats stored in the database by normalizing to last 10 digits.
+ * Normalize a phone string to its last 10 digits.
+ */
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '').slice(-10);
+}
+
+/**
+ * Find a member by phone number.
+ * Accepts any phone format — normalizes to last 10 digits internally.
  *
- * @param normalizedPhone - 10-digit normalized phone number
+ * Lookup strategy (short-circuits on first hit):
+ *   1. Exact match on raw 10-digit number
+ *   2. Exact match with +1 prefix
+ *   3. Fallback: fetch up to {@link FALLBACK_MEMBER_LIMIT} rows and normalize in-memory
+ *
+ * @param phone - Phone number in any format (will be normalized)
  * @param select - Supabase select string. Must include 'member_id'.
  * @param opts.includeDeactivated - If true, skips the deactivated=false filter (needed for lockout checks)
+ * @returns The matched member row, or null
  */
-export async function findMemberByPhone(
-  normalizedPhone: string,
+export async function findMemberByPhone<T extends { member_id: string } = any>(
+  phone: string,
   select: string = 'member_id, phone',
   opts?: { includeDeactivated?: boolean }
-): Promise<any | null> {
+): Promise<T | null> {
+  const normalized = normalizePhone(phone);
+  if (normalized.length < 10) {
+    console.warn('[findMemberByPhone] Phone too short after normalization:', phone);
+    return null;
+  }
+
   const filterDeactivated = !opts?.includeDeactivated;
 
-  // Try exact match first (fastest)
-  let query1 = supabaseAdmin.from('members').select(select).eq('phone', normalizedPhone);
+  // 1. Exact match (fastest)
+  let query1 = supabaseAdmin.from('members').select(select).eq('phone', normalized);
   if (filterDeactivated) query1 = query1.eq('deactivated', false);
   const result1 = await query1.limit(1);
 
   if (result1.error) {
     console.error('[findMemberByPhone] Exact match query error:', result1.error);
   }
-  if (result1.data && result1.data.length > 0) return result1.data[0];
+  if (result1.data && result1.data.length > 0) {
+    warnOnDuplicatePhone(normalized, result1.data.length);
+    return result1.data[0] as T;
+  }
 
-  // Try with +1 prefix
-  let query2 = supabaseAdmin.from('members').select(select).eq('phone', `+1${normalizedPhone}`);
+  // 2. Try with +1 prefix
+  let query2 = supabaseAdmin.from('members').select(select).eq('phone', `+1${normalized}`);
   if (filterDeactivated) query2 = query2.eq('deactivated', false);
   const result2 = await query2.limit(1);
 
   if (result2.error) {
     console.error('[findMemberByPhone] +1 prefix query error:', result2.error);
   }
-  if (result2.data && result2.data.length > 0) return result2.data[0];
+  if (result2.data && result2.data.length > 0) {
+    warnOnDuplicatePhone(normalized, result2.data.length);
+    return result2.data[0] as T;
+  }
 
-  // Fallback: fetch active members with phone set and normalize in-memory.
-  // Always select phone for normalization even if caller didn't request it.
+  // 3. Fallback: fetch members and normalize in-memory.
+  //    Capped at FALLBACK_MEMBER_LIMIT to bound memory/transfer.
   const selectFields = select.split(',').map(s => s.trim());
   const fallbackSelect = selectFields.includes('phone') ? select : `${select}, phone`;
 
   let query3 = supabaseAdmin.from('members').select(fallbackSelect).not('phone', 'is', null);
   if (filterDeactivated) query3 = query3.eq('deactivated', false);
-  const result3 = await query3;
+  const result3 = await query3.limit(FALLBACK_MEMBER_LIMIT);
 
   if (result3.error) {
     console.error('[findMemberByPhone] Fallback query error:', result3.error);
     return null;
   }
 
+  if (result3.data && result3.data.length >= FALLBACK_MEMBER_LIMIT) {
+    console.warn('[findMemberByPhone] Fallback hit limit of', FALLBACK_MEMBER_LIMIT, 'rows — member may not be found. Consider adding a phone_normalized column.');
+  }
+
   const match = result3.data?.find((m: any) => {
-    const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
-    return dbPhone === normalizedPhone;
+    const dbPhone = normalizePhone(m.phone || '');
+    return dbPhone === normalized;
   }) || null;
 
   if (match) {
-    console.log('[findMemberByPhone] Resolved via fallback normalization for phone:', normalizedPhone);
+    console.warn('[findMemberByPhone] Resolved via fallback normalization for phone:', normalized, '— consider normalizing this phone in the database.');
   }
 
-  return match;
+  return match as T | null;
+}
+
+function warnOnDuplicatePhone(phone: string, count: number): void {
+  if (count > 1) {
+    console.warn('[findMemberByPhone] Multiple members found with phone:', phone, '— returning first match');
+  }
 }
 
 /**
@@ -141,33 +179,31 @@ export async function recordFailedLogin(
   const member = await findMemberByPhone(phone, 'member_id, phone', { includeDeactivated: true });
 
   if (!member) {
-    console.warn('[SECURITY] recordFailedLogin: could not find member for phone:', phone);
+    console.warn('[SECURITY] recordFailedLogin: could not find member for phone:', phone, '— lockout tracking skipped');
+    // Still report attempts left based on IP-level tracking, but don't claim we locked
+    return { shouldLock: false, attemptsLeft };
   }
 
   // Lock account if too many failed attempts
   if (failedCount >= MAX_LOGIN_ATTEMPTS) {
     const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
 
-    if (member) {
-      await supabaseAdmin
-        .from('members')
-        .update({
-          account_locked_until: lockedUntil.toISOString(),
-          failed_login_count: failedCount,
-        })
-        .eq('member_id', member.member_id);
-    }
+    await supabaseAdmin
+      .from('members')
+      .update({
+        account_locked_until: lockedUntil.toISOString(),
+        failed_login_count: failedCount,
+      })
+      .eq('member_id', member.member_id);
 
     return { shouldLock: true, attemptsLeft: 0 };
   }
 
   // Update failed login count
-  if (member) {
-    await supabaseAdmin
-      .from('members')
-      .update({ failed_login_count: failedCount })
-      .eq('member_id', member.member_id);
-  }
+  await supabaseAdmin
+    .from('members')
+    .update({ failed_login_count: failedCount })
+    .eq('member_id', member.member_id);
 
   return { shouldLock: false, attemptsLeft };
 }
