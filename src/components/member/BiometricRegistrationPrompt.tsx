@@ -16,7 +16,8 @@ import { useToast } from '@/hooks/useToast';
 const DISMISSED_KEY = 'noir_biometric_prompt_dismissed';
 
 function getDeviceName(): string {
-  const platform = navigator.userAgentData?.platform
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  const platform = nav.userAgentData?.platform
     ?? navigator.platform
     ?? 'Unknown device';
   return `${platform} - ${new Date().toLocaleDateString()}`;
