@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,13 @@ import { useToast } from '@/hooks/useToast';
 
 const DISMISSED_KEY = 'noir_biometric_prompt_dismissed';
 
+function getDeviceName(): string {
+  const platform = navigator.userAgentData?.platform
+    ?? navigator.platform
+    ?? 'Unknown device';
+  return `${platform} - ${new Date().toLocaleDateString()}`;
+}
+
 interface BiometricRegistrationPromptProps {
   memberId: string;
 }
@@ -23,6 +30,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
   const [isOpen, setIsOpen] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [success, setSuccess] = useState(false);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { registerBiometric, isBiometricAvailable } = useMemberAuth();
   const { toast } = useToast();
 
@@ -47,7 +55,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
         if (!response.ok || cancelled) return;
 
         const data = await response.json();
-        const devices = data.devices || [];
+        const devices = Array.isArray(data.devices) ? data.devices : [];
 
         // Only show prompt if no biometric credentials exist
         if (devices.length === 0 && !cancelled) {
@@ -67,11 +75,20 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
     };
   }, [memberId, isBiometricAvailable]);
 
+  // Clean up success auto-close timer on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSetup = async () => {
     setRegistering(true);
 
     try {
-      const deviceName = `${navigator.platform} - ${new Date().toLocaleDateString()}`;
+      const deviceName = getDeviceName();
       await registerBiometric(deviceName);
 
       setSuccess(true);
@@ -82,13 +99,15 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
       });
 
       // Auto-close after showing success
-      setTimeout(() => {
+      successTimerRef.current = setTimeout(() => {
         setIsOpen(false);
         setSuccess(false);
+        successTimerRef.current = null;
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Please try again later in Settings.';
       // User cancelled or registration failed
-      if (error.message?.includes('cancelled')) {
+      if (message.includes('cancelled')) {
         // User cancelled the browser prompt — keep dialog open
         toast({
           title: 'Setup cancelled',
@@ -98,7 +117,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
       } else {
         toast({
           title: 'Setup failed',
-          description: error.message || 'Please try again later in Settings.',
+          description: message,
           variant: 'error',
         });
       }
@@ -108,11 +127,13 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
   };
 
   const handleDismiss = () => {
+    setSuccess(false);
     setIsOpen(false);
   };
 
   const handleDontAskAgain = () => {
     localStorage.setItem(DISMISSED_KEY, memberId);
+    setSuccess(false);
     setIsOpen(false);
   };
 
@@ -131,7 +152,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
           <>
             <DialogHeader className="items-center text-center">
               <div className="mx-auto mb-2 w-16 h-16 rounded-full bg-[#F6F5F2] flex items-center justify-center">
-                <Fingerprint className="w-8 h-8 text-[#A59480]" />
+                <Fingerprint className="w-8 h-8 text-cork" />
               </div>
               <DialogTitle className="text-xl font-semibold text-[#1F1F1F]">
                 Enable Quick Sign-In
@@ -142,7 +163,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
             </DialogHeader>
 
             <div className="flex items-start gap-3 bg-[#F6F5F2] rounded-xl p-3 mt-1">
-              <Shield className="w-4 h-4 text-[#A59480] mt-0.5 flex-shrink-0" />
+              <Shield className="w-4 h-4 text-cork mt-0.5 flex-shrink-0" />
               <p className="text-sm text-[#5A5A5A]">
                 Your biometric data stays on your device and is never stored on our servers.
               </p>
@@ -152,7 +173,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
               <Button
                 onClick={handleSetup}
                 disabled={registering}
-                className="w-full h-12 bg-[#A59480] text-white hover:bg-[#8f7e6b] transition-all hover:-translate-y-0.5 active:translate-y-0 text-base shadow-[0_2px_4px_rgba(0,0,0,0.1),0_4px_8px_rgba(0,0,0,0.08),0_8px_16px_rgba(0,0,0,0.06)]"
+                className="w-full h-12 bg-cork text-white hover:bg-[#8f7e6b] transition-all hover:-translate-y-0.5 active:translate-y-0 text-base shadow-[0_2px_4px_rgba(0,0,0,0.1),0_4px_8px_rgba(0,0,0,0.08),0_8px_16px_rgba(0,0,0,0.06)]"
               >
                 <Fingerprint className="w-5 h-5 mr-2" />
                 {registering ? 'Setting up...' : 'Set Up Face ID / Touch ID'}
@@ -168,14 +189,15 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
                 Maybe Later
               </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="link"
                 onClick={handleDontAskAgain}
                 disabled={registering}
                 className="text-sm text-[#8C7C6D] hover:text-[#5A5A5A] transition-colors min-h-[44px]"
               >
                 Don't ask again
-              </button>
+              </Button>
             </div>
           </>
         )}
