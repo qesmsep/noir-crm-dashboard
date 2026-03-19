@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendPersonalizedSMS } from '@/utils/openphoneUtils';
+import { normalizePhone } from '@/lib/security';
 import { z } from 'zod';
 
 const requestSchema = z.object({
@@ -22,9 +23,7 @@ export default async function handler(
   try {
     const { phone } = requestSchema.parse(req.body);
 
-    // Normalize phone number (remove all non-digits, then take last 10 digits)
-    const digitsOnly = phone.replace(/\D/g, '');
-    const normalizedPhone = digitsOnly.slice(-10);
+    const normalizedPhone = normalizePhone(phone);
 
     // Get client IP address
     const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
@@ -81,7 +80,7 @@ export default async function handler(
 
     // Find member by normalizing database phone numbers (last 10 digits match)
     const member = members?.find(m => {
-      const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
+      const dbPhone = normalizePhone(m.phone || '');
       return dbPhone === normalizedPhone;
     });
 

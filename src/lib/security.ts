@@ -43,7 +43,7 @@ interface MemberBase {
  * Assumes US phone numbers (10-digit NANP format). International numbers
  * will be silently truncated — do not use for non-US phone numbers.
  */
-function normalizePhone(phone: string): string {
+export function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '').slice(-10);
 }
 

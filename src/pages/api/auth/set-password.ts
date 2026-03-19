@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { serialize } from 'cookie';
-import { findMemberByPhone, getSessionCookieDomain } from '@/lib/security';
+import { findMemberByPhone, getSessionCookieDomain, normalizePhone } from '@/lib/security';
 import { Logger } from '@/lib/logger';
 
 interface SetPasswordMember {
@@ -11,6 +11,15 @@ interface SetPasswordMember {
   first_name: string;
   last_name: string;
   email: string;
+}
+
+interface OtpRecord {
+  id: string;
+  phone: string;
+  code: string;
+  expires_at: string;
+  attempts: number;
+  verified: boolean;
 }
 
 const requestSchema = z.object({
@@ -37,17 +46,9 @@ export default async function handler(
     const { phone, otpCode, newPassword } = requestSchema.parse(req.body);
 
     // findMemberByPhone normalizes internally, but we need normalizedPhone for OTP lookup
-    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+    const normalizedPhone = normalizePhone(phone);
 
     // Verify OTP first (try both normalizedPhone and +1 prefix — mirrors verify-phone-otp.ts)
-    interface OtpRecord {
-      id: string;
-      phone: string;
-      code: string;
-      expires_at: string;
-      attempts: number;
-      verified: boolean;
-    }
     let otpRecord: OtpRecord | null = null;
 
     const otp1 = await supabaseAdmin

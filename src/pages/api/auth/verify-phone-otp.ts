@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { z } from 'zod';
 import { serialize } from 'cookie';
-import { getSessionCookieDomain, findMemberByPhone, getClientIP } from '@/lib/security';
+import { getSessionCookieDomain, findMemberByPhone, getClientIP, normalizePhone } from '@/lib/security';
 import { Logger } from '@/lib/logger';
 
 interface OtpVerifyMember {
@@ -37,7 +37,7 @@ export default async function handler(
     const { phone, code } = requestSchema.parse(req.body);
 
     // Normalize phone for OTP table lookups
-    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+    const normalizedPhone = normalizePhone(phone);
 
     const clientIp = getClientIP(req);
 

@@ -12,6 +12,7 @@ import {
   logAuthEvent,
   findMemberByPhone,
   getSessionCookieDomain,
+  normalizePhone,
 } from '@/lib/security';
 import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
@@ -49,9 +50,7 @@ export default async function handler(
   try {
     const { phone, password } = requestSchema.parse(req.body);
 
-    // Normalize phone number (remove all non-digits, then take last 10 digits)
-    const digitsOnly = phone.replace(/\D/g, '');
-    const normalizedPhone = digitsOnly.slice(-10); // Take last 10 digits (removes +1, *1, etc.)
+    const normalizedPhone = normalizePhone(phone);
     Logger.auth('Login attempt', undefined, { phone: `***${normalizedPhone.slice(-4)}` });
 
     // Check rate limiting by IP
