@@ -693,7 +693,7 @@ export default function BusinessDashboard() {
                 <div className={`${styles.kpiDelta} ${deltaStr(s.mrr, s.priorMrr).cls}`}>
                   {deltaStr(s.mrr, s.priorMrr).text}
                 </div>
-                <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of all active members' monthly dues for {fmtMonthRange(s.month)}. Click to view trend.</div>
+                <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of monthly subscription members' dues for {fmtMonthRange(s.month)}. Excludes annual memberships (see ARR). Click to view trend.</div>
               </div>
               <div className={styles.kpiTile} onClick={() => setShowNetNewMrrModal(true)} style={{ cursor: 'pointer' }}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.mrrBridge.netNewMrr)}</div>
@@ -703,7 +703,7 @@ export default function BusinessDashboard() {
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
                 <div className={styles.kpiLabel}>ARR</div>
-                <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthRange(s.month)}) — MRR × 12. A forward-looking projection of yearly revenue if nothing changes.</div>
+                <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthRange(s.month)}) — includes all recurring revenue (monthly and annual memberships) annualized. A forward-looking projection of yearly revenue if nothing changes.</div>
               </div>
               <div
                 className={styles.kpiTile}
