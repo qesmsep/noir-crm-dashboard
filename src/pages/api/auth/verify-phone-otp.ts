@@ -67,7 +67,15 @@ export default async function handler(
     }
 
     // Find the most recent OTP for this phone (try both with and without +1)
-    let otpRecords: Array<Record<string, unknown>> | null = null;
+    interface OtpRecord {
+      id: string;
+      phone: string;
+      code: string;
+      expires_at: string;
+      attempts: number;
+      verified: boolean;
+    }
+    let otpRecords: OtpRecord[] | null = null;
 
     const otp1 = await supabaseAdmin
       .from('phone_otp_codes')
@@ -78,7 +86,7 @@ export default async function handler(
       .limit(1);
 
     if (otp1.data && otp1.data.length > 0) {
-      otpRecords = otp1.data;
+      otpRecords = otp1.data as unknown as OtpRecord[];
     } else {
       const otp2 = await supabaseAdmin
         .from('phone_otp_codes')
@@ -89,7 +97,7 @@ export default async function handler(
         .limit(1);
 
       if (otp2.data && otp2.data.length > 0) {
-        otpRecords = otp2.data;
+        otpRecords = otp2.data as unknown as OtpRecord[];
       }
     }
 
@@ -126,7 +134,7 @@ export default async function handler(
     if (otpRecord.code !== code) {
       Logger.auth('OTP verification failed', undefined, {
         ip_address: clientIp,
-        attempts: (otpRecord.attempts as number) + 1,
+        attempts: otpRecord.attempts + 1,
       });
 
       return res.status(400).json({

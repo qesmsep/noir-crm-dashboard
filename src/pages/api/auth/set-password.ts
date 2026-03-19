@@ -40,7 +40,15 @@ export default async function handler(
     const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
 
     // Verify OTP first (try both normalizedPhone and +1 prefix — mirrors verify-phone-otp.ts)
-    let otpRecord: Record<string, unknown> | null = null;
+    interface OtpRecord {
+      id: string;
+      phone: string;
+      code: string;
+      expires_at: string;
+      attempts: number;
+      verified: boolean;
+    }
+    let otpRecord: OtpRecord | null = null;
 
     const otp1 = await supabaseAdmin
       .from('phone_otp_codes')
@@ -51,7 +59,7 @@ export default async function handler(
       .limit(1);
 
     if (otp1.data && otp1.data.length > 0) {
-      otpRecord = otp1.data[0];
+      otpRecord = otp1.data[0] as unknown as OtpRecord;
     } else {
       const otp2 = await supabaseAdmin
         .from('phone_otp_codes')
@@ -62,7 +70,7 @@ export default async function handler(
         .limit(1);
 
       if (otp2.data && otp2.data.length > 0) {
-        otpRecord = otp2.data[0];
+        otpRecord = otp2.data[0] as unknown as OtpRecord;
       }
     }
 
@@ -73,14 +81,14 @@ export default async function handler(
     }
 
     // Check if expired
-    if (new Date(otpRecord.expires_at as string) < new Date()) {
+    if (new Date(otpRecord.expires_at) < new Date()) {
       return res.status(400).json({
         error: 'Verification code has expired. Please request a new code.',
       });
     }
 
     // Check max attempts (prevents brute-force on 6-digit OTP)
-    const attempts = (otpRecord.attempts as number) || 0;
+    const attempts = otpRecord.attempts || 0;
     if (attempts >= MAX_OTP_ATTEMPTS) {
       return res.status(429).json({
         error: 'Too many failed attempts. Please request a new code.',
