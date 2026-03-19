@@ -18,7 +18,10 @@ CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_member_type
 -- Auto-cleanup: delete expired challenges older than 1 hour past expiry
 -- (handled by application code or a cron job)
 
--- RLS: only service role should access this table
+-- RLS: only service role should access this table.
+-- No policies are defined, so non-service-role access is denied by default (Supabase deny-all).
+-- Service role (used by API routes) bypasses RLS entirely.
+-- Do NOT add permissive policies unless explicitly required.
 ALTER TABLE webauthn_challenges ENABLE ROW LEVEL SECURITY;
 
 -- Rollback:

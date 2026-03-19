@@ -40,6 +40,8 @@ interface MemberBase {
 
 /**
  * Normalize a phone string to its last 10 digits.
+ * Assumes US phone numbers (10-digit NANP format). International numbers
+ * will be silently truncated — do not use for non-US phone numbers.
  */
 function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '').slice(-10);
@@ -137,6 +139,8 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
     Logger.warn('findMemberByPhone: resolved via fallback normalization — consider normalizing this phone in the DB', {
       phone: maskPhone(normalized),
       member_id: match.member_id,
+      rows_scanned: rows?.length ?? 0,
+      action_needed: 'Run phone normalization migration. See TODO(#phone-normalization).',
     });
   }
 
@@ -284,8 +288,7 @@ export async function recordSuccessfulLogin(
  */
 export async function checkRateLimit(
   ipAddress: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  endpoint: string
+  _endpoint: string
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
 
