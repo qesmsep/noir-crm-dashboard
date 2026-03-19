@@ -2,7 +2,7 @@
 -- Required by WebAuthn spec: challenges must be verified against server-stored values
 CREATE TABLE IF NOT EXISTS webauthn_challenges (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  member_id text NOT NULL REFERENCES members(member_id) ON DELETE CASCADE,
+  member_id uuid NOT NULL REFERENCES members(member_id) ON DELETE CASCADE,
   challenge text NOT NULL,
   type text NOT NULL CHECK (type IN ('authentication', 'registration')),
   created_at timestamptz DEFAULT now(),

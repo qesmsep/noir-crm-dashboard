@@ -1,6 +1,8 @@
 **CRITICAL:** Never commit without Tim's explicit approval. Read AI_QUICK_START.md and HOWTO.md for full project docs.
 
-Respond: "Initialized. Use /howto for project docs. What would you like to work on?"
+**First:** Check that local code is up to date with production by running `git fetch` and `git status` to see if the local branch is behind the remote.
+
+Respond: "Initialized. Code is up to date with production. Use /howto for project docs. What would you like to work on?" (or notify if updates are needed)
 
 ---
 
@@ -56,3 +58,17 @@ Respond: "Initialized. Use /howto for project docs. What would you like to work 
 - **Mobile:** Design mobile-first (320px+); 44px touch targets minimum
 - **Breaking Changes:** `/conflict` TLDR first; detailed breakdown only when Tim asks
 - **Commits:** ONLY when Tim explicitly approves; descriptive messages
+
+---
+
+## 🔄 Git Workflow
+
+**CRITICAL: Never push directly to main. Always go through dev first.**
+
+The correct flow:
+1. Commit locally
+2. Push to a feature/fix branch
+3. Create PR
+4. Provide GitHub link to branch to Tim for easy access and approval
+5. Claude reviews on GitHub
+6. Merge after approval → auto-deploy
