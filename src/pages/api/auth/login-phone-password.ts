@@ -16,6 +16,18 @@ import {
 import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
 
+interface LoginMember {
+  member_id: string;
+  auth_user_id: string | null;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  password_hash: string | null;
+  membership: string;
+  password_is_temporary: boolean | null;
+}
+
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -81,7 +93,7 @@ export default async function handler(
     }
 
     // Get member by phone (handles all phone formats via normalization)
-    const member = await findMemberByPhone(
+    const member = await findMemberByPhone<LoginMember>(
       normalizedPhone,
       'member_id, auth_user_id, email, first_name, last_name, phone, password_hash, membership, password_is_temporary'
     );
@@ -122,7 +134,7 @@ export default async function handler(
     }
 
     // Verify password
-    const passwordMatch = await bcrypt.compare(password, member.password_hash as string);
+    const passwordMatch = await bcrypt.compare(password, member.password_hash!);
 
     if (!passwordMatch) {
       const failedResult = await recordFailedLogin(normalizedPhone, ipAddress, member.member_id);

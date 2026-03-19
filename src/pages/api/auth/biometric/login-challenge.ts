@@ -5,6 +5,13 @@ import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
 import { z } from 'zod';
 import { findMemberByPhone } from '@/lib/security';
 
+interface BiometricChallengeMember {
+  member_id: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+}
+
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
 });
@@ -29,7 +36,7 @@ export default async function handler(
     const normalizedPhone = digitsOnly.slice(-10);
 
     // Get member by phone (handles all phone formats via normalization)
-    const member = await findMemberByPhone(
+    const member = await findMemberByPhone<BiometricChallengeMember>(
       normalizedPhone,
       'member_id, phone, first_name, last_name'
     );

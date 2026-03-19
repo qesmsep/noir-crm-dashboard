@@ -4,6 +4,17 @@ import { z } from 'zod';
 import { serialize } from 'cookie';
 import { getSessionCookieDomain, findMemberByPhone } from '@/lib/security';
 
+interface OtpVerifyMember {
+  member_id: string;
+  auth_user_id: string | null;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  password_hash: string | null;
+  password_is_temporary: boolean | null;
+}
+
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
   code: z.string().length(6, 'Code must be 6 digits'),
@@ -147,7 +158,7 @@ export default async function handler(
       .eq('id', otpRecord.id);
 
     // Get member by phone (handles all phone formats via normalization)
-    const member = await findMemberByPhone(
+    const member = await findMemberByPhone<OtpVerifyMember>(
       normalizedPhone,
       'member_id, auth_user_id, email, first_name, last_name, phone, password_hash, password_is_temporary'
     );

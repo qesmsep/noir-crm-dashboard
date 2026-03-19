@@ -124,7 +124,7 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
   if (result3.data && result3.data.length >= FALLBACK_MEMBER_LIMIT) {
     Logger.error('findMemberByPhone: fallback hit row limit — member may not be found. Run phone normalization migration.', undefined, {
       limit: FALLBACK_MEMBER_LIMIT,
-      phone: normalized,
+      phone: maskPhone(normalized),
     });
   }
 
