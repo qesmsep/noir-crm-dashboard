@@ -294,7 +294,7 @@ describe('BiometricRegistrationPrompt', () => {
       mockFetchResponse({ devices: [] });
       mockRegisterBiometric.mockResolvedValue(undefined);
 
-      const { rerender } = render(<BiometricRegistrationPrompt memberId={MEMBER_ID} />);
+      render(<BiometricRegistrationPrompt memberId={MEMBER_ID} />);
 
       await act(async () => { jest.advanceTimersByTime(1600); });
 
@@ -310,6 +310,38 @@ describe('BiometricRegistrationPrompt', () => {
 
       // Dialog should be closed and success state reset
       expect(screen.queryByTestId('dialog')).not.toBeInTheDocument();
+    });
+
+    it('cancels the success auto-close timer on early manual dismiss', async () => {
+      mockIsBiometricAvailable.mockResolvedValue(true);
+      mockFetchResponse({ devices: [] });
+      mockRegisterBiometric.mockResolvedValue(undefined);
+
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+      render(<BiometricRegistrationPrompt memberId={MEMBER_ID} />);
+
+      await act(async () => { jest.advanceTimersByTime(1600); });
+
+      // Trigger success (starts the 2s auto-close timer)
+      await act(async () => {
+        fireEvent.click(screen.getByText('Set Up Face ID / Touch ID'));
+      });
+
+      expect(screen.getByText("You're all set!")).toBeInTheDocument();
+
+      // Manually dismiss before the 2s timer fires
+      fireEvent.click(screen.getByText("You're all set!").closest('[data-testid="dialog"]')!.querySelector('button') || document.body);
+
+      // The clearTimeout should have been called for the success timer
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      // Advancing time past the original 2s should not cause issues
+      act(() => { jest.advanceTimersByTime(3000); });
+
+      expect(screen.queryByTestId('dialog')).not.toBeInTheDocument();
+
+      clearTimeoutSpy.mockRestore();
     });
   });
 });

@@ -128,11 +128,19 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
   };
 
   const handleDismiss = (): void => {
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
     setSuccess(false);
     setIsOpen(false);
   };
 
   const handleDontAskAgain = (): void => {
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
     localStorage.setItem(DISMISSED_KEY, memberId);
     setSuccess(false);
     setIsOpen(false);
