@@ -143,18 +143,25 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
   return match as unknown as T | null;
 }
 
+interface LockableMember {
+  member_id: string;
+  phone: string;
+  account_locked_until: string | null;
+  failed_login_count: number;
+}
+
 /**
  * Check if account is locked
  */
 export async function isAccountLocked(phone: string): Promise<{ locked: boolean; until?: Date }> {
   // Include deactivated members — lockout status must be visible regardless of account status
-  const member = await findMemberByPhone(phone, 'member_id, phone, account_locked_until, failed_login_count', { includeDeactivated: true });
+  const member = await findMemberByPhone<LockableMember>(phone, 'member_id, phone, account_locked_until, failed_login_count', { includeDeactivated: true });
 
   if (!member || !member.account_locked_until) {
     return { locked: false };
   }
 
-  const lockedUntil = new Date(member.account_locked_until as string);
+  const lockedUntil = new Date(member.account_locked_until);
   if (lockedUntil > new Date()) {
     return { locked: true, until: lockedUntil };
   }
