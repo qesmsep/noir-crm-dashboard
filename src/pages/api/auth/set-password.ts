@@ -96,11 +96,14 @@ export default async function handler(
       });
     }
 
-    // Increment attempts BEFORE checking code (prevents timing attacks)
+    // Increment attempts BEFORE checking code (prevents timing attacks).
+    // Uses .eq('attempts', attempts) as an optimistic lock — if a concurrent request
+    // already incremented, this update is a no-op and the next read will see the true count.
     await supabaseAdmin
       .from('phone_otp_codes')
       .update({ attempts: attempts + 1 })
-      .eq('id', otpRecord.id);
+      .eq('id', otpRecord.id)
+      .eq('attempts', attempts);
 
     // Verify code
     if (otpRecord.code !== otpCode) {
