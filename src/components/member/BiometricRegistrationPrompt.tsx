@@ -94,6 +94,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
       await registerBiometric(deviceName);
 
       setSuccess(true);
+      localStorage.setItem(DISMISSED_KEY, memberId);
       toast({
         title: 'Biometric registered',
         description: 'You can now use Face ID / Touch ID to sign in.',
@@ -156,6 +157,14 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
             <p className="text-sm text-[#5A5A5A] text-center">
               Next time, just use Face ID or Touch ID to sign in.
             </p>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleDismiss}
+              className="mt-4 text-[#5A5A5A] hover:text-[#1F1F1F]"
+            >
+              Done
+            </Button>
           </div>
         ) : (
           <>

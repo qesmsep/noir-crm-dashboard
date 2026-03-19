@@ -182,6 +182,43 @@ describe('BiometricRegistrationPrompt', () => {
       );
     });
 
+    it('renders a "Done" button in the success state', async () => {
+      mockIsBiometricAvailable.mockResolvedValue(true);
+      mockFetchResponse({ devices: [] });
+      mockRegisterBiometric.mockResolvedValue(undefined);
+
+      render(<BiometricRegistrationPrompt memberId={MEMBER_ID} />);
+
+      await act(async () => { jest.advanceTimersByTime(1600); });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Set Up Face ID / Touch ID'));
+      });
+
+      const doneButton = screen.getByText('Done');
+      expect(doneButton).toBeInTheDocument();
+
+      // Clicking Done closes the dialog
+      fireEvent.click(doneButton);
+      expect(screen.queryByTestId('dialog')).not.toBeInTheDocument();
+    });
+
+    it('persists DISMISSED_KEY to localStorage on success', async () => {
+      mockIsBiometricAvailable.mockResolvedValue(true);
+      mockFetchResponse({ devices: [] });
+      mockRegisterBiometric.mockResolvedValue(undefined);
+
+      render(<BiometricRegistrationPrompt memberId={MEMBER_ID} />);
+
+      await act(async () => { jest.advanceTimersByTime(1600); });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Set Up Face ID / Touch ID'));
+      });
+
+      expect(localStorage.getItem(DISMISSED_KEY)).toBe(MEMBER_ID);
+    });
+
     it('auto-closes after 2 seconds', async () => {
       mockIsBiometricAvailable.mockResolvedValue(true);
       mockFetchResponse({ devices: [] });
@@ -312,7 +349,7 @@ describe('BiometricRegistrationPrompt', () => {
       expect(screen.queryByTestId('dialog')).not.toBeInTheDocument();
     });
 
-    it('cancels the success auto-close timer on early manual dismiss', async () => {
+    it('cancels the success auto-close timer on early manual dismiss via Done', async () => {
       mockIsBiometricAvailable.mockResolvedValue(true);
       mockFetchResponse({ devices: [] });
       mockRegisterBiometric.mockResolvedValue(undefined);
@@ -330,8 +367,8 @@ describe('BiometricRegistrationPrompt', () => {
 
       expect(screen.getByText("You're all set!")).toBeInTheDocument();
 
-      // Manually dismiss before the 2s timer fires
-      fireEvent.click(screen.getByText("You're all set!").closest('[data-testid="dialog"]')!.querySelector('button') || document.body);
+      // Manually dismiss before the 2s timer fires using the Done button
+      fireEvent.click(screen.getByText('Done'));
 
       // The clearTimeout should have been called for the success timer
       expect(clearTimeoutSpy).toHaveBeenCalled();
