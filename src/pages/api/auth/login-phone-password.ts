@@ -30,7 +30,7 @@ interface LoginMember {
 
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 const SESSION_DURATION_DAYS = 7; // Reduced from 30 days

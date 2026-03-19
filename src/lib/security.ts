@@ -342,18 +342,3 @@ export function getSessionCookieDomain(): string | undefined {
   }
   return undefined;
 }
-
-/**
- * Generate CSRF token
- */
-export function generateCSRFToken(): string {
-  return crypto.randomUUID();
-}
-
-/**
- * Validate CSRF token
- */
-export function validateCSRFToken(token: string, sessionToken: string): boolean {
-  // Simple validation - in production, store CSRF tokens in session
-  return !!(token && sessionToken && token.length > 0);
-}

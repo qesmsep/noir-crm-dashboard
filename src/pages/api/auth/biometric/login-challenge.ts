@@ -4,6 +4,7 @@ import { generateAuthenticationOptions, type PublicKeyCredentialRequestOptionsJS
 import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
 import { z } from 'zod';
 import { findMemberByPhone } from '@/lib/security';
+import { Logger } from '@/lib/logger';
 
 interface BiometricChallengeMember {
   member_id: string;
@@ -15,6 +16,9 @@ interface BiometricChallengeMember {
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
 });
+
+/** Challenge expires in 2 minutes */
+const CHALLENGE_TTL_MS = 2 * 60 * 1000;
 
 /**
  * Generate WebAuthn authentication challenge
@@ -31,13 +35,9 @@ export default async function handler(
   try {
     const { phone } = requestSchema.parse(req.body);
 
-    // Normalize phone number (remove all non-digits, then take last 10 digits)
-    const digitsOnly = phone.replace(/\D/g, '');
-    const normalizedPhone = digitsOnly.slice(-10);
-
-    // Get member by phone (handles all phone formats via normalization)
+    // findMemberByPhone normalizes internally
     const member = await findMemberByPhone<BiometricChallengeMember>(
-      normalizedPhone,
+      phone,
       'member_id, phone, first_name, last_name'
     );
 
@@ -72,9 +72,31 @@ export default async function handler(
       userVerification: 'required',
     });
 
+    // Store challenge server-side (required by WebAuthn spec for anti-replay)
+    // Clean up any existing unused challenges for this member first
+    await supabaseAdmin
+      .from('webauthn_challenges')
+      .delete()
+      .eq('member_id', member.member_id)
+      .eq('type', 'authentication')
+      .eq('used', false);
+
+    const { error: challengeError } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .insert({
+        member_id: member.member_id,
+        challenge: options.challenge,
+        type: 'authentication',
+        expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+      });
+
+    if (challengeError) {
+      Logger.error('Failed to store WebAuthn challenge', challengeError);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
     res.status(200).json({
       options,
-      challenge: options.challenge,
       memberId: member.member_id,
     });
   } catch (error) {
@@ -82,7 +104,7 @@ export default async function handler(
       return res.status(400).json({ error: error.issues[0].message });
     }
 
-    console.error('Login challenge error:', error);
+    Logger.error('Login challenge error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

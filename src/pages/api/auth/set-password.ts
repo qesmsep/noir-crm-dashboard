@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { serialize } from 'cookie';
 import { findMemberByPhone, getSessionCookieDomain } from '@/lib/security';
+import { Logger } from '@/lib/logger';
 
 interface SetPasswordMember {
   member_id: string;
@@ -22,6 +23,7 @@ const requestSchema = z.object({
 });
 
 const SESSION_DURATION_DAYS = 7;
+const MAX_OTP_ATTEMPTS = 5;
 
 export default async function handler(
   req: NextApiRequest,
@@ -32,16 +34,15 @@ export default async function handler(
   }
 
   try {
-    console.log('[SET-PASSWORD] Request body:', req.body);
     const { phone, otpCode, newPassword } = requestSchema.parse(req.body);
 
-    // Normalize phone number (remove all non-digits, then take last 10 digits)
-    const digitsOnly = phone.replace(/\D/g, '');
-    const normalizedPhone = digitsOnly.slice(-10);
-    console.log('[SET-PASSWORD] Normalized phone:', normalizedPhone);
+    // findMemberByPhone normalizes internally, but we need normalizedPhone for OTP lookup
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
 
-    // Verify OTP first (security requirement)
-    const { data: otpRecords, error: fetchError } = await supabaseAdmin
+    // Verify OTP first (try both normalizedPhone and +1 prefix — mirrors verify-phone-otp.ts)
+    let otpRecord: Record<string, unknown> | null = null;
+
+    const otp1 = await supabaseAdmin
       .from('phone_otp_codes')
       .select('*')
       .eq('phone', normalizedPhone)
@@ -49,20 +50,48 @@ export default async function handler(
       .order('created_at', { ascending: false })
       .limit(1);
 
-    if (fetchError || !otpRecords || otpRecords.length === 0) {
+    if (otp1.data && otp1.data.length > 0) {
+      otpRecord = otp1.data[0];
+    } else {
+      const otp2 = await supabaseAdmin
+        .from('phone_otp_codes')
+        .select('*')
+        .eq('phone', `+1${normalizedPhone}`)
+        .eq('verified', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (otp2.data && otp2.data.length > 0) {
+        otpRecord = otp2.data[0];
+      }
+    }
+
+    if (!otpRecord) {
       return res.status(400).json({
         error: 'No verification code found. Please request a new code.',
       });
     }
 
-    const otpRecord = otpRecords[0];
-
     // Check if expired
-    if (new Date(otpRecord.expires_at) < new Date()) {
+    if (new Date(otpRecord.expires_at as string) < new Date()) {
       return res.status(400).json({
         error: 'Verification code has expired. Please request a new code.',
       });
     }
+
+    // Check max attempts (prevents brute-force on 6-digit OTP)
+    const attempts = (otpRecord.attempts as number) || 0;
+    if (attempts >= MAX_OTP_ATTEMPTS) {
+      return res.status(429).json({
+        error: 'Too many failed attempts. Please request a new code.',
+      });
+    }
+
+    // Increment attempts BEFORE checking code (prevents timing attacks)
+    await supabaseAdmin
+      .from('phone_otp_codes')
+      .update({ attempts: attempts + 1 })
+      .eq('id', otpRecord.id);
 
     // Verify code
     if (otpRecord.code !== otpCode) {
@@ -104,7 +133,7 @@ export default async function handler(
       .eq('member_id', member.member_id);
 
     if (updateError) {
-      console.error('Failed to update password:', updateError);
+      Logger.error('Failed to update password', updateError);
       return res.status(500).json({ error: 'Failed to set password' });
     }
 
@@ -121,7 +150,7 @@ export default async function handler(
       });
 
     if (sessionError) {
-      console.error('Failed to create session:', sessionError);
+      Logger.error('Failed to create session', sessionError);
       // Still return success for password set, but don't create session
       return res.status(200).json({
         success: true,
@@ -155,11 +184,10 @@ export default async function handler(
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('[SET-PASSWORD] Validation error:', error.issues);
       return res.status(400).json({ error: error.issues[0].message });
     }
 
-    console.error('[SET-PASSWORD] Error:', error);
+    Logger.error('Set password error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
 import { logAuthEvent, getClientIP, getUserAgent, recordSuccessfulLogin, getSessionCookieDomain } from '@/lib/security';
+import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
 
 const SESSION_DURATION_DAYS = 7;
@@ -23,13 +24,12 @@ export default async function handler(
   const userAgent = getUserAgent(req);
 
   try {
-    const { credential, challenge, memberId } = req.body as {
+    const { credential, memberId } = req.body as {
       credential: AuthenticationResponseJSON;
-      challenge: string;
       memberId: string;
     };
 
-    if (!credential || !challenge || !memberId) {
+    if (!credential || !memberId) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
@@ -43,6 +43,37 @@ export default async function handler(
     if (memberError || !member) {
       return res.status(404).json({ error: 'Member not found' });
     }
+
+    // Retrieve server-stored challenge (NOT from request body — WebAuthn spec requirement)
+    const { data: challengeRecord, error: challengeError } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .select('id, challenge, expires_at')
+      .eq('member_id', memberId)
+      .eq('type', 'authentication')
+      .eq('used', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (challengeError || !challengeRecord) {
+      return res.status(400).json({ error: 'No pending authentication challenge found. Please try again.' });
+    }
+
+    // Check challenge expiry
+    if (new Date(challengeRecord.expires_at) < new Date()) {
+      // Mark as used so it can't be retried
+      await supabaseAdmin
+        .from('webauthn_challenges')
+        .update({ used: true })
+        .eq('id', challengeRecord.id);
+      return res.status(400).json({ error: 'Authentication challenge expired. Please try again.' });
+    }
+
+    // Mark challenge as used immediately (single-use)
+    await supabaseAdmin
+      .from('webauthn_challenges')
+      .update({ used: true })
+      .eq('id', challengeRecord.id);
 
     // Get the credential used
     const credentialID = credential.id;
@@ -60,10 +91,10 @@ export default async function handler(
     // Convert stored public key from base64url to Buffer
     const publicKey = Buffer.from(dbCredential.public_key, 'base64url');
 
-    // Verify the authentication response
+    // Verify the authentication response against the SERVER-STORED challenge
     const verification = await verifyAuthenticationResponse({
       response: credential,
-      expectedChallenge: challenge,
+      expectedChallenge: challengeRecord.challenge,
       expectedOrigin: WEBAUTHN_CONFIG.origin,
       expectedRPID: WEBAUTHN_CONFIG.rpID,
       credential: {
@@ -112,7 +143,7 @@ export default async function handler(
       });
 
     if (sessionError) {
-      console.error('Failed to create session:', sessionError);
+      Logger.error('Failed to create session', sessionError);
       return res.status(500).json({ error: 'Failed to create session' });
     }
 
@@ -157,7 +188,7 @@ export default async function handler(
       },
     });
   } catch (error) {
-    console.error('Login verification error:', error);
+    Logger.error('Login verification error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }
