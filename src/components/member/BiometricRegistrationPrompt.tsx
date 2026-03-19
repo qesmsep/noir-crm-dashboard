@@ -16,11 +16,12 @@ import { useToast } from '@/hooks/useToast';
 const DISMISSED_KEY = 'noir_biometric_prompt_dismissed';
 
 function getDeviceName(): string {
-  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-  const platform = nav.userAgentData?.platform
-    ?? navigator.platform
-    ?? 'Unknown device';
-  return `${platform} - ${new Date().toLocaleDateString()}`;
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad/.test(ua)) return 'iPhone / iPad';
+  if (/Mac/.test(ua)) return 'Mac';
+  if (/Android/.test(ua)) return 'Android Device';
+  if (/Windows/.test(ua)) return 'Windows PC';
+  return 'Unknown Device';
 }
 
 interface BiometricRegistrationPromptProps {
@@ -85,7 +86,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
     };
   }, []);
 
-  const handleSetup = async () => {
+  const handleSetup = async (): Promise<void> => {
     setRegistering(true);
 
     try {
@@ -106,16 +107,15 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
         successTimerRef.current = null;
       }, 2000);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Please try again later in Settings.';
-      // User cancelled or registration failed
-      if (message.includes('cancelled')) {
-        // User cancelled the browser prompt — keep dialog open
+      // User cancelled or denied the WebAuthn prompt
+      if (error instanceof Error && error.name === 'NotAllowedError') {
         toast({
           title: 'Setup cancelled',
           description: 'You can try again or set this up later in Settings.',
           variant: 'warning',
         });
       } else {
+        const message = error instanceof Error ? error.message : 'Please try again later in Settings.';
         toast({
           title: 'Setup failed',
           description: message,
@@ -127,12 +127,12 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
     }
   };
 
-  const handleDismiss = () => {
+  const handleDismiss = (): void => {
     setSuccess(false);
     setIsOpen(false);
   };
 
-  const handleDontAskAgain = () => {
+  const handleDontAskAgain = (): void => {
     localStorage.setItem(DISMISSED_KEY, memberId);
     setSuccess(false);
     setIsOpen(false);
