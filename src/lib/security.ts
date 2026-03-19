@@ -53,13 +53,15 @@ export async function findMemberByPhone(
   if (result2.data && result2.data.length > 0) return result2.data[0];
 
   // Fallback: fetch all active members and normalize phone numbers in-memory
+  // Always include 'phone' in fallback select so we can normalize it
+  const fallbackSelect = select.includes('phone') ? select : `${select}, phone`;
   const { data: members } = await supabaseAdmin
     .from('members')
-    .select(select)
+    .select(fallbackSelect)
     .eq('deactivated', false)
     .not('phone', 'is', null);
 
-  return members?.find(m => {
+  return members?.find((m: any) => {
     const dbPhone = (m.phone || '').replace(/\D/g, '').slice(-10);
     return dbPhone === normalizedPhone;
   }) || null;
