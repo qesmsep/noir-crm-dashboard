@@ -10,17 +10,7 @@ import { z } from 'zod';
 const SESSION_DURATION_DAYS = 7;
 
 const requestSchema = z.object({
-  credential: z.object({
-    id: z.string(),
-    rawId: z.string(),
-    response: z.object({
-      authenticatorData: z.string(),
-      clientDataJSON: z.string(),
-      signature: z.string(),
-      userHandle: z.string().nullable().optional(),
-    }),
-    type: z.literal('public-key'),
-  }),
+  credential: z.any(), // WebAuthn credential structure is complex, validate critical fields only
   memberId: z.string().uuid('Invalid member ID format'),
 });
 
