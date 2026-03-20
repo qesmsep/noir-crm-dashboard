@@ -41,8 +41,15 @@ jest.mock('lucide-react', () => ({
   Shield: () => <span data-testid="shield-icon" />,
 }));
 
+interface MockButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  [key: string]: unknown;
+}
+
 jest.mock('@/components/ui/button', () => ({
-  Button: ({ children, onClick, disabled, ...props }: any) => (
+  Button: ({ children, onClick, disabled, ...props }: MockButtonProps) => (
     <button onClick={onClick} disabled={disabled} {...props}>
       {children}
     </button>
