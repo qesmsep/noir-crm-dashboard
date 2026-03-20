@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { generateRegistrationOptions, type PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
+import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest } from '@/lib/webauthn';
 import { parse } from 'cookie';
 
 /**
@@ -17,13 +17,8 @@ export default async function handler(
   }
 
   try {
-    // Derive rpID and origin from request for production compatibility
-    const host = req.headers.host || 'localhost:3000';
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const rpID = host.split(':')[0]; // Remove port if present
-    const origin = `${protocol}://${host}`;
-
-    console.log('[register-challenge] WebAuthn config:', { rpID, origin });
+    // Get validated WebAuthn config (rpID validated against allowlist, origin from env)
+    const { rpID, origin } = getWebAuthnConfigFromRequest(req);
 
     // Get session from cookie
     const cookies = parse(req.headers.cookie || '');

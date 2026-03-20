@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { generateAuthenticationOptions, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
+import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest } from '@/lib/webauthn';
 import { z } from 'zod';
 import { findMemberByPhone } from '@/lib/security';
 import { Logger } from '@/lib/logger';
@@ -33,11 +33,8 @@ export default async function handler(
   }
 
   try {
-    // Derive rpID from request for production compatibility
-    const host = req.headers.host || 'localhost:3000';
-    const rpID = host.split(':')[0]; // Remove port if present
-
-    console.log('[login-challenge] WebAuthn rpID:', rpID);
+    // Get validated WebAuthn config (rpID validated against allowlist)
+    const { rpID } = getWebAuthnConfigFromRequest(req);
 
     const { phone } = requestSchema.parse(req.body);
 

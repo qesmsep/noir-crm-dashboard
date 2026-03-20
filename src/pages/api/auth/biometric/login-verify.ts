@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
+import { getWebAuthnConfigFromRequest } from '@/lib/webauthn';
 import { logAuthEvent, getClientIP, getUserAgent, recordSuccessfulLogin, getSessionCookieDomain } from '@/lib/security';
 import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
@@ -24,13 +24,8 @@ export default async function handler(
   const userAgent = getUserAgent(req);
 
   try {
-    // Derive rpID and origin from request for production compatibility
-    const host = req.headers.host || 'localhost:3000';
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const rpID = host.split(':')[0]; // Remove port if present
-    const origin = `${protocol}://${host}`;
-
-    console.log('[login-verify] WebAuthn config:', { rpID, origin });
+    // Get validated WebAuthn config (rpID validated against allowlist, origin from env)
+    const { rpID, origin } = getWebAuthnConfigFromRequest(req);
 
     const { credential, memberId } = req.body as {
       credential: AuthenticationResponseJSON;
