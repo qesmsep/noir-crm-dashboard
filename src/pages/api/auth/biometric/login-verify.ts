@@ -44,36 +44,23 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Retrieve server-stored challenge (NOT from request body — WebAuthn spec requirement)
+    // Atomically claim the challenge: update-and-check eliminates TOCTOU race conditions.
+    // If a concurrent request already consumed it, this returns 0 rows and we reject cleanly.
     const { data: challengeRecord, error: challengeError } = await supabaseAdmin
       .from('webauthn_challenges')
-      .select('id, challenge, expires_at')
+      .update({ used: true })
       .eq('member_id', memberId)
       .eq('type', 'authentication')
       .eq('used', false)
+      .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
+      .select('id, challenge')
       .single();
 
     if (challengeError || !challengeRecord) {
-      return res.status(400).json({ error: 'No pending authentication challenge found. Please try again.' });
+      return res.status(400).json({ error: 'No valid authentication challenge found. Please try again.' });
     }
-
-    // Check challenge expiry
-    if (new Date(challengeRecord.expires_at) < new Date()) {
-      // Mark as used so it can't be retried
-      await supabaseAdmin
-        .from('webauthn_challenges')
-        .update({ used: true })
-        .eq('id', challengeRecord.id);
-      return res.status(400).json({ error: 'Authentication challenge expired. Please try again.' });
-    }
-
-    // Mark challenge as used immediately (single-use)
-    await supabaseAdmin
-      .from('webauthn_challenges')
-      .update({ used: true })
-      .eq('id', challengeRecord.id);
 
     // Get the credential used
     const credentialID = credential.id;
