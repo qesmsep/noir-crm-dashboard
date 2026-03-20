@@ -5,8 +5,24 @@ import { getWebAuthnConfigFromRequest } from '@/lib/webauthn';
 import { logAuthEvent, getClientIP, getUserAgent, recordSuccessfulLogin, getSessionCookieDomain } from '@/lib/security';
 import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
+import { z } from 'zod';
 
 const SESSION_DURATION_DAYS = 7;
+
+const requestSchema = z.object({
+  credential: z.object({
+    id: z.string(),
+    rawId: z.string(),
+    response: z.object({
+      authenticatorData: z.string(),
+      clientDataJSON: z.string(),
+      signature: z.string(),
+      userHandle: z.string().nullable().optional(),
+    }),
+    type: z.literal('public-key'),
+  }),
+  memberId: z.string().uuid('Invalid member ID format'),
+});
 
 /**
  * Verify WebAuthn authentication response
@@ -27,14 +43,16 @@ export default async function handler(
     // Get validated WebAuthn config (rpID validated against allowlist, origin from env)
     const { rpID, origin } = getWebAuthnConfigFromRequest(req);
 
-    const { credential, memberId } = req.body as {
-      credential: AuthenticationResponseJSON;
-      memberId: string;
-    };
-
-    if (!credential || !memberId) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    // Validate request body
+    const parseResult = requestSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: parseResult.error.issues[0].message,
+      });
     }
+
+    const { credential, memberId } = parseResult.data;
 
     // Get member
     const { data: member, error: memberError } = await supabaseAdmin
@@ -47,36 +65,23 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Retrieve server-stored challenge (NOT from request body — WebAuthn spec requirement)
+    // Atomically retrieve and mark challenge as used (prevents TOCTOU race condition)
+    // This UPDATE...RETURNING pattern ensures only one request can consume the challenge
     const { data: challengeRecord, error: challengeError } = await supabaseAdmin
       .from('webauthn_challenges')
-      .select('id, challenge, expires_at')
+      .update({ used: true })
       .eq('member_id', memberId)
       .eq('type', 'authentication')
       .eq('used', false)
+      .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
+      .select('id, challenge, expires_at')
       .single();
 
     if (challengeError || !challengeRecord) {
       return res.status(400).json({ error: 'No pending authentication challenge found. Please try again.' });
     }
-
-    // Check challenge expiry
-    if (new Date(challengeRecord.expires_at) < new Date()) {
-      // Mark as used so it can't be retried
-      await supabaseAdmin
-        .from('webauthn_challenges')
-        .update({ used: true })
-        .eq('id', challengeRecord.id);
-      return res.status(400).json({ error: 'Authentication challenge expired. Please try again.' });
-    }
-
-    // Mark challenge as used immediately (single-use)
-    await supabaseAdmin
-      .from('webauthn_challenges')
-      .update({ used: true })
-      .eq('id', challengeRecord.id);
 
     // Get the credential used
     const credentialID = credential.id;

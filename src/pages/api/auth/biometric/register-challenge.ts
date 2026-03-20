@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { generateRegistrationOptions, type PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest } from '@/lib/webauthn';
+import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest, CHALLENGE_TTL_MS } from '@/lib/webauthn';
+import { Logger } from '@/lib/logger';
 import { parse } from 'cookie';
 
 /**
@@ -17,8 +18,8 @@ export default async function handler(
   }
 
   try {
-    // Get validated WebAuthn config (rpID validated against allowlist, origin from env)
-    const { rpID, origin } = getWebAuthnConfigFromRequest(req);
+    // Get validated WebAuthn config (rpID validated against allowlist)
+    const { rpID } = getWebAuthnConfigFromRequest(req);
 
     // Get session from cookie
     const cookies = parse(req.headers.cookie || '');
@@ -54,7 +55,7 @@ export default async function handler(
 
     const options: PublicKeyCredentialCreationOptionsJSON = await generateRegistrationOptions({
       rpName: WEBAUTHN_CONFIG.rpName,
-      rpID: rpID,
+      rpID,
       userID: userIDBuffer,
       userName: member.phone,
       userDisplayName: `${member.first_name} ${member.last_name}`,
@@ -74,8 +75,15 @@ export default async function handler(
     });
 
     // Store challenge in database for server-side verification
-    // Challenge expires in 5 minutes
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    // Clean up any existing unused challenges for this member first
+    await supabaseAdmin
+      .from('webauthn_challenges')
+      .delete()
+      .eq('member_id', member.member_id)
+      .eq('type', 'registration')
+      .eq('used', false);
+
+    const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
 
     const { error: challengeError } = await supabaseAdmin
       .from('webauthn_challenges')
@@ -88,16 +96,12 @@ export default async function handler(
       });
 
     if (challengeError) {
-      console.error('Failed to store challenge:', challengeError);
-      console.error('Challenge data attempted:', {
+      Logger.error('Failed to store WebAuthn challenge', challengeError instanceof Error ? challengeError : undefined, {
         member_id: member.member_id,
-        challenge: options.challenge,
         type: 'registration',
-        expires_at: expiresAt.toISOString(),
       });
       return res.status(500).json({
         error: 'Failed to generate registration challenge',
-        details: challengeError.message,
       });
     }
 
@@ -113,7 +117,7 @@ export default async function handler(
       options,
     });
   } catch (error) {
-    console.error('Registration challenge error:', error);
+    Logger.error('Registration challenge error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

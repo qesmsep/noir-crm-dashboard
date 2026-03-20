@@ -14,6 +14,12 @@ export const WEBAUTHN_CONFIG = {
 };
 
 /**
+ * Challenge time-to-live in milliseconds
+ * Challenges older than this are considered expired
+ */
+export const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
  * Allowed rpID domains for WebAuthn
  * Add your production/staging domains here
  *
@@ -49,8 +55,9 @@ export function getWebAuthnConfigFromRequest(req: NextApiRequest): {
 
   // Validate rpID against allowlist to prevent host header manipulation
   const isAllowed = ALLOWED_RP_IDS.includes(rpID) ||
-    // Allow Vercel preview deployments: *.vercel.app
-    (rpID.endsWith('.vercel.app') && rpID.startsWith('noir-crm-dashboard'));
+    // Allow Vercel preview deployments with strict pattern: noir-crm-dashboard-git-*-team.vercel.app
+    // This prevents malicious deployments like noir-crm-dashboard-attacker.vercel.app
+    /^noir-crm-dashboard-git-[\w-]+-[\w-]+\.vercel\.app$/.test(rpID);
 
   if (!isAllowed) {
     Logger.error('WebAuthn rpID not in allowlist', undefined, { rpID, host });
@@ -59,14 +66,20 @@ export function getWebAuthnConfigFromRequest(req: NextApiRequest): {
 
   // Use env var for origin (trusted source) to prevent x-forwarded-proto spoofing
   // In production on Vercel, NEXT_PUBLIC_APP_URL should be set to https://yourdomain.com
-  let origin = WEBAUTHN_CONFIG.origin;
+  let origin: string;
 
-  // If env var not set and we're on Vercel, construct origin from validated rpID
-  if (origin === 'http://localhost:3000' && rpID !== 'localhost') {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    // Use explicitly configured origin (trusted source)
+    origin = process.env.NEXT_PUBLIC_APP_URL;
+  } else if (rpID !== 'localhost') {
+    // Fallback: construct origin from validated rpID for Vercel deployments
     origin = `https://${rpID}`;
     if (process.env.NODE_ENV === 'development') {
-      Logger.debug('Constructed origin from rpID', { rpID, origin });
+      Logger.debug('Constructed origin from rpID (no env var set)', { rpID, origin });
     }
+  } else {
+    // Local development
+    origin = 'http://localhost:3000';
   }
 
   if (process.env.NODE_ENV === 'development') {
