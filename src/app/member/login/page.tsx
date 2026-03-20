@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/useToast';
 import { PhoneDialPad } from '@/components/member/PhoneDialPad';
 import { Fingerprint } from 'lucide-react';
+import { FEATURES } from '@/lib/features';
 
 export default function MemberLoginPage() {
   const [phone, setPhone] = useState('');
@@ -434,7 +435,7 @@ export default function MemberLoginPage() {
                       </Button>
 
                       {/* Biometric Option */}
-                      {biometricAvailable && (
+                      {FEATURES.BIOMETRIC_AUTH && biometricAvailable && (
                         <Button
                           type="button"
                           size="lg"

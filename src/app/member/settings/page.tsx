@@ -27,6 +27,7 @@ import { CheckIcon, LockIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import MemberNav from '@/components/member/MemberNav';
+import { FEATURES } from '@/lib/features';
 
 export default function MemberSettingsPage() {
   const router = useRouter();
@@ -215,90 +216,92 @@ export default function MemberSettingsPage() {
           </Card>
 
           {/* Biometric Authentication Card */}
-          <Card
-            bg="white"
-            borderRadius="16px"
-            border="1px solid"
-            borderColor="#ECEAE5"
-            boxShadow="sm"
-          >
-            <CardHeader>
-              <Heading size="md" color="#1F1F1F">
-                Biometric Authentication
-              </Heading>
-            </CardHeader>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                {!biometricAvailable ? (
-                  <Alert status="info" borderRadius="8px">
-                    <AlertIcon />
-                    <AlertDescription fontSize="sm">
-                      Biometric authentication is not available on this device. You need Face ID, Touch ID, or Windows Hello to use this feature.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <>
-                    <Text fontSize="sm" color="#5A5A5A">
-                      Use Face ID or Touch ID to sign in quickly and securely
-                    </Text>
-
-                    {biometricDevices.length > 0 ? (
-                      <VStack spacing={3} align="stretch">
-                        <Text fontSize="sm" fontWeight="medium" color="#1F1F1F">
-                          Enrolled Devices ({biometricDevices.length})
-                        </Text>
-                        {biometricDevices.map((device) => (
-                          <HStack
-                            key={device.id}
-                            justify="space-between"
-                            p={3}
-                            bg="#F6F5F2"
-                            borderRadius="8px"
-                          >
-                            <VStack align="flex-start" spacing={1}>
-                              <HStack spacing={2}>
-                                <Icon as={CheckIcon} color="#4CAF50" boxSize={3} />
-                                <Text fontSize="sm" fontWeight="medium" color="#1F1F1F">
-                                  {device.device_name}
-                                </Text>
-                              </HStack>
-                              <Text fontSize="xs" color="#8C7C6D">
-                                Last used: {new Date(device.last_used_at).toLocaleDateString()}
-                              </Text>
-                            </VStack>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              color="#F44336"
-                              _hover={{ bg: '#FFEBEE' }}
-                              onClick={() => handleRemoveDevice(device.id)}
-                            >
-                              Remove
-                            </Button>
-                          </HStack>
-                        ))}
-                      </VStack>
-                    ) : (
-                      <Text fontSize="sm" color="#8C7C6D">
-                        No devices enrolled yet
+          {FEATURES.BIOMETRIC_AUTH && (
+            <Card
+              bg="white"
+              borderRadius="16px"
+              border="1px solid"
+              borderColor="#ECEAE5"
+              boxShadow="sm"
+            >
+              <CardHeader>
+                <Heading size="md" color="#1F1F1F">
+                  Biometric Authentication
+                </Heading>
+              </CardHeader>
+              <CardBody>
+                <VStack spacing={4} align="stretch">
+                  {!biometricAvailable ? (
+                    <Alert status="info" borderRadius="8px">
+                      <AlertIcon />
+                      <AlertDescription fontSize="sm">
+                        Biometric authentication is not available on this device. You need Face ID, Touch ID, or Windows Hello to use this feature.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <>
+                      <Text fontSize="sm" color="#5A5A5A">
+                        Use Face ID or Touch ID to sign in quickly and securely
                       </Text>
-                    )}
 
-                    <Button
-                      bg="#A59480"
-                      color="white"
-                      _hover={{ bg: '#8C7C6D' }}
-                      onClick={handleEnrollBiometric}
-                      isLoading={enrolling}
-                      loadingText="Enrolling..."
-                    >
-                      Add This Device
-                    </Button>
-                  </>
-                )}
-              </VStack>
-            </CardBody>
-          </Card>
+                      {biometricDevices.length > 0 ? (
+                        <VStack spacing={3} align="stretch">
+                          <Text fontSize="sm" fontWeight="medium" color="#1F1F1F">
+                            Enrolled Devices ({biometricDevices.length})
+                          </Text>
+                          {biometricDevices.map((device) => (
+                            <HStack
+                              key={device.id}
+                              justify="space-between"
+                              p={3}
+                              bg="#F6F5F2"
+                              borderRadius="8px"
+                            >
+                              <VStack align="flex-start" spacing={1}>
+                                <HStack spacing={2}>
+                                  <Icon as={CheckIcon} color="#4CAF50" boxSize={3} />
+                                  <Text fontSize="sm" fontWeight="medium" color="#1F1F1F">
+                                    {device.device_name}
+                                  </Text>
+                                </HStack>
+                                <Text fontSize="xs" color="#8C7C6D">
+                                  Last used: {new Date(device.last_used_at).toLocaleDateString()}
+                                </Text>
+                              </VStack>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                color="#F44336"
+                                _hover={{ bg: '#FFEBEE' }}
+                                onClick={() => handleRemoveDevice(device.id)}
+                              >
+                                Remove
+                              </Button>
+                            </HStack>
+                          ))}
+                        </VStack>
+                      ) : (
+                        <Text fontSize="sm" color="#8C7C6D">
+                          No devices enrolled yet
+                        </Text>
+                      )}
+
+                      <Button
+                        bg="#A59480"
+                        color="white"
+                        _hover={{ bg: '#8C7C6D' }}
+                        onClick={handleEnrollBiometric}
+                        isLoading={enrolling}
+                        loadingText="Enrolling..."
+                      >
+                        Add This Device
+                      </Button>
+                    </>
+                  )}
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
 
           {/* Account Actions Card */}
           <Card
