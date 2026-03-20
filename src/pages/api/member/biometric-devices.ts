@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { parse } from 'cookie';
+import logger from '@/lib/logger';
 
 /**
  * Get all biometric devices for the logged-in member
@@ -42,7 +43,7 @@ export default async function handler(
       .order('created_at', { ascending: false });
 
     if (devicesError) {
-      console.error('Error fetching biometric devices:', devicesError);
+      logger.error('Error fetching biometric devices', devicesError, { memberId: session.member_id });
       return res.status(500).json({ error: 'Failed to fetch devices' });
     }
 
@@ -50,7 +51,7 @@ export default async function handler(
       devices: devices || [],
     });
   } catch (error) {
-    console.error('Biometric devices error:', error);
+    logger.error('Biometric devices error', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

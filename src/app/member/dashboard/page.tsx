@@ -16,6 +16,7 @@ import SubscriptionModal from '@/components/member/SubscriptionModal';
 import UpcomingEventsModal from '@/components/member/UpcomingEventsModal';
 import RSVPModal from '@/components/member/RSVPModal';
 import SimpleReservationRequestModal from '@/components/member/SimpleReservationRequestModal';
+import BiometricRegistrationPrompt from '@/components/member/BiometricRegistrationPrompt';
 
 export default function MemberDashboardPage() {
   const router = useRouter();
@@ -907,6 +908,9 @@ export default function MemberDashboardPage() {
         }}
         rsvpUrl={selectedRSVPUrl}
       />
+
+      {/* Biometric Registration Prompt */}
+      <BiometricRegistrationPrompt memberId={member.member_id} />
     </div>
   );
 }
