@@ -150,6 +150,14 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
     console.log('\n========== ACH PAYMENT FLOW ==========');
     console.log('[ACH] Starting ACH payment submission');
 
+    // Prepare billing details (skip placeholders)
+    const billingName = waitlistData.first_name === 'Pending' || waitlistData.last_name === 'Referral'
+      ? undefined
+      : `${waitlistData.first_name} ${waitlistData.last_name}`;
+    const billingEmail = /^referral-.*@pending\.noirkc\.com$/.test(waitlistData.email)
+      ? undefined
+      : waitlistData.email;
+
     try {
       // Create payment intent when user submits payment
       console.log('[ACH] Step 1: Creating payment intent...');
