@@ -41,10 +41,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: onboardEntry, error: onboardError } = await supabase
       .from('waitlist')
       .insert({
-        first_name: '',
-        last_name: '',
-        phone: '',
-        email: '',
+        first_name: 'Pending',
+        last_name: 'Referral',
+        phone: '+10000000000',
+        email: `referral-${applicationToken}@pending.noirkc.com`,
         company: '',
         city_state: '',
         referral: `Referred by ${referrer.first_name} ${referrer.last_name}`,
