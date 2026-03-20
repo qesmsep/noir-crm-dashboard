@@ -1,12 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAuthenticationResponse, type AuthenticationResponseJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
+import { getWebAuthnConfigFromRequest } from '@/lib/webauthn';
 import { logAuthEvent, getClientIP, getUserAgent, recordSuccessfulLogin, getSessionCookieDomain } from '@/lib/security';
 import { Logger } from '@/lib/logger';
 import { serialize } from 'cookie';
+import { z } from 'zod';
 
 const SESSION_DURATION_DAYS = 7;
+
+const requestSchema = z.object({
+  credential: z.object({
+    id: z.string(),
+    rawId: z.string(),
+    response: z.object({}).passthrough(),
+    type: z.literal('public-key'),
+  }).passthrough(), // Allow additional fields, @simplewebauthn/server validates full structure
+  memberId: z.string().uuid('Invalid member ID format'),
+});
 
 /**
  * Verify WebAuthn authentication response
@@ -24,14 +35,19 @@ export default async function handler(
   const userAgent = getUserAgent(req);
 
   try {
-    const { credential, memberId } = req.body as {
-      credential: AuthenticationResponseJSON;
-      memberId: string;
-    };
+    // Get validated WebAuthn config (rpID validated against allowlist, origin from env)
+    const { rpID, origin } = getWebAuthnConfigFromRequest(req);
 
-    if (!credential || !memberId) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    // Validate request body
+    const parseResult = requestSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: parseResult.error.issues[0].message,
+      });
     }
+
+    const { credential, memberId } = parseResult.data;
 
     // Get member
     const { data: member, error: memberError } = await supabaseAdmin
@@ -44,36 +60,23 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Retrieve server-stored challenge (NOT from request body — WebAuthn spec requirement)
+    // Atomically retrieve and mark challenge as used (prevents TOCTOU race condition)
+    // This UPDATE...RETURNING pattern ensures only one request can consume the challenge
     const { data: challengeRecord, error: challengeError } = await supabaseAdmin
       .from('webauthn_challenges')
-      .select('id, challenge, expires_at')
+      .update({ used: true })
       .eq('member_id', memberId)
       .eq('type', 'authentication')
       .eq('used', false)
+      .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
+      .select('id, challenge, expires_at')
       .single();
 
     if (challengeError || !challengeRecord) {
       return res.status(400).json({ error: 'No pending authentication challenge found. Please try again.' });
     }
-
-    // Check challenge expiry
-    if (new Date(challengeRecord.expires_at) < new Date()) {
-      // Mark as used so it can't be retried
-      await supabaseAdmin
-        .from('webauthn_challenges')
-        .update({ used: true })
-        .eq('id', challengeRecord.id);
-      return res.status(400).json({ error: 'Authentication challenge expired. Please try again.' });
-    }
-
-    // Mark challenge as used immediately (single-use)
-    await supabaseAdmin
-      .from('webauthn_challenges')
-      .update({ used: true })
-      .eq('id', challengeRecord.id);
 
     // Get the credential used
     const credentialID = credential.id;
@@ -92,11 +95,12 @@ export default async function handler(
     const publicKey = Buffer.from(dbCredential.public_key, 'base64url');
 
     // Verify the authentication response against the SERVER-STORED challenge
+    // Type assertion needed because Zod's passthrough() type doesn't match simplewebauthn's exact type
     const verification = await verifyAuthenticationResponse({
-      response: credential,
+      response: credential as unknown as AuthenticationResponseJSON,
       expectedChallenge: challengeRecord.challenge,
-      expectedOrigin: WEBAUTHN_CONFIG.origin,
-      expectedRPID: WEBAUTHN_CONFIG.rpID,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
       credential: {
         id: dbCredential.credential_id,
         publicKey: publicKey,
