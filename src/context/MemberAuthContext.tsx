@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
 // Member type based on database schema
 interface Member {
@@ -499,40 +500,16 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
       throw new Error(challengeData.error || 'Failed to get biometric challenge');
     }
 
-    // Step 2: Get credential from authenticator
-    const credential = await navigator.credentials.get({
-      publicKey: {
-        ...challengeData.options,
-        challenge: Uint8Array.from(atob(challengeData.options.challenge), c => c.charCodeAt(0)),
-        allowCredentials: challengeData.options.allowCredentials?.map((cred: any) => ({
-          ...cred,
-          id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
-        })),
-      },
-    }) as PublicKeyCredential;
-
-    if (!credential) {
-      throw new Error('Biometric authentication cancelled');
-    }
+    // Step 2: Get credential from authenticator using @simplewebauthn/browser
+    // startAuthentication handles all base64url encoding/decoding automatically
+    const authResponse = await startAuthentication({ optionsJSON: challengeData.options });
 
     // Step 3: Verify with server (challenge is stored server-side, not sent from client)
     const verifyResponse = await fetch('/api/auth/biometric/login-verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        credential: {
-          id: credential.id,
-          rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-          response: {
-            authenticatorData: btoa(String.fromCharCode(...new Uint8Array((credential.response as AuthenticatorAssertionResponse).authenticatorData))),
-            clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
-            signature: btoa(String.fromCharCode(...new Uint8Array((credential.response as AuthenticatorAssertionResponse).signature))),
-            userHandle: (credential.response as AuthenticatorAssertionResponse).userHandle
-              ? btoa(String.fromCharCode(...new Uint8Array((credential.response as AuthenticatorAssertionResponse).userHandle!)))
-              : null,
-          },
-          type: credential.type,
-        },
+        credential: authResponse,
         memberId: challengeData.memberId,
       }),
     });
@@ -562,43 +539,17 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
       throw new Error(challengeData.error || 'Failed to get registration challenge');
     }
 
-    // Step 2: Create credential with authenticator
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        ...challengeData.options,
-        challenge: Uint8Array.from(atob(challengeData.challenge), c => c.charCodeAt(0)),
-        user: {
-          ...challengeData.options.user,
-          id: Uint8Array.from(atob(challengeData.options.user.id), c => c.charCodeAt(0)),
-        },
-        excludeCredentials: challengeData.options.excludeCredentials?.map((cred: any) => ({
-          ...cred,
-          id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
-        })),
-      },
-    }) as PublicKeyCredential;
+    // Step 2: Create credential with authenticator using @simplewebauthn/browser
+    // startRegistration handles all base64url encoding/decoding automatically
+    const regResponse = await startRegistration({ optionsJSON: challengeData.options });
 
-    if (!credential) {
-      throw new Error('Biometric registration cancelled');
-    }
-
-    // Step 3: Verify and store credential
+    // Step 3: Verify and store credential (challenge is stored server-side)
     const verifyResponse = await fetch('/api/auth/biometric/register-verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        credential: {
-          id: credential.id,
-          rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-          response: {
-            attestationObject: btoa(String.fromCharCode(...new Uint8Array((credential.response as AuthenticatorAttestationResponse).attestationObject))),
-            clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
-            transports: (credential.response as AuthenticatorAttestationResponse).getTransports?.() || [],
-          },
-          type: credential.type,
-        },
-        challenge: challengeData.challenge,
+        credential: regResponse,
         deviceName,
       }),
     });

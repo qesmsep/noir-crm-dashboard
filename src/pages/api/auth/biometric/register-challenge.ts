@@ -4,6 +4,9 @@ import { generateRegistrationOptions, type PublicKeyCredentialCreationOptionsJSO
 import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
 import { parse } from 'cookie';
 
+/** Challenge expires in 2 minutes */
+const CHALLENGE_TTL_MS = 2 * 60 * 1000;
+
 /**
  * Generate WebAuthn registration challenge
  * This is step 1 of biometric registration
@@ -46,10 +49,11 @@ export default async function handler(
       .eq('member_id', member.member_id);
 
     // Generate registration options
+    // simplewebauthn v13 requires userID as Uint8Array
     const options: PublicKeyCredentialCreationOptionsJSON = await generateRegistrationOptions({
       rpName: WEBAUTHN_CONFIG.rpName,
       rpID: WEBAUTHN_CONFIG.rpID,
-      userID: member.member_id,
+      userID: new TextEncoder().encode(member.member_id),
       userName: member.phone,
       userDisplayName: `${member.first_name} ${member.last_name}`,
       timeout: WEBAUTHN_CONFIG.timeout,
@@ -67,19 +71,30 @@ export default async function handler(
       })) || [],
     });
 
-    // Store challenge temporarily (in production, use Redis or similar)
-    // For now, we'll verify it when they submit the registration
+    // Store challenge server-side for verification (anti-replay)
+    // Clean up any existing unused registration challenges for this member
     await supabaseAdmin
-      .from('member_portal_sessions')
-      .update({
-        last_activity: new Date().toISOString(),
-      })
-      .eq('session_token', sessionToken);
+      .from('webauthn_challenges')
+      .delete()
+      .eq('member_id', member.member_id)
+      .eq('type', 'registration')
+      .eq('used', false);
 
-    res.status(200).json({
-      options,
-      challenge: options.challenge, // We'll need this for verification
-    });
+    const { error: challengeError } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .insert({
+        member_id: member.member_id,
+        challenge: options.challenge,
+        type: 'registration',
+        expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+      });
+
+    if (challengeError) {
+      console.error('Failed to store registration challenge:', challengeError);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    res.status(200).json({ options });
   } catch (error) {
     console.error('Registration challenge error:', error);
     res.status(500).json({ error: 'Internal server error' });
