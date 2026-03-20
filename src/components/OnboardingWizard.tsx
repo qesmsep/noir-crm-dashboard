@@ -86,13 +86,20 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
 
       const intentData = await intentResponse.json();
 
-      // Confirm card payment
+      // Confirm card payment (use actual name/email if placeholders were cleared)
+      const billingName = waitlistData.first_name === 'Pending' || waitlistData.last_name === 'Referral'
+        ? undefined
+        : `${waitlistData.first_name} ${waitlistData.last_name}`;
+      const billingEmail = /^referral-.*@pending\.noirkc\.com$/.test(waitlistData.email)
+        ? undefined
+        : waitlistData.email;
+
       const { error, paymentIntent } = await stripe.confirmCardPayment(intentData.client_secret, {
         payment_method: {
           card: cardElement,
           billing_details: {
-            name: `${waitlistData.first_name} ${waitlistData.last_name}`,
-            email: waitlistData.email,
+            ...(billingName && { name: billingName }),
+            ...(billingEmail && { email: billingEmail }),
           },
         },
       });
@@ -190,8 +197,8 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
           payment_method_type: 'us_bank_account',
           payment_method_data: {
             billing_details: {
-              name: `${waitlistData.first_name} ${waitlistData.last_name}`,
-              email: waitlistData.email,
+              ...(billingName && { name: billingName }),
+              ...(billingEmail && { email: billingEmail }),
             },
           },
         },
@@ -530,12 +537,21 @@ export default function OnboardingWizard({
     return formatted;
   };
 
+  // Helper to detect and clear placeholder values used for referral tracking
+  const clearPlaceholder = (value: string, placeholder: string | RegExp) => {
+    if (!value) return '';
+    if (typeof placeholder === 'string') {
+      return value === placeholder ? '' : value;
+    }
+    return placeholder.test(value) ? '' : value;
+  };
+
   // Step 1: Contact Info (includes waitlist intake fields)
-  // Treat single space as empty (used to satisfy NOT NULL constraints while keeping fields functionally empty)
-  const [firstName, setFirstName] = useState((waitlistData.first_name || '').trim());
-  const [lastName, setLastName] = useState((waitlistData.last_name || '').trim());
-  const [email, setEmail] = useState((waitlistData.email || '').trim());
-  const [phone, setPhone] = useState(formatPhoneNumber(waitlistData.phone || ''));
+  // Clear placeholder values used for referral link tracking
+  const [firstName, setFirstName] = useState(clearPlaceholder((waitlistData.first_name || '').trim(), 'Pending'));
+  const [lastName, setLastName] = useState(clearPlaceholder((waitlistData.last_name || '').trim(), 'Referral'));
+  const [email, setEmail] = useState(clearPlaceholder((waitlistData.email || '').trim(), /^referral-.*@pending\.noirkc\.com$/));
+  const [phone, setPhone] = useState(clearPlaceholder(formatPhoneNumber(waitlistData.phone || ''), '+10000000000'));
   const [dateOfBirth, setDateOfBirth] = useState(waitlistData.date_of_birth || '');
   const [address, setAddress] = useState(waitlistData.address || '');
   const [city, setCity] = useState(waitlistData.city || '');
@@ -551,8 +567,12 @@ export default function OnboardingWizard({
   const [whyNoir, setWhyNoir] = useState(waitlistData.why_noir || '');
 
   // Step 2: Agreement
-  const [signerName, setSignerName] = useState(`${waitlistData.first_name} ${waitlistData.last_name}`);
-  const [signerEmail, setSignerEmail] = useState(waitlistData.email);
+  const [signerName, setSignerName] = useState(
+    clearPlaceholder(waitlistData.first_name, 'Pending') && clearPlaceholder(waitlistData.last_name, 'Referral')
+      ? `${waitlistData.first_name} ${waitlistData.last_name}`
+      : ''
+  );
+  const [signerEmail, setSignerEmail] = useState(clearPlaceholder(waitlistData.email, /^referral-.*@pending\.noirkc\.com$/));
   const [signatureData, setSignatureData] = useState('');
   const [agreed, setAgreed] = useState(false);
 
