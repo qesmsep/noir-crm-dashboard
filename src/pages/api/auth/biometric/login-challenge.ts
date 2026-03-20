@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { generateAuthenticationOptions, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest, CHALLENGE_TTL_MS } from '@/lib/webauthn';
+import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest, LOGIN_CHALLENGE_TTL_MS } from '@/lib/webauthn';
 import { z } from 'zod';
 import { findMemberByPhone } from '@/lib/security';
 import { Logger } from '@/lib/logger';
@@ -74,12 +74,20 @@ export default async function handler(
 
     // Store challenge server-side (required by WebAuthn spec for anti-replay)
     // Clean up any existing unused challenges for this member first
-    await supabaseAdmin
+    const { error: cleanupError } = await supabaseAdmin
       .from('webauthn_challenges')
       .delete()
       .eq('member_id', member.member_id)
       .eq('type', 'authentication')
       .eq('used', false);
+
+    if (cleanupError) {
+      Logger.error('Failed to clean up old challenges', cleanupError instanceof Error ? cleanupError : undefined, {
+        member_id: member.member_id,
+        type: 'authentication',
+      });
+      // Continue anyway - this is not critical
+    }
 
     const { error: challengeError } = await supabaseAdmin
       .from('webauthn_challenges')
@@ -87,7 +95,7 @@ export default async function handler(
         member_id: member.member_id,
         challenge: options.challenge,
         type: 'authentication',
-        expires_at: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
+        expires_at: new Date(Date.now() + LOGIN_CHALLENGE_TTL_MS).toISOString(),
       });
 
     if (challengeError) {

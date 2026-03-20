@@ -8,7 +8,12 @@ import { parse } from 'cookie';
 import { z } from 'zod';
 
 const requestSchema = z.object({
-  credential: z.any(), // WebAuthn credential structure is complex, validate critical fields only
+  credential: z.object({
+    id: z.string(),
+    rawId: z.string(),
+    response: z.object({}).passthrough(),
+    type: z.literal('public-key'),
+  }).passthrough(), // Allow additional fields, @simplewebauthn/server validates full structure
   deviceName: z.string().optional(),
 });
 

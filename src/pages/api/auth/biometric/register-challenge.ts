@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { generateRegistrationOptions, type PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest, CHALLENGE_TTL_MS } from '@/lib/webauthn';
+import { WEBAUTHN_CONFIG, getWebAuthnConfigFromRequest, REGISTRATION_CHALLENGE_TTL_MS } from '@/lib/webauthn';
 import { Logger } from '@/lib/logger';
 import { parse } from 'cookie';
 
@@ -76,14 +76,22 @@ export default async function handler(
 
     // Store challenge in database for server-side verification
     // Clean up any existing unused challenges for this member first
-    await supabaseAdmin
+    const { error: cleanupError } = await supabaseAdmin
       .from('webauthn_challenges')
       .delete()
       .eq('member_id', member.member_id)
       .eq('type', 'registration')
       .eq('used', false);
 
-    const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
+    if (cleanupError) {
+      Logger.error('Failed to clean up old challenges', cleanupError instanceof Error ? cleanupError : undefined, {
+        member_id: member.member_id,
+        type: 'registration',
+      });
+      // Continue anyway - this is not critical
+    }
+
+    const expiresAt = new Date(Date.now() + REGISTRATION_CHALLENGE_TTL_MS);
 
     const { error: challengeError } = await supabaseAdmin
       .from('webauthn_challenges')

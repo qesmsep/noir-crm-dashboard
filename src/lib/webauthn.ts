@@ -16,8 +16,12 @@ export const WEBAUTHN_CONFIG = {
 /**
  * Challenge time-to-live in milliseconds
  * Challenges older than this are considered expired
+ *
+ * Login uses shorter TTL (2 min) for tighter security window
+ * Registration uses longer TTL (5 min) for better UX during setup
  */
-export const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const LOGIN_CHALLENGE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+export const REGISTRATION_CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Allowed rpID domains for WebAuthn
@@ -55,8 +59,13 @@ export function getWebAuthnConfigFromRequest(req: NextApiRequest): {
 
   // Validate rpID against allowlist to prevent host header manipulation
   const isAllowed = ALLOWED_RP_IDS.includes(rpID) ||
-    // Allow Vercel preview deployments with strict pattern: noir-crm-dashboard-git-*-team.vercel.app
-    // This prevents malicious deployments like noir-crm-dashboard-attacker.vercel.app
+    // Allow Vercel preview deployments with strict pattern
+    // Format: noir-crm-dashboard-git-{branch}-{team}.vercel.app
+    // Examples:
+    //   ✅ noir-crm-dashboard-git-fix-auth-qesmsep.vercel.app
+    //   ✅ noir-crm-dashboard-git-main-qesmsep.vercel.app
+    //   ❌ noir-crm-dashboard-attacker.vercel.app (no -git- prefix)
+    // This prevents malicious deployments from impersonating the app
     /^noir-crm-dashboard-git-[\w-]+-[\w-]+\.vercel\.app$/.test(rpID);
 
   if (!isAllowed) {
