@@ -46,10 +46,13 @@ export default async function handler(
       .eq('member_id', member.member_id);
 
     // Generate registration options
+    // Convert member_id UUID to Buffer for userID
+    const userIDBuffer = Buffer.from(member.member_id.replace(/-/g, ''), 'hex');
+
     const options: PublicKeyCredentialCreationOptionsJSON = await generateRegistrationOptions({
       rpName: WEBAUTHN_CONFIG.rpName,
       rpID: WEBAUTHN_CONFIG.rpID,
-      userID: member.member_id,
+      userID: userIDBuffer,
       userName: member.phone,
       userDisplayName: `${member.first_name} ${member.last_name}`,
       timeout: WEBAUTHN_CONFIG.timeout,
@@ -67,8 +70,35 @@ export default async function handler(
       })) || [],
     });
 
-    // Store challenge temporarily (in production, use Redis or similar)
-    // For now, we'll verify it when they submit the registration
+    // Store challenge in database for server-side verification
+    // Challenge expires in 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    const { error: challengeError } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .insert({
+        member_id: member.member_id,
+        challenge: options.challenge,
+        type: 'registration',
+        expires_at: expiresAt.toISOString(),
+        used: false,
+      });
+
+    if (challengeError) {
+      console.error('Failed to store challenge:', challengeError);
+      console.error('Challenge data attempted:', {
+        member_id: member.member_id,
+        challenge: options.challenge,
+        type: 'registration',
+        expires_at: expiresAt.toISOString(),
+      });
+      return res.status(500).json({
+        error: 'Failed to generate registration challenge',
+        details: challengeError.message,
+      });
+    }
+
+    // Update session activity
     await supabaseAdmin
       .from('member_portal_sessions')
       .update({
@@ -78,7 +108,6 @@ export default async function handler(
 
     res.status(200).json({
       options,
-      challenge: options.challenge, // We'll need this for verification
     });
   } catch (error) {
     console.error('Registration challenge error:', error);

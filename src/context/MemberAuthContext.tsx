@@ -549,6 +549,8 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
 
   // Register biometric credential
   const registerBiometric = useCallback(async (deviceName?: string) => {
+    console.log('[registerBiometric] Starting biometric registration...');
+
     // Step 1: Get registration challenge
     const challengeResponse = await fetch('/api/auth/biometric/register-challenge', {
       method: 'POST',
@@ -557,26 +559,44 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
     });
 
     const challengeData = await challengeResponse.json();
+    console.log('[registerBiometric] Challenge response:', { ok: challengeResponse.ok, data: challengeData });
 
     if (!challengeResponse.ok) {
       throw new Error(challengeData.error || 'Failed to get registration challenge');
     }
 
+    console.log('[registerBiometric] Creating credential with options:', challengeData.options);
+
+    // Helper to convert base64url to Uint8Array
+    const base64urlToUint8Array = (base64url: string): Uint8Array => {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+      const binary = atob(paddedBase64);
+      return Uint8Array.from(binary, c => c.charCodeAt(0));
+    };
+
     // Step 2: Create credential with authenticator
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        ...challengeData.options,
-        challenge: Uint8Array.from(atob(challengeData.challenge), c => c.charCodeAt(0)),
-        user: {
-          ...challengeData.options.user,
-          id: Uint8Array.from(atob(challengeData.options.user.id), c => c.charCodeAt(0)),
+    let credential: PublicKeyCredential;
+    try {
+      credential = await navigator.credentials.create({
+        publicKey: {
+          ...challengeData.options,
+          challenge: base64urlToUint8Array(challengeData.options.challenge),
+          user: {
+            ...challengeData.options.user,
+            id: base64urlToUint8Array(challengeData.options.user.id),
+          },
+          excludeCredentials: challengeData.options.excludeCredentials?.map((cred: any) => ({
+            ...cred,
+            id: base64urlToUint8Array(cred.id),
+          })),
         },
-        excludeCredentials: challengeData.options.excludeCredentials?.map((cred: any) => ({
-          ...cred,
-          id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
-        })),
-      },
-    }) as PublicKeyCredential;
+      }) as PublicKeyCredential;
+      console.log('[registerBiometric] Credential created:', credential);
+    } catch (error) {
+      console.error('[registerBiometric] Error creating credential:', error);
+      throw error;
+    }
 
     if (!credential) {
       throw new Error('Biometric registration cancelled');
@@ -598,7 +618,6 @@ export function MemberAuthProvider({ children }: { children: React.ReactNode }) 
           },
           type: credential.type,
         },
-        challenge: challengeData.challenge,
         deviceName,
       }),
     });

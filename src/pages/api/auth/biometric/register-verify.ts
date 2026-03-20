@@ -18,14 +18,13 @@ export default async function handler(
   }
 
   try {
-    const { credential, challenge, deviceName } = req.body as {
+    const { credential, deviceName } = req.body as {
       credential: RegistrationResponseJSON;
-      challenge: string;
       deviceName?: string;
     };
 
-    if (!credential || !challenge) {
-      return res.status(400).json({ error: 'Missing credential or challenge' });
+    if (!credential) {
+      return res.status(400).json({ error: 'Missing credential' });
     }
 
     // Get session from cookie
@@ -50,10 +49,33 @@ export default async function handler(
 
     const member = Array.isArray(session.members) ? session.members[0] : session.members;
 
+    // Retrieve the challenge from database
+    const { data: challengeRecord, error: challengeError } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .select('id, challenge, expires_at, used')
+      .eq('member_id', member.member_id)
+      .eq('type', 'registration')
+      .eq('used', false)
+      .gte('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (challengeError || !challengeRecord) {
+      console.error('Challenge lookup failed:', challengeError);
+      return res.status(400).json({ error: 'Invalid or expired challenge' });
+    }
+
+    // Mark challenge as used immediately to prevent replay attacks
+    await supabaseAdmin
+      .from('webauthn_challenges')
+      .update({ used: true })
+      .eq('id', challengeRecord.id);
+
     // Verify the registration response
     const verification = await verifyRegistrationResponse({
       response: credential,
-      expectedChallenge: challenge,
+      expectedChallenge: challengeRecord.challenge,
       expectedOrigin: WEBAUTHN_CONFIG.origin,
       expectedRPID: WEBAUTHN_CONFIG.rpID,
       requireUserVerification: true,
