@@ -33,6 +33,12 @@ export default async function handler(
   }
 
   try {
+    // Derive rpID from request for production compatibility
+    const host = req.headers.host || 'localhost:3000';
+    const rpID = host.split(':')[0]; // Remove port if present
+
+    console.log('[login-challenge] WebAuthn rpID:', rpID);
+
     const { phone } = requestSchema.parse(req.body);
 
     // findMemberByPhone normalizes internally
@@ -62,7 +68,7 @@ export default async function handler(
 
     // Generate authentication options
     const options: PublicKeyCredentialRequestOptionsJSON = await generateAuthenticationOptions({
-      rpID: WEBAUTHN_CONFIG.rpID,
+      rpID: rpID,
       timeout: WEBAUTHN_CONFIG.timeout,
       allowCredentials: credentials.map((cred) => ({
         id: cred.credential_id,

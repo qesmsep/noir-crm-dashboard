@@ -17,6 +17,14 @@ export default async function handler(
   }
 
   try {
+    // Derive rpID and origin from request for production compatibility
+    const host = req.headers.host || 'localhost:3000';
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const rpID = host.split(':')[0]; // Remove port if present
+    const origin = `${protocol}://${host}`;
+
+    console.log('[register-challenge] WebAuthn config:', { rpID, origin });
+
     // Get session from cookie
     const cookies = parse(req.headers.cookie || '');
     const sessionToken = cookies.member_session;
@@ -51,7 +59,7 @@ export default async function handler(
 
     const options: PublicKeyCredentialCreationOptionsJSON = await generateRegistrationOptions({
       rpName: WEBAUTHN_CONFIG.rpName,
-      rpID: WEBAUTHN_CONFIG.rpID,
+      rpID: rpID,
       userID: userIDBuffer,
       userName: member.phone,
       userDisplayName: `${member.first_name} ${member.last_name}`,

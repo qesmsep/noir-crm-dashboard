@@ -18,6 +18,14 @@ export default async function handler(
   }
 
   try {
+    // Derive rpID and origin from request for production compatibility
+    const host = req.headers.host || 'localhost:3000';
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const rpID = host.split(':')[0]; // Remove port if present
+    const origin = `${protocol}://${host}`;
+
+    console.log('[register-verify] WebAuthn config:', { rpID, origin });
+
     const { credential, deviceName } = req.body as {
       credential: RegistrationResponseJSON;
       deviceName?: string;
@@ -76,8 +84,8 @@ export default async function handler(
     const verification = await verifyRegistrationResponse({
       response: credential,
       expectedChallenge: challengeRecord.challenge,
-      expectedOrigin: WEBAUTHN_CONFIG.origin,
-      expectedRPID: WEBAUTHN_CONFIG.rpID,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
       requireUserVerification: true,
     });
 
