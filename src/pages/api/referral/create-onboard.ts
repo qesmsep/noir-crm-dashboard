@@ -54,8 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         agreement_token_created_at: new Date().toISOString(),
         referral_code: referralCode.toUpperCase(),
         referred_by_member_id: referrer.member_id,
-        status: 'link_clicked', // Track that they clicked but haven't filled out yet
-        form_step: 0, // Track which step they're on
+        status: 'review' // Will update to 'review' once they submit the form
       })
       .select()
       .single();
