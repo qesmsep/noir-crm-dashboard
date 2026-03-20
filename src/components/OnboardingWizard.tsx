@@ -199,21 +199,30 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
       document.body.style.overflow = 'hidden';
 
       // Use Financial Connections to collect bank account
+      // Build billing_details only if we have valid data (not placeholders)
+      const billingDetails: any = {};
+      if (billingName) billingDetails.name = billingName;
+      if (billingEmail) billingDetails.email = billingEmail;
+
       const { error, paymentIntent } = await stripe.collectBankAccountForPayment({
         clientSecret: intentData.client_secret,
         params: {
           payment_method_type: 'us_bank_account',
-          payment_method_data: {
-            billing_details: {
-              ...(billingName && { name: billingName }),
-              ...(billingEmail && { email: billingEmail }),
+          ...(Object.keys(billingDetails).length > 0 && {
+            payment_method_data: {
+              billing_details: billingDetails,
             },
-          },
+          }),
         },
       });
 
       console.log('[ACH] Financial Connections result:', {
-        error: error ? error.message : 'none',
+        error: error ? {
+          message: error.message,
+          type: error.type,
+          code: error.code,
+          decline_code: error.decline_code
+        } : 'none',
         paymentIntent: paymentIntent ? {
           id: paymentIntent.id,
           status: paymentIntent.status,
@@ -222,7 +231,7 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
       });
 
       if (error) {
-        console.error('[ACH] Financial Connections error:', error);
+        console.error('[ACH] Financial Connections full error:', JSON.stringify(error, null, 2));
         throw error;
       }
 
