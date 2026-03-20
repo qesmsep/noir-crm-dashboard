@@ -86,8 +86,9 @@ export default async function handler(
     }
 
     // Verify the registration response
+    // Type assertion needed because Zod's passthrough() type doesn't match simplewebauthn's exact type
     const verification = await verifyRegistrationResponse({
-      response: credential,
+      response: credential as unknown as RegistrationResponseJSON,
       expectedChallenge: challengeRecord.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,

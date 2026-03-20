@@ -95,8 +95,9 @@ export default async function handler(
     const publicKey = Buffer.from(dbCredential.public_key, 'base64url');
 
     // Verify the authentication response against the SERVER-STORED challenge
+    // Type assertion needed because Zod's passthrough() type doesn't match simplewebauthn's exact type
     const verification = await verifyAuthenticationResponse({
-      response: credential,
+      response: credential as unknown as AuthenticationResponseJSON,
       expectedChallenge: challengeRecord.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
