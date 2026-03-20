@@ -17,7 +17,9 @@ const DISMISSED_KEY = 'noir_biometric_prompt_dismissed';
 
 function getDeviceName(): string {
   const ua = navigator.userAgent;
-  if (/iPhone|iPad/.test(ua)) return 'iPhone / iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  // iPadOS 13+ reports "Macintosh" in UA — detect via touch support
+  if (/iPad/.test(ua) || (/Mac/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
   if (/Mac/.test(ua)) return 'Mac';
   if (/Android/.test(ua)) return 'Android Device';
   if (/Windows/.test(ua)) return 'Windows PC';
@@ -75,6 +77,7 @@ export default function BiometricRegistrationPrompt({ memberId }: BiometricRegis
       cancelled = true;
       clearTimeout(timer);
     };
+  // isBiometricAvailable is stable — wrapped in useCallback in MemberAuthContext
   }, [memberId, isBiometricAvailable]);
 
   // Clean up success auto-close timer on unmount
