@@ -10,6 +10,9 @@ export const WEBAUTHN_CONFIG = {
   timeout: 60000, // 60 seconds
 };
 
+/** Challenge TTL shared by both registration and authentication flows (2 minutes) */
+export const CHALLENGE_TTL_MS = 2 * 60 * 1000;
+
 export function getWebAuthnRPID(): string {
   if (typeof window !== 'undefined') {
     // In browser, use current hostname

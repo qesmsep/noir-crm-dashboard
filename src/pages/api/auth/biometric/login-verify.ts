@@ -44,22 +44,33 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Atomically claim the challenge: update-and-check eliminates TOCTOU race conditions.
-    // If a concurrent request already consumed it, this returns 0 rows and we reject cleanly.
-    const { data: challengeRecord, error: challengeError } = await supabaseAdmin
+    // Step 1: Find the most recent valid challenge
+    const { data: found } = await supabaseAdmin
       .from('webauthn_challenges')
-      .update({ used: true })
+      .select('id, challenge')
       .eq('member_id', memberId)
       .eq('type', 'authentication')
       .eq('used', false)
       .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
+      .single();
+
+    if (!found) {
+      return res.status(400).json({ error: 'No valid authentication challenge found. Please try again.' });
+    }
+
+    // Step 2: Atomically claim it — .eq('used', false) guards against concurrent consumption
+    const { data: challengeRecord } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .update({ used: true })
+      .eq('id', found.id)
+      .eq('used', false)
       .select('id, challenge')
       .single();
 
-    if (challengeError || !challengeRecord) {
-      return res.status(400).json({ error: 'No valid authentication challenge found. Please try again.' });
+    if (!challengeRecord) {
+      return res.status(400).json({ error: 'Challenge already used. Please try again.' });
     }
 
     // Get the credential used

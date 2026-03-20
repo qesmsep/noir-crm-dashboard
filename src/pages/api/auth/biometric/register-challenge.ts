@@ -1,11 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { generateRegistrationOptions, type PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
+import { WEBAUTHN_CONFIG, CHALLENGE_TTL_MS } from '@/lib/webauthn';
+import { Logger } from '@/lib/logger';
 import { parse } from 'cookie';
-
-/** Challenge expires in 2 minutes */
-const CHALLENGE_TTL_MS = 2 * 60 * 1000;
 
 /**
  * Generate WebAuthn registration challenge
@@ -90,13 +88,13 @@ export default async function handler(
       });
 
     if (challengeError) {
-      console.error('Failed to store registration challenge:', challengeError);
+      Logger.error('Failed to store registration challenge', challengeError);
       return res.status(500).json({ error: 'Internal server error' });
     }
 
     res.status(200).json({ options });
   } catch (error) {
-    console.error('Registration challenge error:', error);
+    Logger.error('Registration challenge error', error instanceof Error ? error : undefined);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

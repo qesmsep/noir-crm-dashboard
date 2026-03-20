@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { generateAuthenticationOptions, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
-import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
+import { WEBAUTHN_CONFIG, CHALLENGE_TTL_MS } from '@/lib/webauthn';
 import { z } from 'zod';
 import { findMemberByPhone } from '@/lib/security';
 import { Logger } from '@/lib/logger';
@@ -16,9 +16,6 @@ interface BiometricChallengeMember {
 const requestSchema = z.object({
   phone: z.string().min(10, 'Phone number is required'),
 });
-
-/** Challenge expires in 2 minutes */
-const CHALLENGE_TTL_MS = 2 * 60 * 1000;
 
 /**
  * Generate WebAuthn authentication challenge

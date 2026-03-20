@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { verifyRegistrationResponse, type RegistrationResponseJSON } from '@simplewebauthn/server';
 import { WEBAUTHN_CONFIG } from '@/lib/webauthn';
 import { logAuthEvent, getClientIP, getUserAgent } from '@/lib/security';
+import { Logger } from '@/lib/logger';
 import { parse } from 'cookie';
 
 /**
@@ -49,22 +50,33 @@ export default async function handler(
 
     const member = Array.isArray(session.members) ? session.members[0] : session.members;
 
-    // Atomically claim the challenge: update-and-check eliminates TOCTOU race conditions.
-    // If a concurrent request already consumed it, this returns 0 rows and we reject cleanly.
-    const { data: challengeRecord, error: challengeError } = await supabaseAdmin
+    // Step 1: Find the most recent valid challenge
+    const { data: found } = await supabaseAdmin
       .from('webauthn_challenges')
-      .update({ used: true })
+      .select('id, challenge')
       .eq('member_id', member.member_id)
       .eq('type', 'registration')
       .eq('used', false)
       .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
+      .single();
+
+    if (!found) {
+      return res.status(400).json({ error: 'No valid registration challenge found. Please try again.' });
+    }
+
+    // Step 2: Atomically claim it — .eq('used', false) guards against concurrent consumption
+    const { data: challengeRecord } = await supabaseAdmin
+      .from('webauthn_challenges')
+      .update({ used: true })
+      .eq('id', found.id)
+      .eq('used', false)
       .select('id, challenge')
       .single();
 
-    if (challengeError || !challengeRecord) {
-      return res.status(400).json({ error: 'No valid registration challenge found. Please try again.' });
+    if (!challengeRecord) {
+      return res.status(400).json({ error: 'Challenge already used. Please try again.' });
     }
 
     // Verify the registration response against the SERVER-STORED challenge
@@ -100,7 +112,7 @@ export default async function handler(
       });
 
     if (insertError) {
-      console.error('Failed to store biometric credential:', insertError);
+      Logger.error('Failed to store biometric credential', insertError);
       return res.status(500).json({ error: 'Failed to save biometric credential' });
     }
 
@@ -122,7 +134,13 @@ export default async function handler(
       message: 'Biometric authentication enabled successfully',
     });
   } catch (error) {
-    console.error('Registration verification error:', error);
+    if (error instanceof Error) {
+      // simplewebauthn throws descriptive errors for verification failures
+      // (origin mismatch, RP ID mismatch, etc.) — surface these as 400s
+      Logger.error('Registration verification failed', error);
+      return res.status(400).json({ error: error.message });
+    }
+    Logger.error('Registration verification error');
     res.status(500).json({ error: 'Internal server error' });
   }
 }
