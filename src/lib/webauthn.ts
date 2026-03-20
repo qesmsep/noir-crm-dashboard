@@ -32,11 +32,9 @@ export const REGISTRATION_CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const ALLOWED_RP_IDS = [
   'localhost',
   'noir-crm-dashboard.vercel.app',
+  'noirkc.com', // Production custom domain
   // Vercel preview deployments (if needed)
   // 'noir-crm-dashboard-git-*.vercel.app',
-  // Add your custom domain here
-  // 'yourdomain.com',
-  // 'www.yourdomain.com',
 ];
 
 /**
