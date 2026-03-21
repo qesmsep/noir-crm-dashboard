@@ -35,7 +35,12 @@ export default function MemberLoginPage() {
   // Redirect if already logged in
   React.useEffect(() => {
     if (member) {
-      router.push('/member/dashboard');
+      // If member needs to set up a password, redirect to change-password page
+      if (!member.has_password || member.password_is_temporary) {
+        router.push('/member/change-password');
+      } else {
+        router.push('/member/dashboard');
+      }
     }
   }, [member, router]);
 
@@ -143,21 +148,22 @@ export default function MemberLoginPage() {
     try {
       const needsPassword = await verifyOTP(phone, otp);
 
-      // Show appropriate message (redirect handled by useEffect)
+      // Show appropriate message and redirect based on password status
       if (needsPassword) {
         toast({
           title: 'Welcome!',
           description: 'Please set a password for your account to continue.',
           variant: 'success',
         });
+        router.push('/member/change-password');
       } else {
         toast({
           title: 'Welcome back',
           description: 'You are now signed in.',
           variant: 'success',
         });
+        router.push('/member/dashboard');
       }
-      // Note: Redirect is handled by the "already logged in" useEffect above
     } catch (error: any) {
       toast({
         title: 'Verification failed',
@@ -177,21 +183,22 @@ export default function MemberLoginPage() {
     try {
       const isTemporary = await signInWithPassword(phone, password);
 
-      // Show appropriate message (redirect handled by useEffect)
+      // Show appropriate message and redirect based on password status
       if (isTemporary) {
         toast({
           title: 'Password change required',
           description: 'Please set a new password to continue.',
           variant: 'warning',
         });
+        router.push('/member/change-password');
       } else {
         toast({
           title: 'Welcome back',
           description: 'You are now signed in.',
           variant: 'success',
         });
+        router.push('/member/dashboard');
       }
-      // Note: Redirect is handled by the "already logged in" useEffect above
     } catch (error: any) {
       toast({
         title: 'Login failed',
