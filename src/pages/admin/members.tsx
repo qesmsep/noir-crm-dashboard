@@ -26,6 +26,7 @@ interface Member {
     subscription_cancel_at?: string | null;
     subscription_status?: string | null;
     next_billing_date?: string | null;
+    plan_name?: string | null;
   };
 }
 
@@ -77,6 +78,8 @@ export default function MembersAdmin() {
   const [showPreview, setShowPreview] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>('active'); // Default to active only
+  const [planFilter, setPlanFilter] = useState<string>('all');
   const router = useRouter();
   const { toast } = useToast();
 
@@ -146,16 +149,35 @@ export default function MembersAdmin() {
       // Fetch all unique account IDs
       const accountIds = [...new Set(membersData?.map(m => m.account_id) || [])];
 
-      // Fetch account subscription data
+      // Fetch account subscription data with plan name
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
-        .select('account_id, subscription_cancel_at, subscription_status, next_billing_date')
+        .select(`
+          account_id,
+          subscription_cancel_at,
+          subscription_status,
+          next_billing_date,
+          subscription_plans!membership_plan_id (
+            plan_name
+          )
+        `)
         .in('account_id', accountIds);
 
       if (accountsError) throw accountsError;
 
-      // Map accounts data by account_id
-      const accountsMap = new Map(accountsData?.map(acc => [acc.account_id, acc]) || []);
+      // Map accounts data by account_id and flatten plan_name
+      const accountsMap = new Map(
+        accountsData?.map(acc => [
+          acc.account_id,
+          {
+            account_id: acc.account_id,
+            subscription_cancel_at: acc.subscription_cancel_at,
+            subscription_status: acc.subscription_status,
+            next_billing_date: acc.next_billing_date,
+            plan_name: (acc as any).subscription_plans?.plan_name || null
+          }
+        ]) || []
+      );
 
       // Merge data
       const membersWithAccounts = membersData?.map(member => ({
@@ -271,6 +293,7 @@ export default function MembersAdmin() {
     accounts?: {
       subscription_cancel_at?: string | null;
       subscription_status?: string | null;
+      plan_name?: string | null;
     };
   }
 
@@ -290,9 +313,36 @@ export default function MembersAdmin() {
       balance: calculateAccountBalance(accountId),
       join_date: primary.join_date,
       renewal_date: getNextBillingDate(primary),
-      accounts: primary.accounts, // Pass through subscription_cancel_at from member data
+      accounts: primary.accounts, // Pass through subscription data
     };
   });
+
+  // Apply filters
+  const filteredAccounts = accounts.filter(account => {
+    // Filter by subscription status
+    if (statusFilter !== 'all') {
+      const status = account.accounts?.subscription_status;
+      if (statusFilter === 'active' && status !== 'active') return false;
+      if (statusFilter === 'canceled' && status !== 'canceled') return false;
+      if (statusFilter === 'past_due' && status !== 'past_due') return false;
+      if (statusFilter === 'paused' && status !== 'paused') return false;
+    }
+
+    // Filter by membership plan
+    if (planFilter !== 'all') {
+      const planName = account.accounts?.plan_name;
+      if (!planName || planName !== planFilter) return false;
+    }
+
+    return true;
+  });
+
+  // Get unique plan names for filter dropdown
+  const uniquePlans = [...new Set(
+    accounts
+      .map(acc => acc.accounts?.plan_name)
+      .filter(Boolean)
+  )].sort() as string[];
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -313,8 +363,8 @@ export default function MembersAdmin() {
     }
   };
 
-  // Sort accounts
-  const sortedAccounts = [...accounts].sort((a, b) => {
+  // Sort filtered accounts
+  const sortedAccounts = [...filteredAccounts].sort((a, b) => {
     if (!sortField) return 0;
 
     let comparison = 0;
@@ -530,7 +580,12 @@ export default function MembersAdmin() {
         <div className={styles.header}>
           <div className={styles.headerTitle}>
             <h1 className={styles.pageTitle}>Members</h1>
-            <span className={styles.memberCount}>{members.length} {members.length === 1 ? 'member' : 'members'}</span>
+            <span className={styles.memberCount}>
+              {sortedAccounts.reduce((sum, acc) => sum + acc.allMembers.length, 0)} members
+              {(statusFilter !== 'all' || planFilter !== 'all') && (
+                <span style={{ color: '#6B7280', fontWeight: '400' }}> ({members.length} total)</span>
+              )}
+            </span>
           </div>
           <div className={styles.searchAndSortContainer}>
             <div className={styles.searchContainer}>
@@ -542,6 +597,31 @@ export default function MembersAdmin() {
                 onChange={(e) => setLookupQuery(e.target.value)}
               />
             </div>
+            {/* Status Filter */}
+            <select
+              className={styles.filterDropdown}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              title="Filter by status"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="canceled">Canceled</option>
+              <option value="past_due">Past Due</option>
+              <option value="paused">Paused</option>
+            </select>
+            {/* Plan Filter */}
+            <select
+              className={styles.filterDropdown}
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value)}
+              title="Filter by plan"
+            >
+              <option value="all">All Plans</option>
+              {uniquePlans.map(plan => (
+                <option key={plan} value={plan}>{plan}</option>
+              ))}
+            </select>
             {/* Sort dropdown for mobile */}
             <select
               className={styles.mobileSortDropdown}
