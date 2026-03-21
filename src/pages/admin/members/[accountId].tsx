@@ -1680,7 +1680,7 @@ export default function MemberDetailAdmin() {
                               alt={`${member.first_name} ${member.last_name}`}
                               width={150}
                               height={150}
-                              style={{ width: 'auto', height: 'auto', objectFit: 'cover', borderRadius: '50%' }}
+                              style={{ objectFit: 'cover' }}
                               loading="lazy"
                             />
                           </div>
