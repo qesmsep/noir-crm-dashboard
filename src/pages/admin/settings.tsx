@@ -129,7 +129,8 @@ export default function Settings() {
           .upsert({
             ...settings,
             hold_fee_enabled: settings.hold_fee_enabled,
-            hold_fee_amount: settings.hold_fee_amount
+            hold_fee_amount: settings.hold_fee_amount,
+            credit_card_fee_percentage: settings.credit_card_fee_percentage
           }, { onConflict: 'id' });
         if (error) throw error;
       } else {
@@ -141,7 +142,8 @@ export default function Settings() {
           body: JSON.stringify({
             ...settings,
             hold_fee_enabled: settings.hold_fee_enabled,
-            hold_fee_amount: settings.hold_fee_amount
+            hold_fee_amount: settings.hold_fee_amount,
+            credit_card_fee_percentage: settings.credit_card_fee_percentage
           }),
         });
         if (!response.ok) {
@@ -407,7 +409,7 @@ export default function Settings() {
                 disabled={holdFeeSaving}
                 className={`${styles.saveButton} ${holdFeeSaving ? styles.saving : ''}`}
               >
-                {holdFeeSaving ? 'Saving...' : 'Save Hold Fee Settings'}
+                {holdFeeSaving ? 'Saving...' : 'Save Payment Settings'}
               </button>
             </div>
           </div>
