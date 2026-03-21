@@ -55,12 +55,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Find accounts due for billing today (using date range to match timestamps)
     // Join with subscription_plans to get billing interval and beverage credit
+    // Skip accounts with subscription_cancel_at set (defensive - should be canceled already)
     const { data: accountsToBill, error: fetchError } = await supabase
       .from('accounts')
       .select('*, subscription_plans!membership_plan_id(interval, beverage_credit)')
       .gte('next_billing_date', today + 'T00:00:00')
       .lt('next_billing_date', tomorrow + 'T00:00:00')
-      .eq('subscription_status', 'active');
+      .eq('subscription_status', 'active')
+      .is('subscription_cancel_at', null);
 
     if (fetchError) {
       console.error('❌ Failed to fetch accounts:', fetchError);

@@ -9,11 +9,10 @@ const supabase = createClient(
 /**
  * PUT /api/subscriptions/cancel
  *
- * Cancels an account's subscription (app-managed, no Stripe subscription)
+ * Cancels an account's subscription immediately (app-managed, no Stripe subscription)
  *
  * Body:
  *   - account_id: UUID
- *   - cancel_immediately: boolean (default: false - cancel at end of billing period)
  *   - reason?: string (cancellation reason for metadata)
  *
  * Returns:
@@ -24,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, cancel_immediately = false, reason } = req.body;
+  const { account_id, reason } = req.body;
 
   if (!account_id) {
     return res.status(400).json({ error: 'account_id is required' });
@@ -46,85 +45,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Subscription is already canceled' });
     }
 
-    if (cancel_immediately) {
-      // Cancel immediately
-      const { data: updatedAccount, error: updateError } = await supabase
-        .from('accounts')
-        .update({
-          subscription_status: 'canceled',
-          subscription_canceled_at: new Date().toISOString(),
-          next_billing_date: null,
-        })
-        .eq('account_id', account_id)
-        .select()
-        .single();
+    // Cancel immediately
+    const { data: updatedAccount, error: updateError } = await supabase
+      .from('accounts')
+      .update({
+        subscription_status: 'canceled',
+        subscription_canceled_at: new Date().toISOString(),
+        subscription_cancel_at: null, // Clear any scheduled cancellation
+        next_billing_date: null,
+      })
+      .eq('account_id', account_id)
+      .select()
+      .single();
 
-      if (updateError) {
-        throw new Error(`Failed to cancel subscription: ${updateError.message}`);
-      }
-
-      // Log cancellation event
-      await supabase.from('subscription_events').insert({
-        account_id,
-        event_type: 'cancel',
-        previous_mrr: Number(account.monthly_dues) || 0,
-        new_mrr: 0,
-        effective_date: new Date().toISOString(),
-        metadata: {
-          cancel_immediately: true,
-          reason: reason || 'No reason provided',
-          canceled_by: 'admin',
-        },
-      });
-
-      console.log(`🚫 Subscription canceled immediately for account ${account_id}`);
-
-      return res.json({
-        success: true,
-        account: updatedAccount,
-        message: 'Subscription canceled immediately',
-      });
-
-    } else {
-      // Schedule cancellation at end of billing period
-      const cancelAt = account.next_billing_date;
-
-      const { data: updatedAccount, error: updateError } = await supabase
-        .from('accounts')
-        .update({
-          subscription_cancel_at: cancelAt,
-        })
-        .eq('account_id', account_id)
-        .select()
-        .single();
-
-      if (updateError) {
-        throw new Error(`Failed to schedule cancellation: ${updateError.message}`);
-      }
-
-      // Log cancellation event (scheduled)
-      await supabase.from('subscription_events').insert({
-        account_id,
-        event_type: 'cancel',
-        previous_mrr: Number(account.monthly_dues) || 0,
-        new_mrr: Number(account.monthly_dues) || 0, // Keep MRR until period end
-        effective_date: cancelAt || new Date().toISOString(),
-        metadata: {
-          cancel_immediately: false,
-          scheduled_for: cancelAt,
-          reason: reason || 'No reason provided',
-          canceled_by: 'admin',
-        },
-      });
-
-      console.log(`📅 Subscription scheduled to cancel on ${cancelAt} for account ${account_id}`);
-
-      return res.json({
-        success: true,
-        account: updatedAccount,
-        message: `Subscription will be canceled on ${cancelAt}`,
-      });
+    if (updateError) {
+      throw new Error(`Failed to cancel subscription: ${updateError.message}`);
     }
+
+    // Log cancellation event
+    await supabase.from('subscription_events').insert({
+      account_id,
+      event_type: 'cancel',
+      previous_mrr: Number(account.monthly_dues) || 0,
+      new_mrr: 0,
+      effective_date: new Date().toISOString(),
+      metadata: {
+        reason: reason || 'No reason provided',
+        canceled_by: 'admin',
+      },
+    });
+
+    console.log(`🚫 Subscription canceled immediately for account ${account_id}`);
+
+    return res.json({
+      success: true,
+      account: updatedAccount,
+      message: 'Subscription canceled',
+    });
 
   } catch (error: any) {
     console.error('Error canceling subscription:', error);
