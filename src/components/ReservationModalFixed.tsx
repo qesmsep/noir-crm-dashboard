@@ -316,17 +316,18 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
 
       {/* Modal Content */}
       <div
-        className="relative pointer-events-auto max-w-[500px] w-[90vw] max-h-[85vh] overflow-y-auto shadow-2xl"
+        className="relative pointer-events-auto max-w-[500px] w-[90vw] shadow-2xl flex flex-col"
         style={{
           zIndex: 99999999,
           backgroundColor: '#ecede8',
           borderRadius: '10px',
           border: '2px solid #353535',
-          fontFamily: 'Montserrat, sans-serif'
+          fontFamily: 'Montserrat, sans-serif',
+          maxHeight: 'calc(100vh - 40px)', // Leave space on mobile
         }}
       >
         {/* Header */}
-        <div className="border-b p-4 pb-2 pt-3" style={{ fontFamily: 'IvyJournal, sans-serif' }}>
+        <div className="border-b p-4 pb-2 pt-3 flex-shrink-0" style={{ fontFamily: 'IvyJournal, sans-serif' }}>
           <h2 className="text-xl font-bold" style={{ color: '#353535' }}>
             New Reservation
           </h2>
@@ -335,19 +336,19 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
             size="sm"
             onClick={handleClose}
             aria-label="Close"
-            className="absolute top-2 right-2"
+            className="absolute top-2 right-2 text-2xl"
           >
             ×
           </Button>
         </div>
 
-        {/* Body */}
-        <div className="p-3 overflow-y-auto">
+        {/* Body - scrollable */}
+        <div className="p-3 overflow-y-auto flex-1">
           <div className="flex flex-col gap-2">
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">First Name *</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">First Name *</label>
                   <Input
                     className="h-8"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -359,7 +360,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
               </div>
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">Last Name *</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">Last Name *</label>
                   <Input
                     className="h-8"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -371,7 +372,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
               </div>
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">Email</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">Email</label>
                   <Input
                     className="h-8"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -383,7 +384,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
               </div>
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">Phone *</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">Phone *</label>
                   <Input
                     className="h-8"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -399,7 +400,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">Party Size *</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">Party Size *</label>
                   <select
                     className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -415,7 +416,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
               </div>
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">Event Type</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">Event Type</label>
                   <select
                     className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -434,7 +435,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">Start Time *</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">Start Time *</label>
                   <Input
                     className="h-8"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -447,7 +448,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
               </div>
               <div>
                 <div className="mb-2">
-                  <label className="text-xs font-semibold mb-0.5 block">End Time *</label>
+                  <label className="text-sm md:text-xs font-semibold mb-1 block">End Time *</label>
                   <Input
                     className="h-8"
                     style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -461,7 +462,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
             </div>
 
             <div className="mb-2">
-              <label className="text-xs font-semibold mb-0.5 block">Table</label>
+              <label className="text-sm md:text-xs font-semibold mb-1 block">Table</label>
               <select
                 className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
                 style={{ fontFamily: 'Montserrat, sans-serif' }}
@@ -476,7 +477,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
             </div>
 
             <div className="mb-2">
-              <label className="text-xs font-semibold mb-0.5 block">Notes</label>
+              <label className="text-sm md:text-xs font-semibold mb-1 block">Notes</label>
               <Textarea
                 style={{ fontFamily: 'Montserrat, sans-serif' }}
                 value={formData.notes}
@@ -493,7 +494,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
                   checked={formData.is_checked_in}
                   onCheckedChange={(checked) => handleInputChange('is_checked_in', checked)}
                 />
-                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                <label className="text-sm md:text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                   Check in
                 </label>
               </div>
@@ -502,7 +503,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
                   checked={formData.send_confirmation}
                   onCheckedChange={(checked) => handleInputChange('send_confirmation', checked)}
                 />
-                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                <label className="text-sm md:text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                   Send confirmation
                 </label>
               </div>
@@ -511,7 +512,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
                   checked={formData.send_access_instructions}
                   onCheckedChange={(checked) => handleInputChange('send_access_instructions', checked)}
                 />
-                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                <label className="text-sm md:text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                   Send access instructions
                 </label>
               </div>
@@ -520,7 +521,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
                   checked={formData.send_reminder}
                   onCheckedChange={(checked) => handleInputChange('send_reminder', checked)}
                 />
-                <label className="text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                <label className="text-sm md:text-xs" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                   Send reminder
                 </label>
               </div>
@@ -528,19 +529,22 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t p-3 flex justify-end">
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleClose} size="sm" className="h-8">
+        {/* Footer - Fixed at bottom */}
+        <div className="border-t p-3 flex justify-end flex-shrink-0 bg-[#ecede8]">
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              className="h-11 sm:h-9 flex-1 sm:flex-initial text-base sm:text-sm"
+            >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              size="sm"
-              className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
+              className="h-11 sm:h-9 flex-1 sm:flex-initial bg-blue-600 hover:bg-blue-700 text-white text-base sm:text-sm font-semibold"
             >
-              {isSaving ? 'Creating...' : 'Create'}
+              {isSaving ? 'Creating...' : 'Create Reservation'}
             </Button>
           </div>
         </div>
