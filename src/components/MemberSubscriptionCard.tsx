@@ -254,7 +254,7 @@ export default function MemberSubscriptionCard({
   };
 
   const handleCancelSubscription = async () => {
-    if (!confirm('Are you sure you want to cancel this subscription at the end of the billing period?')) {
+    if (!confirm('Are you sure you want to cancel this subscription immediately?')) {
       return;
     }
 
@@ -265,7 +265,6 @@ export default function MemberSubscriptionCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           account_id: accountId,
-          cancel_at_period_end: true,
         }),
       });
 
@@ -277,7 +276,7 @@ export default function MemberSubscriptionCard({
 
       toast({
         title: 'Success',
-        description: 'Subscription will be canceled at the end of the billing period',
+        description: 'Subscription canceled immediately',
       });
 
       fetchSubscriptionData();
