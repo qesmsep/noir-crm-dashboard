@@ -11,6 +11,7 @@ interface SubscriptionData {
   subscription_status: string | null;
   subscription_start_date: string | null;
   subscription_cancel_at: string | null;
+  subscription_canceled_at: string | null;
   next_renewal_date: string | null;
   monthly_dues: number | null;
   payment_method_type: string | null;
@@ -162,6 +163,7 @@ export default function MemberSubscriptionCard({
         subscription_status: account.subscription_status || null,
         subscription_start_date: account.subscription_start_date || null,
         subscription_cancel_at: account.subscription_cancel_at || null,
+        subscription_canceled_at: account.subscription_canceled_at || null,
         next_renewal_date: account.next_billing_date || null,
         monthly_dues: account.monthly_dues || null,
         payment_method_type: account.payment_method_type || null,
@@ -436,14 +438,12 @@ export default function MemberSubscriptionCard({
     );
   }
 
-  // Check if there's an active membership (app-managed only)
-  // Show membership for active, past_due, paused - basically anything except canceled/null
-  const hasActiveMembership = subscription &&
-    subscription.subscription_status &&
-    subscription.subscription_status !== 'canceled' &&
-    subscription.monthly_dues;
+  // Check if there's a membership to display (including canceled ones)
+  // Show membership card for any subscription with a status (active, canceled, past_due, paused, etc.)
+  const hasMembership = subscription &&
+    subscription.subscription_status;
 
-  if (!subscription || !hasActiveMembership) {
+  if (!subscription || !hasMembership) {
     return (
       <>
         <div className={styles.card}>
@@ -615,10 +615,17 @@ export default function MemberSubscriptionCard({
             <span style={{ color: '#6B7280', fontWeight: '500' }}>Start Date</span>
             <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.subscription_start_date)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#6B7280', fontWeight: '500' }}>Next Renewal</span>
-            <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.next_renewal_date)}</span>
-          </div>
+          {subscription.subscription_status === 'canceled' && subscription.subscription_canceled_at ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#6B7280', fontWeight: '500' }}>Canceled On</span>
+              <span style={{ color: '#DC2626', fontWeight: '600' }}>{formatDate(subscription.subscription_canceled_at)}</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#6B7280', fontWeight: '500' }}>Next Renewal</span>
+              <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.next_renewal_date)}</span>
+            </div>
+          )}
           {subscription.payment_method_type && (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#6B7280', fontWeight: '500' }}>Payment Method</span>
@@ -667,7 +674,7 @@ export default function MemberSubscriptionCard({
           </>
         )}
             <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
-        {subscription.subscription_cancel_at ? (
+        {subscription.subscription_cancel_at || subscription.subscription_status === 'canceled' ? (
           <button
             className={styles.reactivateButton}
             onClick={handleReactivateSubscription}

@@ -1,10 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,13 +9,13 @@ const supabase = createClient(
 /**
  * POST /api/subscriptions/reactivate
  *
- * Reactivates a canceled subscription (removes scheduled cancellation)
+ * Reactivates a canceled subscription (app-managed billing)
  *
  * Body:
  *   - account_id: UUID
  *
  * Returns:
- *   - subscription: Stripe.Subscription
+ *   - account: Updated account data
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -37,51 +32,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch account
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('account_id, stripe_subscription_id, monthly_dues, subscription_status')
+      .select('account_id, monthly_dues, subscription_status, subscription_cancel_at, subscription_canceled_at, membership_plan_id, subscription_plans!membership_plan_id(interval)')
       .eq('account_id', account_id)
       .single();
 
-    if (accountError || !account || !account.stripe_subscription_id) {
-      return res.status(404).json({ error: 'Account or subscription not found' });
+    if (accountError || !account) {
+      return res.status(404).json({ error: 'Account not found' });
     }
 
-    // Check if subscription is scheduled for cancellation
-    const currentSubscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
-
-    if (!currentSubscription.cancel_at_period_end) {
+    // Check if subscription can be reactivated
+    if (account.subscription_status === 'active' && !account.subscription_cancel_at) {
       return res.status(400).json({
-        error: 'Subscription is not scheduled for cancellation',
+        error: 'Subscription is already active',
       });
     }
 
-    // Reactivate subscription
-    const subscription = await stripe.subscriptions.update(account.stripe_subscription_id, {
-      cancel_at_period_end: false,
-    });
+    // Calculate next billing date based on plan interval
+    const billingInterval = account.subscription_plans?.interval || 'month';
+    const today = new Date();
+    const nextBillingDate = new Date(today);
 
-    // Update account
-    await supabase
+    if (billingInterval === 'year') {
+      nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+    } else {
+      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+    }
+
+    // Reactivate subscription
+    const { data: updatedAccount, error: updateError } = await supabase
       .from('accounts')
       .update({
         subscription_status: 'active',
         subscription_cancel_at: null,
+        subscription_canceled_at: null,
+        next_billing_date: nextBillingDate.toISOString(),
       })
-      .eq('account_id', account_id);
+      .eq('account_id', account_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error(`Failed to reactivate subscription: ${updateError.message}`);
+    }
 
     // Log reactivation event
     await supabase.from('subscription_events').insert({
       account_id,
       event_type: 'reactivate',
-      stripe_subscription_id: account.stripe_subscription_id,
       new_mrr: Number(account.monthly_dues) || 0,
       effective_date: new Date().toISOString(),
       metadata: {
         reactivated_via_api: true,
+        previous_status: account.subscription_status,
       },
     });
 
+    console.log(`✅ Subscription reactivated for account ${account_id}`);
+
     return res.json({
-      subscription,
+      success: true,
+      account: updatedAccount,
       message: 'Subscription reactivated successfully',
     });
   } catch (error: any) {
