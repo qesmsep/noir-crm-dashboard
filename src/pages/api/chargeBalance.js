@@ -68,16 +68,27 @@ export default async function handler(req, res) {
       console.error('Error listing subscriptions:', err);
     }
   }
-  // 3c) If still none, list attached cards
+  // 3c) If still none, list attached payment methods (cards or bank accounts)
   if (!defaultPaymentMethodId) {
     try {
-      const pmList = await stripe.paymentMethods.list({
+      // Try cards first
+      const cardList = await stripe.paymentMethods.list({
         customer: stripe_customer_id,
         type: 'card',
         limit: 1,
       });
-      if (pmList.data.length > 0) {
-        defaultPaymentMethodId = pmList.data[0].id;
+      if (cardList.data.length > 0) {
+        defaultPaymentMethodId = cardList.data[0].id;
+      } else {
+        // Try bank accounts if no cards
+        const bankList = await stripe.paymentMethods.list({
+          customer: stripe_customer_id,
+          type: 'us_bank_account',
+          limit: 1,
+        });
+        if (bankList.data.length > 0) {
+          defaultPaymentMethodId = bankList.data[0].id;
+        }
       }
     } catch (err) {
       console.error('Error listing payment methods:', err);
@@ -134,17 +145,47 @@ export default async function handler(req, res) {
 
   const amountToCharge = baseAmount + creditCardFee;
 
+  // 4c) Get full payment method details to check type
+  let paymentMethod;
+  try {
+    paymentMethod = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
+  } catch (err) {
+    console.error('Error retrieving payment method:', err);
+    return res.status(400).json({ error: 'Failed to retrieve payment method' });
+  }
+
   // 5) Create & confirm a PaymentIntent
   let intent;
   try {
-    intent = await stripe.paymentIntents.create({
+    const paymentIntentParams = {
       amount: amountToCharge,
       currency: 'usd',
       customer: stripe_customer_id,
       payment_method: defaultPaymentMethodId,
-      off_session: true,
+      payment_method_types: ['card', 'us_bank_account'], // Allow both cards and ACH
       confirm: true,
-    });
+      description: chargeDescription,
+      expand: ['charges'],
+    };
+
+    // For ACH payments, provide mandate data and remove off_session
+    if (paymentMethod.type === 'us_bank_account') {
+      // Provide mandate acceptance data
+      paymentIntentParams.mandate_data = {
+        customer_acceptance: {
+          type: 'online',
+          online: {
+            ip_address: '0.0.0.0', // Server-initiated payment
+            user_agent: 'Noir Membership Billing System',
+          },
+        },
+      };
+    } else {
+      // For cards, use off_session
+      paymentIntentParams.off_session = true;
+    }
+
+    intent = await stripe.paymentIntents.create(paymentIntentParams);
   } catch (err) {
     console.error('Stripe charge failed:', err);
     return res.status(500).json({ error: 'Stripe charge failed', details: err.message });
