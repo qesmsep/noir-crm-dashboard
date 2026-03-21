@@ -48,7 +48,7 @@ const STEPS = [
   { id: 6, name: 'Profile', icon: Check }
 ];
 
-function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCount, waitlistData }: any) {
+function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCount, waitlistData, firstName, lastName, email }: any) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -86,13 +86,13 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
 
       const intentData = await intentResponse.json();
 
-      // Confirm card payment (use actual name/email if placeholders were cleared)
-      const billingName = waitlistData.first_name === 'Pending' || waitlistData.last_name === 'Referral'
-        ? undefined
-        : `${waitlistData.first_name} ${waitlistData.last_name}`;
-      const billingEmail = /^referral-.*@pending\.noirkc\.com$/.test(waitlistData.email)
-        ? undefined
-        : waitlistData.email;
+      // Confirm card payment (use actual name/email from form, not original waitlist data)
+      const billingName = firstName && lastName && firstName !== 'Pending' && lastName !== 'Referral'
+        ? `${firstName} ${lastName}`
+        : undefined;
+      const billingEmail = email && !/^referral-.*@pending\.noirkc\.com$/.test(email)
+        ? email
+        : undefined;
 
       const { error, paymentIntent } = await stripe.confirmCardPayment(intentData.client_secret, {
         payment_method: {
@@ -150,13 +150,13 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
     console.log('\n========== ACH PAYMENT FLOW ==========');
     console.log('[ACH] Starting ACH payment submission');
 
-    // Prepare billing details (skip placeholders)
-    const billingName = waitlistData.first_name === 'Pending' || waitlistData.last_name === 'Referral'
-      ? undefined
-      : `${waitlistData.first_name} ${waitlistData.last_name}`;
-    const billingEmail = /^referral-.*@pending\.noirkc\.com$/.test(waitlistData.email)
-      ? undefined
-      : waitlistData.email;
+    // Prepare billing details (use actual name/email from form, not original waitlist data)
+    const billingName = firstName && lastName && firstName !== 'Pending' && lastName !== 'Referral'
+      ? `${firstName} ${lastName}`
+      : undefined;
+    const billingEmail = email && !/^referral-.*@pending\.noirkc\.com$/.test(email)
+      ? email
+      : undefined;
 
     try {
       // Create payment intent when user submits payment
@@ -1537,6 +1537,9 @@ export default function OnboardingWizard({
                 onSuccess={handlePaymentSuccess}
                 additionalMembersCount={additionalMembers.length}
                 waitlistData={waitlistData}
+                firstName={firstName}
+                lastName={lastName}
+                email={email}
               />
             </Elements>
           </VStack>
