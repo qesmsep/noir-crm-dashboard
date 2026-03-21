@@ -113,6 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log('   ✅ Payment succeeded! Reactivating account...');
 
           // Get billing interval from plan
+          // @ts-ignore - subscription_plans is a joined object, not an array
           const billingInterval = account.subscription_plans?.interval || 'month';
           const currentDate = account.next_billing_date || new Date().toISOString().split('T')[0];
 

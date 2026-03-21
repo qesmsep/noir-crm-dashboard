@@ -69,6 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Update subscription status based on payment type
       // ACH payments are 'processing' and take 3-5 days
       // Card payments are 'succeeded' and immediate
+      // @ts-ignore - subscription_plans is a joined object, not an array
       const interval = account.subscription_plans?.interval || 'month';
       const currentBillingDate = account.next_billing_date
         ? account.next_billing_date.split('T')[0] // Convert to YYYY-MM-DD format

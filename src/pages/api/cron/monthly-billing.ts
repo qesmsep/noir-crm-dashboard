@@ -91,6 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           results.skipped++;
 
           // Get billing interval from plan
+          // @ts-ignore - subscription_plans is a joined object, not an array
           const billingInterval = account.subscription_plans?.interval || 'month';
 
           // Still update next_billing_date based on interval
@@ -112,6 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log('   ✅ Payment succeeded');
 
           // Get billing interval from plan
+          // @ts-ignore - subscription_plans is a joined object, not an array
           const billingInterval = account.subscription_plans?.interval || 'month';
 
           // Update next_billing_date based on interval and reset retry counter

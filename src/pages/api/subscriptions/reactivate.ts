@@ -48,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Calculate next billing date based on plan interval
+    // @ts-ignore - subscription_plans is a joined object, not an array
     const billingInterval = account.subscription_plans?.interval || 'month';
     const today = new Date();
     const nextBillingDate = new Date(today);
