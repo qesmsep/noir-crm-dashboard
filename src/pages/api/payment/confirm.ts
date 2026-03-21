@@ -385,20 +385,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     });
   }
 
-  // 3. Beverage credit (if exists)
-  if (beverageCredit > 0) {
-    ledgerEntries.push({
-      account_id: account.account_id,
-      member_id: member.member_id,
-      type: 'credit',
-      amount: beverageCredit.toFixed(2),
-      date: getTodayLocalDate(),
-      note: 'Monthly beverage credit',
-      stripe_payment_intent_id: waitlist.stripe_payment_intent_id
-    });
-  }
-
-  // 4. Processing fee charge (if fee exists)
+  // 3. Processing fee charge (if fee exists)
   if (creditCardFee > 0) {
     ledgerEntries.push({
       account_id: account.account_id,

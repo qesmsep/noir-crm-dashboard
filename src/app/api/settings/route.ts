@@ -41,6 +41,7 @@ export async function GET() {
           hold_fee_enabled: false,
           hold_fee_amount: 0,
           admin_notification_phone: '',
+          credit_card_fee_percentage: 4.0, // Default 4% CC processing fee
         });
       }
       throw error;
@@ -59,7 +60,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const settings = await request.json();
-    
+
     const { data, error } = await supabaseAdmin
       .from('settings')
       .insert([settings])
@@ -79,6 +80,36 @@ export async function POST(request: NextRequest) {
     console.error('Error creating settings:', error);
     return NextResponse.json(
       { error: 'Failed to create settings' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const settings = await request.json();
+
+    // Update the single settings record
+    const { data, error } = await supabaseAdmin
+      .from('settings')
+      .update(settings)
+      .eq('id', settings.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating settings:', error);
+      return NextResponse.json(
+        { error: 'Failed to update settings' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    return NextResponse.json(
+      { error: 'Failed to update settings' },
       { status: 500 }
     );
   }

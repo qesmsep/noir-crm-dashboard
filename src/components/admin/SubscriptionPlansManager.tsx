@@ -18,7 +18,7 @@ export default function SubscriptionPlansManager() {
   const [formData, setFormData] = useState({
     plan_name: '',
     monthly_price: '',
-    beverage_credit: '',
+    admin_fee: '', // UI uses admin_fee, calculated to beverage_credit on save
     interval: 'month',
     is_active: true,
     show_in_onboarding: true,
@@ -67,7 +67,7 @@ export default function SubscriptionPlansManager() {
     setFormData({
       plan_name: '',
       monthly_price: '',
-      beverage_credit: '',
+      admin_fee: '',
       interval: 'month',
       is_active: true,
       show_in_onboarding: true,
@@ -79,10 +79,15 @@ export default function SubscriptionPlansManager() {
 
   function openEditModal(plan: SubscriptionPlan) {
     setEditingPlan(plan);
+    // Calculate admin_fee from stored beverage_credit for display
+    const adminFee = plan.beverage_credit !== undefined && plan.beverage_credit !== null
+      ? (plan.monthly_price - plan.beverage_credit).toString()
+      : '';
+
     setFormData({
       plan_name: plan.plan_name,
       monthly_price: plan.monthly_price.toString(),
-      beverage_credit: plan.beverage_credit?.toString() || '',
+      admin_fee: adminFee,
       interval: plan.interval,
       is_active: plan.is_active,
       show_in_onboarding: (plan as any).show_in_onboarding ?? true,
@@ -110,13 +115,25 @@ export default function SubscriptionPlansManager() {
 
       const method = editingPlan ? 'PUT' : 'POST';
 
+      // Calculate beverage_credit from admin_fee for database storage
+      const monthlyPrice = parseFloat(formData.monthly_price);
+      const adminFee = parseFloat(formData.admin_fee || '0');
+      const beverageCredit = monthlyPrice - adminFee;
+
+      // Send data with beverage_credit (not admin_fee) since that's what DB expects
+      const dataToSend = {
+        ...formData,
+        beverage_credit: beverageCredit.toFixed(2),
+        admin_fee: undefined // Remove admin_fee from payload
+      };
+
       const res = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       });
 
       if (!res.ok) {
@@ -365,14 +382,14 @@ export default function SubscriptionPlansManager() {
 
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                      {formData.interval === 'month' ? 'Monthly' : 'Yearly'} Beverage Credit
+                      {formData.interval === 'month' ? 'Monthly' : 'Yearly'} Administrative Fee
                     </label>
                     <input
                       type="number"
                       step="0.01"
-                      value={formData.beverage_credit}
-                      onChange={(e) => setFormData({ ...formData, beverage_credit: e.target.value })}
-                      placeholder="100.00"
+                      value={formData.admin_fee}
+                      onChange={(e) => setFormData({ ...formData, admin_fee: e.target.value })}
+                      placeholder="50.00"
                       style={{
                         width: '100%',
                         padding: '0.75rem',
@@ -383,8 +400,8 @@ export default function SubscriptionPlansManager() {
                       }}
                     />
                     <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                      Admin fee: ${formData.monthly_price && formData.beverage_credit
-                        ? (parseFloat(formData.monthly_price) - parseFloat(formData.beverage_credit)).toFixed(2)
+                      Beverage credit: ${formData.monthly_price && formData.admin_fee
+                        ? (parseFloat(formData.monthly_price) - parseFloat(formData.admin_fee)).toFixed(2)
                         : '0.00'}
                     </p>
                   </div>

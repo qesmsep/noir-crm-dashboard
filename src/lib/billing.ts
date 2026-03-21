@@ -233,21 +233,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       });
     }
 
-    // 3. If there's a beverage credit, log it as a "credit"
-    if (beverageCredit > 0) {
-      entries.push({
-        member_id: primaryMember.member_id,
-        account_id: account.account_id,
-        type: 'credit',
-        amount: beverageCredit,
-        date: getTodayLocalDate(),
-        note: 'Monthly beverage credit',
-        stripe_charge_id: charge?.id,
-        stripe_payment_intent_id: paymentIntent.id,
-      });
-    }
-
-    // 4. If there's a credit card processing fee, log it as a "charge"
+    // 3. If there's a credit card processing fee, log it as a "charge"
     if (feeAmount > 0) {
       entries.push({
         member_id: primaryMember.member_id,
@@ -263,7 +249,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     await supabase.from('ledger').insert(entries);
 
-    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} payment, -$${adminFee} admin fee, +$${beverageCredit} beverage credit, -$${feeAmount} cc fee`);
+    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} payment, -$${adminFee} admin fee, -$${feeAmount} cc fee, balance: $${baseAmount - adminFee - feeAmount}`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
   }
