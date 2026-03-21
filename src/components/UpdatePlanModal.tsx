@@ -20,16 +20,19 @@ interface Plan {
 interface Props {
   accountId: string;
   currentPlanId: string | null;
+  subscriptionStatus: string | null;
+  lastRenewalDate: string | null;
   onSuccess: () => void;
   onClose: () => void;
 }
 
-export default function UpdatePlanModal({ accountId, currentPlanId, onSuccess, onClose }: Props) {
+export default function UpdatePlanModal({ accountId, currentPlanId, subscriptionStatus, lastRenewalDate, onSuccess, onClose }: Props) {
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(currentPlanId);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [chargeToday, setChargeToday] = useState(true);
 
   useEffect(() => {
     fetchPlans();
@@ -58,7 +61,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, onSuccess, o
   };
 
   const handleSubmit = async () => {
-    if (!selectedPlanId || selectedPlanId === currentPlanId) {
+    if (!selectedPlanId || (selectedPlanId === currentPlanId && subscriptionStatus === 'active')) {
       toast({
         title: 'Info',
         description: 'Please select a different plan',
@@ -74,6 +77,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, onSuccess, o
         body: JSON.stringify({
           account_id: accountId,
           new_plan_id: selectedPlanId,
+          charge_today: chargeToday,
         }),
       });
 
@@ -127,49 +131,83 @@ export default function UpdatePlanModal({ accountId, currentPlanId, onSuccess, o
           ) : plans.length === 0 ? (
             <div className={styles.empty}>No subscription plans available</div>
           ) : (
-            <div className={styles.planList}>
-              {plans.map((plan) => {
-                const isCurrent = plan.plan_id === currentPlanId;
-                const isSelected = plan.plan_id === selectedPlanId;
+            <>
+              <div className={styles.planList}>
+                {plans.map((plan) => {
+                  const isCurrent = plan.plan_id === currentPlanId;
+                  const isSelected = plan.plan_id === selectedPlanId;
 
-                return (
-                  <div
-                    key={plan.plan_id}
-                    className={`${styles.planCard} ${isSelected ? styles.selected : ''} ${isCurrent ? styles.current : ''}`}
-                    onClick={() => setSelectedPlanId(plan.plan_id)}
-                  >
-                    <div className={styles.planHeader}>
-                      <h3 className={styles.planName}>{plan.plan_name}</h3>
-                      {isCurrent && <span className={styles.currentBadge}>Current Plan</span>}
-                    </div>
-
-                    {plan.description && (
-                      <p className={styles.planDescription}>{plan.description}</p>
-                    )}
-
-                    <div className={styles.planPrice}>
-                      <span className={styles.amount}>{formatCurrency(plan.amount)}</span>
-                      <span className={styles.interval}>{formatInterval(plan.interval)}</span>
-                    </div>
-
-                    {plan.interval === 'year' && (
-                      <div className={styles.monthlyEquivalent}>
-                        {formatCurrency(plan.monthly_price / 12)}/month
+                  return (
+                    <div
+                      key={plan.plan_id}
+                      className={`${styles.planCard} ${isSelected ? styles.selected : ''} ${isCurrent ? styles.current : ''}`}
+                      onClick={() => setSelectedPlanId(plan.plan_id)}
+                    >
+                      <div className={styles.planHeader}>
+                        <h3 className={styles.planName}>{plan.plan_name}</h3>
+                        {isCurrent && subscriptionStatus === 'active' && <span className={styles.currentBadge}>Current Plan</span>}
                       </div>
-                    )}
 
-                    <div className={styles.radioButton}>
+                      {plan.description && (
+                        <p className={styles.planDescription}>{plan.description}</p>
+                      )}
+
+                      <div className={styles.planPrice}>
+                        <span className={styles.amount}>{formatCurrency(plan.amount)}</span>
+                        <span className={styles.interval}>{formatInterval(plan.interval)}</span>
+                      </div>
+
+                      {plan.interval === 'year' && (
+                        <div className={styles.monthlyEquivalent}>
+                          {formatCurrency(plan.monthly_price / 12)}/month
+                        </div>
+                      )}
+
+                      <div className={styles.radioButton}>
+                        <input
+                          type="radio"
+                          name="plan"
+                          checked={isSelected}
+                          onChange={() => setSelectedPlanId(plan.plan_id)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {subscriptionStatus === 'canceled' && (
+                <div className={styles.paymentTiming}>
+                  <h4 className={styles.paymentTimingTitle}>Payment Timing</h4>
+                  <div className={styles.paymentOptions}>
+                    <label className={styles.paymentOption}>
                       <input
                         type="radio"
-                        name="plan"
-                        checked={isSelected}
-                        onChange={() => setSelectedPlanId(plan.plan_id)}
+                        name="paymentTiming"
+                        checked={chargeToday}
+                        onChange={() => setChargeToday(true)}
                       />
-                    </div>
+                      <div>
+                        <div className={styles.optionTitle}>Charge Today</div>
+                        <div className={styles.optionDescription}>Reactivate and charge immediately</div>
+                      </div>
+                    </label>
+                    <label className={styles.paymentOption}>
+                      <input
+                        type="radio"
+                        name="paymentTiming"
+                        checked={!chargeToday}
+                        onChange={() => setChargeToday(false)}
+                      />
+                      <div>
+                        <div className={styles.optionTitle}>Pay on Next Renewal Date</div>
+                        <div className={styles.optionDescription}>Reactivate now, charge on next billing cycle</div>
+                      </div>
+                    </label>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -180,9 +218,9 @@ export default function UpdatePlanModal({ accountId, currentPlanId, onSuccess, o
           <button
             className={styles.submitButton}
             onClick={handleSubmit}
-            disabled={submitting || !selectedPlanId || selectedPlanId === currentPlanId}
+            disabled={submitting || !selectedPlanId || (selectedPlanId === currentPlanId && subscriptionStatus === 'active')}
           >
-            {submitting ? 'Updating...' : 'Update Plan'}
+            {submitting ? (subscriptionStatus === 'canceled' ? 'Reactivating...' : 'Updating...') : (subscriptionStatus === 'canceled' ? 'Reactivate & Update Plan' : 'Update Plan')}
           </button>
         </div>
       </div>

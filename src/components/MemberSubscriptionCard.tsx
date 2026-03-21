@@ -674,23 +674,33 @@ export default function MemberSubscriptionCard({
           </>
         )}
             <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
-        {subscription.subscription_cancel_at || subscription.subscription_status === 'canceled' ? (
+        {subscription.subscription_status === 'canceled' ? (
+          // Canceled: Only show Update Plan button (which will reactivate)
           <button
-            className={styles.reactivateButton}
-            onClick={handleReactivateSubscription}
-            disabled={actionLoading}
+            className={styles.updateButton}
+            onClick={() => setShowUpdatePlanModal(true)}
           >
-            {actionLoading ? 'Processing...' : 'Reactivate'}
+            Update Plan
           </button>
         ) : subscription.is_paused ? (
-          <button
-            className={styles.resumeButton}
-            onClick={handleResumeSubscription}
-            disabled={actionLoading}
-          >
-            {actionLoading ? 'Processing...' : 'Resume Membership'}
-          </button>
+          // Paused: Show Resume and Update Plan
+          <>
+            <button
+              className={styles.resumeButton}
+              onClick={handleResumeSubscription}
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Processing...' : 'Resume Membership'}
+            </button>
+            <button
+              className={styles.updateButton}
+              onClick={() => setShowUpdatePlanModal(true)}
+            >
+              Update Plan
+            </button>
+          </>
         ) : (
+          // Active: Show Pause, Cancel, and Update Plan
           <>
             <button
               className={styles.pauseButton}
@@ -706,15 +716,14 @@ export default function MemberSubscriptionCard({
             >
               {actionLoading ? 'Processing...' : 'Cancel'}
             </button>
+            <button
+              className={styles.updateButton}
+              onClick={() => setShowUpdatePlanModal(true)}
+            >
+              Update Plan
+            </button>
           </>
         )}
-
-        <button
-          className={styles.updateButton}
-          onClick={() => setShowUpdatePlanModal(true)}
-        >
-          Update Plan
-        </button>
       </div>
 
       {/* Payment Settings */}
@@ -778,6 +787,8 @@ export default function MemberSubscriptionCard({
         <UpdatePlanModal
           accountId={accountId}
           currentPlanId={currentPlanId}
+          subscriptionStatus={subscription?.subscription_status || null}
+          lastRenewalDate={subscription?.subscription_start_date || null}
           onSuccess={() => {
             fetchSubscriptionData();
             setShowUpdatePlanModal(false);

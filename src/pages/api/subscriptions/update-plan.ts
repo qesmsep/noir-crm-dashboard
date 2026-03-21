@@ -1,10 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
+import { chargeAccount, logPaymentToLedger, handlePaymentFailure } from '@/lib/billing';
+import { getTodayLocalDate } from '@/lib/utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,31 +13,33 @@ const supabase = createClient(
  *
  * Updates an account's subscription plan (upgrade or downgrade)
  * App-managed, no Stripe subscription
+ * Can reactivate canceled subscriptions
  *
  * Body:
  *   - account_id: UUID
  *   - new_plan_id: UUID (ID from subscription_plans table)
+ *   - charge_today: boolean (optional, default true for canceled accounts)
  *
  * Returns:
  *   - account: Updated account data
- *   - event_type: 'upgrade' | 'downgrade'
+ *   - event_type: 'upgrade' | 'downgrade' | 'reactivate'
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST' && req.method !== 'PUT') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, new_plan_id } = req.body;
+  const { account_id, new_plan_id, charge_today = true } = req.body;
 
   if (!account_id || !new_plan_id) {
     return res.status(400).json({ error: 'account_id and new_plan_id are required' });
   }
 
   try {
-    // Fetch account
+    // Fetch account with subscription plan info
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('account_id, subscription_status, monthly_dues')
+      .select('account_id, subscription_status, monthly_dues, stripe_customer_id, subscription_start_date')
       .eq('account_id', account_id)
       .single();
 
@@ -48,9 +47,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    if (account.subscription_status !== 'active') {
-      return res.status(400).json({ error: 'Can only update plan for active subscriptions' });
-    }
+    const isCanceled = account.subscription_status === 'canceled';
+    const wasActive = account.subscription_status === 'active';
 
     // Get new price details from subscription_plans table (app is source of truth)
     const { data: newPlan, error: planError } = await supabase
@@ -66,6 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const basePriceAmount = newPlan.monthly_price;
     const adminFee = newPlan.administrative_fee || 0;
     const additionalMemberFeeRate = newPlan.additional_member_fee || 0;
+    const billingInterval = newPlan.interval || 'month';
 
     // Count secondary members to recalculate monthly dues
     const { data: secondaryMembers } = await supabase
@@ -81,31 +80,105 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const newMonthlyDues = basePriceAmount + (secondaryMemberCount * additionalMemberFeeRate);
 
     const oldMrr = Number(account.monthly_dues) || 0;
-    const eventType = newMonthlyDues > oldMrr ? 'upgrade' : 'downgrade';
+    let eventType = isCanceled ? 'reactivate' : (newMonthlyDues > oldMrr ? 'upgrade' : 'downgrade');
 
     console.log('💰 Updating subscription plan:');
+    console.log(`   Account status: ${account.subscription_status}`);
     console.log(`   Old MRR: $${oldMrr}`);
     console.log(`   New base: $${basePriceAmount}`);
     console.log(`   Admin fee: $${adminFee}`);
     console.log(`   Additional members: ${secondaryMemberCount} x $${additionalMemberFeeRate} = $${secondaryMemberCount * additionalMemberFeeRate}`);
     console.log(`   New MRR: $${newMonthlyDues}`);
     console.log(`   Event type: ${eventType}`);
+    console.log(`   Charge today: ${charge_today}`);
+
+    // Calculate next billing date
+    let nextBillingDate: Date;
+    if (charge_today || !isCanceled) {
+      // If charging today or updating active subscription, next billing is interval from today
+      nextBillingDate = new Date();
+      if (billingInterval === 'year') {
+        nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+      } else {
+        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+      }
+    } else {
+      // If NOT charging today on canceled account, calculate next billing from their last renewal cycle
+      // Get the last payment date from ledger
+      const { data: lastPayment } = await supabase
+        .from('ledger')
+        .select('date')
+        .eq('account_id', account_id)
+        .in('type', ['credit', 'payment'])
+        .order('date', { ascending: false })
+        .limit(1)
+        .single();
+
+      const baseDate = lastPayment?.date ? new Date(lastPayment.date) : new Date(account.subscription_start_date || new Date());
+      nextBillingDate = new Date(baseDate);
+
+      // Add intervals until we're in the future
+      while (nextBillingDate < new Date()) {
+        if (billingInterval === 'year') {
+          nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+        } else {
+          nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+        }
+      }
+    }
 
     // Update account with new monthly dues, membership plan, and lock in the fees
+    const updateData: any = {
+      monthly_dues: newMonthlyDues,
+      membership_plan_id: new_plan_id,
+      administrative_fee: adminFee,
+      additional_member_fee: additionalMemberFeeRate,
+      next_billing_date: nextBillingDate.toISOString(),
+    };
+
+    // Reactivate if canceled
+    if (isCanceled) {
+      updateData.subscription_status = 'active';
+      updateData.subscription_canceled_at = null;
+      updateData.subscription_cancel_at = null;
+    }
+
     const { data: updatedAccount, error: updateError } = await supabase
       .from('accounts')
-      .update({
-        monthly_dues: newMonthlyDues,
-        membership_plan_id: new_plan_id,
-        administrative_fee: adminFee,
-        additional_member_fee: additionalMemberFeeRate,
-      })
+      .update(updateData)
       .eq('account_id', account_id)
       .select()
       .single();
 
     if (updateError) {
       throw new Error(`Failed to update plan: ${updateError.message}`);
+    }
+
+    // If charging today, charge the account
+    let charged = false;
+    if (charge_today && isCanceled) {
+      console.log(`💳 Charging account ${account_id} for reactivation...`);
+
+      // Create a temporary account object with updated values for charging
+      const accountToCharge = {
+        ...updatedAccount,
+        monthly_dues: newMonthlyDues,
+        administrative_fee: adminFee,
+        additional_member_fee: additionalMemberFeeRate,
+      };
+
+      const chargeResult = await chargeAccount(accountToCharge);
+
+      if (chargeResult.success && chargeResult.paymentIntent) {
+        await logPaymentToLedger(accountToCharge, chargeResult.paymentIntent);
+        charged = true;
+        console.log(`✅ Successfully charged $${newMonthlyDues} for reactivation`);
+      } else {
+        console.warn(`⚠️ Failed to charge account on reactivation: ${chargeResult.error?.message || 'Unknown error'}`);
+        // Note: We don't fail the entire operation if payment fails
+        // The subscription is still reactivated, but payment failed
+        await handlePaymentFailure(accountToCharge, chargeResult.error);
+      }
     }
 
     // Log subscription event
@@ -122,16 +195,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         secondary_members: secondaryMemberCount,
         additional_member_fee: additionalMemberFeeRate,
         updated_via_api: true,
+        charge_today,
+        charged,
+        was_canceled: isCanceled,
       },
     });
 
     console.log(`✅ Subscription ${eventType}d for account ${account_id}`);
 
+    let message = `Subscription ${eventType}d successfully. New monthly dues: $${newMonthlyDues}`;
+    if (isCanceled && charge_today && charged) {
+      message += ` (charged $${newMonthlyDues} today)`;
+    } else if (isCanceled && !charge_today) {
+      message += ` (will be charged on ${nextBillingDate.toLocaleDateString()})`;
+    }
+
     return res.json({
       success: true,
       account: updatedAccount,
       event_type: eventType,
-      message: `Subscription ${eventType}d successfully. New monthly dues: $${newMonthlyDues}`,
+      charged,
+      message,
     });
 
   } catch (error: any) {
