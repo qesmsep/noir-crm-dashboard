@@ -372,40 +372,40 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     stripe_payment_intent_id: waitlist.stripe_payment_intent_id
   });
 
-  // 2. Admin fee (non-beverage portion)
+  // 2. Admin fee (non-beverage portion) - NEGATIVE amount
   if (adminFee > 0) {
     ledgerEntries.push({
       account_id: account.account_id,
       member_id: member.member_id,
-      type: 'purchase',
-      amount: adminFee.toFixed(2),
+      type: 'charge',
+      amount: (-adminFee).toFixed(2),
       date: getTodayLocalDate(),
       note: 'Membership administration fee',
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id
     });
   }
 
-  // 3. Additional members fee (if additional members exist)
+  // 3. Additional members fee (if additional members exist) - NEGATIVE amount
   const additionalMembersFee = additionalMemberCount * additionalMemberFee * feeMultiplier;
   if (additionalMembersFee > 0) {
     ledgerEntries.push({
       account_id: account.account_id,
       member_id: member.member_id,
-      type: 'purchase',
-      amount: additionalMembersFee.toFixed(2),
+      type: 'charge',
+      amount: (-additionalMembersFee).toFixed(2),
       date: getTodayLocalDate(),
       note: `Additional members fee (${additionalMemberCount} member${additionalMemberCount > 1 ? 's' : ''})`,
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id
     });
   }
 
-  // 4. Processing fee (if fee exists)
+  // 4. Processing fee (if fee exists) - NEGATIVE amount
   if (creditCardFee > 0) {
     ledgerEntries.push({
       account_id: account.account_id,
       member_id: member.member_id,
-      type: 'purchase',
-      amount: feeAmount.toFixed(2),
+      type: 'charge',
+      amount: (-feeAmount).toFixed(2),
       date: getTodayLocalDate(),
       note: 'Credit card processing fee',
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id

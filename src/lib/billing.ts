@@ -236,13 +236,13 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       stripe_payment_intent_id: paymentIntent.id,
     });
 
-    // 2. If there's an admin fee (non-beverage portion), log it as a "purchase"
+    // 2. If there's an admin fee (non-beverage portion), log it as a "charge" with NEGATIVE amount
     if (adminFee > 0) {
       entries.push({
         member_id: primaryMember.member_id,
         account_id: account.account_id,
-        type: 'purchase',
-        amount: adminFee,
+        type: 'charge',
+        amount: -adminFee,
         date: getTodayLocalDate(),
         note: 'Membership administration fee',
         stripe_charge_id: charge?.id,
@@ -250,7 +250,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       });
     }
 
-    // 3. Additional members fee (if applicable - not for Skyline)
+    // 3. Additional members fee (if applicable - not for Skyline) - NEGATIVE amount
     const additionalMemberFee = isSkylinePlan ? 0 : 25;
     const additionalMembersCountValue = additionalMembersCount || 0;
     const additionalMembersFeeTotal = additionalMembersCountValue * additionalMemberFee;
@@ -258,8 +258,8 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       entries.push({
         member_id: primaryMember.member_id,
         account_id: account.account_id,
-        type: 'purchase',
-        amount: additionalMembersFeeTotal,
+        type: 'charge',
+        amount: -additionalMembersFeeTotal,
         date: getTodayLocalDate(),
         note: `Additional members fee (${additionalMembersCountValue} member${additionalMembersCountValue > 1 ? 's' : ''})`,
         stripe_charge_id: charge?.id,
@@ -267,13 +267,13 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       });
     }
 
-    // 4. If there's a credit card processing fee, log it as a "purchase"
+    // 4. If there's a credit card processing fee, log it as a "charge" with NEGATIVE amount
     if (feeAmount > 0) {
       entries.push({
         member_id: primaryMember.member_id,
         account_id: account.account_id,
-        type: 'purchase',
-        amount: feeAmount,
+        type: 'charge',
+        amount: -feeAmount,
         date: getTodayLocalDate(),
         note: 'Credit card processing fee',
         stripe_charge_id: charge?.id,
@@ -283,8 +283,8 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     await supabase.from('ledger').insert(entries);
 
-    const netBalance = baseAmount - adminFee - additionalMembersFeeTotal - feeAmount;
-    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} payment, -$${adminFee} admin fee, -$${additionalMembersFeeTotal} additional members, -$${feeAmount} cc fee, balance: $${netBalance.toFixed(2)}`);
+    const netBalance = baseAmount + (-adminFee) + (-additionalMembersFeeTotal) + (-feeAmount);
+    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} payment, $${-adminFee} admin fee, $${-additionalMembersFeeTotal} additional members, $${-feeAmount} cc fee, balance: $${netBalance.toFixed(2)}`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
   }
