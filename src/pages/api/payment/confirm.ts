@@ -385,7 +385,21 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     });
   }
 
-  // 3. Processing fee charge (if fee exists)
+  // 3. Additional members fee charge (if additional members exist)
+  const additionalMembersFee = additionalMemberCount * additionalMemberFee * feeMultiplier;
+  if (additionalMembersFee > 0) {
+    ledgerEntries.push({
+      account_id: account.account_id,
+      member_id: member.member_id,
+      type: 'charge',
+      amount: additionalMembersFee.toFixed(2),
+      date: getTodayLocalDate(),
+      note: `Additional members fee (${additionalMemberCount} member${additionalMemberCount > 1 ? 's' : ''})`,
+      stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+    });
+  }
+
+  // 4. Processing fee charge (if fee exists)
   if (creditCardFee > 0) {
     ledgerEntries.push({
       account_id: account.account_id,

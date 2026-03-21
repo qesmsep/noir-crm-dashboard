@@ -30,6 +30,7 @@ interface Settings {
   hold_fee_enabled: boolean;
   hold_fee_amount: number;
   admin_notification_phone: string;
+  credit_card_fee_percentage?: number;
 }
 
 const defaultSettings: Settings = {
@@ -61,6 +62,7 @@ const defaultSettings: Settings = {
   hold_fee_enabled: false,
   hold_fee_amount: 0,
   admin_notification_phone: '',
+  credit_card_fee_percentage: 4.0,
 };
 
 export default function Settings() {
@@ -366,6 +368,38 @@ export default function Settings() {
                 </p>
               </div>
             )}
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Credit Card Processing Fee (%)</label>
+              <div className={styles.numberInput}>
+                <button
+                  type="button"
+                  onClick={() => handleInputChange('credit_card_fee_percentage', '', Math.max(0, (settings.credit_card_fee_percentage || 4.0) - 0.1))}
+                  className={styles.numberButton}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  className={styles.numberInputField}
+                  value={settings.credit_card_fee_percentage || 4.0}
+                  onChange={(e) => handleInputChange('credit_card_fee_percentage', '', parseFloat(e.target.value) || 0)}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleInputChange('credit_card_fee_percentage', '', Math.min(100, (settings.credit_card_fee_percentage || 4.0) + 0.1))}
+                  className={styles.numberButton}
+                >
+                  +
+                </button>
+              </div>
+              <p className={styles.inputHint}>
+                Percentage fee charged for credit card payments (applied to membership payments)
+              </p>
+            </div>
 
             <div className={styles.formActions}>
               <button

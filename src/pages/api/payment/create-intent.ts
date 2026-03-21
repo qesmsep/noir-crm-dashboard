@@ -28,6 +28,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Get settings to fetch dynamic CC fee percentage
+    const { data: settings } = await supabase
+      .from('settings')
+      .select('credit_card_fee_percentage')
+      .single();
+
+    const ccFeePercentage = (settings?.credit_card_fee_percentage || 4.0) / 100; // Convert to decimal
+    console.log('[CREATE INTENT] CC Fee Percentage:', (ccFeePercentage * 100).toFixed(2) + '%');
+
     // Get waitlist entry
     const { data: waitlist, error: waitlistError } = await supabase
       .from('waitlist')
@@ -65,8 +74,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Calculate subtotal before credit card fee
     const subtotal = basePlanAmount + additionalMembersAmount;
 
-    // Calculate 4% credit card processing fee (only for card payments, not ACH)
-    const creditCardFee = payment_method_type === 'card' ? Math.round(subtotal * 0.04) : 0;
+    // Calculate credit card processing fee using dynamic percentage from settings (only for card payments, not ACH)
+    const creditCardFee = payment_method_type === 'card' ? Math.round(subtotal * ccFeePercentage) : 0;
 
     // Total amount including credit card fee (if applicable)
     const totalAmount = subtotal + creditCardFee;

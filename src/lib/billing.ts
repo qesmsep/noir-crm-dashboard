@@ -75,14 +75,22 @@ export async function chargeAccount(account: any): Promise<{
   error?: any;
 }> {
   try {
-    // 1. Get amount to charge
+    // 1. Get settings for dynamic CC fee percentage
+    const { data: settings } = await supabase
+      .from('settings')
+      .select('credit_card_fee_percentage')
+      .single();
+
+    const ccFeePercentage = (settings?.credit_card_fee_percentage || 4.0) / 100;
+
+    // 2. Get amount to charge
     const amount = account.monthly_dues || 0;
 
     if (amount <= 0) {
       return { success: true }; // Nothing to charge
     }
 
-    // 2. Get payment method
+    // 3. Get payment method
     const paymentMethodId = await getDefaultPaymentMethod(account.stripe_customer_id);
 
     if (!paymentMethodId) {
@@ -95,13 +103,13 @@ export async function chargeAccount(account: any): Promise<{
     // Get full payment method details to check type
     const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
 
-    // 3. Add credit card fee if enabled
+    // 4. Add credit card fee if enabled
     let totalAmount = amount;
     let creditCardFee = 0;
 
     if (account.credit_card_fee_enabled) {
-      // Calculate both options: 4% vs 2.9% + $0.30, use whichever is greater
-      const flatRate = amount * 0.04;
+      // Use dynamic percentage from settings
+      const flatRate = amount * ccFeePercentage;
       const stripeFee = amount * 0.029 + 0.30;
       creditCardFee = Math.round(Math.max(flatRate, stripeFee) * 100) / 100;
       totalAmount = amount + creditCardFee;
@@ -188,20 +196,29 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       return;
     }
 
-    // Get subscription plan to determine beverage credit and admin fee
+    // Get count of additional members on the account
+    const { count: additionalMembersCount } = await supabase
+      .from('members')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', account.account_id)
+      .neq('member_type', 'primary');
+
+    // Get subscription plan to determine beverage credit, admin fee, and if Skyline
     let beverageCredit = 0;
     let adminFee = 0;
+    let isSkylinePlan = false;
 
     if (account.membership_plan_id) {
       const { data: plan } = await supabase
         .from('subscription_plans')
-        .select('beverage_credit')
+        .select('beverage_credit, plan_name')
         .eq('id', account.membership_plan_id)
         .single();
 
       if (plan && plan.beverage_credit) {
         beverageCredit = parseFloat(plan.beverage_credit.toString());
         adminFee = baseAmount - beverageCredit;
+        isSkylinePlan = plan.plan_name === 'Skyline';
       }
     }
 
@@ -233,7 +250,24 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       });
     }
 
-    // 3. If there's a credit card processing fee, log it as a "charge"
+    // 3. Additional members fee (if applicable - not for Skyline)
+    const additionalMemberFee = isSkylinePlan ? 0 : 25;
+    const additionalMembersCountValue = additionalMembersCount || 0;
+    const additionalMembersFeeTotal = additionalMembersCountValue * additionalMemberFee;
+    if (additionalMembersFeeTotal > 0) {
+      entries.push({
+        member_id: primaryMember.member_id,
+        account_id: account.account_id,
+        type: 'charge',
+        amount: additionalMembersFeeTotal,
+        date: getTodayLocalDate(),
+        note: `Additional members fee (${additionalMembersCountValue} member${additionalMembersCountValue > 1 ? 's' : ''})`,
+        stripe_charge_id: charge?.id,
+        stripe_payment_intent_id: paymentIntent.id,
+      });
+    }
+
+    // 4. If there's a credit card processing fee, log it as a "charge"
     if (feeAmount > 0) {
       entries.push({
         member_id: primaryMember.member_id,
@@ -249,7 +283,8 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     await supabase.from('ledger').insert(entries);
 
-    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} payment, -$${adminFee} admin fee, -$${feeAmount} cc fee, balance: $${baseAmount - adminFee - feeAmount}`);
+    const netBalance = baseAmount - adminFee - additionalMembersFeeTotal - feeAmount;
+    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} payment, -$${adminFee} admin fee, -$${additionalMembersFeeTotal} additional members, -$${feeAmount} cc fee, balance: $${netBalance.toFixed(2)}`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
   }
