@@ -248,8 +248,15 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   // For annual plans, multiply additional member fee by 12
   const additionalMembers = waitlist.additional_members || [];
   const additionalMemberCount = additionalMembers.length;
-  const isSkylinePlan = basePriceAmount === 10;
-  const additionalMemberFee = isSkylinePlan ? 0 : 25;
+
+  // Get additional_member_fee from subscription plan (not hardcoded)
+  const { data: planFeeDetails } = await supabase
+    .from('subscription_plans')
+    .select('additional_member_fee')
+    .eq('id', membershipPlanId)
+    .single();
+
+  const additionalMemberFee = planFeeDetails?.additional_member_fee || 0;
   const feeMultiplier = billingInterval === 'year' ? 12 : 1;
   const monthlyDues = basePriceAmount + (additionalMemberCount * additionalMemberFee * feeMultiplier);
 
@@ -333,20 +340,18 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   const totalPaid = waitlist.payment_amount / 100; // Convert cents to dollars
   const feeAmount = creditCardFee / 100; // Convert cents to dollars
 
-  // Get beverage credit from subscription plan to calculate admin fee
-  let beverageCredit = 0;
+  // Get administrative_fee directly from subscription plan (not calculated from beverage_credit)
   let adminFee = 0;
 
   if (plan && plan.id) {
     const { data: planDetails } = await supabase
       .from('subscription_plans')
-      .select('beverage_credit')
+      .select('administrative_fee')
       .eq('id', plan.id)
       .single();
 
-    if (planDetails && planDetails.beverage_credit) {
-      beverageCredit = parseFloat(planDetails.beverage_credit.toString());
-      adminFee = basePriceAmount - beverageCredit;
+    if (planDetails && planDetails.administrative_fee) {
+      adminFee = parseFloat(planDetails.administrative_fee.toString());
     }
   }
 
