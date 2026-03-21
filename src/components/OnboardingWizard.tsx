@@ -419,7 +419,7 @@ function PaymentForm({ token, selectedMembership, onSuccess, additionalMembersCo
               />
             </Box>
 
-            <Text fontSize="xs" color="#DC2626" mt={2}>
+            <Text fontSize="xs" color="#1F1F1F" mt={2}>
               Note: A 4% processing fee will be added to credit card payments. To avoid this charge,{' '}
               <Text
                 as="span"

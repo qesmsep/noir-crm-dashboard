@@ -32,15 +32,10 @@ export default function MemberLoginPage() {
     isBiometricAvailable().then(setBiometricAvailable);
   }, [isBiometricAvailable]);
 
-  // Redirect if already logged in (but check password setup first)
+  // Redirect if already logged in
   React.useEffect(() => {
     if (member) {
-      // Check if member has password - if not, redirect to setup
-      if (!member.has_password) {
-        router.push('/member/change-password');
-      } else {
-        router.push('/member/dashboard');
-      }
+      router.push('/member/dashboard');
     }
   }, [member, router]);
 

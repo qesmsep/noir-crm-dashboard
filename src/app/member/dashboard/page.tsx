@@ -110,11 +110,6 @@ export default function MemberDashboardPage() {
       router.push('/member/login');
       return;
     }
-
-    if (member.password_is_temporary) {
-      router.push('/member/change-password');
-      return;
-    }
   }, [member, loading, router]);
 
   // Fetch next upcoming reservation and current balance
