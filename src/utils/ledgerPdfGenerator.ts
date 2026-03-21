@@ -23,8 +23,9 @@ export interface LedgerTransaction {
   account_id: string;
   date: string;
   amount: number;
-  type: 'payment' | 'purchase' | string;
+  type: 'credit' | 'debit' | 'charge' | 'payment' | 'purchase' | string;
   note?: string;
+  status?: 'pending' | 'cleared' | 'failed';
 }
 
 export interface TransactionAttachment {

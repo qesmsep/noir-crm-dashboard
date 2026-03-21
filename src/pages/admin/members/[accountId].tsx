@@ -51,11 +51,14 @@ interface LedgerTransaction {
   id: string;
   member_id: string;
   account_id: string;
-  type: 'payment' | 'purchase';
+  type: 'credit' | 'debit' | 'charge' | 'payment' | 'purchase';
   amount: number;
   note?: string;
   date: string;
   created_at: string;
+  status?: 'pending' | 'cleared' | 'failed';
+  stripe_payment_intent_id?: string;
+  stripe_charge_id?: string;
 }
 
 interface Attribute {

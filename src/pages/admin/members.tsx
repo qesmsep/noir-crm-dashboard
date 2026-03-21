@@ -32,12 +32,13 @@ interface Member {
 interface LedgerTransaction {
   account_id: string;
   member_id: string;
-  type: 'payment' | 'purchase';
+  type: 'credit' | 'debit' | 'charge' | 'payment' | 'purchase';
   amount: number;
   running_balance?: number;
   date?: string;
   created_at?: string;
   note?: string;
+  status?: 'pending' | 'cleared' | 'failed';
 }
 
 type SortField = 'name' | 'join_date' | 'renewal_date' | 'ltv' | 'balance' | null;
@@ -232,16 +233,26 @@ export default function MembersAdmin() {
   };
 
   // Calculate current balance for an account (sum of all signed transaction amounts)
-  // Amounts in ledger are already signed: positive for payments, negative for purchases
+  // Amounts in ledger are already signed: positive for credits/payments, negative for charges/purchases
   // Positive balance = credit, Negative balance = amount due
   const calculateAccountBalance = (accountId: string) => {
-    if (!ledger || ledger.length === 0) return 0;
+    if (!ledger || ledger.length === 0) {
+      console.log('calculateAccountBalance: ledger is empty or null');
+      return 0;
+    }
 
     // Sum all transaction amounts for this account
     // Amounts are already signed in the database
-    const balance = ledger
-      .filter(tx => tx.account_id === accountId)
-      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+    const accountTransactions = ledger.filter(tx => tx.account_id === accountId);
+    const balance = accountTransactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+    if (accountTransactions.length > 0) {
+      console.log(`Balance for ${accountId.substring(0, 8)}:`, {
+        transactionCount: accountTransactions.length,
+        transactions: accountTransactions.map(t => ({ type: t.type, amount: t.amount })),
+        balance
+      });
+    }
 
     return balance;
   };
