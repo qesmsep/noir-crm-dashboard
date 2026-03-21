@@ -180,8 +180,34 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
     const charge = charges[0];
     const metadata = paymentIntent.metadata || {};
 
+    // Use the ACTUAL amount charged from PaymentIntent (source of truth)
+    const totalAmountPaid = paymentIntent.amount / 100; // Convert cents to dollars
+
+    // Metadata for breakdown (validation/logging only)
     const baseAmount = parseFloat(metadata.base_amount || '0');
     const feeAmount = parseFloat(metadata.credit_card_fee || '0');
+
+    // CRITICAL: Validate that metadata matches actual charge
+    const expectedTotal = baseAmount + feeAmount;
+    if (Math.abs(totalAmountPaid - expectedTotal) > 0.01) {
+      const errorMsg = `❌ CRITICAL: Payment amount mismatch for account ${account.account_id}! Stripe charged $${totalAmountPaid.toFixed(2)} but metadata says $${expectedTotal.toFixed(2)} (base: $${baseAmount}, fee: $${feeAmount})`;
+      console.error(errorMsg);
+
+      // Log to subscription_events for visibility
+      await supabase.from('subscription_events').insert({
+        account_id: account.account_id,
+        event_type: 'payment_failed',
+        effective_date: new Date().toISOString(),
+        metadata: {
+          error: 'payment_amount_mismatch',
+          stripe_amount: totalAmountPaid,
+          expected_amount: expectedTotal,
+          payment_intent_id: paymentIntent.id,
+        },
+      });
+
+      throw new Error(errorMsg);
+    }
 
     // Get primary member for this account
     const { data: primaryMember } = await supabase
@@ -214,12 +240,12 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     const entries: any[] = [];
 
-    // 1. Log the payment as a "credit" (positive amount = increases their credit balance)
+    // 1. Log the payment as a "credit" (positive amount = ACTUAL amount charged by Stripe)
     entries.push({
       member_id: primaryMember.member_id,
       account_id: account.account_id,
       type: 'credit',
-      amount: baseAmount,
+      amount: totalAmountPaid,
       date: getTodayLocalDate(),
       note: `Monthly dues - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
       stripe_charge_id: charge?.id,
@@ -276,8 +302,14 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
 
     await supabase.from('ledger').insert(entries);
 
-    const netBalance = baseAmount + (-adminFee) + (-additionalMembersFeeTotal) + (-feeAmount);
-    console.log(`✅ Logged payment to ledger for account ${account.account_id}: +$${baseAmount} payment, $${-adminFee} admin fee, $${-additionalMembersFeeTotal} additional members, $${-feeAmount} cc fee, balance: $${netBalance.toFixed(2)}`);
+    // Calculate net beverage credit (what's actually available for drinks)
+    const netBeverageCredit = totalAmountPaid - adminFee - additionalMembersFeeTotal - feeAmount;
+    console.log(`✅ Logged payment to ledger for account ${account.account_id}:`);
+    console.log(`   Stripe charged: $${totalAmountPaid.toFixed(2)} (verified ✓)`);
+    console.log(`   - Admin fee: $${adminFee.toFixed(2)}`);
+    console.log(`   - Additional members: $${additionalMembersFeeTotal.toFixed(2)}`);
+    console.log(`   - CC processing fee: $${feeAmount.toFixed(2)}`);
+    console.log(`   = Net beverage credit: $${netBeverageCredit.toFixed(2)}`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
   }

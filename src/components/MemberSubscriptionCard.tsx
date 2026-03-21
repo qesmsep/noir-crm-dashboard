@@ -55,11 +55,14 @@ export default function MemberSubscriptionCard({
   const [additionalMemberFeeRate, setAdditionalMemberFeeRate] = useState(25);
   const [isExpanded, setIsExpanded] = useState(false);
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
+  const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<{ type: string; message: string; details?: any } | null>(null);
 
   useEffect(() => {
     if (accountId) {
       fetchSubscriptionData();
       fetchPaymentStatus();
+      fetchPaymentErrors();
     }
   }, [accountId]);
 
@@ -152,6 +155,7 @@ export default function MemberSubscriptionCard({
       setBaseMRR(calculatedBaseMRR);
       setAdditionalMemberFeeRate(feeRate);
       setBillingInterval(planInterval as 'month' | 'year');
+      setCurrentPlanId(account.membership_plan_id || null);
 
       const subscriptionData = {
         stripe_subscription_id: null, // No longer using Stripe subscriptions
@@ -197,6 +201,53 @@ export default function MemberSubscriptionCard({
       }
     } catch (error: any) {
       console.error('Error fetching payment status:', error);
+    }
+  };
+
+  const fetchPaymentErrors = async () => {
+    try {
+      // Only show errors from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data, error } = await supabase
+        .from('subscription_events')
+        .select('event_type, effective_date, metadata')
+        .eq('account_id', accountId)
+        .eq('event_type', 'payment_failed')
+        .gte('effective_date', thirtyDaysAgo.toISOString())
+        .order('effective_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!error && data && data.metadata) {
+        const metadata = data.metadata as any;
+
+        // Check if it's a payment_amount_mismatch error
+        if (metadata.error === 'payment_amount_mismatch') {
+          setPaymentError({
+            type: 'payment_amount_mismatch',
+            message: `Payment mismatch detected: Stripe charged $${metadata.stripe_amount?.toFixed(2)} but expected $${metadata.expected_amount?.toFixed(2)}`,
+            details: metadata,
+          });
+        } else if (metadata.reason === 'no_payment_method') {
+          setPaymentError({
+            type: 'no_payment_method',
+            message: 'No payment method on file',
+            details: metadata,
+          });
+        } else if (metadata.decline_code || metadata.error_message) {
+          setPaymentError({
+            type: 'payment_declined',
+            message: metadata.error_message || `Payment declined: ${metadata.decline_code}`,
+            details: metadata,
+          });
+        }
+      } else {
+        setPaymentError(null);
+      }
+    } catch (error: any) {
+      console.error('Error fetching payment errors:', error);
     }
   };
 
@@ -361,12 +412,14 @@ export default function MemberSubscriptionCard({
 
       fetchSubscriptionData();
       fetchPaymentStatus();
+      fetchPaymentErrors(); // Clear error state on success
     } catch (error: any) {
       toast({
         title: 'Payment Failed',
         description: error.message || 'Failed to process payment',
         variant: 'error',
       });
+      fetchPaymentErrors(); // Refresh error state to show new error if any
     } finally {
       setActionLoading(false);
     }
@@ -521,6 +574,38 @@ export default function MemberSubscriptionCard({
             </button>
           )}
         </div>
+
+        {/* Payment Error Alert */}
+        {paymentError && (
+          <div
+            style={{
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '0.75rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#991B1B', marginBottom: '4px' }}>
+                  {paymentError.type === 'payment_amount_mismatch' && 'Payment Processing Error'}
+                  {paymentError.type === 'no_payment_method' && 'Missing Payment Method'}
+                  {paymentError.type === 'payment_declined' && 'Payment Declined'}
+                </div>
+                <div style={{ fontSize: '0.8125rem', color: '#7F1D1D', lineHeight: '1.4' }}>
+                  {paymentError.message}
+                </div>
+                {paymentError.type === 'payment_amount_mismatch' && paymentError.details && (
+                  <div style={{ fontSize: '0.75rem', color: '#991B1B', marginTop: '6px', fontFamily: 'monospace' }}>
+                    Payment Intent: {paymentError.details.payment_intent_id}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className={styles.divider} style={{ margin: '0.75rem 0' }} />
 
@@ -685,7 +770,7 @@ export default function MemberSubscriptionCard({
       {showUpdatePlanModal && (
         <UpdatePlanModal
           accountId={accountId}
-          currentPriceId={subscription.current_price_id}
+          currentPlanId={currentPlanId}
           onSuccess={() => {
             fetchSubscriptionData();
             setShowUpdatePlanModal(false);

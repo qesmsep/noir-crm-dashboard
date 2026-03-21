@@ -19,32 +19,24 @@ export default function AddSecondaryMemberModal({ accountId, onClose, onSuccess,
   const [scale, setScale] = useState(1);
   const [calculatedFee, setCalculatedFee] = useState(additionalMemberFee);
 
-  // Fetch account subscription to determine the fee rate
+  // Fetch account to get the locked-in additional member fee
   useEffect(() => {
-    const fetchAccountSubscription = async () => {
+    const fetchAccountFee = async () => {
       try {
         const response = await fetch(`/api/accounts/${accountId}`);
         const result = await response.json();
 
-        if (result.data && result.data.stripe_subscription_id) {
-          // Fetch Stripe subscription details to get the base plan amount
-          const subResponse = await fetch(`/api/subscriptions/${result.data.stripe_subscription_id}`);
-          const subData = await subResponse.json();
-
-          if (subData.subscription?.items?.data?.[0]?.price?.unit_amount) {
-            const baseMRR = subData.subscription.items.data[0].price.unit_amount / 100;
-            // Skyline Membership ($10/month) has $0 additional member fees
-            const feeRate = baseMRR === 10 ? 0 : 25;
-            setCalculatedFee(feeRate);
-          }
+        if (result.data && result.data.additional_member_fee !== undefined) {
+          // Use the locked-in fee from the account
+          setCalculatedFee(result.data.additional_member_fee);
         }
       } catch (error) {
-        console.error('Error fetching subscription for fee calculation:', error);
+        console.error('Error fetching account fee:', error);
         // Keep default fee if fetch fails
       }
     };
 
-    fetchAccountSubscription();
+    fetchAccountFee();
   }, [accountId, additionalMemberFee]);
 
   const [formData, setFormData] = useState({

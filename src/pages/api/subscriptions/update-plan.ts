@@ -55,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get new price details from subscription_plans table (app is source of truth)
     const { data: newPlan, error: planError } = await supabase
       .from('subscription_plans')
-      .select('monthly_price, plan_name')
+      .select('monthly_price, plan_name, administrative_fee, additional_member_fee, interval')
       .eq('id', new_plan_id)
       .single();
 
@@ -64,6 +64,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const basePriceAmount = newPlan.monthly_price;
+    const adminFee = newPlan.administrative_fee || 0;
+    const additionalMemberFeeRate = newPlan.additional_member_fee || 0;
 
     // Count secondary members to recalculate monthly dues
     const { data: secondaryMembers } = await supabase
@@ -75,11 +77,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const secondaryMemberCount = secondaryMembers?.length || 0;
 
-    // Calculate new monthly dues: base + (additional members * $25)
-    // Exception: Skyline plan ($10/month) gets free additional members
-    const isSkylinePlan = basePriceAmount === 10;
-    const additionalMemberFee = isSkylinePlan ? 0 : 25;
-    const newMonthlyDues = basePriceAmount + (secondaryMemberCount * additionalMemberFee);
+    // Calculate new monthly dues: base + (additional members * fee from plan)
+    const newMonthlyDues = basePriceAmount + (secondaryMemberCount * additionalMemberFeeRate);
 
     const oldMrr = Number(account.monthly_dues) || 0;
     const eventType = newMonthlyDues > oldMrr ? 'upgrade' : 'downgrade';
@@ -87,16 +86,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('💰 Updating subscription plan:');
     console.log(`   Old MRR: $${oldMrr}`);
     console.log(`   New base: $${basePriceAmount}`);
-    console.log(`   Additional members: ${secondaryMemberCount} x $${additionalMemberFee} = $${secondaryMemberCount * additionalMemberFee}`);
+    console.log(`   Admin fee: $${adminFee}`);
+    console.log(`   Additional members: ${secondaryMemberCount} x $${additionalMemberFeeRate} = $${secondaryMemberCount * additionalMemberFeeRate}`);
     console.log(`   New MRR: $${newMonthlyDues}`);
     console.log(`   Event type: ${eventType}`);
 
-    // Update account with new monthly dues and membership plan
+    // Update account with new monthly dues, membership plan, and lock in the fees
     const { data: updatedAccount, error: updateError } = await supabase
       .from('accounts')
       .update({
         monthly_dues: newMonthlyDues,
         membership_plan_id: new_plan_id,
+        administrative_fee: adminFee,
+        additional_member_fee: additionalMemberFeeRate,
       })
       .eq('account_id', account_id)
       .select()
@@ -116,8 +118,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         new_plan_id,
         base_price: basePriceAmount,
+        administrative_fee: adminFee,
         secondary_members: secondaryMemberCount,
-        additional_member_fee: additionalMemberFee,
+        additional_member_fee: additionalMemberFeeRate,
         updated_via_api: true,
       },
     });

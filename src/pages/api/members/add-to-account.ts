@@ -105,6 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           membership_plan_id,
           next_billing_date,
           stripe_customer_id,
+          additional_member_fee,
           subscription_plans!membership_plan_id (
             plan_name,
             interval
@@ -116,13 +117,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const currentMonthlyDues = currentAccount?.monthly_dues || 0;
       const plan = (currentAccount as any)?.subscription_plans;
       const billingInterval = plan?.interval || 'month';
-      const isSkylinePlan = plan?.plan_name?.toLowerCase() === 'skyline';
 
-      let additionalMemberFee = isSkylinePlan ? 0 : 25;
+      // Use the locked-in fee from the account (set at signup/plan change)
+      let additionalMemberFee = currentAccount?.additional_member_fee || 0;
       let monthsRemaining = 0;
 
-      if (isSkylinePlan) {
-        console.log('[Add Member] Skyline membership detected - additional members are FREE');
+      if (additionalMemberFee === 0) {
+        console.log('[Add Member] No additional member fee for this account (locked-in rate: $0)');
+      } else {
+        console.log(`[Add Member] Using locked-in additional member fee: $${additionalMemberFee}`);
       }
 
       // For annual plans, calculate pro-rated charge and update annual fee

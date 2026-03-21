@@ -1,17 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 /**
  * GET /api/subscriptions/plans
  *
- * Fetches all active subscription plans (products with prices) from Stripe
+ * Fetches all active subscription plans from subscription_plans table
  *
  * Returns:
- *   - plans: Array of plan objects with product and price info
+ *   - plans: Array of plan objects from database
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -19,43 +20,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Fetch all active products that are subscription-based
-    const products = await stripe.products.list({
-      active: true,
-      limit: 100,
-    });
+    // Fetch all active subscription plans from database
+    const { data: plans, error } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
 
-    // Fetch prices for each product
-    const plansPromises = products.data.map(async (product) => {
-      const prices = await stripe.prices.list({
-        product: product.id,
-        active: true,
-        type: 'recurring',
-      });
+    if (error) {
+      console.error('Error fetching subscription plans:', error);
+      throw new Error('Failed to fetch subscription plans');
+    }
 
-      return prices.data.map((price) => ({
-        product_id: product.id,
-        product_name: product.name,
-        product_description: product.description,
-        price_id: price.id,
-        amount: price.unit_amount ? price.unit_amount / 100 : 0,
-        currency: price.currency.toUpperCase(),
-        interval: price.recurring?.interval || 'month',
-        interval_count: price.recurring?.interval_count || 1,
-        // Calculate monthly equivalent for comparison
-        monthly_amount: price.recurring?.interval === 'year'
-          ? (price.unit_amount || 0) / 100 / 12
-          : (price.unit_amount || 0) / 100,
-      }));
-    });
+    // Transform to match expected format
+    const transformedPlans = (plans || []).map((plan) => ({
+      id: plan.id,
+      plan_id: plan.id, // Include both for compatibility
+      plan_name: plan.plan_name,
+      description: plan.description,
+      monthly_price: plan.monthly_price,
+      beverage_credit: plan.beverage_credit,
+      administrative_fee: plan.administrative_fee,
+      additional_member_fee: plan.additional_member_fee,
+      interval: plan.interval,
+      amount: plan.monthly_price, // For display
+      // Calculate annual amount if yearly plan
+      annual_amount: plan.interval === 'year' ? plan.monthly_price : plan.monthly_price * 12,
+    }));
 
-    const plansArrays = await Promise.all(plansPromises);
-    const plans = plansArrays.flat();
-
-    // Sort by monthly amount
-    plans.sort((a, b) => a.monthly_amount - b.monthly_amount);
-
-    return res.json({ plans });
+    return res.json({ plans: transformedPlans });
   } catch (error: any) {
     console.error('Error fetching subscription plans:', error);
     return res.status(500).json({ error: error.message });
