@@ -249,14 +249,15 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   const additionalMembers = waitlist.additional_members || [];
   const additionalMemberCount = additionalMembers.length;
 
-  // Get additional_member_fee from subscription plan (not hardcoded)
+  // Get fee details from subscription plan (administrative_fee and additional_member_fee)
   const { data: planFeeDetails } = await supabase
     .from('subscription_plans')
-    .select('additional_member_fee')
+    .select('administrative_fee, additional_member_fee')
     .eq('id', membershipPlanId)
     .single();
 
-  const additionalMemberFee = planFeeDetails?.additional_member_fee || 0;
+  const administrativeFee = parseFloat(planFeeDetails?.administrative_fee?.toString() || '0');
+  const additionalMemberFee = parseFloat(planFeeDetails?.additional_member_fee?.toString() || '0');
   const feeMultiplier = billingInterval === 'year' ? 12 : 1;
   const monthlyDues = basePriceAmount + (additionalMemberCount * additionalMemberFee * feeMultiplier);
 
@@ -284,7 +285,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     creditCardFee = parseInt(paymentIntent.metadata.credit_card_fee);
   }
 
-  // Create account first
+  // Create account first with fee values locked in from the plan
   const accountId = crypto.randomUUID();
   const { data: account, error: accountError } = await supabase
     .from('accounts')
@@ -299,7 +300,9 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       payment_method_type: paymentMethodType,
       payment_method_last4: paymentMethodLast4,
       payment_method_brand: paymentMethodBrand,
-      credit_card_fee_enabled: creditCardFee > 0 // Enable fee if it was charged during signup
+      credit_card_fee_enabled: creditCardFee > 0, // Enable fee if it was charged during signup
+      administrative_fee: administrativeFee, // Lock in admin fee from plan
+      additional_member_fee: additionalMemberFee // Lock in additional member fee from plan
     })
     .select()
     .single();
@@ -340,20 +343,14 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   const totalPaid = waitlist.payment_amount / 100; // Convert cents to dollars
   const feeAmount = creditCardFee / 100; // Convert cents to dollars
 
-  // Get administrative_fee directly from subscription plan (not calculated from beverage_credit)
-  let adminFee = 0;
+  // Use the administrativeFee already fetched from the plan (locked in on account)
+  const adminFee = administrativeFee;
 
-  if (plan && plan.id) {
-    const { data: planDetails } = await supabase
-      .from('subscription_plans')
-      .select('administrative_fee')
-      .eq('id', plan.id)
-      .single();
-
-    if (planDetails && planDetails.administrative_fee) {
-      adminFee = parseFloat(planDetails.administrative_fee.toString());
-    }
-  }
+  // Determine payment status based on payment method type
+  // ACH payments start as 'pending' until charge.succeeded webhook fires
+  // Card payments are 'cleared' immediately
+  const isACH = paymentMethodType === 'us_bank_account';
+  const paymentStatus = isACH ? 'pending' : 'cleared';
 
   // Create ledger entries
   const ledgerEntries: Array<{
@@ -364,6 +361,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     date: string;
     note: string;
     stripe_payment_intent_id: string;
+    status: string;
   }> = [];
 
   // 1. Payment entry (full amount paid including processing fee as credit)
@@ -374,7 +372,8 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     amount: totalPaid.toFixed(2),
     date: getTodayLocalDate(),
     note: `Initial ${waitlist.selected_membership} membership payment`,
-    stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+    stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+    status: paymentStatus
   });
 
   // 2. Admin fee (non-beverage portion) - NEGATIVE amount
@@ -386,7 +385,8 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       amount: (-adminFee).toFixed(2),
       date: getTodayLocalDate(),
       note: 'Membership administration fee',
-      stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+      stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+      status: 'cleared' // Fees are always cleared immediately
     });
   }
 
@@ -400,7 +400,8 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       amount: (-additionalMembersFee).toFixed(2),
       date: getTodayLocalDate(),
       note: `Additional members fee (${additionalMemberCount} member${additionalMemberCount > 1 ? 's' : ''})`,
-      stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+      stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+      status: 'cleared' // Fees are always cleared immediately
     });
   }
 
@@ -413,7 +414,8 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       amount: (-feeAmount).toFixed(2),
       date: getTodayLocalDate(),
       note: 'Credit card processing fee',
-      stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+      stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+      status: 'cleared' // Fees are always cleared immediately
     });
   }
 

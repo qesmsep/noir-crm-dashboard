@@ -387,7 +387,7 @@ export default async function handler(req, res) {
       return res.json({ success: true, message: 'Payment method updated' });
     }
 
-    // Handle ACH charge succeeded
+    // Handle ACH charge succeeded - UPDATE existing ledger entry from 'pending' to 'cleared'
     if (event.type === 'charge.succeeded') {
       const charge = event.data.object;
 
@@ -395,11 +395,12 @@ export default async function handler(req, res) {
       if (charge.payment_method_details?.type === 'us_bank_account') {
         console.log('Processing ACH charge.succeeded:', {
           chargeId: charge.id,
+          paymentIntentId: charge.payment_intent,
           customerId: charge.customer,
           amount: charge.amount,
         });
 
-        // Check if ledger entry already exists
+        // Check if ledger entry already has this charge_id (already updated)
         const { data: existingCharge } = await supabase
           .from('ledger')
           .select('id')
@@ -407,9 +408,45 @@ export default async function handler(req, res) {
           .single();
 
         if (existingCharge) {
-          console.log('Ledger entry already exists for charge:', charge.id);
-          return res.json({ success: true, message: 'Ledger entry already exists' });
+          console.log('Ledger entry already updated with charge:', charge.id);
+          return res.json({ success: true, message: 'Ledger entry already updated' });
         }
+
+        // Find existing ledger entry by payment_intent_id and update it
+        if (charge.payment_intent) {
+          const { data: existingEntry, error: findError } = await supabase
+            .from('ledger')
+            .select('id, account_id')
+            .eq('stripe_payment_intent_id', charge.payment_intent)
+            .eq('type', 'credit')
+            .single();
+
+          if (existingEntry) {
+            // Update the existing entry: add stripe_charge_id and change status to 'cleared'
+            const { error: updateError } = await supabase
+              .from('ledger')
+              .update({
+                stripe_charge_id: charge.id,
+                status: 'cleared'
+              })
+              .eq('id', existingEntry.id);
+
+            if (updateError) {
+              console.error('Error updating ledger entry:', updateError);
+              return res.status(500).json({ error: 'Failed to update ledger' });
+            }
+
+            console.log('✅ Updated ledger entry to "cleared" for payment_intent:', charge.payment_intent);
+            return res.json({ success: true, message: 'Ledger entry updated to cleared' });
+          } else {
+            console.log('⚠️  No pending ledger entry found for payment_intent:', charge.payment_intent);
+            // This might be an old payment or manual charge - fall through to create new entry
+          }
+        }
+
+        // Fallback: If no payment_intent or no existing entry found, create a new ledger entry
+        // This handles old payments or manual ACH charges
+        console.log('Creating new ledger entry for ACH charge (no payment_intent match)');
 
         // Find account by customer ID
         const { data: account, error: accountError } = await supabase
@@ -437,7 +474,7 @@ export default async function handler(req, res) {
           return res.json({ received: true });
         }
 
-        // Add to ledger
+        // Add to ledger as a new entry
         const { error: ledgerError } = await supabase
           .from('ledger')
           .insert({
@@ -448,6 +485,7 @@ export default async function handler(req, res) {
             note: `ACH payment${charge.description ? `: ${charge.description}` : ''}`,
             date: new Date().toISOString().split('T')[0],
             stripe_charge_id: charge.id,
+            status: 'cleared'
           });
 
         if (ledgerError) {
@@ -455,7 +493,7 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: 'Failed to update ledger' });
         }
 
-        console.log('Successfully processed ACH payment for account:', account.account_id);
+        console.log('Successfully created new ledger entry for ACH payment:', account.account_id);
         return res.json({ success: true });
       }
     }

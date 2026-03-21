@@ -203,24 +203,14 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       .eq('account_id', account.account_id)
       .neq('member_type', 'primary');
 
-    // Get subscription plan to determine beverage credit, admin fee, and if Skyline
-    let beverageCredit = 0;
-    let adminFee = 0;
-    let isSkylinePlan = false;
+    // Get fee values from account (locked in at signup, not from plan)
+    const adminFee = parseFloat(account.administrative_fee?.toString() || '0');
+    const additionalMemberFee = parseFloat(account.additional_member_fee?.toString() || '0');
 
-    if (account.membership_plan_id) {
-      const { data: plan } = await supabase
-        .from('subscription_plans')
-        .select('beverage_credit, plan_name')
-        .eq('id', account.membership_plan_id)
-        .single();
-
-      if (plan && plan.beverage_credit) {
-        beverageCredit = parseFloat(plan.beverage_credit.toString());
-        adminFee = baseAmount - beverageCredit;
-        isSkylinePlan = plan.plan_name === 'Skyline';
-      }
-    }
+    // Determine payment status based on payment method type
+    // ACH payments start as 'pending' until charge.succeeded webhook fires
+    // Card payments are 'succeeded' immediately, so they're 'cleared'
+    const paymentStatus = paymentIntent.status === 'processing' ? 'pending' : 'cleared';
 
     const entries: any[] = [];
 
@@ -234,6 +224,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       note: `Monthly dues - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
       stripe_charge_id: charge?.id,
       stripe_payment_intent_id: paymentIntent.id,
+      status: paymentStatus,
     });
 
     // 2. If there's an admin fee (non-beverage portion), log it as a "charge" with NEGATIVE amount
@@ -247,11 +238,11 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
         note: 'Membership administration fee',
         stripe_charge_id: charge?.id,
         stripe_payment_intent_id: paymentIntent.id,
+        status: 'cleared', // Fees are always cleared immediately
       });
     }
 
-    // 3. Additional members fee (if applicable - not for Skyline) - NEGATIVE amount
-    const additionalMemberFee = isSkylinePlan ? 0 : 25;
+    // 3. Additional members fee - NEGATIVE amount
     const additionalMembersCountValue = additionalMembersCount || 0;
     const additionalMembersFeeTotal = additionalMembersCountValue * additionalMemberFee;
     if (additionalMembersFeeTotal > 0) {
@@ -264,6 +255,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
         note: `Additional members fee (${additionalMembersCountValue} member${additionalMembersCountValue > 1 ? 's' : ''})`,
         stripe_charge_id: charge?.id,
         stripe_payment_intent_id: paymentIntent.id,
+        status: 'cleared', // Fees are always cleared immediately
       });
     }
 
@@ -278,6 +270,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
         note: 'Credit card processing fee',
         stripe_charge_id: charge?.id,
         stripe_payment_intent_id: paymentIntent.id,
+        status: 'cleared', // Fees are always cleared immediately
       });
     }
 
