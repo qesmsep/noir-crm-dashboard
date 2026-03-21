@@ -5,15 +5,17 @@ import { supabase } from '@/lib/supabase';
 import styles from '../styles/UpdatePlanModal.module.css';
 
 interface Plan {
-  product_id: string;
-  product_name: string;
-  product_description: string | null;
-  price_id: string;
-  amount: number;
-  currency: string;
+  id: string;
+  plan_id: string;
+  plan_name: string;
+  description: string | null;
+  monthly_price: number;
+  beverage_credit: number;
+  administrative_fee: number;
+  additional_member_fee: number;
   interval: string;
-  interval_count: number;
-  monthly_amount: number;
+  amount: number;
+  annual_amount: number;
 }
 
 interface Props {
@@ -25,7 +27,7 @@ interface Props {
 export default function CreateSubscriptionModal({ accountId, onSuccess, onClose }: Props) {
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [primaryMemberId, setPrimaryMemberId] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
   };
 
   const handleSubmit = async () => {
-    if (!selectedPriceId) {
+    if (!selectedPlanId) {
       toast({
         title: 'Info',
         description: 'Please select a plan',
@@ -108,7 +110,7 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           member_id: primaryMemberId,
-          price_id: selectedPriceId,
+          plan_id: selectedPlanId,
           charge_immediately: chargeImmediately,
         }),
       });
@@ -119,23 +121,10 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
         throw new Error(data.error);
       }
 
-      // If there's a client_secret, the subscription needs payment confirmation
-      if (data.client_secret) {
-        toast({
-          title: 'Payment Required',
-          description: 'Subscription created. Payment method needs to be added and confirmed.',
-        });
-      } else if (chargeImmediately) {
-        toast({
-          title: 'Success',
-          description: 'Subscription created and charged successfully. Account is now active.',
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: 'Subscription created successfully',
-        });
-      }
+      toast({
+        title: 'Success',
+        description: data.message || 'Subscription created successfully',
+      });
 
       onSuccess();
     } catch (error: any) {
@@ -149,18 +138,15 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
     }
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency || 'USD',
+      currency: 'USD',
     }).format(amount);
   };
 
-  const formatInterval = (interval: string, interval_count: number) => {
-    if (interval_count === 1) {
-      return `per ${interval}`;
-    }
-    return `per ${interval_count} ${interval}s`;
+  const formatInterval = (interval: string) => {
+    return `per ${interval}`;
   };
 
   return (
@@ -181,30 +167,30 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
           ) : (
             <div className={styles.planList}>
               {plans.map((plan) => {
-                const isSelected = plan.price_id === selectedPriceId;
+                const isSelected = plan.plan_id === selectedPlanId;
 
                 return (
                   <div
-                    key={plan.price_id}
+                    key={plan.plan_id}
                     className={`${styles.planCard} ${isSelected ? styles.selected : ''}`}
-                    onClick={() => setSelectedPriceId(plan.price_id)}
+                    onClick={() => setSelectedPlanId(plan.plan_id)}
                   >
                     <div className={styles.planHeader}>
-                      <h3 className={styles.planName}>{plan.product_name}</h3>
+                      <h3 className={styles.planName}>{plan.plan_name}</h3>
                     </div>
 
-                    {plan.product_description && (
-                      <p className={styles.planDescription}>{plan.product_description}</p>
+                    {plan.description && (
+                      <p className={styles.planDescription}>{plan.description}</p>
                     )}
 
                     <div className={styles.planPrice}>
-                      <span className={styles.amount}>{formatCurrency(plan.amount, plan.currency)}</span>
-                      <span className={styles.interval}>{formatInterval(plan.interval, plan.interval_count)}</span>
+                      <span className={styles.amount}>{formatCurrency(plan.amount)}</span>
+                      <span className={styles.interval}>{formatInterval(plan.interval)}</span>
                     </div>
 
                     {plan.interval === 'year' && (
                       <div className={styles.monthlyEquivalent}>
-                        {formatCurrency(plan.monthly_amount, plan.currency)}/month
+                        {formatCurrency(plan.monthly_price / 12)}/month
                       </div>
                     )}
 
@@ -213,7 +199,7 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
                         type="radio"
                         name="plan"
                         checked={isSelected}
-                        onChange={() => setSelectedPriceId(plan.price_id)}
+                        onChange={() => setSelectedPlanId(plan.plan_id)}
                       />
                     </div>
                   </div>
@@ -224,16 +210,37 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
         </div>
 
         <div className={styles.footer}>
-          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              type="checkbox"
-              id="chargeImmediately"
-              checked={chargeImmediately}
-              onChange={(e) => setChargeImmediately(e.target.checked)}
-              disabled={submitting}
-            />
-            <label htmlFor="chargeImmediately" style={{ cursor: 'pointer', fontSize: '14px' }}>
-              Charge immediately and activate (requires valid payment method)
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            background: '#F7F6F3',
+            borderRadius: '8px',
+            border: '1px solid #ECEAE5'
+          }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#1F1F1F'
+            }}>
+              <input
+                type="checkbox"
+                id="chargeImmediately"
+                checked={chargeImmediately}
+                onChange={(e) => setChargeImmediately(e.target.checked)}
+                disabled={submitting}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  cursor: 'pointer',
+                  accentColor: '#A59480'
+                }}
+              />
+              <span>
+                <strong>Charge immediately</strong> (requires valid payment method on file)
+              </span>
             </label>
           </div>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
@@ -243,9 +250,9 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
             <button
               className={styles.submitButton}
               onClick={handleSubmit}
-              disabled={submitting || !selectedPriceId || !primaryMemberId}
+              disabled={submitting || !selectedPlanId || !primaryMemberId}
             >
-              {submitting ? 'Creating...' : 'Create Subscription'}
+              {submitting ? 'Creating...' : 'Create Membership'}
             </button>
           </div>
         </div>

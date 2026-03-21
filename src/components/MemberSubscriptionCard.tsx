@@ -450,14 +450,18 @@ export default function MemberSubscriptionCard({
           <div className={styles.header}>
             <h3 className={styles.title}>Membership</h3>
           </div>
-          <div className={styles.noSubscription}>
-            <p>No active membership</p>
-            <button
-              className={styles.createButton}
-              onClick={() => setShowCreateSubscriptionModal(true)}
-            >
-              Create Membership
-            </button>
+          <div className={styles.content}>
+            <div className={styles.noSubscription}>
+              <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>
+                No membership plan configured for this account.
+              </p>
+              <button
+                className={styles.createButton}
+                onClick={() => setShowCreateSubscriptionModal(true)}
+              >
+                Create Membership
+              </button>
+            </div>
           </div>
         </div>
 
