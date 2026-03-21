@@ -9,6 +9,8 @@ import InlineAttachments from '../../../components/InlineAttachments';
 import MemberSubscriptionCard from '../../../components/MemberSubscriptionCard';
 import AddSecondaryMemberModal from '../../../components/AddSecondaryMemberModal';
 import PhotoCropUpload from '../../../components/PhotoCropUpload';
+import { ChargeConfirmationDialog } from '../../../components/ChargeConfirmationDialog';
+import SimpleReservationRequestModal from '../../../components/member/SimpleReservationRequestModal';
 import styles from '../../../styles/MemberDetail.module.css';
 import { getTodayLocalDate } from '@/lib/utils';
 
@@ -162,6 +164,18 @@ export default function MemberDetailAdmin() {
 
   // Referral code copy state
   const [copiedReferralCode, setCopiedReferralCode] = useState<string | null>(null);
+
+  // Charge confirmation dialog state
+  const [isChargeConfirmDialogOpen, setIsChargeConfirmDialogOpen] = useState(false);
+  const [pendingChargeData, setPendingChargeData] = useState<{
+    amount: number;
+    description: string;
+    date: string;
+    isPayBalance?: boolean;
+  } | null>(null);
+
+  // Reservation modal state
+  const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
 
   // Referral details state
   const [referralDetails, setReferralDetails] = useState<Record<string, {
@@ -1094,43 +1108,18 @@ export default function MemberDetailAdmin() {
       return;
     }
 
-    setIsProcessingPayment(true);
-    try {
-      const response = await fetch('/api/chargeBalance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          account_id: accountId,
-        }),
-      });
+    // Calculate outstanding balance
+    const balance = calculateRunningBalance(ledger, 0);
+    const amountDue = Math.abs(balance);
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to process payment');
-      }
-
-      toast({
-        title: 'Payment Successful',
-        description: 'The balance has been paid successfully',
-        status: 'success',
-        duration: 5000,
-      });
-
-      // Refresh the ledger
-      await refreshLedger();
-    } catch (error: any) {
-      toast({
-        title: 'Payment Failed',
-        description: error.message,
-        status: 'error',
-        duration: 5000,
-      });
-    } finally {
-      setIsProcessingPayment(false);
-    }
+    // Store charge data and open confirmation dialog
+    setPendingChargeData({
+      amount: amountDue,
+      description: 'Outstanding Balance',
+      date: new Date().toISOString().split('T')[0],
+      isPayBalance: true,
+    });
+    setIsChargeConfirmDialogOpen(true);
   };
 
   // Handle custom charge (Stripe payment)
@@ -1166,28 +1155,41 @@ export default function MemberDetailAdmin() {
       return;
     }
 
-    // Confirmation dialog
-    const confirmed = window.confirm(
-      `Charge member's card $${amount.toFixed(2)} for:\n"${customChargeDescription.trim()}"\n\nThis will process a payment via Stripe.`
-    );
+    // Store charge data and open confirmation dialog
+    setPendingChargeData({
+      amount,
+      description: customChargeDescription.trim(),
+      date: customChargeDate || new Date().toISOString().split('T')[0],
+    });
+    setIsChargeConfirmDialogOpen(true);
+  };
 
-    if (!confirmed) {
-      return;
-    }
+  // Process the charge after confirmation
+  const handleConfirmCharge = async () => {
+    if (!pendingChargeData || !accountId) return;
 
+    setIsChargeConfirmDialogOpen(false);
     setIsProcessingPayment(true);
+
     try {
+      // Build request body based on whether it's Pay Balance or Charge Card
+      const requestBody: any = {
+        account_id: accountId,
+      };
+
+      // For custom charges (Charge Card), include custom fields
+      if (!pendingChargeData.isPayBalance) {
+        requestBody.custom_amount = pendingChargeData.amount;
+        requestBody.custom_description = pendingChargeData.description;
+        requestBody.custom_date = pendingChargeData.date;
+      }
+
       const response = await fetch('/api/chargeBalance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          account_id: accountId,
-          custom_amount: amount,
-          custom_description: customChargeDescription.trim(),
-          custom_date: customChargeDate || new Date().toISOString().split('T')[0],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
@@ -1197,22 +1199,27 @@ export default function MemberDetailAdmin() {
       }
 
       toast({
-        title: 'Payment Processed',
-        description: `Successfully processed $${amount.toFixed(2)} payment: ${customChargeDescription}`,
+        title: pendingChargeData.isPayBalance ? 'Payment Successful' : 'Payment Processed',
+        description: pendingChargeData.isPayBalance
+          ? 'The balance has been paid successfully'
+          : `Successfully processed $${pendingChargeData.amount.toFixed(2)} payment: ${pendingChargeData.description}`,
         status: 'success',
         duration: 5000,
       });
 
-      // Clear form
-      setCustomChargeAmount('');
-      setCustomChargeDescription('');
-      setCustomChargeDate('');
+      // Clear form (only for Charge Card, not Pay Balance)
+      if (!pendingChargeData.isPayBalance) {
+        setCustomChargeAmount('');
+        setCustomChargeDescription('');
+        setCustomChargeDate('');
+      }
+      setPendingChargeData(null);
 
       // Refresh the ledger
       await refreshLedger();
     } catch (error: any) {
       toast({
-        title: 'Charge Failed',
+        title: pendingChargeData.isPayBalance ? 'Payment Failed' : 'Charge Failed',
         description: error.message,
         status: 'error',
         duration: 5000,
@@ -1545,7 +1552,7 @@ export default function MemberDetailAdmin() {
   return (
     <AdminLayout>
       <div className={styles.container}>
-        {/* Header with Back Button and Search */}
+        {/* Header with Back Button, Search, and Make Reservation */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
@@ -1631,6 +1638,28 @@ export default function MemberDetailAdmin() {
                 </div>
               )}
             </div>
+
+            {/* Make Reservation Button */}
+            <button
+              onClick={() => setIsReservationModalOpen(true)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#2D3748',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                transition: 'background-color 0.15s',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1A202C'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2D3748'}
+            >
+              Make Reservation
+            </button>
           </div>
         </div>
 
@@ -2744,6 +2773,36 @@ export default function MemberDetailAdmin() {
           }}
         />
       )}
+
+      {/* Charge Confirmation Dialog */}
+      <ChargeConfirmationDialog
+        isOpen={isChargeConfirmDialogOpen}
+        onClose={() => {
+          setIsChargeConfirmDialogOpen(false);
+          setPendingChargeData(null);
+        }}
+        onConfirm={handleConfirmCharge}
+        amount={pendingChargeData?.amount || 0}
+        memberName={members.find(m => m.member_type === 'primary')?.first_name || undefined}
+        description={pendingChargeData?.description}
+      />
+
+      {/* Reservation Modal */}
+      <SimpleReservationRequestModal
+        isOpen={isReservationModalOpen}
+        onClose={() => setIsReservationModalOpen(false)}
+        memberName={(() => {
+          const primaryMember = members.find(m => m.member_type === 'primary');
+          return primaryMember ? `${primaryMember.first_name} ${primaryMember.last_name}` : '';
+        })()}
+        memberPhone={members.find(m => m.member_type === 'primary')?.phone || ''}
+        memberId={members.find(m => m.member_type === 'primary')?.member_id}
+        accountId={accountId as string}
+        onReservationCreated={() => {
+          setIsReservationModalOpen(false);
+          // Optionally refresh reservations list if needed
+        }}
+      />
     </AdminLayout>
   );
 }
