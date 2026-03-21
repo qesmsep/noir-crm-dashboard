@@ -385,7 +385,20 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     });
   }
 
-  // 3. Processing fee charge (if fee exists)
+  // 3. Beverage credit (if exists)
+  if (beverageCredit > 0) {
+    ledgerEntries.push({
+      account_id: account.account_id,
+      member_id: member.member_id,
+      type: 'credit',
+      amount: beverageCredit.toFixed(2),
+      date: getTodayLocalDate(),
+      note: 'Monthly beverage credit',
+      stripe_payment_intent_id: waitlist.stripe_payment_intent_id
+    });
+  }
+
+  // 4. Processing fee charge (if fee exists)
   if (creditCardFee > 0) {
     ledgerEntries.push({
       account_id: account.account_id,
@@ -399,10 +412,16 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
   }
 
   // Insert all ledger entries
-  await supabase
+  const { error: ledgerError } = await supabase
     .from('ledger')
     .insert(ledgerEntries);
 
+  if (ledgerError) {
+    console.error('[PAYMENT CONFIRM] Failed to create ledger entries:', ledgerError);
+    throw new Error(`Failed to create ledger entries: ${ledgerError.message}`);
+  }
+
+  console.log(`[PAYMENT CONFIRM] Created ${ledgerEntries.length} ledger entries for member ${member.member_id}`);
   return { member_id: member.member_id, account_id: account.account_id };
 }
 
