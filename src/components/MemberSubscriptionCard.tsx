@@ -495,7 +495,12 @@ export default function MemberSubscriptionCard({
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    // Extract date portion to avoid timezone conversion issues
+    // e.g., "2026-04-01T00:00:00+00" -> "2026-04-01"
+    const datePart = dateStr.split('T')[0];
+    const [year, month, day] = datePart.split('-');
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
