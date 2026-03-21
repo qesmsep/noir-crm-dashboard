@@ -20,10 +20,10 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const { member_id, account_id, outstanding } = req.query;
-      let query = supabaseAdmin.from("ledger").select("*");
+      let query = supabaseAdmin.from("ledger").select("*", { count: 'exact' });
       if (member_id) query = query.eq("member_id", member_id);
       if (account_id) query = query.eq("account_id", account_id);
-      query = query.order("date", { ascending: true });
+      query = query.order("date", { ascending: true }).limit(10000); // Increase limit to 10k
       const { data, error } = await query;
       if (error) {
         console.error("Ledger GET error:", error);
