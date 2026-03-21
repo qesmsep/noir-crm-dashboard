@@ -178,17 +178,25 @@
 }
 
 /* Loading & Empty States */
-.loading,
-.noSubscription {
+.loading {
   text-align: center;
   padding: 40px 20px;
   color: #6B7280;
 }
 
+.noSubscription {
+  text-align: center;
+  padding: 60px 40px;
+  background: #F9FAFB;
+  border-radius: 12px;
+  border: 1px dashed #D1D5DB;
+}
+
 .noSubscription p {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   color: #6B7280;
   font-size: 14px;
+  line-height: 1.6;
 }
 
 /* Actions */
@@ -215,7 +223,34 @@
   cursor: not-allowed;
 }
 
-.createButton,
+.createButton {
+  background: #1F1F1F;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: 10px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.createButton:hover:not(:disabled) {
+  background: #374151;
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.12),
+    0 8px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.createButton:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
 .reactivateButton,
 .resumeButton {
   background: #A59480; /* Cork */
@@ -226,7 +261,6 @@
     0 8px 16px rgba(165, 148, 128, 0.1);
 }
 
-.createButton:hover:not(:disabled),
 .reactivateButton:hover:not(:disabled),
 .resumeButton:hover:not(:disabled) {
   background: #8D7C6A;
