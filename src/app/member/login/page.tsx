@@ -252,6 +252,7 @@ export default function MemberLoginPage() {
               src="/images/noir-wedding-day.png"
               alt="Noir"
               className="h-12 mx-auto mb-6"
+              style={{ filter: 'brightness(0.7)' }}
             />
             {showPasswordInput && memberInfo ? (
               <div className="space-y-2">
