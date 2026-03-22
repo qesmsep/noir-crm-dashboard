@@ -446,11 +446,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
       if (hasTimeChanged) {
         // FullCalendar provides dates in the configured timezone
-        // Use fromJSDate for consistent handling across drag and resize
-        const startTimeUTC = DateTime.fromJSDate(info.event.start)
+        // Use fromJSDate with explicit timezone for consistent handling across drag and resize
+        const startTimeUTC = DateTime.fromJSDate(info.event.start, { zone: settings.timezone })
           .toUTC()
           .toISO({ suppressMilliseconds: true });
-        const endTimeUTC = DateTime.fromJSDate(info.event.end)
+        const endTimeUTC = DateTime.fromJSDate(info.event.end, { zone: settings.timezone })
           .toUTC()
           .toISO({ suppressMilliseconds: true });
 
@@ -500,10 +500,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     }
 
     try {
-      const startTimeUTC = DateTime.fromJSDate(info.event.start)
+      const startTimeUTC = DateTime.fromJSDate(info.event.start, { zone: settings.timezone })
         .toUTC()
         .toISO({ suppressMilliseconds: true });
-      const endTimeUTC = DateTime.fromJSDate(info.event.end)
+      const endTimeUTC = DateTime.fromJSDate(info.event.end, { zone: settings.timezone })
         .toUTC()
         .toISO({ suppressMilliseconds: true });
 
