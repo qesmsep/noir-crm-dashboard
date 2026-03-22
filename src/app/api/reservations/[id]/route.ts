@@ -131,9 +131,17 @@ export async function PATCH(request: Request, { params }: any) {
   const { id } = await params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
   console.log('PATCH: Querying for reservation id:', reservationId);
-  
+
   try {
     const body = await request.json();
+
+    // Debug: Log the incoming times
+    if (body.start_time || body.end_time) {
+      console.log('=== PATCH RECEIVED ===');
+      console.log('start_time:', body.start_time);
+      console.log('end_time:', body.end_time);
+      console.log('===================');
+    }
 
     const {
       start_time,

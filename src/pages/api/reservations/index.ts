@@ -52,10 +52,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const body = req.body;
 
       // Log incoming request data for debugging
-      console.log('=== RESERVATION API REQUEST ===');
+      console.log('=== RESERVATION POST REQUEST ===');
       console.log('Request body keys:', Object.keys(body));
-      console.log('start_time:', body.start_time);
-      console.log('end_time:', body.end_time);
+      console.log('start_time:', body.start_time, 'TYPE:', typeof body.start_time);
+      console.log('end_time:', body.end_time, 'TYPE:', typeof body.end_time);
       console.log('party_size:', body.party_size);
       console.log('=== END REQUEST LOG ===');
 

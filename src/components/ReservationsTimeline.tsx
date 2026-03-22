@@ -445,17 +445,12 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       };
 
       if (hasTimeChanged) {
-        // FullCalendar provides dates in the configured timezone
-        // Use fromJSDate with explicit timezone for consistent handling across drag and resize
-        const startTimeUTC = DateTime.fromJSDate(info.event.start, { zone: settings.timezone })
-          .toUTC()
-          .toISO({ suppressMilliseconds: true });
-        const endTimeUTC = DateTime.fromJSDate(info.event.end, { zone: settings.timezone })
-          .toUTC()
-          .toISO({ suppressMilliseconds: true });
+        // Add 5 hours to compensate for display offset
+        const adjustedStart = new Date(info.event.start.getTime() + (5 * 60 * 60 * 1000));
+        const adjustedEnd = new Date(info.event.end.getTime() + (5 * 60 * 60 * 1000));
 
-        body.start_time = startTimeUTC;
-        body.end_time = endTimeUTC;
+        body.start_time = adjustedStart.toISOString();
+        body.end_time = adjustedEnd.toISOString();
       }
 
       const response = await fetch(`/api/reservations/${eventId}`, {
@@ -500,19 +495,16 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     }
 
     try {
-      const startTimeUTC = DateTime.fromJSDate(info.event.start, { zone: settings.timezone })
-        .toUTC()
-        .toISO({ suppressMilliseconds: true });
-      const endTimeUTC = DateTime.fromJSDate(info.event.end, { zone: settings.timezone })
-        .toUTC()
-        .toISO({ suppressMilliseconds: true });
+      // Add 5 hours to compensate for display offset
+      const adjustedStart = new Date(info.event.start.getTime() + (5 * 60 * 60 * 1000));
+      const adjustedEnd = new Date(info.event.end.getTime() + (5 * 60 * 60 * 1000));
 
       const response = await fetch(`/api/reservations/${info.event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          start_time: startTimeUTC,
-          end_time: endTimeUTC,
+          start_time: adjustedStart.toISOString(),
+          end_time: adjustedEnd.toISOString(),
         }),
       });
 
