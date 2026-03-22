@@ -58,7 +58,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const [resources, setResources] = useState<Resource[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [localReloadKey, setLocalReloadKey] = useState(0);
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(propCurrentDate || new Date());
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(
+    propCurrentDate || new Date()
+  );
   const [slotMinTime, setSlotMinTime] = useState<string>('18:00:00');
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
   const [scrollTime, setScrollTime] = useState<string>('18:00:00');
@@ -110,13 +112,25 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     loadTables();
   }, [reloadKey, toast]);
 
+  // Debug: Log what date FullCalendar is actually showing
+  useEffect(() => {
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      const currentDate = calendarApi.getDate();
+      console.log('=== CALENDAR CURRENT DATE ===');
+      console.log('FullCalendar is showing:', currentDate);
+      console.log('As ISO:', currentDate.toISOString());
+      console.log('============================');
+    }
+  }, [events, resources]); // Run after events/resources load
+
   // Load private events
   useEffect(() => {
     const fetchPrivateEvents = async () => {
       try {
-        const now = new Date();
-        const startDate = now.toISOString();
-        const endDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString();
+        const now = DateTime.now().setZone('America/Chicago');
+        const startDate = now.toISO();
+        const endDate = now.plus({ years: 1 }).toISO();
         
         const res = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
         if (!res.ok) throw new Error('Failed to fetch private events');
@@ -685,11 +699,16 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const handleToday = () => {
     if (calendarRef.current) {
       const calendarApi = calendarRef.current.getApi();
-      const today = new Date();
-      calendarApi.gotoDate(today);
-      setCurrentCalendarDate(today);
+      const chicagoNow = DateTime.now().setZone('America/Chicago');
+      const todayString = chicagoNow.toFormat('yyyy-MM-dd');
+      console.log('=== TODAY BUTTON CLICKED ===');
+      console.log('Current time Chicago:', chicagoNow.toISO());
+      console.log('Going to date:', todayString);
+      console.log('========================');
+      calendarApi.gotoDate(todayString);
+      setCurrentCalendarDate(new Date());
       if (onDateChange) {
-        onDateChange(today);
+        onDateChange(new Date());
       }
     }
   };
@@ -753,8 +772,16 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           ref={calendarRef}
           plugins={[resourceTimelinePlugin, interactionPlugin]}
           initialView="resourceTimelineDay"
-          initialDate={propCurrentDate || new Date()}
-          timeZone={settings.timezone}
+          initialDate={(() => {
+            const chicagoNow = DateTime.now().setZone('America/Chicago');
+            const dateString = chicagoNow.toFormat('yyyy-MM-dd');
+            console.log('=== FULLCALENDAR INIT ===');
+            console.log('Current time UTC:', DateTime.now().toISO());
+            console.log('Current time Chicago:', chicagoNow.toISO());
+            console.log('Passing initialDate to FC (plain date):', dateString);
+            console.log('========================');
+            return propCurrentDate || dateString;
+          })()}
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
           
           customButtons={{
