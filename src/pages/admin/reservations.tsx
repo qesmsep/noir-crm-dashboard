@@ -4,7 +4,9 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import ReservationsTimeline from '../../components/ReservationsTimeline';
 import ReservationEditModal from '../../components/ReservationEditModal';
 import ReservationModalFixed from '../../components/ReservationModalFixed';
+import SimpleReservationRequestModal from '../../components/member/SimpleReservationRequestModal';
 import { useSettings } from '../../context/SettingsContext';
+import { useToast } from '@/hooks/useToast';
 import { debugLog } from '../../utils/debugLogger';
 import styles from '../../styles/Reservations.module.css';
 
@@ -26,9 +28,24 @@ import styles from '../../styles/Reservations.module.css';
 export default function Reservations() {
   const router = useRouter();
   const { settings } = useSettings();
+  const { toast } = useToast();
   const [reloadKey, setReloadKey] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Member lookup modal state
+  const [isLookupModalOpen, setIsLookupModalOpen] = useState(false);
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [isLookingUp, setIsLookingUp] = useState(false);
+
+  // Simple reservation modal state (for member reservations)
+  const [isSimpleReservationModalOpen, setIsSimpleReservationModalOpen] = useState(false);
+  const [memberData, setMemberData] = useState<{
+    memberName: string;
+    memberPhone: string;
+    memberId?: string;
+    accountId?: string;
+  } | null>(null);
 
   // Debug: Log component mount and router state
   useEffect(() => {
@@ -115,6 +132,56 @@ export default function Reservations() {
 
   const handleDateChange = (date: Date) => {
     setCurrentDate(date);
+  };
+
+  const handleLookupMember = async () => {
+    if (!lookupPhone.trim()) {
+      toast({
+        title: 'Phone Required',
+        description: 'Please enter a phone number',
+        variant: 'error',
+      });
+      return;
+    }
+
+    setIsLookingUp(true);
+
+    try {
+      const response = await fetch(`/api/members?phone=${encodeURIComponent(lookupPhone)}`);
+      const data = await response.json();
+
+      if (response.ok && data.members && data.members.length > 0) {
+        // Member found
+        const member = data.members[0];
+        setMemberData({
+          memberName: `${member.first_name} ${member.last_name}`,
+          memberPhone: member.phone,
+          memberId: member.member_id,
+          accountId: member.account_id,
+        });
+        setIsLookupModalOpen(false);
+        setIsSimpleReservationModalOpen(true);
+        setLookupPhone('');
+      } else {
+        // Member not found - open with just the phone number
+        setMemberData({
+          memberName: '',
+          memberPhone: lookupPhone,
+        });
+        setIsLookupModalOpen(false);
+        setIsSimpleReservationModalOpen(true);
+        setLookupPhone('');
+      }
+    } catch (error) {
+      console.error('Error looking up member:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to lookup member',
+        variant: 'error',
+      });
+    } finally {
+      setIsLookingUp(false);
+    }
   };
 
   // Cleanup: Ensure body scroll is unlocked when component unmounts
@@ -227,10 +294,133 @@ export default function Reservations() {
               onDateChange={handleDateChange}
               onReservationClick={handleReservationClick}
               onSlotClick={handleSlotClick}
+              onMakeReservationClick={() => setIsLookupModalOpen(true)}
             />
           </div>
         </main>
       </div>
+
+      {/* Member Lookup Modal */}
+      {isLookupModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={() => {
+            setIsLookupModalOpen(false);
+            setLookupPhone('');
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ECEDE8',
+              borderRadius: '16px',
+              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+              maxWidth: '400px',
+              width: '100%',
+              padding: '2rem',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', marginBottom: '1.5rem' }}>
+              Member Lookup
+            </h2>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <input
+                type="tel"
+                value={lookupPhone}
+                onChange={(e) => setLookupPhone(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleLookupMember();
+                  }
+                }}
+                placeholder="Phone Number*"
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  padding: '0 1rem',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                }}
+              />
+              <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6B7280' }}>
+                We'll look up the member and pre-fill their information
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => {
+                  setIsLookupModalOpen(false);
+                  setLookupPhone('');
+                }}
+                style={{
+                  flex: 1,
+                  height: '44px',
+                  backgroundColor: '#ffffff',
+                  color: '#1F1F1F',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLookupMember}
+                disabled={isLookingUp}
+                style={{
+                  flex: 1,
+                  height: '44px',
+                  backgroundColor: isLookingUp ? '#D1D5DB' : '#A59480',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: isLookingUp ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isLookingUp ? 'Looking up...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Simple Reservation Modal */}
+      <SimpleReservationRequestModal
+        isOpen={isSimpleReservationModalOpen}
+        onClose={() => {
+          setIsSimpleReservationModalOpen(false);
+          setMemberData(null);
+        }}
+        memberName={memberData?.memberName || ''}
+        memberPhone={memberData?.memberPhone || ''}
+        memberId={memberData?.memberId}
+        accountId={memberData?.accountId}
+        onReservationCreated={() => {
+          setIsSimpleReservationModalOpen(false);
+          setMemberData(null);
+          handleReservationCreated();
+        }}
+      />
     </AdminLayout>
   );
 }

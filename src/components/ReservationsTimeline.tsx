@@ -21,6 +21,7 @@ interface ReservationsTimelineProps {
   onDateChange?: (date: Date) => void;
   onReservationClick?: (reservationId: string) => void;
   onSlotClick?: (slotInfo: { date: Date; resourceId: string }) => void;
+  onMakeReservationClick?: () => void;
 }
 
 const eventTypeEmojis: Record<string, string> = {
@@ -51,6 +52,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   onDateChange,
   onReservationClick,
   onSlotClick,
+  onMakeReservationClick,
 }) => {
   const calendarRef = useRef<FullCalendar | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -736,20 +738,22 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           >
             ›
           </button>
-          <button 
+          <button
             className={styles.mobileNavToday}
             onClick={handleToday}
             aria-label="Today"
           >
             Today
           </button>
-          <button 
-            className={styles.mobileNavNewRez}
-            onClick={handleNewReservation}
-            aria-label="New Reservation"
-          >
-            + rez
-          </button>
+          {onMakeReservationClick && (
+            <button
+              className={styles.mobileNavNewRez}
+              onClick={onMakeReservationClick}
+              aria-label="Make Reservation"
+            >
+              Make Rez
+            </button>
+          )}
         </div>
       )}
       <Box className={styles.calendarContainer}>
@@ -762,16 +766,20 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
           
           customButtons={{
-            newRez: {
-              text: '+ rez',
-              click: handleNewReservation,
+            makeReservation: {
+              text: 'Make Reservation',
+              click: () => {
+                if (onMakeReservationClick) {
+                  onMakeReservationClick();
+                }
+              },
             },
           }}
-          
+
           headerToolbar={isMobile ? false : {
             left: 'prev,next',
             center: 'title',
-            right: 'newRez today',
+            right: 'makeReservation,today',
           }}
           titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
           resources={resources}

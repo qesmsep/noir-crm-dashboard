@@ -87,7 +87,44 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const { member_id } = req.query;
+      const { member_id, phone } = req.query;
+
+      // If phone is provided, search by phone number
+      if (phone) {
+        Logger.info('Fetching member by phone', { requestId, phone });
+
+        // Normalize phone number for search
+        const phoneDigits = phone.replace(/\D/g, '');
+        const phoneVariants = [
+          phone,
+          phoneDigits.length === 10 ? '+1' + phoneDigits : '+' + phoneDigits,
+          phoneDigits.length === 11 && phoneDigits.startsWith('1') ? '+' + phoneDigits : phoneDigits,
+          phoneDigits.slice(-10),
+          phoneDigits
+        ];
+
+        let memberData = null;
+        for (const phoneVariant of phoneVariants) {
+          const { data, error } = await supabase
+            .from('members')
+            .select('*')
+            .eq('phone', phoneVariant)
+            .eq('member_type', 'primary')
+            .limit(1)
+            .maybeSingle();
+
+          if (data) {
+            memberData = data;
+            break;
+          }
+        }
+
+        if (memberData) {
+          return res.status(200).json({ members: [memberData] });
+        } else {
+          return res.status(200).json({ members: [] });
+        }
+      }
 
       // If member_id is provided, fetch single member
       if (member_id) {

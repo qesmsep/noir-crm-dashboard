@@ -1,24 +1,9 @@
-import { useState } from 'react';
-import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalCloseButton,
-  FormControl,
-  FormLabel,
-  Select,
-  Button,
-  Textarea,
-  useToast,
-  Box,
-  VStack,
-  Input,
-} from '@chakra-ui/react';
+import { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { DateTime } from 'luxon';
+import { X } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 
 interface Props {
   isOpen: boolean;
@@ -57,7 +42,7 @@ export default function SimpleReservationRequestModal({
   accountId,
   onReservationCreated,
 }: Props) {
-  const toast = useToast();
+  const { toast } = useToast();
   const [date, setDate] = useState<Date | null>(null);
   const [time, setTime] = useState('');
   const [partySize, setPartySize] = useState('2');
@@ -65,6 +50,42 @@ export default function SimpleReservationRequestModal({
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [blockedTimes, setBlockedTimes] = useState<any[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
+
+  // Manual entry fields (always editable, pre-filled if member found)
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [tableId, setTableId] = useState('');
+  const [tables, setTables] = useState<any[]>([]);
+
+  // Initialize fields when memberName changes
+  useEffect(() => {
+    if (memberName) {
+      const parts = memberName.split(' ');
+      setFirstName(parts[0] || '');
+      setLastName(parts.slice(1).join(' ') || '');
+    } else {
+      setFirstName('');
+      setLastName('');
+      setEmail('');
+    }
+  }, [memberName]);
+
+  // Fetch tables
+  useEffect(() => {
+    const fetchTables = async () => {
+      try {
+        const response = await fetch('/api/tables');
+        const data = await response.json();
+        if (response.ok && data.tables) {
+          setTables(data.tables.sort((a: any, b: any) => Number(a.table_number) - Number(b.table_number)));
+        }
+      } catch (error) {
+        console.error('Error fetching tables:', error);
+      }
+    };
+    fetchTables();
+  }, []);
 
   // Reset time when date changes if current time is not in new slots
   const handleDateChange = async (newDate: Date) => {
@@ -142,8 +163,17 @@ export default function SimpleReservationRequestModal({
       toast({
         title: 'Missing Information',
         description: 'Please select a date and time',
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
+      });
+      return;
+    }
+
+    // Validate name fields
+    if (!firstName.trim() || !lastName.trim()) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please enter first name and last name',
+        variant: 'error',
       });
       return;
     }
@@ -178,12 +208,15 @@ export default function SimpleReservationRequestModal({
           end_time: endDateTime.toISO(),
           party_size: parseInt(partySize),
           phone: memberPhone,
-          first_name: memberName.split(' ')[0],
-          last_name: memberName.split(' ').slice(1).join(' '),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email || undefined,
           notes: notes || undefined,
-          source: 'member_dashboard',
+          table_id: tableId || undefined,
+          source: memberId ? 'member_dashboard' : 'admin_portal',
           member_id: memberId,
           account_id: accountId,
+          create_visitor: !memberId && !accountId, // Create visitor if no member/account found
         }),
       });
 
@@ -196,8 +229,7 @@ export default function SimpleReservationRequestModal({
       toast({
         title: 'Reservation Confirmed!',
         description: 'Your table has been reserved',
-        status: 'success',
-        duration: 5000,
+        variant: 'success',
       });
 
       // Call refresh callback if provided
@@ -215,8 +247,7 @@ export default function SimpleReservationRequestModal({
       toast({
         title: 'Error',
         description: error.message || 'Failed to create reservation',
-        status: 'error',
-        duration: 5000,
+        variant: 'error',
       });
     } finally {
       setIsCreatingReservation(false);
@@ -233,139 +264,312 @@ export default function SimpleReservationRequestModal({
   const maxDate = new Date();
   maxDate.setDate(maxDate.getDate() + 30);
 
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md" isCentered>
-      <ModalOverlay bg="blackAlpha.700" />
-      <ModalContent
-        bg="white"
-        borderRadius="2xl"
-        boxShadow="2xl"
-        maxW="500px"
-        mx={4}
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: '#ECEDE8',
+          borderRadius: '16px',
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+          maxWidth: '600px',
+          width: '100%',
+          padding: '2rem',
+          position: 'relative',
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <ModalHeader>Request a Reservation</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody pb={6}>
-          <VStack spacing={4} align="stretch">
+        {/* Header */}
+        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+            Request a Reservation
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '0.375rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6B7280',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+              e.currentTarget.style.color = '#1F1F1F';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#6B7280';
+            }}
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Guest Information - Always shown, editable (pre-filled if member found) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <input
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="First Name*"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                outline: 'none',
+              }}
+            />
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Last Name*"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                outline: 'none',
+              }}
+            />
+          </div>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email (Optional)"
+            style={{
+              width: '100%',
+              height: '44px',
+              padding: '0 1rem',
+              border: '1px solid #D1D5DB',
+              borderRadius: '10px',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              outline: 'none',
+            }}
+          />
+          <div>
+            <input
+              type="tel"
+              value={memberPhone}
+              readOnly
+              placeholder="Phone Number*"
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: '#F3F4F6',
+                outline: 'none',
+                cursor: 'not-allowed',
+              }}
+            />
+            {accountId && (
+              <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6B7280' }}>
+                Reservation will be linked to member account
+              </p>
+            )}
+          </div>
+
+          {/* Date and Time Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             {/* Date Picker */}
-            <FormControl isRequired>
-              <FormLabel>Date</FormLabel>
-              <Box>
-                <DatePicker
-                  selected={date}
-                  onChange={handleDateChange}
-                  minDate={minDate}
-                  maxDate={maxDate}
-                  filterDate={filterDate}
-                  dateFormat="MMMM d, yyyy"
-                  placeholderText="Select a date"
-                  openToDate={new Date()}
-                  customInput={
-                    <Input
-                      w="full"
-                      h="48px"
-                      borderColor="gray.200"
-                      _hover={{ borderColor: 'gray.300' }}
-                      _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                      fontSize="md"
-                      borderRadius="lg"
-                      bg="white"
-                      readOnly
-                      inputMode="none"
-                    />
-                  }
-                  popperPlacement="bottom-start"
-                  withPortal={false}
+            <DatePicker
+              selected={date}
+              onChange={handleDateChange}
+              minDate={minDate}
+              maxDate={maxDate}
+              filterDate={filterDate}
+              dateFormat="MMMM d, yyyy"
+              placeholderText="Date*"
+              openToDate={new Date()}
+              customInput={
+                <input
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                  readOnly
                 />
-              </Box>
-            </FormControl>
+              }
+              popperPlacement="bottom-start"
+              withPortal={false}
+            />
 
             {/* Time Select */}
-            <FormControl isRequired>
-              <FormLabel>Time</FormLabel>
-              <Select
+            <div>
+              <select
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                placeholder={loadingTimes ? 'Loading times...' : availableTimeSlots.length === 0 && date ? 'No times available' : 'Select a time'}
-                h="48px"
-                borderColor="gray.200"
-                _hover={{ borderColor: 'gray.300' }}
-                _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                fontSize="md"
-                borderRadius="lg"
-                isDisabled={!date || loadingTimes || availableTimeSlots.length === 0}
-                sx={{ 'select': { inputMode: 'none' } }}
+                disabled={!date || loadingTimes || availableTimeSlots.length === 0}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  padding: '0 1rem',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                  cursor: !date || loadingTimes || availableTimeSlots.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: !date || loadingTimes || availableTimeSlots.length === 0 ? 0.6 : 1,
+                }}
               >
+                <option value="">
+                  {loadingTimes ? 'Loading times...' : availableTimeSlots.length === 0 && date ? 'No times available' : 'Time*'}
+                </option>
                 {availableTimeSlots.map((slot) => (
                   <option key={slot} value={slot}>
                     {slot}
                   </option>
                 ))}
-              </Select>
+              </select>
               {date && !loadingTimes && availableTimeSlots.length === 0 && (
-                <Box mt={2} fontSize="sm" color="red.500">
+                <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#EF4444' }}>
                   No times available on this date. Please select another date.
-                </Box>
+                </div>
               )}
-            </FormControl>
+            </div>
+          </div>
 
-            {/* Party Size */}
-            <FormControl isRequired>
-              <FormLabel>Number of Guests</FormLabel>
-              <Select
-                value={partySize}
-                onChange={(e) => setPartySize(e.target.value)}
-                h="48px"
-                borderColor="gray.200"
-                _hover={{ borderColor: 'gray.300' }}
-                _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                fontSize="md"
-                borderRadius="lg"
-              >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
-                  <option key={num} value={num}>
-                    {num} {num === 1 ? 'guest' : 'guests'}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Special Requests */}
-            <FormControl>
-              <FormLabel>Special Requests or Notes (Optional)</FormLabel>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any special requests or dietary restrictions..."
-                minH="100px"
-                borderColor="gray.200"
-                _hover={{ borderColor: 'gray.300' }}
-                _focus={{ borderColor: '#A59480', boxShadow: '0 0 0 1px #A59480' }}
-                fontSize="md"
-                borderRadius="lg"
-              />
-            </FormControl>
-
-            {/* Make Reservation Button */}
-            <Button
-              onClick={handleMakeReservation}
-              isLoading={isCreatingReservation}
-              loadingText="Creating..."
-              h="48px"
-              bg="#2D3748"
-              color="white"
-              fontSize="md"
-              fontWeight="600"
-              borderRadius="lg"
-              _hover={{ bg: '#1A202C' }}
-              _active={{ bg: '#171923' }}
-              mt={2}
+          {/* Party Size and Table */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <select
+              value={partySize}
+              onChange={(e) => setPartySize(e.target.value)}
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
             >
-              Make Reservation
-            </Button>
-          </VStack>
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
+                <option key={num} value={num}>
+                  {num} {num === 1 ? 'guest' : 'guests'}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={tableId}
+              onChange={(e) => setTableId(e.target.value)}
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">Table (Optional)</option>
+              {tables.map((table) => (
+                <option key={table.id} value={table.id}>
+                  Table {table.table_number}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Special Requests */}
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Special requests or dietary restrictions (optional)"
+            style={{
+              width: '100%',
+              minHeight: '100px',
+              padding: '0.75rem 1rem',
+              border: '1px solid #D1D5DB',
+              borderRadius: '10px',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              outline: 'none',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+            }}
+          />
+
+          {/* Make Reservation Button */}
+          <button
+            onClick={handleMakeReservation}
+            disabled={isCreatingReservation}
+            style={{
+              width: '100%',
+              height: '48px',
+              backgroundColor: isCreatingReservation ? '#D1D5DB' : '#A59480',
+              color: 'white',
+              fontSize: '1rem',
+              fontWeight: '600',
+              borderRadius: '10px',
+              border: 'none',
+              cursor: isCreatingReservation ? 'not-allowed' : 'pointer',
+              marginTop: '0.5rem',
+              boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (!isCreatingReservation) e.currentTarget.style.backgroundColor = '#8C7C6D';
+            }}
+            onMouseLeave={(e) => {
+              if (!isCreatingReservation) e.currentTarget.style.backgroundColor = '#A59480';
+            }}
+          >
+            {isCreatingReservation ? 'Creating...' : 'Make Reservation'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

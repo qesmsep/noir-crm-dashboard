@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/useToast";
 import Image from "next/image";
 import { getSupabaseClient } from "../../api/supabaseClient";
@@ -1552,9 +1553,9 @@ export default function MemberDetailAdmin() {
   return (
     <AdminLayout>
       <div className={styles.container}>
-        {/* Header with Back Button, Search, and Make Reservation */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Header with Back Button and Search */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', maxWidth: '600px', padding: '0 1rem' }}>
             <button
               onClick={() => router.push('/admin/members')}
               className={styles.backButton}
@@ -1563,7 +1564,7 @@ export default function MemberDetailAdmin() {
             </button>
 
             {/* Member Search */}
-            <div style={{ position: 'relative', width: '500px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
               <input
                 type="text"
                 placeholder="Search members..."
@@ -1573,7 +1574,8 @@ export default function MemberDetailAdmin() {
                 onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
                 style={{
                   width: '100%',
-                  padding: '0.75rem 1rem',
+                  height: '44px',
+                  padding: '0 1rem',
                   border: '1px solid #e5e7eb',
                   borderRadius: '0.5rem',
                   fontSize: '0.875rem',
@@ -1638,28 +1640,18 @@ export default function MemberDetailAdmin() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Make Reservation Button */}
-            <button
+        {/* Make Reservation Button - Below Search Bar */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ width: '100%', maxWidth: '600px', padding: '0 1rem' }}>
+            <Button
               onClick={() => setIsReservationModalOpen(true)}
-              style={{
-                padding: '0.75rem 1.5rem',
-                backgroundColor: '#2D3748',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                transition: 'background-color 0.15s',
-                whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1A202C'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2D3748'}
+              className="w-full bg-[#A59480] text-white hover:bg-[#8C7C6D] min-h-[44px] text-sm"
             >
               Make Reservation
-            </button>
+            </Button>
           </div>
         </div>
 
