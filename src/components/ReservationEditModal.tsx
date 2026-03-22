@@ -1,17 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
-import { Spinner } from '@/components/ui/spinner';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatDateTime, utcToLocalInput, localInputToUTC } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 
 const eventTypes = [
   { value: 'birthday', label: '🎂 Birthday' },
@@ -133,7 +126,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       });
     } catch (error) {
       console.error('Error in fetchReservation:', error);
-      toast({ title: 'Error', description: 'Failed to load reservation details', status: 'error', duration: 5000 });
+      toast({ title: 'Error', description: 'Failed to load reservation details', variant: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -170,12 +163,12 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         throw new Error(`Failed to update reservation`);
       }
       
-      toast({ title: 'Success', description: 'Reservation updated successfully', status: 'success', duration: 3000 });
+      toast({ title: 'Success', description: 'Reservation updated successfully', variant: 'success' });
       onReservationUpdated();
       onClose();
     } catch (error: any) {
       console.error('Error in handleSave:', error);
-      toast({ title: 'Error', description: `Failed to update reservation: ${error.message}`, status: 'error', duration: 5000 });
+      toast({ title: 'Error', description: `Failed to update reservation: ${error.message}`, variant: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -246,8 +239,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         toast({
           title: 'Success',
           description: newCheckedInStatus ? 'Reservation checked in successfully' : 'Check-in status removed',
-          status: 'success',
-          duration: 3000,
+          variant: 'success',
         });
       }
       
@@ -258,8 +250,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to update check-in status',
-        status: 'error',
-        duration: 5000,
+        variant: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -287,8 +278,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to delete reservation',
-        status: 'error',
-        duration: 5000,
+        variant: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -395,8 +385,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       toast({
         title: 'Error',
         description: err.message,
-        status: 'error',
-        duration: 3000,
+        variant: 'error',
       });
     } finally {
       setIsSendingMessage(false);
@@ -418,257 +407,421 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
 
   const portalContent = (
     <div
-      className="fixed top-0 left-0 w-screen h-screen flex items-center justify-center pointer-events-none"
-      style={{ zIndex: 99999999 }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1rem',
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isConfirmingDelete) {
           handleClose();
         }
       }}
     >
-      {/* Overlay */}
       <div
-        className="fixed top-0 left-0 w-screen h-screen bg-black/70 pointer-events-auto cursor-pointer"
-        style={{ zIndex: 99999998 }}
-        onClick={handleClose}
-      />
-
-      {/* Modal Content */}
-      <div
-        className="relative pointer-events-auto max-w-[600px] w-[90vw] max-h-[90vh] overflow-y-auto shadow-2xl"
         style={{
-          zIndex: 99999999,
-          backgroundColor: '#ecede8',
-          borderRadius: '10px',
-          border: '2px solid #353535',
-          fontFamily: 'Montserrat, sans-serif'
+          backgroundColor: '#ECEDE8',
+          borderRadius: '16px',
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+          maxWidth: '600px',
+          width: '100%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="border-b p-4 pb-2 pt-3 relative" style={{ fontFamily: 'IvyJournal, sans-serif' }}>
+        <div style={{ borderBottom: '1px solid #D1D5DB', padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {isLoading ? (
-            <h2 className="text-xl font-bold" style={{ color: '#353535' }}>Loading...</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>Loading...</h2>
           ) : reservation ? (
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center w-full">
-                <h2 className="text-xl font-bold" style={{ color: '#353535' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
                   {formData.first_name} {formData.last_name}
                 </h2>
-                <div className="flex gap-2 items-center">
-                  <Badge variant={reservation.membership_type === 'member' ? 'default' : 'secondary'}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{
+                    padding: '0.25rem 0.75rem',
+                    backgroundColor: reservation.membership_type === 'member' ? '#353535' : '#D1D5DB',
+                    color: reservation.membership_type === 'member' ? 'white' : '#1F1F1F',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                  }}>
                     {reservation.membership_type === 'member' ? '🖤' : 'Guest'}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant={reservation.checked_in ? 'default' : 'outline'}
+                  </span>
+                  <button
                     onClick={handleCheckInToggle}
-                    style={{ fontFamily: 'Montserrat, sans-serif' }}
-                    className={reservation.checked_in ? 'bg-green-600 hover:bg-green-700' : ''}
+                    style={{
+                      minHeight: '36px',
+                      padding: '0 1rem',
+                      backgroundColor: reservation.checked_in ? '#16A34A' : 'transparent',
+                      color: reservation.checked_in ? 'white' : '#1F1F1F',
+                      border: reservation.checked_in ? 'none' : '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (reservation.checked_in) {
+                        e.currentTarget.style.backgroundColor = '#15803D';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (reservation.checked_in) {
+                        e.currentTarget.style.backgroundColor = '#16A34A';
+                      }
+                    }}
                   >
                     {reservation.checked_in ? 'Checked In' : 'Check In'}
-                  </Button>
+                  </button>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
+              <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0 }}>
                 Table {reservation.tables?.table_number || 'N/A'} | Party Size {formData.party_size} {eventIcon && `| ${eventIcon}`}
               </p>
             </div>
           ) : (
-            <h2 className="text-xl font-bold" style={{ color: '#353535' }}>Edit Reservation</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>Edit Reservation</h2>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={handleClose}
-            aria-label="Close"
-            className="absolute top-2 right-2"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.5rem',
+              borderRadius: '0.375rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6B7280',
+              transition: 'all 0.2s',
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+              e.currentTarget.style.color = '#1F1F1F';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#6B7280';
+            }}
           >
-            ×
-          </Button>
+            <X size={24} />
+          </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 160px)' }}>
+        <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
           {isLoading ? (
-            <div className="flex justify-center items-center h-[200px]">
-              <Spinner size="lg" />
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+              <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>Loading...</div>
             </div>
           ) : reservation ? (
-            <div className="flex flex-col gap-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Contact Information */}
-              <div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">First Name</label>
-                    <Input
-                      className="h-8"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      value={formData.first_name}
-                      onChange={(e) => handleInputChange('first_name', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">Last Name</label>
-                    <Input
-                      className="h-8"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      value={formData.last_name}
-                      onChange={(e) => handleInputChange('last_name', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">Email</label>
-                    <Input
-                      className="h-8"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">Phone</label>
-                    <Input
-                      className="h-8"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      placeholder="+1 (555) 123-4567"
-                    />
-                  </div>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <input
+                  type="text"
+                  value={formData.first_name}
+                  onChange={(e) => handleInputChange('first_name', e.target.value)}
+                  placeholder="First Name"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  value={formData.last_name}
+                  onChange={(e) => handleInputChange('last_name', e.target.value)}
+                  placeholder="Last Name"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="Email"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  placeholder="Phone"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                  }}
+                />
               </div>
 
               {/* Reservation Details */}
-              <div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">Party Size</label>
-                    <select
-                      className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      value={formData.party_size}
-                      onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))}
-                    >
-                      {Array.from({ length: 15 }, (_, i) => i + 1).map(num => (
-                        <option key={num} value={num}>{num} {num === 1 ? 'person' : 'people'}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">Event Type</label>
-                    <select
-                      className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      value={formData.event_type}
-                      onChange={(e) => handleInputChange('event_type', e.target.value)}
-                    >
-                      <option value="">Select an occasion</option>
-                      {eventTypes.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">Table</label>
-                    <select
-                      className="h-8 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      value={formData.table_id}
-                      onChange={(e) => handleInputChange('table_id', e.target.value)}
-                    >
-                      <option value="">Select a table</option>
-                      {tables.map(table => (
-                        <option key={table.id} value={table.id}>
-                          Table {table.table_number} ({table.seats} seats)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">Start Time</label>
-                    <Input
-                      className="h-8"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      type="datetime-local"
-                      value={formData.start_time}
-                      onChange={(e) => handleInputChange('start_time', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-0.5 block">End Time</label>
-                    <Input
-                      className="h-8"
-                      style={{ fontFamily: 'Montserrat, sans-serif' }}
-                      type="datetime-local"
-                      value={formData.end_time}
-                      onChange={(e) => handleInputChange('end_time', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold mb-0.5 block">Notes</label>
-                <Textarea
-                  style={{ fontFamily: 'Montserrat, sans-serif' }}
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                  placeholder="Special requests..."
-                  rows={3}
-                  className="text-sm"
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <select
+                  value={formData.party_size}
+                  onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {Array.from({ length: 15 }, (_, i) => i + 1).map(num => (
+                    <option key={num} value={num}>{num} {num === 1 ? 'person' : 'people'}</option>
+                  ))}
+                </select>
+                <select
+                  value={formData.event_type}
+                  onChange={(e) => handleInputChange('event_type', e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="">Event Type (Optional)</option>
+                  {eventTypes.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={formData.table_id}
+                  onChange={(e) => handleInputChange('table_id', e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="">Table (Optional)</option>
+                  {tables.map(table => (
+                    <option key={table.id} value={table.id}>
+                      Table {table.table_number} ({table.seats} seats)
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="datetime-local"
+                  value={formData.start_time}
+                  onChange={(e) => handleInputChange('start_time', e.target.value)}
+                  placeholder="Start Time"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                  }}
+                />
+                <input
+                  type="datetime-local"
+                  value={formData.end_time}
+                  onChange={(e) => handleInputChange('end_time', e.target.value)}
+                  placeholder="End Time"
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                  }}
                 />
               </div>
 
+              {/* Notes */}
+              <textarea
+                value={formData.notes}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                placeholder="Notes (Optional)"
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '0.75rem 1rem',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                }}
+              />
+
               {/* Send Message Section */}
-              <div>
-                <p className="text-sm font-bold mb-2">Send Message</p>
+              <div style={{ borderTop: '1px solid #D1D5DB', paddingTop: '1.25rem' }}>
+                <p style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1F1F1F' }}>Send Message</p>
 
                 {messageError && (
-                  <Alert variant="error" className="text-sm rounded-md mb-2">
-                    <AlertDescription>{messageError}</AlertDescription>
-                  </Alert>
+                  <div style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#FEE2E2',
+                    border: '1px solid #FCA5A5',
+                    borderRadius: '10px',
+                    marginBottom: '0.75rem',
+                    fontSize: '0.875rem',
+                    color: '#DC2626',
+                  }}>
+                    {messageError}
+                  </div>
                 )}
 
                 {messageSuccess && (
-                  <Alert variant="success" className="text-sm rounded-md mb-2">
-                    <AlertDescription>{messageSuccess}</AlertDescription>
-                  </Alert>
+                  <div style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#D1FAE5',
+                    border: '1px solid #6EE7B7',
+                    borderRadius: '10px',
+                    marginBottom: '0.75rem',
+                    fontSize: '0.875rem',
+                    color: '#059669',
+                  }}>
+                    {messageSuccess}
+                  </div>
                 )}
 
-                <Textarea
+                <textarea
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   placeholder="Type your message here..."
-                  rows={3}
-                  style={{ fontFamily: 'Montserrat, sans-serif' }}
-                  className="mb-2 text-sm"
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    padding: '0.75rem 1rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    marginBottom: '0.75rem',
+                  }}
                 />
 
-                <Button
+                <button
                   onClick={handleSendMessage}
                   disabled={isSendingMessage || !messageText.trim() || !reservation?.phone}
-                  size="sm"
                   style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    backgroundColor: '#353535',
-                    color: '#ecede8'
+                    height: '36px',
+                    padding: '0 1rem',
+                    backgroundColor: isSendingMessage || !messageText.trim() || !reservation?.phone ? '#D1D5DB' : '#353535',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: isSendingMessage || !messageText.trim() || !reservation?.phone ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.2s',
                   }}
-                  className="hover:bg-[#2a2a2a]"
+                  onMouseEnter={(e) => {
+                    if (!isSendingMessage && messageText.trim() && reservation?.phone) {
+                      e.currentTarget.style.backgroundColor = '#2a2a2a';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSendingMessage && messageText.trim() && reservation?.phone) {
+                      e.currentTarget.style.backgroundColor = '#353535';
+                    }
+                  }}
                 >
                   {isSendingMessage ? 'Sending...' : 'Send Message'}
-                </Button>
+                </button>
               </div>
 
               {/* System Info */}
-              <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
-                <p className="text-xs text-gray-600">
+              <div style={{
+                backgroundColor: '#F9FAFB',
+                padding: '0.75rem',
+                borderRadius: '10px',
+                border: '1px solid #E5E7EB',
+              }}>
+                <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: 0, marginBottom: '0.5rem' }}>
                   Created {reservation.created_at ? formatDateTime(new Date(reservation.created_at), timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : ''}
                 </p>
-                <Badge variant="default" style={{ fontFamily: 'Montserrat, sans-serif' }} className="mt-1">
+                <span style={{
+                  display: 'inline-block',
+                  padding: '0.25rem 0.75rem',
+                  backgroundColor: '#353535',
+                  color: 'white',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
+                }}>
                   {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
-                </Badge>
+                </span>
               </div>
             </div>
           ) : (
@@ -677,47 +830,122 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t p-3 flex justify-between items-center">
+        <div style={{ borderTop: '1px solid #D1D5DB', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {isConfirmingDelete ? (
-            <div className="flex justify-between items-center w-full">
-              <p className="font-bold">Are you sure?</p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsConfirmingDelete(false)}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <p style={{ fontWeight: '600', fontSize: '0.875rem', color: '#1F1F1F', margin: 0 }}>Are you sure?</p>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => setIsConfirmingDelete(false)}
+                  style={{
+                    height: '36px',
+                    padding: '0 1rem',
+                    backgroundColor: 'white',
+                    color: '#1F1F1F',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
                   Cancel
-                </Button>
-                <Button
-                  size="sm"
+                </button>
+                <button
                   onClick={handleDelete}
                   disabled={isSaving}
-                  className="bg-red-600 hover:bg-red-700 text-white"
+                  style={{
+                    height: '36px',
+                    padding: '0 1rem',
+                    backgroundColor: isSaving ? '#D1D5DB' : '#DC2626',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSaving) e.currentTarget.style.backgroundColor = '#B91C1C';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSaving) e.currentTarget.style.backgroundColor = '#DC2626';
+                  }}
                 >
                   {isSaving ? 'Deleting...' : 'Delete'}
-                </Button>
+                </button>
               </div>
             </div>
           ) : (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={() => setIsConfirmingDelete(true)}
-                className="text-red-600 hover:text-red-700"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#DC2626',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.1)';
+                  e.currentTarget.style.color = '#B91C1C';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#DC2626';
+                }}
                 aria-label="Delete reservation"
               >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleClose} size="sm" className="h-8">
+                <Trash2 size={16} />
+              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={handleClose}
+                  style={{
+                    height: '36px',
+                    padding: '0 1rem',
+                    backgroundColor: 'white',
+                    color: '#1F1F1F',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  size="sm"
-                  className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
+                  style={{
+                    height: '36px',
+                    padding: '0 1rem',
+                    backgroundColor: isSaving ? '#D1D5DB' : '#A59480',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSaving) e.currentTarget.style.backgroundColor = '#8C7C6D';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSaving) e.currentTarget.style.backgroundColor = '#A59480';
+                  }}
                 >
                   {isSaving ? 'Saving...' : 'Save'}
-                </Button>
+                </button>
               </div>
             </>
           )}
