@@ -128,6 +128,7 @@ export async function chargeAccount(account: any): Promise<{
       description: `Monthly dues - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
       metadata: {
         account_id: account.account_id,
+        source: 'billing_cron',
         billing_period: getTodayLocalDate(),
         base_amount: amount.toFixed(2),
         credit_card_fee: creditCardFee.toFixed(2),
@@ -300,7 +301,29 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       });
     }
 
-    await supabase.from('ledger').insert(entries);
+    const { error: insertError } = await supabase.from('ledger').insert(entries);
+
+    if (insertError) {
+      // CRITICAL: Stripe already charged the customer but ledger insert failed.
+      // Log to subscription_events so this is visible in the admin dashboard.
+      console.error(`❌ CRITICAL: Ledger insert failed for account ${account.account_id} after successful Stripe charge (PI: ${paymentIntent.id}):`, insertError);
+      const { error: alertError } = await supabase.from('subscription_events').insert({
+        account_id: account.account_id,
+        event_type: 'billing_error',
+        effective_date: new Date().toISOString(),
+        metadata: {
+          error: 'ledger_insert_failed',
+          payment_intent_id: paymentIntent.id,
+          amount: totalAmountPaid,
+          insert_error: insertError.message,
+        },
+      });
+      if (alertError) {
+        console.error(`❌ CRITICAL: Also failed to log billing_error event for account ${account.account_id}:`, alertError);
+      }
+      // Re-throw so the caller (cron job) knows the ledger write failed
+      throw new Error(`Ledger insert failed for account ${account.account_id}: ${insertError.message}`);
+    }
 
     // Calculate net beverage credit (what's actually available for drinks)
     const netBeverageCredit = totalAmountPaid - adminFee - additionalMembersFeeTotal - feeAmount;
@@ -312,6 +335,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
     console.log(`   = Net beverage credit: $${netBeverageCredit.toFixed(2)}`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
+    throw error;
   }
 }
 

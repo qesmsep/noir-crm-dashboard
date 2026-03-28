@@ -295,6 +295,13 @@ export default async function handler(req, res) {
         return res.json({ received: true, skipped: 'subscription payment' });
       }
 
+      // Skip payment intents created by the monthly billing cron job
+      // Those are logged to the ledger directly by logPaymentToLedger() in billing.ts
+      if (paymentIntent.metadata?.source === 'billing_cron' && paymentIntent.metadata?.billing_period) {
+        console.log(`Skipping billing cron payment intent ${paymentIntent.id} (period: ${paymentIntent.metadata.billing_period})`);
+        return res.json({ received: true, skipped: 'cron billing payment' });
+      }
+
       // Check if ledger entry already exists for this payment intent
       const exists = await checkExistingLedgerEntry(null, paymentIntent.id);
       if (exists) {

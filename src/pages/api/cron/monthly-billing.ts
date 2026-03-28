@@ -131,9 +131,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.error('   ⚠️  Failed to update billing date:', updateError);
           }
 
-          // Log to ledger
+          // Log to ledger — catch separately so a ledger failure doesn't
+          // trigger handlePaymentFailure (the Stripe charge already succeeded)
           if (result.paymentIntent) {
-            await logPaymentToLedger(account, result.paymentIntent);
+            try {
+              await logPaymentToLedger(account, result.paymentIntent);
+            } catch (ledgerError: any) {
+              console.error(`   ⚠️  Ledger write failed (charge succeeded): ${ledgerError.message}`);
+              results.errors.push({
+                account_id: account.account_id,
+                error: `Ledger write failed after successful charge: ${ledgerError.message}`,
+              });
+            }
           }
 
           // Log success event
