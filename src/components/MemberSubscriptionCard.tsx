@@ -138,11 +138,14 @@ export default function MemberSubscriptionCard({
       // Get base amount from monthly_dues field (contains total: base + additional member fees)
       let calculatedBaseMRR = account.monthly_dues ? Number(account.monthly_dues) : 0;
 
-      // For annual plans, the monthly_dues field contains the full annual amount
-      // We need to subtract the additional member fees to get the base plan amount
-      if (planInterval === 'year' && secondaryMemberCount > 0) {
-        const annualAdditionalMemberFees = secondaryMemberCount * 25 * 12;
-        calculatedBaseMRR = calculatedBaseMRR - annualAdditionalMemberFees;
+      // monthly_dues includes additional member fees, so subtract them to get the base plan amount
+      // Use the account's locked-in additional_member_fee (set at signup)
+      const accountAdditionalMemberFee = Number(account.additional_member_fee || 0);
+      if (secondaryMemberCount > 0 && accountAdditionalMemberFee > 0) {
+        const additionalMemberFees = planInterval === 'year'
+          ? secondaryMemberCount * accountAdditionalMemberFee * 12
+          : secondaryMemberCount * accountAdditionalMemberFee;
+        calculatedBaseMRR = calculatedBaseMRR - additionalMemberFees;
       }
 
       // Determine additional member fee rate based on plan

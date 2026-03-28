@@ -49,6 +49,7 @@ export default async function handler(
         next_billing_date,
         monthly_dues,
         membership_plan_id,
+        additional_member_fee,
         subscription_plans!membership_plan_id (
           plan_name,
           interval
@@ -88,13 +89,17 @@ export default async function handler(
     const secondaryMemberCount = secondaryMembers.length;
 
     // Calculate base MRR and additional member fees
+    // monthly_dues includes additional member fees, so subtract them to get the base plan amount
     let totalDues = account.monthly_dues || 0;
     let baseMRR = totalDues;
 
-    // For annual plans, subtract additional member fees to get base
-    if (billingInterval === 'year' && secondaryMemberCount > 0) {
-      const annualAdditionalFees = secondaryMemberCount * 25 * 12; // $25/mo × 12 × count
-      baseMRR = totalDues - annualAdditionalFees;
+    // Use the account's locked-in additional_member_fee (set at signup)
+    const accountAdditionalMemberFee = Number(account.additional_member_fee || 0);
+    if (secondaryMemberCount > 0 && accountAdditionalMemberFee > 0) {
+      const additionalFees = billingInterval === 'year'
+        ? secondaryMemberCount * accountAdditionalMemberFee * 12
+        : secondaryMemberCount * accountAdditionalMemberFee;
+      baseMRR = totalDues - additionalFees;
     }
 
     // Calculate additional member fee based on plan type and interval
