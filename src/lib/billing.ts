@@ -128,6 +128,7 @@ export async function chargeAccount(account: any): Promise<{
       description: `Monthly dues - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
       metadata: {
         account_id: account.account_id,
+        source: 'billing_cron',
         billing_period: getTodayLocalDate(),
         base_amount: amount.toFixed(2),
         credit_card_fee: creditCardFee.toFixed(2),
@@ -300,7 +301,25 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       });
     }
 
-    await supabase.from('ledger').insert(entries);
+    const { error: insertError } = await supabase.from('ledger').insert(entries);
+
+    if (insertError) {
+      // CRITICAL: Stripe already charged the customer but ledger insert failed.
+      // Log to subscription_events so this is visible in the admin dashboard.
+      console.error(`❌ CRITICAL: Ledger insert failed for account ${account.account_id} after successful Stripe charge (PI: ${paymentIntent.id}):`, insertError);
+      await supabase.from('subscription_events').insert({
+        account_id: account.account_id,
+        event_type: 'payment_failed',
+        effective_date: new Date().toISOString(),
+        metadata: {
+          error: 'ledger_insert_failed',
+          payment_intent_id: paymentIntent.id,
+          amount: totalAmountPaid,
+          insert_error: insertError.message,
+        },
+      });
+      throw new Error(`Ledger insert failed: ${insertError.message}`);
+    }
 
     // Calculate net beverage credit (what's actually available for drinks)
     const netBeverageCredit = totalAmountPaid - adminFee - additionalMembersFeeTotal - feeAmount;
