@@ -102,12 +102,11 @@ export default async function handler(
       baseMRR = totalDues - additionalFees;
     }
 
-    // Calculate additional member fee based on plan type and interval
-    // Skyline: $0 (unlimited members included)
-    // Annual plans: $300/year per member ($25/mo × 12)
-    // Monthly plans: $25/month per member
-    const isSkyline = planName.toLowerCase() === 'skyline';
-    const additionalMemberFee = isSkyline ? 0 : (billingInterval === 'year' ? 300 : 25);
+    // Determine additional member fee rate from the account's locked-in fee
+    // Skyline: $0, Standard monthly: $25/mo, Annual: $25/mo × 12 = $300/yr
+    const additionalMemberFee = billingInterval === 'year'
+      ? accountAdditionalMemberFee * 12
+      : accountAdditionalMemberFee;
 
     // Get next renewal date from primary member or account
     const nextRenewalDate = primaryMember?.next_renewal_date || account.next_billing_date;

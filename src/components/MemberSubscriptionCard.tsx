@@ -148,12 +148,11 @@ export default function MemberSubscriptionCard({
         calculatedBaseMRR = calculatedBaseMRR - additionalMemberFees;
       }
 
-      // Determine additional member fee rate based on plan
-      // Skyline Membership ($10/month base) has $0 additional member fees
-      // Annual plans: $25/month × 12 = $300/year per additional member
-      // Monthly plans: $25/month per additional member
-      const isSkyline = planName.toLowerCase() === 'skyline' || calculatedBaseMRR === 10;
-      const feeRate = isSkyline ? 0 : (planInterval === 'year' ? 300 : 25);
+      // Determine additional member fee rate from the account's locked-in fee
+      // Skyline: $0, Standard monthly: $25/mo, Annual: $25/mo × 12 = $300/yr
+      const feeRate = planInterval === 'year'
+        ? accountAdditionalMemberFee * 12
+        : accountAdditionalMemberFee;
 
       setAdditionalMembersCount(secondaryMemberCount);
       setBaseMRR(calculatedBaseMRR);
