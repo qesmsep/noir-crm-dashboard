@@ -307,11 +307,12 @@
     padding: 16px;
     min-height: 0;
     overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .footer {
     padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
     flex-shrink: 0;
   }
 
@@ -331,6 +332,6 @@
   .cancelButton,
   .submitButton {
     padding: 10px 16px;
-    font-size: 13px;
+    min-height: 44px;
   }
 }
