@@ -86,7 +86,7 @@ describe('stripe-webhook: cron billing PI skip gate', () => {
 
     // Reset module to get fresh handler
     jest.isolateModules(() => {
-      handler = require('../stripe-webhook').default;
+      handler = require('../../pages/api/stripe-webhook').default;
     });
   });
 
