@@ -84,9 +84,6 @@ describe('stripe-webhook: cron billing PI skip gate', () => {
     for (const key of Object.keys(mockInsertResults)) delete mockInsertResults[key];
     for (const key of Object.keys(mockSelectResults)) delete mockSelectResults[key];
 
-    // No duplicate webhook events by default
-    mockSelectResults['stripe_webhook_events'] = { data: null, error: { code: 'PGRST116' } };
-
     // Reset module to get fresh handler
     jest.isolateModules(() => {
       handler = require('../stripe-webhook').default;
@@ -123,8 +120,8 @@ describe('stripe-webhook: cron billing PI skip gate', () => {
       expect.objectContaining({ received: true, skipped: 'cron billing payment' })
     );
 
-    // Verify it accessed stripe_webhook_events for idempotency check
-    expect(mockSupabaseFrom).toHaveBeenCalledWith('stripe_webhook_events');
+    // The skip fires before any Supabase calls — no DB interaction needed
+    expect(mockSupabaseFrom).not.toHaveBeenCalled();
   });
 
   it('should NOT skip PaymentIntent with only billing_period but no source=billing_cron', async () => {
