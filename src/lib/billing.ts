@@ -307,9 +307,9 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       // CRITICAL: Stripe already charged the customer but ledger insert failed.
       // Log to subscription_events so this is visible in the admin dashboard.
       console.error(`❌ CRITICAL: Ledger insert failed for account ${account.account_id} after successful Stripe charge (PI: ${paymentIntent.id}):`, insertError);
-      await supabase.from('subscription_events').insert({
+      const { error: alertError } = await supabase.from('subscription_events').insert({
         account_id: account.account_id,
-        event_type: 'payment_failed',
+        event_type: 'billing_error',
         effective_date: new Date().toISOString(),
         metadata: {
           error: 'ledger_insert_failed',
@@ -318,7 +318,11 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
           insert_error: insertError.message,
         },
       });
-      throw new Error(`Ledger insert failed: ${insertError.message}`);
+      if (alertError) {
+        console.error(`❌ CRITICAL: Also failed to log billing_error event for account ${account.account_id}:`, alertError);
+      }
+      // Re-throw so the caller (cron job) knows the ledger write failed
+      throw new Error(`Ledger insert failed for account ${account.account_id}: ${insertError.message}`);
     }
 
     // Calculate net beverage credit (what's actually available for drinks)
@@ -331,6 +335,7 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
     console.log(`   = Net beverage credit: $${netBeverageCredit.toFixed(2)}`);
   } catch (error: any) {
     console.error(`Failed to log payment to ledger for account ${account.account_id}:`, error);
+    throw error;
   }
 }
 

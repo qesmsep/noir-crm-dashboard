@@ -3,12 +3,34 @@
  * created by the monthly billing cron job (to prevent duplicate ledger entries).
  */
 
-// Mock dependencies before imports
-const mockSupabaseFrom = jest.fn();
-const mockSupabaseSelect = jest.fn();
-const mockSupabaseEq = jest.fn();
-const mockSupabaseSingle = jest.fn();
-const mockSupabaseInsert = jest.fn();
+// Table-aware Supabase mock: returns different chain behavior per table
+const mockInsertResults: Record<string, any> = {};
+const mockSelectResults: Record<string, any> = {};
+
+function buildChain(tableName: string) {
+  return {
+    select: jest.fn().mockReturnValue({
+      eq: jest.fn().mockReturnValue({
+        single: jest.fn().mockImplementation(() =>
+          Promise.resolve(mockSelectResults[tableName] ?? { data: null, error: { code: 'PGRST116' } })
+        ),
+        limit: jest.fn().mockReturnValue({
+          single: jest.fn().mockImplementation(() =>
+            Promise.resolve(mockSelectResults[tableName] ?? { data: null, error: { code: 'PGRST116' } })
+          ),
+        }),
+      }),
+    }),
+    insert: jest.fn().mockImplementation(() =>
+      Promise.resolve(mockInsertResults[tableName] ?? { error: null })
+    ),
+    update: jest.fn().mockReturnValue({
+      eq: jest.fn().mockResolvedValue({ error: null }),
+    }),
+  };
+}
+
+const mockSupabaseFrom = jest.fn((tableName: string) => buildChain(tableName));
 
 jest.mock('micro', () => ({
   buffer: jest.fn(),
@@ -24,14 +46,7 @@ jest.mock('stripe', () => {
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
-    from: mockSupabaseFrom.mockReturnValue({
-      select: mockSupabaseSelect.mockReturnValue({
-        eq: mockSupabaseEq.mockReturnValue({
-          single: mockSupabaseSingle.mockResolvedValue({ data: null, error: null }),
-        }),
-      }),
-      insert: mockSupabaseInsert.mockResolvedValue({ error: null }),
-    }),
+    from: mockSupabaseFrom,
   })),
 }));
 
@@ -65,6 +80,13 @@ describe('stripe-webhook: cron billing PI skip gate', () => {
     jest.clearAllMocks();
     (buffer as jest.Mock).mockResolvedValue(Buffer.from('{}'));
 
+    // Reset per-table mock results
+    for (const key of Object.keys(mockInsertResults)) delete mockInsertResults[key];
+    for (const key of Object.keys(mockSelectResults)) delete mockSelectResults[key];
+
+    // No duplicate webhook events by default
+    mockSelectResults['stripe_webhook_events'] = { data: null, error: { code: 'PGRST116' } };
+
     // Reset module to get fresh handler
     jest.isolateModules(() => {
       handler = require('../stripe-webhook').default;
@@ -94,17 +116,15 @@ describe('stripe-webhook: cron billing PI skip gate', () => {
 
     stripeInstance.webhooks.constructEvent.mockReturnValue(mockEvent);
 
-    // No duplicate webhook event found
-    mockSupabaseSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
-    // Webhook event insert succeeds
-    mockSupabaseInsert.mockResolvedValueOnce({ error: null });
-
     const { req, res, jsonFn } = createMockReqRes();
     await handler(req, res);
 
     expect(jsonFn).toHaveBeenCalledWith(
       expect.objectContaining({ received: true, skipped: 'cron billing payment' })
     );
+
+    // Verify it accessed stripe_webhook_events for idempotency check
+    expect(mockSupabaseFrom).toHaveBeenCalledWith('stripe_webhook_events');
   });
 
   it('should NOT skip PaymentIntent with only billing_period but no source=billing_cron', async () => {
@@ -127,12 +147,8 @@ describe('stripe-webhook: cron billing PI skip gate', () => {
 
     stripeInstance.webhooks.constructEvent.mockReturnValue(mockEvent);
 
-    // No duplicate webhook event
-    mockSupabaseSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
-    mockSupabaseInsert.mockResolvedValueOnce({ error: null });
-
-    // checkExistingLedgerEntry returns no match
-    mockSupabaseSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
+    // No existing ledger entry for this PI
+    mockSelectResults['ledger'] = { data: null, error: { code: 'PGRST116' } };
 
     const { req, res, jsonFn } = createMockReqRes();
     await handler(req, res);
@@ -161,10 +177,6 @@ describe('stripe-webhook: cron billing PI skip gate', () => {
     };
 
     stripeInstance.webhooks.constructEvent.mockReturnValue(mockEvent);
-
-    // No duplicate webhook event
-    mockSupabaseSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
-    mockSupabaseInsert.mockResolvedValueOnce({ error: null });
 
     const { req, res, jsonFn } = createMockReqRes();
     await handler(req, res);
