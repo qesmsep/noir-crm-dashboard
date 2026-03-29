@@ -15,6 +15,29 @@ function getTodayLocalDate() {
   return `${year}-${month}-${day}`;
 }
 
+// Fetch all ledger rows (no row limit) and aggregate per-account balances and LTVs
+async function aggregateAccountData() {
+  const { data: allTx, error } = await supabaseAdmin
+    .from("ledger")
+    .select("account_id, type, amount, note");
+  if (error) throw error;
+  const balances = {};
+  const ltvs = {};
+  (allTx || []).forEach(tx => {
+    const aid = tx.account_id;
+    const amt = Number(tx.amount);
+    if (!balances[aid]) balances[aid] = 0;
+    balances[aid] += amt;
+    if (!ltvs[aid]) ltvs[aid] = 0;
+    if (tx.type === 'payment' && amt > 0 &&
+        !tx.note?.includes('4%') &&
+        !tx.note?.toLowerCase().includes('processing fee')) {
+      ltvs[aid] += amt;
+    }
+  });
+  return { balances, ltvs };
+}
+
 export default async function handler(req, res) {
   console.log('Ledger handler:', req.method, req.body, req.query);
   try {
@@ -23,30 +46,27 @@ export default async function handler(req, res) {
 
       // Single source of truth for account balances and LTV - computed server-side without row limits
       if (account_balances === '1') {
-        const { data: allTx, error: balError } = await supabaseAdmin
-          .from("ledger")
-          .select("account_id, type, amount, note");
-        if (balError) {
-          console.error("Ledger account_balances error:", balError);
-          return res.status(500).json({ error: balError.message });
+        try {
+          const result = await aggregateAccountData();
+          return res.status(200).json(result);
+        } catch (err) {
+          console.error("Ledger account_balances error:", err);
+          return res.status(500).json({ error: err.message });
         }
-        const balances = {};
-        const ltvs = {};
-        (allTx || []).forEach(tx => {
-          const aid = tx.account_id;
-          const amt = Number(tx.amount);
-          // Balance: sum of all signed amounts
-          if (!balances[aid]) balances[aid] = 0;
-          balances[aid] += amt;
-          // LTV: sum of payment amounts, excluding processing fees
-          if (!ltvs[aid]) ltvs[aid] = 0;
-          if (tx.type === 'payment' && amt > 0 &&
-              !tx.note?.includes('4%') &&
-              !tx.note?.toLowerCase().includes('processing fee')) {
-            ltvs[aid] += amt;
-          }
-        });
-        return res.status(200).json({ balances, ltvs });
+      }
+
+      if (outstanding === '1') {
+        try {
+          const { balances } = await aggregateAccountData();
+          // Sum only negative balances (amounts owed to us)
+          const total = Object.values(balances)
+            .filter(balance => balance < 0)
+            .reduce((sum, balance) => sum + Math.abs(balance), 0);
+          return res.status(200).json({ total });
+        } catch (err) {
+          console.error("Ledger outstanding error:", err);
+          return res.status(500).json({ error: err.message });
+        }
       }
 
       let query = supabaseAdmin.from("ledger").select("*", { count: 'exact' });
@@ -57,23 +77,6 @@ export default async function handler(req, res) {
       if (error) {
         console.error("Ledger GET error:", error);
         return res.status(500).json({ error: error.message });
-      }
-      if (outstanding === '1') {
-        // Outstanding = sum of all negative account balances (amounts owed to us)
-        const accountBalances = {};
-        (data || []).forEach(tx => {
-          if (!accountBalances[tx.account_id]) {
-            accountBalances[tx.account_id] = 0;
-          }
-          accountBalances[tx.account_id] += Number(tx.amount);
-        });
-
-        // Sum only negative balances (amounts owed to us)
-        const total = Object.values(accountBalances)
-          .filter(balance => balance < 0)
-          .reduce((sum, balance) => sum + Math.abs(balance), 0);
-
-        return res.status(200).json({ total });
       }
 
       // If we have ledger data, fetch attachment counts for each transaction

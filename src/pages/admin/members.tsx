@@ -30,24 +30,11 @@ interface Member {
   };
 }
 
-interface LedgerTransaction {
-  account_id: string;
-  member_id: string;
-  type: 'credit' | 'debit' | 'charge' | 'payment' | 'purchase';
-  amount: number;
-  running_balance?: number;
-  date?: string;
-  created_at?: string;
-  note?: string;
-  status?: 'pending' | 'cleared' | 'failed';
-}
-
 type SortField = 'name' | 'join_date' | 'renewal_date' | 'ltv' | 'balance' | null;
 type SortDirection = 'asc' | 'desc';
 
 export default function MembersAdmin() {
   const [members, setMembers] = useState<Member[]>([]);
-  const [ledger, setLedger] = useState<LedgerTransaction[]>([]);
   const [accountBalances, setAccountBalances] = useState<Record<string, number>>({});
   const [accountLTVs, setAccountLTVs] = useState<Record<string, number>>({});
   const [failedPaymentAccounts, setFailedPaymentAccounts] = useState<Set<string>>(new Set());
@@ -87,7 +74,6 @@ export default function MembersAdmin() {
 
   useEffect(() => {
     fetchMembers();
-    fetchLedger();
     fetchAccountBalances();
     fetchFailedPayments();
     fetchNoSubscriptionAccounts();
@@ -193,17 +179,6 @@ export default function MembersAdmin() {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function fetchLedger() {
-    try {
-      const res = await fetch('/api/ledger');
-      const result = await res.json();
-      if (result.error) throw new Error(result.error);
-      setLedger(result.data || []);
-    } catch (err: any) {
-      console.error('Error fetching ledger:', err);
     }
   }
 

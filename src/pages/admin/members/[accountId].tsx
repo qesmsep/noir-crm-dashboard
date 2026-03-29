@@ -495,15 +495,25 @@ export default function MemberDetailAdmin() {
 
   // Refresh ledger data and recalculate account balance (single source of truth)
   const refreshLedger = async () => {
-    const res = await fetch(`/api/ledger?account_id=${accountId}`);
-    const result = await res.json();
-    if (result.error) throw new Error(result.error);
-    const entries = result.data || [];
-    const sortedLedger = entries.sort((a: LedgerTransaction, b: LedgerTransaction) => {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-    setLedger(sortedLedger);
-    setAccountBalance(entries.reduce((sum: number, tx: LedgerTransaction) => sum + Number(tx.amount), 0));
+    try {
+      const res = await fetch(`/api/ledger?account_id=${accountId}`);
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      const entries = result.data || [];
+      const sortedLedger = entries.sort((a: LedgerTransaction, b: LedgerTransaction) => {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+      setLedger(sortedLedger);
+      setAccountBalance(entries.reduce((sum: number, tx: LedgerTransaction) => sum + Number(tx.amount), 0));
+    } catch (err: any) {
+      console.error('Error refreshing ledger:', err);
+      toast({
+        title: 'Error refreshing ledger',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+    }
   };
 
   // Search members
