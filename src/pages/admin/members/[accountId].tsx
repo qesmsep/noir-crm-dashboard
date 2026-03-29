@@ -314,7 +314,7 @@ export default function MemberDetailAdmin() {
         });
         setLedger(sortedLedger);
         // Account balance = sum of all transaction amounts (single source of truth)
-        setAccountBalance(entries.reduce((sum: number, tx: LedgerTransaction) => sum + Number(tx.amount), 0));
+        setAccountBalance(Math.round(entries.reduce((sum: number, tx: LedgerTransaction) => sum + Number(tx.amount), 0) * 100) / 100);
       } catch (err: any) {
         console.error('Ledger fetch error:', err);
         toast({
@@ -493,7 +493,8 @@ export default function MemberDetailAdmin() {
     }).format(amount);
   };
 
-  // Refresh ledger data and recalculate account balance (single source of truth)
+  // Refresh ledger data and recalculate account balance (single source of truth).
+  // Re-throws so callers can skip their success toast on failure.
   const refreshLedger = async () => {
     try {
       const res = await fetch(`/api/ledger?account_id=${accountId}`);
@@ -504,7 +505,7 @@ export default function MemberDetailAdmin() {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
       setLedger(sortedLedger);
-      setAccountBalance(entries.reduce((sum: number, tx: LedgerTransaction) => sum + Number(tx.amount), 0));
+      setAccountBalance(Math.round(entries.reduce((sum: number, tx: LedgerTransaction) => sum + Number(tx.amount), 0) * 100) / 100);
     } catch (err: any) {
       console.error('Error refreshing ledger:', err);
       toast({
@@ -513,6 +514,7 @@ export default function MemberDetailAdmin() {
         status: 'error',
         duration: 5000,
       });
+      throw err;
     }
   };
 

@@ -35,8 +35,17 @@ async function aggregateAccountData() {
       ltvs[aid] += amt;
     }
   });
+  // Round to 2 decimal places to avoid IEEE 754 floating point drift
+  for (const aid of Object.keys(balances)) {
+    balances[aid] = Math.round(balances[aid] * 100) / 100;
+    ltvs[aid] = Math.round(ltvs[aid] * 100) / 100;
+  }
   return { balances, ltvs };
 }
+
+// TODO: Add auth middleware - all admin API routes currently lack authentication.
+// This requires a coordinated change: either Next.js middleware for /api/* routes,
+// or updating all frontend callers to pass Authorization headers.
 
 export default async function handler(req, res) {
   console.log('Ledger handler:', req.method, req.body, req.query);
