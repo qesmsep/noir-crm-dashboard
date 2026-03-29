@@ -88,6 +88,19 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: error.message });
       }
 
+      // When fetching for a specific account, compute balance server-side
+      // from ALL rows (not limited) so it matches the admin page calculation.
+      let balance;
+      if (account_id) {
+        const { data: balRows, error: balErr } = await supabaseAdmin
+          .from("ledger")
+          .select("amount")
+          .eq("account_id", account_id);
+        if (!balErr && balRows) {
+          balance = Math.round(balRows.reduce((sum, tx) => sum + Number(tx.amount), 0) * 100) / 100;
+        }
+      }
+
       // If we have ledger data, fetch attachment counts for each transaction
       if (data && data.length > 0) {
         const ledgerIds = data.map(tx => tx.id);
@@ -110,7 +123,7 @@ export default async function handler(req, res) {
         }
       }
 
-      return res.status(200).json({ data });
+      return res.status(200).json({ data, ...(balance !== undefined && { balance }) });
     }
 
     if (req.method === "POST") {
@@ -184,7 +197,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    res.setHeader("Allow", ["GET", "POST", "PUT"]);
+    res.setHeader("Allow", ["GET", "POST", "PUT", "DELETE"]);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   } catch (err) {
     console.error("Ledger handler unexpected error:", err);
