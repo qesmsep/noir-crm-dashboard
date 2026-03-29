@@ -49,6 +49,7 @@ export default async function handler(
         next_billing_date,
         monthly_dues,
         membership_plan_id,
+        additional_member_fee,
         subscription_plans!membership_plan_id (
           plan_name,
           interval
@@ -88,21 +89,23 @@ export default async function handler(
     const secondaryMemberCount = secondaryMembers.length;
 
     // Calculate base MRR and additional member fees
+    // monthly_dues includes additional member fees, so subtract them to get the base plan amount
     let totalDues = account.monthly_dues || 0;
     let baseMRR = totalDues;
 
-    // For annual plans, subtract additional member fees to get base
-    if (billingInterval === 'year' && secondaryMemberCount > 0) {
-      const annualAdditionalFees = secondaryMemberCount * 25 * 12; // $25/mo × 12 × count
-      baseMRR = totalDues - annualAdditionalFees;
+    // Use the account's locked-in additional_member_fee (set at signup)
+    const accountAdditionalMemberFee = Number(account.additional_member_fee || 0);
+    if (secondaryMemberCount > 0 && accountAdditionalMemberFee > 0) {
+      const additionalFees = billingInterval === 'year'
+        ? secondaryMemberCount * accountAdditionalMemberFee * 12
+        : secondaryMemberCount * accountAdditionalMemberFee;
+      baseMRR = Math.max(0, totalDues - additionalFees);
     }
 
-    // Calculate additional member fee based on plan type and interval
-    // Skyline: $0 (unlimited members included)
-    // Annual plans: $300/year per member ($25/mo × 12)
-    // Monthly plans: $25/month per member
-    const isSkyline = planName.toLowerCase() === 'skyline';
-    const additionalMemberFee = isSkyline ? 0 : (billingInterval === 'year' ? 300 : 25);
+    // Determine additional member fee rate from the account's locked-in fee
+    const additionalMemberFee = billingInterval === 'year'
+      ? accountAdditionalMemberFee * 12
+      : accountAdditionalMemberFee;
 
     // Get next renewal date from primary member or account
     const nextRenewalDate = primaryMember?.next_renewal_date || account.next_billing_date;
@@ -114,7 +117,7 @@ export default async function handler(
       },
       baseMRR: Number(baseMRR),
       secondaryMemberCount,
-      additionalMemberFee, // $0 for Skyline, $300 for Annual, $25 for Monthly
+      additionalMemberFee, // per-member fee from account.additional_member_fee, annualized if yearly
       membershipType,
       billingInterval, // 'month' or 'year'
     });

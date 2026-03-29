@@ -138,19 +138,21 @@ export default function MemberSubscriptionCard({
       // Get base amount from monthly_dues field (contains total: base + additional member fees)
       let calculatedBaseMRR = account.monthly_dues ? Number(account.monthly_dues) : 0;
 
-      // For annual plans, the monthly_dues field contains the full annual amount
-      // We need to subtract the additional member fees to get the base plan amount
-      if (planInterval === 'year' && secondaryMemberCount > 0) {
-        const annualAdditionalMemberFees = secondaryMemberCount * 25 * 12;
-        calculatedBaseMRR = calculatedBaseMRR - annualAdditionalMemberFees;
+      // monthly_dues includes additional member fees, so subtract them to get the base plan amount
+      // Use the account's locked-in additional_member_fee (set at signup)
+      const accountAdditionalMemberFee = Number(account.additional_member_fee || 0);
+      if (secondaryMemberCount > 0 && accountAdditionalMemberFee > 0) {
+        const additionalMemberFees = planInterval === 'year'
+          ? secondaryMemberCount * accountAdditionalMemberFee * 12
+          : secondaryMemberCount * accountAdditionalMemberFee;
+        calculatedBaseMRR = Math.max(0, calculatedBaseMRR - additionalMemberFees);
       }
 
-      // Determine additional member fee rate based on plan
-      // Skyline Membership ($10/month base) has $0 additional member fees
-      // Annual plans: $25/month × 12 = $300/year per additional member
-      // Monthly plans: $25/month per additional member
-      const isSkyline = planName.toLowerCase() === 'skyline' || calculatedBaseMRR === 10;
-      const feeRate = isSkyline ? 0 : (planInterval === 'year' ? 300 : 25);
+      // Determine additional member fee rate from the account's locked-in fee
+      // Skyline: $0, Standard monthly: $25/mo, Annual: $25/mo × 12 = $300/yr
+      const feeRate = planInterval === 'year'
+        ? accountAdditionalMemberFee * 12
+        : accountAdditionalMemberFee;
 
       setAdditionalMembersCount(secondaryMemberCount);
       setBaseMRR(calculatedBaseMRR);
