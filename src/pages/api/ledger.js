@@ -19,18 +19,47 @@ export default async function handler(req, res) {
   console.log('Ledger handler:', req.method, req.body, req.query);
   try {
     if (req.method === "GET") {
-      const { member_id, account_id, outstanding } = req.query;
+      const { member_id, account_id, outstanding, account_balances } = req.query;
+
+      // Single source of truth for account balances and LTV - computed server-side without row limits
+      if (account_balances === '1') {
+        const { data: allTx, error: balError } = await supabaseAdmin
+          .from("ledger")
+          .select("account_id, type, amount, note");
+        if (balError) {
+          console.error("Ledger account_balances error:", balError);
+          return res.status(500).json({ error: balError.message });
+        }
+        const balances = {};
+        const ltvs = {};
+        (allTx || []).forEach(tx => {
+          const aid = tx.account_id;
+          const amt = Number(tx.amount);
+          // Balance: sum of all signed amounts
+          if (!balances[aid]) balances[aid] = 0;
+          balances[aid] += amt;
+          // LTV: sum of payment amounts, excluding processing fees
+          if (!ltvs[aid]) ltvs[aid] = 0;
+          if (tx.type === 'payment' && amt > 0 &&
+              !tx.note?.includes('4%') &&
+              !tx.note?.toLowerCase().includes('processing fee')) {
+            ltvs[aid] += amt;
+          }
+        });
+        return res.status(200).json({ balances, ltvs });
+      }
+
       let query = supabaseAdmin.from("ledger").select("*", { count: 'exact' });
       if (member_id) query = query.eq("member_id", member_id);
       if (account_id) query = query.eq("account_id", account_id);
-      query = query.order("date", { ascending: true }).limit(10000); // Increase limit to 10k
+      query = query.order("date", { ascending: true }).limit(10000);
       const { data, error } = await query;
       if (error) {
         console.error("Ledger GET error:", error);
         return res.status(500).json({ error: error.message });
       }
       if (outstanding === '1') {
-        // FIXED: Outstanding = sum of all negative account balances (amounts owed to us)
+        // Outstanding = sum of all negative account balances (amounts owed to us)
         const accountBalances = {};
         (data || []).forEach(tx => {
           if (!accountBalances[tx.account_id]) {
@@ -38,12 +67,12 @@ export default async function handler(req, res) {
           }
           accountBalances[tx.account_id] += Number(tx.amount);
         });
-        
+
         // Sum only negative balances (amounts owed to us)
         const total = Object.values(accountBalances)
           .filter(balance => balance < 0)
           .reduce((sum, balance) => sum + Math.abs(balance), 0);
-        
+
         return res.status(200).json({ total });
       }
 

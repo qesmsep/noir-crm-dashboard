@@ -48,6 +48,8 @@ type SortDirection = 'asc' | 'desc';
 export default function MembersAdmin() {
   const [members, setMembers] = useState<Member[]>([]);
   const [ledger, setLedger] = useState<LedgerTransaction[]>([]);
+  const [accountBalances, setAccountBalances] = useState<Record<string, number>>({});
+  const [accountLTVs, setAccountLTVs] = useState<Record<string, number>>({});
   const [failedPaymentAccounts, setFailedPaymentAccounts] = useState<Set<string>>(new Set());
   const [noSubscriptionAccounts, setNoSubscriptionAccounts] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,7 @@ export default function MembersAdmin() {
   useEffect(() => {
     fetchMembers();
     fetchLedger();
+    fetchAccountBalances();
     fetchFailedPayments();
     fetchNoSubscriptionAccounts();
   }, []);
@@ -204,6 +207,19 @@ export default function MembersAdmin() {
     }
   }
 
+  // Fetch account balances and LTV from server - single source of truth
+  async function fetchAccountBalances() {
+    try {
+      const res = await fetch('/api/ledger?account_balances=1');
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      setAccountBalances(result.balances || {});
+      setAccountLTVs(result.ltvs || {});
+    } catch (err: any) {
+      console.error('Error fetching account balances:', err);
+    }
+  }
+
   const formatDateLong = (date?: string) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('en-US', {
@@ -226,8 +242,6 @@ export default function MembersAdmin() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -240,29 +254,13 @@ export default function MembersAdmin() {
     }).replace(/\//g, '.');
   };
 
-  // Calculate LTV for an account (sum of all payment transactions, excluding 4% fees)
-  const calculateAccountLTV = (accountId: string) => {
-    if (!ledger || ledger.length === 0) return 0;
-    return ledger
-      .filter(tx =>
-        tx.account_id === accountId &&
-        tx.type === 'payment' &&
-        tx.amount > 0 &&
-        !tx.note?.includes('4%') &&
-        !tx.note?.toLowerCase().includes('processing fee')
-      )
-      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  // Account LTV and balance from server-side calculation (single source of truth)
+  const getAccountLTV = (accountId: string) => {
+    return accountLTVs[accountId] || 0;
   };
 
-  // Calculate current balance for an account (sum of all signed transaction amounts)
-  // Same calculation as member detail page
-  const calculateAccountBalance = (accountId: string) => {
-    if (!ledger || ledger.length === 0) return 0;
-
-    // Sum all amounts for this account
-    return ledger
-      .filter(tx => tx.account_id === accountId)
-      .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const getAccountBalance = (accountId: string) => {
+    return accountBalances[accountId] || 0;
   };
 
   // Get next billing date from accounts table (single source of truth)
@@ -309,8 +307,8 @@ export default function MembersAdmin() {
       account_id: accountId,
       primaryMember: primary,
       allMembers: accountMembers,
-      ltv: calculateAccountLTV(accountId),
-      balance: calculateAccountBalance(accountId),
+      ltv: getAccountLTV(accountId),
+      balance: getAccountBalance(accountId),
       join_date: primary.join_date,
       renewal_date: getNextBillingDate(primary),
       accounts: primary.accounts, // Pass through subscription data
