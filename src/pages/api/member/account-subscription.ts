@@ -99,11 +99,10 @@ export default async function handler(
       const additionalFees = billingInterval === 'year'
         ? secondaryMemberCount * accountAdditionalMemberFee * 12
         : secondaryMemberCount * accountAdditionalMemberFee;
-      baseMRR = totalDues - additionalFees;
+      baseMRR = Math.max(0, totalDues - additionalFees);
     }
 
     // Determine additional member fee rate from the account's locked-in fee
-    // Skyline: $0, Standard monthly: $25/mo, Annual: $25/mo × 12 = $300/yr
     const additionalMemberFee = billingInterval === 'year'
       ? accountAdditionalMemberFee * 12
       : accountAdditionalMemberFee;
@@ -118,7 +117,7 @@ export default async function handler(
       },
       baseMRR: Number(baseMRR),
       secondaryMemberCount,
-      additionalMemberFee, // $0 for Skyline, $300 for Annual, $25 for Monthly
+      additionalMemberFee, // per-member fee from account.additional_member_fee, annualized if yearly
       membershipType,
       billingInterval, // 'month' or 'year'
     });

@@ -145,7 +145,7 @@ export default function MemberSubscriptionCard({
         const additionalMemberFees = planInterval === 'year'
           ? secondaryMemberCount * accountAdditionalMemberFee * 12
           : secondaryMemberCount * accountAdditionalMemberFee;
-        calculatedBaseMRR = calculatedBaseMRR - additionalMemberFees;
+        calculatedBaseMRR = Math.max(0, calculatedBaseMRR - additionalMemberFees);
       }
 
       // Determine additional member fee rate from the account's locked-in fee
