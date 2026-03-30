@@ -364,11 +364,11 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     status: string;
   }> = [];
 
-  // 1. Payment entry (full amount paid including processing fee as credit)
+  // 1. Payment entry (full amount paid by customer)
   ledgerEntries.push({
     account_id: account.account_id,
     member_id: member.member_id,
-    type: 'credit',
+    type: 'payment',
     amount: totalPaid.toFixed(2),
     date: getTodayLocalDate(),
     note: `Initial ${waitlist.selected_membership} membership payment`,
