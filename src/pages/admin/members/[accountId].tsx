@@ -86,6 +86,7 @@ export default function MemberDetailAdmin() {
   const [members, setMembers] = useState<Member[]>([]);
   const [ledger, setLedger] = useState<LedgerTransaction[]>([]);
   const [accountBalance, setAccountBalance] = useState<number>(0);
+  const [accountLTV, setAccountLTV] = useState<number>(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [memberAttributes, setMemberAttributes] = useState<Record<string, Attribute[]>>({});
   const [memberNotes, setMemberNotes] = useState<Record<string, Note[]>>({});
@@ -313,9 +314,12 @@ export default function MemberDetailAdmin() {
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
         setLedger(sortedLedger);
-        // Use server-computed balance (not limited by row cap)
+        // Use server-computed balance and LTV (not limited by row cap)
         if (result.balance !== undefined) {
           setAccountBalance(result.balance);
+        }
+        if (result.ltv !== undefined) {
+          setAccountLTV(result.ltv);
         }
       } catch (err: any) {
         console.error('Ledger fetch error:', err);
@@ -507,9 +511,12 @@ export default function MemberDetailAdmin() {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
       setLedger(sortedLedger);
-      // Use server-computed balance (not limited by row cap)
+      // Use server-computed balance and LTV (not limited by row cap)
       if (result.balance !== undefined) {
         setAccountBalance(result.balance);
+      }
+      if (result.ltv !== undefined) {
+        setAccountLTV(result.ltv);
       }
     } catch (err: any) {
       console.error('Error refreshing ledger:', err);
@@ -2279,7 +2286,7 @@ export default function MemberDetailAdmin() {
               creditCardFeeEnabled={creditCardFeeEnabled}
               updatingFeeToggle={updatingFeeToggle}
               onToggleCreditCardFee={handleToggleCreditCardFee}
-              totalLTV={members.reduce((sum, member) => sum + calculateMemberLTV(member.member_id), 0)}
+              totalLTV={accountLTV}
             />
 
             {/* Quick Actions Card - Between Membership and Ledger */}
