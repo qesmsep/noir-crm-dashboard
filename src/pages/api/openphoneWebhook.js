@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import { enrollPhone } from './membership/intake-enroll';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -974,7 +975,52 @@ export async function handler(req, res) {
   console.log('Message lowercase:', text.toLowerCase());
   console.log('Message trimmed:', text.toLowerCase().trim());
 
-  // Handle "MEMBER" and "MEMBERSHIP" messages for waitlist
+  // Check for intake campaign trigger words from the database
+  // This runs before hardcoded triggers so DB-managed campaigns take priority
+  try {
+    const triggerText = text.toLowerCase().trim();
+    const { data: matchedCampaign } = await supabase
+      .from('sms_intake_campaigns')
+      .select('id, trigger_word')
+      .eq('status', 'active')
+      .ilike('trigger_word', triggerText)
+      .single();
+
+    if (matchedCampaign) {
+      console.log('Matched intake campaign:', matchedCampaign.trigger_word, '-> campaign', matchedCampaign.id);
+
+      // Call enrollment logic directly (no HTTP round-trip)
+      const enrollResult = await enrollPhone({
+        campaign_id: matchedCampaign.id,
+        phone: from,
+        source: 'trigger',
+      });
+      console.log('Intake enrollment result:', enrollResult.body);
+
+      // Immediate messages (delay=0) are scheduled with scheduled_for = now().
+      // The every-minute cron will pick them up — no fire-and-forget needed here,
+      // as it risks partial execution when Vercel freezes the Lambda after response.
+      return res.status(200).json({ message: 'Intake campaign triggered', campaign: matchedCampaign.trigger_word });
+    }
+  } catch (intakeError) {
+    // Log but don't block - fall through to hardcoded triggers
+    console.log('Intake campaign check (no match or error):', intakeError?.message || intakeError);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LEGACY HARDCODED TRIGGER: MEMBER / MEMBERSHIP
+  // ─────────────────────────────────────────────────────────────────────────
+  // SAFE TO REMOVE once an Intake Campaign with trigger word "MEMBERSHIP"
+  // (and optionally "MEMBER") is created and set to "active" in the admin UI
+  // at /admin/membership -> Intake Campaigns.
+  //
+  // The DB-based intake campaign check above will match first when active,
+  // so this block only fires as a fallback. Once the DB campaign is confirmed
+  // working, delete this entire if-block (lines marked START to END).
+  //
+  // No other code depends on this block. Removing it is safe.
+  // ═══════════════════════════════════════════════════════════════════════════
+  // --- LEGACY MEMBER/MEMBERSHIP BLOCK START ---
   if (text.toLowerCase().trim() === 'member' || text.toLowerCase().trim() === 'membership') {
     console.log('Processing MEMBER/MEMBERSHIP message for waitlist');
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
@@ -982,8 +1028,25 @@ export async function handler(req, res) {
     await sendSMS(from, waitlistMessage);
     return res.status(200).json({ message: 'Sent waitlist invitation message' });
   }
+  // --- LEGACY MEMBER/MEMBERSHIP BLOCK END ---
 
-  // Handle "INVITATION" messages for membership signup
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LEGACY HARDCODED TRIGGER: INVITATION
+  // ─────────────────────────────────────────────────────────────────────────
+  // WARNING: This block has CUSTOM BUSINESS LOGIC beyond simple SMS responses.
+  // It generates signup tokens, creates/updates waitlist entries, and builds
+  // personalized /onboard/<token> URLs with 24-hour expiration.
+  //
+  // DO NOT replace with a simple Intake Campaign unless the campaign's
+  // message template can replicate the token generation and waitlist logic.
+  // To migrate this, you would need to either:
+  //   1. Move the token/waitlist logic into the intake-enroll API, OR
+  //   2. Keep this block and only use Intake Campaigns for simple SMS triggers.
+  //
+  // SAFE TO REMOVE only after the token generation logic is handled elsewhere.
+  // No other code depends on this block's return value.
+  // ═══════════════════════════════════════════════════════════════════════════
+  // --- LEGACY INVITATION BLOCK START ---
   if (text.toLowerCase().trim() === 'invitation') {
     console.log('Processing INVITATION message for membership signup');
 
@@ -1060,8 +1123,19 @@ Thank you.`;
       return res.status(500).json({ error: 'Failed to process invitation request' });
     }
   }
+  // --- LEGACY INVITATION BLOCK END ---
 
-  // Handle "SKYLINE" messages for Skyline membership signup
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LEGACY HARDCODED TRIGGER: SKYLINE
+  // ─────────────────────────────────────────────────────────────────────────
+  // WARNING: Same custom logic as INVITATION above, but pre-selects
+  // "Skyline" membership type. Same migration considerations apply.
+  //
+  // SAFE TO REMOVE only after the token generation + selected_membership
+  // logic is handled elsewhere.
+  // No other code depends on this block's return value.
+  // ═══════════════════════════════════════════════════════════════════════════
+  // --- LEGACY SKYLINE BLOCK START ---
   if (text.toLowerCase().trim() === 'skyline') {
     console.log('Processing SKYLINE message for Skyline membership signup');
 
@@ -1140,6 +1214,7 @@ Thank you.`;
       return res.status(500).json({ error: 'Failed to process Skyline request' });
     }
   }
+  // --- LEGACY SKYLINE BLOCK END ---
 
   // Handle "BALANCE" messages for ledger PDF
   if (text.toLowerCase().trim() === 'balance') {

@@ -1,0 +1,273 @@
+import { NextApiRequest, NextApiResponse } from 'next';
+import { supabaseAdmin } from '../../../lib/supabase';
+import { verifyAdmin } from '../../../lib/admin-auth';
+
+const VALID_STATUSES = ['draft', 'active', 'inactive'];
+const MAX_MESSAGE_LENGTH = 1600; // SMS practical limit
+
+interface MessagePayload {
+  message_content: string;
+  delay_minutes?: number;
+  send_time?: string | null;
+}
+
+interface CampaignUpdateFields {
+  name?: string;
+  trigger_word?: string;
+  status?: string;
+  actions?: Record<string, unknown>;
+  non_member_response?: string | null;
+  updated_at: string;
+}
+
+async function logAudit(req: NextApiRequest, action: string, details: Record<string, unknown>) {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      if (user) {
+        await supabaseAdmin.from('audit_logs').insert({
+          user_id: user.id,
+          action: 'admin_update',
+          details: { intake_campaign_action: action, ...details },
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Audit log failed:', e);
+  }
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // All intake-campaigns operations require admin auth
+  if (!(await verifyAdmin(req))) {
+    return res.status(401).json({ error: 'Admin authentication required' });
+  }
+
+  if (req.method === 'GET') {
+    try {
+      const { id } = req.query;
+
+      if (id) {
+        // Get single campaign with messages
+        const { data: campaign, error } = await supabaseAdmin
+          .from('sms_intake_campaigns')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+
+        const { data: messages, error: msgError } = await supabaseAdmin
+          .from('sms_intake_campaign_messages')
+          .select('*')
+          .eq('campaign_id', id)
+          .order('sort_order', { ascending: true });
+
+        if (msgError) throw msgError;
+
+        return res.status(200).json({ ...campaign, messages: messages || [] });
+      }
+
+      // List all campaigns with message counts in a single query
+      const { data: campaigns, error } = await supabaseAdmin
+        .from('sms_intake_campaigns')
+        .select('*, sms_intake_campaign_messages(count)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const result = (campaigns || []).map((c: Record<string, unknown>) => {
+        const msgCount = c.sms_intake_campaign_messages as Array<{ count: number }> | undefined;
+        return {
+          ...c,
+          message_count: msgCount?.[0]?.count ?? 0,
+          sms_intake_campaign_messages: undefined,
+        };
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Error fetching intake campaigns:', error);
+      return res.status(500).json({ error: 'Failed to fetch intake campaigns' });
+    }
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const { name, trigger_word, status, messages, actions, non_member_response } = req.body;
+
+      if (!name || !trigger_word) {
+        return res.status(400).json({ error: 'Name and trigger word are required' });
+      }
+
+      if (!messages || messages.length === 0) {
+        return res.status(400).json({ error: 'At least one message is required' });
+      }
+
+      const campaignStatus = status || 'draft';
+      if (!VALID_STATUSES.includes(campaignStatus)) {
+        return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
+
+      // Validate message content length
+      for (const msg of messages) {
+        if (msg.message_content && msg.message_content.length > MAX_MESSAGE_LENGTH) {
+          return res.status(400).json({ error: `Message content exceeds ${MAX_MESSAGE_LENGTH} character limit` });
+        }
+      }
+
+      // Create campaign
+      const { data: campaign, error } = await supabaseAdmin
+        .from('sms_intake_campaigns')
+        .insert({
+          name,
+          trigger_word: trigger_word.trim(),
+          status: campaignStatus,
+          actions: actions || {},
+          non_member_response: non_member_response || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'A campaign with this trigger word already exists' });
+        }
+        throw error;
+      }
+
+      // Insert messages
+      const messageRows = messages.map((msg: MessagePayload, index: number) => ({
+        campaign_id: campaign.id,
+        message_content: msg.message_content,
+        delay_minutes: msg.delay_minutes || 0,
+        send_time: msg.send_time || null,
+        sort_order: index,
+      }));
+
+      const { error: msgError } = await supabaseAdmin
+        .from('sms_intake_campaign_messages')
+        .insert(messageRows);
+
+      if (msgError) throw msgError;
+
+      await logAudit(req, 'create_intake_campaign', { campaign_id: campaign.id, name: campaign.name, trigger_word: campaign.trigger_word });
+      return res.status(201).json(campaign);
+    } catch (error) {
+      console.error('Error creating intake campaign:', error);
+      return res.status(500).json({ error: 'Failed to create intake campaign' });
+    }
+  }
+
+  if (req.method === 'PUT') {
+    try {
+      const { id, name, trigger_word, status, messages, actions, non_member_response } = req.body;
+
+      if (!id) {
+        return res.status(400).json({ error: 'Campaign ID is required' });
+      }
+
+      // Update campaign
+      if (status !== undefined && !VALID_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
+
+      // Validate message content length on update
+      if (messages) {
+        for (const msg of messages) {
+          if (msg.message_content && msg.message_content.length > MAX_MESSAGE_LENGTH) {
+            return res.status(400).json({ error: `Message content exceeds ${MAX_MESSAGE_LENGTH} character limit` });
+          }
+        }
+      }
+
+      const updateFields: CampaignUpdateFields = { updated_at: new Date().toISOString() };
+      if (name !== undefined) updateFields.name = name;
+      if (trigger_word !== undefined) updateFields.trigger_word = trigger_word.trim();
+      if (status !== undefined) updateFields.status = status;
+      if (actions !== undefined) updateFields.actions = actions;
+      if (non_member_response !== undefined) updateFields.non_member_response = non_member_response;
+
+      const { data: campaign, error } = await supabaseAdmin
+        .from('sms_intake_campaigns')
+        .update(updateFields)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'A campaign with this trigger word already exists' });
+        }
+        throw error;
+      }
+
+      // If messages provided, replace all messages (insert-first to prevent data loss)
+      if (messages) {
+        // Get existing message IDs before replacement
+        const { data: existingMsgs } = await supabaseAdmin
+          .from('sms_intake_campaign_messages')
+          .select('id')
+          .eq('campaign_id', id);
+        const oldIds = (existingMsgs || []).map((m: { id: string }) => m.id);
+
+        // Insert new messages first — if this fails, old messages are preserved
+        if (messages.length > 0) {
+          const messageRows = messages.map((msg: MessagePayload, index: number) => ({
+            campaign_id: id,
+            message_content: msg.message_content,
+            delay_minutes: msg.delay_minutes || 0,
+            send_time: msg.send_time || null,
+            sort_order: index,
+          }));
+
+          const { error: msgError } = await supabaseAdmin
+            .from('sms_intake_campaign_messages')
+            .insert(messageRows);
+
+          if (msgError) throw msgError;
+        }
+
+        // Delete old messages only after new ones are safely inserted
+        if (oldIds.length > 0) {
+          await supabaseAdmin
+            .from('sms_intake_campaign_messages')
+            .delete()
+            .in('id', oldIds);
+        }
+      }
+
+      await logAudit(req, 'update_intake_campaign', { campaign_id: id, updates: Object.keys(updateFields) });
+      return res.status(200).json(campaign);
+    } catch (error) {
+      console.error('Error updating intake campaign:', error);
+      return res.status(500).json({ error: 'Failed to update intake campaign' });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      const { id } = req.query;
+      if (!id) {
+        return res.status(400).json({ error: 'Campaign ID is required' });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('sms_intake_campaigns')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await logAudit(req, 'delete_intake_campaign', { campaign_id: id });
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Error deleting intake campaign:', error);
+      return res.status(500).json({ error: 'Failed to delete intake campaign' });
+    }
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+  return res.status(405).end(`Method ${req.method} Not Allowed`);
+}
