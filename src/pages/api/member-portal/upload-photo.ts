@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import formidable from 'formidable';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { convertToJPEG, getConvertedMimeType } from '../../../lib/photoConversion';
 
 export const config = {
   api: {
@@ -55,8 +56,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Invalid file type. Please upload an image.' });
     }
 
-    // Get user from authorization header (if using session-based auth)
-    // For now, we'll skip auth validation for photo upload since it's part of the profile change workflow
+    // Read the uploaded file
+    const fileBuffer = await fs.readFile(photoFile.filepath);
+
+    // Convert HEIC to JPEG if needed
+    const convertedBuffer = await convertToJPEG(fileBuffer);
+    const convertedMimeType = getConvertedMimeType(photoFile.mimetype);
+
+    // If conversion happened, write the converted file back
+    if (convertedBuffer !== fileBuffer) {
+      await fs.writeFile(photoFile.filepath, convertedBuffer);
+      console.log('[upload-photo] Converted HEIC to JPEG');
+    }
 
     // Generate public URL for the uploaded file
     const filename = path.basename(photoFile.filepath);
@@ -66,6 +77,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true,
       photo_url: photoUrl,
       filename,
+      converted: convertedBuffer !== fileBuffer,
+      mimeType: convertedMimeType
     });
   } catch (error) {
     console.error('Photo upload error:', error);
