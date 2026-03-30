@@ -17,25 +17,40 @@ export const config = {
 };
 
 // Helper function to check if a ledger entry already exists
-async function checkExistingLedgerEntry(stripeInvoiceId, stripePaymentIntentId) {
+// Checks by ledger_entry_key first (most accurate), then falls back to old method
+async function checkExistingLedgerEntry(stripeInvoiceId, stripePaymentIntentId, ledgerEntryKey = null) {
+  // New method: Check by ledger_entry_key (most accurate)
+  if (ledgerEntryKey) {
+    const { data: existingEntry } = await supabase
+      .from('ledger')
+      .select('id')
+      .eq('ledger_entry_key', ledgerEntryKey)
+      .limit(1);
+    if (existingEntry && existingEntry.length > 0) return true;
+  }
+
+  // Legacy method: Check by invoice_id (for backward compatibility)
   if (stripeInvoiceId) {
     const { data: existingInvoice } = await supabase
       .from('ledger')
       .select('id')
       .eq('stripe_invoice_id', stripeInvoiceId)
-      .single();
-    if (existingInvoice) return true;
+      .limit(1);
+    if (existingInvoice && existingInvoice.length > 0) return true;
   }
-  
+
+  // Legacy method: Check by payment_intent_id for payment/credit types
+  // This prevents duplicate main payment entries created before ledger_entry_key was added
   if (stripePaymentIntentId) {
     const { data: existingPaymentIntent } = await supabase
       .from('ledger')
       .select('id')
       .eq('stripe_payment_intent_id', stripePaymentIntentId)
-      .single();
-    if (existingPaymentIntent) return true;
+      .eq('type', 'credit') // Only check for main payment/credit entry
+      .limit(1);
+    if (existingPaymentIntent && existingPaymentIntent.length > 0) return true;
   }
-  
+
   return false;
 }
 
@@ -206,7 +221,7 @@ export default async function handler(req, res) {
       // Check if ledger entry already exists for this payment intent
       const paymentIntentId = session.payment_intent;
       if (paymentIntentId) {
-        const exists = await checkExistingLedgerEntry(null, paymentIntentId);
+        const exists = await checkExistingLedgerEntry(null, paymentIntentId, paymentIntentId);
         if (exists) {
           console.log('Ledger entry already exists for payment intent:', paymentIntentId);
           return res.json({ success: true, debug: { ...debugInfo, message: 'Ledger entry already exists' } });
@@ -226,7 +241,9 @@ export default async function handler(req, res) {
           amount: paymentAmount,
           note: ledgerNote,
           date: paymentDate,
-          stripe_payment_intent_id: paymentIntentId
+          ledger_entry_key: paymentIntentId, // Unique key
+          stripe_payment_intent_id: paymentIntentId,
+          source: 'stripe_webhook'
         });
       if (ledgerError) {
         console.error('Error inserting ledger entry:', ledgerError);
@@ -303,7 +320,7 @@ export default async function handler(req, res) {
       }
 
       // Check if ledger entry already exists for this payment intent
-      const exists = await checkExistingLedgerEntry(null, paymentIntent.id);
+      const exists = await checkExistingLedgerEntry(null, paymentIntent.id, paymentIntent.id);
       if (exists) {
         console.log('Ledger entry already exists for payment intent:', paymentIntent.id);
         return res.json({ success: true, message: 'Ledger entry already exists' });
@@ -365,7 +382,9 @@ export default async function handler(req, res) {
           type: 'payment',
           note: `Manual payment${paymentIntent.description ? `: ${paymentIntent.description}` : ''}`,
           date: paymentDate,
-          stripe_payment_intent_id: paymentIntent.id
+          ledger_entry_key: paymentIntent.id, // Unique key
+          stripe_payment_intent_id: paymentIntent.id,
+          source: 'stripe_webhook'
         });
 
       if (ledgerError) {
@@ -491,7 +510,9 @@ export default async function handler(req, res) {
             type: 'payment',
             note: `ACH payment${charge.description ? `: ${charge.description}` : ''}`,
             date: new Date().toISOString().split('T')[0],
+            ledger_entry_key: charge.id, // Use charge_id as unique key for ACH payments
             stripe_charge_id: charge.id,
+            source: 'stripe_webhook',
             status: 'cleared'
           });
 

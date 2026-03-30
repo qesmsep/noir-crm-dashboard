@@ -249,8 +249,10 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
       amount: totalAmountPaid,
       date: getTodayLocalDate(),
       note: `Monthly dues - ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+      ledger_entry_key: paymentIntent.id, // Main payment uses payment_intent_id as key
       stripe_charge_id: charge?.id,
       stripe_payment_intent_id: paymentIntent.id,
+      source: 'billing_cron',
       status: paymentStatus,
     });
 
@@ -263,8 +265,10 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
         amount: -adminFee,
         date: getTodayLocalDate(),
         note: 'Membership administration fee',
+        ledger_entry_key: `${paymentIntent.id}:admin_fee`, // Unique key for admin fee
         stripe_charge_id: charge?.id,
         stripe_payment_intent_id: paymentIntent.id,
+        source: 'billing_cron',
         status: 'cleared', // Fees are always cleared immediately
       });
     }
@@ -280,8 +284,10 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
         amount: -additionalMembersFeeTotal,
         date: getTodayLocalDate(),
         note: `Additional members fee (${additionalMembersCountValue} member${additionalMembersCountValue > 1 ? 's' : ''})`,
+        ledger_entry_key: `${paymentIntent.id}:additional_members`, // Unique key for additional members fee
         stripe_charge_id: charge?.id,
         stripe_payment_intent_id: paymentIntent.id,
+        source: 'billing_cron',
         status: 'cleared', // Fees are always cleared immediately
       });
     }
@@ -295,8 +301,10 @@ export async function logPaymentToLedger(account: any, paymentIntent: Stripe.Pay
         amount: -feeAmount,
         date: getTodayLocalDate(),
         note: 'Credit card processing fee',
+        ledger_entry_key: `${paymentIntent.id}:cc_fee`, // Unique key for CC fee
         stripe_charge_id: charge?.id,
         stripe_payment_intent_id: paymentIntent.id,
+        source: 'billing_cron',
         status: 'cleared', // Fees are always cleared immediately
       });
     }
