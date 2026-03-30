@@ -974,7 +974,56 @@ export async function handler(req, res) {
   console.log('Message lowercase:', text.toLowerCase());
   console.log('Message trimmed:', text.toLowerCase().trim());
 
-  // Handle "MEMBER" and "MEMBERSHIP" messages for waitlist
+  // Check for intake campaign trigger words from the database
+  // This runs before hardcoded triggers so DB-managed campaigns take priority
+  try {
+    const triggerText = text.toLowerCase().trim();
+    const { data: matchedCampaign } = await supabase
+      .from('sms_intake_campaigns')
+      .select('id, trigger_word')
+      .eq('status', 'active')
+      .ilike('trigger_word', triggerText)
+      .single();
+
+    if (matchedCampaign) {
+      console.log('Matched intake campaign:', matchedCampaign.trigger_word, '-> campaign', matchedCampaign.id);
+
+      // Enroll the phone number via the intake-enroll logic
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
+      const enrollResponse = await fetch(`${baseUrl}/api/membership/intake-enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign_id: matchedCampaign.id,
+          phone: from,
+          source: 'trigger',
+        }),
+      });
+
+      if (enrollResponse.ok) {
+        const enrollData = await enrollResponse.json();
+        console.log('Intake enrollment result:', enrollData);
+
+        // Process any immediate messages right away
+        await fetch(`${baseUrl}/api/process-intake-messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+          },
+        });
+      } else {
+        console.error('Intake enrollment failed:', await enrollResponse.text());
+      }
+
+      return res.status(200).json({ message: 'Intake campaign triggered', campaign: matchedCampaign.trigger_word });
+    }
+  } catch (intakeError) {
+    // Log but don't block - fall through to hardcoded triggers
+    console.log('Intake campaign check (no match or error):', intakeError?.message || intakeError);
+  }
+
+  // Handle "MEMBER" and "MEMBERSHIP" messages for waitlist (legacy hardcoded fallback)
   if (text.toLowerCase().trim() === 'member' || text.toLowerCase().trim() === 'membership') {
     console.log('Processing MEMBER/MEMBERSHIP message for waitlist');
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';

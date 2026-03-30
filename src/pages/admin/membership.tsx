@@ -5,7 +5,8 @@ import WaitlistManager from '../../components/admin/WaitlistManager';
 import ApplicationManager from '../../components/admin/ApplicationManager';
 import QuestionnaireManager from '../../components/admin/QuestionnaireManager';
 import AgreementManager from '../../components/admin/AgreementManager';
-import { Settings, List, Users, FileText, CheckSquare } from 'lucide-react';
+import IntakeCampaignManager from '../../components/admin/IntakeCampaignManager';
+import { Settings, List, Users, FileText, CheckSquare, MessageSquare } from 'lucide-react';
 import styles from '../../styles/Membership.module.css';
 
 export default function AdminMembership() {
@@ -17,6 +18,7 @@ export default function AdminMembership() {
     { id: 2, name: 'Applications', icon: Users, component: ApplicationManager },
     { id: 3, name: 'Questionnaires', icon: FileText, component: QuestionnaireManager },
     { id: 4, name: 'Agreements', icon: CheckSquare, component: AgreementManager },
+    { id: 5, name: 'Intake Campaigns', icon: MessageSquare, component: IntakeCampaignManager },
   ];
 
   const ActiveComponent = tabs[activeTab].component;
