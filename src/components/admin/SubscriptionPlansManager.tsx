@@ -308,12 +308,12 @@ export default function SubscriptionPlansManager() {
               width: '90%',
               maxHeight: '90vh',
               overflow: 'auto',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
               position: 'relative',
             }}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
             onDragStart={(e) => e.preventDefault()}
           >
             <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>

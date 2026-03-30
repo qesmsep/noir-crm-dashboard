@@ -1871,7 +1871,7 @@ export default function MemberDetailAdmin() {
                               </div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Member Spend</div>
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>LTV</div>
                               <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
                                 {formatCurrency(calculateMemberSpend(member.member_id))}
                               </div>

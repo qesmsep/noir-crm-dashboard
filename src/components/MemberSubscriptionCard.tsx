@@ -59,6 +59,9 @@ export default function MemberSubscriptionCard({
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<{ type: string; message: string; details?: any } | null>(null);
+  const [planName, setPlanName] = useState<string>('');
+  const [beverageCredit, setBeverageCredit] = useState<number>(0);
+  const [adminFee, setAdminFee] = useState<number>(0);
 
   useEffect(() => {
     if (accountId) {
@@ -136,11 +139,13 @@ export default function MemberSubscriptionCard({
 
       // Get plan details to check if it's annual and get base price
       let planBasePrice = 0;
+      let planBeverageCredit = 0;
+      let planAdminFee = 0;
       if (account.membership_plan_id) {
         try {
           const { data: plan, error: planError } = await supabase
             .from('subscription_plans')
-            .select('interval, plan_name, monthly_price')
+            .select('interval, plan_name, monthly_price, beverage_credit, administrative_fee')
             .eq('id', account.membership_plan_id)
             .single();
 
@@ -148,6 +153,8 @@ export default function MemberSubscriptionCard({
             planInterval = plan.interval || 'month';
             planName = plan.plan_name || '';
             planBasePrice = Number(plan.monthly_price || 0);
+            planBeverageCredit = Number(plan.beverage_credit || 0);
+            planAdminFee = Number(plan.administrative_fee || 0);
           }
         } catch (err) {
           console.error('Error fetching plan:', err);
@@ -176,6 +183,9 @@ export default function MemberSubscriptionCard({
       setAdditionalMemberFeeRate(feeRate);
       setBillingInterval(planInterval as 'month' | 'year');
       setCurrentPlanId(account.membership_plan_id || null);
+      setPlanName(planName);
+      setBeverageCredit(planBeverageCredit);
+      setAdminFee(planAdminFee);
 
       const subscriptionData = {
         stripe_subscription_id: null, // No longer using Stripe subscriptions
@@ -564,7 +574,7 @@ export default function MemberSubscriptionCard({
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Account LTV</div>
+            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Membership Fees Paid</div>
             <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>{formatCurrency(totalLTV)}</div>
           </div>
         </div>
@@ -672,13 +682,29 @@ export default function MemberSubscriptionCard({
           <>
             <div className={styles.divider} style={{ marginTop: '0.75rem' }} />
 
-            {/* Base Membership */}
+            {/* Membership Plan */}
             <div className={styles.row}>
-              <span className={styles.label}>Base Membership</span>
+              <span className={styles.label}>{planName || 'Base Membership'}</span>
               <span className={styles.value}>
                 {formatCurrency(baseMRR)}/{billingInterval === 'year' ? 'yr' : 'mo'}
               </span>
             </div>
+
+            {/* Beverage Credit & Admin Fee Breakdown */}
+            {beverageCredit > 0 && (
+              <div style={{ fontSize: '0.8125rem', color: '#6B7280', marginLeft: '1rem', marginTop: '0.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span>💳 Beverage Credit</span>
+                  <span>{formatCurrency(beverageCredit)}/{billingInterval === 'year' ? 'yr' : 'mo'}</span>
+                </div>
+                {adminFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>⚙️ Admin Fee</span>
+                    <span>{formatCurrency(adminFee)}/{billingInterval === 'year' ? 'yr' : 'mo'}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Additional Members */}
             {additionalMembersCount > 0 && (
