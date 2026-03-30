@@ -14,12 +14,18 @@ interface MemberRecord {
   phone: string;
 }
 
+interface CampaignActions {
+  create_onboarding_link?: { enabled?: boolean; selected_membership?: string };
+  add_ledger_charge?: { enabled?: boolean; amount?: number; description?: string };
+  create_event_rsvp?: { enabled?: boolean; event_id?: string; party_size?: number };
+}
+
 interface CampaignRecord {
   id: string;
   name: string;
   trigger_word: string;
   status: string;
-  actions: Record<string, Record<string, unknown>> | null;
+  actions: CampaignActions | null;
   non_member_response: string | null;
 }
 
@@ -468,7 +474,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Action: Add Ledger Charge (member already verified above)
       if (actions.add_ledger_charge?.enabled && member) {
         const amount = Number(actions.add_ledger_charge.amount);
-        const description = actions.add_ledger_charge.description || 'Intake campaign charge';
+        const description: string = actions.add_ledger_charge.description || 'Intake campaign charge';
         if (!amount || amount <= 0 || !isFinite(amount)) {
           actionResults.push({ action: 'add_ledger_charge', success: false, error: 'Invalid charge amount' });
         } else {
@@ -492,7 +498,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           try {
             const { event_title } = await executeCreateEventRsvp(member, {
               event_id: eventId,
-              party_size: Math.max(1, parseInt(actions.create_event_rsvp.party_size) || 1),
+              party_size: Math.max(1, actions.create_event_rsvp.party_size || 1),
             });
             templateVars.event_title = event_title;
             actionResults.push({ action: 'create_event_rsvp', success: true });
