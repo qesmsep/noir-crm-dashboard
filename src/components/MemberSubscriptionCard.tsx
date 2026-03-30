@@ -10,6 +10,7 @@ interface SubscriptionData {
   stripe_subscription_id: string | null;
   subscription_status: string | null;
   subscription_start_date: string | null;
+  member_join_date: string | null;
   subscription_cancel_at: string | null;
   subscription_canceled_at: string | null;
   next_renewal_date: string | null;
@@ -98,18 +99,36 @@ export default function MemberSubscriptionCard({
       let secondaryMemberCount = 0;
       let planInterval = 'month'; // Default to monthly
       let planName = '';
+      let primaryMemberJoinDate: string | null = null;
 
       try {
+        // Get all members to find primary join date and count secondary members
         const { data: members, error: membersError } = await supabase
           .from('members')
-          .select('member_id, member_type, deactivated, status')
+          .select('member_id, member_type, status, join_date')
           .eq('account_id', accountId)
-          .eq('member_type', 'secondary')
-          .eq('deactivated', false)
-          .in('status', ['active', 'paused']);
+          .order('join_date', { ascending: true, nullsFirst: false });
 
-        if (!membersError && members) {
-          secondaryMemberCount = members.length;
+        if (membersError) {
+          console.error('Error fetching members:', membersError);
+        } else if (members && members.length > 0) {
+          // Use the earliest join_date from all members (sorted query)
+          // Or find primary member if member_type is set
+          const primaryMember = members.find(m => m.member_type === 'primary') || members[0];
+          primaryMemberJoinDate = primaryMember.join_date || null;
+
+          console.log('[MemberSubscriptionCard] Primary member join date:', {
+            member: primaryMember,
+            join_date: primaryMemberJoinDate
+          });
+
+          // Count active secondary members (status != 'archived')
+          secondaryMemberCount = members.filter(m =>
+            m.member_type === 'secondary' &&
+            ['active', 'paused'].includes(m.status)
+          ).length;
+        } else {
+          console.warn('[MemberSubscriptionCard] No members found for account:', accountId);
         }
       } catch (err) {
         console.error('Error fetching members:', err);
@@ -165,6 +184,7 @@ export default function MemberSubscriptionCard({
         stripe_subscription_id: null, // No longer using Stripe subscriptions
         subscription_status: account.subscription_status || null,
         subscription_start_date: account.subscription_start_date || null,
+        member_join_date: primaryMemberJoinDate,
         subscription_cancel_at: account.subscription_cancel_at || null,
         subscription_canceled_at: account.subscription_canceled_at || null,
         next_renewal_date: account.next_billing_date || null,
@@ -624,7 +644,7 @@ export default function MemberSubscriptionCard({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8125rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: '#6B7280', fontWeight: '500' }}>Start Date</span>
-            <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.subscription_start_date)}</span>
+            <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.member_join_date)}</span>
           </div>
           {subscription.subscription_status === 'canceled' && subscription.subscription_canceled_at ? (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -207,10 +207,10 @@ export default async function handler(req, res) {
 
       Logger.info('Deactivating member', { requestId, member_id });
 
-      // Instead of deleting, set a deactivated flag
+      // Instead of deleting, set status to inactive
       const { error } = await supabase
         .from('members')
-        .update({ deactivated: true })
+        .update({ status: 'inactive' })
         .eq('member_id', member_id);
 
       if (error) {

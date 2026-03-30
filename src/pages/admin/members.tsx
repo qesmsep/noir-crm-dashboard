@@ -130,7 +130,6 @@ export default function MembersAdmin() {
       const { data: membersData, error: membersError } = await supabase
         .from('members')
         .select('*')
-        .eq('deactivated', false)
         .in('status', ['active', 'paused']); // Show active and paused, exclude inactive/pending/incomplete
 
       if (membersError) throw membersError;

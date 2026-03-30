@@ -256,10 +256,9 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
           member_id,
           account_id,
           status,
-          join_date,
-          deactivated
+          join_date
         `)
-        .or('deactivated.is.null,deactivated.eq.false')
+        .in('status', ['active', 'paused'])
         .lte('join_date', endOfMonth)
         .then(async (membersResult) => {
           if (membersResult.error) throw membersResult.error;
@@ -321,7 +320,7 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
     const accountStatus = m.accounts?.subscription_status || null;
     const interval = m.accounts?.plan_interval || 'month';
 
-    const isActive = m.status === 'active' && !m.deactivated && accountDues > 0;
+    const isActive = m.status === 'active' && accountDues > 0;
     const isPaused = m.status === 'paused';
 
     // DATA CONTRACT: For annual plans, accounts.monthly_dues stores the full

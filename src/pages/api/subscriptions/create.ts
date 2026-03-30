@@ -142,7 +142,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select('member_id')
       .eq('account_id', member.account_id)
       .eq('member_type', 'secondary')
-      .eq('deactivated', false);
+      .in('status', ['active', 'paused']);
 
     const secondaryMemberCount = secondaryMembers?.length || 0;
 
