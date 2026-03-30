@@ -3,23 +3,12 @@ import { supabaseAdmin } from '../../lib/supabase';
 
 /**
  * Process pending SMS intake campaign messages.
- * Called by Vercel cron or manually.
+ * Called by Vercel cron, manually, or directly from the webhook.
  * Sends messages whose scheduled_for time has passed.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    res.setHeader('Allow', ['POST', 'GET']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
-  }
 
-  // Verify cron or auth token
-  const isVercelCron = req.headers['x-vercel-cron'] === '1' ||
-    req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
-
-  if (!isVercelCron) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+// Exported so the webhook can call it directly without an HTTP round-trip
+export async function processIntakeMessages(): Promise<{ processed: number; sent: number; failed: number }> {
   try {
     const now = new Date().toISOString();
 
@@ -35,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error) throw error;
 
     if (!pendingMessages || pendingMessages.length === 0) {
-      return res.status(200).json({ processed: 0, message: 'No pending messages' });
+      return { processed: 0, sent: 0, failed: 0 };
     }
 
     let sent = 0;
@@ -104,9 +93,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    return res.status(200).json({ processed: sent + failed, sent, failed });
+    return { processed: sent + failed, sent, failed };
   } catch (error) {
     console.error('Error processing intake messages:', error);
+    throw error;
+  }
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    res.setHeader('Allow', ['POST', 'GET']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  // Verify cron or auth token
+  const isVercelCron = req.headers['x-vercel-cron'] === '1' ||
+    req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (!isVercelCron) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const result = await processIntakeMessages();
+    return res.status(200).json(result);
+  } catch (error) {
     return res.status(500).json({ error: 'Failed to process intake messages' });
   }
 }

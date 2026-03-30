@@ -2,6 +2,8 @@ import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import { enrollPhone } from './membership/intake-enroll';
+import { processIntakeMessages } from './process-intake-messages';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -988,35 +990,17 @@ export async function handler(req, res) {
     if (matchedCampaign) {
       console.log('Matched intake campaign:', matchedCampaign.trigger_word, '-> campaign', matchedCampaign.id);
 
-      // Enroll the phone number via the intake-enroll logic
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
-      const enrollResponse = await fetch(`${baseUrl}/api/membership/intake-enroll`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-        },
-        body: JSON.stringify({
-          campaign_id: matchedCampaign.id,
-          phone: from,
-          source: 'trigger',
-        }),
+      // Call enrollment logic directly (no HTTP round-trip)
+      const enrollResult = await enrollPhone({
+        campaign_id: matchedCampaign.id,
+        phone: from,
+        source: 'trigger',
       });
+      console.log('Intake enrollment result:', enrollResult.body);
 
-      if (enrollResponse.ok) {
-        const enrollData = await enrollResponse.json();
-        console.log('Intake enrollment result:', enrollData);
-
+      if (enrollResult.status < 400) {
         // Process any immediate messages right away
-        await fetch(`${baseUrl}/api/process-intake-messages`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-          },
-        });
-      } else {
-        console.error('Intake enrollment failed:', await enrollResponse.text());
+        await processIntakeMessages();
       }
 
       return res.status(200).json({ message: 'Intake campaign triggered', campaign: matchedCampaign.trigger_word });

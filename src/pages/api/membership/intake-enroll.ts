@@ -56,26 +56,6 @@ interface ActionResult {
  *   ?campaign_id=UUID
  */
 
-// ── Rate Limiting ──────────────────────────────────────────────────────────
-// Simple in-memory rate limiter per phone number (5 enrollments per minute)
-const enrollmentAttempts = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-
-function checkRateLimit(phone: string): boolean {
-  const now = Date.now();
-  const entry = enrollmentAttempts.get(phone);
-
-  if (!entry || now > entry.resetAt) {
-    enrollmentAttempts.set(phone, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) return false;
-  entry.count++;
-  return true;
-}
-
 // ── Phone Normalization ────────────────────────────────────────────────────
 // Normalize phone to E.164 format (+1XXXXXXXXXX) for consistent storage
 function normalizePhone(phone: string): string {
@@ -313,6 +293,244 @@ function expandTemplateVars(
 // ── Admin Auth ─────────────────────────────────────────────────────────────
 import { verifyAdmin, isInternalCall } from '../../../lib/admin-auth';
 
+// ── Enrollment Result Type ─────────────────────────────────────────────────
+interface EnrollmentResult {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+// ── Core Enrollment Logic ──────────────────────────────────────────────────
+// Exported so the webhook can call it directly without an HTTP round-trip
+export async function enrollPhone(params: {
+  campaign_id?: string;
+  trigger_word?: string;
+  phone: string;
+  source?: 'trigger' | 'manual';
+}): Promise<EnrollmentResult> {
+  const { campaign_id, trigger_word, source = 'manual' } = params;
+  const phone = normalizePhone(params.phone);
+
+  // Resolve campaign from trigger_word or campaign_id
+  let resolvedCampaignId = campaign_id;
+  let campaignData: CampaignRecord | null = null;
+
+  if (resolvedCampaignId) {
+    const { data } = await supabaseAdmin
+      .from('sms_intake_campaigns')
+      .select('*')
+      .eq('id', resolvedCampaignId)
+      .single();
+
+    if (!data) {
+      return { status: 404, body: { error: 'Campaign not found' } };
+    }
+    if (data.status !== 'active') {
+      return { status: 400, body: { error: 'Campaign is not active' } };
+    }
+    campaignData = data;
+  } else if (trigger_word) {
+    const { data } = await supabaseAdmin
+      .from('sms_intake_campaigns')
+      .select('*')
+      .ilike('trigger_word', trigger_word.trim())
+      .eq('status', 'active')
+      .single();
+
+    if (!data) {
+      return { status: 404, body: { error: 'No active campaign found for this trigger word' } };
+    }
+    campaignData = data;
+    resolvedCampaignId = data.id;
+  }
+
+  if (!resolvedCampaignId || !campaignData) {
+    return { status: 400, body: { error: 'campaign_id or trigger_word is required' } };
+  }
+
+  // ── Member Lookup (if needed for members-only actions) ──────────────
+  const actions = campaignData.actions || {};
+  const templateVars: Record<string, string> = {};
+  let member: MemberRecord | null = null;
+
+  const needsMember =
+    (actions.add_ledger_charge?.enabled) ||
+    (actions.create_event_rsvp?.enabled);
+
+  if (needsMember) {
+    member = await lookupMemberByPhone(phone);
+
+    if (!member) {
+      // Non-member trying a members-only action — send response and bail
+      const nonMemberMsg = campaignData.non_member_response ||
+        'We apologize but our system cannot find this phone number registered to a member. Please text us to resolve this issue.';
+
+      try {
+        const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': process.env.OPENPHONE_API_KEY || '',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            to: [phone],
+            from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+            content: nonMemberMsg,
+          }),
+        });
+        if (!smsResponse.ok) {
+          console.error('Failed to send non-member response:', await smsResponse.text());
+        }
+      } catch (smsError) {
+        console.error('Error sending non-member response:', smsError);
+      }
+
+      return { status: 200, body: { message: 'Non-member response sent', is_member: false } };
+    }
+
+    templateVars.member_name = member.first_name;
+  }
+
+  // ── Create Enrollment FIRST (before side effects) ───────────────────
+  // This ensures no financial actions are committed without an enrollment record
+  const { data: enrollment, error: enrollError } = await supabaseAdmin
+    .from('sms_intake_enrollments')
+    .insert({
+      campaign_id: resolvedCampaignId,
+      phone,
+      source,
+      status: 'active',
+    })
+    .select()
+    .single();
+
+  if (enrollError) {
+    // Unique constraint violation = already enrolled (race condition)
+    if (enrollError.code === '23505') {
+      return { status: 200, body: { message: 'Already enrolled' } };
+    }
+    throw enrollError;
+  }
+
+  // ── Execute Actions (after enrollment is persisted) ─────────────────
+  const actionResults: ActionResult[] = [];
+
+  // Action: Create Onboarding Link
+  if (actions.create_onboarding_link?.enabled) {
+    try {
+      const { onboard_url } = await executeCreateOnboardingLink(phone, {
+        selected_membership: actions.create_onboarding_link.selected_membership,
+      });
+      templateVars.onboard_url = onboard_url;
+      actionResults.push({ action: 'create_onboarding_link', success: true });
+    } catch (err: unknown) {
+      console.error('Error creating onboarding link:', err);
+      actionResults.push({ action: 'create_onboarding_link', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+    }
+  }
+
+  // Action: Add Ledger Charge (member already verified above)
+  if (actions.add_ledger_charge?.enabled && member) {
+    const amount = Number(actions.add_ledger_charge.amount);
+    const description: string = actions.add_ledger_charge.description || 'Intake campaign charge';
+    if (!amount || amount <= 0 || !isFinite(amount)) {
+      actionResults.push({ action: 'add_ledger_charge', success: false, error: 'Invalid charge amount' });
+    } else {
+      try {
+        await executeAddLedgerCharge(member, { amount, description });
+        templateVars.charge_amount = `$${amount.toFixed(2)}`;
+        actionResults.push({ action: 'add_ledger_charge', success: true });
+      } catch (err: unknown) {
+        console.error('Error adding ledger charge:', err);
+        actionResults.push({ action: 'add_ledger_charge', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+  }
+
+  // Action: Create Event RSVP (member already verified above)
+  if (actions.create_event_rsvp?.enabled && member) {
+    const eventId = actions.create_event_rsvp.event_id;
+    if (!eventId) {
+      actionResults.push({ action: 'create_event_rsvp', success: false, error: 'No event selected' });
+    } else {
+      try {
+        const { event_title } = await executeCreateEventRsvp(member, {
+          event_id: eventId,
+          party_size: Math.max(1, actions.create_event_rsvp.party_size || 1),
+        });
+        templateVars.event_title = event_title;
+        actionResults.push({ action: 'create_event_rsvp', success: true });
+      } catch (err: unknown) {
+        console.error('Error creating event RSVP:', err);
+        actionResults.push({ action: 'create_event_rsvp', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+  }
+
+  // ── Schedule Messages ────────────────────────────────────────────────
+  const { data: messages, error: msgError } = await supabaseAdmin
+    .from('sms_intake_campaign_messages')
+    .select('*')
+    .eq('campaign_id', resolvedCampaignId)
+    .order('sort_order', { ascending: true });
+
+  if (msgError) throw msgError;
+
+  if (messages && messages.length > 0) {
+    const now = DateTime.now().setZone(DEFAULT_TIMEZONE);
+    const scheduledRows = messages.map((msg: CampaignMessageRecord) => {
+      let scheduledFor: DateTime;
+
+      if (msg.delay_minutes === 0 && !msg.send_time) {
+        scheduledFor = now;
+      } else if (msg.send_time) {
+        const delayDays = Math.floor(msg.delay_minutes / 1440);
+        const targetDay = now.plus({ days: delayDays || 1 });
+        const timeParts = (msg.send_time as string).split(':').map(Number);
+        const hours = timeParts[0] || 0;
+        const minutes = timeParts[1] || 0;
+        if (isNaN(hours) || isNaN(minutes)) {
+          scheduledFor = targetDay.set({ hour: 10, minute: 0, second: 0, millisecond: 0 });
+        } else {
+          scheduledFor = targetDay.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+        }
+
+        if (scheduledFor <= now) {
+          scheduledFor = scheduledFor.plus({ days: 1 });
+        }
+      } else {
+        scheduledFor = now.plus({ minutes: msg.delay_minutes });
+      }
+
+      const expandedContent = expandTemplateVars(msg.message_content, templateVars);
+
+      return {
+        enrollment_id: enrollment.id,
+        campaign_message_id: msg.id,
+        phone,
+        message_content: expandedContent,
+        scheduled_for: scheduledFor.toISO(),
+        status: 'pending',
+      };
+    });
+
+    const { error: schedError } = await supabaseAdmin
+      .from('sms_intake_scheduled_messages')
+      .insert(scheduledRows);
+
+    if (schedError) throw schedError;
+  }
+
+  return {
+    status: 201,
+    body: {
+      enrollment_id: enrollment.id,
+      messages_scheduled: messages?.length || 0,
+      action_results: actionResults,
+    },
+  };
+}
+
 // ── Main Handler ───────────────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -347,249 +565,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const { campaign_id, trigger_word, phone: rawPhone, source = 'manual' } = req.body;
+      const { campaign_id, trigger_word, phone, source = 'manual' } = req.body;
 
-      if (!rawPhone) {
+      if (!phone) {
         return res.status(400).json({ error: 'Phone number is required' });
       }
 
-      const phone = normalizePhone(rawPhone);
-
-      // Rate limit per phone number
-      if (!checkRateLimit(phone)) {
-        return res.status(429).json({ error: 'Too many enrollment attempts. Please try again later.' });
-      }
-
-      // Resolve campaign from trigger_word or campaign_id
-      let resolvedCampaignId = campaign_id;
-      let campaignData: CampaignRecord | null = null;
-
-      if (resolvedCampaignId) {
-        const { data } = await supabaseAdmin
-          .from('sms_intake_campaigns')
-          .select('*')
-          .eq('id', resolvedCampaignId)
-          .single();
-
-        if (data && data.status !== 'active') {
-          return res.status(400).json({ error: 'Campaign is not active' });
-        }
-        campaignData = data;
-      } else if (trigger_word) {
-        const { data } = await supabaseAdmin
-          .from('sms_intake_campaigns')
-          .select('*')
-          .ilike('trigger_word', trigger_word.trim())
-          .eq('status', 'active')
-          .single();
-
-        if (!data) {
-          return res.status(404).json({ error: 'No active campaign found for this trigger word' });
-        }
-        campaignData = data;
-        resolvedCampaignId = data.id;
-      }
-
-      if (!resolvedCampaignId || !campaignData) {
-        return res.status(400).json({ error: 'campaign_id or trigger_word is required' });
-      }
-
-      // Check for existing active enrollment
-      const { data: existing } = await supabaseAdmin
-        .from('sms_intake_enrollments')
-        .select('id')
-        .eq('campaign_id', resolvedCampaignId)
-        .eq('phone', phone)
-        .eq('status', 'active')
-        .single();
-
-      if (existing) {
-        return res.status(200).json({ message: 'Already enrolled', enrollment_id: existing.id });
-      }
-
-      // ── Execute Actions ──────────────────────────────────────────────
-      const actions = campaignData.actions || {};
-      const templateVars: Record<string, string> = {};
-      const actionResults: ActionResult[] = [];
-      let member: MemberRecord | null = null;
-
-      // Check if any action requires member lookup
-      const needsMember =
-        (actions.add_ledger_charge?.enabled) ||
-        (actions.create_event_rsvp?.enabled);
-
-      if (needsMember) {
-        member = await lookupMemberByPhone(phone);
-
-        if (!member) {
-          // Non-member trying a members-only action
-          const nonMemberMsg = campaignData.non_member_response ||
-            'We apologize but our system cannot find this phone number registered to a member. Please text us to resolve this issue.';
-
-          // Send the non-member response via OpenPhone
-          try {
-            const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': process.env.OPENPHONE_API_KEY || '',
-                'Accept': 'application/json',
-              },
-              body: JSON.stringify({
-                to: [phone],
-                from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-                content: nonMemberMsg,
-              }),
-            });
-            if (!smsResponse.ok) {
-              console.error('Failed to send non-member response:', await smsResponse.text());
-            }
-          } catch (smsError) {
-            console.error('Error sending non-member response:', smsError);
-          }
-
-          return res.status(200).json({
-            message: 'Non-member response sent',
-            is_member: false,
-          });
-        }
-
-        templateVars.member_name = member.first_name;
-      }
-
-      // Action: Create Onboarding Link
-      if (actions.create_onboarding_link?.enabled) {
-        try {
-          const { onboard_url } = await executeCreateOnboardingLink(phone, {
-            selected_membership: actions.create_onboarding_link.selected_membership,
-          });
-          templateVars.onboard_url = onboard_url;
-          actionResults.push({ action: 'create_onboarding_link', success: true });
-        } catch (err: unknown) {
-          console.error('Error creating onboarding link:', err);
-          actionResults.push({ action: 'create_onboarding_link', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
-        }
-      }
-
-      // Action: Add Ledger Charge (member already verified above)
-      if (actions.add_ledger_charge?.enabled && member) {
-        const amount = Number(actions.add_ledger_charge.amount);
-        const description: string = actions.add_ledger_charge.description || 'Intake campaign charge';
-        if (!amount || amount <= 0 || !isFinite(amount)) {
-          actionResults.push({ action: 'add_ledger_charge', success: false, error: 'Invalid charge amount' });
-        } else {
-          try {
-            await executeAddLedgerCharge(member, { amount, description });
-            templateVars.charge_amount = `$${amount.toFixed(2)}`;
-            actionResults.push({ action: 'add_ledger_charge', success: true });
-          } catch (err: unknown) {
-            console.error('Error adding ledger charge:', err);
-            actionResults.push({ action: 'add_ledger_charge', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
-          }
-        }
-      }
-
-      // Action: Create Event RSVP (member already verified above)
-      if (actions.create_event_rsvp?.enabled && member) {
-        const eventId = actions.create_event_rsvp.event_id;
-        if (!eventId) {
-          actionResults.push({ action: 'create_event_rsvp', success: false, error: 'No event selected' });
-        } else {
-          try {
-            const { event_title } = await executeCreateEventRsvp(member, {
-              event_id: eventId,
-              party_size: Math.max(1, actions.create_event_rsvp.party_size || 1),
-            });
-            templateVars.event_title = event_title;
-            actionResults.push({ action: 'create_event_rsvp', success: true });
-          } catch (err: unknown) {
-            console.error('Error creating event RSVP:', err);
-            actionResults.push({ action: 'create_event_rsvp', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
-          }
-        }
-      }
-
-      // ── Create Enrollment ────────────────────────────────────────────
-      const { data: enrollment, error: enrollError } = await supabaseAdmin
-        .from('sms_intake_enrollments')
-        .insert({
-          campaign_id: resolvedCampaignId,
-          phone,
-          source,
-          status: 'active',
-        })
-        .select()
-        .single();
-
-      if (enrollError) {
-        // Handle race condition: unique constraint violation means already enrolled
-        if (enrollError.code === '23505') {
-          return res.status(200).json({ message: 'Already enrolled' });
-        }
-        throw enrollError;
-      }
-
-      // ── Schedule Messages ────────────────────────────────────────────
-      const { data: messages, error: msgError } = await supabaseAdmin
-        .from('sms_intake_campaign_messages')
-        .select('*')
-        .eq('campaign_id', resolvedCampaignId)
-        .order('sort_order', { ascending: true });
-
-      if (msgError) throw msgError;
-
-      if (messages && messages.length > 0) {
-        const now = DateTime.now().setZone(DEFAULT_TIMEZONE);
-        const scheduledRows = messages.map((msg: CampaignMessageRecord) => {
-          let scheduledFor: DateTime;
-
-          if (msg.delay_minutes === 0 && !msg.send_time) {
-            scheduledFor = now;
-          } else if (msg.send_time) {
-            const delayDays = Math.floor(msg.delay_minutes / 1440);
-            const targetDay = now.plus({ days: delayDays || 1 });
-            const timeParts = (msg.send_time as string).split(':').map(Number);
-            const hours = timeParts[0] || 0;
-            const minutes = timeParts[1] || 0;
-            if (isNaN(hours) || isNaN(minutes)) {
-              // Default to 10:00 AM if send_time is malformed
-              scheduledFor = targetDay.set({ hour: 10, minute: 0, second: 0, millisecond: 0 });
-            } else {
-              scheduledFor = targetDay.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
-            }
-
-            if (scheduledFor <= now) {
-              scheduledFor = scheduledFor.plus({ days: 1 });
-            }
-          } else {
-            scheduledFor = now.plus({ minutes: msg.delay_minutes });
-          }
-
-          // Expand template variables in message content
-          const expandedContent = expandTemplateVars(msg.message_content, templateVars);
-
-          return {
-            enrollment_id: enrollment.id,
-            campaign_message_id: msg.id,
-            phone,
-            message_content: expandedContent,
-            scheduled_for: scheduledFor.toISO(),
-            status: 'pending',
-          };
-        });
-
-        const { error: schedError } = await supabaseAdmin
-          .from('sms_intake_scheduled_messages')
-          .insert(scheduledRows);
-
-        if (schedError) throw schedError;
-      }
-
-      return res.status(201).json({
-        enrollment_id: enrollment.id,
-        messages_scheduled: messages?.length || 0,
-        action_results: actionResults,
-      });
+      const result = await enrollPhone({ campaign_id, trigger_word, phone, source });
+      return res.status(result.status).json(result.body);
     } catch (error) {
       console.error('Error enrolling phone:', error);
       return res.status(500).json({ error: 'Failed to enroll phone number' });
