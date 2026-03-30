@@ -7,9 +7,20 @@ CREATE TABLE IF NOT EXISTS sms_intake_campaigns (
   name TEXT NOT NULL,
   trigger_word TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'inactive')),
+  actions JSONB DEFAULT '{}',
+  non_member_response TEXT DEFAULT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Actions define business logic that runs when a phone is enrolled:
+--   create_onboarding_link: Generates signup token, creates/updates waitlist entry
+--     - selected_membership: optional, pre-selects membership type (e.g., 'Skyline')
+--   add_ledger_charge: Adds a charge to the member's ledger (members only)
+--     - amount: decimal, description: text
+--   create_event_rsvp: RSVPs the member to a private event (members only)
+--     - event_id: UUID, party_size: integer (default 1)
+-- non_member_response: SMS sent when a members-only action can't find the member
 
 -- Unique constraint on trigger_word (case-insensitive)
 CREATE UNIQUE INDEX idx_sms_intake_campaigns_trigger_word

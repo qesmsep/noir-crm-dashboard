@@ -3,6 +3,40 @@ import { supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
 
 const DEFAULT_TIMEZONE = 'America/Chicago';
+const MAX_MESSAGE_LENGTH = 1600; // SMS segment limit
+
+interface MemberRecord {
+  member_id: string;
+  account_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+}
+
+interface CampaignRecord {
+  id: string;
+  name: string;
+  trigger_word: string;
+  status: string;
+  actions: Record<string, Record<string, unknown>> | null;
+  non_member_response: string | null;
+}
+
+interface CampaignMessageRecord {
+  id: string;
+  campaign_id: string;
+  message_content: string;
+  delay_minutes: number;
+  send_time: string | null;
+  sort_order: number;
+}
+
+interface ActionResult {
+  action: string;
+  success: boolean;
+  error?: string;
+}
 
 /**
  * Enroll a phone number into an intake campaign.
@@ -16,9 +50,39 @@ const DEFAULT_TIMEZONE = 'America/Chicago';
  *   ?campaign_id=UUID
  */
 
+// ── Rate Limiting ──────────────────────────────────────────────────────────
+// Simple in-memory rate limiter per phone number (5 enrollments per minute)
+const enrollmentAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function checkRateLimit(phone: string): boolean {
+  const now = Date.now();
+  const entry = enrollmentAttempts.get(phone);
+
+  if (!entry || now > entry.resetAt) {
+    enrollmentAttempts.set(phone, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
+// ── Phone Normalization ────────────────────────────────────────────────────
+// Normalize phone to E.164 format (+1XXXXXXXXXX) for consistent storage
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  if (last10.length === 10) return '+1' + last10;
+  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
+  return phone; // Return as-is if we can't normalize
+}
+
 // ── Member Lookup ──────────────────────────────────────────────────────────
 // Mirrors the checkMemberStatus logic from openphoneWebhook.js
-async function lookupMemberByPhone(phone: string) {
+async function lookupMemberByPhone(phone: string): Promise<MemberRecord | null> {
   const digits = phone.replace(/\D/g, '');
   const last10 = digits.slice(-10);
 
@@ -89,7 +153,7 @@ async function executeCreateOnboardingLink(
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    const tokenFields: Record<string, any> = {
+    const tokenFields: Record<string, string> = {
       agreement_token: signupToken,
       agreement_token_created_at: new Date().toISOString(),
       application_expires_at: expiresAt.toISOString(),
@@ -123,7 +187,7 @@ async function executeCreateOnboardingLink(
 
 // ── Action: Add Ledger Charge ──────────────────────────────────────────────
 async function executeAddLedgerCharge(
-  member: { member_id: string; account_id: string },
+  member: Pick<MemberRecord, 'member_id' | 'account_id'>,
   actionConfig: { amount: number; description: string }
 ) {
   const cstDate = DateTime.now().setZone(DEFAULT_TIMEZONE).toISODate();
@@ -145,7 +209,7 @@ async function executeAddLedgerCharge(
 
 // ── Action: Create Event RSVP ──────────────────────────────────────────────
 async function executeCreateEventRsvp(
-  member: { member_id: string; account_id: string; first_name: string; last_name: string; email: string; phone: string },
+  member: MemberRecord,
   actionConfig: { event_id: string; party_size?: number }
 ): Promise<{ event_title: string }> {
   const partySize = actionConfig.party_size || 1;
@@ -169,7 +233,7 @@ async function executeCreateEventRsvp(
     .eq('private_event_id', actionConfig.event_id);
 
   const currentAttendees = (attendeeReservations || []).reduce(
-    (sum: number, r: any) => sum + (r.party_size || 0),
+    (sum: number, r: { party_size: number }) => sum + (r.party_size || 0),
     0
   );
 
@@ -241,27 +305,7 @@ function expandTemplateVars(
 }
 
 // ── Admin Auth ─────────────────────────────────────────────────────────────
-async function verifyAdmin(req: NextApiRequest): Promise<boolean> {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return false;
-
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !user) return false;
-
-  const { data: admin } = await supabaseAdmin
-    .from('admins')
-    .select('access_level')
-    .eq('auth_user_id', user.id)
-    .eq('status', 'active')
-    .single();
-
-  return !!admin;
-}
-
-function isInternalCall(req: NextApiRequest): boolean {
-  // Allow webhook/cron internal calls via CRON_SECRET
-  return req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
-}
+import { verifyAdmin, isInternalCall } from '../../../lib/admin-auth';
 
 // ── Main Handler ───────────────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -297,15 +341,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const { campaign_id, trigger_word, phone, source = 'manual' } = req.body;
+      const { campaign_id, trigger_word, phone: rawPhone, source = 'manual' } = req.body;
 
-      if (!phone) {
+      if (!rawPhone) {
         return res.status(400).json({ error: 'Phone number is required' });
+      }
+
+      const phone = normalizePhone(rawPhone);
+
+      // Rate limit per phone number
+      if (!checkRateLimit(phone)) {
+        return res.status(429).json({ error: 'Too many enrollment attempts. Please try again later.' });
       }
 
       // Resolve campaign from trigger_word or campaign_id
       let resolvedCampaignId = campaign_id;
-      let campaignData: any = null;
+      let campaignData: CampaignRecord | null = null;
 
       if (resolvedCampaignId) {
         const { data } = await supabaseAdmin
@@ -353,8 +404,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // ── Execute Actions ──────────────────────────────────────────────
       const actions = campaignData.actions || {};
       const templateVars: Record<string, string> = {};
-      const actionResults: { action: string; success: boolean; error?: string }[] = [];
-      let member: any = null;
+      const actionResults: ActionResult[] = [];
+      let member: MemberRecord | null = null;
 
       // Check if any action requires member lookup
       const needsMember =
@@ -370,19 +421,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'We apologize but our system cannot find this phone number registered to a member. Please text us to resolve this issue.';
 
           // Send the non-member response via OpenPhone
-          await fetch('https://api.openphone.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': process.env.OPENPHONE_API_KEY || '',
-              'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-              to: [phone],
-              from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-              content: nonMemberMsg,
-            }),
-          });
+          try {
+            const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': process.env.OPENPHONE_API_KEY || '',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify({
+                to: [phone],
+                from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+                content: nonMemberMsg,
+              }),
+            });
+            if (!smsResponse.ok) {
+              console.error('Failed to send non-member response:', await smsResponse.text());
+            }
+          } catch (smsError) {
+            console.error('Error sending non-member response:', smsError);
+          }
 
           return res.status(200).json({
             message: 'Non-member response sent',
@@ -401,9 +459,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
           templateVars.onboard_url = onboard_url;
           actionResults.push({ action: 'create_onboarding_link', success: true });
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('Error creating onboarding link:', err);
-          actionResults.push({ action: 'create_onboarding_link', success: false, error: err.message });
+          actionResults.push({ action: 'create_onboarding_link', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
         }
       }
 
@@ -418,9 +476,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             await executeAddLedgerCharge(member, { amount, description });
             templateVars.charge_amount = `$${amount.toFixed(2)}`;
             actionResults.push({ action: 'add_ledger_charge', success: true });
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error('Error adding ledger charge:', err);
-            actionResults.push({ action: 'add_ledger_charge', success: false, error: err.message });
+            actionResults.push({ action: 'add_ledger_charge', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
           }
         }
       }
@@ -438,9 +496,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
             templateVars.event_title = event_title;
             actionResults.push({ action: 'create_event_rsvp', success: true });
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error('Error creating event RSVP:', err);
-            actionResults.push({ action: 'create_event_rsvp', success: false, error: err.message });
+            actionResults.push({ action: 'create_event_rsvp', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
           }
         }
       }
@@ -476,7 +534,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (messages && messages.length > 0) {
         const now = DateTime.now().setZone(DEFAULT_TIMEZONE);
-        const scheduledRows = messages.map((msg: any) => {
+        const scheduledRows = messages.map((msg: CampaignMessageRecord) => {
           let scheduledFor: DateTime;
 
           if (msg.delay_minutes === 0 && !msg.send_time) {
@@ -484,8 +542,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else if (msg.send_time) {
             const delayDays = Math.floor(msg.delay_minutes / 1440);
             const targetDay = now.plus({ days: delayDays || 1 });
-            const [hours, minutes] = msg.send_time.split(':').map(Number);
-            scheduledFor = targetDay.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+            const timeParts = (msg.send_time as string).split(':').map(Number);
+            const hours = timeParts[0] || 0;
+            const minutes = timeParts[1] || 0;
+            if (isNaN(hours) || isNaN(minutes)) {
+              // Default to 10:00 AM if send_time is malformed
+              scheduledFor = targetDay.set({ hour: 10, minute: 0, second: 0, millisecond: 0 });
+            } else {
+              scheduledFor = targetDay.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+            }
 
             if (scheduledFor <= now) {
               scheduledFor = scheduledFor.plus({ days: 1 });

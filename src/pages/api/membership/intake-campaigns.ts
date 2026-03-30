@@ -1,24 +1,42 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
-
-async function verifyAdmin(req: NextApiRequest): Promise<boolean> {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return false;
-
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !user) return false;
-
-  const { data: admin } = await supabaseAdmin
-    .from('admins')
-    .select('access_level')
-    .eq('auth_user_id', user.id)
-    .eq('status', 'active')
-    .single();
-
-  return !!admin;
-}
+import { verifyAdmin } from '../../../lib/admin-auth';
 
 const VALID_STATUSES = ['draft', 'active', 'inactive'];
+const MAX_MESSAGE_LENGTH = 1600; // SMS practical limit
+
+interface MessagePayload {
+  message_content: string;
+  delay_minutes?: number;
+  send_time?: string | null;
+}
+
+interface CampaignUpdateFields {
+  name?: string;
+  trigger_word?: string;
+  status?: string;
+  actions?: Record<string, unknown>;
+  non_member_response?: string | null;
+  updated_at: string;
+}
+
+async function logAudit(req: NextApiRequest, action: string, details: Record<string, unknown>) {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      if (user) {
+        await supabaseAdmin.from('audit_logs').insert({
+          user_id: user.id,
+          action: 'admin_update',
+          details: { intake_campaign_action: action, ...details },
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Audit log failed:', e);
+  }
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // All intake-campaigns operations require admin auth
@@ -105,6 +123,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
       }
 
+      // Validate message content length
+      for (const msg of messages) {
+        if (msg.message_content && msg.message_content.length > MAX_MESSAGE_LENGTH) {
+          return res.status(400).json({ error: `Message content exceeds ${MAX_MESSAGE_LENGTH} character limit` });
+        }
+      }
+
       // Create campaign
       const { data: campaign, error } = await supabaseAdmin
         .from('sms_intake_campaigns')
@@ -126,7 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Insert messages
-      const messageRows = messages.map((msg: any, index: number) => ({
+      const messageRows = messages.map((msg: MessagePayload, index: number) => ({
         campaign_id: campaign.id,
         message_content: msg.message_content,
         delay_minutes: msg.delay_minutes || 0,
@@ -140,6 +165,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (msgError) throw msgError;
 
+      await logAudit(req, 'create_intake_campaign', { campaign_id: campaign.id, name: campaign.name, trigger_word: campaign.trigger_word });
       return res.status(201).json(campaign);
     } catch (error) {
       console.error('Error creating intake campaign:', error);
@@ -160,7 +186,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
       }
 
-      const updateFields: any = { updated_at: new Date().toISOString() };
+      const updateFields: CampaignUpdateFields = { updated_at: new Date().toISOString() };
       if (name !== undefined) updateFields.name = name;
       if (trigger_word !== undefined) updateFields.trigger_word = trigger_word.trim();
       if (status !== undefined) updateFields.status = status;
@@ -191,7 +217,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Insert new messages
         if (messages.length > 0) {
-          const messageRows = messages.map((msg: any, index: number) => ({
+          const messageRows = messages.map((msg: MessagePayload, index: number) => ({
             campaign_id: id,
             message_content: msg.message_content,
             delay_minutes: msg.delay_minutes || 0,
@@ -207,6 +233,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      await logAudit(req, 'update_intake_campaign', { campaign_id: id, updates: Object.keys(updateFields) });
       return res.status(200).json(campaign);
     } catch (error) {
       console.error('Error updating intake campaign:', error);
@@ -228,6 +255,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (error) throw error;
 
+      await logAudit(req, 'delete_intake_campaign', { campaign_id: id });
       return res.status(200).json({ success: true });
     } catch (error) {
       console.error('Error deleting intake campaign:', error);
