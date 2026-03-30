@@ -30,13 +30,14 @@ interface Member {
   };
 }
 
-type SortField = 'name' | 'join_date' | 'renewal_date' | 'ltv' | 'balance' | null;
+type SortField = 'name' | 'join_date' | 'renewal_date' | 'mrr' | 'ltv' | 'balance' | null;
 type SortDirection = 'asc' | 'desc';
 
 export default function MembersAdmin() {
   const [members, setMembers] = useState<Member[]>([]);
   const [accountBalances, setAccountBalances] = useState<Record<string, number>>({});
   const [accountLTVs, setAccountLTVs] = useState<Record<string, number>>({});
+  const [accountMRRs, setAccountMRRs] = useState<Record<string, number>>({});
   const [failedPaymentAccounts, setFailedPaymentAccounts] = useState<Set<string>>(new Set());
   const [noSubscriptionAccounts, setNoSubscriptionAccounts] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,7 @@ export default function MembersAdmin() {
   const [sortField, setSortField] = useState<SortField>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('membersSortField');
-      return (saved === 'name' || saved === 'join_date' || saved === 'renewal_date' || saved === 'ltv' || saved === 'balance') ? saved : null;
+      return (saved === 'name' || saved === 'join_date' || saved === 'renewal_date' || saved === 'mrr' || saved === 'ltv' || saved === 'balance') ? saved : null;
     }
     return null;
   });
@@ -137,7 +138,7 @@ export default function MembersAdmin() {
       // Fetch all unique account IDs
       const accountIds = [...new Set(membersData?.map(m => m.account_id) || [])];
 
-      // Fetch account subscription data with plan name
+      // Fetch account subscription data with plan name and MRR
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
         .select(`
@@ -145,6 +146,7 @@ export default function MembersAdmin() {
           subscription_cancel_at,
           subscription_status,
           next_billing_date,
+          monthly_dues,
           subscription_plans!membership_plan_id (
             plan_name
           )
@@ -166,6 +168,13 @@ export default function MembersAdmin() {
           }
         ]) || []
       );
+
+      // Store MRR values
+      const mrrMap: Record<string, number> = {};
+      accountsData?.forEach(acc => {
+        mrrMap[acc.account_id] = Number(acc.monthly_dues) || 0;
+      });
+      setAccountMRRs(mrrMap);
 
       // Merge data
       const membersWithAccounts = membersData?.map(member => ({
@@ -228,13 +237,17 @@ export default function MembersAdmin() {
     }).replace(/\//g, '.');
   };
 
-  // Account LTV and balance from server-side calculation (single source of truth)
+  // Account LTV, balance, and MRR from server-side calculation (single source of truth)
   const getAccountLTV = (accountId: string) => {
     return accountLTVs[accountId] || 0;
   };
 
   const getAccountBalance = (accountId: string) => {
     return accountBalances[accountId] || 0;
+  };
+
+  const getAccountMRR = (accountId: string) => {
+    return accountMRRs[accountId] || 0;
   };
 
   // Get next billing date from accounts table (single source of truth)
@@ -258,6 +271,7 @@ export default function MembersAdmin() {
     account_id: string;
     primaryMember: Member;
     allMembers: Member[];
+    mrr: number;
     ltv: number;
     balance: number;
     join_date?: string;
@@ -281,6 +295,7 @@ export default function MembersAdmin() {
       account_id: accountId,
       primaryMember: primary,
       allMembers: accountMembers,
+      mrr: getAccountMRR(accountId),
       ltv: getAccountLTV(accountId),
       balance: getAccountBalance(accountId),
       join_date: primary.join_date,
@@ -355,6 +370,9 @@ export default function MembersAdmin() {
         const aRenewal = a.renewal_date ? a.renewal_date.getTime() : 0;
         const bRenewal = b.renewal_date ? b.renewal_date.getTime() : 0;
         comparison = aRenewal - bRenewal;
+        break;
+      case 'mrr':
+        comparison = a.mrr - b.mrr;
         break;
       case 'ltv':
         comparison = a.ltv - b.ltv;
@@ -604,6 +622,7 @@ export default function MembersAdmin() {
               <option value="name">Name</option>
               <option value="join_date">Sign Up</option>
               <option value="renewal_date">Renewal</option>
+              <option value="mrr">MRR</option>
               <option value="ltv">LTV</option>
               <option value="balance">Balance</option>
             </select>
@@ -693,6 +712,7 @@ export default function MembersAdmin() {
                 <option value="name">Name</option>
                 <option value="join_date">Sign Up Date</option>
                 <option value="renewal_date">Renewal Date</option>
+                <option value="mrr">MRR</option>
                 <option value="ltv">LTV</option>
                 <option value="balance">Balance</option>
               </select>
@@ -817,6 +837,10 @@ export default function MembersAdmin() {
                         </span>
                       </div>
                       <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>MRR</span>
+                        <span className={styles.mobileMetaValue}>{formatCurrency(account.mrr)}</span>
+                      </div>
+                      <div className={styles.mobileMetaItem}>
                         <span className={styles.mobileMetaLabel}>LTV</span>
                         <span className={styles.mobileMetaValue}>{formatCurrency(account.ltv)}</span>
                       </div>
@@ -859,12 +883,23 @@ export default function MembersAdmin() {
                       </span>
                     )}
                   </th>
-                  <th 
+                  <th
                     className={`${styles.sortableHeader} ${styles.thinColumn} ${sortField === 'renewal_date' ? styles.activeSort : ''}`}
                     onClick={() => handleSort('renewal_date')}
                   >
                     Renewal
                     {sortField === 'renewal_date' && (
+                      <span className={styles.sortIndicator}>
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </th>
+                  <th
+                    className={`${styles.sortableHeader} ${styles.thinColumn} ${sortField === 'mrr' ? styles.activeSort : ''}`}
+                    onClick={() => handleSort('mrr')}
+                  >
+                    MRR
+                    {sortField === 'mrr' && (
                       <span className={styles.sortIndicator}>
                         {sortDirection === 'asc' ? '↑' : '↓'}
                       </span>
@@ -1009,6 +1044,9 @@ export default function MembersAdmin() {
                       </td>
                       <td className={`${styles.dateCell} ${styles.thinCell}`}>
                         {account.renewal_date ? formatDateShort(account.renewal_date.toISOString()) : 'N/A'}
+                      </td>
+                      <td className={`${styles.ltvCell} ${styles.thinCell}`}>
+                        {formatCurrency(account.mrr)}
                       </td>
                       <td className={`${styles.ltvCell} ${styles.thinCell}`}>
                         {formatCurrency(account.ltv)}

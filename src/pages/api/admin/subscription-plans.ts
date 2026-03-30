@@ -88,6 +88,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     stripe_price_id,
     monthly_price,
     beverage_credit,
+    additional_member_fee,
     interval,
     is_active,
     show_in_onboarding,
@@ -117,6 +118,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'A plan with this name already exists' });
   }
 
+  // Calculate administrative fee from monthly_price and beverage_credit
+  const parsedMonthlyPrice = parseFloat(monthly_price);
+  const parsedBeverageCredit = beverage_credit ? parseFloat(beverage_credit) : 0;
+  const administrativeFee = parsedMonthlyPrice - parsedBeverageCredit;
+
   // Create plan
   const { data: plan, error } = await supabase
     .from('subscription_plans')
@@ -124,8 +130,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       plan_name,
       stripe_product_id: stripe_product_id || null,
       stripe_price_id: stripe_price_id || null,
-      monthly_price: parseFloat(monthly_price),
-      beverage_credit: beverage_credit ? parseFloat(beverage_credit) : 0,
+      monthly_price: parsedMonthlyPrice,
+      beverage_credit: parsedBeverageCredit,
+      administrative_fee: administrativeFee,
+      additional_member_fee: additional_member_fee ? parseFloat(additional_member_fee) : 0,
       interval,
       is_active: is_active !== undefined ? is_active : true,
       show_in_onboarding: show_in_onboarding !== undefined ? show_in_onboarding : true,
@@ -154,6 +162,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     stripe_price_id,
     monthly_price,
     beverage_credit,
+    additional_member_fee,
     interval,
     is_active,
     show_in_onboarding,
@@ -172,6 +181,13 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
   if (stripe_price_id !== undefined) updateData.stripe_price_id = stripe_price_id;
   if (monthly_price !== undefined) updateData.monthly_price = parseFloat(monthly_price);
   if (beverage_credit !== undefined) updateData.beverage_credit = beverage_credit ? parseFloat(beverage_credit) : 0;
+  if (additional_member_fee !== undefined) updateData.additional_member_fee = additional_member_fee ? parseFloat(additional_member_fee) : 0;
+
+  // Calculate administrative_fee if both monthly_price and beverage_credit are being updated
+  if (monthly_price !== undefined && beverage_credit !== undefined) {
+    updateData.administrative_fee = parseFloat(monthly_price) - (beverage_credit ? parseFloat(beverage_credit) : 0);
+  }
+
   if (interval !== undefined) {
     if (!['month', 'year'].includes(interval)) {
       return res.status(400).json({ error: 'Invalid interval. Must be "month" or "year"' });

@@ -207,7 +207,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
                   <p className={styles.sectionDescription}>
                     Specify how many additional members to bill for at ${plans.find(p => p.plan_id === selectedPlanId)?.additional_member_fee || 25}/month each
                   </p>
-                  <div className={styles.memberCountInput}>
+                  <div className={styles.memberCountInput} onClick={(e) => e.stopPropagation()}>
                     <label className={styles.inputLabel}>Number of Additional Members:</label>
                     <input
                       type="number"
@@ -215,6 +215,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
                       className={styles.numberInput}
                       value={additionalMemberCount}
                       onChange={(e) => setAdditionalMemberCount(Math.max(0, parseInt(e.target.value) || 0))}
+                      onMouseDown={(e) => e.stopPropagation()}
                     />
                     {currentSecondaryCount > 0 && currentSecondaryCount !== additionalMemberCount && (
                       <div className={styles.memberCountNote}>

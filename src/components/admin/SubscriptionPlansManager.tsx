@@ -19,6 +19,7 @@ export default function SubscriptionPlansManager() {
     plan_name: '',
     monthly_price: '',
     admin_fee: '', // UI uses admin_fee, calculated to beverage_credit on save
+    additional_member_fee: '', // Fee per additional member
     interval: 'month',
     is_active: true,
     show_in_onboarding: true,
@@ -68,6 +69,7 @@ export default function SubscriptionPlansManager() {
       plan_name: '',
       monthly_price: '',
       admin_fee: '',
+      additional_member_fee: '25.00', // Default to $25/month
       interval: 'month',
       is_active: true,
       show_in_onboarding: true,
@@ -88,6 +90,7 @@ export default function SubscriptionPlansManager() {
       plan_name: plan.plan_name,
       monthly_price: plan.monthly_price.toString(),
       admin_fee: adminFee,
+      additional_member_fee: ((plan as any).additional_member_fee || 0).toString(),
       interval: plan.interval,
       is_active: plan.is_active,
       show_in_onboarding: (plan as any).show_in_onboarding ?? true,
@@ -119,11 +122,13 @@ export default function SubscriptionPlansManager() {
       const monthlyPrice = parseFloat(formData.monthly_price);
       const adminFee = parseFloat(formData.admin_fee || '0');
       const beverageCredit = monthlyPrice - adminFee;
+      const additionalMemberFee = parseFloat(formData.additional_member_fee || '0');
 
       // Send data with beverage_credit (not admin_fee) since that's what DB expects
       const dataToSend = {
         ...formData,
         beverage_credit: beverageCredit.toFixed(2),
+        additional_member_fee: additionalMemberFee.toFixed(2),
         admin_fee: undefined // Remove admin_fee from payload
       };
 
@@ -254,6 +259,9 @@ export default function SubscriptionPlansManager() {
                   <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
                     <div>💳 Beverage Credit: ${plan.beverage_credit.toFixed(2)}</div>
                     <div>⚙️ Admin Fee: ${(plan.monthly_price - plan.beverage_credit).toFixed(2)}</div>
+                    {(plan as any).additional_member_fee > 0 && (
+                      <div>👥 Additional Member: ${((plan as any).additional_member_fee || 0).toFixed(2)}/{plan.interval}</div>
+                    )}
                   </div>
                 )}
 
@@ -341,7 +349,23 @@ export default function SubscriptionPlansManager() {
                   </label>
                   <select
                     value={formData.interval}
-                    onChange={(e) => setFormData({ ...formData, interval: e.target.value })}
+                    onChange={(e) => {
+                      const newInterval = e.target.value;
+                      // Auto-adjust additional member fee based on interval
+                      const currentFee = parseFloat(formData.additional_member_fee || '0');
+                      let newFee = formData.additional_member_fee;
+
+                      // If changing to yearly and fee looks like monthly rate, convert it
+                      if (newInterval === 'year' && currentFee === 25) {
+                        newFee = '300.00'; // 25 * 12
+                      }
+                      // If changing to monthly and fee looks like yearly rate, convert it
+                      else if (newInterval === 'month' && currentFee === 300) {
+                        newFee = '25.00'; // 300 / 12
+                      }
+
+                      setFormData({ ...formData, interval: newInterval, additional_member_fee: newFee });
+                    }}
                     required
                     style={{
                       width: '100%',
@@ -405,6 +429,32 @@ export default function SubscriptionPlansManager() {
                         : '0.00'}
                     </p>
                   </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Additional Member Fee {formData.interval === 'year' ? '(per year)' : '(per month)'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.additional_member_fee}
+                    onChange={(e) => setFormData({ ...formData, additional_member_fee: e.target.value })}
+                    placeholder={formData.interval === 'year' ? '300.00' : '25.00'}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      userSelect: 'text',
+                      WebkitUserSelect: 'text',
+                    }}
+                  />
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                    {formData.interval === 'year'
+                      ? 'Fee charged per additional member per year (typically $25/month × 12 = $300/year)'
+                      : 'Fee charged per additional member per month (typically $25/month)'}
+                  </p>
                 </div>
 
                 <div>
