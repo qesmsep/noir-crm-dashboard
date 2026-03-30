@@ -84,10 +84,16 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
   };
 
   const handleSubmit = async () => {
-    if (!selectedPlanId || (selectedPlanId === currentPlanId && subscriptionStatus === 'active')) {
+    // Allow submission if:
+    // 1. A plan is selected
+    // 2. Either the plan changed OR the additional member count changed
+    const planChanged = selectedPlanId !== currentPlanId;
+    const memberCountChanged = additionalMemberCount !== currentSecondaryCount;
+
+    if (!selectedPlanId || (selectedPlanId === currentPlanId && subscriptionStatus === 'active' && !memberCountChanged)) {
       toast({
         title: 'Info',
-        description: 'Please select a different plan',
+        description: 'Please select a different plan or change the additional member count',
       });
       return;
     }
@@ -205,7 +211,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
                 <div className={styles.additionalMembersSection}>
                   <h4 className={styles.sectionTitle}>Additional Members</h4>
                   <p className={styles.sectionDescription}>
-                    Specify how many additional members to bill for at ${plans.find(p => p.plan_id === selectedPlanId)?.additional_member_fee || 25}/month each
+                    Specify how many additional members to bill for at ${plans.find(p => p.plan_id === selectedPlanId)?.additional_member_fee || 25}/{plans.find(p => p.plan_id === selectedPlanId)?.interval || 'month'} each
                   </p>
                   <div className={styles.memberCountInput} onClick={(e) => e.stopPropagation()}>
                     <label className={styles.inputLabel}>Number of Additional Members:</label>
@@ -284,7 +290,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
           <button
             className={styles.submitButton}
             onClick={handleSubmit}
-            disabled={submitting || !selectedPlanId || (selectedPlanId === currentPlanId && subscriptionStatus === 'active')}
+            disabled={submitting || !selectedPlanId || (selectedPlanId === currentPlanId && subscriptionStatus === 'active' && additionalMemberCount === currentSecondaryCount)}
           >
             {submitting ? (subscriptionStatus === 'canceled' ? 'Reactivating...' : 'Updating...') : (subscriptionStatus === 'canceled' ? 'Reactivate & Update Plan' : 'Update Plan')}
           </button>

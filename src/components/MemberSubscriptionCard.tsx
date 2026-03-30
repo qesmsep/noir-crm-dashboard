@@ -134,18 +134,20 @@ export default function MemberSubscriptionCard({
         console.error('Error fetching members:', err);
       }
 
-      // Get plan details to check if it's annual
+      // Get plan details to check if it's annual and get base price
+      let planBasePrice = 0;
       if (account.membership_plan_id) {
         try {
           const { data: plan, error: planError } = await supabase
             .from('subscription_plans')
-            .select('interval, plan_name')
+            .select('interval, plan_name, monthly_price')
             .eq('id', account.membership_plan_id)
             .single();
 
           if (!planError && plan) {
             planInterval = plan.interval || 'month';
             planName = plan.plan_name || '';
+            planBasePrice = Number(plan.monthly_price || 0);
           }
         } catch (err) {
           console.error('Error fetching plan:', err);
@@ -155,26 +157,21 @@ export default function MemberSubscriptionCard({
       // All subscriptions are now app-managed (no Stripe subscriptions)
       let isPaused = account.subscription_status === 'paused';
 
-      // Get base amount from monthly_dues field (contains total: base + additional member fees)
-      let calculatedBaseMRR = account.monthly_dues ? Number(account.monthly_dues) : 0;
-
-      // monthly_dues includes additional member fees, so subtract them to get the base plan amount
-      // Use the account's locked-in additional_member_fee (set at signup)
-      const accountAdditionalMemberFee = Number(account.additional_member_fee || 0);
-      if (secondaryMemberCount > 0 && accountAdditionalMemberFee > 0) {
-        const additionalMemberFees = planInterval === 'year'
-          ? secondaryMemberCount * accountAdditionalMemberFee * 12
-          : secondaryMemberCount * accountAdditionalMemberFee;
-        calculatedBaseMRR = Math.max(0, calculatedBaseMRR - additionalMemberFees);
-      }
+      // Calculate base and additional member fees
+      // Base = plan's monthly_price, additional = monthly_dues - base
+      const totalMRR = account.monthly_dues ? Number(account.monthly_dues) : 0;
+      const calculatedBaseMRR = planBasePrice || totalMRR; // Use plan base price if available
+      const additionalMemberCharges = Math.max(0, totalMRR - calculatedBaseMRR);
 
       // Determine additional member fee rate from the account's locked-in fee
-      // Skyline: $0, Standard monthly: $25/mo, Annual: $25/mo × 12 = $300/yr
-      const feeRate = planInterval === 'year'
-        ? accountAdditionalMemberFee * 12
-        : accountAdditionalMemberFee;
+      // Fee is already at the correct interval rate (e.g., $25/month or $300/year)
+      const accountAdditionalMemberFee = Number(account.additional_member_fee || 0);
+      const feeRate = accountAdditionalMemberFee;
 
-      setAdditionalMembersCount(secondaryMemberCount);
+      // Calculate how many additional members are being charged
+      const chargedAdditionalMembers = feeRate > 0 ? Math.round(additionalMemberCharges / feeRate) : 0;
+
+      setAdditionalMembersCount(chargedAdditionalMembers); // Show charged count, not actual member count
       setBaseMRR(calculatedBaseMRR);
       setAdditionalMemberFeeRate(feeRate);
       setBillingInterval(planInterval as 'month' | 'year');
