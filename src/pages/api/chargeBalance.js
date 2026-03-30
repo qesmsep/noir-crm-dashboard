@@ -107,15 +107,33 @@ export default async function handler(req, res) {
     baseAmount = Math.round(Number(custom_amount) * 100);
     chargeDescription = custom_description || 'Custom charge';
   } else {
-    // Use existing balance logic
-    const { data: ledgerRows, error: ledgerErr } = await supabase
-      .from('ledger')
-      .select('amount')
-      .eq('account_id', account_id);
-    if (ledgerErr) {
-      return res.status(500).json({ error: ledgerErr.message });
+    // Use existing balance logic (paginated to handle accounts with >1000 transactions)
+    const ledgerRows = [];
+    let from = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('ledger')
+        .select('amount')
+        .eq('account_id', account_id)
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+
+      if (data && data.length > 0) {
+        ledgerRows.push(...data);
+        from += pageSize;
+        hasMore = data.length === pageSize;
+      } else {
+        hasMore = false;
+      }
     }
-    const balance = (ledgerRows || []).reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const balance = ledgerRows.reduce((sum, t) => sum + Number(t.amount), 0);
     if (balance >= 0) {
       return res.status(400).json({ error: 'No outstanding balance' });
     }

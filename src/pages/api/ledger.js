@@ -16,14 +16,34 @@ function getTodayLocalDate() {
 }
 
 // Fetch all ledger rows (no row limit) and aggregate per-account balances and LTVs
+// Supabase has a default 1000-row limit, so we paginate to get all rows
 async function aggregateAccountData() {
-  const { data: allTx, error } = await supabaseAdmin
-    .from("ledger")
-    .select("account_id, type, amount, note");
-  if (error) throw error;
+  const allTx = [];
+  let from = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  // Paginate through all ledger entries
+  while (hasMore) {
+    const { data, error } = await supabaseAdmin
+      .from("ledger")
+      .select("account_id, type, amount, note")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allTx.push(...data);
+      from += pageSize;
+      hasMore = data.length === pageSize; // Continue if we got a full page
+    } else {
+      hasMore = false;
+    }
+  }
+
   const balances = {};
   const ltvs = {};
-  (allTx || []).forEach(tx => {
+  allTx.forEach(tx => {
     const aid = tx.account_id;
     const amt = Number(tx.amount);
     if (!balances[aid]) balances[aid] = 0;

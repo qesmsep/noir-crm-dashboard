@@ -16,25 +16,56 @@ export default async function handler(req, res) {
     const targetMonth = month ? parseInt(month) : currentDate.getMonth();
     const targetYear = year ? parseInt(year) : currentDate.getFullYear();
 
-    // Fetch all ledger transactions
-    const { data: ledgerData, error: ledgerError } = await supabaseAdmin
-      .from("ledger")
-      .select("*")
-      .order("date", { ascending: true });
+    // Fetch all ledger transactions (paginated to avoid 1000-row limit)
+    const ledgerData = [];
+    let ledgerFrom = 0;
+    const pageSize = 1000;
+    let hasMoreLedger = true;
 
-    if (ledgerError) {
-      console.error("Ledger fetch error:", ledgerError);
-      return res.status(500).json({ error: ledgerError.message });
+    while (hasMoreLedger) {
+      const { data, error } = await supabaseAdmin
+        .from("ledger")
+        .select("*")
+        .order("date", { ascending: true })
+        .range(ledgerFrom, ledgerFrom + pageSize - 1);
+
+      if (error) {
+        console.error("Ledger fetch error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      if (data && data.length > 0) {
+        ledgerData.push(...data);
+        ledgerFrom += pageSize;
+        hasMoreLedger = data.length === pageSize;
+      } else {
+        hasMoreLedger = false;
+      }
     }
 
-    // Fetch all members
-    const { data: membersData, error: membersError } = await supabaseAdmin
-      .from("members")
-      .select("*");
+    // Fetch all members (paginated to avoid 1000-row limit)
+    const membersData = [];
+    let membersFrom = 0;
+    let hasMoreMembers = true;
 
-    if (membersError) {
-      console.error("Members fetch error:", membersError);
-      return res.status(500).json({ error: membersError.message });
+    while (hasMoreMembers) {
+      const { data, error } = await supabaseAdmin
+        .from("members")
+        .select("*")
+        .range(membersFrom, membersFrom + pageSize - 1);
+
+      if (error) {
+        console.error("Members fetch error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      if (data && data.length > 0) {
+        membersData.push(...data);
+        membersFrom += pageSize;
+        hasMoreMembers = data.length === pageSize;
+      } else {
+        hasMoreMembers = false;
+      }
     }
 
     // Helper function to check if transaction is in target month
