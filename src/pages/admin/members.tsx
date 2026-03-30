@@ -127,11 +127,11 @@ export default function MembersAdmin() {
     try {
       const supabase = getSupabaseClient();
 
-      // Fetch members (active and paused, not archived)
+      // Fetch members (active, paused, and archived)
       const { data: membersData, error: membersError } = await supabase
         .from('members')
         .select('*')
-        .in('status', ['active', 'paused']); // Show active and paused, exclude inactive/pending/incomplete
+        .in('status', ['active', 'paused', 'archived']); // Include archived for canceled filter
 
       if (membersError) throw membersError;
 
@@ -306,14 +306,27 @@ export default function MembersAdmin() {
 
   // Apply filters
   const filteredAccounts = accounts.filter(account => {
+    // Exclude accounts where all members are archived (unless filtering for canceled)
+    const hasArchivedMembers = account.allMembers.some(m => m.status === 'archived');
+    const allMembersArchived = account.allMembers.every(m => m.status === 'archived');
+
     // Filter by subscription status
     if (statusFilter !== 'all') {
       const status = account.accounts?.subscription_status;
       if (statusFilter === 'active' && status !== 'active') return false;
-      if (statusFilter === 'canceled' && !isAccountCancelled(account)) return false;
+      if (statusFilter === 'canceled') {
+        // Show canceled accounts OR accounts with archived members
+        if (!isAccountCancelled(account) && !hasArchivedMembers) return false;
+      }
       if (statusFilter === 'past_due' && status !== 'past_due') return false;
       if (statusFilter === 'paused' && status !== 'paused') return false;
+    } else {
+      // For "all" filter, exclude accounts where all members are archived
+      if (allMembersArchived) return false;
     }
+
+    // Exclude fully archived accounts from non-canceled filters
+    if (statusFilter !== 'canceled' && allMembersArchived) return false;
 
     // Filter by membership plan
     if (planFilter !== 'all') {
