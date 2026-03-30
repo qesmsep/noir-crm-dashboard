@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isVercelCron = req.headers['x-vercel-cron'] === '1' ||
     req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
 
-  if (!isVercelCron && req.method === 'GET') {
+  if (!isVercelCron) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

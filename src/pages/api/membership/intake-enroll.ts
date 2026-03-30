@@ -224,20 +224,52 @@ async function executeCreateEventRsvp(
 }
 
 // ── Template Variable Expansion ────────────────────────────────────────────
+// Only expand known safe variable names - no dynamic regex from user input
+const KNOWN_TEMPLATE_VARS = ['onboard_url', 'member_name', 'charge_amount', 'event_title'];
+
 function expandTemplateVars(
   content: string,
   vars: Record<string, string>
 ): string {
   let result = content;
-  for (const [key, value] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+  for (const key of KNOWN_TEMPLATE_VARS) {
+    if (vars[key]) {
+      result = result.split(`{{${key}}}`).join(vars[key]);
+    }
   }
   return result;
+}
+
+// ── Admin Auth ─────────────────────────────────────────────────────────────
+async function verifyAdmin(req: NextApiRequest): Promise<boolean> {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return false;
+
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) return false;
+
+  const { data: admin } = await supabaseAdmin
+    .from('admins')
+    .select('access_level')
+    .eq('auth_user_id', user.id)
+    .eq('status', 'active')
+    .single();
+
+  return !!admin;
+}
+
+function isInternalCall(req: NextApiRequest): boolean {
+  // Allow webhook/cron internal calls via CRON_SECRET
+  return req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
 }
 
 // ── Main Handler ───────────────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
+    // GET requires admin auth
+    if (!(await verifyAdmin(req))) {
+      return res.status(401).json({ error: 'Admin authentication required' });
+    }
     try {
       const { campaign_id } = req.query;
       if (!campaign_id) {
@@ -259,6 +291,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'POST') {
+    // POST requires admin auth OR internal call (from webhook)
+    if (!isInternalCall(req) && !(await verifyAdmin(req))) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     try {
       const { campaign_id, trigger_word, phone, source = 'manual' } = req.body;
 
@@ -276,6 +313,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .select('*')
           .eq('id', resolvedCampaignId)
           .single();
+
+        if (data && data.status !== 'active') {
+          return res.status(400).json({ error: 'Campaign is not active' });
+        }
         campaignData = data;
       } else if (trigger_word) {
         const { data } = await supabaseAdmin
@@ -312,6 +353,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // ── Execute Actions ──────────────────────────────────────────────
       const actions = campaignData.actions || {};
       const templateVars: Record<string, string> = {};
+      const actionResults: { action: string; success: boolean; error?: string }[] = [];
       let member: any = null;
 
       // Check if any action requires member lookup
@@ -358,34 +400,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             selected_membership: actions.create_onboarding_link.selected_membership,
           });
           templateVars.onboard_url = onboard_url;
-        } catch (err) {
+          actionResults.push({ action: 'create_onboarding_link', success: true });
+        } catch (err: any) {
           console.error('Error creating onboarding link:', err);
+          actionResults.push({ action: 'create_onboarding_link', success: false, error: err.message });
         }
       }
 
       // Action: Add Ledger Charge (member already verified above)
       if (actions.add_ledger_charge?.enabled && member) {
-        try {
-          await executeAddLedgerCharge(member, {
-            amount: actions.add_ledger_charge.amount,
-            description: actions.add_ledger_charge.description,
-          });
-          templateVars.charge_amount = `$${Number(actions.add_ledger_charge.amount).toFixed(2)}`;
-        } catch (err) {
-          console.error('Error adding ledger charge:', err);
+        const amount = Number(actions.add_ledger_charge.amount);
+        const description = actions.add_ledger_charge.description || 'Intake campaign charge';
+        if (!amount || amount <= 0 || !isFinite(amount)) {
+          actionResults.push({ action: 'add_ledger_charge', success: false, error: 'Invalid charge amount' });
+        } else {
+          try {
+            await executeAddLedgerCharge(member, { amount, description });
+            templateVars.charge_amount = `$${amount.toFixed(2)}`;
+            actionResults.push({ action: 'add_ledger_charge', success: true });
+          } catch (err: any) {
+            console.error('Error adding ledger charge:', err);
+            actionResults.push({ action: 'add_ledger_charge', success: false, error: err.message });
+          }
         }
       }
 
       // Action: Create Event RSVP (member already verified above)
       if (actions.create_event_rsvp?.enabled && member) {
-        try {
-          const { event_title } = await executeCreateEventRsvp(member, {
-            event_id: actions.create_event_rsvp.event_id,
-            party_size: actions.create_event_rsvp.party_size,
-          });
-          templateVars.event_title = event_title;
-        } catch (err) {
-          console.error('Error creating event RSVP:', err);
+        const eventId = actions.create_event_rsvp.event_id;
+        if (!eventId) {
+          actionResults.push({ action: 'create_event_rsvp', success: false, error: 'No event selected' });
+        } else {
+          try {
+            const { event_title } = await executeCreateEventRsvp(member, {
+              event_id: eventId,
+              party_size: Math.max(1, parseInt(actions.create_event_rsvp.party_size) || 1),
+            });
+            templateVars.event_title = event_title;
+            actionResults.push({ action: 'create_event_rsvp', success: true });
+          } catch (err: any) {
+            console.error('Error creating event RSVP:', err);
+            actionResults.push({ action: 'create_event_rsvp', success: false, error: err.message });
+          }
         }
       }
 
@@ -401,7 +457,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .select()
         .single();
 
-      if (enrollError) throw enrollError;
+      if (enrollError) {
+        // Handle race condition: unique constraint violation means already enrolled
+        if (enrollError.code === '23505') {
+          return res.status(200).json({ message: 'Already enrolled' });
+        }
+        throw enrollError;
+      }
 
       // ── Schedule Messages ────────────────────────────────────────────
       const { data: messages, error: msgError } = await supabaseAdmin
@@ -455,7 +517,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(201).json({
         enrollment_id: enrollment.id,
         messages_scheduled: messages?.length || 0,
-        actions_executed: Object.keys(actions).filter(k => actions[k]?.enabled),
+        action_results: actionResults,
       });
     } catch (error) {
       console.error('Error enrolling phone:', error);

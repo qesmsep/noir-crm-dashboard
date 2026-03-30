@@ -11,7 +11,18 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
+import { getSupabaseClient } from '@/pages/api/supabaseClient';
 import { Plus, Edit, Trash2, MessageSquare, UserPlus, GripVertical, Zap } from 'lucide-react';
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const supabase = getSupabaseClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return { 'Content-Type': 'application/json' };
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`,
+  };
+}
 
 interface CampaignMessage {
   id?: string;
@@ -162,7 +173,8 @@ export default function IntakeCampaignManager() {
 
   const loadCampaigns = async () => {
     try {
-      const response = await fetch('/api/membership/intake-campaigns');
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/membership/intake-campaigns', { headers });
       if (response.ok) {
         const data = await response.json();
         setCampaigns(data);
@@ -213,7 +225,8 @@ export default function IntakeCampaignManager() {
 
   const handleEdit = async (campaign: IntakeCampaign) => {
     try {
-      const response = await fetch(`/api/membership/intake-campaigns?id=${campaign.id}`);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/membership/intake-campaigns?id=${campaign.id}`, { headers });
       if (response.ok) {
         const data = await response.json();
         setEditingCampaign(data);
@@ -266,9 +279,10 @@ export default function IntakeCampaignManager() {
         non_member_response: nonMemberResponse || null,
       };
 
+      const headers = await getAuthHeaders();
       const response = await fetch('/api/membership/intake-campaigns', {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       });
 
@@ -290,7 +304,8 @@ export default function IntakeCampaignManager() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
     try {
-      const response = await fetch(`/api/membership/intake-campaigns?id=${id}`, { method: 'DELETE' });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/membership/intake-campaigns?id=${id}`, { method: 'DELETE', headers });
       if (response.ok) {
         toast({ title: 'Success', description: 'Campaign deleted' });
         loadCampaigns();
@@ -308,9 +323,10 @@ export default function IntakeCampaignManager() {
 
     setEnrolling(true);
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch('/api/membership/intake-enroll', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           campaign_id: enrollCampaignId,
           phone: enrollPhone.trim(),

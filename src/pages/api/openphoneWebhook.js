@@ -992,7 +992,10 @@ export async function handler(req, res) {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
       const enrollResponse = await fetch(`${baseUrl}/api/membership/intake-enroll`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+        },
         body: JSON.stringify({
           campaign_id: matchedCampaign.id,
           phone: from,

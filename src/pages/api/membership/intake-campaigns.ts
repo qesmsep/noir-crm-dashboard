@@ -1,7 +1,31 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
 
+async function verifyAdmin(req: NextApiRequest): Promise<boolean> {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return false;
+
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) return false;
+
+  const { data: admin } = await supabaseAdmin
+    .from('admins')
+    .select('access_level')
+    .eq('auth_user_id', user.id)
+    .eq('status', 'active')
+    .single();
+
+  return !!admin;
+}
+
+const VALID_STATUSES = ['draft', 'active', 'inactive'];
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // All intake-campaigns operations require admin auth
+  if (!(await verifyAdmin(req))) {
+    return res.status(401).json({ error: 'Admin authentication required' });
+  }
+
   if (req.method === 'GET') {
     try {
       const { id } = req.query;
@@ -76,13 +100,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'At least one message is required' });
       }
 
+      const campaignStatus = status || 'draft';
+      if (!VALID_STATUSES.includes(campaignStatus)) {
+        return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
+
       // Create campaign
       const { data: campaign, error } = await supabaseAdmin
         .from('sms_intake_campaigns')
         .insert({
           name,
           trigger_word: trigger_word.trim(),
-          status: status || 'draft',
+          status: campaignStatus,
           actions: actions || {},
           non_member_response: non_member_response || null,
         })
@@ -127,6 +156,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Update campaign
+      if (status !== undefined && !VALID_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
+
       const updateFields: any = { updated_at: new Date().toISOString() };
       if (name !== undefined) updateFields.name = name;
       if (trigger_word !== undefined) updateFields.trigger_word = trigger_word.trim();
