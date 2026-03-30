@@ -33,9 +33,12 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [chargeToday, setChargeToday] = useState(true);
+  const [additionalMemberCount, setAdditionalMemberCount] = useState<number>(0);
+  const [currentSecondaryCount, setCurrentSecondaryCount] = useState<number>(0);
 
   useEffect(() => {
     fetchPlans();
+    fetchCurrentMemberCount();
   }, []);
 
   const fetchPlans = async () => {
@@ -60,6 +63,26 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
     }
   };
 
+  const fetchCurrentMemberCount = async () => {
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`);
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Get the count of secondary members from the account
+      const account = result.data;
+      const secondaryCount = account.secondary_member_count || 0;
+      setCurrentSecondaryCount(secondaryCount);
+      setAdditionalMemberCount(secondaryCount); // Pre-populate with current count
+    } catch (error: any) {
+      console.error('Error fetching member count:', error);
+      // Don't show error toast for this, just default to 0
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedPlanId || (selectedPlanId === currentPlanId && subscriptionStatus === 'active')) {
       toast({
@@ -78,6 +101,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
           account_id: accountId,
           new_plan_id: selectedPlanId,
           charge_today: chargeToday,
+          additional_member_count: additionalMemberCount,
         }),
       });
 
@@ -175,6 +199,47 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
                   );
                 })}
               </div>
+
+              {/* Additional Members Section */}
+              {selectedPlanId && (
+                <div className={styles.additionalMembersSection}>
+                  <h4 className={styles.sectionTitle}>Additional Members</h4>
+                  <p className={styles.sectionDescription}>
+                    Specify how many additional members to bill for at ${plans.find(p => p.plan_id === selectedPlanId)?.additional_member_fee || 25}/month each
+                  </p>
+                  <div className={styles.memberCountInput}>
+                    <label className={styles.inputLabel}>Number of Additional Members:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className={styles.numberInput}
+                      value={additionalMemberCount}
+                      onChange={(e) => setAdditionalMemberCount(Math.max(0, parseInt(e.target.value) || 0))}
+                    />
+                    {currentSecondaryCount > 0 && currentSecondaryCount !== additionalMemberCount && (
+                      <div className={styles.memberCountNote}>
+                        Note: Account has {currentSecondaryCount} member{currentSecondaryCount !== 1 ? 's' : ''} in the system
+                      </div>
+                    )}
+                  </div>
+                  {selectedPlanId && additionalMemberCount > 0 && (
+                    <div className={styles.pricingSummary}>
+                      <div className={styles.summaryRow}>
+                        <span>Base Plan:</span>
+                        <span>{formatCurrency(plans.find(p => p.plan_id === selectedPlanId)?.monthly_price || 0)}</span>
+                      </div>
+                      <div className={styles.summaryRow}>
+                        <span>Additional Members ({additionalMemberCount} × ${plans.find(p => p.plan_id === selectedPlanId)?.additional_member_fee || 25}):</span>
+                        <span>{formatCurrency((plans.find(p => p.plan_id === selectedPlanId)?.additional_member_fee || 25) * additionalMemberCount)}</span>
+                      </div>
+                      <div className={`${styles.summaryRow} ${styles.total}`}>
+                        <span>Total Monthly Dues:</span>
+                        <span>{formatCurrency((plans.find(p => p.plan_id === selectedPlanId)?.monthly_price || 0) + ((plans.find(p => p.plan_id === selectedPlanId)?.additional_member_fee || 25) * additionalMemberCount))}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {subscriptionStatus === 'canceled' && (
                 <div className={styles.paymentTiming}>

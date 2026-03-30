@@ -567,8 +567,7 @@ export default function BusinessDashboard() {
       const { count: memberCount } = await supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'active')
-        .eq('deactivated', false);
+        .eq('status', 'active');
       setActiveMemberCount(memberCount ?? null);
 
       // Fetch active accounts count (distinct accounts with Skyline, Solo, or Duo memberships)

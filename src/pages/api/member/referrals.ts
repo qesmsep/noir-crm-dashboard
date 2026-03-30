@@ -43,7 +43,7 @@ export default async function handler(
     // Get all members who used this referral code
     const { data: referredMembers, error: referralError } = await supabaseAdmin
       .from('members')
-      .select('member_id, deactivated')
+      .select('member_id, status')
       .eq('referred_by', member.referral_code);
 
     if (referralError) {
@@ -52,7 +52,7 @@ export default async function handler(
     }
 
     const total = referredMembers?.length || 0;
-    const active = referredMembers?.filter(m => !m.deactivated).length || 0;
+    const active = referredMembers?.filter(m => m.status !== 'inactive').length || 0;
 
     res.status(200).json({
       stats: {

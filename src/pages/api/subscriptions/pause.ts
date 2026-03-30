@@ -65,6 +65,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error(`Failed to pause subscription: ${updateError.message}`);
     }
 
+    // Update all non-archived members to paused status
+    await supabase
+      .from('members')
+      .update({ status: 'paused' })
+      .eq('account_id', account_id)
+      .in('status', ['active', 'paused']);
+
     // Log pause event
     await supabase.from('subscription_events').insert({
       account_id,

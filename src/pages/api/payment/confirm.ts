@@ -332,7 +332,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       dob: waitlist.date_of_birth,
       photo: waitlist.photo_url,
       join_date: startDate,
-      deactivated: false
+      status: 'active'
     })
     .select()
     .single();

@@ -45,7 +45,7 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
         .select('member_id')
         .eq('account_id', accountId)
         .eq('member_type', 'primary')
-        .eq('deactivated', false)
+        .in('status', ['active', 'paused'])
         .single();
 
       if (error || !data) {

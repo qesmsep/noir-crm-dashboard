@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     let query = supabase
       .from('members')
       .select('member_id, account_id, phone, first_name, last_name')
-      .eq('deactivated', false)
+      .in('status', ['active', 'paused'])
       .not('phone', 'is', null);
     
     if (member_ids && Array.isArray(member_ids) && member_ids.length > 0) {

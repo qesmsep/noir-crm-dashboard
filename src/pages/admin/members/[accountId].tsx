@@ -247,14 +247,14 @@ export default function MemberDetailAdmin() {
         const { data, error } = await supabase
           .from('members')
           .select('account_id')
-          .eq('deactivated', false)
-          .neq('status', 'pending')
+          .in('status', ['active', 'paused'])
           .order('join_date', { ascending: true });
 
         if (error) throw error;
 
         // Get unique account IDs
-        const uniqueAccountIds = [...new Set(data?.map(m => m.account_id) || [])];
+        const accountIds = data?.map((m: any) => m.account_id as string) || [];
+        const uniqueAccountIds = [...new Set<string>(accountIds)];
         setAllAccountIds(uniqueAccountIds);
 
         // Find current account index
@@ -296,7 +296,7 @@ export default function MemberDetailAdmin() {
           .from('members')
           .select('*')
           .eq('account_id', accountId)
-          .eq('deactivated', false);
+          .in('status', ['active', 'paused']);
 
         if (error) throw error;
 

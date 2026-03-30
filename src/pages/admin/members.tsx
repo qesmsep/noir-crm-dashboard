@@ -126,12 +126,12 @@ export default function MembersAdmin() {
     try {
       const supabase = getSupabaseClient();
 
-      // Fetch members
+      // Fetch members (active and paused, not archived)
       const { data: membersData, error: membersError } = await supabase
         .from('members')
         .select('*')
         .eq('deactivated', false)
-        .neq('status', 'pending'); // Exclude pending members from main list
+        .in('status', ['active', 'paused']); // Show active and paused, exclude inactive/pending/incomplete
 
       if (membersError) throw membersError;
 

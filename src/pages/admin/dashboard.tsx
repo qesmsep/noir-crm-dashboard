@@ -464,7 +464,7 @@ export default function Dashboard() {
           <DashboardCard
             label="Active Members"
             value={totalMembers}
-            description="Members with active accounts (not deactivated)"
+            description="Members with active or paused accounts"
           />
 
           <DashboardCard

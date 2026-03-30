@@ -408,11 +408,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log(`🔄 Found ${members.length} members with renewals today`);
       } else if (triggerType === 'all_members') {
         console.log('👥 Fetching all active members for all_members campaign...');
-        // Get all active members for all_members campaigns (not deactivated)
+        // Get all active members for all_members campaigns
         const { data: allMembers, error: membersError } = await supabaseAdmin
           .from('members')
           .select('*')
-          .eq('deactivated', false);
+          .in('status', ['active', 'paused']);
 
         if (membersError) {
           console.error('❌ Error fetching all members:', membersError);

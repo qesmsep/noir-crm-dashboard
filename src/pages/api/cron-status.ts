@@ -32,7 +32,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('members')
       .select('member_id, first_name, last_name, membership, monthly_credit, last_credit_date, credit_renewal_date')
       .eq('membership', 'Skyline')
-      .eq('deactivated', false)
       .eq('status', 'active');
 
     if (membersError) {

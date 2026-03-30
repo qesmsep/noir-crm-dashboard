@@ -40,12 +40,12 @@ export default async function handler(
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Get all members in the same account
+    // Get all members in the same account (active and paused, not archived)
     const { data: accountMembers, error: membersError } = await supabaseAdmin
       .from('members')
       .select('*')
       .eq('account_id', member.account_id)
-      .eq('deactivated', false)
+      .in('status', ['active', 'paused'])
       .order('created_at', { ascending: true });
 
     if (membersError) {

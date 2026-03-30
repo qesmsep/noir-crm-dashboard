@@ -19,6 +19,7 @@ const supabase = createClient(
  *   - account_id: UUID
  *   - new_plan_id: UUID (ID from subscription_plans table)
  *   - charge_today: boolean (optional, default true for canceled accounts)
+ *   - additional_member_count: number (optional, manually specify billing count; defaults to database count)
  *
  * Returns:
  *   - account: Updated account data
@@ -29,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, new_plan_id, charge_today = true } = req.body;
+  const { account_id, new_plan_id, charge_today = true, additional_member_count } = req.body;
 
   if (!account_id || !new_plan_id) {
     return res.status(400).json({ error: 'account_id and new_plan_id are required' });
@@ -66,15 +67,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const additionalMemberFeeRate = newPlan.additional_member_fee || 0;
     const billingInterval = newPlan.interval || 'month';
 
-    // Count secondary members to recalculate monthly dues
-    const { data: secondaryMembers } = await supabase
-      .from('members')
-      .select('member_id')
-      .eq('account_id', account_id)
-      .eq('member_type', 'secondary')
-      .eq('deactivated', false);
+    // Use provided additional_member_count if specified, otherwise count from database
+    let secondaryMemberCount: number;
+    if (additional_member_count !== undefined && additional_member_count !== null) {
+      // Use the manually specified count
+      secondaryMemberCount = Math.max(0, parseInt(additional_member_count));
+      console.log(`   Using manually specified additional member count: ${secondaryMemberCount}`);
+    } else {
+      // Count secondary members from database (fallback for backwards compatibility)
+      const { data: secondaryMembers } = await supabase
+        .from('members')
+        .select('member_id')
+        .eq('account_id', account_id)
+        .eq('member_type', 'secondary')
+        .in('status', ['active', 'paused']);
 
-    const secondaryMemberCount = secondaryMembers?.length || 0;
+      secondaryMemberCount = secondaryMembers?.length || 0;
+      console.log(`   Counted additional members from database: ${secondaryMemberCount}`);
+    }
 
     // Calculate new monthly dues: base + (additional members * fee from plan)
     const newMonthlyDues = basePriceAmount + (secondaryMemberCount * additionalMemberFeeRate);
@@ -93,39 +103,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`   Charge today: ${charge_today}`);
 
     // Calculate next billing date
-    let nextBillingDate: Date;
-    if (charge_today || !isCanceled) {
-      // If charging today or updating active subscription, next billing is interval from today
-      nextBillingDate = new Date();
-      if (billingInterval === 'year') {
-        nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
-      } else {
-        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-      }
-    } else {
-      // If NOT charging today on canceled account, calculate next billing from their last renewal cycle
-      // Get the last payment date from ledger
-      const { data: lastPayment } = await supabase
-        .from('ledger')
-        .select('date')
-        .eq('account_id', account_id)
-        .in('type', ['credit', 'payment'])
-        .order('date', { ascending: false })
-        .limit(1)
-        .single();
+    let nextBillingDate: Date | null = null;
 
-      const baseDate = lastPayment?.date ? new Date(lastPayment.date) : new Date(account.subscription_start_date || new Date());
-      nextBillingDate = new Date(baseDate);
-
-      // Add intervals until we're in the future
-      while (nextBillingDate < new Date()) {
+    // Only recalculate next_billing_date if reactivating a canceled subscription
+    if (isCanceled) {
+      if (charge_today) {
+        // Reactivating and charging today: next billing is interval from today
+        nextBillingDate = new Date();
         if (billingInterval === 'year') {
           nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
         } else {
           nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
         }
+      } else {
+        // Reactivating but NOT charging today: calculate next billing from their last renewal cycle
+        const { data: lastPayment } = await supabase
+          .from('ledger')
+          .select('date')
+          .eq('account_id', account_id)
+          .in('type', ['credit', 'payment'])
+          .order('date', { ascending: false })
+          .limit(1)
+          .single();
+
+        const baseDate = lastPayment?.date ? new Date(lastPayment.date) : new Date(account.subscription_start_date || new Date());
+        nextBillingDate = new Date(baseDate);
+
+        // Add intervals until we're in the future
+        while (nextBillingDate < new Date()) {
+          if (billingInterval === 'year') {
+            nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+          } else {
+            nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+          }
+        }
       }
     }
+    // If updating an active subscription, keep the existing next_billing_date
 
     // Update account with new monthly dues, membership plan, and lock in the fees
     const updateData: any = {
@@ -133,8 +147,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       membership_plan_id: new_plan_id,
       administrative_fee: adminFee,
       additional_member_fee: additionalMemberFeeRate,
-      next_billing_date: nextBillingDate.toISOString(),
     };
+
+    // Only update next_billing_date if we recalculated it (i.e., reactivating canceled subscription)
+    if (nextBillingDate) {
+      updateData.next_billing_date = nextBillingDate.toISOString();
+    }
 
     // Reactivate if canceled
     if (isCanceled) {
@@ -152,6 +170,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (updateError) {
       throw new Error(`Failed to update plan: ${updateError.message}`);
+    }
+
+    // If reactivating canceled subscription, update all inactive/paused members to active
+    // Note: This will reactivate archived members too. Admin can re-archive if needed.
+    if (isCanceled) {
+      await supabase
+        .from('members')
+        .update({ status: 'active' })
+        .eq('account_id', account_id)
+        .in('status', ['inactive', 'paused']);
     }
 
     // If charging today, charge the account
@@ -206,7 +234,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let message = `Subscription ${eventType}d successfully. New monthly dues: $${newMonthlyDues}`;
     if (isCanceled && charge_today && charged) {
       message += ` (charged $${newMonthlyDues} today)`;
-    } else if (isCanceled && !charge_today) {
+    } else if (isCanceled && !charge_today && nextBillingDate) {
       message += ` (will be charged on ${nextBillingDate.toLocaleDateString()})`;
     }
 

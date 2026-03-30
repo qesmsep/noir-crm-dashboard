@@ -43,7 +43,7 @@ export default function ArchivedMembersModal({ isOpen, onClose, onUnarchiveSucce
       const { data, error } = await supabase
         .from('members')
         .select('*')
-        .eq('deactivated', true)
+        .eq('status', 'inactive')
         .order('first_name', { ascending: true });
 
       if (error) throw error;

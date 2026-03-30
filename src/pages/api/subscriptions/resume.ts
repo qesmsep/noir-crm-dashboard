@@ -64,6 +64,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error(`Failed to resume subscription: ${updateError.message}`);
     }
 
+    // Update all paused members back to active status
+    await supabase
+      .from('members')
+      .update({ status: 'active' })
+      .eq('account_id', account_id)
+      .eq('status', 'paused');
+
     // Log resume event
     await supabase.from('subscription_events').insert({
       account_id,

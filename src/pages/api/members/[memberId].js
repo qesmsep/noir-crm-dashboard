@@ -30,10 +30,10 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Member not found' });
       }
 
-      // Instead of deleting, set a deactivated flag
+      // Instead of deleting, set status to inactive
       const { error } = await supabase
         .from('members')
-        .update({ deactivated: true })
+        .update({ status: 'inactive' })
         .eq('member_id', memberId);
 
       if (error) {
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
                     .select('member_id')
                     .eq('account_id', member.account_id)
                     .eq('member_type', 'secondary')
-                    .eq('deactivated', false);
+                    .in('status', ['active', 'paused']);
 
                   const secondaryMemberCount = remainingMembers?.length || 0;
 

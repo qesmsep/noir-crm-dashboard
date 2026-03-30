@@ -69,8 +69,8 @@ export default async function handler(
     // Get all active members and normalize phone numbers in-memory to handle various formats
     const { data: members, error: memberError } = await supabaseAdmin
       .from('members')
-      .select('member_id, first_name, email, phone, deactivated')
-      .eq('deactivated', false)
+      .select('member_id, first_name, email, phone, status')
+      .in('status', ['active', 'paused'])
       .not('phone', 'is', null);
 
     if (memberError) {

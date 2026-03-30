@@ -68,7 +68,7 @@ export default async function handler(
       .from('members')
       .select('member_id, member_type, membership, monthly_dues, next_renewal_date')
       .eq('account_id', member.account_id)
-      .eq('deactivated', false);
+      .in('status', ['active', 'paused']);
 
     if (membersError) {
       console.error('Error fetching members:', membersError);

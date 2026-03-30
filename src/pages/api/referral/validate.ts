@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('members')
       .select('member_id, first_name, last_name, referral_code')
       .eq('referral_code', code.toUpperCase())
-      .eq('deactivated', false)
+      .in('status', ['active', 'paused'])
       .single();
 
     if (error || !member) {

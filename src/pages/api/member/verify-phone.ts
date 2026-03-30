@@ -37,8 +37,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get all active members and filter in memory (since we need to normalize database phone numbers)
     const { data: members, error } = await supabase
       .from('members')
-      .select('member_id, first_name, last_name, phone, password_hash, deactivated')
-      .eq('deactivated', false)
+      .select('member_id, first_name, last_name, phone, password_hash, status')
+      .in('status', ['active', 'paused'])
       .not('phone', 'is', null);
 
     if (error) {

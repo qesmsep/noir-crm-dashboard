@@ -45,7 +45,6 @@ export default function PendingMembersModal({ isOpen, onClose, onStatusChangeSuc
         .from('members')
         .select('*')
         .eq('status', 'pending')
-        .eq('deactivated', false)
         .order('join_date', { ascending: false });
 
       if (error) throw error;

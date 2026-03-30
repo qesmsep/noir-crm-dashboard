@@ -67,7 +67,7 @@ function maskPhone(phone: string): string {
  *
  * @param phone - Phone number in any format (will be normalized)
  * @param select - Supabase select string. Must include 'member_id'.
- * @param opts.includeDeactivated - If true, skips the deactivated=false filter (needed for lockout checks)
+ * @param opts.includeDeactivated - If true, includes inactive members (needed for lockout checks)
  * @returns The matched member row, or null
  */
 export async function findMemberByPhone<T extends MemberBase = MemberBase>(
@@ -81,11 +81,11 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
     return null;
   }
 
-  const filterDeactivated = !opts?.includeDeactivated;
+  const filterInactive = !opts?.includeDeactivated;
 
   // 1. Exact match (fastest)
   let query1 = supabaseAdmin.from('members').select(select).eq('phone', normalized);
-  if (filterDeactivated) query1 = query1.eq('deactivated', false);
+  if (filterInactive) query1 = query1.in('status', ['active', 'paused']);
   const result1 = await query1.limit(1);
 
   if (result1.error) {
@@ -97,7 +97,7 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
 
   // 2. Try with +1 prefix
   let query2 = supabaseAdmin.from('members').select(select).eq('phone', `+1${normalized}`);
-  if (filterDeactivated) query2 = query2.eq('deactivated', false);
+  if (filterInactive) query2 = query2.in('status', ['active', 'paused']);
   const result2 = await query2.limit(1);
 
   if (result2.error) {
@@ -114,7 +114,7 @@ export async function findMemberByPhone<T extends MemberBase = MemberBase>(
   const fallbackSelect = selectFields.includes('phone') ? select : `${select}, phone`;
 
   let query3 = supabaseAdmin.from('members').select(fallbackSelect).not('phone', 'is', null);
-  if (filterDeactivated) query3 = query3.eq('deactivated', false);
+  if (filterInactive) query3 = query3.in('status', ['active', 'paused']);
   const result3 = await query3.limit(FALLBACK_MEMBER_LIMIT);
 
   if (result3.error) {
@@ -158,7 +158,7 @@ interface LockableMember {
  * Check if account is locked
  */
 export async function isAccountLocked(phone: string): Promise<{ locked: boolean; until?: Date }> {
-  // Include deactivated members — lockout status must be visible regardless of account status
+  // Include inactive members — lockout status must be visible regardless of account status
   const member = await findMemberByPhone<LockableMember>(phone, 'member_id, phone, account_locked_until, failed_login_count', { includeDeactivated: true });
 
   if (!member || !member.account_locked_until) {

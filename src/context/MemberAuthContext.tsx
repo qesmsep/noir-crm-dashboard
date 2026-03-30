@@ -17,7 +17,7 @@ interface Member {
   monthly_credit: number;
   last_credit_date: string | null;
   credit_renewal_date: string | null;
-  deactivated: boolean;
+  status: string;
   auth_user_id: string | null;
   photo?: string | null; // Migrated photo field
   profile_photo_url: string | null;

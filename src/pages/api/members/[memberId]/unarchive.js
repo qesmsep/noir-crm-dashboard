@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     // Get member details before reactivating
     const { data: member, error: memberError } = await supabase
       .from('members')
-      .select('member_id, account_id, member_type, first_name, last_name, deactivated')
+      .select('member_id, account_id, member_type, first_name, last_name, status')
       .eq('member_id', memberId)
       .single();
 
@@ -34,14 +34,14 @@ export default async function handler(req, res) {
     }
 
     // Check if member is actually archived
-    if (member.deactivated === false) {
+    if (member.status !== 'inactive') {
       return res.status(400).json({ error: 'Member is not archived' });
     }
 
-    // Reactivate the member
+    // Reactivate the member - set status to active
     const { error } = await supabase
       .from('members')
-      .update({ deactivated: false })
+      .update({ status: 'active' })
       .eq('member_id', memberId);
 
     if (error) {

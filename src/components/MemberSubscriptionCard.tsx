@@ -102,10 +102,11 @@ export default function MemberSubscriptionCard({
       try {
         const { data: members, error: membersError } = await supabase
           .from('members')
-          .select('member_id, member_type, deactivated')
+          .select('member_id, member_type, deactivated, status')
           .eq('account_id', accountId)
           .eq('member_type', 'secondary')
-          .eq('deactivated', false);
+          .eq('deactivated', false)
+          .in('status', ['active', 'paused']);
 
         if (!membersError && members) {
           secondaryMemberCount = members.length;

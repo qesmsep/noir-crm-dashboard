@@ -55,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('members')
       .select('member_id, member_type')
       .eq('account_id', account_id)
-      .eq('deactivated', false);
+      .in('status', ['active', 'paused']);
 
     if (membersError) {
       throw membersError;
@@ -73,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...member_data,
       account_id,
       member_type: 'secondary',
-      deactivated: false,
+      status: 'active',
       created_at: new Date().toISOString(),
       join_date: new Date().toISOString().split('T')[0],
     };

@@ -321,8 +321,8 @@ export async function generateSnapshot(monthStr: string, sb?: SupabaseClient): P
     const accountStatus = m.accounts?.subscription_status || null;
     const interval = m.accounts?.plan_interval || 'month';
 
-    const isActive = m.status === 'active' && accountDues > 0;
-    const isPaused = m.status === 'inactive' && !m.deactivated;
+    const isActive = m.status === 'active' && !m.deactivated && accountDues > 0;
+    const isPaused = m.status === 'paused';
 
     // DATA CONTRACT: For annual plans, accounts.monthly_dues stores the full
     // annual amount (e.g. $1200), NOT a monthly equivalent. For monthly plans it

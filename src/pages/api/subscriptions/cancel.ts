@@ -62,6 +62,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error(`Failed to cancel subscription: ${updateError.message}`);
     }
 
+    // Update all non-archived members to inactive status
+    await supabase
+      .from('members')
+      .update({ status: 'inactive' })
+      .eq('account_id', account_id)
+      .in('status', ['active', 'paused']);
+
     // Log cancellation event
     await supabase.from('subscription_events').insert({
       account_id,

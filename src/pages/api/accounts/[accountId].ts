@@ -37,11 +37,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (accounts.length > 1) {
         console.error(`Multiple accounts found for ID: ${accountId}`, accounts.length);
-        // Return the first one but log the issue
-        return res.json({ success: true, data: accounts[0] });
       }
 
-      return res.json({ success: true, data: accounts[0] });
+      const account = accounts[0];
+
+      // Count secondary members for this account
+      const { data: secondaryMembers, error: membersError } = await supabase
+        .from('members')
+        .select('member_id')
+        .eq('account_id', accountId)
+        .eq('member_type', 'secondary')
+        .in('status', ['active', 'paused']);
+
+      const secondaryMemberCount = membersError ? 0 : (secondaryMembers?.length || 0);
+
+      // Add secondary_member_count to the account data
+      const accountWithMemberCount = {
+        ...account,
+        secondary_member_count: secondaryMemberCount,
+      };
+
+      return res.json({ success: true, data: accountWithMemberCount });
     } catch (error: any) {
       console.error('Unexpected error:', error);
       return res.status(500).json({ error: error.message || 'Internal server error' });
