@@ -203,15 +203,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw error;
       }
 
-      // If messages provided, replace all messages
+      // If messages provided, replace all messages (insert-first to prevent data loss)
       if (messages) {
-        // Delete existing messages
-        await supabaseAdmin
+        // Get existing message IDs before replacement
+        const { data: existingMsgs } = await supabaseAdmin
           .from('sms_intake_campaign_messages')
-          .delete()
+          .select('id')
           .eq('campaign_id', id);
+        const oldIds = (existingMsgs || []).map((m: { id: string }) => m.id);
 
-        // Insert new messages
+        // Insert new messages first — if this fails, old messages are preserved
         if (messages.length > 0) {
           const messageRows = messages.map((msg: MessagePayload, index: number) => ({
             campaign_id: id,
@@ -226,6 +227,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .insert(messageRows);
 
           if (msgError) throw msgError;
+        }
+
+        // Delete old messages only after new ones are safely inserted
+        if (oldIds.length > 0) {
+          await supabaseAdmin
+            .from('sms_intake_campaign_messages')
+            .delete()
+            .in('id', oldIds);
         }
       }
 

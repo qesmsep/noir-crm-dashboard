@@ -12,7 +12,7 @@ import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { getSupabaseClient } from '@/pages/api/supabaseClient';
-import { Plus, Edit, Trash2, MessageSquare, UserPlus, GripVertical, Zap } from 'lucide-react';
+import { Plus, Edit, Trash2, MessageSquare, UserPlus, Zap } from 'lucide-react';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const supabase = getSupabaseClient();
@@ -188,7 +188,8 @@ export default function IntakeCampaignManager() {
 
   const loadEvents = async () => {
     try {
-      const response = await fetch('/api/private_events');
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/private_events', { headers });
       if (response.ok) {
         const data = await response.json();
         setEvents((data || []).filter((e: PrivateEvent) => e.status === 'active'));
@@ -200,7 +201,8 @@ export default function IntakeCampaignManager() {
 
   const loadPlans = async () => {
     try {
-      const response = await fetch('/api/admin/subscription-plans');
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/admin/subscription-plans', { headers });
       if (response.ok) {
         const data = await response.json();
         setPlans((data || []).filter((p: SubscriptionPlan) => p.is_active));
@@ -318,6 +320,13 @@ export default function IntakeCampaignManager() {
   const handleEnroll = async () => {
     if (!enrollPhone.trim() || !enrollCampaignId) {
       toast({ title: 'Error', description: 'Phone number is required', variant: 'error' });
+      return;
+    }
+
+    // Basic phone format check — must have at least 10 digits
+    const digits = enrollPhone.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 15) {
+      toast({ title: 'Error', description: 'Please enter a valid phone number (10-15 digits)', variant: 'error' });
       return;
     }
 
@@ -572,7 +581,7 @@ export default function IntakeCampaignManager() {
               <Select
                 id="campaign-status"
                 value={editingCampaign?.status || 'draft'}
-                onChange={(e) => setEditingCampaign(prev => prev ? { ...prev, status: e.target.value as any } : prev)}
+                onChange={(e) => setEditingCampaign(prev => prev ? { ...prev, status: e.target.value as IntakeCampaign['status'] } : prev)}
                 className="mt-1 text-sm h-9"
               >
                 <option value="draft">Draft</option>
@@ -849,7 +858,6 @@ export default function IntakeCampaignManager() {
                   <div key={index} className="border border-border-cream-1 rounded-xl p-3 bg-[#FAFAF8]">
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center gap-2">
-                        <GripVertical className="w-4 h-4 text-text-muted" />
                         <span className="text-xs font-semibold text-[#353535]">
                           Message {index + 1}
                         </span>

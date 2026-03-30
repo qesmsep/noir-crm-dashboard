@@ -145,6 +145,7 @@ async function executeCreateOnboardingLink(
         .update(tokenFields)
         .eq('id', existingEntry.id);
     } else {
+      // Space char satisfies NOT NULL constraint — matches legacy webhook pattern
       await supabaseAdmin.from('waitlist').insert({
         phone,
         first_name: ' ',
@@ -350,25 +351,29 @@ export async function enrollPhone(params: {
       const nonMemberMsg = campaignData.non_member_response ||
         'We apologize but our system cannot find this phone number registered to a member. Please text us to resolve this issue.';
 
-      try {
-        const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': process.env.OPENPHONE_API_KEY || '',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({
-            to: [phone],
-            from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-            content: nonMemberMsg,
-          }),
-        });
-        if (!smsResponse.ok) {
-          console.error('Failed to send non-member response:', await smsResponse.text());
+      if (process.env.OPENPHONE_API_KEY) {
+        try {
+          const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': process.env.OPENPHONE_API_KEY,
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+              to: [phone],
+              from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+              content: nonMemberMsg,
+            }),
+          });
+          if (!smsResponse.ok) {
+            console.error('Failed to send non-member response:', await smsResponse.text());
+          }
+        } catch (smsError) {
+          console.error('Error sending non-member response:', smsError);
         }
-      } catch (smsError) {
-        console.error('Error sending non-member response:', smsError);
+      } else {
+        console.error('OPENPHONE_API_KEY is not configured — cannot send non-member response');
       }
 
       return { status: 200, body: { message: 'Non-member response sent', is_member: false } };

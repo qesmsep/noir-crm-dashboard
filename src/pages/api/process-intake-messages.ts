@@ -1,18 +1,26 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../lib/supabase';
 
+const MAX_RETRIES = 3;
+
 /**
  * Process pending SMS intake campaign messages.
  * Called by Vercel cron, manually, or directly from the webhook.
  * Sends messages whose scheduled_for time has passed.
+ * Failed messages are retried up to MAX_RETRIES times with exponential backoff.
  */
 
 // Exported so the webhook can call it directly without an HTTP round-trip
 export async function processIntakeMessages(): Promise<{ processed: number; sent: number; failed: number }> {
+  if (!process.env.OPENPHONE_API_KEY) {
+    console.error('OPENPHONE_API_KEY is not configured');
+    throw new Error('OPENPHONE_API_KEY is not configured');
+  }
+
   try {
     const now = new Date().toISOString();
 
-    // Get pending messages that are due
+    // Get pending messages that are due (includes retries that have waited long enough)
     const { data: pendingMessages, error } = await supabaseAdmin
       .from('sms_intake_scheduled_messages')
       .select('*')
@@ -37,7 +45,7 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': process.env.OPENPHONE_API_KEY || '',
+            'Authorization': process.env.OPENPHONE_API_KEY,
             'Accept': 'application/json',
           },
           body: JSON.stringify({
@@ -56,40 +64,35 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
         } else {
           const errorText = await response.text();
           console.error(`Failed to send intake message ${msg.id}:`, errorText);
-          await supabaseAdmin
-            .from('sms_intake_scheduled_messages')
-            .update({ status: 'failed', error_message: errorText.substring(0, 500) })
-            .eq('id', msg.id);
+          await handleSendFailure(msg, errorText.substring(0, 500));
           failed++;
         }
       } catch (sendError) {
         console.error(`Error sending intake message ${msg.id}:`, sendError);
-        await supabaseAdmin
-          .from('sms_intake_scheduled_messages')
-          .update({
-            status: 'failed',
-            error_message: sendError instanceof Error ? sendError.message : 'Unknown error',
-          })
-          .eq('id', msg.id);
+        await handleSendFailure(msg, sendError instanceof Error ? sendError.message : 'Unknown error');
         failed++;
       }
     }
 
-    // Mark enrollments as completed if all messages sent
+    // Mark enrollments as completed if all messages are sent/permanently failed
     const enrollmentIds = [...new Set(pendingMessages.map(m => m.enrollment_id))];
-    for (const enrollmentId of enrollmentIds) {
-      const { data: remaining } = await supabaseAdmin
+    if (enrollmentIds.length > 0) {
+      // Single query: find enrollments that still have pending messages
+      const { data: pendingRemaining } = await supabaseAdmin
         .from('sms_intake_scheduled_messages')
-        .select('id')
-        .eq('enrollment_id', enrollmentId)
-        .eq('status', 'pending')
-        .limit(1);
+        .select('enrollment_id')
+        .in('enrollment_id', enrollmentIds)
+        .eq('status', 'pending');
 
-      if (!remaining || remaining.length === 0) {
+      const stillPending = new Set((pendingRemaining || []).map(r => r.enrollment_id));
+
+      // Mark enrollments with no remaining pending messages as completed
+      const completedIds = enrollmentIds.filter(id => !stillPending.has(id));
+      if (completedIds.length > 0) {
         await supabaseAdmin
           .from('sms_intake_enrollments')
           .update({ status: 'completed' })
-          .eq('id', enrollmentId);
+          .in('id', completedIds);
       }
     }
 
@@ -97,6 +100,36 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
   } catch (error) {
     console.error('Error processing intake messages:', error);
     throw error;
+  }
+}
+
+// Retry with exponential backoff or mark as permanently failed
+async function handleSendFailure(msg: { id: string; retry_count: number }, errorMessage: string) {
+  const newRetryCount = (msg.retry_count || 0) + 1;
+
+  if (newRetryCount < MAX_RETRIES) {
+    // Exponential backoff: 2min, 8min, 32min
+    const backoffMinutes = Math.pow(2, newRetryCount * 2 - 1);
+    const nextAttempt = new Date(Date.now() + backoffMinutes * 60_000).toISOString();
+
+    await supabaseAdmin
+      .from('sms_intake_scheduled_messages')
+      .update({
+        retry_count: newRetryCount,
+        error_message: errorMessage,
+        scheduled_for: nextAttempt, // Push back for retry
+      })
+      .eq('id', msg.id);
+  } else {
+    // Max retries exhausted — permanently mark as failed
+    await supabaseAdmin
+      .from('sms_intake_scheduled_messages')
+      .update({
+        status: 'failed',
+        retry_count: newRetryCount,
+        error_message: errorMessage,
+      })
+      .eq('id', msg.id);
   }
 }
 

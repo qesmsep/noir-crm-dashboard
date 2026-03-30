@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS sms_intake_scheduled_messages (
   scheduled_for TIMESTAMPTZ NOT NULL,
   sent_at TIMESTAMPTZ DEFAULT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'cancelled')),
+  retry_count INTEGER NOT NULL DEFAULT 0,
   error_message TEXT DEFAULT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
