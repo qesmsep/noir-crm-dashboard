@@ -325,7 +325,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!member) {
           // Non-member trying a members-only action
           const nonMemberMsg = campaignData.non_member_response ||
-            'Thank you for your interest. This offer is available to Noir members only. For membership info, text MEMBERSHIP.';
+            'We apologize but our system cannot find this phone number registered to a member. Please text us to resolve this issue.';
 
           // Send the non-member response via OpenPhone
           await fetch('https://api.openphone.com/v1/messages', {

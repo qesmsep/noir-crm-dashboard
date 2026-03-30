@@ -776,7 +776,7 @@ export default function IntakeCampaignManager() {
                     <Textarea
                       value={nonMemberResponse}
                       onChange={(e) => setNonMemberResponse(e.target.value)}
-                      placeholder="Thank you for your interest. This offer is available to Noir members only. For membership info, text MEMBERSHIP."
+                      placeholder="We apologize but our system cannot find this phone number registered to a member. Please text us to resolve this issue."
                       rows={3}
                       className="text-sm"
                     />
