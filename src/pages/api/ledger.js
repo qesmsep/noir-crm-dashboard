@@ -88,16 +88,22 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: error.message });
       }
 
-      // When fetching for a specific account, compute balance server-side
+      // When fetching for a specific account, compute balance and LTV server-side
       // from ALL rows (not limited) so it matches the admin page calculation.
       let balance;
+      let ltv;
       if (account_id) {
         const { data: balRows, error: balErr } = await supabaseAdmin
           .from("ledger")
-          .select("amount")
+          .select("amount, type, note")
           .eq("account_id", account_id);
         if (!balErr && balRows) {
           balance = Math.round(balRows.reduce((sum, tx) => sum + Number(tx.amount), 0) * 100) / 100;
+          ltv = Math.round(balRows
+            .filter(tx => tx.type === 'payment' && Number(tx.amount) > 0 &&
+              !tx.note?.includes('4%') &&
+              !tx.note?.toLowerCase().includes('processing fee'))
+            .reduce((sum, tx) => sum + Number(tx.amount), 0) * 100) / 100;
         }
       }
 
@@ -123,7 +129,7 @@ export default async function handler(req, res) {
         }
       }
 
-      return res.status(200).json({ data, ...(balance !== undefined && { balance }) });
+      return res.status(200).json({ data, ...(balance !== undefined && { balance }), ...(ltv !== undefined && { ltv }) });
     }
 
     if (req.method === "POST") {
