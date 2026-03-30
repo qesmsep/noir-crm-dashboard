@@ -186,6 +186,10 @@ export default function MemberDetailAdmin() {
     referredByMember: { member_id: string; first_name: string; last_name: string } | null;
   }>>({});
 
+  // Navigation state for next/previous member
+  const [allAccountIds, setAllAccountIds] = useState<string[]>([]);
+  const [currentAccountIndex, setCurrentAccountIndex] = useState<number>(-1);
+
   const toggleMemberExpansion = async (memberId: string) => {
     const isExpanding = !expandedMemberIds.has(memberId);
 
@@ -232,6 +236,52 @@ export default function MemberDetailAdmin() {
       } catch (error) {
         console.error('Error fetching referral details:', error);
       }
+    }
+  };
+
+  // Fetch all account IDs for navigation
+  useEffect(() => {
+    async function fetchAllAccountIds() {
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('members')
+          .select('account_id')
+          .eq('deactivated', false)
+          .neq('status', 'pending')
+          .order('join_date', { ascending: true });
+
+        if (error) throw error;
+
+        // Get unique account IDs
+        const uniqueAccountIds = [...new Set(data?.map(m => m.account_id) || [])];
+        setAllAccountIds(uniqueAccountIds);
+
+        // Find current account index
+        if (accountId) {
+          const index = uniqueAccountIds.indexOf(accountId as string);
+          setCurrentAccountIndex(index);
+        }
+      } catch (err: any) {
+        console.error('Error fetching account IDs for navigation:', err);
+      }
+    }
+
+    fetchAllAccountIds();
+  }, [accountId]);
+
+  // Navigation functions
+  const goToNextMember = () => {
+    if (currentAccountIndex < allAccountIds.length - 1) {
+      const nextAccountId = allAccountIds[currentAccountIndex + 1];
+      router.push(`/admin/members/${nextAccountId}`);
+    }
+  };
+
+  const goToPreviousMember = () => {
+    if (currentAccountIndex > 0) {
+      const prevAccountId = allAccountIds[currentAccountIndex - 1];
+      router.push(`/admin/members/${prevAccountId}`);
     }
   };
 
@@ -1559,15 +1609,37 @@ export default function MemberDetailAdmin() {
   return (
     <AdminLayout>
       <div className={styles.container}>
-        {/* Header with Back Button and Search */}
+        {/* Header with Back Button, Navigation, and Search */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', maxWidth: '600px', padding: '0 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', maxWidth: '600px', padding: '0 1rem', flexWrap: 'wrap' }}>
             <button
               onClick={() => router.push('/admin/members')}
               className={styles.backButton}
             >
               ← Members
             </button>
+
+            {/* Navigation Buttons */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={goToPreviousMember}
+                disabled={currentAccountIndex <= 0}
+                className={styles.navButton}
+                title="Previous member"
+                aria-label="Go to previous member"
+              >
+                ←
+              </button>
+              <button
+                onClick={goToNextMember}
+                disabled={currentAccountIndex >= allAccountIds.length - 1}
+                className={styles.navButton}
+                title="Next member"
+                aria-label="Go to next member"
+              >
+                →
+              </button>
+            </div>
 
             {/* Member Search */}
             <div style={{ position: 'relative', flex: 1 }}>
