@@ -85,6 +85,7 @@ export default function MemberDetailAdmin() {
   // Data states
   const [members, setMembers] = useState<Member[]>([]);
   const [ledger, setLedger] = useState<LedgerTransaction[]>([]);
+  const [accountBalance, setAccountBalance] = useState<number>(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [memberAttributes, setMemberAttributes] = useState<Record<string, Attribute[]>>({});
   const [memberNotes, setMemberNotes] = useState<Record<string, Note[]>>({});
@@ -306,11 +307,16 @@ export default function MemberDetailAdmin() {
         const res = await fetch(`/api/ledger?account_id=${accountId}`);
         const result = await res.json();
         if (result.error) throw new Error(result.error);
+        const entries = result.data || [];
         // Sort by date descending (most recent first)
-        const sortedLedger = (result.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
+        const sortedLedger = entries.sort((a: LedgerTransaction, b: LedgerTransaction) => {
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
         setLedger(sortedLedger);
+        // Use server-computed balance (not limited by row cap)
+        if (result.balance !== undefined) {
+          setAccountBalance(result.balance);
+        }
       } catch (err: any) {
         console.error('Ledger fetch error:', err);
         toast({
@@ -489,6 +495,34 @@ export default function MemberDetailAdmin() {
     }).format(amount);
   };
 
+  // Refresh ledger data and recalculate account balance (single source of truth).
+  // Re-throws so callers can skip their success toast on failure.
+  const refreshLedger = async () => {
+    try {
+      const res = await fetch(`/api/ledger?account_id=${accountId}`);
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      const entries = result.data || [];
+      const sortedLedger = entries.sort((a: LedgerTransaction, b: LedgerTransaction) => {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+      setLedger(sortedLedger);
+      // Use server-computed balance (not limited by row cap)
+      if (result.balance !== undefined) {
+        setAccountBalance(result.balance);
+      }
+    } catch (err: any) {
+      console.error('Error refreshing ledger:', err);
+      toast({
+        title: 'Error refreshing ledger',
+        description: err.message,
+        status: 'error',
+        duration: 5000,
+      });
+      throw err;
+    }
+  };
+
   // Search members
   const handleMemberSearch = async (query: string) => {
     setMemberSearch(query);
@@ -651,15 +685,8 @@ export default function MemberDetailAdmin() {
 
       setNewTransaction({});
 
-      // Refresh ledger
-      const res = await fetch(`/api/ledger?account_id=${accountId}`);
-      const ledgerResult = await res.json();
-      if (ledgerResult.error) throw new Error(ledgerResult.error);
-      // Sort by date descending (most recent first)
-      const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
-      setLedger(sortedLedger);
+      // Refresh ledger and balance
+      await refreshLedger();
 
       toast({
         title: 'Transaction added',
@@ -693,15 +720,8 @@ export default function MemberDetailAdmin() {
       setEditingTransactionId(null);
       setEditingTransactionData({});
 
-      // Refresh ledger
-      const res = await fetch(`/api/ledger?account_id=${accountId}`);
-      const ledgerResult = await res.json();
-      if (ledgerResult.error) throw new Error(ledgerResult.error);
-      // Sort by date descending (most recent first)
-      const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
-      setLedger(sortedLedger);
+      // Refresh ledger and balance
+      await refreshLedger();
 
       toast({
         title: 'Transaction updated',
@@ -729,15 +749,8 @@ export default function MemberDetailAdmin() {
       const result = await response.json();
       if (result.error) throw new Error(result.error);
 
-      // Refresh ledger
-      const res = await fetch(`/api/ledger?account_id=${accountId}`);
-      const ledgerResult = await res.json();
-      if (ledgerResult.error) throw new Error(ledgerResult.error);
-      // Sort by date descending (most recent first)
-      const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
-      setLedger(sortedLedger);
+      // Refresh ledger and balance
+      await refreshLedger();
 
       toast({
         title: 'Transaction deleted',
@@ -1051,19 +1064,7 @@ export default function MemberDetailAdmin() {
     }
   };
 
-  // Helper to refresh and sort ledger
-  const refreshLedger = async () => {
-    const res = await fetch(`/api/ledger?account_id=${accountId}`);
-    const ledgerResult = await res.json();
-    if (ledgerResult.error) throw new Error(ledgerResult.error);
-    // Sort by date descending (most recent first)
-    const sortedLedger = (ledgerResult.data || []).sort((a: LedgerTransaction, b: LedgerTransaction) => {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-    setLedger(sortedLedger);
-  };
-
-  // Calculate running balance
+  // Calculate running balance for individual ledger rows
   // Since ledger is sorted descending (newest first), we need to sum from the end (oldest) to current index
   const calculateRunningBalance = (transactions: LedgerTransaction[], currentIndex: number) => {
     if (!transactions || currentIndex < 0) return 0;
@@ -1109,9 +1110,7 @@ export default function MemberDetailAdmin() {
       return;
     }
 
-    // Calculate outstanding balance
-    const balance = calculateRunningBalance(ledger, 0);
-    const amountDue = Math.abs(balance);
+    const amountDue = Math.abs(accountBalance);
 
     // Store charge data and open confirmation dialog
     setPendingChargeData({
@@ -2428,10 +2427,10 @@ export default function MemberDetailAdmin() {
                   <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     {!ledgerLoading && ledger.length > 0 && (
                       <>
-                        <div className={`${styles.currentBalance} ${calculateRunningBalance(ledger, 0) < 0 ? styles.balance : styles.credit}`}>
-                          {calculateRunningBalance(ledger, 0) < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(calculateRunningBalance(ledger, 0)))}
+                        <div className={`${styles.currentBalance} ${accountBalance < 0 ? styles.balance : styles.credit}`}>
+                          {accountBalance < 0 ? 'BALANCE' : 'CREDIT'}: {formatCurrency(Math.abs(accountBalance))}
                         </div>
-                        {calculateRunningBalance(ledger, 0) < 0 && (
+                        {accountBalance < 0 && (
                           <button
                             onClick={handlePayBalance}
                             disabled={isProcessingPayment}
