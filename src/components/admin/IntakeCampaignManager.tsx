@@ -17,7 +17,9 @@ import { Plus, Edit, Trash2, MessageSquare, UserPlus, Zap } from 'lucide-react';
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const supabase = getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) return { 'Content-Type': 'application/json' };
+  if (!session?.access_token) {
+    throw new Error('Not authenticated — please log in again');
+  }
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${session.access_token}`,
@@ -77,6 +79,9 @@ function getDelayPreset(msg: CampaignMessage): { preset: DelayPreset; customMinu
   if (msg.delay_minutes === 0 && !msg.send_time) {
     return { preset: 'immediate', customMinutes: 0, delayDays: 0, sendTime: '10:00' };
   }
+  // <= 1440 with send_time = "next day at time" (1440 = exactly 1 day)
+  // > 1440 with send_time = "N days at time"
+  // Without send_time, any delay_minutes value (including 1440) = custom minutes
   if (msg.send_time && msg.delay_minutes <= 1440) {
     return { preset: 'next_day_at', customMinutes: 0, delayDays: 0, sendTime: msg.send_time };
   }
@@ -193,9 +198,12 @@ export default function IntakeCampaignManager() {
       if (response.ok) {
         const data = await response.json();
         setEvents((data || []).filter((e: PrivateEvent) => e.status === 'active'));
+      } else {
+        toast({ title: 'Warning', description: 'Failed to load events for campaign actions', variant: 'error' });
       }
     } catch (error) {
       console.error('Error loading events:', error);
+      toast({ title: 'Warning', description: 'Failed to load events for campaign actions', variant: 'error' });
     }
   };
 
@@ -206,9 +214,12 @@ export default function IntakeCampaignManager() {
       if (response.ok) {
         const data = await response.json();
         setPlans((data || []).filter((p: SubscriptionPlan) => p.is_active));
+      } else {
+        toast({ title: 'Warning', description: 'Failed to load subscription plans', variant: 'error' });
       }
     } catch (error) {
       console.error('Error loading plans:', error);
+      toast({ title: 'Warning', description: 'Failed to load subscription plans', variant: 'error' });
     }
   };
 

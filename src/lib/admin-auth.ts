@@ -24,8 +24,9 @@ export async function verifyAdmin(req: NextApiRequest): Promise<boolean> {
 
 /**
  * Check if the request is an internal service call (webhook/cron).
- * Uses CRON_SECRET for authentication.
+ * Uses a dedicated x-internal-secret header to avoid ambiguity with
+ * the Authorization header used by admin JWTs.
  */
 export function isInternalCall(req: NextApiRequest): boolean {
-  return req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
+  return req.headers['x-internal-secret'] === process.env.CRON_SECRET;
 }

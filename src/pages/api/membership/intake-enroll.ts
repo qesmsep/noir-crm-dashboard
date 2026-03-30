@@ -5,7 +5,6 @@ import { verifyAdmin, isInternalCall } from '../../../lib/admin-auth';
 import { DateTime } from 'luxon';
 
 const DEFAULT_TIMEZONE = 'America/Chicago';
-const MAX_MESSAGE_LENGTH = 1600; // SMS segment limit
 
 interface MemberRecord {
   member_id: string;
@@ -277,6 +276,8 @@ function expandTemplateVars(
       result = result.split(`{{${key}}}`).join(vars[key]);
     }
   }
+  // Strip any remaining unreplaced placeholders so users don't see raw {{var}} text
+  result = result.replace(/\{\{[a-z_]+\}\}/g, '');
   return result;
 }
 

@@ -3,7 +3,6 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import { enrollPhone } from './membership/intake-enroll';
-import { processIntakeMessages } from './process-intake-messages';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -998,11 +997,9 @@ export async function handler(req, res) {
       });
       console.log('Intake enrollment result:', enrollResult.body);
 
-      if (enrollResult.status < 400) {
-        // Fire-and-forget: let the cron handle it if this fails, but try to send immediate messages now
-        processIntakeMessages().catch(err => console.error('Background intake message processing failed:', err));
-      }
-
+      // Immediate messages (delay=0) are scheduled with scheduled_for = now().
+      // The every-minute cron will pick them up — no fire-and-forget needed here,
+      // as it risks partial execution when Vercel freezes the Lambda after response.
       return res.status(200).json({ message: 'Intake campaign triggered', campaign: matchedCampaign.trigger_word });
     }
   } catch (intakeError) {

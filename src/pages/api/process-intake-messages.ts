@@ -20,25 +20,29 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
   try {
     const now = new Date().toISOString();
 
-    // Get pending messages that are due (includes retries that have waited long enough)
-    const { data: pendingMessages, error } = await supabaseAdmin
+    // Step 1: Atomically claim pending messages by setting status = 'processing'
+    // This prevents duplicate sends when concurrent cron invocations overlap.
+    // Only rows still in 'pending' status will be claimed — if another process
+    // already claimed them, this returns an empty set.
+    const { data: claimed, error: claimError } = await supabaseAdmin
       .from('sms_intake_scheduled_messages')
-      .select('*')
+      .update({ status: 'processing' })
       .eq('status', 'pending')
       .lte('scheduled_for', now)
+      .select('*')
       .order('scheduled_for', { ascending: true })
       .limit(50);
 
-    if (error) throw error;
+    if (claimError) throw claimError;
 
-    if (!pendingMessages || pendingMessages.length === 0) {
+    if (!claimed || claimed.length === 0) {
       return { processed: 0, sent: 0, failed: 0 };
     }
 
     let sent = 0;
     let failed = 0;
 
-    for (const msg of pendingMessages) {
+    for (const msg of claimed) {
       try {
         // Send via OpenPhone API
         const response = await fetch('https://api.openphone.com/v1/messages', {
@@ -75,18 +79,17 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
     }
 
     // Mark enrollments as completed if all messages are sent/permanently failed
-    const enrollmentIds = [...new Set(pendingMessages.map(m => m.enrollment_id))];
+    const enrollmentIds = [...new Set(claimed.map(m => m.enrollment_id))];
     if (enrollmentIds.length > 0) {
-      // Single query: find enrollments that still have pending messages
+      // Single query: find enrollments that still have pending/processing messages
       const { data: pendingRemaining } = await supabaseAdmin
         .from('sms_intake_scheduled_messages')
         .select('enrollment_id')
         .in('enrollment_id', enrollmentIds)
-        .eq('status', 'pending');
+        .in('status', ['pending', 'processing']);
 
       const stillPending = new Set((pendingRemaining || []).map(r => r.enrollment_id));
 
-      // Mark enrollments with no remaining pending messages as completed
       const completedIds = enrollmentIds.filter(id => !stillPending.has(id));
       if (completedIds.length > 0) {
         await supabaseAdmin
@@ -115,9 +118,10 @@ async function handleSendFailure(msg: { id: string; retry_count: number }, error
     await supabaseAdmin
       .from('sms_intake_scheduled_messages')
       .update({
+        status: 'pending', // Reset from 'processing' so cron picks it up again
         retry_count: newRetryCount,
         error_message: errorMessage,
-        scheduled_for: nextAttempt, // Push back for retry
+        scheduled_for: nextAttempt,
       })
       .eq('id', msg.id);
   } else {
