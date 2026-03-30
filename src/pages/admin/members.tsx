@@ -584,12 +584,17 @@ export default function MembersAdmin() {
         <div className={styles.header}>
           <div className={styles.headerTitle}>
             <h1 className={styles.pageTitle}>Members</h1>
-            <span className={styles.memberCount}>
-              {sortedAccounts.reduce((sum, acc) => sum + acc.allMembers.length, 0)} members
-              {(statusFilter !== 'all' || planFilter !== 'all') && (
-                <span style={{ color: '#6B7280', fontWeight: '400' }}> ({members.length} total)</span>
-              )}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <span className={styles.memberCount}>
+                {sortedAccounts.reduce((sum, acc) => sum + acc.allMembers.length, 0)} {statusFilter !== 'all' ? statusFilter : ''} members
+                {(statusFilter !== 'all' || planFilter !== 'all') && (
+                  <span style={{ color: '#6B7280', fontWeight: '400' }}> ({members.length} total)</span>
+                )}
+              </span>
+              <span style={{ fontSize: '0.875rem', color: '#6B7280' }}>
+                {sortedAccounts.length} {statusFilter !== 'all' ? statusFilter : ''} accounts
+              </span>
+            </div>
           </div>
           <div className={styles.searchAndSortContainer}>
             <div className={styles.searchContainer}>

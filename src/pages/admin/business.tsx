@@ -570,16 +570,12 @@ export default function BusinessDashboard() {
         .eq('status', 'active');
       setActiveMemberCount(memberCount ?? null);
 
-      // Fetch active accounts count (distinct accounts with Skyline, Solo, or Duo memberships)
-      const { data: accountData } = await supabase
-        .from('members')
-        .select('account_id')
-        .eq('member_type', 'primary')
-        .in('membership', ['Skyline', 'Solo', 'Duo'])
-        .eq('status', 'active');
-
-      const uniqueAccounts = new Set(accountData?.map(m => m.account_id) || []);
-      setActiveAccountCount(uniqueAccounts.size);
+      // Fetch active accounts count (accounts with subscription_status = 'active')
+      const { count: accountCount } = await supabase
+        .from('accounts')
+        .select('*', { count: 'exact', head: true })
+        .eq('subscription_status', 'active');
+      setActiveAccountCount(accountCount ?? null);
 
       // Fetch party size metrics from completed/confirmed reservations
       const { data: reservationData } = await supabase
@@ -727,7 +723,7 @@ export default function BusinessDashboard() {
               <div className={styles.kpiTile}>
                 <div className={styles.kpiValue}>{activeAccountCount ?? '--'}</div>
                 <div className={styles.kpiLabel}>Active Accounts</div>
-                <div className={styles.kpiHint}>Total number of accounts with primary membership as Skyline, Noir Solo, or Noir Duo that are active and not archived/paused/deactivated (as of today).</div>
+                <div className={styles.kpiHint}>Total number of accounts with active subscription status (as of today).</div>
               </div>
               <div className={styles.kpiTile} onClick={() => setShowPortalAccessModal(true)} style={{ cursor: 'pointer' }}>
                 <div className={styles.kpiValue}>{portalAccessStats.monthlyAccessCount}</div>

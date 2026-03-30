@@ -921,7 +921,7 @@ export async function getDrilldownNew(
 
   const { data: members } = await supabase
     .from('members')
-    .select('member_id, first_name, last_name, membership')
+    .select('member_id, first_name, last_name')
     .in('member_id', memberIds);
 
   const memberMap = new Map<string, any>();
@@ -934,7 +934,7 @@ export async function getDrilldownNew(
       first_name: m?.first_name || '',
       last_name: m?.last_name || '',
       mrr: s.mrr,
-      plan_name: m?.membership || null,
+      plan_name: s.plan_name, // Use plan_name from snapshot instead of legacy members.membership
     };
   });
 }
@@ -968,7 +968,7 @@ export async function getDrilldownPaused(
 
   const { data: members } = await supabase
     .from('members')
-    .select('member_id, first_name, last_name, membership')
+    .select('member_id, first_name, last_name')
     .in('member_id', memberIds);
 
   const memberMap = new Map<string, any>();
@@ -982,7 +982,7 @@ export async function getDrilldownPaused(
       first_name: m?.first_name || '',
       last_name: m?.last_name || '',
       prior_mrr: prior?.mrr || 0,
-      plan_name: m?.membership || null,
+      plan_name: curr.plan_name, // Use plan_name from snapshot instead of legacy members.membership
     };
   });
 }
