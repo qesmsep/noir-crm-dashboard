@@ -34,15 +34,13 @@ interface Props {
   creditCardFeeEnabled?: boolean;
   updatingFeeToggle?: boolean;
   onToggleCreditCardFee?: () => void;
-  totalLTV?: number;
 }
 
 export default function MemberSubscriptionCard({
   accountId,
   creditCardFeeEnabled = false,
   updatingFeeToggle = false,
-  onToggleCreditCardFee,
-  totalLTV = 0
+  onToggleCreditCardFee
 }: Props) {
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
@@ -563,54 +561,85 @@ export default function MemberSubscriptionCard({
       </div>
 
       <div className={styles.content}>
-        {/* Compact MRR/ARR and LTV Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        {/* Two-column layout: MRR/Status on left, Key Info on right */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
+          {/* Left Column: MRR and Status */}
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>
-              {billingInterval === 'year' ? 'Total ARR' : 'Total MRR'}
+            {/* Total MRR/ARR */}
+            <div style={{ marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>
+                {billingInterval === 'year' ? 'Total ARR' : 'Total MRR'}
+              </div>
+              <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>
+                {formatCurrency(baseMRR + (additionalMembersCount * additionalMemberFeeRate))}/{billingInterval === 'year' ? 'yr' : 'mo'}
+              </div>
             </div>
-            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>
-              {formatCurrency(baseMRR + (additionalMembersCount * additionalMemberFeeRate))}/{billingInterval === 'year' ? 'yr' : 'mo'}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>Membership Fees Paid</div>
-            <div style={{ fontSize: '1.125rem', color: '#1F1F1F', fontWeight: '700' }}>{formatCurrency(totalLTV)}</div>
-          </div>
-        </div>
 
-        {/* Status Badges */}
-        <div className={styles.badges} style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {paymentStatus?.last_payment_status === 'failed' && (
-            <span className={styles.paymentFailedBadge}>
-              PAYMENT FAILED
-            </span>
-          )}
-          <span className={statusBadgeClass}>
-            {statusText}
-          </span>
-          {(subscription.subscription_status === 'past_due' || paymentStatus?.last_payment_status === 'failed') && subscription.subscription_status !== 'processing' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRetryPayment();
-              }}
-              disabled={actionLoading}
-              style={{
-                backgroundColor: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                fontSize: '0.75rem',
-                fontWeight: '600',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1,
-              }}
-            >
-              {actionLoading ? 'Processing...' : '🔄 Retry Payment'}
-            </button>
-          )}
+            {/* Status Badges */}
+            <div className={styles.badges} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {paymentStatus?.last_payment_status === 'failed' && (
+                <span className={styles.paymentFailedBadge}>
+                  PAYMENT FAILED
+                </span>
+              )}
+              <span className={statusBadgeClass}>
+                {statusText}
+              </span>
+              {(subscription.subscription_status === 'past_due' || paymentStatus?.last_payment_status === 'failed') && subscription.subscription_status !== 'processing' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRetryPayment();
+                  }}
+                  disabled={actionLoading}
+                  style={{
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                    opacity: actionLoading ? 0.6 : 1,
+                  }}
+                >
+                  {actionLoading ? 'Processing...' : '🔄 Retry Payment'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Key Info */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8125rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#6B7280', fontWeight: '500' }}>Start Date</span>
+              <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.member_join_date)}</span>
+            </div>
+            {subscription.subscription_status === 'canceled' && subscription.subscription_canceled_at ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#6B7280', fontWeight: '500' }}>Canceled On</span>
+                <span style={{ color: '#DC2626', fontWeight: '600' }}>{formatDate(subscription.subscription_canceled_at)}</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#6B7280', fontWeight: '500' }}>Next Renewal</span>
+                <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.next_renewal_date)}</span>
+              </div>
+            )}
+            {subscription.payment_method_type && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#6B7280', fontWeight: '500' }}>Payment Method</span>
+                <span style={{ color: '#1F1F1F', fontWeight: '600' }}>
+                  {subscription.payment_method_type === 'card' ? (
+                    <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
+                  ) : (
+                    <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Payment Error Alert */}
@@ -644,39 +673,6 @@ export default function MemberSubscriptionCard({
             </div>
           </div>
         )}
-
-        <div className={styles.divider} style={{ margin: '0.75rem 0' }} />
-
-        {/* Key Info - Always Visible */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8125rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#6B7280', fontWeight: '500' }}>Start Date</span>
-            <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.member_join_date)}</span>
-          </div>
-          {subscription.subscription_status === 'canceled' && subscription.subscription_canceled_at ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6B7280', fontWeight: '500' }}>Canceled On</span>
-              <span style={{ color: '#DC2626', fontWeight: '600' }}>{formatDate(subscription.subscription_canceled_at)}</span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6B7280', fontWeight: '500' }}>Next Renewal</span>
-              <span style={{ color: '#1F1F1F', fontWeight: '600' }}>{formatDate(subscription.next_renewal_date)}</span>
-            </div>
-          )}
-          {subscription.payment_method_type && (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6B7280', fontWeight: '500' }}>Payment Method</span>
-              <span style={{ color: '#1F1F1F', fontWeight: '600' }}>
-                {subscription.payment_method_type === 'card' ? (
-                  <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
-                ) : (
-                  <>{subscription.payment_method_brand} •••• {subscription.payment_method_last4}</>
-                )}
-              </span>
-            </div>
-          )}
-        </div>
 
         {isExpanded && (
           <>

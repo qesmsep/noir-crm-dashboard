@@ -1873,7 +1873,7 @@ export default function MemberDetailAdmin() {
                             <div style={{ textAlign: 'center' }}>
                               <div style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase', marginBottom: '0.25rem' }}>LTV</div>
                               <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
-                                {formatCurrency(calculateMemberSpend(member.member_id))}
+                                {formatCurrency(calculateMemberLTV(member.member_id))}
                               </div>
                             </div>
                           </div>
@@ -2366,7 +2366,6 @@ export default function MemberDetailAdmin() {
               creditCardFeeEnabled={creditCardFeeEnabled}
               updatingFeeToggle={updatingFeeToggle}
               onToggleCreditCardFee={handleToggleCreditCardFee}
-              totalLTV={accountLTV}
             />
 
             {/* Quick Actions Card - Between Membership and Ledger */}
