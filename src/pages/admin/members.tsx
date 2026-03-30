@@ -310,7 +310,7 @@ export default function MembersAdmin() {
     if (statusFilter !== 'all') {
       const status = account.accounts?.subscription_status;
       if (statusFilter === 'active' && status !== 'active') return false;
-      if (statusFilter === 'canceled' && status !== 'canceled') return false;
+      if (statusFilter === 'canceled' && !isAccountCancelled(account)) return false;
       if (statusFilter === 'past_due' && status !== 'past_due') return false;
       if (statusFilter === 'paused' && status !== 'paused') return false;
     }
