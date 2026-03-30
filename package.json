@@ -47,6 +47,7 @@
     "form-data": "^4.0.4",
     "formidable": "^3.5.4",
     "framer-motion": "^7.6.16",
+    "heic-convert": "^2.1.0",
     "iron-session": "^8.0.4",
     "limiter": "^3.0.0",
     "lucide-react": "^0.563.0",
