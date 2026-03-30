@@ -306,6 +306,14 @@ export default function MemberDetailAdmin() {
           if (a.member_type !== 'primary' && b.member_type === 'primary') return 1;
           return 0;
         });
+
+        // Debug: Log member data with photos
+        console.log('[MemberDetailAdmin] Fetched members:', sorted.map(m => ({
+          name: `${m.first_name} ${m.last_name}`,
+          photo: m.photo,
+          has_photo: !!m.photo
+        })));
+
         setMembers(sorted);
       } catch (err: any) {
         setError(err.message);

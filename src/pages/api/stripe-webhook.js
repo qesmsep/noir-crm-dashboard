@@ -462,6 +462,20 @@ export default async function handler(req, res) {
               return res.status(500).json({ error: 'Failed to update ledger' });
             }
 
+            // Update account status from 'processing' to 'active' now that ACH payment cleared
+            const { error: accountUpdateError } = await supabase
+              .from('accounts')
+              .update({ subscription_status: 'active' })
+              .eq('account_id', existingEntry.account_id)
+              .eq('subscription_status', 'processing'); // Only update if still in processing state
+
+            if (accountUpdateError) {
+              console.error('Error updating account status:', accountUpdateError);
+              // Don't fail the entire webhook, just log the error
+            } else {
+              console.log('✅ Updated account status to "active" for account:', existingEntry.account_id);
+            }
+
             console.log('✅ Updated ledger entry to "cleared" for payment_intent:', charge.payment_intent);
             return res.json({ success: true, message: 'Ledger entry updated to cleared' });
           } else {
