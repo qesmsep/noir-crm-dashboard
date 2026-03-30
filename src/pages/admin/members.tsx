@@ -22,6 +22,7 @@ interface Member {
   join_date?: string;
   member_type?: string;
   dob?: string;
+  status?: string;
   accounts?: {
     subscription_cancel_at?: string | null;
     subscription_status?: string | null;
@@ -127,11 +128,11 @@ export default function MembersAdmin() {
     try {
       const supabase = getSupabaseClient();
 
-      // Fetch members (active, paused, and archived)
-      const { data: membersData, error: membersError } = await supabase
+      // Fetch members (active, paused, and inactive/archived)
+      const { data: membersData, error: membersError} = await supabase
         .from('members')
         .select('*')
-        .in('status', ['active', 'paused', 'archived']); // Include archived for canceled filter
+        .in('status', ['active', 'paused', 'inactive']); // Include inactive (archived) for canceled filter
 
       if (membersError) throw membersError;
 
@@ -306,9 +307,9 @@ export default function MembersAdmin() {
 
   // Apply filters
   const filteredAccounts = accounts.filter(account => {
-    // Exclude accounts where all members are archived (unless filtering for canceled)
-    const hasArchivedMembers = account.allMembers.some(m => m.status === 'archived');
-    const allMembersArchived = account.allMembers.every(m => m.status === 'archived');
+    // Exclude accounts where all members are archived/inactive (unless filtering for canceled)
+    const hasArchivedMembers = account.allMembers.some(m => m.status === 'inactive');
+    const allMembersArchived = account.allMembers.every(m => m.status === 'inactive');
 
     // Filter by subscription status
     if (statusFilter !== 'all') {
