@@ -1551,6 +1551,18 @@
   .searchAndSortContainer {
     order: 2;
     max-width: 100%;
+    flex-wrap: wrap; /* Allow filters to wrap */
+  }
+
+  .searchContainer {
+    flex: 1 1 100%; /* Full width on mobile */
+    min-width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .filterDropdown {
+    flex: 1; /* Equal width for filters */
+    min-width: 0; /* Allow shrinking */
   }
 
   .headerButtons {
@@ -1563,11 +1575,13 @@
   .iconButton {
     flex: 1;
     width: auto;
-    padding: 0 0.75rem;
+    min-width: 44px; /* Minimum touch target */
+    padding: 0; /* Remove padding to keep icon-only */
   }
 
+  /* Keep button text hidden on mobile - icons only */
   .buttonText {
-    display: inline;
+    display: none;
   }
 
   .mobileList {
