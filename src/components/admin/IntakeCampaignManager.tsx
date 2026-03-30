@@ -505,6 +505,14 @@ export default function IntakeCampaignManager() {
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                 </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleDelete(campaign.id)}
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  title="Delete campaign"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">

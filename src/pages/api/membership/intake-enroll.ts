@@ -1,5 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { verifyAdmin, isInternalCall } from '../../../lib/admin-auth';
 import { DateTime } from 'luxon';
 
 const DEFAULT_TIMEZONE = 'America/Chicago';
@@ -67,43 +69,32 @@ function normalizePhone(phone: string): string {
 }
 
 // ── Member Lookup ──────────────────────────────────────────────────────────
-// Mirrors the checkMemberStatus logic from openphoneWebhook.js
+// Consolidated into a single query using OR to avoid sequential DB round-trips
 async function lookupMemberByPhone(phone: string): Promise<MemberRecord | null> {
   const digits = phone.replace(/\D/g, '');
   const last10 = digits.slice(-10);
 
-  const possiblePhones = [
-    phone,
-    digits,
-    last10,
-    '+1' + last10,
-    '1' + last10,
-    '+' + digits,
-  ];
-  const uniquePhones = [...new Set(possiblePhones)];
+  const variants = [...new Set([phone, digits, last10, '+1' + last10, '1' + last10, '+' + digits])];
 
-  for (const fmt of uniquePhones) {
-    const { data: member } = await supabaseAdmin
-      .from('members')
-      .select('member_id, account_id, first_name, last_name, email, phone')
-      .eq('phone', fmt)
-      .maybeSingle();
+  // Single query: exact match on any phone format variant
+  const { data: member } = await supabaseAdmin
+    .from('members')
+    .select('member_id, account_id, first_name, last_name, email, phone')
+    .in('phone', variants)
+    .limit(1)
+    .maybeSingle();
 
-    if (member) return member;
-  }
+  if (member) return member;
 
-  // Fallback: LIKE search
-  for (const variant of [digits, last10]) {
-    const { data: members } = await supabaseAdmin
-      .from('members')
-      .select('member_id, account_id, first_name, last_name, email, phone')
-      .ilike('phone', `%${variant}%`)
-      .limit(1);
+  // Fallback: ILIKE on last 10 digits (handles unexpected storage formats)
+  const { data: fallback } = await supabaseAdmin
+    .from('members')
+    .select('member_id, account_id, first_name, last_name, email, phone')
+    .ilike('phone', `%${last10}%`)
+    .limit(1)
+    .maybeSingle();
 
-    if (members && members.length > 0) return members[0];
-  }
-
-  return null;
+  return fallback;
 }
 
 // ── Action: Create Onboarding Link ─────────────────────────────────────────
@@ -132,10 +123,8 @@ async function executeCreateOnboardingLink(
     // Reuse existing valid token
     signupToken = existingEntry.agreement_token;
   } else {
-    // Generate new 24-hour token
-    signupToken =
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15);
+    // Generate new 24-hour token (cryptographically secure)
+    signupToken = randomBytes(24).toString('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -289,9 +278,6 @@ function expandTemplateVars(
   }
   return result;
 }
-
-// ── Admin Auth ─────────────────────────────────────────────────────────────
-import { verifyAdmin, isInternalCall } from '../../../lib/admin-auth';
 
 // ── Enrollment Result Type ─────────────────────────────────────────────────
 interface EnrollmentResult {

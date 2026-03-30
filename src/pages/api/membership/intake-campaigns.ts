@@ -69,35 +69,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ ...campaign, messages: messages || [] });
       }
 
-      // List all campaigns with message counts
+      // List all campaigns with message counts in a single query
       const { data: campaigns, error } = await supabaseAdmin
         .from('sms_intake_campaigns')
-        .select('*')
+        .select('*, sms_intake_campaign_messages(count)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get message counts for each campaign
-      const campaignIds = (campaigns || []).map(c => c.id);
-      let messageCounts: Record<string, number> = {};
-
-      if (campaignIds.length > 0) {
-        const { data: counts } = await supabaseAdmin
-          .from('sms_intake_campaign_messages')
-          .select('campaign_id')
-          .in('campaign_id', campaignIds);
-
-        if (counts) {
-          for (const row of counts) {
-            messageCounts[row.campaign_id] = (messageCounts[row.campaign_id] || 0) + 1;
-          }
-        }
-      }
-
-      const result = (campaigns || []).map(c => ({
-        ...c,
-        message_count: messageCounts[c.id] || 0,
-      }));
+      const result = (campaigns || []).map((c: Record<string, unknown>) => {
+        const msgCount = c.sms_intake_campaign_messages as Array<{ count: number }> | undefined;
+        return {
+          ...c,
+          message_count: msgCount?.[0]?.count ?? 0,
+          sms_intake_campaign_messages: undefined,
+        };
+      });
 
       return res.status(200).json(result);
     } catch (error) {
@@ -184,6 +171,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Update campaign
       if (status !== undefined && !VALID_STATUSES.includes(status)) {
         return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
+
+      // Validate message content length on update
+      if (messages) {
+        for (const msg of messages) {
+          if (msg.message_content && msg.message_content.length > MAX_MESSAGE_LENGTH) {
+            return res.status(400).json({ error: `Message content exceeds ${MAX_MESSAGE_LENGTH} character limit` });
+          }
+        }
       }
 
       const updateFields: CampaignUpdateFields = { updated_at: new Date().toISOString() };

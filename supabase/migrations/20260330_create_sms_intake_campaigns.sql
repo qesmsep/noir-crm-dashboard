@@ -81,19 +81,24 @@ ALTER TABLE sms_intake_campaign_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sms_intake_enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sms_intake_scheduled_messages ENABLE ROW LEVEL SECURITY;
 
--- Allow service role full access (admin operations)
+-- Allow service role full access (admin operations via supabaseAdmin)
+-- Scoped to service_role only — anon/authenticated clients cannot access these tables
 CREATE POLICY "Service role full access on sms_intake_campaigns"
   ON sms_intake_campaigns FOR ALL
+  TO service_role
   USING (true) WITH CHECK (true);
 
 CREATE POLICY "Service role full access on sms_intake_campaign_messages"
   ON sms_intake_campaign_messages FOR ALL
+  TO service_role
   USING (true) WITH CHECK (true);
 
 CREATE POLICY "Service role full access on sms_intake_enrollments"
   ON sms_intake_enrollments FOR ALL
+  TO service_role
   USING (true) WITH CHECK (true);
 
 CREATE POLICY "Service role full access on sms_intake_scheduled_messages"
   ON sms_intake_scheduled_messages FOR ALL
+  TO service_role
   USING (true) WITH CHECK (true);

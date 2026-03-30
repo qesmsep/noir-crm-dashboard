@@ -999,8 +999,8 @@ export async function handler(req, res) {
       console.log('Intake enrollment result:', enrollResult.body);
 
       if (enrollResult.status < 400) {
-        // Process any immediate messages right away
-        await processIntakeMessages();
+        // Fire-and-forget: let the cron handle it if this fails, but try to send immediate messages now
+        processIntakeMessages().catch(err => console.error('Background intake message processing failed:', err));
       }
 
       return res.status(200).json({ message: 'Intake campaign triggered', campaign: matchedCampaign.trigger_word });
