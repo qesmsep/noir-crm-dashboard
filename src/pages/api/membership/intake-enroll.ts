@@ -15,6 +15,227 @@ const DEFAULT_TIMEZONE = 'America/Chicago';
  * GET: list enrollments for a campaign
  *   ?campaign_id=UUID
  */
+
+// ── Member Lookup ──────────────────────────────────────────────────────────
+// Mirrors the checkMemberStatus logic from openphoneWebhook.js
+async function lookupMemberByPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+
+  const possiblePhones = [
+    phone,
+    digits,
+    last10,
+    '+1' + last10,
+    '1' + last10,
+    '+' + digits,
+  ];
+  const uniquePhones = [...new Set(possiblePhones)];
+
+  for (const fmt of uniquePhones) {
+    const { data: member } = await supabaseAdmin
+      .from('members')
+      .select('member_id, account_id, first_name, last_name, email, phone')
+      .eq('phone', fmt)
+      .maybeSingle();
+
+    if (member) return member;
+  }
+
+  // Fallback: LIKE search
+  for (const variant of [digits, last10]) {
+    const { data: members } = await supabaseAdmin
+      .from('members')
+      .select('member_id, account_id, first_name, last_name, email, phone')
+      .ilike('phone', `%${variant}%`)
+      .limit(1);
+
+    if (members && members.length > 0) return members[0];
+  }
+
+  return null;
+}
+
+// ── Action: Create Onboarding Link ─────────────────────────────────────────
+// Replicates the INVITATION / SKYLINE logic from the legacy webhook
+async function executeCreateOnboardingLink(
+  phone: string,
+  actionConfig: { selected_membership?: string }
+): Promise<{ onboard_url: string }> {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
+
+  // Check for existing approved waitlist entry with a valid token
+  const { data: existingEntry } = await supabaseAdmin
+    .from('waitlist')
+    .select('id, agreement_token, application_expires_at')
+    .eq('phone', phone)
+    .eq('status', 'approved')
+    .single();
+
+  let signupToken: string;
+
+  if (
+    existingEntry &&
+    existingEntry.agreement_token &&
+    new Date(existingEntry.application_expires_at) > new Date()
+  ) {
+    // Reuse existing valid token
+    signupToken = existingEntry.agreement_token;
+  } else {
+    // Generate new 24-hour token
+    signupToken =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    const tokenFields: Record<string, any> = {
+      agreement_token: signupToken,
+      agreement_token_created_at: new Date().toISOString(),
+      application_expires_at: expiresAt.toISOString(),
+      application_link_sent_at: new Date().toISOString(),
+    };
+
+    if (actionConfig.selected_membership) {
+      tokenFields.selected_membership = actionConfig.selected_membership;
+    }
+
+    if (existingEntry) {
+      await supabaseAdmin
+        .from('waitlist')
+        .update(tokenFields)
+        .eq('id', existingEntry.id);
+    } else {
+      await supabaseAdmin.from('waitlist').insert({
+        phone,
+        first_name: ' ',
+        last_name: ' ',
+        email: ' ',
+        status: 'approved',
+        submitted_at: new Date().toISOString(),
+        ...tokenFields,
+      });
+    }
+  }
+
+  return { onboard_url: `${baseUrl}/onboard/${signupToken}` };
+}
+
+// ── Action: Add Ledger Charge ──────────────────────────────────────────────
+async function executeAddLedgerCharge(
+  member: { member_id: string; account_id: string },
+  actionConfig: { amount: number; description: string }
+) {
+  const cstDate = DateTime.now().setZone(DEFAULT_TIMEZONE).toISODate();
+
+  const { error } = await supabaseAdmin.from('ledger').insert({
+    member_id: member.member_id,
+    account_id: member.account_id,
+    type: 'purchase',
+    amount: -Math.abs(actionConfig.amount), // Negative for charges
+    note: actionConfig.description,
+    date: cstDate,
+  });
+
+  if (error) {
+    console.error('Error creating ledger charge:', error);
+    throw new Error('Failed to create ledger charge');
+  }
+}
+
+// ── Action: Create Event RSVP ──────────────────────────────────────────────
+async function executeCreateEventRsvp(
+  member: { member_id: string; account_id: string; first_name: string; last_name: string; email: string; phone: string },
+  actionConfig: { event_id: string; party_size?: number }
+): Promise<{ event_title: string }> {
+  const partySize = actionConfig.party_size || 1;
+
+  // Get event details
+  const { data: event, error: eventError } = await supabaseAdmin
+    .from('private_events')
+    .select('*')
+    .eq('id', actionConfig.event_id)
+    .eq('status', 'active')
+    .single();
+
+  if (eventError || !event) {
+    throw new Error('Event not found or inactive');
+  }
+
+  // Check capacity
+  const { data: attendeeReservations } = await supabaseAdmin
+    .from('reservations')
+    .select('party_size')
+    .eq('private_event_id', actionConfig.event_id);
+
+  const currentAttendees = (attendeeReservations || []).reduce(
+    (sum: number, r: any) => sum + (r.party_size || 0),
+    0
+  );
+
+  if (event.total_attendees_maximum && currentAttendees + partySize > event.total_attendees_maximum) {
+    throw new Error(`Event is full (${currentAttendees}/${event.total_attendees_maximum})`);
+  }
+
+  // Check for existing RSVP by phone
+  const { data: existingRsvp } = await supabaseAdmin
+    .from('reservations')
+    .select('id')
+    .eq('private_event_id', actionConfig.event_id)
+    .eq('phone', member.phone)
+    .single();
+
+  if (existingRsvp) {
+    return { event_title: event.title }; // Already RSVP'd, skip
+  }
+
+  // Create reservation
+  await supabaseAdmin.from('reservations').insert({
+    private_event_id: actionConfig.event_id,
+    table_id: null,
+    start_time: event.start_time,
+    end_time: event.end_time,
+    party_size: partySize,
+    first_name: member.first_name,
+    last_name: member.last_name,
+    email: member.email,
+    phone: member.phone,
+    member_id: member.member_id,
+    notes: `RSVP via SMS trigger for ${event.title}`,
+    source: 'sms_intake_campaign',
+  });
+
+  // Charge if event has price_per_seat
+  if (event.price_per_seat && event.price_per_seat > 0) {
+    const totalCost = event.price_per_seat * partySize;
+    const cstDate = DateTime.now().setZone(DEFAULT_TIMEZONE).toISODate();
+
+    await supabaseAdmin.from('ledger').insert({
+      member_id: member.member_id,
+      account_id: member.account_id,
+      type: 'purchase',
+      amount: -totalCost,
+      note: `Private Event: ${event.title} - ${partySize} seat${partySize > 1 ? 's' : ''}`,
+      date: cstDate,
+    });
+  }
+
+  return { event_title: event.title };
+}
+
+// ── Template Variable Expansion ────────────────────────────────────────────
+function expandTemplateVars(
+  content: string,
+  vars: Record<string, string>
+): string {
+  let result = content;
+  for (const [key, value] of Object.entries(vars)) {
+    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+  }
+  return result;
+}
+
+// ── Main Handler ───────────────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
@@ -45,23 +266,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Phone number is required' });
       }
 
-      // Resolve campaign_id from trigger_word if needed
+      // Resolve campaign from trigger_word or campaign_id
       let resolvedCampaignId = campaign_id;
-      if (!resolvedCampaignId && trigger_word) {
-        const { data: campaign } = await supabaseAdmin
+      let campaignData: any = null;
+
+      if (resolvedCampaignId) {
+        const { data } = await supabaseAdmin
           .from('sms_intake_campaigns')
-          .select('id')
+          .select('*')
+          .eq('id', resolvedCampaignId)
+          .single();
+        campaignData = data;
+      } else if (trigger_word) {
+        const { data } = await supabaseAdmin
+          .from('sms_intake_campaigns')
+          .select('*')
           .ilike('trigger_word', trigger_word.trim())
           .eq('status', 'active')
           .single();
 
-        if (!campaign) {
+        if (!data) {
           return res.status(404).json({ error: 'No active campaign found for this trigger word' });
         }
-        resolvedCampaignId = campaign.id;
+        campaignData = data;
+        resolvedCampaignId = data.id;
       }
 
-      if (!resolvedCampaignId) {
+      if (!resolvedCampaignId || !campaignData) {
         return res.status(400).json({ error: 'campaign_id or trigger_word is required' });
       }
 
@@ -78,7 +309,87 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({ message: 'Already enrolled', enrollment_id: existing.id });
       }
 
-      // Create enrollment
+      // ── Execute Actions ──────────────────────────────────────────────
+      const actions = campaignData.actions || {};
+      const templateVars: Record<string, string> = {};
+      let member: any = null;
+
+      // Check if any action requires member lookup
+      const needsMember =
+        (actions.add_ledger_charge?.enabled) ||
+        (actions.create_event_rsvp?.enabled);
+
+      if (needsMember) {
+        member = await lookupMemberByPhone(phone);
+
+        if (!member) {
+          // Non-member trying a members-only action
+          const nonMemberMsg = campaignData.non_member_response ||
+            'Thank you for your interest. This offer is available to Noir members only. For membership info, text MEMBERSHIP.';
+
+          // Send the non-member response via OpenPhone
+          await fetch('https://api.openphone.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': process.env.OPENPHONE_API_KEY || '',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+              to: [phone],
+              from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+              content: nonMemberMsg,
+            }),
+          });
+
+          return res.status(200).json({
+            message: 'Non-member response sent',
+            is_member: false,
+          });
+        }
+
+        templateVars.member_name = member.first_name;
+      }
+
+      // Action: Create Onboarding Link
+      if (actions.create_onboarding_link?.enabled) {
+        try {
+          const { onboard_url } = await executeCreateOnboardingLink(phone, {
+            selected_membership: actions.create_onboarding_link.selected_membership,
+          });
+          templateVars.onboard_url = onboard_url;
+        } catch (err) {
+          console.error('Error creating onboarding link:', err);
+        }
+      }
+
+      // Action: Add Ledger Charge (member already verified above)
+      if (actions.add_ledger_charge?.enabled && member) {
+        try {
+          await executeAddLedgerCharge(member, {
+            amount: actions.add_ledger_charge.amount,
+            description: actions.add_ledger_charge.description,
+          });
+          templateVars.charge_amount = `$${Number(actions.add_ledger_charge.amount).toFixed(2)}`;
+        } catch (err) {
+          console.error('Error adding ledger charge:', err);
+        }
+      }
+
+      // Action: Create Event RSVP (member already verified above)
+      if (actions.create_event_rsvp?.enabled && member) {
+        try {
+          const { event_title } = await executeCreateEventRsvp(member, {
+            event_id: actions.create_event_rsvp.event_id,
+            party_size: actions.create_event_rsvp.party_size,
+          });
+          templateVars.event_title = event_title;
+        } catch (err) {
+          console.error('Error creating event RSVP:', err);
+        }
+      }
+
+      // ── Create Enrollment ────────────────────────────────────────────
       const { data: enrollment, error: enrollError } = await supabaseAdmin
         .from('sms_intake_enrollments')
         .insert({
@@ -92,7 +403,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (enrollError) throw enrollError;
 
-      // Get campaign messages
+      // ── Schedule Messages ────────────────────────────────────────────
       const { data: messages, error: msgError } = await supabaseAdmin
         .from('sms_intake_campaign_messages')
         .select('*')
@@ -107,29 +418,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           let scheduledFor: DateTime;
 
           if (msg.delay_minutes === 0 && !msg.send_time) {
-            // Send immediately
             scheduledFor = now;
           } else if (msg.send_time) {
-            // Send at specific time, delay_minutes represents delay in days (converted)
             const delayDays = Math.floor(msg.delay_minutes / 1440);
             const targetDay = now.plus({ days: delayDays || 1 });
             const [hours, minutes] = msg.send_time.split(':').map(Number);
             scheduledFor = targetDay.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
 
-            // If the scheduled time has already passed today, push to next day
             if (scheduledFor <= now) {
               scheduledFor = scheduledFor.plus({ days: 1 });
             }
           } else {
-            // Delay by minutes from now
             scheduledFor = now.plus({ minutes: msg.delay_minutes });
           }
+
+          // Expand template variables in message content
+          const expandedContent = expandTemplateVars(msg.message_content, templateVars);
 
           return {
             enrollment_id: enrollment.id,
             campaign_message_id: msg.id,
             phone,
-            message_content: msg.message_content,
+            message_content: expandedContent,
             scheduled_for: scheduledFor.toISO(),
             status: 'pending',
           };
@@ -145,6 +455,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(201).json({
         enrollment_id: enrollment.id,
         messages_scheduled: messages?.length || 0,
+        actions_executed: Object.keys(actions).filter(k => actions[k]?.enabled),
       });
     } catch (error) {
       console.error('Error enrolling phone:', error);

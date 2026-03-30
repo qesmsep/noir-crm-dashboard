@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'POST') {
     try {
-      const { name, trigger_word, status, messages } = req.body;
+      const { name, trigger_word, status, messages, actions, non_member_response } = req.body;
 
       if (!name || !trigger_word) {
         return res.status(400).json({ error: 'Name and trigger word are required' });
@@ -79,7 +79,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Create campaign
       const { data: campaign, error } = await supabaseAdmin
         .from('sms_intake_campaigns')
-        .insert({ name, trigger_word: trigger_word.trim(), status: status || 'draft' })
+        .insert({
+          name,
+          trigger_word: trigger_word.trim(),
+          status: status || 'draft',
+          actions: actions || {},
+          non_member_response: non_member_response || null,
+        })
         .select()
         .single();
 
@@ -114,7 +120,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'PUT') {
     try {
-      const { id, name, trigger_word, status, messages } = req.body;
+      const { id, name, trigger_word, status, messages, actions, non_member_response } = req.body;
 
       if (!id) {
         return res.status(400).json({ error: 'Campaign ID is required' });
@@ -125,6 +131,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (name !== undefined) updateFields.name = name;
       if (trigger_word !== undefined) updateFields.trigger_word = trigger_word.trim();
       if (status !== undefined) updateFields.status = status;
+      if (actions !== undefined) updateFields.actions = actions;
+      if (non_member_response !== undefined) updateFields.non_member_response = non_member_response;
 
       const { data: campaign, error } = await supabaseAdmin
         .from('sms_intake_campaigns')

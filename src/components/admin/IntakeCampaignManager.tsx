@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Select } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
-import { Plus, Edit, Trash2, MessageSquare, UserPlus, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, MessageSquare, UserPlus, GripVertical, Zap } from 'lucide-react';
 
 interface CampaignMessage {
   id?: string;
@@ -20,6 +21,12 @@ interface CampaignMessage {
   sort_order: number;
 }
 
+interface CampaignActions {
+  create_onboarding_link?: { enabled: boolean; selected_membership?: string };
+  add_ledger_charge?: { enabled: boolean; amount?: number; description?: string };
+  create_event_rsvp?: { enabled: boolean; event_id?: string; party_size?: number };
+}
+
 interface IntakeCampaign {
   id: string;
   name: string;
@@ -27,6 +34,22 @@ interface IntakeCampaign {
   status: 'draft' | 'active' | 'inactive';
   message_count?: number;
   messages?: CampaignMessage[];
+  actions?: CampaignActions;
+  non_member_response?: string;
+}
+
+interface PrivateEvent {
+  id: string;
+  title: string;
+  start_time: string;
+  status: string;
+  price_per_seat?: number;
+}
+
+interface SubscriptionPlan {
+  id: string;
+  plan_name: string;
+  is_active: boolean;
 }
 
 type DelayPreset = 'immediate' | 'custom_minutes' | 'next_day_at' | 'days_at';
@@ -125,10 +148,16 @@ export default function IntakeCampaignManager() {
   const [enrollCampaignId, setEnrollCampaignId] = useState<string>('');
   const [enrollPhone, setEnrollPhone] = useState('');
   const [enrolling, setEnrolling] = useState(false);
+  const [actions, setActions] = useState<CampaignActions>({});
+  const [nonMemberResponse, setNonMemberResponse] = useState('');
+  const [events, setEvents] = useState<PrivateEvent[]>([]);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
     loadCampaigns();
+    loadEvents();
+    loadPlans();
   }, []);
 
   const loadCampaigns = async () => {
@@ -145,6 +174,30 @@ export default function IntakeCampaignManager() {
     }
   };
 
+  const loadEvents = async () => {
+    try {
+      const response = await fetch('/api/private_events');
+      if (response.ok) {
+        const data = await response.json();
+        setEvents((data || []).filter((e: PrivateEvent) => e.status === 'active'));
+      }
+    } catch (error) {
+      console.error('Error loading events:', error);
+    }
+  };
+
+  const loadPlans = async () => {
+    try {
+      const response = await fetch('/api/admin/subscription-plans');
+      if (response.ok) {
+        const data = await response.json();
+        setPlans((data || []).filter((p: SubscriptionPlan) => p.is_active));
+      }
+    } catch (error) {
+      console.error('Error loading plans:', error);
+    }
+  };
+
   const handleCreate = () => {
     setEditingCampaign({
       id: '',
@@ -153,6 +206,8 @@ export default function IntakeCampaignManager() {
       status: 'draft',
     });
     setMessageForms([emptyMessageForm()]);
+    setActions({});
+    setNonMemberResponse('');
     setIsOpen(true);
   };
 
@@ -162,6 +217,8 @@ export default function IntakeCampaignManager() {
       if (response.ok) {
         const data = await response.json();
         setEditingCampaign(data);
+        setActions(data.actions || {});
+        setNonMemberResponse(data.non_member_response || '');
         if (data.messages && data.messages.length > 0) {
           setMessageForms(data.messages.map((msg: CampaignMessage) => {
             const { preset, customMinutes, delayDays, sendTime } = getDelayPreset(msg);
@@ -205,6 +262,8 @@ export default function IntakeCampaignManager() {
         trigger_word: editingCampaign.trigger_word,
         status: editingCampaign.status,
         messages,
+        actions,
+        non_member_response: nonMemberResponse || null,
       };
 
       const response = await fetch('/api/membership/intake-campaigns', {
@@ -497,6 +556,255 @@ export default function IntakeCampaignManager() {
                 <option value="inactive">Inactive</option>
               </Select>
             </div>
+
+            {/* Actions */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-[#353535]" />
+                <Label className="text-xs font-semibold text-[#353535]">Actions (optional)</Label>
+              </div>
+              <p className="text-xs text-text-muted mb-3">
+                Business logic that runs when someone is enrolled in this campaign.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                {/* Create Onboarding Link */}
+                <div className="border border-border-cream-1 rounded-xl p-3 bg-[#FAFAF8]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Checkbox
+                      id="action-onboarding"
+                      checked={actions.create_onboarding_link?.enabled || false}
+                      onCheckedChange={(checked) =>
+                        setActions(prev => ({
+                          ...prev,
+                          create_onboarding_link: {
+                            ...prev.create_onboarding_link,
+                            enabled: checked as boolean,
+                          },
+                        }))
+                      }
+                    />
+                    <Label htmlFor="action-onboarding" className="text-xs font-semibold text-[#353535] cursor-pointer">
+                      Create Onboarding Link
+                    </Label>
+                  </div>
+                  {actions.create_onboarding_link?.enabled && (
+                    <div className="ml-6 flex flex-col gap-2">
+                      <p className="text-xs text-text-muted">
+                        Generates a 24-hour signup token and creates a waitlist entry.
+                        Use <code className="bg-white px-1 rounded">{'{{onboard_url}}'}</code> in your messages.
+                      </p>
+                      <div>
+                        <Label className="text-xs text-text-muted">Pre-select Membership Type (optional)</Label>
+                        <Select
+                          value={actions.create_onboarding_link?.selected_membership || ''}
+                          onChange={(e) =>
+                            setActions(prev => ({
+                              ...prev,
+                              create_onboarding_link: {
+                                ...prev.create_onboarding_link,
+                                enabled: true,
+                                selected_membership: e.target.value || undefined,
+                              },
+                            }))
+                          }
+                          className="mt-1 text-sm h-8"
+                        >
+                          <option value="">None</option>
+                          {plans.map(plan => (
+                            <option key={plan.id} value={plan.plan_name}>{plan.plan_name}</option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Ledger Charge */}
+                <div className="border border-border-cream-1 rounded-xl p-3 bg-[#FAFAF8]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Checkbox
+                      id="action-charge"
+                      checked={actions.add_ledger_charge?.enabled || false}
+                      onCheckedChange={(checked) =>
+                        setActions(prev => ({
+                          ...prev,
+                          add_ledger_charge: {
+                            ...prev.add_ledger_charge,
+                            enabled: checked as boolean,
+                          },
+                        }))
+                      }
+                    />
+                    <Label htmlFor="action-charge" className="text-xs font-semibold text-[#353535] cursor-pointer">
+                      Add Ledger Charge
+                    </Label>
+                    <Badge className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">Members Only</Badge>
+                  </div>
+                  {actions.add_ledger_charge?.enabled && (
+                    <div className="ml-6 flex flex-col gap-2">
+                      <p className="text-xs text-text-muted">
+                        Adds a charge to the member's account.
+                        Use <code className="bg-white px-1 rounded">{'{{charge_amount}}'}</code> in your messages.
+                      </p>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Label className="text-xs text-text-muted">Amount ($)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={actions.add_ledger_charge?.amount || ''}
+                            onChange={(e) =>
+                              setActions(prev => ({
+                                ...prev,
+                                add_ledger_charge: {
+                                  ...prev.add_ledger_charge,
+                                  enabled: true,
+                                  amount: parseFloat(e.target.value) || 0,
+                                },
+                              }))
+                            }
+                            className="mt-1 text-sm h-8"
+                            placeholder="50.00"
+                          />
+                        </div>
+                        <div className="flex-[2]">
+                          <Label className="text-xs text-text-muted">Description</Label>
+                          <Input
+                            value={actions.add_ledger_charge?.description || ''}
+                            onChange={(e) =>
+                              setActions(prev => ({
+                                ...prev,
+                                add_ledger_charge: {
+                                  ...prev.add_ledger_charge,
+                                  enabled: true,
+                                  description: e.target.value,
+                                },
+                              }))
+                            }
+                            className="mt-1 text-sm h-8"
+                            placeholder="Event ticket, etc."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Create Event RSVP */}
+                <div className="border border-border-cream-1 rounded-xl p-3 bg-[#FAFAF8]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Checkbox
+                      id="action-rsvp"
+                      checked={actions.create_event_rsvp?.enabled || false}
+                      onCheckedChange={(checked) =>
+                        setActions(prev => ({
+                          ...prev,
+                          create_event_rsvp: {
+                            ...prev.create_event_rsvp,
+                            enabled: checked as boolean,
+                          },
+                        }))
+                      }
+                    />
+                    <Label htmlFor="action-rsvp" className="text-xs font-semibold text-[#353535] cursor-pointer">
+                      Create Event RSVP
+                    </Label>
+                    <Badge className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">Members Only</Badge>
+                  </div>
+                  {actions.create_event_rsvp?.enabled && (
+                    <div className="ml-6 flex flex-col gap-2">
+                      <p className="text-xs text-text-muted">
+                        RSVPs the member to a private event and charges if the event has a per-seat price.
+                        Use <code className="bg-white px-1 rounded">{'{{event_title}}'}</code> in your messages.
+                      </p>
+                      <div>
+                        <Label className="text-xs text-text-muted">Private Event</Label>
+                        <Select
+                          value={actions.create_event_rsvp?.event_id || ''}
+                          onChange={(e) =>
+                            setActions(prev => ({
+                              ...prev,
+                              create_event_rsvp: {
+                                ...prev.create_event_rsvp,
+                                enabled: true,
+                                event_id: e.target.value,
+                              },
+                            }))
+                          }
+                          className="mt-1 text-sm h-8"
+                        >
+                          <option value="">Select an event...</option>
+                          {events.map(event => (
+                            <option key={event.id} value={event.id}>
+                              {event.title}{event.price_per_seat ? ` ($${event.price_per_seat}/seat)` : ''}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-text-muted">Party Size</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={actions.create_event_rsvp?.party_size || 1}
+                          onChange={(e) =>
+                            setActions(prev => ({
+                              ...prev,
+                              create_event_rsvp: {
+                                ...prev.create_event_rsvp,
+                                enabled: true,
+                                party_size: parseInt(e.target.value) || 1,
+                              },
+                            }))
+                          }
+                          className="mt-1 text-sm h-8 w-24"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Non-member Response (shown when any members-only action is enabled) */}
+                {(actions.add_ledger_charge?.enabled || actions.create_event_rsvp?.enabled) && (
+                  <div className="border border-amber-200 rounded-xl p-3 bg-amber-50">
+                    <Label className="text-xs font-semibold text-[#353535]">Non-Member Response</Label>
+                    <p className="text-xs text-text-muted mt-1 mb-2">
+                      Sent instead of the campaign messages when a non-member texts this trigger word.
+                    </p>
+                    <Textarea
+                      value={nonMemberResponse}
+                      onChange={(e) => setNonMemberResponse(e.target.value)}
+                      placeholder="Thank you for your interest. This offer is available to Noir members only. For membership info, text MEMBERSHIP."
+                      rows={3}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Template Variables Reference */}
+            {(actions.create_onboarding_link?.enabled || actions.add_ledger_charge?.enabled || actions.create_event_rsvp?.enabled) && (
+              <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                <p className="font-semibold mb-1">Available Template Variables:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-gray-700">
+                  {actions.create_onboarding_link?.enabled && (
+                    <li><code className="bg-white px-1 rounded">{'{{onboard_url}}'}</code> - Signup link (24hr expiry)</li>
+                  )}
+                  {(actions.add_ledger_charge?.enabled || actions.create_event_rsvp?.enabled) && (
+                    <li><code className="bg-white px-1 rounded">{'{{member_name}}'}</code> - Member's first name</li>
+                  )}
+                  {actions.add_ledger_charge?.enabled && (
+                    <li><code className="bg-white px-1 rounded">{'{{charge_amount}}'}</code> - Charge amount (e.g., $50.00)</li>
+                  )}
+                  {actions.create_event_rsvp?.enabled && (
+                    <li><code className="bg-white px-1 rounded">{'{{event_title}}'}</code> - Event name</li>
+                  )}
+                </ul>
+              </div>
+            )}
 
             {/* Messages */}
             <div>
