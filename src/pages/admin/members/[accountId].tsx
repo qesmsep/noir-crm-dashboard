@@ -296,7 +296,7 @@ export default function MemberDetailAdmin() {
           .from('members')
           .select('*')
           .eq('account_id', accountId)
-          .in('status', ['active', 'paused']);
+          .in('status', ['active', 'paused', 'inactive']);
 
         if (error) throw error;
 
@@ -2825,7 +2825,7 @@ export default function MemberDetailAdmin() {
                   .from('members')
                   .select('*')
                   .eq('account_id', accountId)
-                  .eq('deactivated', false);
+                  .in('status', ['active', 'paused', 'inactive']);
 
                 if (error) throw error;
 
