@@ -3,7 +3,7 @@ import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
 import { supabase } from '../../lib/supabase';
-import type { MembershipCashBreakdown } from '../../lib/businessMetrics';
+import type { MembershipCashBreakdown, BusinessSummary as BusinessSummaryBase } from '../../lib/businessMetrics';
 
 // ---------------------------------------------------------------------------
 // Types (mirror server types for client-side display)
@@ -52,20 +52,9 @@ interface AlertStatus {
   current_value: number | null;
 }
 
-interface BusinessSummary {
-  month: string;
-  priorMonth: string;
-  mrr: number;
-  priorMrr: number;
-  arr: number;
-  mrrBridge: MrrBridge;
-  memberCounts: MemberCounts;
-  priorMemberCounts: MemberCounts;
-  rates: RetentionRates;
-  attach: AttachMetrics;
-  priorAttach: AttachMetrics;
-  failedPayments30d: number;
-  membershipCash: MembershipCashBreakdown;
+// Extends the canonical BusinessSummary from the lib with client-only fields
+// added by the API layer (alerts are evaluated separately in business-summary.ts).
+interface BusinessSummary extends BusinessSummaryBase {
   alerts: AlertStatus[];
 }
 
@@ -703,7 +692,7 @@ export default function BusinessDashboard() {
                 <div className={styles.kpiLabel}>ARR</div>
                 <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthRange(s.month)}) — includes all recurring revenue (monthly and annual memberships) annualized. A forward-looking projection of yearly revenue if nothing changes.</div>
               </div>
-              <div className={styles.kpiTile} onClick={() => setShowMembershipCashModal(true)} style={{ cursor: 'pointer' }}>
+              <div className={styles.kpiTileClickable} onClick={() => setShowMembershipCashModal(true)}>
                 <div className={styles.kpiValue}>{fmtCurrency(s.membershipCash?.total ?? 0)}</div>
                 <div className={styles.kpiLabel}>Membership Cash This Month</div>
                 <div className={styles.kpiHint}>Expected subscription cash for {fmtMonthRange(s.month)}: monthly renewals due + new sign-ups + annual prorated − cancellations before renewal. Click for breakdown.</div>
