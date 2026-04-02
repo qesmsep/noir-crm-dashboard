@@ -141,6 +141,7 @@ async function processWebhookEvent(event: Stripe.Event) {
       await handlePaymentFailed(event.data.object as Stripe.Invoice);
       break;
 
+    case 'invoice.paid':
     case 'invoice.payment_succeeded':
       await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
       break;
@@ -636,48 +637,95 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     console.log(`   Found processing fee: $${processingFeeAmount.toFixed(2)}`);
   }
 
-  // Record total payment (positive amount = reduces balance)
-  const { error: paymentError } = await supabase
-    .from('ledger')
-    .insert({
+  // Build all ledger entries to insert in a single batch
+  const ledgerEntries: any[] = [];
+
+  // 1. Record total payment (positive amount = reduces balance)
+  ledgerEntries.push({
+    account_id: account.account_id,
+    member_id: primaryMember.member_id,
+    type: 'payment',
+    amount: totalAmountPaid,
+    note: `Subscription Payment (${invoice.id})`,
+    date: transactionDate,
+    stripe_charge_id: chargeId || null,
+    stripe_invoice_id: invoiceId || null,
+    stripe_invoice_pdf_url: invoice.invoice_pdf || null,
+  });
+
+  // 2. Admin fee charge (non-beverage portion deducted from balance)
+  const adminFee = parseFloat(account.administrative_fee?.toString() || '0');
+  if (adminFee > 0) {
+    ledgerEntries.push({
       account_id: account.account_id,
       member_id: primaryMember.member_id,
-      type: 'payment',
-      amount: totalAmountPaid,
-      note: `Subscription Payment (${invoice.id})`,
+      type: 'charge',
+      amount: -adminFee,
+      note: 'Membership administration fee',
       date: transactionDate,
-      stripe_charge_id: chargeId || null,
-      stripe_invoice_id: invoiceId || null,
-      stripe_invoice_pdf_url: invoice.invoice_pdf || null,
     });
-
-  if (paymentError) {
-    console.error('❌ Failed to record payment in ledger:', paymentError);
-  } else {
-    console.log(`✅ Payment recorded: +$${totalAmountPaid.toFixed(2)}`);
+    console.log(`   Admin fee: -$${adminFee.toFixed(2)}`);
   }
 
-  // If there was a processing fee, record it as a separate charge (makes it a wash)
-  if (processingFeeAmount > 0) {
-    const { error: feeError } = await supabase
-      .from('ledger')
-      .insert({
+  // 3. Additional members fee
+  const additionalMemberFee = parseFloat(account.additional_member_fee?.toString() || '0');
+  if (additionalMemberFee > 0) {
+    const { count: additionalMembersCount } = await supabase
+      .from('members')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', account.account_id)
+      .neq('member_type', 'primary');
+
+    const additionalMembersCountValue = additionalMembersCount || 0;
+    const additionalMembersFeeTotal = additionalMembersCountValue * additionalMemberFee;
+    if (additionalMembersFeeTotal > 0) {
+      ledgerEntries.push({
         account_id: account.account_id,
         member_id: primaryMember.member_id,
-        type: 'purchase',
-        amount: -processingFeeAmount, // Negative = charge
-        note: '4% Credit Card Processing Fee',
+        type: 'charge',
+        amount: -additionalMembersFeeTotal,
+        note: `Additional members fee (${additionalMembersCountValue} member${additionalMembersCountValue > 1 ? 's' : ''})`,
         date: transactionDate,
       });
-
-    if (feeError) {
-      console.error('❌ Failed to record processing fee in ledger:', feeError);
-    } else {
-      console.log(`✅ Processing fee recorded: -$${processingFeeAmount.toFixed(2)}`);
+      console.log(`   Additional members fee: -$${additionalMembersFeeTotal.toFixed(2)}`);
     }
   }
 
-  console.log('✅ Ledger entries complete');
+  // 4. Credit card processing fee (if found on the invoice)
+  if (processingFeeAmount > 0) {
+    ledgerEntries.push({
+      account_id: account.account_id,
+      member_id: primaryMember.member_id,
+      type: 'purchase',
+      amount: -processingFeeAmount,
+      note: '4% Credit Card Processing Fee',
+      date: transactionDate,
+    });
+    console.log(`   Processing fee: -$${processingFeeAmount.toFixed(2)}`);
+  }
+
+  // Insert all ledger entries in a single batch
+  const { error: insertError } = await supabase.from('ledger').insert(ledgerEntries);
+
+  if (insertError) {
+    console.error('❌ Failed to record ledger entries:', insertError);
+
+    // Log to subscription_events for visibility
+    await supabase.from('subscription_events').insert({
+      account_id: account.account_id,
+      event_type: 'billing_error',
+      effective_date: new Date().toISOString(),
+      metadata: {
+        error: 'ledger_insert_failed',
+        invoice_id: invoiceId,
+        amount: totalAmountPaid,
+        insert_error: insertError.message,
+      },
+    });
+  } else {
+    console.log(`✅ Payment recorded: +$${totalAmountPaid.toFixed(2)}`);
+    console.log('✅ Ledger entries complete');
+  }
 }
 
 async function handleInvoiceCreated(invoice: Stripe.Invoice) {
