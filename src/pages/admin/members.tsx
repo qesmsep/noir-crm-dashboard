@@ -993,9 +993,6 @@ export default function MembersAdmin() {
                             <div className={styles.memberInfo}>
                               <div className={styles.primaryName}>
                                 {member1.first_name} {member1.last_name}
-                                {member1.member_type === 'primary' && (
-                                  <span className={styles.primaryBadge}>Primary</span>
-                                )}
                               </div>
                               <div className={styles.contactInfo}>
                                 {member1.email && (
@@ -1039,9 +1036,6 @@ export default function MembersAdmin() {
                             <div className={styles.memberInfo}>
                               <div className={styles.primaryName}>
                                 {member2.first_name} {member2.last_name}
-                                {member2.member_type === 'primary' && (
-                                  <span className={styles.primaryBadge}>Primary</span>
-                                )}
                               </div>
                               <div className={styles.contactInfo}>
                                 {member2.email && (
@@ -1167,7 +1161,6 @@ export default function MembersAdmin() {
                                   />
                                   <span className={styles.memberCheckboxText}>
                                     {member.first_name} {member.last_name}
-                                    {member.member_type === 'primary' && <span className={styles.primaryBadgeSmall}>Primary</span>}
                                   </span>
                                 </label>
                               ))}
