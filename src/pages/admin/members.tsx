@@ -209,7 +209,8 @@ export default function MembersAdmin() {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'America/Chicago'
     });
   };
 
@@ -234,7 +235,8 @@ export default function MembersAdmin() {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'numeric',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'America/Chicago'
     }).replace(/\//g, '.');
   };
 
@@ -315,11 +317,14 @@ export default function MembersAdmin() {
     if (statusFilter !== 'all') {
       const status = account.accounts?.subscription_status;
       if (statusFilter === 'active' && status !== 'active') return false;
+      if (statusFilter === 'payment_failed') {
+        // Show only active accounts with failed payments
+        if (!failedPaymentAccounts.has(account.account_id)) return false;
+      }
       if (statusFilter === 'canceled') {
         // Show canceled accounts OR accounts with archived members
         if (!isAccountCancelled(account) && !hasArchivedMembers) return false;
       }
-      if (statusFilter === 'past_due' && status !== 'past_due') return false;
       if (statusFilter === 'paused' && status !== 'paused') return false;
     } else {
       // For "all" filter, exclude accounts where all members are archived
@@ -615,8 +620,8 @@ export default function MembersAdmin() {
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
+              <option value="payment_failed">Payment Failed</option>
               <option value="canceled">Canceled</option>
-              <option value="past_due">Past Due</option>
               <option value="paused">Paused</option>
             </select>
             {/* Plan Filter */}
@@ -794,9 +799,6 @@ export default function MembersAdmin() {
                         <div className={styles.mobileMemberInfo}>
                           <div className={styles.mobileMemberName}>
                             {member1?.first_name} {member1?.last_name}
-                            {member1?.member_type === 'primary' && (
-                              <span className={styles.mobilePrimaryBadge}>Primary</span>
-                            )}
                           </div>
                           <div className={styles.mobileContactLine}>
                             {member1?.email || '—'}
@@ -993,6 +995,20 @@ export default function MembersAdmin() {
                             <div className={styles.memberInfo}>
                               <div className={styles.primaryName}>
                                 {member1.first_name} {member1.last_name}
+                                {failedPaymentAccounts.has(account.account_id) && (
+                                  <span style={{
+                                    marginLeft: '0.5rem',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    backgroundColor: '#fee2e2',
+                                    color: '#dc2626',
+                                    border: '1px solid #fca5a5'
+                                  }}>
+                                    ⚠️ PAYMENT FAILED
+                                  </span>
+                                )}
                               </div>
                               <div className={styles.contactInfo}>
                                 {member1.email && (

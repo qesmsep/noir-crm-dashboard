@@ -137,10 +137,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             try {
               await logPaymentToLedger(account, result.paymentIntent);
             } catch (ledgerError: any) {
-              console.error(`   ⚠️  Ledger write failed (charge succeeded): ${ledgerError.message}`);
+              // CRITICAL: Stripe charge succeeded but ledger write failed
+              // Member was charged but balance won't reflect payment
+              console.error('\n🚨 CRITICAL: LEDGER SYNC FAILURE 🚨');
+              console.error(`   Account: ${account.account_id}`);
+              console.error(`   Stripe Payment: ${result.paymentIntent.id} ($${account.monthly_dues})`);
+              console.error(`   Error: ${ledgerError.message}`);
+              console.error('   ACTION REQUIRED: Manual ledger entry needed\n');
+              // TODO: Implement proper alerting (Slack/email/monitoring service)
               results.errors.push({
                 account_id: account.account_id,
-                error: `Ledger write failed after successful charge: ${ledgerError.message}`,
+                error: `CRITICAL: Ledger write failed after successful charge: ${ledgerError.message}`,
+                type: 'ledger_sync_failure',
+                payment_intent_id: result.paymentIntent.id,
+                amount: account.monthly_dues,
               });
             }
           }

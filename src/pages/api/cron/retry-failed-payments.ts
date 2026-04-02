@@ -20,12 +20,15 @@ const supabase = createClient(
  * Retry Failed Payments Cron Job
  *
  * Runs daily to:
- * 1. Find accounts with past_due status
+ * 1. Find active accounts with failed payments (last_payment_failed_at is set)
  * 2. Check if it's time to retry based on schedule (Day 3, 5, 7, 10)
  * 3. Attempt to charge again
- * 4. If successful: Reactivate and move next_billing_date forward
+ * 4. If successful: Clear payment failure flag and move next_billing_date forward
  * 5. If still failing: Increment retry counter
  * 6. After 4 retries: Cancel subscription
+ *
+ * Note: Accounts remain in 'active' status during retries; payment failures
+ * are tracked via last_payment_failed_at timestamp, not status changes.
  *
  * Should be scheduled to run daily (e.g., 3 AM UTC, after monthly billing)
  */
@@ -53,25 +56,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   try {
-    // Find accounts with past_due status and retry_count < 4
+    // Find accounts with failed payments (last_payment_failed_at set) and retry_count < 4
+    // Status remains 'active' so they don't disappear from filters
     // Join with subscription_plans to get billing interval
     const { data: failedAccounts, error: fetchError } = await supabase
       .from('accounts')
       .select('*, subscription_plans!membership_plan_id(interval)')
-      .eq('subscription_status', 'past_due')
+      .eq('subscription_status', 'active')
+      .not('last_payment_failed_at', 'is', null)
       .lt('billing_retry_count', 4);
 
     if (fetchError) {
-      console.error('❌ Failed to fetch past due accounts:', fetchError);
+      console.error('❌ Failed to fetch accounts with failed payments:', fetchError);
       return res.status(500).json({ error: 'Failed to fetch accounts', details: fetchError });
     }
 
     if (!failedAccounts || failedAccounts.length === 0) {
-      console.log('✅ No past due accounts to retry');
+      console.log('✅ No accounts with failed payments to retry');
       return res.json({ message: 'No accounts to retry', results });
     }
 
-    console.log(`\n📋 Found ${failedAccounts.length} past due account(s)\n`);
+    console.log(`\n📋 Found ${failedAccounts.length} account(s) with failed payments\n`);
 
     results.total = failedAccounts.length;
 
@@ -80,12 +85,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         console.log(`\n💳 Checking account: ${account.account_id}`);
         console.log(`   Current retry count: ${account.billing_retry_count}`);
-
-        if (!account.last_payment_failed_at) {
-          console.log('   ⏭️  Skipped - no failure date recorded');
-          results.skipped++;
-          continue;
-        }
 
         const daysSinceFailure = daysBetween(account.last_payment_failed_at, new Date());
         console.log(`   Days since failure: ${daysSinceFailure}`);
@@ -117,11 +116,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const billingInterval = account.subscription_plans?.interval || 'month';
           const currentDate = account.next_billing_date || new Date().toISOString().split('T')[0];
 
-          // Reactivate account and move billing date forward based on interval
+          // Clear payment failure and move billing date forward based on interval
+          // Status is already 'active' (never changed on payment failure)
           const { error: updateError } = await supabase
             .from('accounts')
             .update({
-              subscription_status: 'active',
               next_billing_date: billingInterval === 'year' ? addYears(currentDate, 1) : addMonths(currentDate, 1),
               billing_retry_count: 0,
               last_billing_attempt: new Date().toISOString(),

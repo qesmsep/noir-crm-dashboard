@@ -1,10 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,9 +10,10 @@ const supabase = createClient(
  * GET /api/accounts/failed-payments-summary
  *
  * Returns a summary of accounts with failed last payments
+ * Now uses last_payment_failed_at column instead of querying Stripe
  *
  * Returns:
- *   - failed_payment_accounts: Array of { account_id, last_payment_status, failed_count }
+ *   - failed_payment_accounts: Array of { account_id, last_payment_failed_at, billing_retry_count }
  *   - total_failed_accounts: number
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -26,11 +22,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Fetch all accounts with Stripe customer IDs
+    // Fetch all accounts with failed payments (last_payment_failed_at is set)
+    // Status remains 'active' so they don't disappear from filters
     const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
-      .select('account_id, stripe_customer_id')
-      .not('stripe_customer_id', 'is', null);
+      .select('account_id, last_payment_failed_at, billing_retry_count')
+      .eq('subscription_status', 'active')
+      .not('last_payment_failed_at', 'is', null);
 
     if (accountsError) {
       throw accountsError;
@@ -43,46 +41,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    interface FailedPaymentAccount {
-      account_id: string;
-      last_payment_status: string;
-      failed_count: number;
-      last_payment_date: number;
-    }
-
-    const failedPaymentAccounts: FailedPaymentAccount[] = [];
-
-    // Check each account's last payment status
-    for (const account of accounts) {
-      try {
-        const charges = await stripe.charges.list({
-          customer: account.stripe_customer_id,
-          limit: 10,
-        });
-
-        if (charges.data.length > 0) {
-          const lastCharge = charges.data[0];
-
-          if (lastCharge.status === 'failed') {
-            // Count recent failed payments
-            const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
-            const recentFailedCount = charges.data.filter(
-              charge => charge.status === 'failed' && charge.created >= thirtyDaysAgo
-            ).length;
-
-            failedPaymentAccounts.push({
-              account_id: account.account_id,
-              last_payment_status: lastCharge.status,
-              failed_count: recentFailedCount,
-              last_payment_date: lastCharge.created,
-            });
-          }
-        }
-      } catch (stripeError) {
-        console.error(`Error fetching charges for account ${account.account_id}:`, stripeError);
-        // Continue processing other accounts
-      }
-    }
+    // Map to the expected format
+    const failedPaymentAccounts = accounts.map(account => ({
+      account_id: account.account_id,
+      last_payment_failed_at: account.last_payment_failed_at,
+      billing_retry_count: account.billing_retry_count || 0,
+    }));
 
     return res.json({
       failed_payment_accounts: failedPaymentAccounts,
