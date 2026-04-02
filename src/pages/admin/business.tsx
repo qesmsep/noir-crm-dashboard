@@ -3,6 +3,7 @@ import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
 import { supabase } from '../../lib/supabase';
+import type { MembershipCashBreakdown, BusinessSummary as BusinessSummaryBase } from '../../lib/businessMetrics';
 
 // ---------------------------------------------------------------------------
 // Types (mirror server types for client-side display)
@@ -51,19 +52,9 @@ interface AlertStatus {
   current_value: number | null;
 }
 
-interface BusinessSummary {
-  month: string;
-  priorMonth: string;
-  mrr: number;
-  priorMrr: number;
-  arr: number;
-  mrrBridge: MrrBridge;
-  memberCounts: MemberCounts;
-  priorMemberCounts: MemberCounts;
-  rates: RetentionRates;
-  attach: AttachMetrics;
-  priorAttach: AttachMetrics;
-  failedPayments30d: number;
+// Extends the canonical BusinessSummary from the lib with client-only fields
+// added by the API layer (alerts are evaluated separately in business-summary.ts).
+interface BusinessSummary extends BusinessSummaryBase {
   alerts: AlertStatus[];
 }
 
@@ -503,6 +494,7 @@ export default function BusinessDashboard() {
   const [showPortalAccessModal, setShowPortalAccessModal] = useState(false);
   const [showMrrModal, setShowMrrModal] = useState(false);
   const [showNetNewMrrModal, setShowNetNewMrrModal] = useState(false);
+  const [showMembershipCashModal, setShowMembershipCashModal] = useState(false);
   const [drillNew, setDrillNew] = useState<any[]>([]);
   const [drillPaused, setDrillPaused] = useState<any[]>([]);
   const [partySizeMetrics, setPartySizeMetrics] = useState<{
@@ -699,6 +691,11 @@ export default function BusinessDashboard() {
                 <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
                 <div className={styles.kpiLabel}>ARR</div>
                 <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthRange(s.month)}) — includes all recurring revenue (monthly and annual memberships) annualized. A forward-looking projection of yearly revenue if nothing changes.</div>
+              </div>
+              <div className={styles.kpiTileClickable} onClick={() => setShowMembershipCashModal(true)}>
+                <div className={styles.kpiValue}>{fmtCurrency(s.membershipCash?.total ?? 0)}</div>
+                <div className={styles.kpiLabel}>Membership Cash This Month</div>
+                <div className={styles.kpiHint}>Expected subscription cash for {fmtMonthRange(s.month)}: monthly renewals due + new sign-ups + annual prorated − cancellations before renewal. Click for breakdown.</div>
               </div>
               <div
                 className={styles.kpiTile}
@@ -1281,6 +1278,72 @@ export default function BusinessDashboard() {
                       </tbody>
                     </table>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Membership Cash Breakdown Modal */}
+        {showMembershipCashModal && s?.membershipCash && (
+          <div className={styles.modalOverlay} onClick={() => setShowMembershipCashModal(false)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Membership Cash — {fmtMonthRange(s.month)}</h2>
+                <button className={styles.modalClose} onClick={() => setShowMembershipCashModal(false)}>×</button>
+              </div>
+              <div className={styles.modalBody}>
+                <div className={styles.modalSummaryBlock}>
+                  <div className={styles.modalSummaryValue}>
+                    {fmtCurrency(s.membershipCash.total)}
+                  </div>
+                  <div className={styles.modalSummaryCaption}>
+                    Expected subscription cash for {fmtMonthRange(s.month)}
+                  </div>
+                </div>
+
+                <table className={styles.dataTable}>
+                  <thead>
+                    <tr>
+                      <th>Component</th>
+                      <th className={styles.textRight}>Members</th>
+                      <th className={styles.textRight}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Monthly Renewals Due</td>
+                      <td className={styles.textRight}>{s.membershipCash.monthlyRenewalsCount}</td>
+                      <td className={styles.textRight}>{fmtCurrencyDec(s.membershipCash.monthlyRenewals)}</td>
+                    </tr>
+                    <tr>
+                      <td>New Member Sign-ups</td>
+                      <td className={styles.textRight}>{s.membershipCash.newMembersCount}</td>
+                      <td className={`${styles.textRight} ${styles.deltaPositive}`}>+{fmtCurrencyDec(s.membershipCash.newMemberCash)}</td>
+                    </tr>
+                    <tr>
+                      <td>Annual Members (Prorated)</td>
+                      <td className={styles.textRight}>{s.membershipCash.annualMembersCount}</td>
+                      <td className={`${styles.textRight} ${styles.deltaPositive}`}>+{fmtCurrencyDec(s.membershipCash.annualProrated)}</td>
+                    </tr>
+                    <tr>
+                      <td>Canceled Before Renewal</td>
+                      <td className={styles.textRight}>{s.membershipCash.canceledBeforeRenewalCount}</td>
+                      <td className={`${styles.textRight} ${styles.deltaNegative}`}>−{fmtCurrencyDec(s.membershipCash.canceledBeforeRenewal)}</td>
+                    </tr>
+                    <tr className={styles.totalRow}>
+                      <td>Total</td>
+                      <td></td>
+                      <td className={styles.textRight}>{fmtCurrencyDec(s.membershipCash.total)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className={styles.modalHint}>
+                  Monthly renewals = active monthly members whose next billing date falls in {fmtMonthRange(s.month)}.
+                  New sign-ups = members who joined this month. Annual prorated = annual subscription ÷ 12.
+                  Canceled = members who canceled before their renewal date this month.
+                  This metric fluctuates as new members sign up and cancellations occur.
                 </div>
               </div>
             </div>

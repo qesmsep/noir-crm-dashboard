@@ -85,6 +85,23 @@ export interface AttachMetrics {
   membersWithAttach: number;
 }
 
+export interface MembershipCashBreakdown {
+  /** Monthly members whose next_renewal_date falls in the month */
+  monthlyRenewals: number;
+  monthlyRenewalsCount: number;
+  /** New members who signed up this month (first payment) */
+  newMemberCash: number;
+  newMembersCount: number;
+  /** Annual members' prorated share (plan_amount / 12) */
+  annualProrated: number;
+  annualMembersCount: number;
+  /** Lost cash from members who canceled before their renewal this month */
+  canceledBeforeRenewal: number;
+  canceledBeforeRenewalCount: number;
+  /** Total expected membership cash */
+  total: number;
+}
+
 export interface BusinessSummary {
   month: string;
   priorMonth: string;
@@ -98,6 +115,7 @@ export interface BusinessSummary {
   attach: AttachMetrics;
   priorAttach: AttachMetrics;
   failedPayments30d: number;
+  membershipCash: MembershipCashBreakdown;
 }
 
 export interface BusinessSeriesPoint {
@@ -599,6 +617,176 @@ export function computeAttachMetrics(
     attachRate,
     allInArpm,
     membersWithAttach,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Membership Cash This Month
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute expected membership subscription cash for a given month.
+ *
+ * Formula:
+ *   Monthly renewals due this month (active monthly members with next_renewal_date in month)
+ * + New member sign-ups this month (first payment)
+ * + Annual members prorated (plan_amount / 12)
+ * - Cancellations before renewal this month
+ *
+ * This is a real-time/dynamic metric that changes as the month progresses.
+ */
+export async function computeMembershipCash(
+  monthStr: string,
+  sb?: SupabaseClient
+): Promise<MembershipCashBreakdown> {
+  const supabase = sb || getSupabaseAdmin();
+  const monthStartDate = monthStr; // e.g. "2026-04-01"
+  const monthEndDate = monthEnd(monthStr); // e.g. "2026-04-30"
+  const emptyResult: MembershipCashBreakdown = { monthlyRenewals: 0, monthlyRenewalsCount: 0, newMemberCash: 0, newMembersCount: 0, annualProrated: 0, annualMembersCount: 0, canceledBeforeRenewal: 0, canceledBeforeRenewalCount: 0, total: 0 };
+
+  // Fetch accounts that either have a renewal in this month or are annual (always counted).
+  // This filters at the DB level to avoid loading all accounts.
+  const { data: accounts, error: accountsErr } = await supabase
+    .from('accounts')
+    .select('account_id, monthly_dues, subscription_status, next_renewal_date, next_billing_date, subscription_cancel_at, membership_plan_id')
+    .gt('monthly_dues', 0)
+    .in('subscription_status', ['active', 'canceled', 'past_due']);
+
+  if (accountsErr) throw new Error(`Failed to fetch accounts: ${accountsErr.message}`);
+  if (!accounts || accounts.length === 0) return emptyResult;
+
+  const accountIds = accounts.map(a => a.account_id);
+
+  // Fetch members and plan intervals in parallel
+  const [membersResult, plansResult] = await Promise.all([
+    supabase
+      .from('members')
+      .select('member_id, status, join_date, account_id')
+      .in('account_id', accountIds)
+      .in('status', ['active', 'paused', 'inactive']),
+    (() => {
+      const planIds = accounts.map(a => a.membership_plan_id).filter(Boolean);
+      if (planIds.length === 0) return Promise.resolve({ data: [] as any[], error: null });
+      return supabase
+        .from('subscription_plans')
+        .select('id, interval, plan_name')
+        .in('id', planIds);
+    })(),
+  ]);
+
+  if (membersResult.error) throw new Error(`Failed to fetch members: ${membersResult.error.message}`);
+  if (plansResult.error) throw new Error(`Failed to fetch subscription plans: ${plansResult.error.message}`);
+
+  const members = membersResult.data || [];
+  const planMap = new Map<string, { interval: string; plan_name: string }>();
+  for (const p of plansResult.data || []) {
+    planMap.set(p.id, { interval: p.interval || 'month', plan_name: p.plan_name || '' });
+  }
+
+  // Build account lookup — use account subscription_status as single source of truth
+  // for billing state (it reflects Stripe's actual subscription status).
+  interface AccountWithPlan {
+    account_id: string;
+    monthly_dues: number | null;
+    subscription_status: string | null;
+    next_renewal_date: string | null;
+    next_billing_date: string | null;
+    subscription_cancel_at: string | null;
+    membership_plan_id: string | null;
+    plan_interval: string;
+  }
+  const accountMap = new Map<string, AccountWithPlan>();
+  for (const a of accounts) {
+    const planInfo = a.membership_plan_id ? planMap.get(a.membership_plan_id) : null;
+    accountMap.set(a.account_id, {
+      ...a,
+      plan_interval: planInfo?.interval || 'month',
+    });
+  }
+
+  // Find the earliest join_date per account so multi-member accounts are
+  // classified by the account's first member, not whichever member is iterated first.
+  const earliestJoinByAccount = new Map<string, string>();
+  for (const m of members) {
+    if (!m.account_id || !m.join_date) continue;
+    const jd = m.join_date.substring(0, 10);
+    const existing = earliestJoinByAccount.get(m.account_id);
+    if (!existing || jd < existing) {
+      earliestJoinByAccount.set(m.account_id, jd);
+    }
+  }
+
+  let monthlyRenewals = 0;
+  let monthlyRenewalsCount = 0;
+  let newMemberCash = 0;
+  let newMembersCount = 0;
+  let annualProrated = 0;
+  let annualMembersCount = 0;
+  let canceledBeforeRenewal = 0;
+  let canceledBeforeRenewalCount = 0;
+
+  // Iterate accounts directly — each account counted once, using account-level
+  // subscription_status as single source of truth for billing state.
+  for (const acct of accountMap.values()) {
+    // accounts.monthly_dues stores the FULL annual amount for annual plans
+    // (e.g. $1200/yr, NOT the monthly equivalent). For monthly plans it stores
+    // the monthly charge. This matches the convention in generateSnapshot().
+    const dues = Number(acct.monthly_dues) || 0;
+    if (dues <= 0) continue;
+
+    const isAnnual = acct.plan_interval === 'year';
+    const renewalDate = acct.next_renewal_date || acct.next_billing_date;
+    const renewalStr = renewalDate ? renewalDate.substring(0, 10) : null;
+    const cancelAt = acct.subscription_cancel_at ? acct.subscription_cancel_at.substring(0, 10) : null;
+    const joinDate = earliestJoinByAccount.get(acct.account_id) || null;
+
+    // Use account-level subscription_status as single source of truth
+    const isActive = acct.subscription_status === 'active' || acct.subscription_status === 'past_due';
+    const isCanceled = acct.subscription_status === 'canceled';
+
+    // "New this month" based on the earliest member join_date for the account
+    const isNewThisMonth = joinDate && joinDate >= monthStartDate && joinDate <= monthEndDate;
+
+    // Renewal falls in this month
+    const renewalInMonth = renewalStr && renewalStr >= monthStartDate && renewalStr <= monthEndDate;
+
+    // Canceled THIS month before their renewal date (not old cancellations)
+    const canceledThisMonthBeforeRenewal = isCanceled
+      && cancelAt && cancelAt >= monthStartDate && cancelAt <= monthEndDate
+      && renewalStr && cancelAt <= renewalStr;
+
+    if (isAnnual) {
+      if (isActive) {
+        annualProrated += dues / 12;
+        annualMembersCount++;
+      }
+    } else {
+      // Monthly members
+      if (canceledThisMonthBeforeRenewal && renewalInMonth) {
+        canceledBeforeRenewal += dues;
+        canceledBeforeRenewalCount++;
+      } else if (isNewThisMonth && isActive) {
+        newMemberCash += dues;
+        newMembersCount++;
+      } else if (renewalInMonth && isActive) {
+        monthlyRenewals += dues;
+        monthlyRenewalsCount++;
+      }
+    }
+  }
+
+  const total = monthlyRenewals + newMemberCash + annualProrated - canceledBeforeRenewal;
+
+  return {
+    monthlyRenewals: Math.round(monthlyRenewals * 100) / 100,
+    monthlyRenewalsCount,
+    newMemberCash: Math.round(newMemberCash * 100) / 100,
+    newMembersCount,
+    annualProrated: Math.round(annualProrated * 100) / 100,
+    annualMembersCount,
+    canceledBeforeRenewal: Math.round(canceledBeforeRenewal * 100) / 100,
+    canceledBeforeRenewalCount,
+    total: Math.round(total * 100) / 100,
   };
 }
 
@@ -1133,7 +1321,10 @@ export async function getBusinessSummary(
     fullBridge.startingMrr
   );
 
-  const failedPayments30d = await getFailedPayments30d(supabase);
+  const [failedPayments30d, membershipCash] = await Promise.all([
+    getFailedPayments30d(supabase),
+    computeMembershipCash(monthStr, supabase),
+  ]);
 
   return {
     month: monthStr,
@@ -1148,6 +1339,7 @@ export async function getBusinessSummary(
     attach,
     priorAttach,
     failedPayments30d,
+    membershipCash,
   };
 }
 
