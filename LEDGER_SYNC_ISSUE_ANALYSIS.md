@@ -10,7 +10,7 @@ Multiple member accounts were charged by Stripe on April 1-2, 2026, but payments
 On March 30th, commit `235963e` added new columns (`source` and `ledger_entry_key`) to the ledger table and updated the billing code to use these columns. However, the migration file `supabase/migrations/20260330_prevent_duplicate_ledger_entries.sql` was never run against the production database.
 
 When the billing cron job ran on April 1st at 14:00:17 UTC, it:
-1. ✅ Successfully charged the account $150 (Stripe Payment Intent: `pi_3THPJcFdjSPifIH51J7fZXhS`)
+1. ✅ Successfully charged the account $150 via Stripe
 2. ✅ Updated `next_billing_date` to May 1st
 3. ❌ Failed to insert ledger entries because columns `source` and `ledger_entry_key` don't exist
 4. ⚠️  Error was caught silently (lines 139-145 in `monthly-billing.ts`)

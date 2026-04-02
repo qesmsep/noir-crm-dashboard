@@ -62,14 +62,7 @@ ORDER BY account_id, type DESC;
 
 -- Expected: 8 rows (2 per account)
 
--- 3. Verify subscription_events
-SELECT account_id, event_type, effective_date, metadata
-FROM subscription_events
-WHERE metadata->>'backfilled' = 'true';
-
--- Expected: 4 rows
-
--- 4. Check specific account
+-- 3. Check specific account
 SELECT type, amount, note, date, source
 FROM ledger
 WHERE account_id = '[ACCOUNT_ID]'
@@ -85,7 +78,7 @@ After migration:
 - Each account will show +$150 credit and -$50 admin fee in ledger
 - Net beverage credit for each account: $100
 - All Stripe payments reconciled with ledger
-- Complete audit trail in subscription_events
+- Ledger entries provide audit trail (subscription_events not backfilled)
 
 ## Rollback Plan
 If issues occur:
@@ -97,10 +90,6 @@ DELETE FROM ledger
 WHERE source = 'billing_cron'
   AND date IN ('2026-04-01', '2026-04-02')
   AND ledger_entry_key LIKE 'pi_%';
-
--- Remove backfilled events
-DELETE FROM subscription_events
-WHERE metadata->>'backfilled' = 'true';
 
 COMMIT;
 ```

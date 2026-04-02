@@ -209,7 +209,8 @@ export default function MembersAdmin() {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'America/Chicago'
     });
   };
 
@@ -234,7 +235,8 @@ export default function MembersAdmin() {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'numeric',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'America/Chicago'
     }).replace(/\//g, '.');
   };
 

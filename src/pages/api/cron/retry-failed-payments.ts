@@ -86,12 +86,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log(`\n💳 Checking account: ${account.account_id}`);
         console.log(`   Current retry count: ${account.billing_retry_count}`);
 
-        if (!account.last_payment_failed_at) {
-          console.log('   ⏭️  Skipped - no failure date recorded');
-          results.skipped++;
-          continue;
-        }
-
         const daysSinceFailure = daysBetween(account.last_payment_failed_at, new Date());
         console.log(`   Days since failure: ${daysSinceFailure}`);
 
