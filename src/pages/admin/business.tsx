@@ -3,6 +3,7 @@ import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
 import { supabase } from '../../lib/supabase';
+import type { MembershipCashBreakdown } from '../../lib/businessMetrics';
 
 // ---------------------------------------------------------------------------
 // Types (mirror server types for client-side display)
@@ -49,18 +50,6 @@ interface AlertStatus {
   is_triggered: boolean;
   last_evaluated_at: string | null;
   current_value: number | null;
-}
-
-interface MembershipCashBreakdown {
-  monthlyRenewals: number;
-  monthlyRenewalsCount: number;
-  newMemberCash: number;
-  newMembersCount: number;
-  annualProrated: number;
-  annualMembersCount: number;
-  canceledBeforeRenewal: number;
-  canceledBeforeRenewalCount: number;
-  total: number;
 }
 
 interface BusinessSummary {
@@ -1315,11 +1304,11 @@ export default function BusinessDashboard() {
                 <button className={styles.modalClose} onClick={() => setShowMembershipCashModal(false)}>×</button>
               </div>
               <div className={styles.modalBody}>
-                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f5f5f7', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1d1d1f', marginBottom: '0.5rem' }}>
+                <div className={styles.modalSummaryBlock}>
+                  <div className={styles.modalSummaryValue}>
                     {fmtCurrency(s.membershipCash.total)}
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#6e6e73' }}>
+                  <div className={styles.modalSummaryCaption}>
                     Expected subscription cash for {fmtMonthRange(s.month)}
                   </div>
                 </div>
@@ -1328,40 +1317,40 @@ export default function BusinessDashboard() {
                   <thead>
                     <tr>
                       <th>Component</th>
-                      <th style={{ textAlign: 'right' }}>Members</th>
-                      <th style={{ textAlign: 'right' }}>Amount</th>
+                      <th className={styles.textRight}>Members</th>
+                      <th className={styles.textRight}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
                       <td>Monthly Renewals Due</td>
-                      <td style={{ textAlign: 'right' }}>{s.membershipCash.monthlyRenewalsCount}</td>
-                      <td style={{ textAlign: 'right', color: '#1d1d1f' }}>{fmtCurrencyDec(s.membershipCash.monthlyRenewals)}</td>
+                      <td className={styles.textRight}>{s.membershipCash.monthlyRenewalsCount}</td>
+                      <td className={styles.textRight}>{fmtCurrencyDec(s.membershipCash.monthlyRenewals)}</td>
                     </tr>
                     <tr>
                       <td>New Member Sign-ups</td>
-                      <td style={{ textAlign: 'right' }}>{s.membershipCash.newMembersCount}</td>
-                      <td style={{ textAlign: 'right', color: '#34c759' }}>+{fmtCurrencyDec(s.membershipCash.newMemberCash)}</td>
+                      <td className={styles.textRight}>{s.membershipCash.newMembersCount}</td>
+                      <td className={`${styles.textRight} ${styles.deltaPositive}`}>+{fmtCurrencyDec(s.membershipCash.newMemberCash)}</td>
                     </tr>
                     <tr>
                       <td>Annual Members (Prorated)</td>
-                      <td style={{ textAlign: 'right' }}>{s.membershipCash.annualMembersCount}</td>
-                      <td style={{ textAlign: 'right', color: '#007aff' }}>+{fmtCurrencyDec(s.membershipCash.annualProrated)}</td>
+                      <td className={styles.textRight}>{s.membershipCash.annualMembersCount}</td>
+                      <td className={`${styles.textRight} ${styles.deltaPositive}`}>+{fmtCurrencyDec(s.membershipCash.annualProrated)}</td>
                     </tr>
                     <tr>
                       <td>Canceled Before Renewal</td>
-                      <td style={{ textAlign: 'right' }}>{s.membershipCash.canceledBeforeRenewalCount}</td>
-                      <td style={{ textAlign: 'right', color: '#ff3b30' }}>−{fmtCurrencyDec(s.membershipCash.canceledBeforeRenewal)}</td>
+                      <td className={styles.textRight}>{s.membershipCash.canceledBeforeRenewalCount}</td>
+                      <td className={`${styles.textRight} ${styles.deltaNegative}`}>−{fmtCurrencyDec(s.membershipCash.canceledBeforeRenewal)}</td>
                     </tr>
-                    <tr style={{ borderTop: '2px solid #e5e5ea', fontWeight: '600' }}>
+                    <tr className={styles.totalRow}>
                       <td>Total</td>
                       <td></td>
-                      <td style={{ textAlign: 'right' }}>{fmtCurrencyDec(s.membershipCash.total)}</td>
+                      <td className={styles.textRight}>{fmtCurrencyDec(s.membershipCash.total)}</td>
                     </tr>
                   </tbody>
                 </table>
 
-                <div className={styles.modalHint} style={{ marginTop: '1rem' }}>
+                <div className={styles.modalHint}>
                   Monthly renewals = active monthly members whose next billing date falls in {fmtMonthRange(s.month)}.
                   New sign-ups = members who joined this month. Annual prorated = annual subscription ÷ 12.
                   Canceled = members who canceled before their renewal date this month.

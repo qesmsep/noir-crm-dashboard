@@ -642,25 +642,27 @@ export async function computeMembershipCash(
   const supabase = sb || getSupabaseAdmin();
   const monthStartDate = monthStr; // e.g. "2026-04-01"
   const monthEndDate = monthEnd(monthStr); // e.g. "2026-04-30"
+  const emptyResult: MembershipCashBreakdown = { monthlyRenewals: 0, monthlyRenewalsCount: 0, newMemberCash: 0, newMembersCount: 0, annualProrated: 0, annualMembersCount: 0, canceledBeforeRenewal: 0, canceledBeforeRenewalCount: 0, total: 0 };
 
-  // Fetch all members with their account and plan data
-  const { data: members, error: membersErr } = await supabase
-    .from('members')
-    .select('member_id, status, join_date, account_id')
-    .in('status', ['active', 'paused', 'inactive']);
-
-  if (membersErr) throw new Error(`Failed to fetch members: ${membersErr.message}`);
-
-  const accountIds = [...new Set((members || []).map(m => m.account_id).filter(Boolean))];
-  if (accountIds.length === 0) {
-    return { monthlyRenewals: 0, monthlyRenewalsCount: 0, newMemberCash: 0, newMembersCount: 0, annualProrated: 0, annualMembersCount: 0, canceledBeforeRenewal: 0, canceledBeforeRenewalCount: 0, total: 0 };
-  }
-
-  // Fetch accounts with billing info
+  // Fetch accounts that either have a renewal in this month or are annual (always counted).
+  // This filters at the DB level to avoid loading all accounts.
   const { data: accounts, error: accountsErr } = await supabase
     .from('accounts')
     .select('account_id, monthly_dues, subscription_status, next_renewal_date, next_billing_date, subscription_cancel_at, membership_plan_id')
-    .in('account_id', accountIds);
+    .gt('monthly_dues', 0)
+    .in('subscription_status', ['active', 'canceled', 'past_due']);
+
+  if (accountsErr) throw new Error(`Failed to fetch accounts: ${accountsErr.message}`);
+  if (!accounts || accounts.length === 0) return emptyResult;
+
+  const accountIds = accounts.map(a => a.account_id);
+
+  // Fetch members for those accounts only
+  const { data: members, error: membersErr } = await supabase
+    .from('members')
+    .select('member_id, status, join_date, account_id')
+    .in('account_id', accountIds)
+    .in('status', ['active', 'paused', 'inactive']);
 
   if (accountsErr) throw new Error(`Failed to fetch accounts: ${accountsErr.message}`);
 
@@ -668,17 +670,28 @@ export async function computeMembershipCash(
   const planIds = (accounts || []).map(a => a.membership_plan_id).filter(Boolean);
   const planMap = new Map<string, { interval: string; plan_name: string }>();
   if (planIds.length > 0) {
-    const { data: plans } = await supabase
+    const { data: plans, error: plansErr } = await supabase
       .from('subscription_plans')
       .select('id, interval, plan_name')
       .in('id', planIds);
+    if (plansErr) throw new Error(`Failed to fetch subscription plans: ${plansErr.message}`);
     for (const p of plans || []) {
       planMap.set(p.id, { interval: p.interval || 'month', plan_name: p.plan_name || '' });
     }
   }
 
   // Build account lookup
-  const accountMap = new Map<string, any>();
+  interface AccountWithPlan {
+    account_id: string;
+    monthly_dues: number | null;
+    subscription_status: string | null;
+    next_renewal_date: string | null;
+    next_billing_date: string | null;
+    subscription_cancel_at: string | null;
+    membership_plan_id: string | null;
+    plan_interval: string;
+  }
+  const accountMap = new Map<string, AccountWithPlan>();
   for (const a of accounts || []) {
     const planInfo = a.membership_plan_id ? planMap.get(a.membership_plan_id) : null;
     accountMap.set(a.account_id, {
@@ -709,6 +722,9 @@ export async function computeMembershipCash(
     if (countedAccounts.has(member.account_id)) continue;
     countedAccounts.add(member.account_id);
 
+    // accounts.monthly_dues stores the FULL annual amount for annual plans
+    // (e.g. $1200/yr, NOT the monthly equivalent). For monthly plans it stores
+    // the monthly charge. This matches the convention in generateSnapshot().
     const dues = Number(acct.monthly_dues) || 0;
     if (dues <= 0) continue;
 
