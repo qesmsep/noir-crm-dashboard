@@ -355,11 +355,12 @@ export async function handlePaymentFailure(account: any, error: any) {
     const decline_code = error?.decline_code || error?.code || 'unknown';
     const error_message = error?.message || 'Payment failed';
 
-    // Update account to past_due
+    // Keep status as 'active' - payment failure is tracked via last_payment_failed_at
+    // This ensures failed payment accounts remain visible in active member filters
     await supabase
       .from('accounts')
       .update({
-        subscription_status: 'past_due',
+        // subscription_status remains 'active' - only manual pause/cancel changes this
         last_payment_failed_at: new Date().toISOString(),
         last_billing_attempt: new Date().toISOString(),
       })
@@ -391,11 +392,12 @@ export async function handlePaymentFailure(account: any, error: any) {
  */
 export async function handleMissingPaymentMethod(account: any) {
   try {
-    // Update account to past_due
+    // Keep status as 'active' - missing payment method is tracked via last_payment_failed_at
     await supabase
       .from('accounts')
       .update({
-        subscription_status: 'past_due',
+        // subscription_status remains 'active' - only manual pause/cancel changes this
+        last_payment_failed_at: new Date().toISOString(),
         last_billing_attempt: new Date().toISOString(),
       })
       .eq('account_id', account.account_id);

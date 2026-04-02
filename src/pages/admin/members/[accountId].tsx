@@ -155,6 +155,7 @@ export default function MemberDetailAdmin() {
   // Account subscription status
   const [subscriptionCancelAt, setSubscriptionCancelAt] = useState<string | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [lastPaymentFailedAt, setLastPaymentFailedAt] = useState<string | null>(null);
 
   // Member card expansion
   const [expandedMemberIds, setExpandedMemberIds] = useState<Set<string>>(new Set());
@@ -332,7 +333,7 @@ export default function MemberDetailAdmin() {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('accounts')
-          .select('credit_card_fee_enabled, subscription_cancel_at, subscription_status')
+          .select('credit_card_fee_enabled, subscription_cancel_at, subscription_status, last_payment_failed_at')
           .eq('account_id', accountId)
           .single();
 
@@ -347,6 +348,7 @@ export default function MemberDetailAdmin() {
         setCreditCardFeeEnabled(data?.credit_card_fee_enabled || false);
         setSubscriptionCancelAt(data?.subscription_cancel_at || null);
         setSubscriptionStatus(data?.subscription_status || null);
+        setLastPaymentFailedAt(data?.last_payment_failed_at || null);
       } catch (err: any) {
         console.error('Error fetching account settings:', err);
       }
@@ -1824,7 +1826,7 @@ export default function MemberDetailAdmin() {
                           <h3 className={styles.memberName} style={{ margin: 0 }}>
                             {member.first_name} {member.last_name}
                           </h3>
-                          {/* Status Badge */}
+                          {/* Status Badges */}
                           {(subscriptionStatus === 'canceled' || subscriptionCancelAt) && (
                             <span style={{
                               padding: '2px 8px',
@@ -1836,6 +1838,20 @@ export default function MemberDetailAdmin() {
                               border: '1px solid #fcc'
                             }}>
                               Cancelled
+                            </span>
+                          )}
+                          {lastPaymentFailedAt && subscriptionStatus === 'active' && (
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              backgroundColor: '#fee2e2',
+                              color: '#dc2626',
+                              border: '1px solid #fca5a5',
+                              animation: 'pulse 2s ease-in-out infinite'
+                            }}>
+                              ⚠️ PAYMENT FAILED
                             </span>
                           )}
                           <svg
@@ -2607,10 +2623,24 @@ export default function MemberDetailAdmin() {
                           style={{ cursor: isEditing ? 'default' : 'pointer' }}
                         >
                               <div className={styles.ledgerRowMain}>
-                                <div className={styles.ledgerDate}>
+                                <div className={styles.ledgerDate} style={tx.status === 'pending' ? { fontStyle: 'italic', color: '#f59e0b' } : {}}>
                                   {formatLedgerDate(tx.date)}
+                                  {tx.status === 'pending' && (
+                                    <span style={{
+                                      marginLeft: '0.5rem',
+                                      fontSize: '0.75rem',
+                                      padding: '2px 6px',
+                                      borderRadius: '3px',
+                                      backgroundColor: '#fef3c7',
+                                      color: '#d97706',
+                                      fontWeight: '500',
+                                      fontStyle: 'normal'
+                                    }}>
+                                      PENDING
+                                    </span>
+                                  )}
                                 </div>
-                                <div className={styles.ledgerInfo}>
+                                <div className={styles.ledgerInfo} style={tx.status === 'pending' ? { fontStyle: 'italic', color: '#f59e0b' } : {}}>
                                   {tx.note && <div className={styles.ledgerNote}>{tx.note}</div>}
                                   {!tx.note && (
                                     <div className={styles.ledgerMember}>
@@ -2632,7 +2662,7 @@ export default function MemberDetailAdmin() {
                                   </button>
                                 )}
                                 <div className={styles.ledgerRowRight}>
-                                  <div className={`${styles.ledgerAmount} ${tx.amount < 0 ? styles.negative : styles.positive}`}>
+                                  <div className={`${styles.ledgerAmount} ${tx.amount < 0 ? styles.negative : styles.positive}`} style={tx.status === 'pending' ? { fontStyle: 'italic', color: '#f59e0b' } : {}}>
                                     {tx.amount >= 0 ? '+' : ''}{formatCurrency(tx.amount)}
                                   </div>
                                 </div>
@@ -2700,6 +2730,21 @@ export default function MemberDetailAdmin() {
                                     <span>{tx.note || '—'}</span>
                                   )}
                                 </div>
+                                {tx.status && (
+                                  <div className={styles.ledgerDetailRow}>
+                                    <span className={styles.ledgerDetailLabel}>Status:</span>
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.875rem',
+                                      fontWeight: '500',
+                                      backgroundColor: tx.status === 'pending' ? '#fef3c7' : tx.status === 'failed' ? '#fee2e2' : '#d1fae5',
+                                      color: tx.status === 'pending' ? '#d97706' : tx.status === 'failed' ? '#dc2626' : '#059669'
+                                    }}>
+                                      {tx.status.toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
                                 <div className={styles.ledgerRowActions}>
                                   {isEditing ? (
                                     <>
