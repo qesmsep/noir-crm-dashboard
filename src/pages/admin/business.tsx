@@ -51,6 +51,18 @@ interface AlertStatus {
   current_value: number | null;
 }
 
+interface MembershipCashBreakdown {
+  monthlyRenewals: number;
+  monthlyRenewalsCount: number;
+  newMemberCash: number;
+  newMembersCount: number;
+  annualProrated: number;
+  annualMembersCount: number;
+  canceledBeforeRenewal: number;
+  canceledBeforeRenewalCount: number;
+  total: number;
+}
+
 interface BusinessSummary {
   month: string;
   priorMonth: string;
@@ -64,6 +76,7 @@ interface BusinessSummary {
   attach: AttachMetrics;
   priorAttach: AttachMetrics;
   failedPayments30d: number;
+  membershipCash: MembershipCashBreakdown;
   alerts: AlertStatus[];
 }
 
@@ -503,6 +516,7 @@ export default function BusinessDashboard() {
   const [showPortalAccessModal, setShowPortalAccessModal] = useState(false);
   const [showMrrModal, setShowMrrModal] = useState(false);
   const [showNetNewMrrModal, setShowNetNewMrrModal] = useState(false);
+  const [showMembershipCashModal, setShowMembershipCashModal] = useState(false);
   const [drillNew, setDrillNew] = useState<any[]>([]);
   const [drillPaused, setDrillPaused] = useState<any[]>([]);
   const [partySizeMetrics, setPartySizeMetrics] = useState<{
@@ -699,6 +713,11 @@ export default function BusinessDashboard() {
                 <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
                 <div className={styles.kpiLabel}>ARR</div>
                 <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthRange(s.month)}) — includes all recurring revenue (monthly and annual memberships) annualized. A forward-looking projection of yearly revenue if nothing changes.</div>
+              </div>
+              <div className={styles.kpiTile} onClick={() => setShowMembershipCashModal(true)} style={{ cursor: 'pointer' }}>
+                <div className={styles.kpiValue}>{fmtCurrency(s.membershipCash?.total ?? 0)}</div>
+                <div className={styles.kpiLabel}>Membership Cash This Month</div>
+                <div className={styles.kpiHint}>Expected subscription cash for {fmtMonthRange(s.month)}: monthly renewals due + new sign-ups + annual prorated − cancellations before renewal. Click for breakdown.</div>
               </div>
               <div
                 className={styles.kpiTile}
@@ -1281,6 +1300,72 @@ export default function BusinessDashboard() {
                       </tbody>
                     </table>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Membership Cash Breakdown Modal */}
+        {showMembershipCashModal && s?.membershipCash && (
+          <div className={styles.modalOverlay} onClick={() => setShowMembershipCashModal(false)}>
+            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Membership Cash — {fmtMonthRange(s.month)}</h2>
+                <button className={styles.modalClose} onClick={() => setShowMembershipCashModal(false)}>×</button>
+              </div>
+              <div className={styles.modalBody}>
+                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f5f5f7', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1d1d1f', marginBottom: '0.5rem' }}>
+                    {fmtCurrency(s.membershipCash.total)}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#6e6e73' }}>
+                    Expected subscription cash for {fmtMonthRange(s.month)}
+                  </div>
+                </div>
+
+                <table className={styles.dataTable}>
+                  <thead>
+                    <tr>
+                      <th>Component</th>
+                      <th style={{ textAlign: 'right' }}>Members</th>
+                      <th style={{ textAlign: 'right' }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Monthly Renewals Due</td>
+                      <td style={{ textAlign: 'right' }}>{s.membershipCash.monthlyRenewalsCount}</td>
+                      <td style={{ textAlign: 'right', color: '#1d1d1f' }}>{fmtCurrencyDec(s.membershipCash.monthlyRenewals)}</td>
+                    </tr>
+                    <tr>
+                      <td>New Member Sign-ups</td>
+                      <td style={{ textAlign: 'right' }}>{s.membershipCash.newMembersCount}</td>
+                      <td style={{ textAlign: 'right', color: '#34c759' }}>+{fmtCurrencyDec(s.membershipCash.newMemberCash)}</td>
+                    </tr>
+                    <tr>
+                      <td>Annual Members (Prorated)</td>
+                      <td style={{ textAlign: 'right' }}>{s.membershipCash.annualMembersCount}</td>
+                      <td style={{ textAlign: 'right', color: '#007aff' }}>+{fmtCurrencyDec(s.membershipCash.annualProrated)}</td>
+                    </tr>
+                    <tr>
+                      <td>Canceled Before Renewal</td>
+                      <td style={{ textAlign: 'right' }}>{s.membershipCash.canceledBeforeRenewalCount}</td>
+                      <td style={{ textAlign: 'right', color: '#ff3b30' }}>−{fmtCurrencyDec(s.membershipCash.canceledBeforeRenewal)}</td>
+                    </tr>
+                    <tr style={{ borderTop: '2px solid #e5e5ea', fontWeight: '600' }}>
+                      <td>Total</td>
+                      <td></td>
+                      <td style={{ textAlign: 'right' }}>{fmtCurrencyDec(s.membershipCash.total)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className={styles.modalHint} style={{ marginTop: '1rem' }}>
+                  Monthly renewals = active monthly members whose next billing date falls in {fmtMonthRange(s.month)}.
+                  New sign-ups = members who joined this month. Annual prorated = annual subscription ÷ 12.
+                  Canceled = members who canceled before their renewal date this month.
+                  This metric fluctuates as new members sign up and cancellations occur.
                 </div>
               </div>
             </div>
