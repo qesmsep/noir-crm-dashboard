@@ -96,6 +96,16 @@ export function utcToLocalInput(utcString: string | null | undefined, timezone: 
 }
 
 /**
+ * Convert a Date object to a datetime-local input value in the specified timezone
+ */
+export function dateToLocalInput(date: Date | null | undefined, timezone: TimeZone = DEFAULT_TIMEZONE): string {
+  if (!date) return '';
+  return DateTime.fromJSDate(date)
+    .setZone(timezone)
+    .toFormat("yyyy-LL-dd'T'HH:mm");
+}
+
+/**
  * Convert a datetime-local input value to UTC ISO string
  */
 export function localInputToUTC(localString: string, timezone: TimeZone = DEFAULT_TIMEZONE): string {

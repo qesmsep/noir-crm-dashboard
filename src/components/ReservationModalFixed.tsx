@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
-import { localInputToUTC } from '../utils/dateUtils';
+import { localInputToUTC, dateToLocalInput } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
 
 interface ReservationModalProps {
@@ -126,7 +126,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
       fetchTables();
       const startTime = initialDate ? new Date(initialDate) : new Date();
       const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
-      
+
       setFormData({
         first_name: '',
         last_name: '',
@@ -136,15 +136,15 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         event_type: '',
         notes: '',
         table_id: initialTableId || '',
-        start_time: startTime.toISOString().slice(0, 16),
-        end_time: endTime.toISOString().slice(0, 16),
+        start_time: dateToLocalInput(startTime, timezone),
+        end_time: dateToLocalInput(endTime, timezone),
         is_checked_in: false,
         send_access_instructions: false,
         send_reminder: false,
         send_confirmation: false,
       });
     }
-  }, [isOpen, initialDate, initialTableId]);
+  }, [isOpen, initialDate, initialTableId, timezone]);
 
   useEffect(() => {
     if (isOpen && initialTableId) {
