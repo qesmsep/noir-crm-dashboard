@@ -1,7 +1,7 @@
 # Ledger Sync Issue Analysis - April 1, 2026
 
 ## Issue Summary
-Member Richard Alexander (account: `f9e7e988-3f52-4568-a03e-9cbe36b66724`) was charged $150 by Stripe on April 1st, but the payment and $50 admin fee did not appear in their ledger.
+Multiple member accounts were charged by Stripe on April 1-2, 2026, but payments did not appear in their ledgers.
 
 ## Root Cause
 
@@ -19,8 +19,6 @@ When the billing cron job ran on April 1st at 14:00:17 UTC, it:
 ## Evidence
 
 ### Stripe Records (Confirmed via Stripe API)
-- **Charge ID:** `ch_3THPJcFdjSPifIH51WZcMD0P`
-- **Payment Intent:** `pi_3THPJcFdjSPifIH51J7fZXhS`
 - **Amount:** $150.00
 - **Date:** 2026-04-01 14:00:17 UTC
 - **Status:** succeeded

@@ -20,12 +20,15 @@ const supabase = createClient(
  * Retry Failed Payments Cron Job
  *
  * Runs daily to:
- * 1. Find accounts with past_due status
+ * 1. Find active accounts with failed payments (last_payment_failed_at is set)
  * 2. Check if it's time to retry based on schedule (Day 3, 5, 7, 10)
  * 3. Attempt to charge again
- * 4. If successful: Reactivate and move next_billing_date forward
+ * 4. If successful: Clear payment failure flag and move next_billing_date forward
  * 5. If still failing: Increment retry counter
  * 6. After 4 retries: Cancel subscription
+ *
+ * Note: Accounts remain in 'active' status during retries; payment failures
+ * are tracked via last_payment_failed_at timestamp, not status changes.
  *
  * Should be scheduled to run daily (e.g., 3 AM UTC, after monthly billing)
  */

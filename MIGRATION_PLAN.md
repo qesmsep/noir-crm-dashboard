@@ -4,10 +4,10 @@
 On April 1-2, 2026, the billing cron successfully charged 4 accounts via Stripe, but failed to create ledger entries because migration `20260330_prevent_duplicate_ledger_entries.sql` was committed to the repo but never applied to the database.
 
 ## Affected Accounts
-1. **3b8cf6cb-9b76-41cb-86d9-a5d4b6d52462** - April 1, $150 charged
-2. **f9e7e988-3f52-4568-a03e-9cbe36b66724** - April 1, $150 charged (Richard Alexander)
-3. **53814dc3-36d2-4d40-b075-8d030f920ec4** - April 1, $150 charged
-4. **d21bd26b-f5cd-492f-83ef-8e88a2c7acc1** - April 2, $150 charged
+1. Account 1 - April 1, $150 charged
+2. Account 2 - April 1, $150 charged
+3. Account 3 - April 1, $150 charged
+4. Account 4 - April 2, $150 charged
 
 Each account:
 - ✅ Was successfully charged $150 in Stripe
@@ -69,10 +69,10 @@ WHERE metadata->>'backfilled' = 'true';
 
 -- Expected: 4 rows
 
--- 4. Check specific account (Richard Alexander)
+-- 4. Check specific account
 SELECT type, amount, note, date, source
 FROM ledger
-WHERE account_id = 'f9e7e988-3f52-4568-a03e-9cbe36b66724'
+WHERE account_id = '[ACCOUNT_ID]'
   AND date = '2026-04-01';
 
 -- Expected:
@@ -96,16 +96,7 @@ BEGIN;
 DELETE FROM ledger
 WHERE source = 'billing_cron'
   AND date IN ('2026-04-01', '2026-04-02')
-  AND ledger_entry_key IN (
-    'pi_3THPJWFdjSPifIH50x9rXJ51',
-    'pi_3THPJWFdjSPifIH50x9rXJ51:admin_fee',
-    'pi_3THPJcFdjSPifIH51J7fZXhS',
-    'pi_3THPJcFdjSPifIH51J7fZXhS:admin_fee',
-    'pi_3THPJeFdjSPifIH51xYtOnVZ',
-    'pi_3THPJeFdjSPifIH51xYtOnVZ:admin_fee',
-    'pi_3THln9FdjSPifIH51ygPBiDq',
-    'pi_3THln9FdjSPifIH51ygPBiDq:admin_fee'
-  );
+  AND ledger_entry_key LIKE 'pi_%';
 
 -- Remove backfilled events
 DELETE FROM subscription_events

@@ -315,6 +315,10 @@ export default function MembersAdmin() {
     if (statusFilter !== 'all') {
       const status = account.accounts?.subscription_status;
       if (statusFilter === 'active' && status !== 'active') return false;
+      if (statusFilter === 'payment_failed') {
+        // Show only active accounts with failed payments
+        if (!failedPaymentAccounts.has(account.account_id)) return false;
+      }
       if (statusFilter === 'canceled') {
         // Show canceled accounts OR accounts with archived members
         if (!isAccountCancelled(account) && !hasArchivedMembers) return false;
@@ -614,6 +618,7 @@ export default function MembersAdmin() {
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
+              <option value="payment_failed">Payment Failed</option>
               <option value="canceled">Canceled</option>
               <option value="paused">Paused</option>
             </select>
@@ -792,9 +797,6 @@ export default function MembersAdmin() {
                         <div className={styles.mobileMemberInfo}>
                           <div className={styles.mobileMemberName}>
                             {member1?.first_name} {member1?.last_name}
-                            {member1?.member_type === 'primary' && (
-                              <span className={styles.mobilePrimaryBadge}>Primary</span>
-                            )}
                           </div>
                           <div className={styles.mobileContactLine}>
                             {member1?.email || '—'}
@@ -991,9 +993,6 @@ export default function MembersAdmin() {
                             <div className={styles.memberInfo}>
                               <div className={styles.primaryName}>
                                 {member1.first_name} {member1.last_name}
-                                {member1.member_type === 'primary' && (
-                                  <span className={styles.primaryBadge}>Primary</span>
-                                )}
                                 {failedPaymentAccounts.has(account.account_id) && (
                                   <span style={{
                                     marginLeft: '0.5rem',
@@ -1051,9 +1050,6 @@ export default function MembersAdmin() {
                             <div className={styles.memberInfo}>
                               <div className={styles.primaryName}>
                                 {member2.first_name} {member2.last_name}
-                                {member2.member_type === 'primary' && (
-                                  <span className={styles.primaryBadge}>Primary</span>
-                                )}
                               </div>
                               <div className={styles.contactInfo}>
                                 {member2.email && (
@@ -1179,7 +1175,6 @@ export default function MembersAdmin() {
                                   />
                                   <span className={styles.memberCheckboxText}>
                                     {member.first_name} {member.last_name}
-                                    {member.member_type === 'primary' && <span className={styles.primaryBadgeSmall}>Primary</span>}
                                   </span>
                                 </label>
                               ))}

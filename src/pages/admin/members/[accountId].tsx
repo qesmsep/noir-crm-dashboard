@@ -1848,8 +1848,7 @@ export default function MemberDetailAdmin() {
                               fontWeight: '600',
                               backgroundColor: '#fee2e2',
                               color: '#dc2626',
-                              border: '1px solid #fca5a5',
-                              animation: 'pulse 2s ease-in-out infinite'
+                              border: '1px solid #fca5a5'
                             }}>
                               ⚠️ PAYMENT FAILED
                             </span>
