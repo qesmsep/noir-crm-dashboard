@@ -42,7 +42,68 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
     let sent = 0;
     let failed = 0;
 
+    // Pre-fetch campaign cancel_on_signup flags for all claimed messages
+    // to avoid repeated DB lookups inside the loop
+    const enrollmentIds = [...new Set(claimed.map(m => m.enrollment_id))];
+    const { data: enrollments } = await supabaseAdmin
+      .from('sms_intake_enrollments')
+      .select('id, campaign_id, phone')
+      .in('id', enrollmentIds);
+
+    const campaignIds = [...new Set((enrollments || []).map(e => e.campaign_id))];
+    const { data: campaigns } = await supabaseAdmin
+      .from('sms_intake_campaigns')
+      .select('id, cancel_on_signup')
+      .in('id', campaignIds);
+
+    const cancelOnSignupCampaigns = new Set(
+      (campaigns || []).filter(c => c.cancel_on_signup).map(c => c.id)
+    );
+    const enrollmentMap = new Map(
+      (enrollments || []).map(e => [e.id, e])
+    );
+
+    // For cancel_on_signup campaigns, check which phones have completed signup
+    const phonesToCheck = [...new Set(
+      (enrollments || [])
+        .filter(e => cancelOnSignupCampaigns.has(e.campaign_id))
+        .map(e => e.phone)
+    )];
+
+    const convertedPhones = new Set<string>();
+    if (phonesToCheck.length > 0) {
+      const { data: signedUp } = await supabaseAdmin
+        .from('waitlist')
+        .select('phone')
+        .in('phone', phonesToCheck)
+        .not('member_id', 'is', null);
+
+      for (const entry of signedUp || []) {
+        convertedPhones.add(entry.phone);
+      }
+    }
+
     for (const msg of claimed) {
+      const enrollment = enrollmentMap.get(msg.enrollment_id);
+
+      // Signup detection: if this phone has converted, cancel this message
+      // and all remaining pending messages for this enrollment
+      if (enrollment && cancelOnSignupCampaigns.has(enrollment.campaign_id) && convertedPhones.has(msg.phone)) {
+        await supabaseAdmin
+          .from('sms_intake_scheduled_messages')
+          .update({ status: 'cancelled' })
+          .eq('enrollment_id', msg.enrollment_id)
+          .in('status', ['pending', 'processing']);
+
+        await supabaseAdmin
+          .from('sms_intake_enrollments')
+          .update({ status: 'completed' })
+          .eq('id', msg.enrollment_id);
+
+        console.log(`Signup detected for ${msg.phone} — cancelled remaining nurture messages`);
+        continue;
+      }
+
       try {
         // Send via OpenPhone API
         const response = await fetch('https://api.openphone.com/v1/messages', {

@@ -1007,28 +1007,9 @@ export async function handler(req, res) {
     console.log('Intake campaign check (no match or error):', intakeError?.message || intakeError);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LEGACY HARDCODED TRIGGER: MEMBER / MEMBERSHIP
-  // ─────────────────────────────────────────────────────────────────────────
-  // SAFE TO REMOVE once an Intake Campaign with trigger word "MEMBERSHIP"
-  // (and optionally "MEMBER") is created and set to "active" in the admin UI
-  // at /admin/membership -> Intake Campaigns.
-  //
-  // The DB-based intake campaign check above will match first when active,
-  // so this block only fires as a fallback. Once the DB campaign is confirmed
-  // working, delete this entire if-block (lines marked START to END).
-  //
-  // No other code depends on this block. Removing it is safe.
-  // ═══════════════════════════════════════════════════════════════════════════
-  // --- LEGACY MEMBER/MEMBERSHIP BLOCK START ---
-  if (text.toLowerCase().trim() === 'member' || text.toLowerCase().trim() === 'membership') {
-    console.log('Processing MEMBER/MEMBERSHIP message for waitlist');
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
-    const waitlistMessage = `Thank you for seeking information about becoming a member of Noir.\n\nTo learn more please respond directly to this message with any questions.\n\nTo request an invitation, please complete the following form.\n\nWe typically respond within 24 hours. 🖤\n\n${baseUrl}/apply`;
-    await sendSMS(from, waitlistMessage);
-    return res.status(200).json({ message: 'Sent waitlist invitation message' });
-  }
-  // --- LEGACY MEMBER/MEMBERSHIP BLOCK END ---
+  // MEMBER / MEMBERSHIP triggers are now handled by the DB-driven intake campaign
+  // system above. The Membership Nurture Flow campaign was created in migration
+  // 20260403_membership_nurture_flow.sql with both MEMBERSHIP and MEMBER triggers.
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LEGACY HARDCODED TRIGGER: INVITATION
