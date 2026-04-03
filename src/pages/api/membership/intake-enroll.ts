@@ -117,9 +117,10 @@ async function executeCreateOnboardingLink(
   if (
     existingEntry &&
     existingEntry.agreement_token &&
+    existingEntry.application_expires_at &&
     new Date(existingEntry.application_expires_at) > new Date()
   ) {
-    // Reuse existing valid token
+    // Reuse existing valid token (confirmed not expired)
     signupToken = existingEntry.agreement_token;
   } else {
     // Generate new token (cryptographically secure)

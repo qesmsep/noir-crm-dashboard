@@ -69,6 +69,8 @@ ON CONFLICT ((LOWER(trigger_word))) DO UPDATE SET
   updated_at = now();
 
 -- Insert the same 3 messages for the MEMBER alias campaign
+-- NOTE: Message content below is identical to the MEMBERSHIP campaign.
+-- If copy changes are needed, update both campaigns.
 WITH campaign AS (
   SELECT id FROM sms_intake_campaigns WHERE LOWER(trigger_word) = 'member'
 )

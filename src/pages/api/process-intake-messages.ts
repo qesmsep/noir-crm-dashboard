@@ -72,11 +72,15 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
 
     const convertedPhones = new Set<string>();
     if (phonesToCheck.length > 0) {
-      const { data: signedUp } = await supabaseAdmin
+      const { data: signedUp, error: signupCheckError } = await supabaseAdmin
         .from('waitlist')
         .select('phone')
         .in('phone', phonesToCheck)
         .not('member_id', 'is', null);
+
+      if (signupCheckError) {
+        console.error('Failed to check converted phones — proceeding without signup detection:', signupCheckError);
+      }
 
       for (const entry of signedUp || []) {
         convertedPhones.add(entry.phone);
@@ -140,18 +144,18 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
     }
 
     // Mark enrollments as completed if all messages are sent/permanently failed
-    const enrollmentIds = [...new Set(claimed.map(m => m.enrollment_id))];
-    if (enrollmentIds.length > 0) {
+    const batchEnrollmentIds = [...new Set(claimed.map(m => m.enrollment_id))];
+    if (batchEnrollmentIds.length > 0) {
       // Single query: find enrollments that still have pending/processing messages
       const { data: pendingRemaining } = await supabaseAdmin
         .from('sms_intake_scheduled_messages')
         .select('enrollment_id')
-        .in('enrollment_id', enrollmentIds)
+        .in('enrollment_id', batchEnrollmentIds)
         .in('status', ['pending', 'processing']);
 
       const stillPending = new Set((pendingRemaining || []).map(r => r.enrollment_id));
 
-      const completedIds = enrollmentIds.filter(id => !stillPending.has(id));
+      const completedIds = batchEnrollmentIds.filter(id => !stillPending.has(id));
       if (completedIds.length > 0) {
         await supabaseAdmin
           .from('sms_intake_enrollments')
