@@ -246,6 +246,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (activeEnrollments && activeEnrollments.length > 0) {
         const enrollmentIds = activeEnrollments.map(e => e.id);
 
+        // Note: messages in 'processing' state may already be mid-send via the cron.
+        // In that rare race, the SMS delivers but DB shows 'cancelled' — acceptable.
         await supabase
           .from('sms_intake_scheduled_messages')
           .update({ status: 'cancelled' })

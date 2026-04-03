@@ -134,7 +134,7 @@ async function executeCreateOnboardingLink(
   } else {
     // Generate new token (cryptographically secure)
     // Token expiry is configurable via campaign actions (default 24h)
-    const expiryHours = actionConfig.token_expiry_hours || 24;
+    const expiryHours = Math.max(1, actionConfig.token_expiry_hours || 24);
     signupToken = randomBytes(24).toString('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + expiryHours);
