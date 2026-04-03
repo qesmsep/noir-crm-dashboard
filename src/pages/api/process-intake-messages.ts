@@ -42,7 +42,80 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
     let sent = 0;
     let failed = 0;
 
+    // Pre-fetch campaign cancel_on_signup flags for all claimed messages
+    // to avoid repeated DB lookups inside the loop
+    const enrollmentIds = [...new Set(claimed.map(m => m.enrollment_id))];
+    const { data: enrollments } = await supabaseAdmin
+      .from('sms_intake_enrollments')
+      .select('id, campaign_id, phone')
+      .in('id', enrollmentIds);
+
+    const campaignIds = [...new Set((enrollments || []).map(e => e.campaign_id))];
+    const { data: campaigns } = await supabaseAdmin
+      .from('sms_intake_campaigns')
+      .select('id, cancel_on_signup')
+      .in('id', campaignIds);
+
+    const cancelOnSignupCampaigns = new Set(
+      (campaigns || []).filter(c => c.cancel_on_signup).map(c => c.id)
+    );
+    const enrollmentMap = new Map(
+      (enrollments || []).map(e => [e.id, e])
+    );
+
+    // For cancel_on_signup campaigns, check which phones have completed signup
+    const phonesToCheck = [...new Set(
+      (enrollments || [])
+        .filter(e => cancelOnSignupCampaigns.has(e.campaign_id))
+        .map(e => e.phone)
+    )];
+
+    const convertedPhones = new Set<string>();
+    if (phonesToCheck.length > 0) {
+      const { data: signedUp, error: signupCheckError } = await supabaseAdmin
+        .from('waitlist')
+        .select('phone')
+        .in('phone', phonesToCheck)
+        .not('member_id', 'is', null);
+
+      if (signupCheckError) {
+        console.error('Failed to check converted phones — proceeding without signup detection:', signupCheckError);
+      }
+
+      for (const entry of signedUp || []) {
+        convertedPhones.add(entry.phone);
+      }
+    }
+
     for (const msg of claimed) {
+      const enrollment = enrollmentMap.get(msg.enrollment_id);
+
+      // Signup detection: if this phone has converted, cancel this message
+      // and all remaining pending messages for this enrollment
+      if (enrollment && cancelOnSignupCampaigns.has(enrollment.campaign_id) && convertedPhones.has(msg.phone)) {
+        const { error: cancelMsgError } = await supabaseAdmin
+          .from('sms_intake_scheduled_messages')
+          .update({ status: 'cancelled' })
+          .eq('enrollment_id', msg.enrollment_id)
+          .in('status', ['pending', 'processing']);
+
+        if (cancelMsgError) {
+          console.error(`Failed to cancel messages for enrollment ${msg.enrollment_id}:`, cancelMsgError);
+        }
+
+        const { error: completeError } = await supabaseAdmin
+          .from('sms_intake_enrollments')
+          .update({ status: 'completed' })
+          .eq('id', msg.enrollment_id);
+
+        if (completeError) {
+          console.error(`Failed to complete enrollment ${msg.enrollment_id}:`, completeError);
+        }
+
+        console.log(`Signup detected for ${msg.phone} — cancelled remaining nurture messages`);
+        continue;
+      }
+
       try {
         // Send via OpenPhone API
         const response = await fetch('https://api.openphone.com/v1/messages', {
@@ -79,18 +152,18 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
     }
 
     // Mark enrollments as completed if all messages are sent/permanently failed
-    const enrollmentIds = [...new Set(claimed.map(m => m.enrollment_id))];
-    if (enrollmentIds.length > 0) {
+    const batchEnrollmentIds = [...new Set(claimed.map(m => m.enrollment_id))];
+    if (batchEnrollmentIds.length > 0) {
       // Single query: find enrollments that still have pending/processing messages
       const { data: pendingRemaining } = await supabaseAdmin
         .from('sms_intake_scheduled_messages')
         .select('enrollment_id')
-        .in('enrollment_id', enrollmentIds)
+        .in('enrollment_id', batchEnrollmentIds)
         .in('status', ['pending', 'processing']);
 
       const stillPending = new Set((pendingRemaining || []).map(r => r.enrollment_id));
 
-      const completedIds = enrollmentIds.filter(id => !stillPending.has(id));
+      const completedIds = batchEnrollmentIds.filter(id => !stillPending.has(id));
       if (completedIds.length > 0) {
         await supabaseAdmin
           .from('sms_intake_enrollments')

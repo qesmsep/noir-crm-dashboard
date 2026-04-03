@@ -29,13 +29,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Invalid token' });
     }
 
-    // Check if token is expired (7 days)
-    const tokenCreated = new Date(waitlist.agreement_token_created_at);
+    // Check if token is expired using the actual expiry timestamp
+    // Falls back to 7 days from creation if application_expires_at is not set
     const now = new Date();
-    const daysDiff = (now.getTime() - tokenCreated.getTime()) / (1000 * 60 * 60 * 24);
-
-    if (daysDiff > 7) {
-      return res.status(400).json({ error: 'Token expired' });
+    if (waitlist.application_expires_at) {
+      if (now > new Date(waitlist.application_expires_at)) {
+        return res.status(400).json({ error: 'This link has expired. Text MEMBERSHIP to our number to get a new one.' });
+      }
+    } else {
+      const tokenCreated = new Date(waitlist.agreement_token_created_at);
+      const daysDiff = (now.getTime() - tokenCreated.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysDiff > 7) {
+        return res.status(400).json({ error: 'This link has expired. Text MEMBERSHIP to our number to get a new one.' });
+      }
     }
 
     // Check if already completed

@@ -16,7 +16,7 @@ interface MemberRecord {
 }
 
 interface CampaignActions {
-  create_onboarding_link?: { enabled?: boolean; selected_membership?: string };
+  create_onboarding_link?: { enabled?: boolean; selected_membership?: string; token_expiry_hours?: number };
   add_ledger_charge?: { enabled?: boolean; amount?: number; description?: string };
   create_event_rsvp?: { enabled?: boolean; event_id?: string; party_size?: number };
 }
@@ -100,32 +100,44 @@ async function lookupMemberByPhone(phone: string): Promise<MemberRecord | null> 
 // Replicates the INVITATION / SKYLINE logic from the legacy webhook
 async function executeCreateOnboardingLink(
   phone: string,
-  actionConfig: { selected_membership?: string }
+  actionConfig: { selected_membership?: string; token_expiry_hours?: number }
 ): Promise<{ onboard_url: string }> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
 
   // Check for existing approved waitlist entry with a valid token
   const { data: existingEntry } = await supabaseAdmin
     .from('waitlist')
-    .select('id, agreement_token, application_expires_at')
+    .select('id, agreement_token, agreement_token_created_at, application_expires_at')
     .eq('phone', phone)
     .eq('status', 'approved')
     .single();
 
   let signupToken: string;
 
-  if (
-    existingEntry &&
-    existingEntry.agreement_token &&
-    new Date(existingEntry.application_expires_at) > new Date()
-  ) {
-    // Reuse existing valid token
+  const now = new Date();
+  const hasValidToken = existingEntry && existingEntry.agreement_token && (() => {
+    if (existingEntry.application_expires_at) {
+      // Use explicit expiry timestamp
+      return new Date(existingEntry.application_expires_at) > now;
+    }
+    // Pre-migration fallback: 7-day window from token creation
+    if (existingEntry.agreement_token_created_at) {
+      const daysSinceCreation = (now.getTime() - new Date(existingEntry.agreement_token_created_at).getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceCreation < 7;
+    }
+    return false;
+  })();
+
+  if (hasValidToken) {
+    // Reuse existing valid token (confirmed not expired)
     signupToken = existingEntry.agreement_token;
   } else {
-    // Generate new 24-hour token (cryptographically secure)
+    // Generate new token (cryptographically secure)
+    // Token expiry is configurable via campaign actions (default 24h)
+    const expiryHours = Math.max(1, actionConfig.token_expiry_hours || 24);
     signupToken = randomBytes(24).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    expiresAt.setHours(expiresAt.getHours() + expiryHours);
 
     const tokenFields: Record<string, string> = {
       agreement_token: signupToken,
@@ -412,6 +424,7 @@ export async function enrollPhone(params: {
     try {
       const { onboard_url } = await executeCreateOnboardingLink(phone, {
         selected_membership: actions.create_onboarding_link.selected_membership,
+        token_expiry_hours: actions.create_onboarding_link.token_expiry_hours,
       });
       templateVars.onboard_url = onboard_url;
       actionResults.push({ action: 'create_onboarding_link', success: true });

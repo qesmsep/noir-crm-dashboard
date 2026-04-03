@@ -234,6 +234,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Failed to update waitlist:', updateError);
     }
 
+    // Cancel any pending nurture flow messages for this phone
+    // This provides immediate cancellation rather than waiting for the cron to detect it
+    try {
+      const { data: activeEnrollments } = await supabase
+        .from('sms_intake_enrollments')
+        .select('id')
+        .eq('phone', waitlist.phone)
+        .eq('status', 'active');
+
+      if (activeEnrollments && activeEnrollments.length > 0) {
+        const enrollmentIds = activeEnrollments.map(e => e.id);
+
+        // Note: messages in 'processing' state may already be mid-send via the cron.
+        // In that rare race, the SMS delivers but DB shows 'cancelled' — acceptable.
+        await supabase
+          .from('sms_intake_scheduled_messages')
+          .update({ status: 'cancelled' })
+          .in('enrollment_id', enrollmentIds)
+          .in('status', ['pending', 'processing']);
+
+        await supabase
+          .from('sms_intake_enrollments')
+          .update({ status: 'completed' })
+          .in('id', enrollmentIds);
+
+        console.log(`Cancelled ${enrollmentIds.length} nurture enrollment(s) for ${waitlist.phone} on signup completion`);
+      }
+    } catch (cancelError) {
+      console.error('Failed to cancel nurture messages:', cancelError);
+      // Non-fatal — the cron processor will also catch this
+    }
+
     // Send welcome SMS (optional - using existing SMS infrastructure)
     try {
       const { sendSMS } = await import('@/lib/sms');
