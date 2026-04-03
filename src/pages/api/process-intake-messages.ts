@@ -93,16 +93,24 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
       // Signup detection: if this phone has converted, cancel this message
       // and all remaining pending messages for this enrollment
       if (enrollment && cancelOnSignupCampaigns.has(enrollment.campaign_id) && convertedPhones.has(msg.phone)) {
-        await supabaseAdmin
+        const { error: cancelMsgError } = await supabaseAdmin
           .from('sms_intake_scheduled_messages')
           .update({ status: 'cancelled' })
           .eq('enrollment_id', msg.enrollment_id)
           .in('status', ['pending', 'processing']);
 
-        await supabaseAdmin
+        if (cancelMsgError) {
+          console.error(`Failed to cancel messages for enrollment ${msg.enrollment_id}:`, cancelMsgError);
+        }
+
+        const { error: completeError } = await supabaseAdmin
           .from('sms_intake_enrollments')
           .update({ status: 'completed' })
           .eq('id', msg.enrollment_id);
+
+        if (completeError) {
+          console.error(`Failed to complete enrollment ${msg.enrollment_id}:`, completeError);
+        }
 
         console.log(`Signup detected for ${msg.phone} — cancelled remaining nurture messages`);
         continue;

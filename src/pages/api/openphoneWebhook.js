@@ -978,7 +978,12 @@ export async function handler(req, res) {
   // Check for intake campaign trigger words from the database
   // This runs before hardcoded triggers so DB-managed campaigns take priority
   try {
-    const triggerText = text.toLowerCase().trim();
+    let triggerText = text.toLowerCase().trim();
+
+    // Trigger word aliases: map alternate keywords to their canonical campaign
+    const triggerAliases = { 'member': 'membership' };
+    triggerText = triggerAliases[triggerText] || triggerText;
+
     const { data: matchedCampaign } = await supabase
       .from('sms_intake_campaigns')
       .select('id, trigger_word')

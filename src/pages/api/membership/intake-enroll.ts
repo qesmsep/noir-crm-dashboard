@@ -107,19 +107,28 @@ async function executeCreateOnboardingLink(
   // Check for existing approved waitlist entry with a valid token
   const { data: existingEntry } = await supabaseAdmin
     .from('waitlist')
-    .select('id, agreement_token, application_expires_at')
+    .select('id, agreement_token, agreement_token_created_at, application_expires_at')
     .eq('phone', phone)
     .eq('status', 'approved')
     .single();
 
   let signupToken: string;
 
-  if (
-    existingEntry &&
-    existingEntry.agreement_token &&
-    existingEntry.application_expires_at &&
-    new Date(existingEntry.application_expires_at) > new Date()
-  ) {
+  const now = new Date();
+  const hasValidToken = existingEntry && existingEntry.agreement_token && (() => {
+    if (existingEntry.application_expires_at) {
+      // Use explicit expiry timestamp
+      return new Date(existingEntry.application_expires_at) > now;
+    }
+    // Pre-migration fallback: 7-day window from token creation
+    if (existingEntry.agreement_token_created_at) {
+      const daysSinceCreation = (now.getTime() - new Date(existingEntry.agreement_token_created_at).getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceCreation < 7;
+    }
+    return false;
+  })();
+
+  if (hasValidToken) {
     // Reuse existing valid token (confirmed not expired)
     signupToken = existingEntry.agreement_token;
   } else {
