@@ -185,7 +185,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       stripe_subscription_id: subscription.id,
       subscription_status: subscription.status,
       subscription_start_date: new Date(subscription.created * 1000).toISOString(),
-      next_renewal_date: (subscription as any).current_period_end
+      next_billing_date: (subscription as any).current_period_end
         ? new Date((subscription as any).current_period_end * 1000).toISOString()
         : null,
       monthly_dues: mrr,
@@ -261,7 +261,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     subscription_cancel_at: subscription.cancel_at
       ? new Date(subscription.cancel_at * 1000).toISOString()
       : null,
-    next_renewal_date: (subscription as any).current_period_end
+    next_billing_date: (subscription as any).current_period_end
       ? new Date((subscription as any).current_period_end * 1000).toISOString()
       : null,
     monthly_dues: newMrr,
@@ -339,7 +339,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       stripe_subscription_id: null,
       subscription_start_date: null,
       subscription_cancel_at: null,
-      next_renewal_date: null,
+      next_billing_date: null,
       monthly_dues: 0,
       payment_method_type: null,
       payment_method_last4: null,
@@ -451,7 +451,7 @@ async function handleSubscriptionResumed(subscription: Stripe.Subscription) {
       stripe_subscription_id: subscription.id, // Ensure subscription ID is set
       subscription_status: 'active',
       monthly_dues: mrr,
-      next_renewal_date: (subscription as any).current_period_end
+      next_billing_date: (subscription as any).current_period_end
         ? new Date((subscription as any).current_period_end * 1000).toISOString()
         : null,
       ...paymentMethodInfo,
