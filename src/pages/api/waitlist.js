@@ -324,10 +324,26 @@ export default async function handler(req, res) {
 
   if (req.method === 'PATCH') {
     try {
-      const { id, status, review_notes } = req.body;
+      const {
+        id,
+        status,
+        review_notes,
+        first_name,
+        last_name,
+        email,
+        phone,
+        company,
+        occupation,
+        city_state,
+        referral,
+        how_did_you_hear,
+        why_noir,
+        visit_frequency,
+        go_to_drink
+      } = req.body;
 
-      if (!id || !status) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      if (!id) {
+        return res.status(400).json({ error: 'Missing required field: id' });
       }
 
       // Get the waitlist entry to send SMS
@@ -341,12 +357,32 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Waitlist entry not found' });
       }
 
-      // Update the waitlist entry
-      const updateData = {
-        status,
-        reviewed_at: new Date().toISOString(),
-        review_notes
-      };
+      // Build update data object - only include fields that are provided
+      const updateData = {};
+
+      // Add editable fields if provided
+      if (first_name !== undefined) updateData.first_name = first_name;
+      if (last_name !== undefined) updateData.last_name = last_name;
+      if (email !== undefined) updateData.email = email;
+      if (phone !== undefined) updateData.phone = phone;
+      if (company !== undefined) updateData.company = company;
+      if (occupation !== undefined) updateData.occupation = occupation;
+      if (city_state !== undefined) updateData.city_state = city_state;
+      if (referral !== undefined) updateData.referral = referral;
+      if (how_did_you_hear !== undefined) updateData.how_did_you_hear = how_did_you_hear;
+      if (why_noir !== undefined) updateData.why_noir = why_noir;
+      if (visit_frequency !== undefined) updateData.visit_frequency = visit_frequency;
+      if (go_to_drink !== undefined) updateData.go_to_drink = go_to_drink;
+
+      // Add status fields if status is being updated
+      if (status) {
+        updateData.status = status;
+        updateData.reviewed_at = new Date().toISOString();
+      }
+
+      if (review_notes !== undefined) {
+        updateData.review_notes = review_notes;
+      }
 
       const { data: updatedEntry, error: updateError } = await supabase
         .from('waitlist')
@@ -382,8 +418,9 @@ export default async function handler(req, res) {
 
       // Send appropriate SMS based on status with personalization
       // Note: archived status does not send SMS
+      // Only send SMS if status is being updated
       let smsMessage = '';
-      if (status === 'approved') {
+      if (status && status === 'approved') {
         // Generate application token for agreement signing (24-hour expiration)
         const applicationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         const expiresAt = new Date();
@@ -404,9 +441,9 @@ export default async function handler(req, res) {
         const onboardingUrl = `${baseUrl}/onboard/${applicationToken}`;
 
         smsMessage = `Hi {firstName} - We've reviewed your request and would like to formally invite you to become a member of Noir.\n\nComplete your onboarding here:\n\n${onboardingUrl}\n\nYou'll sign the agreement, select your membership, and complete payment—all in one smooth flow. The link expires in 24 hours.\n\nQuestions? Just reply to this text.\n\nThank you. 🖤`;
-      } else if (status === 'waitlisted') {
+      } else if (status && status === 'waitlisted') {
         smsMessage = "Hi {firstName} - We appreciate your request.\n\nNoir is intentionally intimate—each additional member carefully considered to preserve the experience we value most at Noir.\n\nAt this time, we aren't able to extend an invitation. However, you've been added to our waitlist, and as space allows, your request will be revisited and you'll be notified.\n\nThank you for your patience. We hope to welcome you, when the time is right.";
-      } else if (status === 'denied') {
+      } else if (status && status === 'denied') {
         smsMessage = "Hi {firstName} - Thank you for your interest in Noir. After careful consideration, we are unable to extend an invitation at this time. We wish you the best in your future endeavors.";
       }
       // archived status intentionally does not send SMS

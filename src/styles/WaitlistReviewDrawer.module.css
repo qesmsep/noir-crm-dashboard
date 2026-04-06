@@ -73,6 +73,28 @@
   letter-spacing: -0.3px;
 }
 
+.editButton {
+  padding: 6px 16px;
+  background: #007aff;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.editButton:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+.editButton:active {
+  transform: translateY(0) scale(0.98);
+}
+
 .closeButton {
   width: 32px;
   height: 32px;
