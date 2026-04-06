@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import styles from '../../styles/ReferralAnalytics.module.css';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 interface ReferralStats {
   member_id: string;
@@ -36,85 +30,19 @@ export default function ReferralAnalytics() {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      // Fetch referral stats grouped by member
-      const { data: statsData, error: statsError } = await supabase.rpc('get_referral_stats');
+      const response = await fetch('/api/admin/referral-analytics');
 
-      if (statsError) {
-        console.error('Error fetching referral stats:', statsError);
-        // Fallback to manual query if RPC doesn't exist
-        await fetchAnalyticsManually();
-        return;
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics');
       }
 
-      setStats(statsData || []);
-
-      // Fetch recent unconverted clicks
-      const { data: unconvertedData, error: unconvertedError } = await supabase
-        .from('referral_clicks')
-        .select(`
-          clicked_at,
-          ip_address,
-          members:referred_by_member_id (
-            first_name,
-            last_name
-          )
-        `)
-        .eq('converted', false)
-        .order('clicked_at', { ascending: false })
-        .limit(20);
-
-      if (!unconvertedError && unconvertedData) {
-        const formatted = unconvertedData.map((click: any) => ({
-          referrer_name: `${click.members?.first_name || ''} ${click.members?.last_name || ''}`.trim(),
-          clicked_at: click.clicked_at,
-          ip_address: click.ip_address
-        }));
-        setUnconvertedClicks(formatted);
-      }
+      const data = await response.json();
+      setStats(data.stats || []);
+      setUnconvertedClicks(data.unconvertedClicks || []);
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      await fetchAnalyticsManually();
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchAnalyticsManually = async () => {
-    try {
-      // Manual query if RPC function doesn't exist
-      const { data: members, error } = await supabase
-        .from('members')
-        .select('member_id, first_name, last_name, referral_code')
-        .not('referral_code', 'is', null);
-
-      if (error) throw error;
-
-      const statsPromises = (members || []).map(async (member) => {
-        const { data: clicks } = await supabase
-          .from('referral_clicks')
-          .select('converted')
-          .eq('referred_by_member_id', member.member_id);
-
-        const totalClicks = clicks?.length || 0;
-        const conversions = clicks?.filter(c => c.converted).length || 0;
-        const conversionRate = totalClicks > 0 ? (conversions / totalClicks) * 100 : 0;
-
-        return {
-          member_id: member.member_id,
-          first_name: member.first_name,
-          last_name: member.last_name,
-          referral_code: member.referral_code,
-          total_clicks: totalClicks,
-          conversions,
-          conversion_rate: Math.round(conversionRate * 10) / 10
-        };
-      });
-
-      const statsData = await Promise.all(statsPromises);
-      const sortedStats = statsData.filter(s => s.total_clicks > 0).sort((a, b) => b.total_clicks - a.total_clicks);
-      setStats(sortedStats);
-    } catch (error) {
-      console.error('Error in manual analytics fetch:', error);
     }
   };
 
