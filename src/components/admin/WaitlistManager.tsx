@@ -174,7 +174,7 @@ export default function WaitlistManager() {
 
       <div className={styles.statusGrid}>
         {statusCounts
-          .filter((statusCount) => statusCount.status !== 'waitlisted' && statusCount.status !== 'denied')
+          .filter((statusCount) => statusCount.status !== 'waitlisted' && statusCount.status !== 'archived')
           .map((statusCount) => {
             const displayName = statusCount.status === 'referrals' ? 'Referrals' :
                                statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1);
@@ -202,6 +202,19 @@ export default function WaitlistManager() {
             {statusCounts.reduce((sum, s) => sum + s.count, 0)}
           </div>
         </div>
+        {statusCounts
+          .filter((statusCount) => statusCount.status === 'archived')
+          .map((statusCount) => (
+            <div
+              key={statusCount.status}
+              className={`${styles.statusCard} ${statusFilter === statusCount.status ? styles.statusCardActive : ''}`}
+              onClick={() => setStatusFilter(statusCount.status)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className={styles.statusLabel}>Archived</div>
+              <div className={styles.statusNumber}>{statusCount.count}</div>
+            </div>
+          ))}
       </div>
 
       <div className={styles.filters}>
