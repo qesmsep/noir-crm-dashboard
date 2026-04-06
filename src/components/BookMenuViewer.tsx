@@ -165,12 +165,11 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
 
         {/* The Book */}
         <div
-          className="relative transition-all duration-700 ease-out"
+          className={isMobile ? "relative w-full flex justify-center" : "relative transition-all duration-700 ease-out"}
           style={{
+            // Mobile: Always centered
             // Desktop: Cover page (0) shift left -200px, then shifts to 0 before flip
-            // Mobile: Cover page (0) at 0
-            // Both: Open pages (>0) at 0
-            transform: currentPage === 0 && !isMobile ? 'translateX(-200px)' : 'translateX(0)',
+            transform: isMobile ? 'translateX(0)' : (currentPage === 0 ? 'translateX(-200px)' : 'translateX(0)'),
           }}
         >
           <HTMLFlipBook
