@@ -174,20 +174,24 @@ export default function WaitlistManager() {
 
       <div className={styles.statusGrid}>
         {statusCounts
-          .filter((statusCount) => statusCount.status !== 'waitlisted')
-          .map((statusCount) => (
-            <div
-              key={statusCount.status}
-              className={`${styles.statusCard} ${statusFilter === statusCount.status ? styles.statusCardActive : ''}`}
-              onClick={() => setStatusFilter(statusCount.status)}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className={styles.statusLabel}>
-                {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
+          .filter((statusCount) => statusCount.status !== 'waitlisted' && statusCount.status !== 'denied')
+          .map((statusCount) => {
+            const displayName = statusCount.status === 'referrals' ? 'Referrals' :
+                               statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1);
+            return (
+              <div
+                key={statusCount.status}
+                className={`${styles.statusCard} ${statusFilter === statusCount.status ? styles.statusCardActive : ''}`}
+                onClick={() => setStatusFilter(statusCount.status)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className={styles.statusLabel}>
+                  {displayName}
+                </div>
+                <div className={styles.statusNumber}>{statusCount.count}</div>
               </div>
-              <div className={styles.statusNumber}>{statusCount.count}</div>
-            </div>
-          ))}
+            );
+          })}
         <div
           className={`${styles.statusCard} ${statusFilter === '' ? styles.statusCardActive : ''}`}
           onClick={() => setStatusFilter('')}

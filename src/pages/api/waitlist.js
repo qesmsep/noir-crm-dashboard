@@ -151,12 +151,24 @@ export default async function handler(req, res) {
           .order('submitted_at', { ascending: false });
 
         if (status) {
-          query = query.eq('status', status);
-
-          // For "approved" status, only show those who haven't completed onboarding yet
-          // (i.e., those who don't have a member_id)
-          if (status === 'approved') {
+          // Special handling for referrals filter
+          if (status === 'referrals') {
+            query = query.not('referred_by_member_id', 'is', null);
+            query = query.in('status', ['review', 'submitted']);
+          }
+          // Regular review filter (exclude referrals)
+          else if (status === 'review') {
+            query = query.eq('status', 'review');
+            query = query.is('referred_by_member_id', null);
+          }
+          // Approved filter
+          else if (status === 'approved') {
+            query = query.eq('status', 'approved');
             query = query.is('member_id', null);
+          }
+          // Other statuses
+          else {
+            query = query.eq('status', status);
           }
         }
 
@@ -194,17 +206,34 @@ export default async function handler(req, res) {
           console.log('[WAITLIST API] Fetching status counts...');
 
           // Get counts for each status
-          const statuses = ['review', 'approved', 'waitlisted', 'denied', 'archived'];
+          const statuses = ['review', 'referrals', 'approved', 'waitlisted', 'denied', 'archived'];
           const counts = await Promise.all(
             statuses.map(async (s) => {
               let countQuery = supabase
                 .from('waitlist')
-                .select('*', { count: 'exact', head: true })
-                .eq('status', s);
+                .select('*', { count: 'exact', head: true });
 
+              // Special handling for referrals
+              if (s === 'referrals') {
+                countQuery = countQuery
+                  .not('referred_by_member_id', 'is', null)
+                  .in('status', ['review', 'submitted']);
+              }
+              // Regular review (exclude referrals)
+              else if (s === 'review') {
+                countQuery = countQuery
+                  .eq('status', 'review')
+                  .is('referred_by_member_id', null);
+              }
               // For approved, only count those who haven't completed onboarding
-              if (s === 'approved') {
-                countQuery = countQuery.is('member_id', null);
+              else if (s === 'approved') {
+                countQuery = countQuery
+                  .eq('status', 'approved')
+                  .is('member_id', null);
+              }
+              // Other statuses
+              else {
+                countQuery = countQuery.eq('status', s);
               }
 
               const { count } = await countQuery;
