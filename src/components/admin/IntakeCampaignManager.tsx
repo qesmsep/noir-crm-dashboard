@@ -196,8 +196,9 @@ export default function IntakeCampaignManager() {
       const headers = await getAuthHeaders();
       const response = await fetch('/api/private_events', { headers });
       if (response.ok) {
-        const data = await response.json();
-        setEvents((data || []).filter((e: PrivateEvent) => e.status === 'active'));
+        const result = await response.json();
+        const events = result.data || result || [];
+        setEvents(Array.isArray(events) ? events.filter((e: PrivateEvent) => e.status === 'active') : []);
       } else {
         toast({ title: 'Warning', description: 'Failed to load events for campaign actions', variant: 'error' });
       }
@@ -212,8 +213,9 @@ export default function IntakeCampaignManager() {
       const headers = await getAuthHeaders();
       const response = await fetch('/api/admin/subscription-plans', { headers });
       if (response.ok) {
-        const data = await response.json();
-        setPlans((data || []).filter((p: SubscriptionPlan) => p.is_active));
+        const result = await response.json();
+        const plans = result.data || result || [];
+        setPlans(Array.isArray(plans) ? plans.filter((p: SubscriptionPlan) => p.is_active) : []);
       } else {
         toast({ title: 'Warning', description: 'Failed to load subscription plans', variant: 'error' });
       }

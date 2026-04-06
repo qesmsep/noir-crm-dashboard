@@ -55,4 +55,31 @@ export const getPrivateEventById = async (id) => {
 
     if (error) throw error;
     return data;
-}; 
+};
+
+// API route handler
+export default async function handler(req, res) {
+    try {
+        if (req.method === 'GET') {
+            // Get all active private events
+            const { data, error } = await supabase
+                .from('private_events')
+                .select('*')
+                .eq('status', 'active')
+                .order('start_time', { ascending: true });
+
+            if (error) {
+                console.error('Error fetching private events:', error);
+                return res.status(500).json({ error: error.message });
+            }
+
+            return res.status(200).json(data);
+        } else {
+            res.setHeader('Allow', ['GET']);
+            return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+        }
+    } catch (error) {
+        console.error('Error in private_events API:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+} 
