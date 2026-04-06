@@ -648,7 +648,7 @@ export async function computeMembershipCash(
   // This filters at the DB level to avoid loading all accounts.
   const { data: accounts, error: accountsErr } = await supabase
     .from('accounts')
-    .select('account_id, monthly_dues, subscription_status, next_renewal_date, next_billing_date, subscription_cancel_at, membership_plan_id')
+    .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id')
     .gt('monthly_dues', 0)
     .in('subscription_status', ['active', 'canceled', 'past_due']);
 
@@ -689,7 +689,6 @@ export async function computeMembershipCash(
     account_id: string;
     monthly_dues: number | null;
     subscription_status: string | null;
-    next_renewal_date: string | null;
     next_billing_date: string | null;
     subscription_cancel_at: string | null;
     membership_plan_id: string | null;
@@ -735,7 +734,7 @@ export async function computeMembershipCash(
     if (dues <= 0) continue;
 
     const isAnnual = acct.plan_interval === 'year';
-    const renewalDate = acct.next_renewal_date || acct.next_billing_date;
+    const renewalDate = acct.next_billing_date;
     const renewalStr = renewalDate ? renewalDate.substring(0, 10) : null;
     const cancelAt = acct.subscription_cancel_at ? acct.subscription_cancel_at.substring(0, 10) : null;
     const joinDate = earliestJoinByAccount.get(acct.account_id) || null;
