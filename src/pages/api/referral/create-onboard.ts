@@ -36,32 +36,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // Create a waitlist entry to track the referral click
-    // This helps us see who clicked but didn't complete, and where they dropped off
-    const { data: onboardEntry, error: onboardError } = await supabase
-      .from('waitlist')
+    // Track the referral click in referral_clicks table (for analytics)
+    // This does NOT create a waitlist entry - that happens when they enter their phone number
+    const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || null;
+    const userAgent = req.headers['user-agent'] || null;
+
+    const { data: clickEntry, error: clickError } = await supabase
+      .from('referral_clicks')
       .insert({
-        first_name: 'Pending',
-        last_name: 'Referral',
-        phone: '+10000000000',
-        email: `referral-${applicationToken}@pending.noirkc.com`,
-        company: '',
-        city_state: '',
-        referral: `Referred by ${referrer.first_name} ${referrer.last_name}`,
-        visit_frequency: '',
-        go_to_drink: '',
-        agreement_token: applicationToken,
-        agreement_token_created_at: new Date().toISOString(),
         referral_code: referralCode.toUpperCase(),
         referred_by_member_id: referrer.member_id,
-        status: 'review' // Will update to 'review' once they submit the form
+        clicked_at: new Date().toISOString(),
+        ip_address: Array.isArray(ipAddress) ? ipAddress[0] : ipAddress,
+        user_agent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
+        converted: false,
+        waitlist_id: null
       })
       .select()
       .single();
 
-    if (onboardError) {
-      console.error('Error creating onboard entry:', onboardError);
-      return res.status(500).json({ error: 'Failed to create onboard link' });
+    if (clickError) {
+      console.error('Error tracking referral click:', clickError);
+      // Don't fail the request if click tracking fails - continue anyway
     }
 
     const onboardUrl = `/onboard/${applicationToken}`;
@@ -70,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true,
       onboardUrl,
       token: applicationToken,
+      clickId: clickEntry?.id || null,
       referrerName: `${referrer.first_name} ${referrer.last_name}`,
       expiresAt: expiresAt.toISOString()
     });

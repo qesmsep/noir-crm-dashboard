@@ -140,6 +140,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Failed to submit application' });
     }
 
+    // Mark the referral click as converted (if this was from a referral link)
+    if (referred_by_member_id && referral_code) {
+      const { error: updateClickError } = await supabaseAdmin
+        .from('referral_clicks')
+        .update({
+          converted: true,
+          waitlist_id: waitlist.id
+        })
+        .eq('referral_code', referral_code.toUpperCase())
+        .eq('referred_by_member_id', referred_by_member_id)
+        .eq('converted', false)
+        .order('clicked_at', { ascending: false })
+        .limit(1);
+
+      if (updateClickError) {
+        console.error('Error updating referral click:', updateClickError);
+        // Don't fail the request if this fails - it's just analytics
+      }
+    }
+
     // Send SMS notification to applicant
     try {
       await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-sms`, {

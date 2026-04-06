@@ -1,46 +1,52 @@
+import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import Stripe from 'stripe';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 async function checkSpecificAccounts() {
-  const subscriptionIds = [
-    'sub_1SyEmLFdjSPifIH5y64F9SYF', // Jesse Crawford
-    'sub_1S4axoFdjSPifIH5m6mCYHX7', // Brian Hoette / Holli Hiette
-    'sub_1S4b2mFdjSPifIH5K4Xu626T', // Brian Dercher / Crystal Dercher
+  console.log('\n🔍 Checking specific accounts from screenshot...\n');
+
+  const names = [
+    { first: 'Alicia', last: 'Reyes' },
+    { first: 'Sam', last: 'DeArmon' },
+    { first: 'Whitney', last: 'Courser' },
+    { first: 'Dell', last: 'Johnson' },
   ];
 
-  console.log('\n🔍 Checking specific subscriptions from app...\n');
+  for (const name of names) {
+    const { data: members } = await supabase
+      .from('members')
+      .select('first_name, last_name, account_id')
+      .eq('first_name', name.first)
+      .ilike('last_name', name.last + '%')
+      .limit(1);
 
-  for (const subId of subscriptionIds) {
-    try {
-      const subscription = await stripe.subscriptions.retrieve(subId);
+    if (members && members.length > 0) {
+      const member = members[0];
+      
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('account_id', member.account_id)
+        .single();
 
-      console.log(`📋 Subscription: ${subId}`);
-      console.log(`   Status: ${subscription.status}`);
-      console.log(`   Created: ${new Date(subscription.created * 1000).toLocaleString()}`);
-      console.log(`   Current Period Start: ${subscription.current_period_start ? new Date(subscription.current_period_start * 1000).toLocaleString() : 'None'}`);
-      console.log(`   Current Period End: ${subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toLocaleString() : 'None'}`);
-      console.log(`   Trial End: ${subscription.trial_end ? new Date(subscription.trial_end * 1000).toLocaleString() : 'None'}`);
-      console.log(`   Cancel At: ${subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toLocaleString() : 'None'}`);
-      console.log(`   Canceled At: ${subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toLocaleString() : 'None'}`);
-
-      // Calculate amount
-      let totalAmount = 0;
-      subscription.items.data.forEach(item => {
-        if (item.price.unit_amount) {
-          totalAmount += (item.price.unit_amount / 100) * (item.quantity || 1);
-        }
-      });
-      console.log(`   Amount: $${totalAmount}`);
-      console.log('');
-    } catch (err: any) {
-      console.error(`❌ Error: ${err.message}`);
+      if (account) {
+        console.log(`\n${member.first_name} ${member.last_name}`);
+        console.log(`   Account: ${account.account_id}`);
+        console.log(`   Next Billing: ${account.next_billing_date}`);
+        console.log(`   Status: ${account.subscription_status}`);
+        console.log(`   Dues: \$${account.monthly_dues || 0}`);
+        console.log(`   Last Attempt: ${account.last_billing_attempt || 'never'}`);
+        console.log(`   Failed At: ${account.last_payment_failed_at || 'no'}`);
+      }
+    } else {
+      console.log(`\n❌ ${name.first} ${name.last} - NOT FOUND`);
     }
   }
 }

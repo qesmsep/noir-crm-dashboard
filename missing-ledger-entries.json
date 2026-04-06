@@ -1,0 +1,54 @@
+[
+  {
+    "account_id": "3b8cf6cb-9b76-41cb-86d9-a5d4b6d52462",
+    "member_id": "34fe9068-cae4-4344-9b0c-c3e1391a461e",
+    "billing_date": "2026-04-01",
+    "stripe_charge_id": "ch_3THPJWFdjSPifIH50byT7RJQ",
+    "stripe_payment_intent_id": "pi_3THPJWFdjSPifIH50x9rXJ51",
+    "total_amount": 150,
+    "monthly_dues": 150,
+    "admin_fee": 50,
+    "additional_member_fee": 25,
+    "additional_members_count": 0,
+    "credit_card_fee_enabled": false
+  },
+  {
+    "account_id": "f9e7e988-3f52-4568-a03e-9cbe36b66724",
+    "member_id": "209f2fea-d4c3-4d91-899c-6a19dcb33701",
+    "billing_date": "2026-04-01",
+    "stripe_charge_id": "ch_3THPJcFdjSPifIH51WZcMD0P",
+    "stripe_payment_intent_id": "pi_3THPJcFdjSPifIH51J7fZXhS",
+    "total_amount": 150,
+    "monthly_dues": 150,
+    "admin_fee": 50,
+    "additional_member_fee": 25,
+    "additional_members_count": 0,
+    "credit_card_fee_enabled": false
+  },
+  {
+    "account_id": "53814dc3-36d2-4d40-b075-8d030f920ec4",
+    "member_id": "c86603e4-7e9b-4a1c-b88e-d6e84a3250f3",
+    "billing_date": "2026-04-01",
+    "stripe_charge_id": "ch_3THPJeFdjSPifIH51VSRBs5E",
+    "stripe_payment_intent_id": "pi_3THPJeFdjSPifIH51xYtOnVZ",
+    "total_amount": 150,
+    "monthly_dues": 150,
+    "admin_fee": 50,
+    "additional_member_fee": 25,
+    "additional_members_count": 0,
+    "credit_card_fee_enabled": false
+  },
+  {
+    "account_id": "d21bd26b-f5cd-492f-83ef-8e88a2c7acc1",
+    "member_id": "9c755f7d-c75a-485c-90c9-0300f3787ba0",
+    "billing_date": "2026-04-02",
+    "stripe_charge_id": "ch_3THln9FdjSPifIH51eNhdBBy",
+    "stripe_payment_intent_id": "pi_3THln9FdjSPifIH51ygPBiDq",
+    "total_amount": 150,
+    "monthly_dues": 150,
+    "admin_fee": 50,
+    "additional_member_fee": 25,
+    "additional_members_count": 0,
+    "credit_card_fee_enabled": false
+  }
+]

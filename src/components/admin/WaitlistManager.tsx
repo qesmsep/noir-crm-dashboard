@@ -45,7 +45,7 @@ export default function WaitlistManager() {
   const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<WaitlistEntry | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('review');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -174,44 +174,37 @@ export default function WaitlistManager() {
 
       <div className={styles.statusGrid}>
         {statusCounts
-          .filter((statusCount) => statusCount.status !== 'waitlisted')
-          .map((statusCount) => (
-            <div key={statusCount.status} className={styles.statusCard}>
-              <div className={styles.statusLabel}>
-                {statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1)}
+          .filter((statusCount) => statusCount.status !== 'waitlisted' && statusCount.status !== 'denied')
+          .map((statusCount) => {
+            const displayName = statusCount.status === 'referrals' ? 'Referrals' :
+                               statusCount.status.charAt(0).toUpperCase() + statusCount.status.slice(1);
+            return (
+              <div
+                key={statusCount.status}
+                className={`${styles.statusCard} ${statusFilter === statusCount.status ? styles.statusCardActive : ''}`}
+                onClick={() => setStatusFilter(statusCount.status)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className={styles.statusLabel}>
+                  {displayName}
+                </div>
+                <div className={styles.statusNumber}>{statusCount.count}</div>
               </div>
-              <div className={styles.statusNumber}>{statusCount.count}</div>
-            </div>
-          ))}
+            );
+          })}
+        <div
+          className={`${styles.statusCard} ${statusFilter === '' ? styles.statusCardActive : ''}`}
+          onClick={() => setStatusFilter('')}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className={styles.statusLabel}>All</div>
+          <div className={styles.statusNumber}>
+            {statusCounts.reduce((sum, s) => sum + s.count, 0)}
+          </div>
+        </div>
       </div>
 
       <div className={styles.filters}>
-        <div className={styles.filterButtons}>
-          <button
-            onClick={() => setStatusFilter('review')}
-            className={`${styles.filterButton} ${statusFilter === 'review' ? styles.filterButtonActive : ''}`}
-          >
-            Review
-          </button>
-          <button
-            onClick={() => setStatusFilter('approved')}
-            className={`${styles.filterButton} ${statusFilter === 'approved' ? styles.filterButtonActive : ''}`}
-          >
-            Approved
-          </button>
-          <button
-            onClick={() => setStatusFilter('archived')}
-            className={`${styles.filterButton} ${statusFilter === 'archived' ? styles.filterButtonActive : ''}`}
-          >
-            Archived
-          </button>
-          <button
-            onClick={() => setStatusFilter('')}
-            className={`${styles.filterButton} ${statusFilter === '' ? styles.filterButtonActive : ''}`}
-          >
-            All
-          </button>
-        </div>
 
         <div className={styles.searchContainer}>
           <svg className={styles.searchIcon} viewBox="0 0 20 20" fill="currentColor">
