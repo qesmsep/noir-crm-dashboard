@@ -154,7 +154,7 @@ export default async function handler(req, res) {
           // Special handling for referrals filter
           if (status === 'referrals') {
             query = query.not('referred_by_member_id', 'is', null);
-            query = query.in('status', ['review', 'submitted']);
+            query = query.eq('status', 'review');
           }
           // Regular review filter (exclude referrals)
           else if (status === 'review') {
@@ -217,7 +217,7 @@ export default async function handler(req, res) {
               if (s === 'referrals') {
                 countQuery = countQuery
                   .not('referred_by_member_id', 'is', null)
-                  .in('status', ['review', 'submitted']);
+                  .eq('status', 'review');
               }
               // Regular review (exclude referrals)
               else if (s === 'review') {
