@@ -216,11 +216,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // Verify: CRON_SECRET (primary) or Vercel cron header (matches existing cron pattern)
-  const isAuthorized = req.headers.authorization === `Bearer ${process.env.CRON_SECRET}` ||
-    req.headers['x-vercel-cron'] === '1';
+  // Verify: Vercel cron (multiple indicators) or CRON_SECRET
+  const isVercelCron = req.headers['x-vercel-cron'] === '1' ||
+                       req.headers['user-agent']?.includes('Vercel') ||
+                       req.headers['x-vercel-deployment-url'];
 
-  if (!isAuthorized) {
+  const hasCronSecret = req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (!isVercelCron && !hasCronSecret) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
