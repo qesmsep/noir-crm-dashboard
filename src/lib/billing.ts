@@ -440,29 +440,68 @@ async function sendPaymentFailedNotification(account: any, decline_code: string,
       return;
     }
 
-    // Customize message based on decline code
-    let message = '';
-    if (decline_code === 'no_payment_method') {
-      message = `Hi ${primaryMember.first_name}, we couldn't process your monthly dues because there's no payment method on file. Please add a card at noirkc.com/member/profile`;
-    } else if (decline_code === 'insufficient_funds') {
-      message = `Hi ${primaryMember.first_name}, your monthly dues payment was declined due to insufficient funds. We'll retry in a few days.`;
-    } else if (decline_code === 'expired_card') {
-      message = `Hi ${primaryMember.first_name}, your payment card has expired. Please update it at noirkc.com/member/profile`;
-    } else {
-      message = `Hi ${primaryMember.first_name}, we couldn't process your monthly dues payment. Please check your payment method at noirkc.com/member/profile`;
+    // Format phone number
+    let formattedPhone = primaryMember.phone.trim();
+    if (!formattedPhone.startsWith('+')) {
+      const digits = formattedPhone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        formattedPhone = '+1' + digits;
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        formattedPhone = '+' + digits;
+      } else {
+        formattedPhone = '+' + digits;
+      }
     }
 
-    // Queue SMS message
+    // Create message with actual Stripe error
+    const message = `Hello ${primaryMember.first_name}. This is a notification to let you know that your membership did not successfully renew. We used your preferred payment method and received this response from the payment processor: ${error_message}. Please let us know when your payment is ready to be retried. Thank you!`;
+
+    // Send SMS immediately via OpenPhone
+    const response = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY || '',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: [formattedPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: message
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Failed to send payment failure SMS: ${errorText}`);
+
+      // Store failed message in messages table for record
+      await supabase.from('messages').insert({
+        member_id: primaryMember.member_id,
+        account_id: account.account_id,
+        content: message,
+        direction: 'outbound',
+        status: 'failed',
+        phone_number: formattedPhone,
+        error_message: errorText,
+      });
+
+      return;
+    }
+
+    const result = await response.json();
+
+    // Store sent message in messages table for record
     await supabase.from('messages').insert({
       member_id: primaryMember.member_id,
       account_id: account.account_id,
       content: message,
       direction: 'outbound',
-      status: 'pending',
-      phone_number: primaryMember.phone,
+      status: 'sent',
+      phone_number: formattedPhone,
     });
 
-    console.log(`📱 Queued payment failure SMS for account ${account.account_id}`);
+    console.log(`📱 Sent payment failure SMS for account ${account.account_id} (message ID: ${result.id})`);
   } catch (error: any) {
     console.error(`Failed to send payment failed notification for account ${account.account_id}:`, error);
   }
@@ -484,18 +523,67 @@ export async function sendPaymentSuccessNotification(account: any) {
       return;
     }
 
+    // Format phone number
+    let formattedPhone = primaryMember.phone.trim();
+    if (!formattedPhone.startsWith('+')) {
+      const digits = formattedPhone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        formattedPhone = '+1' + digits;
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        formattedPhone = '+' + digits;
+      } else {
+        formattedPhone = '+' + digits;
+      }
+    }
+
     const message = `Hi ${primaryMember.first_name}, your monthly dues payment has been processed successfully. Thank you!`;
 
+    // Send SMS immediately via OpenPhone
+    const response = await fetch('https://api.openphone.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.OPENPHONE_API_KEY || '',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        to: [formattedPhone],
+        from: process.env.OPENPHONE_PHONE_NUMBER_ID,
+        content: message
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Failed to send payment success SMS: ${errorText}`);
+
+      // Store failed message in messages table for record
+      await supabase.from('messages').insert({
+        member_id: primaryMember.member_id,
+        account_id: account.account_id,
+        content: message,
+        direction: 'outbound',
+        status: 'failed',
+        phone_number: formattedPhone,
+        error_message: errorText,
+      });
+
+      return;
+    }
+
+    const result = await response.json();
+
+    // Store sent message in messages table for record
     await supabase.from('messages').insert({
       member_id: primaryMember.member_id,
       account_id: account.account_id,
       content: message,
       direction: 'outbound',
-      status: 'pending',
-      phone_number: primaryMember.phone,
+      status: 'sent',
+      phone_number: formattedPhone,
     });
 
-    console.log(`📱 Queued payment success SMS for account ${account.account_id}`);
+    console.log(`📱 Sent payment success SMS for account ${account.account_id} (message ID: ${result.id})`);
   } catch (error: any) {
     console.error(`Failed to send payment success notification for account ${account.account_id}:`, error);
   }
