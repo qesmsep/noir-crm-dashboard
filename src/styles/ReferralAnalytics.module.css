@@ -1,0 +1,303 @@
+/* Apple Mobile-First Design System - Referral Analytics */
+
+/* Container */
+.container {
+  min-height: 100vh;
+  background: #f5f5f7;
+  padding: 16px;
+  font-family: 'Montserrat', sans-serif;
+  color: #1d1d1f;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.headerTitle h2 {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: #1d1d1f;
+  letter-spacing: -0.5px;
+}
+
+.headerTitle p {
+  font-size: 14px;
+  color: #86868b;
+  margin: 0;
+}
+
+.refreshButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: #ffffff;
+  color: #007aff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 1px 2px rgba(165, 148, 128, 0.08),
+    0 4px 8px rgba(165, 148, 128, 0.12),
+    0 8px 16px rgba(165, 148, 128, 0.08);
+}
+
+.refreshButton:hover {
+  background: #007aff;
+  color: white;
+  transform: scale(1.05);
+  box-shadow:
+    0 2px 4px rgba(165, 148, 128, 0.1),
+    0 8px 16px rgba(165, 148, 128, 0.15),
+    0 16px 32px rgba(165, 148, 128, 0.12);
+}
+
+.refreshButton:active {
+  transform: scale(0.95);
+}
+
+.refreshIcon {
+  width: 20px;
+  height: 20px;
+}
+
+/* View Toggle */
+.viewToggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.toggleButton {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid #d2d2d7;
+  background: #ffffff;
+  color: #1d1d1f;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 1px 2px rgba(165, 148, 128, 0.08),
+    0 4px 8px rgba(165, 148, 128, 0.12),
+    0 8px 16px rgba(165, 148, 128, 0.08);
+}
+
+.toggleButton:hover {
+  background: #f5f5f7;
+  border-color: #007aff;
+  box-shadow:
+    0 2px 4px rgba(165, 148, 128, 0.1),
+    0 8px 16px rgba(165, 148, 128, 0.15),
+    0 16px 32px rgba(165, 148, 128, 0.12);
+}
+
+.toggleButtonActive {
+  background: #007aff;
+  color: #ffffff;
+  border-color: #007aff;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #d2d2d7;
+  border-top-color: #007aff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #86868b;
+  font-size: 16px;
+}
+
+/* Stats Grid */
+.statsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .statsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Stat Card */
+.statCard {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow:
+    0 1px 2px rgba(165, 148, 128, 0.08),
+    0 4px 8px rgba(165, 148, 128, 0.12),
+    0 8px 16px rgba(165, 148, 128, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(165, 148, 128, 0.1),
+    0 8px 16px rgba(165, 148, 128, 0.15),
+    0 16px 32px rgba(165, 148, 128, 0.12);
+}
+
+.statHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.memberName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 4px;
+}
+
+.referralCode {
+  font-size: 12px;
+  color: #86868b;
+  font-family: 'Monaco', 'Courier New', monospace;
+  background: #f5f5f7;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.conversionBadge {
+  font-size: 20px;
+  font-weight: 700;
+  color: #34c759;
+  background: rgba(52, 199, 89, 0.1);
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.statMetrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.metric {
+  text-align: center;
+}
+
+.metricLabel {
+  font-size: 12px;
+  color: #86868b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.metricValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1d1d1f;
+}
+
+/* Clicks List */
+.clicksList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clickCard {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow:
+    0 1px 2px rgba(165, 148, 128, 0.08),
+    0 4px 8px rgba(165, 148, 128, 0.12),
+    0 8px 16px rgba(165, 148, 128, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.clickCard:hover {
+  transform: translateX(4px);
+  box-shadow:
+    0 2px 4px rgba(165, 148, 128, 0.1),
+    0 8px 16px rgba(165, 148, 128, 0.15),
+    0 16px 32px rgba(165, 148, 128, 0.12);
+}
+
+.clickInfo {
+  flex: 1;
+}
+
+.clickMember {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 4px;
+}
+
+.clickTime {
+  font-size: 12px;
+  color: #86868b;
+}
+
+.clickIp {
+  font-size: 12px;
+  color: #86868b;
+  font-family: 'Monaco', 'Courier New', monospace;
+  background: #f5f5f7;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Tablet & Desktop */
+@media (min-width: 768px) {
+  .container {
+    padding: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .headerTitle h2 {
+    font-size: 34px;
+  }
+}
