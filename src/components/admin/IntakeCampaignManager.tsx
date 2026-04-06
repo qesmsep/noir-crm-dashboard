@@ -458,27 +458,24 @@ export default function IntakeCampaignManager() {
                 <td className="p-4 border-b border-[#EFEDE8]">
                   <div className="flex gap-2">
                     <Button
-                      size="sm"
                       onClick={() => handleEdit(campaign)}
-                      className="bg-cork text-white hover:bg-cork-dark shadow-sm"
+                      className="bg-cork text-white hover:bg-cork-dark shadow-sm min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
-                      size="sm"
                       onClick={() => {
                         setEnrollCampaignId(campaign.id);
                         setEnrollOpen(true);
                       }}
-                      className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                      className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm min-w-[44px] min-h-[44px] flex items-center justify-center"
                       title="Enroll phone number"
                     >
                       <UserPlus className="w-4 h-4" />
                     </Button>
                     <Button
-                      size="sm"
                       onClick={() => handleDelete(campaign.id)}
-                      className="bg-red-600 text-white hover:bg-red-700 shadow-sm"
+                      className="bg-red-600 text-white hover:bg-red-700 shadow-sm min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -510,30 +507,27 @@ export default function IntakeCampaignManager() {
               </div>
               <div className="flex gap-1">
                 <Button
-                  size="sm"
                   onClick={() => handleEdit(campaign)}
-                  className="bg-cork text-white hover:bg-cork-dark"
+                  className="bg-cork text-white hover:bg-cork-dark min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
-                  <Edit className="w-3.5 h-3.5" />
+                  <Edit className="w-4 h-4" />
                 </Button>
                 <Button
-                  size="sm"
                   onClick={() => {
                     setEnrollCampaignId(campaign.id);
                     setEnrollOpen(true);
                   }}
-                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  className="bg-blue-600 text-white hover:bg-blue-700 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   title="Enroll phone number"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
+                  <UserPlus className="w-4 h-4" />
                 </Button>
                 <Button
-                  size="sm"
                   onClick={() => handleDelete(campaign.id)}
-                  className="bg-red-600 text-white hover:bg-red-700"
+                  className="bg-red-600 text-white hover:bg-red-700 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   title="Delete campaign"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -571,7 +565,7 @@ export default function IntakeCampaignManager() {
                 value={editingCampaign?.name || ''}
                 onChange={(e) => setEditingCampaign(prev => prev ? { ...prev, name: e.target.value } : prev)}
                 placeholder="e.g., Membership Inquiry"
-                className="mt-1 text-sm h-9"
+                className="mt-1 text-sm min-h-[44px]"
               />
             </div>
 
@@ -595,7 +589,7 @@ export default function IntakeCampaignManager() {
                 id="campaign-status"
                 value={editingCampaign?.status || 'draft'}
                 onChange={(e) => setEditingCampaign(prev => prev ? { ...prev, status: e.target.value as IntakeCampaign['status'] } : prev)}
-                className="mt-1 text-sm h-9"
+                className="mt-1 text-sm min-h-[44px]"
               >
                 <option value="draft">Draft</option>
                 <option value="active">Active</option>
@@ -654,7 +648,7 @@ export default function IntakeCampaignManager() {
                               },
                             }))
                           }
-                          className="mt-1 text-sm h-8"
+                          className="mt-1 text-sm min-h-[44px]"
                         >
                           <option value="">None</option>
                           {plans.map(plan => (
@@ -685,7 +679,7 @@ export default function IntakeCampaignManager() {
                     <Label htmlFor="action-charge" className="text-xs font-semibold text-[#353535] cursor-pointer">
                       Add Ledger Charge
                     </Label>
-                    <Badge className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">Members Only</Badge>
+                    <Badge className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-xs">Members Only</Badge>
                   </div>
                   {actions.add_ledger_charge?.enabled && (
                     <div className="ml-6 flex flex-col gap-2">
@@ -711,7 +705,7 @@ export default function IntakeCampaignManager() {
                                 },
                               }))
                             }
-                            className="mt-1 text-sm h-8"
+                            className="mt-1 text-sm min-h-[44px]"
                             placeholder="50.00"
                           />
                         </div>
@@ -729,7 +723,7 @@ export default function IntakeCampaignManager() {
                                 },
                               }))
                             }
-                            className="mt-1 text-sm h-8"
+                            className="mt-1 text-sm min-h-[44px]"
                             placeholder="Event ticket, etc."
                           />
                         </div>
@@ -757,7 +751,7 @@ export default function IntakeCampaignManager() {
                     <Label htmlFor="action-rsvp" className="text-xs font-semibold text-[#353535] cursor-pointer">
                       Create Event RSVP
                     </Label>
-                    <Badge className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px]">Members Only</Badge>
+                    <Badge className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-xs">Members Only</Badge>
                   </div>
                   {actions.create_event_rsvp?.enabled && (
                     <div className="ml-6 flex flex-col gap-2">
@@ -779,7 +773,7 @@ export default function IntakeCampaignManager() {
                               },
                             }))
                           }
-                          className="mt-1 text-sm h-8"
+                          className="mt-1 text-sm min-h-[44px]"
                         >
                           <option value="">Select an event...</option>
                           {events.map(event => (
@@ -805,7 +799,7 @@ export default function IntakeCampaignManager() {
                               },
                             }))
                           }
-                          className="mt-1 text-sm h-8 w-24"
+                          className="mt-1 text-sm min-h-[44px] w-24"
                         />
                       </div>
                     </div>
@@ -859,10 +853,9 @@ export default function IntakeCampaignManager() {
                 <Button
                   type="button"
                   onClick={addMessage}
-                  size="sm"
-                  className="text-xs h-7 bg-cork text-white hover:bg-cork-dark"
+                  className="text-sm min-h-[44px] bg-cork text-white hover:bg-cork-dark px-3"
                 >
-                  <Plus className="w-3 h-3 mr-1" /> Add Message
+                  <Plus className="w-4 h-4 mr-2" /> Add Message
                 </Button>
               </div>
 
@@ -879,10 +872,9 @@ export default function IntakeCampaignManager() {
                         <Button
                           type="button"
                           onClick={() => removeMessage(index)}
-                          size="sm"
-                          className="text-xs h-6 px-2 bg-red-100 text-red-700 hover:bg-red-200"
+                          className="min-w-[44px] min-h-[44px] bg-red-100 text-red-700 hover:bg-red-200 flex items-center justify-center"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
@@ -901,7 +893,7 @@ export default function IntakeCampaignManager() {
                         <Select
                           value={form.delayPreset}
                           onChange={(e) => updateMessage(index, { delayPreset: e.target.value as DelayPreset })}
-                          className="mt-1 text-sm h-8"
+                          className="mt-1 text-sm min-h-[44px]"
                         >
                           <option value="immediate">Immediately</option>
                           <option value="custom_minutes">After X minutes</option>
@@ -918,7 +910,7 @@ export default function IntakeCampaignManager() {
                             min={1}
                             value={form.customMinutes}
                             onChange={(e) => updateMessage(index, { customMinutes: parseInt(e.target.value) || 0 })}
-                            className="mt-1 text-sm h-8 w-32"
+                            className="mt-1 text-sm min-h-[44px] w-32"
                           />
                         </div>
                       )}
@@ -931,7 +923,7 @@ export default function IntakeCampaignManager() {
                             min={2}
                             value={form.delayDays}
                             onChange={(e) => updateMessage(index, { delayDays: parseInt(e.target.value) || 2 })}
-                            className="mt-1 text-sm h-8 w-32"
+                            className="mt-1 text-sm min-h-[44px] w-32"
                           />
                         </div>
                       )}
@@ -943,7 +935,7 @@ export default function IntakeCampaignManager() {
                             type="time"
                             value={form.sendTime}
                             onChange={(e) => updateMessage(index, { sendTime: e.target.value })}
-                            className="mt-1 text-sm h-8 w-40"
+                            className="mt-1 text-sm min-h-[44px] w-40"
                           />
                         </div>
                       )}
@@ -958,14 +950,14 @@ export default function IntakeCampaignManager() {
             <Button
               variant="outline"
               onClick={() => setIsOpen(false)}
-              className="text-sm h-8"
+              className="text-sm min-h-[44px]"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="text-sm h-8"
+              className="text-sm min-h-[44px]"
             >
               {saving ? 'Saving...' : 'Save'}
             </Button>
@@ -990,10 +982,11 @@ export default function IntakeCampaignManager() {
               <Label htmlFor="enroll-phone" className="text-xs font-semibold text-[#353535]">Phone Number</Label>
               <Input
                 id="enroll-phone"
+                type="tel"
                 value={enrollPhone}
                 onChange={(e) => setEnrollPhone(e.target.value)}
                 placeholder="+1XXXXXXXXXX"
-                className="mt-1 text-sm h-9"
+                className="mt-1 text-sm min-h-[44px]"
               />
               <p className="text-xs text-text-muted mt-1">
                 Use full format with country code (e.g., +18165551234)
@@ -1005,14 +998,14 @@ export default function IntakeCampaignManager() {
             <Button
               variant="outline"
               onClick={() => { setEnrollOpen(false); setEnrollPhone(''); }}
-              className="text-sm h-8"
+              className="text-sm min-h-[44px]"
             >
               Cancel
             </Button>
             <Button
               onClick={handleEnroll}
               disabled={enrolling}
-              className="text-sm h-8"
+              className="text-sm min-h-[44px]"
             >
               {enrolling ? 'Enrolling...' : 'Enroll'}
             </Button>
