@@ -12,6 +12,7 @@ export default function SubscriptionPlansManager() {
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const { toast } = useToast();
 
   // Form state
@@ -209,13 +210,32 @@ export default function SubscriptionPlansManager() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerTitle}>
-          <h2>Subscription Plans</h2>
+          <h2>Membership Plans</h2>
           <p>Manage Stripe product and price ID mappings for membership plans</p>
         </div>
-        <button onClick={openCreateModal} className={styles.addButton}>
-          <Plus size={20} />
-          Add Plan
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => setShowInactive(!showInactive)}
+            className={styles.toggleButton}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: showInactive ? '#353535' : 'white',
+              color: showInactive ? 'white' : '#353535',
+              border: `1px solid ${showInactive ? '#353535' : '#D1D5DB'}`,
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            {showInactive ? 'Hide Inactive' : 'Show Inactive'}
+          </button>
+          <button onClick={openCreateModal} className={styles.addButton}>
+            <Plus size={20} />
+            Add Plan
+          </button>
+        </div>
       </div>
 
       {/* Plans List */}
@@ -234,7 +254,7 @@ export default function SubscriptionPlansManager() {
         </div>
       ) : (
         <div className={styles.plansGrid}>
-          {plans.map((plan) => (
+          {plans.filter(plan => showInactive || plan.is_active).map((plan) => (
             <div key={plan.id} className={styles.planCard}>
               <div className={styles.planContent}>
                 {/* Row 1: Name, Status, Price */}
@@ -317,7 +337,7 @@ export default function SubscriptionPlansManager() {
             onDragStart={(e) => e.preventDefault()}
           >
             <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
-              {editingPlan ? 'Edit Subscription Plan' : 'Create Subscription Plan'}
+              {editingPlan ? 'Edit Membership Plan' : 'Create Membership Plan'}
             </h2>
 
             <form onSubmit={handleSubmit}>
