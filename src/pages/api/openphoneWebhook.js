@@ -1033,6 +1033,9 @@ export async function handler(req, res) {
   // No other code depends on this block's return value.
   // ═══════════════════════════════════════════════════════════════════════════
   // --- LEGACY INVITATION BLOCK START ---
+  // COMMENTED OUT 2026-04-06: Testing new intake campaign system
+  // TODO: Delete this block after confirming intake campaigns work
+  /*
   if (text.toLowerCase().trim() === 'invitation') {
     console.log('Processing INVITATION message for membership signup');
 
@@ -1109,6 +1112,7 @@ Thank you.`;
       return res.status(500).json({ error: 'Failed to process invitation request' });
     }
   }
+  */
   // --- LEGACY INVITATION BLOCK END ---
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1122,6 +1126,9 @@ Thank you.`;
   // No other code depends on this block's return value.
   // ═══════════════════════════════════════════════════════════════════════════
   // --- LEGACY SKYLINE BLOCK START ---
+  // COMMENTED OUT 2026-04-06: Testing new intake campaign system
+  // TODO: Delete this block after confirming intake campaigns work
+  /*
   if (text.toLowerCase().trim() === 'skyline') {
     console.log('Processing SKYLINE message for Skyline membership signup');
 
@@ -1200,9 +1207,13 @@ Thank you.`;
       return res.status(500).json({ error: 'Failed to process Skyline request' });
     }
   }
+  */
   // --- LEGACY SKYLINE BLOCK END ---
 
   // Handle "BALANCE" messages for ledger PDF
+  // COMMENTED OUT 2026-04-06: Testing new intake campaign system
+  // TODO: Create intake campaign for BALANCE or keep hardcoded if needed
+  /*
   if (text.toLowerCase().trim() === 'balance') {
     console.log('Processing BALANCE message for ledger PDF');
     
@@ -1299,6 +1310,7 @@ Thank you.`;
       });
     }
   }
+  */
 
   console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
 
