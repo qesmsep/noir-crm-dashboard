@@ -91,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const member = members?.find(m => m.member_id === click.referred_by_member_id);
 
         // If there's a waitlist_id, get the applicant's name
-        let applicantName = null;
+        let applicantName: string | null = null;
         if (click.waitlist_id) {
           const { data: waitlistEntry } = await supabase
             .from('waitlist')
