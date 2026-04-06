@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
@@ -553,14 +553,14 @@ export default function IntakeCampaignManager() {
         ))}
       </div>
 
-      {/* Campaign Edit Sheet */}
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-[550px] overflow-y-auto bg-white p-4">
-          <SheetHeader className="pb-3">
-            <SheetTitle className="text-lg font-semibold text-[#353535]">
+      {/* Campaign Edit Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-[#353535]">
               {editingCampaign?.id ? 'Edit Campaign' : 'Create Campaign'}
-            </SheetTitle>
-          </SheetHeader>
+            </DialogTitle>
+          </DialogHeader>
 
           <div className="flex flex-col gap-4 mt-3">
             {/* Campaign Details */}
@@ -954,7 +954,7 @@ export default function IntakeCampaignManager() {
             </div>
           </div>
 
-          <SheetFooter className="mt-4 pt-3 border-t gap-2">
+          <DialogFooter className="mt-4 pt-3 border-t gap-2">
             <Button
               variant="outline"
               onClick={() => setIsOpen(false)}
@@ -969,18 +969,18 @@ export default function IntakeCampaignManager() {
             >
               {saving ? 'Saving...' : 'Save'}
             </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Enroll Phone Sheet */}
-      <Sheet open={enrollOpen} onOpenChange={setEnrollOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-[400px] overflow-y-auto bg-white p-4">
-          <SheetHeader className="pb-3">
-            <SheetTitle className="text-lg font-semibold text-[#353535]">
+      {/* Enroll Phone Dialog */}
+      <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-[#353535]">
               Enroll Phone Number
-            </SheetTitle>
-          </SheetHeader>
+            </DialogTitle>
+          </DialogHeader>
 
           <div className="flex flex-col gap-3 mt-3">
             <p className="text-xs text-text-muted">
@@ -1001,7 +1001,7 @@ export default function IntakeCampaignManager() {
             </div>
           </div>
 
-          <SheetFooter className="mt-4 pt-3 border-t gap-2">
+          <DialogFooter className="mt-4 pt-3 border-t gap-2">
             <Button
               variant="outline"
               onClick={() => { setEnrollOpen(false); setEnrollPhone(''); }}
@@ -1016,9 +1016,9 @@ export default function IntakeCampaignManager() {
             >
               {enrolling ? 'Enrolling...' : 'Enroll'}
             </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
