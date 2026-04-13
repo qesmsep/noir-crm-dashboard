@@ -22,19 +22,27 @@ export default function MemberLoginPage() {
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [memberInfo, setMemberInfo] = useState<{ first_name: string; has_password: boolean } | null>(null);
   const [phoneNotRecognized, setPhoneNotRecognized] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const { signInWithPassword, signInWithBiometric, signInWithPhone, verifyOTP, isBiometricAvailable, member } = useMemberAuth();
   const { toast } = useToast();
   const router = useRouter();
 
+  // Set mounted state to prevent hydration mismatch
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Check biometric availability on mount
   React.useEffect(() => {
-    isBiometricAvailable().then(setBiometricAvailable);
-  }, [isBiometricAvailable]);
+    if (mounted) {
+      isBiometricAvailable().then(setBiometricAvailable);
+    }
+  }, [mounted, isBiometricAvailable]);
 
   // Redirect if already logged in
   React.useEffect(() => {
-    if (member) {
+    if (mounted && member) {
       // If member needs to set up a password, redirect to change-password page
       if (!member.has_password || member.password_is_temporary) {
         router.push('/member/change-password');
@@ -42,7 +50,7 @@ export default function MemberLoginPage() {
         router.push('/member/dashboard');
       }
     }
-  }, [member, router]);
+  }, [mounted, member, router]);
 
   // Handle dial pad "Call" button - verify phone first, then show password input
   const handleCall = async () => {
@@ -241,6 +249,26 @@ export default function MemberLoginPage() {
       setLoading(false);
     }
   };
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[#ECEDE8] flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          <div className="flex flex-col gap-8">
+            <div className="text-center">
+              <img
+                src="/images/noir-wedding-day.png"
+                alt="Noir"
+                className="h-12 mx-auto mb-6"
+                style={{ filter: 'brightness(0.7)' }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#ECEDE8] flex items-center justify-center px-4 py-8">

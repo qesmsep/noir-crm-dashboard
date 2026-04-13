@@ -836,6 +836,7 @@ export default function MemberDashboardPage() {
         memberPhone={member?.phone || ''}
         memberId={member?.member_id}
         accountId={member?.account_id}
+        hideTableSelection={true}
       />
 
       {/* Balance Modal */}

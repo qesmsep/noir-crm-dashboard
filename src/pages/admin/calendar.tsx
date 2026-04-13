@@ -17,6 +17,7 @@ export default function Calendar() {
   const [currentView, setCurrentView] = useState<ViewType>('day');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [activeLocation, setActiveLocation] = useState<string>('noirkc');
   const [bookingStartDate, setBookingStartDate] = useState<Date>(new Date());
   const [bookingEndDate, setBookingEndDate] = useState<Date>(() => {
     const d = new Date();
@@ -115,6 +116,7 @@ export default function Calendar() {
             currentDate={currentDate}
             onDateChange={handleDateChange}
             onSlotClick={handleSlotClick}
+            locationSlug={activeLocation}
           />
         );
       case 'month':
@@ -146,6 +148,21 @@ export default function Calendar() {
       <div className={`${styles.container} ${isFullScreen ? styles.fullScreen : ''}`}>
         <header className={styles.header}>
           <nav className={styles.nav}>
+            <div className={styles.locationTabs}>
+              <button
+                className={`${styles.locationTab} ${activeLocation === 'noirkc' ? styles.active : ''}`}
+                onClick={() => setActiveLocation('noirkc')}
+              >
+                Noir KC
+              </button>
+              <button
+                className={`${styles.locationTab} ${activeLocation === 'rooftopkc' ? styles.active : ''}`}
+                onClick={() => setActiveLocation('rooftopkc')}
+              >
+                RooftopKC
+              </button>
+            </div>
+
             <div className={styles.viewButtons}>
               <button
                 className={`${styles.viewButton} ${currentView === 'day' ? styles.active : ''}`}
@@ -233,7 +250,6 @@ function isDayOpenOptimized(date: Date, baseHours: any[], exceptionalClosures: a
 
     return true;
   } catch (error) {
-    console.error('Error checking if day is open:', error);
     return false;
   }
 }
@@ -341,7 +357,7 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
 
       setMonthData(calendarData);
     } catch (error) {
-      console.error('Error fetching month data:', error);
+      // Error handled silently
     } finally {
       setLoading(false);
     }
@@ -420,7 +436,7 @@ function AllReservationsView({ onReservationClick }: {
       const data = await response.json();
       setReservations(data.data || []);
     } catch (error) {
-      console.error('Error fetching reservations:', error);
+      // Error handled silently
     } finally {
       setLoading(false);
     }

@@ -14,6 +14,7 @@ interface ReservationModalProps {
   initialDate?: Date;
   initialTableId?: string;
   onReservationCreated: () => void;
+  locationSlug?: string;
 }
 
 const eventTypes = [
@@ -41,6 +42,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
   initialDate,
   initialTableId,
   onReservationCreated,
+  locationSlug,
 }) => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -178,7 +180,8 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
 
   const fetchTables = async () => {
     try {
-      const response = await fetch('/api/tables');
+      const url = locationSlug ? `/api/tables?location=${locationSlug}` : '/api/tables';
+      const response = await fetch(url);
       if (response.ok) {
         const result = await response.json();
         setTables(result.data || []);

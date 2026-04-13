@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import ical from 'node-ical';
 import { DateTime } from 'luxon';
+import { createClient } from '@supabase/supabase-js';
 
 interface MinakaEvent {
   id: string;
@@ -18,14 +19,44 @@ interface MinakaEvent {
 
 export async function GET(request: Request) {
   try {
-    const minakaCalendarUrl = process.env.MINAKA_CALENDAR_URL;
-    
-    if (!minakaCalendarUrl) {
-      return NextResponse.json(
-        { error: 'Minaka calendar URL not configured' },
-        { status: 500 }
-      );
+    // Get location from query params
+    const { searchParams } = new URL(request.url);
+    const locationSlug = searchParams.get('location');
+
+    console.log('🔍 [MINAKA API] Query params:', { locationSlug });
+
+    // Create Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Get Minaka iCal URL from locations table
+    let minakaCalendarUrl: string | undefined;
+
+    if (locationSlug) {
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('minaka_ical_url')
+        .eq('slug', locationSlug)
+        .single();
+
+      if (locationError) {
+        console.error('🔍 [MINAKA API] Error fetching location:', locationError);
+        return NextResponse.json({ data: [] });
+      }
+
+      minakaCalendarUrl = locationData?.minaka_ical_url || undefined;
+      console.log('🔍 [MINAKA API] Found Minaka URL for', locationSlug, ':', minakaCalendarUrl ? 'Yes' : 'No');
     }
+
+    if (!minakaCalendarUrl) {
+      console.log('🔍 [MINAKA API] No Minaka calendar URL configured for location:', locationSlug || 'default');
+      // Return empty array instead of error - this location doesn't have Minaka integration yet
+      return NextResponse.json({ data: [] });
+    }
+
+    console.log('🔍 [MINAKA API] Fetching from URL:', minakaCalendarUrl.substring(0, 50) + '...');
 
     // Fetch the iCal feed
     const response = await fetch(minakaCalendarUrl, {

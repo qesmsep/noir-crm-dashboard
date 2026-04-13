@@ -62,6 +62,7 @@ interface FullCalendarTimelineProps {
   currentDate?: Date;
   onDateChange?: (date: Date) => void;
   onSlotClick?: (slotInfo: { date: Date; resourceId: string }) => void;
+  locationSlug?: string;
 }
 
 
@@ -107,7 +108,7 @@ const isPhone = () => {
   return isMobile && !isTablet;
 };
 
-const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick, currentDate: propCurrentDate, onDateChange, onSlotClick }) => {
+const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, bookingStartDate, bookingEndDate, baseDays, viewOnly = false, onReservationClick, currentDate: propCurrentDate, onDateChange, onSlotClick, locationSlug }) => {
   // Private Event Table expand/collapse state
   const [expandedId, setExpandedId] = useState<string | null>(null);
   function toggleExpand(id: string) {
@@ -115,6 +116,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   }
   const calendarRef = useRef<FullCalendar | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
+  const [tableIds, setTableIds] = useState<string[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [localReloadKey, setLocalReloadKey] = useState(0);
   const [newReservation, setNewReservation] = useState<any>(null);
@@ -161,9 +163,27 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   useEffect(() => {
     async function loadTables() {
       try {
-        const { data: tables, error } = await supabase
+        let query = supabase
           .from('tables')
           .select('id, table_number');
+
+        // Filter by location if provided
+        if (locationSlug) {
+          // First, fetch the location ID by slug
+          const { data: locationData, error: locationError } = await supabase
+            .from('locations')
+            .select('id')
+            .eq('slug', locationSlug)
+            .single();
+
+          if (locationError) throw locationError;
+          if (!locationData) throw new Error(`Location not found: ${locationSlug}`);
+
+          // Then filter tables by location_id
+          query = query.eq('location_id', locationData.id);
+        }
+
+        const { data: tables, error } = await query;
         if (error) throw error;
         const tableResources = tables
           .sort((a, b) => Number(a.table_number) - Number(b.table_number))
@@ -171,10 +191,11 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             id: t.id,
             title: `${t.table_number}`,
           }));
-        
+
         setResources(tableResources);
+        // Extract table IDs for filtering reservations
+        setTableIds(tables.map(t => t.id));
       } catch (err) {
-        console.error('Error loading tables:', err);
         toast({
           title: 'Error loading tables',
           description: 'Failed to load table list.',
@@ -184,7 +205,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       }
     }
     loadTables();
-  }, [reloadKey, toast]);
+  }, [reloadKey, locationSlug, toast]);
 
   useEffect(() => {
     const fetchPrivateEvents = async () => {
@@ -193,41 +214,66 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         const now = new Date();
         const startDate = now.toISOString();
         const endDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString();
-        
+
+        // Add location parameter if provided
+        const locationParam = locationSlug ? `&location=${locationSlug}` : '';
+        const apiUrl = `/api/private-events?startDate=${startDate}&endDate=${endDate}${locationParam}`;
+
+        console.log('🔍 [CALENDAR] Fetching private events with location:', locationSlug);
+        console.log('🔍 [CALENDAR] API URL:', apiUrl);
+
         // Fetch both private events and Minaka events
+        // Pass location to both APIs so they can filter appropriately
+        const minakaUrl = locationSlug
+          ? `/api/minaka-events?location=${locationSlug}`
+          : '/api/minaka-events';
+
         const [privateEventsRes, minakaEventsRes] = await Promise.all([
-          fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`),
-          fetch('/api/minaka-events').catch(() => null), // Don't fail if Minaka fetch fails
+          fetch(apiUrl),
+          fetch(minakaUrl).catch(() => null), // Don't fail if Minaka fetch fails
         ]);
-        
+
         let allEvents: any[] = [];
-        
+
         if (privateEventsRes.ok) {
           const privateEventsData = await privateEventsRes.json();
+          console.log('🔍 [CALENDAR] Received private events:', privateEventsData.data?.length || 0);
+          if (privateEventsData.data && privateEventsData.data.length > 0) {
+            console.log('🔍 [CALENDAR] Sample events:',
+              privateEventsData.data.slice(0, 3).map((e: any) => ({
+                title: e.title,
+                location_id: e.location_id
+              }))
+            );
+          }
           const localEvents = (privateEventsData.data || []).map((e: any) => ({
             ...e,
             source: 'local',
           }));
           allEvents = [...allEvents, ...localEvents];
         }
-        
+
         if (minakaEventsRes && minakaEventsRes.ok) {
           const minakaEventsData = await minakaEventsRes.json();
+          console.log('🔍 [CALENDAR] Received Minaka events:', minakaEventsData.data?.length || 0);
+
           const minakaEvents = (minakaEventsData.data || []).map((e: any) => ({
             ...e,
             source: 'minaka',
           }));
           allEvents = [...allEvents, ...minakaEvents];
+          console.log('🔍 [CALENDAR] After adding Minaka events:', allEvents.length);
         }
-        
+
+        console.log('🔍 [CALENDAR] Setting total private events:', allEvents.length);
         setPrivateEvents(allEvents);
       } catch (error) {
-        console.error('Error fetching private events:', error);
+        console.error('🔍 [CALENDAR] Error fetching private events:', error);
       }
     };
 
     fetchPrivateEvents();
-  }, [reloadKey, localReloadKey]);
+  }, [reloadKey, localReloadKey, locationSlug]);
 
   // Update calendar date when prop changes
   useEffect(() => {
@@ -241,17 +287,54 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   }, [propCurrentDate]);
 
   useEffect(() => {
-    console.log('FullCalendarTimeline: reloadKey changed to', reloadKey);
     const fetchReservations = async () => {
       try {
-        console.log('Fetching reservations due to reloadKey change');
-        const res = await fetch('/api/reservations');
-        if (!res.ok) throw new Error('Failed to fetch reservations');
-        const reservationsData = await res.json();
-        console.log('Reservations fetched:', reservationsData);
-        setEventData({ evRes: null, resRes: reservationsData });
+        // If no location specified, don't fetch reservations
+        if (!locationSlug) {
+          setEventData({ evRes: null, resRes: [] });
+          return;
+        }
+
+        // Get location ID first
+        const { data: locationData, error: locationError } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', locationSlug)
+          .single();
+
+        if (locationError) throw locationError;
+        if (!locationData) throw new Error(`Location not found: ${locationSlug}`);
+
+        // Fetch reservations in two parts:
+        // 1. Regular reservations with table_id (filter by table_id)
+        // 2. Private event RSVPs (null table_id, filter by private_event location_id)
+
+        let allReservations = [];
+
+        // Part 1: Regular reservations with table_id
+        if (tableIds.length > 0) {
+          const { data: tableReservations, error: tableError } = await supabase
+            .from('reservations')
+            .select('*')
+            .in('table_id', tableIds)
+            .not('table_id', 'is', null);
+
+          if (tableError) throw tableError;
+          allReservations = allReservations.concat(tableReservations || []);
+        }
+
+        // Part 2: Private event RSVPs (null table_id, filtered by location)
+        const { data: privateEventReservations, error: privateError } = await supabase
+          .from('reservations')
+          .select('*, private_events!inner(location_id)')
+          .is('table_id', null)
+          .eq('private_events.location_id', locationData.id);
+
+        if (privateError) throw privateError;
+        allReservations = allReservations.concat(privateEventReservations || []);
+
+        setEventData({ evRes: null, resRes: allReservations });
       } catch (error) {
-        console.error('Error fetching reservations:', error);
         toast({
           title: 'Error loading data',
           description: 'Failed to load reservations. Please try refreshing the page.',
@@ -277,25 +360,17 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     return () => {
       subscription.unsubscribe();
     };
-  }, [reloadKey, localReloadKey, toast]);
+  }, [reloadKey, localReloadKey, tableIds, locationSlug, toast]);
 
   useEffect(() => {
     if (!resources.length || !eventData.resRes) {
-      console.log('Skipping event mapping - missing resources or reservations:', {
-        resourcesLength: resources.length,
-        hasReservations: !!eventData.resRes
-      });
       return;
     }
     const rawReservations = Array.isArray(eventData.resRes)
       ? eventData.resRes
       : eventData.resRes.data || [];
-    
-    console.log('Raw reservations data:', rawReservations);
-    
+
     const mapped = rawReservations.map((r: Record<string, any>) => {
-      console.log('Processing reservation:', r);
-      console.log('Reservation ID:', r.id, 'Type:', typeof r.id);
       
       const heart = r.membership_type === 'member' ? '🖤 ' : '';
       let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
@@ -345,8 +420,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         resourceId: resourceId,
         type: 'reservation',
       };
-      
-      console.log('Created event:', event);
+
       return event;
     });
     
@@ -386,8 +460,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     
     // Combine regular events with blocking events
     const allEvents = [...mapped, ...blockingEvents];
-    
-    console.log('Final mapped events:', allEvents);
+
     setEvents(allEvents);
 
     const isThursday = currentCalendarDate.getDay() === 4;
@@ -397,46 +470,30 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   // Get private events for the current calendar date
   const getCurrentDayPrivateEvents = () => {
-    console.log('=== DEBUG: getCurrentDayPrivateEvents ===');
-    console.log('Total private events:', privateEvents.length);
-    console.log('Current calendar date:', currentCalendarDate);
-    console.log('Settings timezone:', settings.timezone);
-    
     const filtered = privateEvents.filter((pe: any) => {
       // Only show active events (if status column exists and is set)
       // If status doesn't exist or is null, include the event (assume it's active)
       if (pe.status && pe.status !== 'active') {
-        console.log(`Skipping ${pe.title} - not active (status: ${pe.status})`);
         return false;
       }
-      
+
       // Convert event times to configured timezone
       const eventStartLocal = fromUTC(pe.start_time, settings.timezone);
       const eventEndLocal = fromUTC(pe.end_time, settings.timezone);
-      
+
       // For calendar date, get the start and end of the day in the configured timezone
       const calendarDateUTC = currentCalendarDate.toISOString();
       const calendarDateLocal = fromUTC(calendarDateUTC, settings.timezone);
       const dayStart = calendarDateLocal.startOf('day');
       const dayEnd = calendarDateLocal.endOf('day');
-      
-      console.log(`Event: ${pe.title}`);
-      console.log(`  Event start_time: ${pe.start_time}`);
-      console.log(`  Event end_time: ${pe.end_time}`);
-      console.log(`  Event start local: ${eventStartLocal.toFormat('yyyy-MM-dd HH:mm')}`);
-      console.log(`  Event end local: ${eventEndLocal.toFormat('yyyy-MM-dd HH:mm')}`);
-      console.log(`  Calendar date local: ${calendarDateLocal.toFormat('yyyy-MM-dd')}`);
-      console.log(`  Day range: ${dayStart.toFormat('yyyy-MM-dd HH:mm')} to ${dayEnd.toFormat('yyyy-MM-dd HH:mm')}`);
-      
+
       // Check if event overlaps with the current day
       // Event overlaps if: (eventStart < dayEnd) AND (eventEnd > dayStart)
       const overlaps = eventStartLocal < dayEnd && eventEndLocal > dayStart;
-      console.log(`  Overlaps current day: ${overlaps}`);
-      
+
       return overlaps;
     });
-    
-    console.log('Filtered events:', filtered.length);
+
     return filtered;
   };
 
@@ -457,19 +514,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   async function handleEventDrop(info: any) {
     try {
-      console.log('[Drop Triggered] Raw info:', info);
-      console.log('[Touch Device]', isTouchDeviceState);
-      console.log('[Mobile]', isMobile);
-  
       // Prevent drag and drop for blocking events
       if (info.event.extendedProps.is_blocking) {
-        console.log('Blocking event drop prevented');
         if (info.revert) info.revert();
         return;
       }
-  
+
       if (!info.event || !info.event.id || !info.oldEvent) {
-        console.warn('Missing event, event.id, or oldEvent in drop info:', info);
         if (info.revert) info.revert();
         return;
       }
@@ -486,7 +537,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       const hasTableChanged = newTableId !== oldResource?.id;
 
       if (!hasTimeChanged && !hasTableChanged) {
-        console.log('No change detected. Skipping update.');
         return;
       }
 
@@ -504,16 +554,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           .toUTC()
           .toISO({ suppressMilliseconds: true });
 
-        console.log('[Drop] Converted to UTC:', {
-          startTimeUTC,
-          endTimeUTC
-        });
-
         body.start_time = startTimeUTC;
         body.end_time = endTimeUTC;
       }
-  
-      console.log('[Sending PATCH]', eventId, body);
   
       const response = await fetch(`/api/reservations/${eventId}`, {
         method: 'PATCH',
@@ -534,10 +577,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       });
   
       setLocalReloadKey(k => k + 1);
-  
+
     } catch (error) {
-      console.error('[Drop Handler Error]', error);
-  
       toast({
         title: 'Error',
         description: isTouchDeviceState ? 'Touch drag failed. Please try again.' : 'Reservation update failed. Please try again.',
@@ -553,26 +594,19 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   async function handleEventResize(info: any) {
     if (viewOnly) return;
-    
+
     // Prevent resizing of blocking events
     if (info.event.extendedProps.is_blocking) {
-      console.log('Blocking event resize prevented');
       if (info.revert) info.revert();
       return;
     }
-    
+
     const { event } = info;
 
     try {
       // FullCalendar provides Date objects that are already in UTC but represent times in the business timezone
       // We need to convert them back to the business timezone first, then to UTC for database storage
-      console.log('[Resize] Original times from FullCalendar:', {
-        start: event.start.toISOString(),
-        end: event.end.toISOString(),
-        configuredTimezone: settings.timezone,
-        localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      });
-      
+
       // Convert the Date objects using the business timezone, then to UTC
       const startTimeUTC = DateTime.fromJSDate(event.start, { zone: settings.timezone })
         .toUTC()
@@ -580,11 +614,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       const endTimeUTC = DateTime.fromJSDate(event.end, { zone: settings.timezone })
         .toUTC()
         .toISO({ suppressMilliseconds: true });
-      
-      console.log('[Resize] Converted to UTC:', {
-        startTimeUTC,
-        endTimeUTC
-      });
 
       const response = await fetch(`/api/reservations/${event.id}`, {
         method: 'PATCH',
@@ -597,12 +626,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error Response:', errorText);
         throw new Error(`Failed to update reservation. Status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('Resize successful:', result);
 
       toast({
         title: 'Success',
@@ -613,7 +640,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       setLocalReloadKey(prev => prev + 1);
 
     } catch (error) {
-      console.error('Caught an error in handleEventResize:', error);
       toast({
         title: 'Error updating reservation',
         description: (error as Error).message,
@@ -626,14 +652,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   }
 
   function handleEventClick(info: any) {
-    console.log('Event clicked:', info);
-    console.log('Event ID:', info.event.id);
-    console.log('Event title:', info.event.title);
-    console.log('Event extendedProps:', info.event.extendedProps);
-    
     // Prevent interaction with blocking events
     if (info.event.extendedProps.is_blocking) {
-      console.log('Blocking event clicked - no action taken');
       return;
     }
     
@@ -652,12 +672,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const handleSlotClick = (info: any) => {
-    console.log('🎯 Slot clicked!', info);
-    console.log('viewOnly:', viewOnly);
-    console.log('Full info object:', JSON.stringify(info, null, 2));
-    
     if (viewOnly) {
-      console.log('❌ Slot click blocked - viewOnly is true');
       return;
     }
     
@@ -686,21 +701,11 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         // Extract just the time portion from the clicked date for comparison
         const clickedTime = DateTime.fromJSDate(clickedDate, { zone: settings.timezone });
         const clickedTimeOnly = clickedTime.set({ year: eventStart.year, month: eventStart.month, day: eventStart.day });
-        
-        console.log('🔍 Blocking check:', {
-          eventTitle: privateEvent.title,
-          eventStart: eventStart.toISO(),
-          eventEnd: eventEnd.toISO(),
-          clickedTime: clickedTime.toISO(),
-          clickedTimeOnly: clickedTimeOnly.toISO(),
-          isBlocked: clickedTimeOnly >= eventStart && clickedTimeOnly < eventEnd
-        });
-        
+
         return clickedTimeOnly >= eventStart && clickedTimeOnly < eventEnd;
       });
-      
+
       if (isBlocked) {
-        console.log('❌ Slot click blocked - private event in progress');
         toast({
           title: 'Private Event',
           description: 'This time slot is blocked due to a private event.',
@@ -710,14 +715,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         return;
       }
     }
-    
-    console.log('📅 Clicked date:', clickedDate);
-    console.log('🪑 Resource ID:', resourceId);
-    console.log('📊 Full info object:', JSON.stringify(info, null, 2));
-    
+
     if (clickedDate && resourceId) {
-      console.log('✅ Opening new reservation modal...');
-      
       // Clear the FullCalendar selection to remove the blue box
       if (calendarRef.current) {
         const calendarApi = calendarRef.current.getApi();
@@ -738,8 +737,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         });
         setIsNewReservationDrawerOpen(true);
       }
-    } else {
-      console.log('❌ Missing date or resource ID');
     }
   };
 
@@ -778,18 +775,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   // Handle calendar date changes
   const handleDatesSet = (info: any) => {
-    console.log('=== DEBUG: handleDatesSet ===');
-    console.log('FullCalendar info:', info);
-    console.log('info.start:', info.start);
-    console.log('info.startStr:', info.startStr);
-    console.log('info.end:', info.end);
-    console.log('info.endStr:', info.endStr);
-    
     // Use startStr to get the correct date in the configured timezone
     const newDate = new Date(info.startStr);
-    console.log('New date created from startStr:', newDate);
-    console.log('New date in local timezone:', newDate.toLocaleDateString('en-US', { timeZone: settings.timezone }));
-    
+
     setCurrentCalendarDate(newDate);
     
     // If the drawer is open, update the selected date to match the current calendar view
@@ -800,7 +788,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   // Touch drag event handlers
   const handleEventDragStart = (info: any) => {
-    console.log('[Drag Start]', info);
     if (isTouchDeviceState) {
       // Add visual feedback for touch devices
       const eventEl = info.el;
@@ -813,7 +800,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const handleEventDragStop = (info: any) => {
-    console.log('[Drag Stop]', info);
     if (isTouchDeviceState) {
       // Remove visual feedback for touch devices
       const eventEl = info.el;
@@ -826,29 +812,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const currentDayPrivateEvents = getCurrentDayPrivateEvents();
-  
-  // Debug logging for date changes
-  console.log('Current calendar date:', currentCalendarDate);
-  console.log('Private events for this date:', currentDayPrivateEvents.length);
-  if (currentDayPrivateEvents.length > 0) {
-    console.log('Events found:', currentDayPrivateEvents.map(pe => pe.title));
-  }
-  
-  // Manual test for July 12, 2025
-  const testDate = new Date('2025-07-12T00:00:00.000Z');
-  const testEvents = privateEvents.filter(pe => {
-    if (pe.status !== 'active') return false;
-    const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
-    const testDateLocal = fromUTC(testDate, settings.timezone);
-    return isSameDay(eventDateLocal, testDateLocal, settings.timezone);
-  });
-  console.log('Manual test - Events for July 12, 2025:', testEvents.map(pe => pe.title));
-  
-  // Test all private events
-  console.log('All private events:');
-  privateEvents.forEach(pe => {
-    console.log(`- ${pe.title}: ${pe.start_time} (status: ${pe.status})`);
-  });
 
   const formatPhoneNumber = (phone: string) => {
     const cleaned = phone.replace(/\D/g, '');
@@ -881,22 +844,14 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
   const handleSaveInlineEdit = async () => {
     if (!editingRowId) {
-      console.error('No editing row ID found');
       return;
     }
-
-    console.log('Saving inline edit with data:', {
-      editingRowId,
-      editingData
-    });
 
     try {
       const requestBody = {
         id: editingRowId,
         ...editingData
       };
-      
-      console.log('Sending request to /api/rsvp/update with body:', requestBody);
 
       const response = await fetch('/api/rsvp/update', {
         method: 'PUT',
@@ -906,11 +861,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         body: JSON.stringify(requestBody),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
       const result = await response.json();
-      console.log('Response result:', result);
 
       if (response.ok) {
         toast({
@@ -926,7 +877,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         throw new Error(result.error || 'Failed to update RSVP');
       }
     } catch (error) {
-      console.error('Error updating RSVP:', error);
       toast({
         title: 'Error updating RSVP',
         description: error instanceof Error ? error.message : 'Failed to update RSVP. Please try again.',
@@ -949,7 +899,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   };
 
   const handleDeleteRSVP = async (reservationId: string) => {
-    console.log('Delete RSVP:', reservationId);
     try {
       const { data, error } = await supabase
         .from('reservations')
@@ -968,7 +917,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       });
       setLocalReloadKey(prev => prev + 1);
     } catch (error) {
-      console.error('Error deleting RSVP:', error);
       toast({
         title: 'Error deleting RSVP',
         description: 'Failed to delete RSVP. Please try again.',
@@ -999,7 +947,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         throw new Error(result.error || 'Failed to delete RSVP');
       }
     } catch (error) {
-      console.error('Error deleting RSVP:', error);
       toast({
         title: 'Error deleting RSVP',
         description: error instanceof Error ? error.message : 'Failed to delete RSVP. Please try again.',
@@ -1375,31 +1322,10 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           
                    // Adjust the details of the reservations on the calendar
           eventContent={(arg) => {
-            console.log('🔍 EVENT RENDER DEBUG:', {
-              title: arg.event.title,
-              isMobile,
-              timeText: arg.timeText,
-              view: arg.view.type,
-              isStart: arg.isStart,
-              isEnd: arg.isEnd,
-              event: arg.event.toPlainObject()
-            });
-
             // Handle blocking events differently
             if (arg.event.extendedProps.is_blocking) {
-              console.log('🚫 Rendering BLOCKING event:', arg.event.title);
               return (
                 <div
-                  ref={(el) => {
-                    if (el) {
-                      console.log('📏 Blocking event dimensions:', {
-                        width: el.offsetWidth,
-                        height: el.offsetHeight,
-                        parentWidth: el.parentElement?.offsetWidth,
-                        computedStyle: window.getComputedStyle(el).width
-                      });
-                    }
-                  }}
                   style={{
                     fontFamily: 'Montserrat, sans-serif',
                     whiteSpace: 'normal',
@@ -1435,27 +1361,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             const backgroundColor = isCheckedIn ? '#a59480' : '#353535';
             const textColor = isCheckedIn ? '#353535' : '#ecede8';
 
-            console.log('✅ Rendering REGULAR event:', {
-              title: arg.event.title,
-              isCheckedIn,
-              backgroundColor,
-              textColor
-            });
-
             return (
               <div
-                ref={(el) => {
-                  if (el) {
-                    console.log('📏 Regular event dimensions:', {
-                      title: arg.event.title,
-                      width: el.offsetWidth,
-                      height: el.offsetHeight,
-                      parentWidth: el.parentElement?.offsetWidth,
-                      computedStyle: window.getComputedStyle(el).width,
-                      display: window.getComputedStyle(el).display
-                    });
-                  }
-                }}
                 style={{
                   fontFamily: 'Montserrat, sans-serif',
                   whiteSpace: 'normal',
@@ -1493,9 +1400,6 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             );
           }}
           datesSet={handleDatesSet}
-          eventDidMount={(info) => {
-            console.log('Event mounted:', info.event.title);
-          }}
         />
       </Box>
       

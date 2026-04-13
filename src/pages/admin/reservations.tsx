@@ -32,6 +32,7 @@ export default function Reservations() {
   const [reloadKey, setReloadKey] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [activeLocation, setActiveLocation] = useState<string>('noirkc');
 
   // Member lookup modal state
   const [isLookupModalOpen, setIsLookupModalOpen] = useState(false);
@@ -274,6 +275,7 @@ export default function Reservations() {
         onClose={handleCloseEditModal}
         reservationId={selectedReservationId}
         onReservationUpdated={handleReservationUpdated}
+        locationSlug={activeLocation}
       />
 
       {/* Modal for creating new reservations - Custom portal to document.body */}
@@ -283,11 +285,28 @@ export default function Reservations() {
         initialDate={selectedSlot?.date}
         initialTableId={selectedSlot?.resourceId}
         onReservationCreated={handleReservationCreated}
+        locationSlug={activeLocation}
       />
 
       <div className={`${styles.container} ${isFullScreen ? styles.fullScreen : ''}`}>
         <main className={styles.content}>
           <div className={styles.timelineContainer}>
+            {/* Location Switcher */}
+            <div className={styles.locationTabs}>
+              <button
+                className={`${styles.locationTab} ${activeLocation === 'noirkc' ? styles.active : ''}`}
+                onClick={() => setActiveLocation('noirkc')}
+              >
+                Noir KC
+              </button>
+              <button
+                className={`${styles.locationTab} ${activeLocation === 'rooftopkc' ? styles.active : ''}`}
+                onClick={() => setActiveLocation('rooftopkc')}
+              >
+                RooftopKC
+              </button>
+            </div>
+
             <ReservationsTimeline
               reloadKey={reloadKey}
               currentDate={currentDate}
@@ -295,6 +314,7 @@ export default function Reservations() {
               onReservationClick={handleReservationClick}
               onSlotClick={handleSlotClick}
               onMakeReservationClick={() => setIsLookupModalOpen(true)}
+              locationSlug={activeLocation}
             />
           </div>
         </main>
@@ -420,6 +440,7 @@ export default function Reservations() {
           setMemberData(null);
           handleReservationCreated();
         }}
+        locationSlug={activeLocation}
       />
     </AdminLayout>
   );

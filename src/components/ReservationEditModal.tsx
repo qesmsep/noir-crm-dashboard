@@ -26,6 +26,7 @@ interface ReservationEditModalProps {
   onClose: () => void;
   reservationId: string | null;
   onReservationUpdated: () => void;
+  locationSlug?: string;
 }
 
 /**
@@ -37,6 +38,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
   onClose,
   reservationId,
   onReservationUpdated,
+  locationSlug,
 }) => {
   const [reservation, setReservation] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
@@ -92,7 +94,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
 
   const fetchTables = async () => {
     try {
-      const response = await fetch('/api/tables');
+      const url = locationSlug ? `/api/tables?location=${locationSlug}` : '/api/tables';
+      const response = await fetch(url);
       if (response.ok) {
         const result = await response.json();
         setTables(result.data || []);

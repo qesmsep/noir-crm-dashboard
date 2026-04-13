@@ -13,6 +13,8 @@ interface Props {
   memberId?: string;
   accountId?: string;
   onReservationCreated?: () => void;
+  locationSlug?: string;
+  hideTableSelection?: boolean;
 }
 
 // Generate time options
@@ -41,6 +43,8 @@ export default function SimpleReservationRequestModal({
   memberId,
   accountId,
   onReservationCreated,
+  locationSlug,
+  hideTableSelection = false,
 }: Props) {
   const { toast } = useToast();
   const [date, setDate] = useState<Date | null>(null);
@@ -58,6 +62,9 @@ export default function SimpleReservationRequestModal({
   const [tableId, setTableId] = useState('');
   const [tables, setTables] = useState<any[]>([]);
 
+  // Location state - defaults to prop, but user can change
+  const [selectedLocation, setSelectedLocation] = useState(locationSlug || 'noirkc');
+
   // Initialize fields when memberName changes
   useEffect(() => {
     if (memberName) {
@@ -71,21 +78,31 @@ export default function SimpleReservationRequestModal({
     }
   }, [memberName]);
 
-  // Fetch tables
+  // Update selected location when prop changes
+  useEffect(() => {
+    if (locationSlug) {
+      setSelectedLocation(locationSlug);
+    }
+  }, [locationSlug]);
+
+  // Fetch tables based on selected location
   useEffect(() => {
     const fetchTables = async () => {
       try {
-        const response = await fetch('/api/tables');
-        const data = await response.json();
-        if (response.ok && data.tables) {
-          setTables(data.tables.sort((a: any, b: any) => Number(a.table_number) - Number(b.table_number)));
+        const url = selectedLocation ? `/api/tables?location=${selectedLocation}` : '/api/tables';
+        const response = await fetch(url);
+        const result = await response.json();
+        if (response.ok && result.data) {
+          setTables(result.data.sort((a: any, b: any) => Number(a.table_number) - Number(b.table_number)));
+          // Reset table selection when location changes
+          setTableId('');
         }
       } catch (error) {
         console.error('Error fetching tables:', error);
       }
     };
     fetchTables();
-  }, []);
+  }, [selectedLocation]);
 
   // Reset time when date changes if current time is not in new slots
   const handleDateChange = async (newDate: Date) => {
@@ -399,11 +416,28 @@ export default function SimpleReservationRequestModal({
                 cursor: 'not-allowed',
               }}
             />
-            {accountId && (
-              <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#6B7280' }}>
-                Reservation will be linked to member account
-              </p>
-            )}
+          </div>
+
+          {/* Location Picker */}
+          <div>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="noirkc">Noir KC</option>
+              <option value="rooftopkc">RooftopKC</option>
+            </select>
           </div>
 
           {/* Date and Time Row */}
@@ -475,7 +509,7 @@ export default function SimpleReservationRequestModal({
           </div>
 
           {/* Party Size and Table */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: hideTableSelection ? '1fr' : '1fr 1fr', gap: '1rem' }}>
             <select
               value={partySize}
               onChange={(e) => setPartySize(e.target.value)}
@@ -498,28 +532,30 @@ export default function SimpleReservationRequestModal({
               ))}
             </select>
 
-            <select
-              value={tableId}
-              onChange={(e) => setTableId(e.target.value)}
-              style={{
-                width: '100%',
-                height: '44px',
-                padding: '0 1rem',
-                border: '1px solid #D1D5DB',
-                borderRadius: '10px',
-                fontSize: '0.875rem',
-                backgroundColor: 'white',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="">Table (Optional)</option>
-              {tables.map((table) => (
-                <option key={table.id} value={table.id}>
-                  Table {table.table_number}
-                </option>
-              ))}
-            </select>
+            {!hideTableSelection && (
+              <select
+                value={tableId}
+                onChange={(e) => setTableId(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  padding: '0 1rem',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">Table (Optional)</option>
+                {tables.map((table) => (
+                  <option key={table.id} value={table.id}>
+                    Table {table.table_number}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Special Requests */}

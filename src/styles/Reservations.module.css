@@ -65,6 +65,44 @@
   box-shadow: 0 6px 16px rgba(165, 148, 128, 0.12);
 }
 
+/* Location Tabs */
+.locationTabs {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e5e7;
+  margin-bottom: 16px;
+}
+
+.locationTab {
+  padding: 6px 20px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6e6e73;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.locationTab:hover {
+  background: #f5f5f7;
+  color: #1d1d1f;
+}
+
+.locationTab.active {
+  background: #A59480;
+  color: #ffffff;
+}
+
+.locationTab.active:hover {
+  background: #8f7e6a;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .container {

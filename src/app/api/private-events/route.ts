@@ -107,22 +107,50 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
-    
+    const locationSlug = searchParams.get('location');
+
+    console.log('🔍 [PRIVATE EVENTS API] Query params:', { startDate, endDate, locationSlug });
+
+    // Get location ID if location filter is provided
+    let locationId: string | null = null;
+    if (locationSlug) {
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('slug', locationSlug)
+        .single();
+
+      if (locationError) {
+        console.error('Error fetching location:', locationError);
+        return NextResponse.json(
+          { error: 'Invalid location' },
+          { status: 400 }
+        );
+      }
+      locationId = locationData.id;
+      console.log('🔍 [PRIVATE EVENTS API] Found location ID:', locationId, 'for slug:', locationSlug);
+    }
+
     // Try with status filter first, fall back without it if column doesn't exist
     let query = supabase
       .from('private_events')
       .select('*')
       .order('start_time', { ascending: true });
-    
+
     // Try to filter by status if column exists
     const queryWithStatus = query.eq('status', 'active');
-    
+
     // Add date filtering if provided
     if (startDate) {
       queryWithStatus.gte('start_time', startDate);
     }
     if (endDate) {
       queryWithStatus.lte('end_time', endDate);
+    }
+
+    // Filter by location_id if provided
+    if (locationId) {
+      queryWithStatus.eq('location_id', locationId);
     }
 
     let { data, error } = await queryWithStatus;
@@ -134,18 +162,23 @@ export async function GET(request: Request) {
         .from('private_events')
         .select('*')
         .order('start_time', { ascending: true });
-      
+
       if (startDate) {
         query = query.gte('start_time', startDate);
       }
       if (endDate) {
         query = query.lte('end_time', endDate);
       }
-      
+
+      // Filter by location_id if provided
+      if (locationId) {
+        query = query.eq('location_id', locationId);
+      }
+
       const result = await query;
       data = result.data;
       error = result.error;
-      
+
       // Filter out cancelled events in JavaScript if status column doesn't exist
       if (data && Array.isArray(data)) {
         data = data.filter((event: any) => !event.status || event.status !== 'cancelled');
@@ -157,6 +190,13 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { error: 'Failed to fetch private events' },
         { status: 500 }
+      );
+    }
+
+    console.log('🔍 [PRIVATE EVENTS API] Returning', data?.length || 0, 'events');
+    if (locationSlug && data) {
+      console.log('🔍 [PRIVATE EVENTS API] Sample event location_ids:',
+        data.slice(0, 3).map((e: any) => ({ title: e.title, location_id: e.location_id }))
       );
     }
 

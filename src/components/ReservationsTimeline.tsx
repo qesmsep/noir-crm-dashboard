@@ -22,6 +22,7 @@ interface ReservationsTimelineProps {
   onReservationClick?: (reservationId: string) => void;
   onSlotClick?: (slotInfo: { date: Date; resourceId: string }) => void;
   onMakeReservationClick?: () => void;
+  locationSlug?: string;
 }
 
 const eventTypeEmojis: Record<string, string> = {
@@ -53,11 +54,13 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   onReservationClick,
   onSlotClick,
   onMakeReservationClick,
+  locationSlug,
 }) => {
   const calendarRef = useRef<FullCalendar | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [localReloadKey, setLocalReloadKey] = useState(0);
+  const [tableIds, setTableIds] = useState<string[]>([]);
   const [currentCalendarDate, setCurrentCalendarDate] = useState(
     propCurrentDate || new Date()
   );
@@ -88,17 +91,38 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   useEffect(() => {
     async function loadTables() {
       try {
-        const { data: tables, error } = await supabase
+        let query = supabase
           .from('tables')
-          .select('id, table_number');
+          .select('id, table_number, location_id');
+
+        // Filter by location if provided
+        if (locationSlug) {
+          const { data: locationData, error: locationError } = await supabase
+            .from('locations')
+            .select('id')
+            .eq('slug', locationSlug)
+            .single();
+
+          if (locationError) {
+            console.error('Error fetching location:', locationError);
+            throw locationError;
+          }
+
+          query = query.eq('location_id', locationData.id);
+        }
+
+        const { data: tables, error } = await query;
         if (error) throw error;
+
         const tableResources = tables
           .sort((a, b) => Number(a.table_number) - Number(b.table_number))
           .map(t => ({
             id: t.id,
             title: `${t.table_number}`,
           }));
+
         setResources(tableResources);
+        setTableIds(tables.map(t => t.id));
       } catch (err) {
         console.error('Error loading tables:', err);
         toast({
@@ -110,7 +134,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       }
     }
     loadTables();
-  }, [reloadKey, toast]);
+  }, [reloadKey, locationSlug, toast]);
 
   // Debug: Log what date FullCalendar is actually showing
   useEffect(() => {
@@ -131,8 +155,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         const now = DateTime.now().setZone('America/Chicago');
         const startDate = now.toISO();
         const endDate = now.plus({ years: 1 }).toISO();
-        
-        const res = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}`);
+
+        const locationParam = locationSlug ? `&location=${locationSlug}` : '';
+        const res = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}${locationParam}`);
         if (!res.ok) throw new Error('Failed to fetch private events');
         const privateEventsData = await res.json();
         setPrivateEvents(privateEventsData.data || []);
@@ -142,7 +167,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     };
 
     fetchPrivateEvents();
-  }, [reloadKey, localReloadKey]);
+  }, [reloadKey, localReloadKey, locationSlug]);
 
   // Track if we're updating from props to prevent infinite loop
   const isUpdatingFromProps = useRef(false);
@@ -190,22 +215,62 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   useEffect(() => {
     const fetchReservations = async () => {
       try {
-        console.log('Fetching reservations from /api/reservations...');
-        const res = await fetch('/api/reservations');
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error('Failed to fetch reservations:', res.status, errorText);
-          throw new Error(`Failed to fetch reservations: ${res.status}`);
+        if (!locationSlug) {
+          setEventData({ resRes: { data: [] } });
+          return;
         }
-        const reservationsData = await res.json();
+
+        // Get location ID
+        const { data: locationData, error: locationError } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', locationSlug)
+          .single();
+
+        if (locationError) {
+          console.error('Error fetching location:', locationError);
+          throw locationError;
+        }
+
+        let allReservations: any[] = [];
+
+        // Part 1: Regular reservations with table_id
+        if (tableIds.length > 0) {
+          const { data: tableReservations, error: tableError } = await supabase
+            .from('reservations')
+            .select('*')
+            .in('table_id', tableIds)
+            .not('table_id', 'is', null);
+
+          if (tableError) {
+            console.error('Error fetching table reservations:', tableError);
+          } else {
+            allReservations = allReservations.concat(tableReservations || []);
+          }
+        }
+
+        // Part 2: Private event RSVPs (null table_id)
+        const { data: privateEventReservations, error: privateError } = await supabase
+          .from('reservations')
+          .select('*, private_events!inner(location_id)')
+          .is('table_id', null)
+          .eq('private_events.location_id', locationData.id);
+
+        if (privateError) {
+          console.error('Error fetching private event reservations:', privateError);
+        } else {
+          allReservations = allReservations.concat(privateEventReservations || []);
+        }
+
         console.log('Reservations API response:', {
-          hasData: !!reservationsData.data,
-          dataLength: reservationsData.data?.length,
-          isArray: Array.isArray(reservationsData),
-          keys: Object.keys(reservationsData),
-          sample: reservationsData.data?.[0]
+          locationSlug,
+          locationId: locationData.id,
+          tableReservationsCount: allReservations.filter(r => r.table_id).length,
+          privateEventReservationsCount: allReservations.filter(r => !r.table_id).length,
+          totalCount: allReservations.length
         });
-        setEventData({ resRes: reservationsData });
+
+        setEventData({ resRes: { data: allReservations } });
       } catch (error) {
         console.error('Error fetching reservations:', error);
         toast({
@@ -234,7 +299,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     return () => {
       subscription.unsubscribe();
     };
-  }, [reloadKey, localReloadKey, toast]);
+  }, [reloadKey, localReloadKey, tableIds, locationSlug, toast]);
 
   const [eventData, setEventData] = useState<{ resRes: any }>({ resRes: null });
 
