@@ -69,6 +69,12 @@ async function aggregateAccountData() {
 
 export default async function handler(req, res) {
   console.log('Ledger handler:', req.method, req.body, req.query);
+
+  // Prevent caching of ledger data to avoid stale balances on mobile/desktop
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     if (req.method === "GET") {
       const { member_id, account_id, outstanding, account_balances } = req.query;
