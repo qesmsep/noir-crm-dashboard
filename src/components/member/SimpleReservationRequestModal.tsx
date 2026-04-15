@@ -65,6 +65,10 @@ export default function SimpleReservationRequestModal({
   // Location state - defaults to prop, but user can change
   const [selectedLocation, setSelectedLocation] = useState(locationSlug || 'noirkc');
 
+  // Cover charge state
+  const [coverEnabled, setCoverEnabled] = useState(false);
+  const [coverPrice, setCoverPrice] = useState(0);
+
   // Initialize fields when memberName changes
   useEffect(() => {
     if (memberName) {
@@ -85,9 +89,9 @@ export default function SimpleReservationRequestModal({
     }
   }, [locationSlug]);
 
-  // Fetch tables based on selected location
+  // Fetch tables and cover charge info based on selected location
   useEffect(() => {
-    const fetchTables = async () => {
+    const fetchTablesAndCoverCharge = async () => {
       try {
         const url = selectedLocation ? `/api/tables?location=${selectedLocation}` : '/api/tables';
         const response = await fetch(url);
@@ -100,8 +104,35 @@ export default function SimpleReservationRequestModal({
       } catch (error) {
         console.error('Error fetching tables:', error);
       }
+
+      // Fetch cover charge info for selected location
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('cover_enabled, cover_price')
+          .eq('slug', selectedLocation)
+          .single();
+
+        if (locationData) {
+          setCoverEnabled(locationData.cover_enabled || false);
+          setCoverPrice(locationData.cover_price || 0);
+        } else {
+          setCoverEnabled(false);
+          setCoverPrice(0);
+        }
+      } catch (error) {
+        console.error('Error fetching cover charge info:', error);
+        setCoverEnabled(false);
+        setCoverPrice(0);
+      }
     };
-    fetchTables();
+    fetchTablesAndCoverCharge();
   }, [selectedLocation]);
 
   // Reset time when date changes if current time is not in new slots
@@ -217,6 +248,9 @@ export default function SimpleReservationRequestModal({
       // End time is 2 hours after start
       const endDateTime = startDateTime.plus({ hours: 2 });
 
+      // Determine if cover charge applies (enabled AND not a member)
+      const coverChargeApplies = coverEnabled && !memberId;
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,6 +264,9 @@ export default function SimpleReservationRequestModal({
           email: email || undefined,
           notes: notes || undefined,
           table_id: tableId || undefined,
+          location_slug: selectedLocation, // Pass selected location for availability check
+          cover_charge_applied: coverChargeApplies,
+          cover_price: coverChargeApplies ? coverPrice : 0,
           source: memberId ? 'member_dashboard' : 'admin_portal',
           member_id: memberId,
           account_id: accountId,
@@ -438,6 +475,17 @@ export default function SimpleReservationRequestModal({
               <option value="noirkc">Noir KC</option>
               <option value="rooftopkc">RooftopKC</option>
             </select>
+            {/* Cover charge notice for non-members */}
+            {coverEnabled && !memberId && (
+              <p style={{
+                marginTop: '0.5rem',
+                fontSize: '0.875rem',
+                color: '#A59480',
+                fontWeight: '600'
+              }}>
+                ${coverPrice} cover charge applies for this location
+              </p>
+            )}
           </div>
 
           {/* Date and Time Row */}

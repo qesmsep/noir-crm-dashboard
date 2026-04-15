@@ -73,10 +73,113 @@ export default function Settings() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [holdFeeSaving, setHoldFeeSaving] = useState(false);
   const [holdFeeMessage, setHoldFeeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'general' | 'noirkc' | 'rooftopkc'>('general');
+
+  // Noir KC location settings
+  const [noirKCCoverEnabled, setNoirKCCoverEnabled] = useState(false);
+  const [noirKCCoverPrice, setNoirKCCoverPrice] = useState(0);
+  const [noirKCSaving, setNoirKCSaving] = useState(false);
+  const [noirKCMessage, setNoirKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // RooftopKC location settings
+  const [rooftopKCCoverEnabled, setRooftopKCCoverEnabled] = useState(false);
+  const [rooftopKCCoverPrice, setRooftopKCCoverPrice] = useState(0);
+  const [rooftopKCSaving, setRooftopKCSaving] = useState(false);
+  const [rooftopKCMessage, setRooftopKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     setSettings(contextSettings);
   }, [contextSettings]);
+
+  // Fetch Noir KC location settings
+  useEffect(() => {
+    async function fetchNoirKCSettings() {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('locations')
+          .select('cover_enabled, cover_price')
+          .eq('slug', 'noirkc')
+          .single();
+
+        if (!error && data) {
+          setNoirKCCoverEnabled(data.cover_enabled || false);
+          setNoirKCCoverPrice(data.cover_price || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching Noir KC settings:', error);
+      }
+    }
+    fetchNoirKCSettings();
+  }, []);
+
+  // Fetch RooftopKC location settings
+  useEffect(() => {
+    async function fetchRooftopKCSettings() {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('locations')
+          .select('cover_enabled, cover_price')
+          .eq('slug', 'rooftopkc')
+          .single();
+
+        if (!error && data) {
+          setRooftopKCCoverEnabled(data.cover_enabled || false);
+          setRooftopKCCoverPrice(data.cover_price || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching RooftopKC settings:', error);
+      }
+    }
+    fetchRooftopKCSettings();
+  }, []);
+
+  async function handleNoirKCSave() {
+    setNoirKCSaving(true);
+    setNoirKCMessage(null);
+
+    try {
+      const { error } = await supabaseAdmin
+        .from('locations')
+        .update({
+          cover_enabled: noirKCCoverEnabled,
+          cover_price: noirKCCoverPrice,
+        })
+        .eq('slug', 'noirkc');
+
+      if (error) throw error;
+
+      setNoirKCMessage({ type: 'success', text: 'Noir KC settings saved successfully' });
+    } catch (error: any) {
+      console.error('Error saving Noir KC settings:', error);
+      setNoirKCMessage({ type: 'error', text: error.message || 'Failed to save settings' });
+    } finally {
+      setNoirKCSaving(false);
+    }
+  }
+
+  async function handleRooftopKCSave() {
+    setRooftopKCSaving(true);
+    setRooftopKCMessage(null);
+
+    try {
+      const { error } = await supabaseAdmin
+        .from('locations')
+        .update({
+          cover_enabled: rooftopKCCoverEnabled,
+          cover_price: rooftopKCCoverPrice,
+        })
+        .eq('slug', 'rooftopkc');
+
+      if (error) throw error;
+
+      setRooftopKCMessage({ type: 'success', text: 'RooftopKC settings saved successfully' });
+    } catch (error: any) {
+      console.error('Error saving RooftopKC settings:', error);
+      setRooftopKCMessage({ type: 'error', text: error.message || 'Failed to save settings' });
+    } finally {
+      setRooftopKCSaving(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -230,7 +333,31 @@ export default function Settings() {
           </div>
         )}
 
-        <div className={styles.sections}>
+        {/* Tabs */}
+        <div className={styles.tabs}>
+          <button
+            className={`${styles.tab} ${activeTab === 'general' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('general')}
+          >
+            General Settings
+          </button>
+          <button
+            className={`${styles.tab} ${activeTab === 'noirkc' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('noirkc')}
+          >
+            Noir KC
+          </button>
+          <button
+            className={`${styles.tab} ${activeTab === 'rooftopkc' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('rooftopkc')}
+          >
+            RooftopKC
+          </button>
+        </div>
+
+        {/* General Settings Tab */}
+        {activeTab === 'general' && (
+          <div className={styles.sections}>
           {/* Booking Window */}
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Booking Window</h2>
@@ -413,7 +540,284 @@ export default function Settings() {
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        )}
+
+        {/* Noir KC Location Settings Tab */}
+        {activeTab === 'noirkc' && (
+          <div className={styles.sections}>
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Noir KC - Location Settings</h2>
+              <p className={styles.cardDescription}>
+                Configure location-specific settings for Noir KC including booking windows, hours, and cover charges.
+              </p>
+            </div>
+
+            {/* Booking Window */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Booking Window</h2>
+              <p className={styles.inputHint}>
+                Note: Currently showing global settings. Location-specific booking windows coming soon.
+              </p>
+              <CalendarAvailabilityControl section="booking_window" />
+            </div>
+
+            {/* Base Hours */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Base Hours</h2>
+              <p className={styles.inputHint}>
+                Note: Currently showing global settings. Location-specific hours coming soon.
+              </p>
+              <CalendarAvailabilityControl section="base" />
+            </div>
+
+            {/* Custom Open/Closed Days */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Custom Open/Closed Days</h2>
+              <p className={styles.inputHint}>
+                Note: Currently showing global settings. Location-specific custom days coming soon.
+              </p>
+              <div className={styles.subsection}>
+                <h3 className={styles.subsectionTitle}>Custom Open Days</h3>
+                <CalendarAvailabilityControl section="custom_open" />
+              </div>
+              <div className={styles.subsection}>
+                <h3 className={styles.subsectionTitle}>Custom Closed Days</h3>
+                <CalendarAvailabilityControl section="custom_closed" />
+              </div>
+            </div>
+
+            {/* Timezone */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Timezone</h2>
+              <div className={styles.formGroup}>
+                <input
+                  type="text"
+                  className={styles.input}
+                  value="America/Chicago"
+                  readOnly
+                  placeholder="America/Chicago"
+                />
+                <p className={styles.inputHint}>
+                  Noir KC timezone (currently read-only)
+                </p>
+              </div>
+            </div>
+
+            {/* Cover Charge Settings */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Cover Charge</h2>
+
+              {noirKCMessage && (
+                <div className={`${styles.message} ${styles[noirKCMessage.type]}`}>
+                  {noirKCMessage.text}
+                </div>
+              )}
+
+              <div className={styles.formGroup}>
+                <div className={styles.switchRow}>
+                  <label className={styles.switchLabel}>
+                    Cover Charge Enabled
+                  </label>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={noirKCCoverEnabled}
+                    onClick={() => setNoirKCCoverEnabled(!noirKCCoverEnabled)}
+                    className={`${styles.switch} ${noirKCCoverEnabled ? styles.switchOn : ''}`}
+                  >
+                    <span className={styles.switchThumb}></span>
+                  </button>
+                </div>
+                <p className={styles.inputHint}>
+                  Cover charge for non-members (members always free)
+                </p>
+              </div>
+
+              {noirKCCoverEnabled && (
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Cover Charge Amount ($)</label>
+                  <div className={styles.numberInput}>
+                    <button
+                      type="button"
+                      onClick={() => setNoirKCCoverPrice(Math.max(0, noirKCCoverPrice - 1))}
+                      className={styles.numberButton}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      className={styles.numberInputField}
+                      value={noirKCCoverPrice}
+                      onChange={(e) => setNoirKCCoverPrice(parseFloat(e.target.value) || 0)}
+                      min="0"
+                      max="100"
+                      step="1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNoirKCCoverPrice(Math.min(100, noirKCCoverPrice + 1))}
+                      className={styles.numberButton}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className={styles.inputHint}>
+                    Amount charged to non-members for entry
+                  </p>
+                </div>
+              )}
+
+              <div className={styles.formActions}>
+                <button
+                  onClick={handleNoirKCSave}
+                  disabled={noirKCSaving}
+                  className={`${styles.saveButton} ${noirKCSaving ? styles.saving : ''}`}
+                >
+                  {noirKCSaving ? 'Saving...' : 'Save Cover Charge Settings'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RooftopKC Location Settings Tab */}
+        {activeTab === 'rooftopkc' && (
+          <div className={styles.sections}>
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>RooftopKC - Location Settings</h2>
+              <p className={styles.cardDescription}>
+                Configure location-specific settings for RooftopKC including booking windows, hours, and cover charges.
+              </p>
+            </div>
+
+            {/* Booking Window */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Booking Window</h2>
+              <p className={styles.inputHint}>
+                Note: Currently showing global settings. Location-specific booking windows coming soon.
+              </p>
+              <CalendarAvailabilityControl section="booking_window" />
+            </div>
+
+            {/* Base Hours */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Base Hours</h2>
+              <p className={styles.inputHint}>
+                Note: Currently showing global settings. Location-specific hours coming soon.
+              </p>
+              <CalendarAvailabilityControl section="base" />
+            </div>
+
+            {/* Custom Open/Closed Days */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Custom Open/Closed Days</h2>
+              <p className={styles.inputHint}>
+                Note: Currently showing global settings. Location-specific custom days coming soon.
+              </p>
+              <div className={styles.subsection}>
+                <h3 className={styles.subsectionTitle}>Custom Open Days</h3>
+                <CalendarAvailabilityControl section="custom_open" />
+              </div>
+              <div className={styles.subsection}>
+                <h3 className={styles.subsectionTitle}>Custom Closed Days</h3>
+                <CalendarAvailabilityControl section="custom_closed" />
+              </div>
+            </div>
+
+            {/* Timezone */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Timezone</h2>
+              <div className={styles.formGroup}>
+                <input
+                  type="text"
+                  className={styles.input}
+                  value="America/Chicago"
+                  readOnly
+                  placeholder="America/Chicago"
+                />
+                <p className={styles.inputHint}>
+                  RooftopKC timezone (currently read-only)
+                </p>
+              </div>
+            </div>
+
+            {/* Cover Charge Settings */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Cover Charge</h2>
+
+              {rooftopKCMessage && (
+                <div className={`${styles.message} ${styles[rooftopKCMessage.type]}`}>
+                  {rooftopKCMessage.text}
+                </div>
+              )}
+
+              <div className={styles.formGroup}>
+                <div className={styles.switchRow}>
+                  <label className={styles.switchLabel}>
+                    Cover Charge Enabled
+                  </label>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={rooftopKCCoverEnabled}
+                    onClick={() => setRooftopKCCoverEnabled(!rooftopKCCoverEnabled)}
+                    className={`${styles.switch} ${rooftopKCCoverEnabled ? styles.switchOn : ''}`}
+                  >
+                    <span className={styles.switchThumb}></span>
+                  </button>
+                </div>
+                <p className={styles.inputHint}>
+                  Cover charge for non-members (members always free)
+                </p>
+              </div>
+
+              {rooftopKCCoverEnabled && (
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Cover Charge Amount ($)</label>
+                  <div className={styles.numberInput}>
+                    <button
+                      type="button"
+                      onClick={() => setRooftopKCCoverPrice(Math.max(0, rooftopKCCoverPrice - 1))}
+                      className={styles.numberButton}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      className={styles.numberInputField}
+                      value={rooftopKCCoverPrice}
+                      onChange={(e) => setRooftopKCCoverPrice(parseFloat(e.target.value) || 0)}
+                      min="0"
+                      max="100"
+                      step="1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRooftopKCCoverPrice(Math.min(100, rooftopKCCoverPrice + 1))}
+                      className={styles.numberButton}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className={styles.inputHint}>
+                    Amount charged to non-members for entry
+                  </p>
+                </div>
+              )}
+
+              <div className={styles.formActions}>
+                <button
+                  onClick={handleRooftopKCSave}
+                  disabled={rooftopKCSaving}
+                  className={`${styles.saveButton} ${rooftopKCSaving ? styles.saving : ''}`}
+                >
+                  {rooftopKCSaving ? 'Saving...' : 'Save Cover Charge Settings'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

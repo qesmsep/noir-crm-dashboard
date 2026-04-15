@@ -240,6 +240,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         send_access_instructions: formData.send_access_instructions,
         send_reminder: formData.send_reminder,
         send_confirmation: formData.send_confirmation,
+        location_slug: locationSlug, // Pass location for availability check
         source: 'manual'
       };
 

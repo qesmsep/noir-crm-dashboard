@@ -104,16 +104,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Find available table if not provided
       let tableId = body.table_id;
-      
+
+      // Get location ID if location_slug is provided
+      let locationId: string | null = null;
+      if (body.location_slug) {
+        const { data: locationData } = await client
+          .from('locations')
+          .select('id')
+          .eq('slug', body.location_slug)
+          .single();
+        locationId = locationData?.id || null;
+      }
+
       // If table_id is provided, validate it first
       if (tableId && body.start_time && body.end_time && body.party_size && !body.private_event_id) {
         const startTime = new Date(body.start_time);
         const endTime = new Date(body.end_time);
-        
+
         // Check if table exists and can accommodate party size
         const { data: tableInfo, error: tableInfoError } = await client
           .from('tables')
-          .select('id, table_number, seats')
+          .select('id, table_number, seats, location_id')
           .eq('id', tableId)
           .single();
         
@@ -188,12 +199,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!tableId && body.start_time && body.end_time && body.party_size) {
         console.log('Finding available table for reservation...');
         try {
-          // Get tables that fit party size
-          const { data: tables } = await client
+          // Get tables that fit party size, filtered by location if provided
+          let tablesQuery = client
             .from('tables')
             .select('id, table_number, seats')
             .gte('seats', body.party_size)
             .order('seats', { ascending: true }); // Prefer smaller tables that fit
+
+          // Filter by location if location_id is available
+          if (locationId) {
+            tablesQuery = tablesQuery.eq('location_id', locationId);
+            console.log('Filtering available tables by location_id:', locationId);
+          }
+
+          const { data: tables } = await tablesQuery;
           
           // Filter out tables 4, 8, and 12 (not available for reservations)
           const excludedTableNumbers = [4, 8, 12];
@@ -211,14 +230,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             
             // Fetch reservations that start before the requested end time and end after the requested start time
             // This covers all possible overlaps. We'll filter cancelled ones in JavaScript.
-            // Try with status column first, fall back without it if column doesn't exist
+            // Only check reservations for tables in the same location
             let allReservations: any[] = [];
             let reservationsError: any = null;
-            
+
+            // Get table IDs for this location to filter reservations
+            const locationTableIds = availableTables.map((t: any) => t.id);
+
             const resultWithStatus = await client
               .from('reservations')
               .select('table_id, start_time, end_time, status')
-              .not('table_id', 'is', null) // Exclude private events
+              .in('table_id', locationTableIds) // Only check tables in this location
               .lt('start_time', endTime.toISOString())
               .gt('end_time', startTime.toISOString());
             
@@ -229,7 +251,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const resultWithoutStatus = await client
                   .from('reservations')
                   .select('table_id, start_time, end_time')
-                  .not('table_id', 'is', null) // Exclude private events
+                  .in('table_id', locationTableIds) // Only check tables in this location
                   .lt('start_time', endTime.toISOString())
                   .gt('end_time', startTime.toISOString());
                 
