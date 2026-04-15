@@ -72,18 +72,42 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
 
     const convertedPhones = new Set<string>();
     if (phonesToCheck.length > 0) {
-      const { data: signedUp, error: signupCheckError } = await supabaseAdmin
-        .from('waitlist')
-        .select('phone')
-        .in('phone', phonesToCheck)
-        .not('member_id', 'is', null);
-
-      if (signupCheckError) {
-        console.error('Failed to check converted phones — proceeding without signup detection:', signupCheckError);
+      // Check the members table directly to see if they have an active membership
+      // Use phone number variants to handle different storage formats
+      const phoneVariants = new Set<string>();
+      for (const phone of phonesToCheck) {
+        const digits = phone.replace(/\D/g, '');
+        const last10 = digits.slice(-10);
+        phoneVariants.add(phone);
+        phoneVariants.add(digits);
+        phoneVariants.add(last10);
+        phoneVariants.add('+1' + last10);
+        phoneVariants.add('1' + last10);
+        phoneVariants.add('+' + digits);
       }
 
-      for (const entry of signedUp || []) {
-        convertedPhones.add(entry.phone);
+      const { data: members, error: memberCheckError } = await supabaseAdmin
+        .from('members')
+        .select('phone')
+        .in('phone', [...phoneVariants])
+        .eq('status', 'active');
+
+      if (memberCheckError) {
+        console.error('Failed to check members — proceeding without signup detection:', memberCheckError);
+      }
+
+      // Map found members back to original enrollment phone format
+      for (const member of members || []) {
+        const memberDigits = member.phone.replace(/\D/g, '');
+        const memberLast10 = memberDigits.slice(-10);
+
+        // Find matching enrollment phone by comparing last 10 digits
+        for (const enrollPhone of phonesToCheck) {
+          const enrollLast10 = enrollPhone.replace(/\D/g, '').slice(-10);
+          if (enrollLast10 === memberLast10) {
+            convertedPhones.add(enrollPhone);
+          }
+        }
       }
     }
 
