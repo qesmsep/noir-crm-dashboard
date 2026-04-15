@@ -47,13 +47,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const mapped = (data || []).map(t => ({
-      id: t.id,
-      table_number: t.table_number ? String(t.table_number).padStart(2, '0') : 'N/A',
-      seats: parseInt(t.seats, 10) || 0,
-      location_id: t.location_id,
-      location_slug: t.locations?.slug || null
-    }));
+    const mapped = (data || []).map(t => {
+      const location = Array.isArray(t.locations) ? t.locations[0] : t.locations;
+      return {
+        id: t.id,
+        table_number: t.table_number ? String(t.table_number).padStart(2, '0') : 'N/A',
+        seats: parseInt(t.seats, 10) || 0,
+        location_id: t.location_id,
+        location_slug: location?.slug || null
+      };
+    });
 
     return NextResponse.json({ data: mapped });
 
