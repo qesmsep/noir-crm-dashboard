@@ -72,7 +72,7 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
 
     const convertedPhones = new Set<string>();
     if (phonesToCheck.length > 0) {
-      // Check the members table directly to see if they have an active membership
+      // Check the waitlist table to see if they have completed signup (member_id is populated)
       // Use phone number variants to handle different storage formats
       const phoneVariants = new Set<string>();
       for (const phone of phonesToCheck) {
@@ -86,25 +86,25 @@ export async function processIntakeMessages(): Promise<{ processed: number; sent
         phoneVariants.add('+' + digits);
       }
 
-      const { data: members, error: memberCheckError } = await supabaseAdmin
-        .from('members')
+      const { data: completedSignups, error: signupCheckError } = await supabaseAdmin
+        .from('waitlist')
         .select('phone')
         .in('phone', [...phoneVariants])
-        .eq('status', 'active');
+        .not('member_id', 'is', null);
 
-      if (memberCheckError) {
-        console.error('Failed to check members — proceeding without signup detection:', memberCheckError);
+      if (signupCheckError) {
+        console.error('Failed to check waitlist — proceeding without signup detection:', signupCheckError);
       }
 
-      // Map found members back to original enrollment phone format
-      for (const member of members || []) {
-        const memberDigits = member.phone.replace(/\D/g, '');
-        const memberLast10 = memberDigits.slice(-10);
+      // Map found waitlist entries back to original enrollment phone format
+      for (const signup of completedSignups || []) {
+        const signupDigits = signup.phone.replace(/\D/g, '');
+        const signupLast10 = signupDigits.slice(-10);
 
         // Find matching enrollment phone by comparing last 10 digits
         for (const enrollPhone of phonesToCheck) {
           const enrollLast10 = enrollPhone.replace(/\D/g, '').slice(-10);
-          if (enrollLast10 === memberLast10) {
+          if (enrollLast10 === signupLast10) {
             convertedPhones.add(enrollPhone);
           }
         }
