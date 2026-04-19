@@ -254,6 +254,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   useEffect(() => {
     const fetchReservations = async () => {
       try {
+        console.log('🔍 fetchReservations called with locationSlug:', locationSlug);
         if (!locationSlug) {
           setEventData({ resRes: { data: [] } });
           return;
@@ -266,6 +267,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           .eq('slug', locationSlug)
           .single();
 
+        console.log('🔍 Location lookup result:', { locationSlug, locationData, locationError });
+
         if (locationError) {
           console.error('Error fetching location:', locationError);
           throw locationError;
@@ -273,19 +276,17 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
         let allReservations: any[] = [];
 
-        // Part 1: Regular reservations with table_id
-        if (tableIds.length > 0) {
-          const { data: tableReservations, error: tableError } = await supabase
-            .from('reservations')
-            .select('*')
-            .in('table_id', tableIds)
-            .not('table_id', 'is', null);
+        // Part 1: Regular reservations with table_id - query by location
+        const { data: tableReservations, error: tableError } = await supabase
+          .from('reservations')
+          .select('*, tables!inner(location_id)')
+          .not('table_id', 'is', null)
+          .eq('tables.location_id', locationData.id);
 
-          if (tableError) {
-            console.error('Error fetching table reservations:', tableError);
-          } else {
-            allReservations = allReservations.concat(tableReservations || []);
-          }
+        if (tableError) {
+          console.error('Error fetching table reservations:', tableError);
+        } else {
+          allReservations = allReservations.concat(tableReservations || []);
         }
 
         // Part 2: Private event RSVPs (null table_id)
@@ -306,7 +307,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           locationId: locationData.id,
           tableReservationsCount: allReservations.filter(r => r.table_id).length,
           privateEventReservationsCount: allReservations.filter(r => !r.table_id).length,
-          totalCount: allReservations.length
+          totalCount: allReservations.length,
+          timWirick: allReservations.find(r => r.first_name === 'Tim' && r.last_name === 'Wirick')
         });
 
         setEventData({ resRes: { data: allReservations } });
@@ -338,7 +340,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     return () => {
       subscription.unsubscribe();
     };
-  }, [reloadKey, localReloadKey, tableIds, locationSlug, toast]);
+  }, [reloadKey, localReloadKey, locationSlug, toast]);
 
   const [eventData, setEventData] = useState<{ resRes: any }>({ resRes: null });
 
@@ -411,11 +413,21 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       const mapped = rawReservations.map((r: Record<string, any>) => {
         const heart = r.membership_type === 'member' ? '🖤 ' : '';
         let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
-        
+
         // Get display name
-        const displayName = r.first_name 
+        const displayName = r.first_name
           ? `${r.first_name}${r.last_name ? ' ' + r.last_name : ''}`
           : (r.phone ? `Guest (${r.phone.slice(-4)})` : 'Guest');
+
+        // Debug logging for Tim Wirick
+        if (r.first_name === 'Tim' && r.last_name === 'Wirick') {
+          console.log('🔍 Mapping Tim Wirick reservation:', {
+            id: r.id,
+            start_time_utc: r.start_time,
+            end_time_utc: r.end_time,
+            table_id: r.table_id
+          });
+        }
         
         // Handle private event reservations
         let resourceId, startTime, endTime;
@@ -443,7 +455,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
         }
         
-        return {
+        const event = {
           id: String(r.id),
           title: `${heart}${displayName} | Party Size: ${r.party_size}${emoji ? ' ' + emoji : ''}`,
           extendedProps: {
@@ -460,6 +472,13 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           resourceId: resourceId,
           type: 'reservation',
         };
+
+        // Debug logging for Tim Wirick
+        if (r.first_name === 'Tim' && r.last_name === 'Wirick') {
+          console.log('🔍 Mapped Tim Wirick event:', event);
+        }
+
+        return event;
       });
       
       // Add blocking events for private events
@@ -631,12 +650,19 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       };
 
       if (hasTimeChanged) {
-        // Add 5 hours to compensate for display offset
-        const adjustedStart = new Date(info.event.start.getTime() + (5 * 60 * 60 * 1000));
-        const adjustedEnd = new Date(info.event.end.getTime() + (5 * 60 * 60 * 1000));
+        // Use FullCalendar's string fields which are in the configured timezone
+        // Parse them explicitly in the business timezone, then convert to UTC
+        // NOTE: Do NOT use Date objects - they are timezone-naive and cause the
+        // "reservation disappears after drag" bug. Use startStr/endStr instead.
+        const newStartUTC = DateTime.fromISO(info.event.startStr, { zone: settings.timezone })
+          .toUTC()
+          .toISO({ suppressMilliseconds: true });
+        const newEndUTC = DateTime.fromISO(info.event.endStr, { zone: settings.timezone })
+          .toUTC()
+          .toISO({ suppressMilliseconds: true });
 
-        body.start_time = adjustedStart.toISOString();
-        body.end_time = adjustedEnd.toISOString();
+        body.start_time = newStartUTC;
+        body.end_time = newEndUTC;
       }
 
       const response = await fetch(`/api/reservations/${eventId}`, {
@@ -681,16 +707,22 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     }
 
     try {
-      // Add 5 hours to compensate for display offset
-      const adjustedStart = new Date(info.event.start.getTime() + (5 * 60 * 60 * 1000));
-      const adjustedEnd = new Date(info.event.end.getTime() + (5 * 60 * 60 * 1000));
+      // Use FullCalendar's string fields for proper timezone handling
+      // NOTE: Do NOT use Date objects - they are timezone-naive and cause the
+      // "reservation disappears after drag" bug. Use startStr/endStr instead.
+      const newStartUTC = DateTime.fromISO(info.event.startStr, { zone: settings.timezone })
+        .toUTC()
+        .toISO({ suppressMilliseconds: true });
+      const newEndUTC = DateTime.fromISO(info.event.endStr, { zone: settings.timezone })
+        .toUTC()
+        .toISO({ suppressMilliseconds: true });
 
       const response = await fetch(`/api/reservations/${info.event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          start_time: adjustedStart.toISOString(),
-          end_time: adjustedEnd.toISOString(),
+          start_time: newStartUTC,
+          end_time: newEndUTC,
         }),
       });
 
@@ -954,6 +986,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             console.log('========================');
             return propCurrentDate || dateString;
           })()}
+          timeZone={settings.timezone}
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
           
           customButtons={{

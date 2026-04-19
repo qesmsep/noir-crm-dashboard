@@ -32,7 +32,7 @@ export default function Reservations() {
   const [reloadKey, setReloadKey] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [activeLocation, setActiveLocation] = useState<string>('noirkc');
+  const [activeLocation, setActiveLocation] = useState<string>('rooftopkc');
 
   // Member lookup modal state
   const [isLookupModalOpen, setIsLookupModalOpen] = useState(false);

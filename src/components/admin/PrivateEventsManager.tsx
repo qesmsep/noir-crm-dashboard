@@ -36,6 +36,7 @@ interface PrivateEvent {
   price_per_seat?: number;
   background_image_url?: string;
   is_member_event?: boolean;
+  location_id?: string;
 }
 
 interface Reservation {
@@ -65,6 +66,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
   const [linkedReservations, setLinkedReservations] = useState<Reservation[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [locations, setLocations] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -77,12 +79,34 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
     total_attendees_maximum: 100,
     price_per_seat: 0,
     is_member_event: false,
+    location_id: '',
   });
   const { toast } = useToast();
 
   useEffect(() => {
     fetchEvents();
+    fetchLocations();
   }, []);
+
+  const fetchLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name, slug')
+        .eq('status', 'active')
+        .order('name');
+
+      if (error) throw error;
+      setLocations(data || []);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load locations',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -236,6 +260,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
             price_per_seat: formData.rsvp_enabled ? formData.price_per_seat : 0,
             background_image_url,
             is_member_event: formData.is_member_event,
+            location_id: formData.location_id,
           })
           .eq('id', editingEvent.id);
 
@@ -260,6 +285,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
             total_attendees_maximum: formData.rsvp_enabled ? formData.total_attendees_maximum : null,
             price_per_seat: formData.rsvp_enabled ? formData.price_per_seat : 0,
             is_member_event: formData.is_member_event,
+            location_id: formData.location_id,
           })
           .select()
           .single();
@@ -364,6 +390,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
       total_attendees_maximum: event.total_attendees_maximum || 100,
       price_per_seat: event.price_per_seat || 0,
       is_member_event: event.is_member_event || false,
+      location_id: event.location_id || '',
     });
 
     if (event.rsvp_enabled) {
@@ -393,6 +420,7 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
       total_attendees_maximum: 100,
       price_per_seat: 0,
       is_member_event: false,
+      location_id: '',
     });
   };
 
@@ -545,6 +573,32 @@ export default function PrivateEventsManager({ onEventChange }: PrivateEventsMan
                 required
               />
               <p className={styles.helpText}>The name of the private event</p>
+            </div>
+
+            <div className={styles.formField}>
+              <Label htmlFor="location">Location *</Label>
+              <select
+                id="location"
+                value={formData.location_id}
+                onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
+                required
+                className={styles.select}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.875rem',
+                }}
+              >
+                <option value="">Select a location...</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+              <p className={styles.helpText}>Which venue this event is for</p>
             </div>
 
             <div className={styles.formField}>

@@ -20,13 +20,14 @@ export async function POST(request: Request) {
       event_description,
       rsvp_enabled = false,
       background_image_url,
-      require_time_selection = false
+      require_time_selection = false,
+      location_id
     } = body;
 
     // Validate required fields
-    if (!title || !event_type || !start_time || !end_time || !max_guests || !total_attendees_maximum) {
+    if (!title || !event_type || !start_time || !end_time || !max_guests || !total_attendees_maximum || !location_id) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields (title, event_type, start_time, end_time, max_guests, total_attendees_maximum, location_id)' },
         { status: 400 }
       );
     }
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
         rsvp_url,
         background_image_url,
         require_time_selection,
+        location_id,
         created_by: userId || body.created_by // Use authenticated user or fallback
       }])
       .select()

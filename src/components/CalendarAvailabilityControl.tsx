@@ -296,7 +296,14 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const deleteExceptionalOpen = async (id: number) => {
     try {
       setError('');
-      const { error } = await supabase.from('venue_hours').delete().eq('id', id);
+      let deleteQuery = supabase.from('venue_hours').delete().eq('id', id);
+
+      // Only delete if it belongs to this location (if locationId is set)
+      if (locationId) {
+        deleteQuery = deleteQuery.eq('location_id', locationId);
+      }
+
+      const { error } = await deleteQuery;
       if (error) throw error;
       setExceptionalOpens(exceptionalOpens.filter(open => open.id !== id));
     } catch (error: any) {
@@ -347,7 +354,14 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const deleteExceptionalClosure = async (id: number) => {
     try {
       setError('');
-      const { error } = await supabase.from('venue_hours').delete().eq('id', id);
+      let deleteQuery = supabase.from('venue_hours').delete().eq('id', id);
+
+      // Only delete if it belongs to this location (if locationId is set)
+      if (locationId) {
+        deleteQuery = deleteQuery.eq('location_id', locationId);
+      }
+
+      const { error } = await deleteQuery;
       if (error) throw error;
       setExceptionalClosures(exceptionalClosures.filter(closure => closure.id !== id));
     } catch (error: any) {
@@ -450,6 +464,12 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         end_time = eventDate.set({ hour: Number(endHour), minute: Number(endMinute) }).toUTC().toISO({ suppressMilliseconds: true });
       }
       
+      // Validate location_id is available
+      if (!locationId) {
+        setPrivateEventStatus('Location is required to create a private event.');
+        return;
+      }
+
       const { data, error } = await supabase.from('private_events').insert([
         {
           title: privateEvent.name,
@@ -457,6 +477,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           start_time: start_time.toISOString(),
           end_time: end_time.toISOString(),
           full_day: privateEvent.full_day,
+          location_id: locationId,
         }
       ]).select().single();
       if (error) throw error;

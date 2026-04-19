@@ -604,10 +604,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     const { event } = info;
 
     try {
-      // FullCalendar provides Date objects that are already in UTC but represent times in the business timezone
-      // We need to convert them back to the business timezone first, then to UTC for database storage
-
-      // Convert the Date objects using the business timezone, then to UTC
+      // Convert local times to UTC properly using the business timezone
+      // FullCalendar provides Date objects representing local (CST) times
+      // We need to parse them as CST, then convert to UTC for database storage
       const startTimeUTC = DateTime.fromJSDate(event.start, { zone: settings.timezone })
         .toUTC()
         .toISO({ suppressMilliseconds: true });

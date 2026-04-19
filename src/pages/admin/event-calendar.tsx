@@ -141,12 +141,21 @@ export default function EventCalendarNew() {
       const calendarStart = startOfWeek(monthStart);
       const calendarEnd = endOfWeek(monthEnd);
 
-      // Fetch private events
-      const { data: privateEvents } = await supabase
-        .from('private_events')
-        .select('*')
-        .gte('start_time', calendarStart.toISOString())
-        .lte('start_time', calendarEnd.toISOString());
+      // Fetch private events via API (supports location filtering)
+      // TODO: Add location selector UI and pass location parameter
+      // For now, fetches all locations - will need UI update to filter by specific location
+      let privateEvents: PrivateEvent[] = [];
+      try {
+        const privateEventsResponse = await fetch(
+          `/api/private-events?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`
+        );
+        if (privateEventsResponse.ok) {
+          const privateEventsData = await privateEventsResponse.json();
+          privateEvents = privateEventsData.data || [];
+        }
+      } catch (error) {
+        console.error('Error fetching private events:', error);
+      }
 
       // Fetch Minaka events
       let minakaEvents: PrivateEvent[] = [];

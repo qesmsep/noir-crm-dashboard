@@ -78,12 +78,14 @@ export default function Settings() {
   // Noir KC location settings
   const [noirKCCoverEnabled, setNoirKCCoverEnabled] = useState(false);
   const [noirKCCoverPrice, setNoirKCCoverPrice] = useState(0);
+  const [noirKCMinakaUrl, setNoirKCMinakaUrl] = useState('');
   const [noirKCSaving, setNoirKCSaving] = useState(false);
   const [noirKCMessage, setNoirKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // RooftopKC location settings
   const [rooftopKCCoverEnabled, setRooftopKCCoverEnabled] = useState(false);
   const [rooftopKCCoverPrice, setRooftopKCCoverPrice] = useState(0);
+  const [rooftopKCMinakaUrl, setRooftopKCMinakaUrl] = useState('');
   const [rooftopKCSaving, setRooftopKCSaving] = useState(false);
   const [rooftopKCMessage, setRooftopKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -97,13 +99,14 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price')
+          .select('cover_enabled, cover_price, minaka_ical_url')
           .eq('slug', 'noirkc')
           .single();
 
         if (!error && data) {
           setNoirKCCoverEnabled(data.cover_enabled || false);
           setNoirKCCoverPrice(data.cover_price || 0);
+          setNoirKCMinakaUrl(data.minaka_ical_url || '');
         }
       } catch (error) {
         console.error('Error fetching Noir KC settings:', error);
@@ -118,13 +121,14 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price')
+          .select('cover_enabled, cover_price, minaka_ical_url')
           .eq('slug', 'rooftopkc')
           .single();
 
         if (!error && data) {
           setRooftopKCCoverEnabled(data.cover_enabled || false);
           setRooftopKCCoverPrice(data.cover_price || 0);
+          setRooftopKCMinakaUrl(data.minaka_ical_url || '');
         }
       } catch (error) {
         console.error('Error fetching RooftopKC settings:', error);
@@ -143,6 +147,7 @@ export default function Settings() {
         .update({
           cover_enabled: noirKCCoverEnabled,
           cover_price: noirKCCoverPrice,
+          minaka_ical_url: noirKCMinakaUrl,
         })
         .eq('slug', 'noirkc');
 
@@ -167,6 +172,7 @@ export default function Settings() {
         .update({
           cover_enabled: rooftopKCCoverEnabled,
           cover_price: rooftopKCCoverPrice,
+          minaka_ical_url: rooftopKCMinakaUrl,
         })
         .eq('slug', 'rooftopkc');
 
@@ -665,13 +671,27 @@ export default function Settings() {
                 </div>
               )}
 
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Minaka Calendar iCal URL</label>
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={noirKCMinakaUrl}
+                  onChange={(e) => setNoirKCMinakaUrl(e.target.value)}
+                  placeholder="https://www.minaka.app/api/user/calendar/feed.ics?token=..."
+                />
+                <p className={styles.inputHint}>
+                  iCal feed URL from Minaka to sync events to the calendar
+                </p>
+              </div>
+
               <div className={styles.formActions}>
                 <button
                   onClick={handleNoirKCSave}
                   disabled={noirKCSaving}
                   className={`${styles.saveButton} ${noirKCSaving ? styles.saving : ''}`}
                 >
-                  {noirKCSaving ? 'Saving...' : 'Save Cover Charge Settings'}
+                  {noirKCSaving ? 'Saving...' : 'Save Noir KC Settings'}
                 </button>
               </div>
             </div>
@@ -800,13 +820,27 @@ export default function Settings() {
                 </div>
               )}
 
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Minaka Calendar iCal URL</label>
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={rooftopKCMinakaUrl}
+                  onChange={(e) => setRooftopKCMinakaUrl(e.target.value)}
+                  placeholder="https://www.minaka.app/api/user/calendar/feed.ics?token=..."
+                />
+                <p className={styles.inputHint}>
+                  iCal feed URL from Minaka to sync events to the calendar
+                </p>
+              </div>
+
               <div className={styles.formActions}>
                 <button
                   onClick={handleRooftopKCSave}
                   disabled={rooftopKCSaving}
                   className={`${styles.saveButton} ${rooftopKCSaving ? styles.saving : ''}`}
                 >
-                  {rooftopKCSaving ? 'Saving...' : 'Save Cover Charge Settings'}
+                  {rooftopKCSaving ? 'Saving...' : 'Save RooftopKC Settings'}
                 </button>
               </div>
             </div>
