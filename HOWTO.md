@@ -5302,9 +5302,12 @@ Each location tab includes:
 - Currently shows global settings
 - Will support location-specific operating hours
 
-**Custom Open/Closed Days** (Coming Soon)
-- Currently shows global settings
-- Will support location-specific custom schedules
+**Custom Open/Closed Days** ✅ Fully Functional (As of 2026-04-18)
+- Location-specific exceptional closures
+- Each location maintains independent closed days
+- Component: `CalendarAvailabilityControl.tsx` with `locationSlug` prop
+- Saves to: `venue_hours.location_id`
+- Migration: `migrations/20260418_add_location_id_to_venue_hours.sql`
 
 **Timezone**
 - Display only (America/Chicago)
@@ -5316,6 +5319,12 @@ Each location tab includes:
 - **Business Rule**: Cover charges apply ONLY to non-members. Members always bypass cover charges.
 - **Saves to**: `locations.cover_enabled`, `locations.cover_price`
 - **UI**: Cork-branded with 3-layer drop shadows, number input with increment buttons
+
+**Minaka Calendar Integration** ✅ Fully Functional (As of 2026-04-18)
+- **iCal URL Input**: Add Minaka calendar feed URL per location
+- **Saves to**: `locations.minaka_ical_url`
+- **Purpose**: Sync external events from Minaka to location-specific calendar
+- **Format**: `https://www.minaka.app/api/user/calendar/feed.ics?token=...`
 
 **Current Configuration**:
 - **Noir KC**: Cover charges typically disabled

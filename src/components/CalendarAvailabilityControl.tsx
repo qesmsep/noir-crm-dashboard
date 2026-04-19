@@ -77,6 +77,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     }
 
     async function fetchLocationId() {
+      console.log('🔍 [CalendarAvailabilityControl] Fetching location ID for slug:', locationSlug);
       const { data, error } = await supabase
         .from('locations')
         .select('id')
@@ -84,7 +85,10 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         .single();
 
       if (!error && data) {
+        console.log('🔍 [CalendarAvailabilityControl] Found location ID:', data.id, 'for slug:', locationSlug);
         setLocationId(data.id);
+      } else {
+        console.error('🔍 [CalendarAvailabilityControl] Error fetching location:', error);
       }
     }
     fetchLocationId();
@@ -179,20 +183,38 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       try {
         setError('');
 
+        console.log('🔍 [CalendarAvailabilityControl] Loading data with locationId:', locationId, 'locationSlug:', locationSlug);
+
+        // CRITICAL FIX: If locationSlug is provided but locationId hasn't been fetched yet, wait
+        if (locationSlug && !locationId) {
+          console.log('⏳ [CalendarAvailabilityControl] Waiting for locationId to be fetched...');
+          return;
+        }
+
         let baseQuery = supabase.from('venue_hours').select('*').eq('type', 'base');
         let opensQuery = supabase.from('venue_hours').select('*').eq('type', 'exceptional_open');
         let closuresQuery = supabase.from('venue_hours').select('*').eq('type', 'exceptional_closure');
 
         // Filter by location if locationId is available
         if (locationId) {
+          console.log('🔍 [CalendarAvailabilityControl] Filtering queries by location_id:', locationId);
           baseQuery = baseQuery.eq('location_id', locationId);
           opensQuery = opensQuery.eq('location_id', locationId);
           closuresQuery = closuresQuery.eq('location_id', locationId);
+        } else {
+          console.log('⚠️ [CalendarAvailabilityControl] No locationId set - loading ALL venue_hours!');
         }
 
         const { data: baseHoursData } = await baseQuery;
         const { data: opensData } = await opensQuery;
         const { data: closuresData } = await closuresQuery;
+
+        console.log('🔍 [CalendarAvailabilityControl] Loaded data:', {
+          baseHours: baseHoursData?.length,
+          opensData: opensData?.length,
+          closuresData: closuresData?.length,
+          closures: closuresData
+        });
         if (baseHoursData) {
           const enabledDays = Array(7).fill(false);
           const timeRanges = Array(7).fill(null).map(() => [{ start: '18:00', end: '23:00' }]);
