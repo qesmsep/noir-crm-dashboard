@@ -19,6 +19,12 @@
   font-family: 'Montserrat', sans-serif;
 }
 
+/* Reduce title font size */
+.calendarContainer :global(.fc-toolbar-title) {
+  font-size: 1.0rem !important;
+  font-weight: 400 !important;
+}
+
 /* Custom button styling for new reservation button */
 .calendarContainer :global(.fc-newRez-button) {
   background-color: #34c759 !important;

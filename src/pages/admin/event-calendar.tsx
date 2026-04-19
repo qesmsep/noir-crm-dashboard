@@ -109,6 +109,7 @@ export default function EventCalendarNew() {
   const [mounted, setMounted] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [activeLocation, setActiveLocation] = useState<string | 'all'>('all');
   const [eventFormData, setEventFormData] = useState({
     title: '',
     start_time: '',
@@ -142,12 +143,11 @@ export default function EventCalendarNew() {
       const calendarEnd = endOfWeek(monthEnd);
 
       // Fetch private events via API (supports location filtering)
-      // TODO: Add location selector UI and pass location parameter
-      // For now, fetches all locations - will need UI update to filter by specific location
+      const locationParam = activeLocation !== 'all' ? `&location=${activeLocation}` : '';
       let privateEvents: PrivateEvent[] = [];
       try {
         const privateEventsResponse = await fetch(
-          `/api/private-events?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`
+          `/api/private-events?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}${locationParam}`
         );
         if (privateEventsResponse.ok) {
           const privateEventsData = await privateEventsResponse.json();
@@ -160,13 +160,17 @@ export default function EventCalendarNew() {
       // Fetch Minaka events
       let minakaEvents: PrivateEvent[] = [];
       try {
-        const minakaResponse = await fetch('/api/minaka-events');
+        const minakaLocationParam = activeLocation !== 'all' ? `?location=${activeLocation}` : '';
+        const minakaResponse = await fetch(`/api/minaka-events${minakaLocationParam}`);
         if (minakaResponse.ok) {
           const minakaData = await minakaResponse.json();
-          // Filter Minaka events to the calendar date range
+          // Filter Minaka events to the calendar date range AND exclude Cocktail Lounge events
           minakaEvents = (minakaData.data || []).filter((e: PrivateEvent) => {
             const eventDate = parseISO(e.start_time);
-            return eventDate >= calendarStart && eventDate <= calendarEnd;
+            const isInDateRange = eventDate >= calendarStart && eventDate <= calendarEnd;
+            // Exclude the exact "Noir Cocktail Lounge - Cocktail Lounge" event
+            const isNotCocktailLounge = e.title !== 'Noir Cocktail Lounge - Cocktail Lounge';
+            return isInDateRange && isNotCocktailLounge;
           }).map((e: PrivateEvent) => ({
             ...e,
             source: 'minaka' as const,
@@ -189,19 +193,44 @@ export default function EventCalendarNew() {
       console.log('Fetching reservations for calendar:', {
         start: calendarStart.toISOString(),
         end: calendarEnd.toISOString(),
-        usingAdmin: !!supabaseAdmin
+        usingAdmin: !!supabaseAdmin,
+        location: activeLocation
       });
-      
-      const { data: reservations, error: reservationsError } = await client
+
+      // Build reservations query with location filtering
+      let reservationsQuery = client
         .from('reservations')
-        .select('*')
+        .select('*, tables(location_id), private_events(location_id)')
         .gte('start_time', calendarStart.toISOString())
         .lte('start_time', calendarEnd.toISOString());
-      
+
+      const { data: allReservations, error: reservationsError } = await reservationsQuery;
+
+      // Filter reservations by location if not 'all'
+      let reservations = allReservations;
+      if (activeLocation !== 'all' && allReservations) {
+        // Get location ID from slug
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', activeLocation)
+          .single();
+
+        if (locationData) {
+          reservations = allReservations.filter((r: any) => {
+            // Check if reservation is linked to a table at this location
+            if (r.tables && r.tables.location_id === locationData.id) return true;
+            // Or if it's a private event reservation at this location
+            if (r.private_events && r.private_events.location_id === locationData.id) return true;
+            return false;
+          });
+        }
+      }
+
       if (reservationsError) {
         console.error('Error fetching reservations for calendar:', reservationsError);
       } else {
-        console.log(`Fetched ${reservations?.length || 0} reservations for calendar`);
+        console.log(`Fetched ${reservations?.length || 0} reservations for calendar (filtered by location: ${activeLocation})`);
         if (reservations && reservations.length > 0) {
           console.log('Sample reservation:', {
             id: reservations[0].id,
@@ -212,18 +241,48 @@ export default function EventCalendarNew() {
         }
       }
 
-      // Fetch venue hours
-      const { data: baseHours } = await supabase
+      // Fetch venue hours - filter by location if not 'all'
+      let baseHoursQuery = supabase
         .from('venue_hours')
         .select('*')
         .eq('type', 'base');
 
-      const { data: customDays } = await supabase
+      if (activeLocation !== 'all') {
+        // Get location ID for filtering
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', activeLocation)
+          .single();
+
+        if (locationData) {
+          baseHoursQuery = baseHoursQuery.eq('location_id', locationData.id);
+        }
+      }
+
+      const { data: baseHours } = await baseHoursQuery;
+
+      let customDaysQuery = supabase
         .from('venue_hours')
         .select('*')
         .in('type', ['exceptional_open', 'exceptional_closure'])
         .gte('date', format(calendarStart, 'yyyy-MM-dd'))
         .lte('date', format(calendarEnd, 'yyyy-MM-dd'));
+
+      if (activeLocation !== 'all') {
+        // Get location ID for filtering
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', activeLocation)
+          .single();
+
+        if (locationData) {
+          customDaysQuery = customDaysQuery.eq('location_id', locationData.id);
+        }
+      }
+
+      const { data: customDays } = await customDaysQuery;
 
       // Build calendar grid
       const days: DayData[] = [];
@@ -355,7 +414,7 @@ export default function EventCalendarNew() {
 
   useEffect(() => {
     fetchCalendarData();
-  }, [currentDate]);
+  }, [currentDate, activeLocation]);
 
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
@@ -723,6 +782,52 @@ export default function EventCalendarNew() {
           </button>
         </div>
 
+        {/* Location Switcher */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', justifyContent: 'center' }}>
+          <button
+            onClick={() => setActiveLocation('all')}
+            style={{
+              padding: '0.5rem 1.5rem',
+              borderRadius: '8px',
+              border: '1px solid #D1D5DB',
+              backgroundColor: activeLocation === 'all' ? '#A59480' : 'white',
+              color: activeLocation === 'all' ? 'white' : '#1F1F1F',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            All Locations
+          </button>
+          <button
+            onClick={() => setActiveLocation('noirkc')}
+            style={{
+              padding: '0.5rem 1.5rem',
+              borderRadius: '8px',
+              border: '1px solid #D1D5DB',
+              backgroundColor: activeLocation === 'noirkc' ? '#A59480' : 'white',
+              color: activeLocation === 'noirkc' ? 'white' : '#1F1F1F',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Noir KC
+          </button>
+          <button
+            onClick={() => setActiveLocation('rooftopkc')}
+            style={{
+              padding: '0.5rem 1.5rem',
+              borderRadius: '8px',
+              border: '1px solid #D1D5DB',
+              backgroundColor: activeLocation === 'rooftopkc' ? '#A59480' : 'white',
+              color: activeLocation === 'rooftopkc' ? 'white' : '#1F1F1F',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            RooftopKC
+          </button>
+        </div>
+
         {/* Month Stats */}
         <div className={styles.statsCard}>
           <div className={styles.statsGrid}>
@@ -770,7 +875,7 @@ export default function EventCalendarNew() {
               className={`${styles.tab} ${activeTab === 3 ? styles.tabActive : ''}`}
               onClick={() => setActiveTab(3)}
             >
-              ⚙️ Settings
+              📅 Custom Dates
             </button>
           </div>
 
@@ -898,7 +1003,7 @@ export default function EventCalendarNew() {
           )}
 
           {activeTab === 3 && (
-            <CustomDaysManager onDaysChange={fetchCalendarData} />
+            <CustomDaysManager onDaysChange={fetchCalendarData} activeLocation={activeLocation} />
           )}
         </div>
 
@@ -1653,7 +1758,7 @@ function AnalyticsView({ currentDate }: { currentDate: Date }) {
 }
 
 // Custom Days Manager Component
-function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
+function CustomDaysManager({ onDaysChange, activeLocation }: { onDaysChange: () => void; activeLocation: string | 'all' }) {
   const [customOpenDays, setCustomOpenDays] = useState<any[]>([]);
   const [customClosedDays, setCustomClosedDays] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1665,20 +1770,58 @@ function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
 
   useEffect(() => {
     fetchCustomDays();
-  }, []);
+  }, [activeLocation]);
 
   const fetchCustomDays = async () => {
     setLoading(true);
     try {
-      const { data: settings } = await supabase
-        .from('settings')
-        .select('custom_open_dates, custom_closed_dates')
+      if (activeLocation === 'all') {
+        // Show message that user needs to select a specific location
+        setCustomOpenDays([]);
+        setCustomClosedDays([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get location ID from slug
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('slug', activeLocation)
         .single();
 
-      if (settings) {
-        setCustomOpenDays(settings.custom_open_dates || []);
-        setCustomClosedDays(settings.custom_closed_dates || []);
+      if (locationError || !locationData) {
+        console.error('Error fetching location:', locationError);
+        setLoading(false);
+        return;
       }
+
+      // Fetch exceptional open days
+      const { data: openDays, error: openError } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'exceptional_open')
+        .eq('location_id', locationData.id)
+        .order('date', { ascending: true });
+
+      if (openError) {
+        console.error('Error fetching open days:', openError);
+      }
+
+      // Fetch exceptional closure days
+      const { data: closedDays, error: closedError } = await supabase
+        .from('venue_hours')
+        .select('*')
+        .eq('type', 'exceptional_closure')
+        .eq('location_id', locationData.id)
+        .order('date', { ascending: true });
+
+      if (closedError) {
+        console.error('Error fetching closed days:', closedError);
+      }
+
+      setCustomOpenDays(openDays || []);
+      setCustomClosedDays(closedDays || []);
     } catch (error) {
       console.error('Error fetching custom days:', error);
     } finally {
@@ -1687,15 +1830,28 @@ function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
   };
 
   const handleAddOpenDay = async () => {
-    if (!newOpenDate) return;
+    if (!newOpenDate || activeLocation === 'all') return;
 
     try {
-      const updatedOpenDays = [...customOpenDays, { date: newOpenDate }];
+      // Get location ID from slug
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('slug', activeLocation)
+        .single();
+
+      if (locationError || !locationData) {
+        throw new Error('Location not found');
+      }
 
       const { error } = await supabase
-        .from('settings')
-        .update({ custom_open_dates: updatedOpenDays })
-        .eq('id', (await supabase.from('settings').select('id').single()).data?.id);
+        .from('venue_hours')
+        .insert([{
+          location_id: locationData.id,
+          type: 'exceptional_open',
+          date: newOpenDate,
+          full_day: true,
+        }]);
 
       if (error) throw error;
 
@@ -1719,15 +1875,28 @@ function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
   };
 
   const handleAddClosedDay = async () => {
-    if (!newClosedDate) return;
+    if (!newClosedDate || activeLocation === 'all') return;
 
     try {
-      const updatedClosedDays = [...customClosedDays, { date: newClosedDate }];
+      // Get location ID from slug
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('slug', activeLocation)
+        .single();
+
+      if (locationError || !locationData) {
+        throw new Error('Location not found');
+      }
 
       const { error } = await supabase
-        .from('settings')
-        .update({ custom_closed_dates: updatedClosedDays })
-        .eq('id', (await supabase.from('settings').select('id').single()).data?.id);
+        .from('venue_hours')
+        .insert([{
+          location_id: locationData.id,
+          type: 'exceptional_closure',
+          date: newClosedDate,
+          full_day: true,
+        }]);
 
       if (error) throw error;
 
@@ -1750,16 +1919,14 @@ function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
     }
   };
 
-  const handleRemoveOpenDay = async (dateToRemove: string) => {
+  const handleRemoveOpenDay = async (idToRemove: string) => {
     if (!confirm('Remove this custom open day?')) return;
 
     try {
-      const updatedOpenDays = customOpenDays.filter(day => day.date !== dateToRemove);
-
       const { error } = await supabase
-        .from('settings')
-        .update({ custom_open_dates: updatedOpenDays })
-        .eq('id', (await supabase.from('settings').select('id').single()).data?.id);
+        .from('venue_hours')
+        .delete()
+        .eq('id', idToRemove);
 
       if (error) throw error;
 
@@ -1780,16 +1947,14 @@ function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
     }
   };
 
-  const handleRemoveClosedDay = async (dateToRemove: string) => {
+  const handleRemoveClosedDay = async (idToRemove: string) => {
     if (!confirm('Remove this custom closed day?')) return;
 
     try {
-      const updatedClosedDays = customClosedDays.filter(day => day.date !== dateToRemove);
-
       const { error } = await supabase
-        .from('settings')
-        .update({ custom_closed_dates: updatedClosedDays })
-        .eq('id', (await supabase.from('settings').select('id').single()).data?.id);
+        .from('venue_hours')
+        .delete()
+        .eq('id', idToRemove);
 
       if (error) throw error;
 
@@ -1812,111 +1977,366 @@ function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
 
   if (loading) {
     return (
-      <Box bg="white" p={6} borderRadius="xl" shadow="sm" minH="400px" display="flex" alignItems="center" justifyContent="center">
-        <Spinner size="xl" color="blue.500" />
-      </Box>
+      <div style={{
+        background: 'white',
+        padding: '1.5rem',
+        borderRadius: '16px',
+        boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+        minHeight: '400px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ color: '#A59480', fontSize: '1.5rem' }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (activeLocation === 'all') {
+    return (
+      <div style={{
+        background: 'white',
+        padding: '1.5rem',
+        borderRadius: '16px',
+        boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+        minHeight: '400px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '1.125rem', color: '#5A5A5A', marginBottom: '0.5rem', fontFamily: 'Montserrat, sans-serif' }}>
+            Please select a specific location to manage custom dates
+          </p>
+          <p style={{ fontSize: '0.875rem', color: '#868686', fontFamily: 'Montserrat, sans-serif' }}>
+            Custom open/closed days are location-specific
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <VStack spacing={4} align="stretch">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Custom Open Days */}
-      <Box bg="white" p={6} borderRadius="xl" shadow="sm">
-        <HStack justify="space-between" mb={4}>
-          <Text fontSize="lg" fontWeight="semibold">Custom Open Days</Text>
-          <Button
-            leftIcon={<Plus size={16} />}
-            colorScheme="green"
-            size="sm"
+      <div style={{
+        background: 'white',
+        padding: '1.5rem',
+        borderRadius: '16px',
+        boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+        fontFamily: 'Montserrat, sans-serif'
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.5rem',
+          paddingBottom: '1rem',
+          borderBottom: '2px solid #ECEDE8'
+        }}>
+          <div>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: '700',
+              color: '#1F1F1F',
+              marginBottom: '0.25rem',
+              letterSpacing: '-0.02em'
+            }}>
+              Custom Open Days
+            </h3>
+            <p style={{
+              fontSize: '0.8125rem',
+              color: '#868686',
+              margin: 0
+            }}>
+              Override normally closed days to allow reservations
+            </p>
+          </div>
+          <button
             onClick={() => setIsAddOpenModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: '#34C759',
+              color: 'white',
+              border: '1px solid #34C759',
+              padding: '0.5rem 1rem',
+              borderRadius: '10px',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(52, 199, 89, 0.15), 0 4px 8px rgba(52, 199, 89, 0.25), 0 8px 16px rgba(52, 199, 89, 0.18)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              minHeight: '44px'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#28A745';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(52, 199, 89, 0.2), 0 8px 16px rgba(52, 199, 89, 0.3), 0 16px 32px rgba(52, 199, 89, 0.22)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#34C759';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 2px rgba(52, 199, 89, 0.15), 0 4px 8px rgba(52, 199, 89, 0.25), 0 8px 16px rgba(52, 199, 89, 0.18)';
+            }}
           >
+            <Plus size={16} />
             Add Open Day
-          </Button>
-        </HStack>
-        <Text fontSize="sm" color="gray.600" mb={4}>
-          Override normally closed days to allow reservations
-        </Text>
+          </button>
+        </div>
+
+        {/* List */}
         {customOpenDays.length === 0 ? (
-          <Text color="gray.500" textAlign="center" py={8}>
+          <p style={{
+            textAlign: 'center',
+            color: '#ABA8A1',
+            padding: '3rem 0',
+            fontSize: '0.875rem'
+          }}>
             No custom open days configured
-          </Text>
+          </p>
         ) : (
-          <VStack spacing={2} align="stretch">
-            {customOpenDays.map((day, index) => (
-              <HStack
-                key={index}
-                p={4}
-                bg="green.50"
-                borderRadius="lg"
-                justify="space-between"
-                border="1px"
-                borderColor="green.200"
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {customOpenDays.map((day) => (
+              <div
+                key={day.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '1rem 1.25rem',
+                  background: '#F0FDF4',
+                  border: '1px solid #BBF7D0',
+                  borderRadius: '10px',
+                  transition: 'all 0.2s',
+                  minHeight: '44px'
+                }}
               >
-                <Text fontWeight="medium">
-                  {format(new Date(day.date), 'EEEE, MMMM d, yyyy')}
-                </Text>
-                <IconButton
+                <div style={{ flex: 1 }}>
+                  <p style={{
+                    fontWeight: '600',
+                    color: '#1F1F1F',
+                    marginBottom: '0.25rem',
+                    fontSize: '0.9375rem'
+                  }}>
+                    {format(new Date(day.date), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                  {day.time_ranges && day.time_ranges.length > 0 ? (
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: '#16A34A',
+                      margin: 0
+                    }}>
+                      {day.time_ranges.map((range: any) => `${range.start} - ${range.end}`).join(', ')}
+                    </p>
+                  ) : (
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: '#16A34A',
+                      margin: 0
+                    }}>
+                      All day
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleRemoveOpenDay(day.id)}
                   aria-label="Remove"
-                  icon={<X size={16} />}
-                  size="sm"
-                  colorScheme="red"
-                  variant="ghost"
-                  onClick={() => handleRemoveOpenDay(day.date)}
-                />
-              </HStack>
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#EF4444',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s',
+                    minWidth: '44px',
+                    minHeight: '44px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#FEE2E2';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             ))}
-          </VStack>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* Custom Closed Days */}
-      <Box bg="white" p={6} borderRadius="xl" shadow="sm">
-        <HStack justify="space-between" mb={4}>
-          <Text fontSize="lg" fontWeight="semibold">Custom Closed Days</Text>
-          <Button
-            leftIcon={<Plus size={16} />}
-            colorScheme="red"
-            size="sm"
+      <div style={{
+        background: 'white',
+        padding: '1.5rem',
+        borderRadius: '16px',
+        boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+        fontFamily: 'Montserrat, sans-serif'
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1.5rem',
+          paddingBottom: '1rem',
+          borderBottom: '2px solid #ECEDE8'
+        }}>
+          <div>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: '700',
+              color: '#1F1F1F',
+              marginBottom: '0.25rem',
+              letterSpacing: '-0.02em'
+            }}>
+              Custom Closed Days
+            </h3>
+            <p style={{
+              fontSize: '0.8125rem',
+              color: '#868686',
+              margin: 0
+            }}>
+              Override normally open days to block reservations
+            </p>
+          </div>
+          <button
             onClick={() => setIsAddClosedModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: '#EF4444',
+              color: 'white',
+              border: '1px solid #EF4444',
+              padding: '0.5rem 1rem',
+              borderRadius: '10px',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(239, 68, 68, 0.15), 0 4px 8px rgba(239, 68, 68, 0.25), 0 8px 16px rgba(239, 68, 68, 0.18)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              minHeight: '44px'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#DC2626';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.2), 0 8px 16px rgba(239, 68, 68, 0.3), 0 16px 32px rgba(239, 68, 68, 0.22)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#EF4444';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 2px rgba(239, 68, 68, 0.15), 0 4px 8px rgba(239, 68, 68, 0.25), 0 8px 16px rgba(239, 68, 68, 0.18)';
+            }}
           >
+            <Plus size={16} />
             Add Closed Day
-          </Button>
-        </HStack>
-        <Text fontSize="sm" color="gray.600" mb={4}>
-          Override normally open days to block reservations
-        </Text>
+          </button>
+        </div>
+
+        {/* List */}
         {customClosedDays.length === 0 ? (
-          <Text color="gray.500" textAlign="center" py={8}>
+          <p style={{
+            textAlign: 'center',
+            color: '#ABA8A1',
+            padding: '3rem 0',
+            fontSize: '0.875rem'
+          }}>
             No custom closed days configured
-          </Text>
+          </p>
         ) : (
-          <VStack spacing={2} align="stretch">
-            {customClosedDays.map((day, index) => (
-              <HStack
-                key={index}
-                p={4}
-                bg="red.50"
-                borderRadius="lg"
-                justify="space-between"
-                border="1px"
-                borderColor="red.200"
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {customClosedDays.map((day) => (
+              <div
+                key={day.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '1rem 1.25rem',
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '10px',
+                  transition: 'all 0.2s',
+                  minHeight: '44px'
+                }}
               >
-                <Text fontWeight="medium">
-                  {format(new Date(day.date), 'EEEE, MMMM d, yyyy')}
-                </Text>
-                <IconButton
+                <div style={{ flex: 1 }}>
+                  <p style={{
+                    fontWeight: '600',
+                    color: '#1F1F1F',
+                    marginBottom: '0.25rem',
+                    fontSize: '0.9375rem'
+                  }}>
+                    {format(new Date(day.date), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                  {day.reason && (
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: '#DC2626',
+                      margin: 0,
+                      marginBottom: '0.25rem'
+                    }}>
+                      {day.reason}
+                    </p>
+                  )}
+                  {day.time_ranges && day.time_ranges.length > 0 ? (
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: '#EF4444',
+                      margin: 0
+                    }}>
+                      {day.time_ranges.map((range: any) => `${range.start} - ${range.end}`).join(', ')}
+                    </p>
+                  ) : (
+                    <p style={{
+                      fontSize: '0.8125rem',
+                      color: '#EF4444',
+                      margin: 0
+                    }}>
+                      All day
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleRemoveClosedDay(day.id)}
                   aria-label="Remove"
-                  icon={<X size={16} />}
-                  size="sm"
-                  colorScheme="red"
-                  variant="ghost"
-                  onClick={() => handleRemoveClosedDay(day.date)}
-                />
-              </HStack>
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#EF4444',
+                    cursor: 'pointer',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s',
+                    minWidth: '44px',
+                    minHeight: '44px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#FEE2E2';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             ))}
-          </VStack>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* Add Open Day Modal */}
       <Modal isOpen={isAddOpenModalOpen} onClose={() => setIsAddOpenModalOpen(false)} isCentered>
@@ -2011,6 +2431,6 @@ function CustomDaysManager({ onDaysChange }: { onDaysChange: () => void }) {
           </ModalBody>
         </ModalContent>
       </Modal>
-    </VStack>
+    </div>
   );
 }

@@ -32,7 +32,13 @@ export default function Reservations() {
   const [reloadKey, setReloadKey] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [activeLocation, setActiveLocation] = useState<string>('rooftopkc');
+  const [activeLocation, setActiveLocation] = useState<string>(() => {
+    // Load from localStorage or default to 'noirkc'
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('reservations-location') || 'noirkc';
+    }
+    return 'noirkc';
+  });
 
   // Member lookup modal state
   const [isLookupModalOpen, setIsLookupModalOpen] = useState(false);
@@ -91,6 +97,13 @@ export default function Reservations() {
   // New reservation modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ date: Date; resourceId: string } | null>(null);
+
+  // Save location preference to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('reservations-location', activeLocation);
+    }
+  }, [activeLocation]);
 
   useEffect(() => {
     if (router.isReady && router.query.date) {

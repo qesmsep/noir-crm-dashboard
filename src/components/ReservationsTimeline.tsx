@@ -149,7 +149,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     }
   }, [events, resources]); // Run after events/resources load
 
-  // Load private events
+  // Load private events (including Minaka events)
   useEffect(() => {
     const fetchPrivateEvents = async () => {
       try {
@@ -158,10 +158,35 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         const endDate = now.plus({ years: 1 }).toISO();
 
         const locationParam = locationSlug ? `&location=${locationSlug}` : '';
+
+        // Fetch local private events
         const res = await fetch(`/api/private-events?startDate=${startDate}&endDate=${endDate}${locationParam}`);
         if (!res.ok) throw new Error('Failed to fetch private events');
         const privateEventsData = await res.json();
-        setPrivateEvents(privateEventsData.data || []);
+        const localPrivateEvents = privateEventsData.data || [];
+
+        // Fetch Minaka events
+        let minakaEvents: any[] = [];
+        try {
+          const minakaLocationParam = locationSlug ? `?location=${locationSlug}` : '';
+          const minakaRes = await fetch(`/api/minaka-events${minakaLocationParam}`);
+          if (minakaRes.ok) {
+            const minakaData = await minakaRes.json();
+            // Filter out the specific recurring "Noir Cocktail Lounge - Cocktail Lounge" event
+            minakaEvents = (minakaData.data || []).filter((event: any) => {
+              const title = event.title || '';
+              // Exclude only the exact "Noir Cocktail Lounge - Cocktail Lounge" event
+              return title !== 'Noir Cocktail Lounge - Cocktail Lounge';
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching Minaka events:', error);
+          // Don't fail the whole load if Minaka fetch fails
+        }
+
+        // Combine both sources
+        const allEvents = [...localPrivateEvents, ...minakaEvents];
+        setPrivateEvents(allEvents);
       } catch (error) {
         console.error('Error fetching private events:', error);
       }
@@ -492,7 +517,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
           const blockingEvent = {
             id: `blocking-${privateEvent.id}-${resource.id}`,
-            title: `🔒 ${privateEvent.title} - Private Event`,
+            title: `🔒 ${privateEvent.title}`,
             extendedProps: {
               private_event_id: privateEvent.id,
               is_blocking: true,
@@ -506,7 +531,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             backgroundColor: '#6b7280',
             borderColor: '#6b7280',
             textColor: '#ffffff',
-            display: 'background',
             classNames: ['private-event-blocking']
           };
 
@@ -531,7 +555,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             closure.time_ranges.forEach((range: any, idx: number) => {
               const closureEvent = {
                 id: `closure-${closure.id}-${resource.id}-${idx}`,
-                title: closure.reason || 'Closed',
+                title: `🔒 ${closure.reason || 'Closed'}`,
                 extendedProps: {
                   closure_id: closure.id,
                   is_blocking: true,
@@ -546,7 +570,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
                 backgroundColor: '#6b7280',
                 borderColor: '#6b7280',
                 textColor: '#ffffff',
-                display: 'background',
                 classNames: ['exceptional-closure-blocking']
               };
               blockingEvents.push(closureEvent);
@@ -559,7 +582,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           // Full day blocking event
           const closureEvent = {
             id: `closure-${closure.id}-${resource.id}`,
-            title: closure.reason || 'Closed',
+            title: `🔒 ${closure.reason || 'Closed'}`,
             extendedProps: {
               closure_id: closure.id,
               is_blocking: true,
@@ -574,7 +597,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             backgroundColor: '#6b7280',
             borderColor: '#6b7280',
             textColor: '#ffffff',
-            display: 'background',
             classNames: ['exceptional-closure-blocking']
           };
 
@@ -610,7 +632,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   // Get private events for the current calendar date
   const getCurrentDayPrivateEvents = () => {
     return privateEvents.filter((pe: any) => {
-      if (pe.status !== 'active') return false;
+      // Minaka events don't have a status field, so only check status for local events
+      if (pe.status && pe.status !== 'active') return false;
       const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
       const calendarDateUTC = currentCalendarDate.toISOString();
       const calendarDateLocal = fromUTC(calendarDateUTC, settings.timezone);
