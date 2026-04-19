@@ -66,21 +66,49 @@ export async function POST(request: Request) {
       }
     }
     
-    // 0. Check if date is within booking window
+    // 0. Check if date is within booking window (location-specific with global fallback)
+    let bookingStart: Date | null = null;
+    let bookingEnd: Date | null = null;
+
+    // Fetch global settings
     const { data: settingsData } = await supabase
       .from('settings')
       .select('booking_start_date, booking_end_date')
       .single();
-    
-    if (settingsData) {
-      const bookingStart = settingsData.booking_start_date ? new Date(settingsData.booking_start_date) : null;
-      const bookingEnd = settingsData.booking_end_date ? new Date(settingsData.booking_end_date) : null;
-      const reqDate = new Date(dateStr + 'T00:00:00');
-      
-      if ((bookingStart && reqDate < bookingStart) || (bookingEnd && reqDate > bookingEnd)) {
-        if (DEBUG) console.log('Date outside booking window:', { dateStr, bookingStart, bookingEnd });
-        return NextResponse.json({ slots: [] });
-      }
+
+    // If location is specified, check location-specific booking window first
+    if (locationId) {
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('booking_start_date, booking_end_date')
+        .eq('id', locationId)
+        .single();
+
+      // Use COALESCE logic: location-specific first, then global
+      const effectiveStart = locationData?.booking_start_date || settingsData?.booking_start_date;
+      const effectiveEnd = locationData?.booking_end_date || settingsData?.booking_end_date;
+
+      bookingStart = effectiveStart ? new Date(effectiveStart) : null;
+      bookingEnd = effectiveEnd ? new Date(effectiveEnd) : null;
+
+      if (DEBUG) console.log('Using location-specific booking window:', {
+        locationBooking: { start: locationData?.booking_start_date, end: locationData?.booking_end_date },
+        globalBooking: { start: settingsData?.booking_start_date, end: settingsData?.booking_end_date },
+        effective: { start: effectiveStart, end: effectiveEnd }
+      });
+    } else {
+      // No location specified: use global settings
+      bookingStart = settingsData?.booking_start_date ? new Date(settingsData.booking_start_date) : null;
+      bookingEnd = settingsData?.booking_end_date ? new Date(settingsData.booking_end_date) : null;
+
+      if (DEBUG) console.log('Using global booking window:', { start: bookingStart, end: bookingEnd });
+    }
+
+    // Check if requested date is within the effective booking window
+    const reqDate = new Date(dateStr + 'T00:00:00');
+    if ((bookingStart && reqDate < bookingStart) || (bookingEnd && reqDate > bookingEnd)) {
+      if (DEBUG) console.log('Date outside booking window:', { dateStr, bookingStart, bookingEnd });
+      return NextResponse.json({ slots: [] });
     }
     
     // 1. Check if the venue is open on this date

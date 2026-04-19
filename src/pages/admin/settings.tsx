@@ -563,9 +563,9 @@ export default function Settings() {
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Booking Window</h2>
               <p className={styles.inputHint}>
-                Note: Currently showing global settings. Location-specific booking windows coming soon.
+                Set booking availability window for Noir KC. Members can only book reservations within this date range.
               </p>
-              <CalendarAvailabilityControl section="booking_window" />
+              <CalendarAvailabilityControl section="booking_window" locationSlug="noirkc" />
             </div>
 
             {/* Base Hours */}
@@ -712,9 +712,9 @@ export default function Settings() {
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Booking Window</h2>
               <p className={styles.inputHint}>
-                Note: Currently showing global settings. Location-specific booking windows coming soon.
+                Set booking availability window for RooftopKC. Members can only book reservations within this date range.
               </p>
-              <CalendarAvailabilityControl section="booking_window" />
+              <CalendarAvailabilityControl section="booking_window" locationSlug="rooftopkc" />
             </div>
 
             {/* Base Hours */}

@@ -70,6 +70,10 @@ export default function SimpleReservationRequestModal({
   const [coverEnabled, setCoverEnabled] = useState(false);
   const [coverPrice, setCoverPrice] = useState(0);
 
+  // Booking window state
+  const [bookingStartDate, setBookingStartDate] = useState<Date | null>(null);
+  const [bookingEndDate, setBookingEndDate] = useState<Date | null>(null);
+
   // Initialize fields when memberName changes
   useEffect(() => {
     if (memberName) {
@@ -89,6 +93,52 @@ export default function SimpleReservationRequestModal({
       setSelectedLocation(locationSlug);
     }
   }, [locationSlug]);
+
+  // Fetch booking window for selected location
+  useEffect(() => {
+    const fetchBookingWindow = async () => {
+      if (!isOpen || !selectedLocation) return;
+
+      try {
+        // Import supabase client
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        // Fetch location-specific booking window
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('booking_start_date, booking_end_date')
+          .eq('slug', selectedLocation)
+          .single();
+
+        // Fetch global settings as fallback
+        const { data: settingsData } = await supabase
+          .from('settings')
+          .select('booking_start_date, booking_end_date')
+          .single();
+
+        // Use COALESCE logic: location-specific first, then global
+        const effectiveStart = locationData?.booking_start_date || settingsData?.booking_start_date;
+        const effectiveEnd = locationData?.booking_end_date || settingsData?.booking_end_date;
+
+        setBookingStartDate(effectiveStart ? new Date(effectiveStart) : null);
+        setBookingEndDate(effectiveEnd ? new Date(effectiveEnd) : null);
+
+        console.log('📅 [SimpleReservationModal] Booking window:', {
+          location: selectedLocation,
+          effectiveStart,
+          effectiveEnd
+        });
+      } catch (error) {
+        console.error('Error fetching booking window:', error);
+      }
+    };
+
+    fetchBookingWindow();
+  }, [isOpen, selectedLocation]);
 
   // Fetch blocked dates for the next 30 days
   useEffect(() => {
@@ -355,6 +405,14 @@ export default function SimpleReservationRequestModal({
   };
 
   const filterDate = (date: Date) => {
+    // Check if date is within booking window
+    if (bookingStartDate && date < bookingStartDate) {
+      return false;
+    }
+    if (bookingEndDate && date > bookingEndDate) {
+      return false;
+    }
+
     // Only allow Thursday (4), Friday (5), Saturday (6)
     const day = date.getDay();
     if (day !== 4 && day !== 5 && day !== 6) {
@@ -370,9 +428,13 @@ export default function SimpleReservationRequestModal({
     return true;
   };
 
-  const minDate = new Date();
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 30);
+  // Use booking window dates if available, otherwise fall back to defaults
+  const minDate = bookingStartDate || new Date();
+  const maxDate = bookingEndDate || (() => {
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 30);
+    return fallback;
+  })();
 
   if (!isOpen) return null;
 

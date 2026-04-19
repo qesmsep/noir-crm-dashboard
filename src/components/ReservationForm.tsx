@@ -358,7 +358,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
   // Optimized fetch function with caching and request deduplication
   const fetchAvailableSlotsCached = useCallback(async (dateStr: string, partySize: number): Promise<{ slots: string[] }> => {
-    const cacheKey = `${dateStr}-${partySize}`;
+    const cacheKey = `${dateStr}-${partySize}-${tableLocationSlug || 'global'}`;
     const now = Date.now();
     
     // Check cache first
@@ -379,7 +379,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         const res = await fetch('/api/available-slots', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr, party_size: partySize })
+          body: JSON.stringify({
+            date: dateStr,
+            party_size: partySize,
+            location: tableLocationSlug // Pass location for location-specific booking window check
+          })
         });
         
         if (!res.ok) {
@@ -401,9 +405,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     
     // Track in-flight request
     inFlightRequestsRef.current.set(cacheKey, requestPromise);
-    
+
     return requestPromise;
-  }, []);
+  }, [tableLocationSlug]);
 
   // Fetch available times when date or party_size changes
   useEffect(() => {

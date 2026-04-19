@@ -106,34 +106,84 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   useEffect(() => {
     async function fetchBookingDates() {
       setBookingDatesLoading(true);
-      const { data: settingsData } = await supabase
-        .from('settings')
-        .select('booking_start_date, booking_end_date')
-        .single();
-      if (settingsData) {
-        if (settingsData.booking_start_date) setBookingStartDate(DateTime.fromISO(settingsData.booking_start_date, { zone: 'America/Chicago' }).toJSDate());
-        if (settingsData.booking_end_date) setBookingEndDate(DateTime.fromISO(settingsData.booking_end_date, { zone: 'America/Chicago' }).toJSDate());
+
+      // If locationSlug provided, fetch location-specific booking window with global fallback
+      if (locationSlug) {
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('booking_start_date, booking_end_date')
+          .eq('slug', locationSlug)
+          .single();
+
+        // Also fetch global settings for fallback
+        const { data: settingsData } = await supabase
+          .from('settings')
+          .select('booking_start_date, booking_end_date')
+          .single();
+
+        // Use COALESCE logic: location-specific first, then global
+        const effectiveStart = locationData?.booking_start_date || settingsData?.booking_start_date;
+        const effectiveEnd = locationData?.booking_end_date || settingsData?.booking_end_date;
+
+        if (effectiveStart) setBookingStartDate(DateTime.fromISO(effectiveStart, { zone: 'America/Chicago' }).toJSDate());
+        if (effectiveEnd) setBookingEndDate(DateTime.fromISO(effectiveEnd, { zone: 'America/Chicago' }).toJSDate());
+      } else {
+        // No locationSlug: fetch global settings only
+        const { data: settingsData } = await supabase
+          .from('settings')
+          .select('booking_start_date, booking_end_date')
+          .single();
+        if (settingsData) {
+          if (settingsData.booking_start_date) setBookingStartDate(DateTime.fromISO(settingsData.booking_start_date, { zone: 'America/Chicago' }).toJSDate());
+          if (settingsData.booking_end_date) setBookingEndDate(DateTime.fromISO(settingsData.booking_end_date, { zone: 'America/Chicago' }).toJSDate());
+        }
       }
       setBookingDatesLoading(false);
     }
     fetchBookingDates();
-  }, []);
+  }, [locationSlug]);
 
   async function handleBookingDatesChange(start: Date, end: Date) {
     setBookingStartDate(start);
     setBookingEndDate(end);
     setBookingDatesSaving(true);
     try {
+      console.log('🔍 [handleBookingDatesChange] locationSlug:', locationSlug, 'locationId (from state):', locationId);
+
+      // Get the current locationId - if locationSlug provided, fetch it fresh to avoid race conditions
+      let currentLocationId = locationId;
+      if (locationSlug && !currentLocationId) {
+        console.warn('⚠️ [handleBookingDatesChange] locationSlug provided but locationId not in state. Fetching now...');
+        const { data, error } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', locationSlug)
+          .single();
+
+        if (!error && data) {
+          currentLocationId = data.id;
+          console.log('🔍 [handleBookingDatesChange] Fetched locationId:', currentLocationId);
+        } else {
+          console.error('🔍 [handleBookingDatesChange] Error fetching location:', error);
+        }
+      }
+
+      console.log('🔍 [handleBookingDatesChange] Using locationId:', currentLocationId);
+
       const response = await fetch('/api/booking-window', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start: formatDateToLocal(start), end: formatDateToLocal(end) })
+        body: JSON.stringify({
+          start: formatDateToLocal(start),
+          end: formatDateToLocal(end),
+          locationId: currentLocationId || null
+        })
       });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to save booking window');
       }
-      console.log('Booking window saved successfully');
+      console.log(`Booking window saved successfully${currentLocationId ? ` for location ${locationSlug}` : ' (global)'}`);
     } catch (error) {
       console.error('Error saving booking window:', error);
     } finally {

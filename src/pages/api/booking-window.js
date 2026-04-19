@@ -5,14 +5,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { start, end } = req.body;
+  const { start, end, locationId } = req.body;
   if (!start || !end) {
     return res.status(400).json({ error: 'Start and end dates are required' });
   }
 
   try {
-    console.log('Saving booking window:', { start, end });
+    console.log('Saving booking window:', { start, end, locationId });
 
+    // If locationId is provided, save to locations table
+    if (locationId) {
+      const { error: updateError } = await supabaseAdmin
+        .from('locations')
+        .update({ booking_start_date: start, booking_end_date: end })
+        .eq('id', locationId);
+
+      if (updateError) {
+        console.error('Error updating location booking window:', updateError);
+        return res.status(500).json({ error: 'Failed to save booking window' });
+      }
+
+      console.log('Location-specific booking window saved successfully');
+      return res.status(200).json({ success: true });
+    }
+
+    // No locationId: save to global settings table
     // Find existing settings row (there should be at most one)
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('settings')
@@ -45,7 +62,7 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log('Booking window saved successfully');
+    console.log('Global booking window saved successfully');
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error saving booking window:', error);
