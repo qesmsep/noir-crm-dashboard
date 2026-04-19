@@ -29,6 +29,7 @@ interface ReservationFormProps {
     first_name?: string;
     last_name?: string;
   };
+  locationSlug?: string;
 }
 
 interface FormData {
@@ -136,12 +137,34 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   isMember = false,
   onClose,
   baseDays = [],
-  memberData
+  memberData,
+  locationSlug
 }) => {
   const toast = useToast();
   const { colors } = useTheme();
   const { settings, refreshHoldFeeSettings } = useSettings();
-  
+  const [tableLocationSlug, setTableLocationSlug] = useState<string | undefined>(locationSlug);
+
+  // Fetch location from table_id if not explicitly provided
+  useEffect(() => {
+    if (!locationSlug && table_id) {
+      async function fetchTableLocation() {
+        const { data, error } = await supabase
+          .from('tables')
+          .select('location_id, locations!inner(slug)')
+          .eq('id', table_id)
+          .single();
+
+        if (!error && data?.locations) {
+          setTableLocationSlug((data.locations as any).slug);
+        }
+      }
+      fetchTableLocation();
+    } else if (locationSlug) {
+      setTableLocationSlug(locationSlug);
+    }
+  }, [table_id, locationSlug]);
+
   // Booking window logic: today or bookingStartDate (if in future)
   // Use a ref to track the current day to avoid recalculating on every render
   const todayRef = useRef<Date>(DateTime.now().toJSDate());
@@ -1501,6 +1524,29 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               </FormControl>
             )}
 
+            {/* RooftopKC Weather Disclaimer */}
+            {tableLocationSlug === 'rooftopkc' && (
+              <Box
+                mt={{ base: 4, sm: 6 }}
+                p={{ base: 4, sm: 5 }}
+                bg="orange.50"
+                borderLeft="4px solid"
+                borderColor="orange.400"
+                borderRadius="md"
+              >
+                <Text
+                  fontSize={{ base: "xs", sm: "sm" }}
+                  color="gray.700"
+                  lineHeight="1.6"
+                >
+                  <strong>Weather Notice:</strong> RooftopKC reservations are subject to weather conditions.
+                  We attempt to provide at least 24 hours notice of cancellations, but in some situations
+                  it may be less. Any reservations will be refunded if a deposit is paid.
+                  <strong> There are no refunds for no-shows or cancellations.</strong>
+                </Text>
+              </Box>
+            )}
+
             <Button
               type="submit"
               colorScheme="black"
@@ -1511,8 +1557,8 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
               color="#A59480"
               _hover={{ bg: 'gray.800' }}
               _active={{ transform: 'scale(0.98)' }}
-              _disabled={{ 
-                opacity: 0.6, 
+              _disabled={{
+                opacity: 0.6,
                 cursor: 'not-allowed',
                 transform: 'none'
               }}
