@@ -46,7 +46,10 @@ type BaseHour = { enabled: boolean; timeRanges: TimeRange[] };
 type ExceptionalOpen = { id: number; date: string; time_ranges: TimeRange[]; label?: string };
 type ExceptionalClosure = { id: number; date: string; reason?: string; full_day?: boolean; time_ranges?: TimeRange[]; sms_notification?: string };
 
-type CalendarAvailabilityControlProps = { section: 'booking_window' | 'base' | 'custom_open' | 'custom_closed' | 'private_events' };
+type CalendarAvailabilityControlProps = {
+  section: 'booking_window' | 'base' | 'custom_open' | 'custom_closed' | 'private_events';
+  locationSlug?: string;
+};
 
 function formatTime12h(timeStr: string) {
   if (!timeStr) return '';
@@ -63,7 +66,29 @@ function formatDateToLocal(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = ({ section }) => {
+const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = ({ section, locationSlug }) => {
+  const [locationId, setLocationId] = useState<string | null>(null);
+
+  // Fetch location ID based on locationSlug
+  useEffect(() => {
+    if (!locationSlug) {
+      setLocationId(null);
+      return;
+    }
+
+    async function fetchLocationId() {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('slug', locationSlug)
+        .single();
+
+      if (!error && data) {
+        setLocationId(data.id);
+      }
+    }
+    fetchLocationId();
+  }, [locationSlug]);
   // Booking window state
   const [bookingStartDate, setBookingStartDate] = useState<Date>(() => {
     return DateTime.now().setZone('America/Chicago').toJSDate();
@@ -153,18 +178,21 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     async function loadAvailabilityData() {
       try {
         setError('');
-        const { data: baseHoursData } = await supabase
-          .from('venue_hours')
-          .select('*')
-          .eq('type', 'base');
-        const { data: opensData } = await supabase
-          .from('venue_hours')
-          .select('*')
-          .eq('type', 'exceptional_open');
-        const { data: closuresData } = await supabase
-          .from('venue_hours')
-          .select('*')
-          .eq('type', 'exceptional_closure');
+
+        let baseQuery = supabase.from('venue_hours').select('*').eq('type', 'base');
+        let opensQuery = supabase.from('venue_hours').select('*').eq('type', 'exceptional_open');
+        let closuresQuery = supabase.from('venue_hours').select('*').eq('type', 'exceptional_closure');
+
+        // Filter by location if locationId is available
+        if (locationId) {
+          baseQuery = baseQuery.eq('location_id', locationId);
+          opensQuery = opensQuery.eq('location_id', locationId);
+          closuresQuery = closuresQuery.eq('location_id', locationId);
+        }
+
+        const { data: baseHoursData } = await baseQuery;
+        const { data: opensData } = await opensQuery;
+        const { data: closuresData } = await closuresQuery;
         if (baseHoursData) {
           const enabledDays = Array(7).fill(false);
           const timeRanges = Array(7).fill(null).map(() => [{ start: '18:00', end: '23:00' }]);
@@ -181,7 +209,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       }
     }
     loadAvailabilityData();
-  }, []);
+  }, [locationId]);
 
   // Base Hours Handlers
   const toggleDay = (dayIndex: number) => {
@@ -242,12 +270,17 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         setError('Cannot add exceptional open on a closure date.');
         return;
       }
-      const newOpen = {
+      const newOpen: any = {
         date: newOpenDateStr,
         time_ranges: newOpenTimeRanges,
         label: newOpenLabel,
         type: 'exceptional_open'
       };
+
+      // Add location_id if available
+      if (locationId) {
+        newOpen.location_id = locationId;
+      }
       const { data, error } = await supabase.from('venue_hours').insert([newOpen]).select();
       if (error) throw error;
       if (data) {
@@ -284,7 +317,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         setError('Cannot add closure on an exceptional open date.');
         return;
       }
-      const newClosure = {
+      const newClosure: any = {
         date: newClosureDateStr,
         reason: newClosureReason,
         type: 'exceptional_closure',
@@ -292,6 +325,11 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         time_ranges: newClosureFullDay ? null : newClosureTimeRanges,
         sms_notification: newClosureSmsNotification
       };
+
+      // Add location_id if available
+      if (locationId) {
+        newClosure.location_id = locationId;
+      }
       const { data, error } = await supabase.from('venue_hours').insert([newClosure]).select();
       if (error) throw error;
       if (data) {

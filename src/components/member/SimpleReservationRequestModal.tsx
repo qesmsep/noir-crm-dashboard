@@ -54,6 +54,7 @@ export default function SimpleReservationRequestModal({
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [blockedTimes, setBlockedTimes] = useState<any[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
 
   // Manual entry fields (always editable, pre-filled if member found)
   const [firstName, setFirstName] = useState('');
@@ -88,6 +89,50 @@ export default function SimpleReservationRequestModal({
       setSelectedLocation(locationSlug);
     }
   }, [locationSlug]);
+
+  // Fetch blocked dates for the next 30 days
+  useEffect(() => {
+    const fetchBlockedDates = async () => {
+      if (!isOpen) return;
+
+      try {
+        const blockedDatesSet = new Set<string>();
+        const today = DateTime.now().setZone('America/Chicago');
+
+        // Check next 30 days
+        for (let i = 0; i <= 30; i++) {
+          const checkDate = today.plus({ days: i });
+          const dateStr = checkDate.toFormat('yyyy-MM-dd');
+
+          const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
+          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}`);
+
+          if (response.ok) {
+            const result = await response.json();
+
+            // If there are blocked time ranges that cover the full day, mark as blocked
+            if (result.blockedTimeRanges && result.blockedTimeRanges.length > 0) {
+              // Check if any blocking is for the full day (starts at midnight or early, ends late)
+              const hasFullDayBlock = result.blockedTimeRanges.some((range: any) => {
+                return (range.startHour === 0 && range.endHour === 23) ||
+                       (range.startHour <= 16 && range.endHour >= 23);
+              });
+
+              if (hasFullDayBlock) {
+                blockedDatesSet.add(dateStr);
+              }
+            }
+          }
+        }
+
+        setBlockedDates(blockedDatesSet);
+      } catch (error) {
+        console.error('Error fetching blocked dates:', error);
+      }
+    };
+
+    fetchBlockedDates();
+  }, [isOpen, selectedLocation]);
 
   // Fetch tables and cover charge info based on selected location
   useEffect(() => {
@@ -146,7 +191,8 @@ export default function SimpleReservationRequestModal({
     try {
       // Fetch blocked times for this date
       const dateStr = DateTime.fromJSDate(newDate).toFormat('yyyy-MM-dd');
-      const response = await fetch(`/api/check-date-availability?date=${dateStr}`, {
+      const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
+      const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}`, {
         signal: abortController.signal,
       });
       const result = await response.json();
@@ -311,7 +357,17 @@ export default function SimpleReservationRequestModal({
   const filterDate = (date: Date) => {
     // Only allow Thursday (4), Friday (5), Saturday (6)
     const day = date.getDay();
-    return day === 4 || day === 5 || day === 6;
+    if (day !== 4 && day !== 5 && day !== 6) {
+      return false;
+    }
+
+    // Check if date is blocked (closure or private event)
+    const dateStr = DateTime.fromJSDate(date).toFormat('yyyy-MM-dd');
+    if (blockedDates.has(dateStr)) {
+      return false;
+    }
+
+    return true;
   };
 
   const minDate = new Date();
@@ -489,39 +545,41 @@ export default function SimpleReservationRequestModal({
           </div>
 
           {/* Date and Time Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem' }}>
             {/* Date Picker */}
-            <DatePicker
-              selected={date}
-              onChange={handleDateChange}
-              minDate={minDate}
-              maxDate={maxDate}
-              filterDate={filterDate}
-              dateFormat="MMMM d, yyyy"
-              placeholderText="Date*"
-              openToDate={new Date()}
-              customInput={
-                <input
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                  readOnly
-                />
-              }
-              popperPlacement="bottom-start"
-              withPortal={false}
-            />
+            <div style={{ flex: '1 1 65%' }}>
+              <DatePicker
+                selected={date}
+                onChange={handleDateChange}
+                minDate={minDate}
+                maxDate={maxDate}
+                filterDate={filterDate}
+                dateFormat="MMMM d, yyyy"
+                placeholderText="Date*"
+                openToDate={new Date()}
+                customInput={
+                  <input
+                    style={{
+                      width: '100%',
+                      height: '44px',
+                      padding: '0 1rem',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '10px',
+                      fontSize: '0.875rem',
+                      backgroundColor: 'white',
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                    readOnly
+                  />
+                }
+                popperPlacement="bottom-start"
+                withPortal={false}
+              />
+            </div>
 
             {/* Time Select */}
-            <div>
+            <div style={{ flex: '0 0 35%' }}>
               <select
                 value={time}
                 onChange={(e) => setTime(e.target.value)}

@@ -107,6 +107,13 @@
   opacity: 0.8;
 }
 
+/* Exceptional closure blocking events (custom closed days) */
+.calendarContainer :global(.exceptional-closure-blocking) {
+  background-color: #6b7280 !important;
+  border-color: #6b7280 !important;
+  opacity: 0.8 !important;
+}
+
 /* Mobile Navigation Bar */
 .mobileNavBar {
   display: none;

@@ -785,12 +785,34 @@ While focusing on aesthetics, maintain accessibility:
 - `notes` (TEXT)
 - `created_at`, `updated_at`
 
-#### `tables`
+#### `locations`
 - `id` (UUID, PK)
-- `table_number` (INTEGER, UNIQUE)
-- `capacity` (INTEGER)
+- `name` (TEXT, UNIQUE) - Display name (e.g., "Noir KC", "RooftopKC")
+- `slug` (TEXT, UNIQUE) - URL-safe identifier (e.g., "noirkc", "rooftopkc")
+- `timezone` (TEXT) - IANA timezone (default: 'America/Chicago')
+- `address` (TEXT) - Physical location address
+- `cover_enabled` (BOOLEAN) - Whether cover charges apply (default: false)
+- `cover_price` (INTEGER) - Cover charge amount in dollars (for non-members only, members always free)
+- `minaka_ical_url` (TEXT) - Location-specific Minaka calendar feed URL
 - `status` (TEXT) - 'active', 'inactive'
 - `created_at`, `updated_at`
+
+**Notes**:
+- Cover charges are NEVER applied to members (checked via memberId)
+- Each location has independent booking windows, hours, and calendar settings
+- Minaka iCal URLs are stored per-location for scalability
+
+#### `tables`
+- `id` (UUID, PK)
+- `table_number` (INTEGER) - Unique per location (composite unique with location_id)
+- `location_id` (UUID, FK → locations) - References location
+- `seats` (INTEGER) - Table capacity
+- `status` (TEXT) - 'active', 'inactive'
+- `created_at`, `updated_at`
+
+**Constraints**:
+- Composite unique: `(location_id, table_number)` - Allows duplicate table numbers across locations
+- Tables are location-specific (e.g., Noir KC has 20 tables, RooftopKC has 17 tables)
 
 #### `campaigns`
 - `id` (UUID, PK)
@@ -1016,30 +1038,42 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 
 ## Core Systems & Features
 
-### 1. Reservation System
+### 1. Reservation System (Multi-Location)
 
 **Location**: `src/app/api/reservations/route.ts`, `src/components/ReservationForm.tsx`
 
 **Flow**:
-1. User selects date/time/party size
-2. System checks availability (`/api/available-slots`)
-3. For non-members: Stripe hold created if enabled
-4. Reservation created with table assignment
-5. SMS confirmation sent
-6. Admin notification sent to `admin_notification_phone` (6199713730)
-7. Reminders scheduled if enabled
+1. User selects location (Noir KC, RooftopKC)
+2. User selects date/time/party size
+3. System checks availability (`/api/available-slots`) **filtered by location**
+4. **Cover charge logic**: If location has `cover_enabled=true` AND user is not a member, cover charge applies
+5. For non-members: Stripe hold created if enabled
+6. Reservation created with table assignment
+7. SMS confirmation sent
+8. Admin notification sent to `admin_notification_phone` (6199713730)
+9. Reminders scheduled if enabled
 
 **Key Features**:
+- **Multi-location support**: Independent table inventory and availability per location
+- **Location-aware availability**: Only checks tables at selected location
+- **Cover charges**: Configurable per location, members always bypass
 - Automatic table assignment based on capacity
 - Alternative time suggestions if requested time unavailable
 - Hold fee system for non-members (configurable)
 - Check-in tracking
 - Multiple sources: website, SMS, manual, RSVP
 
+**Locations**:
+- **Noir KC** (`noirkc`): 20 tables, typically no cover
+- **RooftopKC** (`rooftopkc`): 17 tables, $20 cover for non-members
+- **Future**: Noir OP and additional locations
+
 **Related Files**:
-- `src/components/NewReservationDrawer.tsx` - Admin reservation creation
-- `src/components/ReservationEditDrawer.tsx` - Edit existing reservations
-- `src/components/DayReservationsDrawer.tsx` - Day view of reservations
+- `src/components/ReservationModalFixed.tsx` - New reservation modal (passes `location_slug`)
+- `src/components/member/SimpleReservationRequestModal.tsx` - Member reservation request (cover charge UI)
+- `src/components/ReservationsTimeline.tsx` - Location-filtered timeline
+- `src/components/FullCalendarTimeline.tsx` - Location-filtered calendar
+- `src/pages/admin/reservations.tsx` - Location switcher tabs
 - `src/app/api/available-slots/route.ts` - Availability checking
 - `src/app/api/find-alternative-times/route.ts` - Alternative time suggestions
 
@@ -4679,6 +4713,76 @@ ON phone_otp_codes(ip_address, created_at);
 
 #### API Endpoints
 
+**Multi-Location Endpoints**:
+
+`GET /api/tables?location=<slug>`
+- **Purpose**: Fetch tables filtered by location
+- **Query Params**: `location` (optional) - Location slug (e.g., "noirkc", "rooftopkc")
+- **Returns**:
+  ```javascript
+  {
+    data: [
+      {
+        id: string,
+        table_number: string,  // Zero-padded (e.g., "01", "15")
+        seats: number,
+        location_id: string,
+        location_slug: string
+      }
+    ]
+  }
+  ```
+- **Filtering**: Fetches location ID from `locations` table by slug, then filters tables by `location_id`
+
+`GET /api/private-events?location=<slug>&startDate=<iso>&endDate=<iso>`
+- **Purpose**: Fetch private events filtered by location and date range
+- **Query Params**:
+  - `location` (optional) - Location slug
+  - `startDate`, `endDate` (optional) - ISO date strings
+- **Returns**: Array of private events for the specified location
+- **Filtering**: Uses location ID lookup, then filters by `location_id` and date range
+
+`GET /api/minaka-events?location=<slug>`
+- **Purpose**: Fetch Minaka calendar events for a specific location
+- **Query Params**: `location` (required) - Location slug
+- **Returns**:
+  ```javascript
+  {
+    data: [
+      {
+        id: string,
+        title: string,
+        start_time: string,  // ISO UTC
+        end_time: string,    // ISO UTC
+        description?: string,
+        guest_count?: number,
+        client_name?: string,
+        client_email?: string,
+        location?: string,
+        minaka_url?: string,
+        source: 'minaka'
+      }
+    ]
+  }
+  ```
+- **How it works**: Fetches `minaka_ical_url` from `locations` table, parses iCal feed, returns events
+- **Scalability**: Each location has its own Minaka iCal feed URL stored in database
+
+`POST /api/reservations` (Updated)
+- **New Fields**:
+  - `location_slug` (string) - Location identifier for availability check
+  - `cover_charge_applied` (boolean) - Whether cover charge applies to this reservation
+  - `cover_price` (number) - Cover charge amount (only if non-member at location with cover enabled)
+- **Availability Check**: Now location-aware
+  - Fetches location ID from `location_slug`
+  - Only checks tables belonging to that location
+  - Prevents cross-location booking conflicts
+- **Cover Charge Logic**:
+  - Applied only if `cover_enabled=true` for location AND no `memberId`
+  - Members ALWAYS bypass cover charges regardless of location
+
+---
+
 **New Endpoint**: `POST /api/member/verify-phone`
 - **Purpose**: Verify phone number exists and return member info
 - **Body**: `{ phone: string }`
@@ -5167,6 +5271,89 @@ ALTER TABLE waitlist ADD COLUMN form_step INTEGER DEFAULT 0;
 - Could add step-by-step progress tracking in referral form (update form_step on each page)
 - Could add webhook handler to automatically set subscription to 'active' when ACH payment succeeds
 - Could add partial data capture (save form fields as user progresses through steps)
+
+---
+
+## Multi-Location Settings Management
+
+**Added**: 2026-04-15
+
+### Admin Settings Page (`/admin/settings`)
+
+**Location**: `src/pages/admin/settings.tsx`
+
+The settings page now features a tabbed interface for managing global and location-specific settings.
+
+#### Tabs
+
+1. **General Settings** - Global system settings (booking windows, hours, admin notifications, hold fees)
+2. **Noir KC** - Location-specific settings for Noir KC
+3. **RooftopKC** - Location-specific settings for RooftopKC
+
+#### Location-Specific Settings (Per Tab)
+
+Each location tab includes:
+
+**Booking Window** (Coming Soon)
+- Currently shows global settings
+- Will support location-specific booking windows
+
+**Base Hours** (Coming Soon)
+- Currently shows global settings
+- Will support location-specific operating hours
+
+**Custom Open/Closed Days** (Coming Soon)
+- Currently shows global settings
+- Will support location-specific custom schedules
+
+**Timezone**
+- Display only (America/Chicago)
+- Per-location timezone support planned
+
+**Cover Charge Settings** ✅ Fully Functional
+- **Toggle**: Enable/disable cover charges for the location
+- **Price Input**: Set cover amount ($0-$100) with +/- controls
+- **Business Rule**: Cover charges apply ONLY to non-members. Members always bypass cover charges.
+- **Saves to**: `locations.cover_enabled`, `locations.cover_price`
+- **UI**: Cork-branded with 3-layer drop shadows, number input with increment buttons
+
+**Current Configuration**:
+- **Noir KC**: Cover charges typically disabled
+- **RooftopKC**: $20 cover for non-members (configurable)
+
+#### Design System Applied
+
+The settings page now follows Noir brand guidelines:
+
+**Colors**:
+- Primary buttons: Cork (#A59480)
+- Switches: Cork when active
+- Backgrounds: Wedding Day (#ECEDE8)
+- Text: Day Break (#1F1F1F)
+
+**Shadows**:
+- Cards: `0 4px 12px rgba(165, 148, 128, 0.08)`
+- Buttons: 3-layer drop shadow system
+- Hover: Enhanced shadows with lift effect
+
+**Typography**:
+- Headings: IvyJournal serif
+- UI Elements: Montserrat sans-serif
+
+**Spacing**:
+- Border radius: 16px (cards), 10px (buttons)
+- Responsive padding: 1rem mobile → 3rem desktop
+- Card hover: `translateY(-2px)` lift effect
+
+**Mobile Optimized**:
+- Responsive breakpoints: 768px, 1024px
+- Touch targets ≥ 44px
+- No horizontal scrolling
+- Font sizes ≥ 12px minimum
+
+**Files**:
+- Component: `src/pages/admin/settings.tsx`
+- Styles: `src/styles/Settings.module.css`
 
 ---
 

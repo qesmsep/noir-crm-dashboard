@@ -38,19 +38,33 @@ function generateTimeSlots(timeRanges: any[] = [{ start: '18:00', end: '23:00' }
 
 export async function POST(request: Request) {
   try {
-    const { date, party_size } = await request.json();
+    const { date, party_size, location } = await request.json();
     if (!date || !party_size) {
       return NextResponse.json({ error: 'Missing date or party_size' }, { status: 400 });
     }
-    
-    if (DEBUG) console.log('🚨 AVAILABLE SLOTS API CALLED:', { date, party_size });
+
+    if (DEBUG) console.log('🚨 AVAILABLE SLOTS API CALLED:', { date, party_size, location });
     if (DEBUG) console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
     if (DEBUG) console.log('🚨 DEPLOYMENT TIMESTAMP:', new Date().toISOString());
-    
+
     const supabase = getSupabaseClient();
-    
+
     // date should already be in YYYY-MM-DD format from frontend
     const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);
+
+    // Get location_id if location slug is provided
+    let locationId: string | null = null;
+    if (location && typeof location === 'string') {
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('slug', location)
+        .single();
+
+      if (!locationError && locationData) {
+        locationId = locationData.id;
+      }
+    }
     
     // 0. Check if date is within booking window
     const { data: settingsData } = await supabase
@@ -75,12 +89,18 @@ export async function POST(request: Request) {
     if (DEBUG) console.log('Checking venue hours for:', { dateStr, dayOfWeek });
     
     // Check for exceptional closure
-    const { data: exceptionalClosure } = await supabase
+    let closureQuery = supabase
       .from('venue_hours')
       .select('*')
       .eq('type', 'exceptional_closure')
-      .eq('date', dateStr)
-      .maybeSingle();
+      .eq('date', dateStr);
+
+    // Filter by location if provided
+    if (locationId) {
+      closureQuery = closureQuery.eq('location_id', locationId);
+    }
+
+    const { data: exceptionalClosure } = await closureQuery.maybeSingle();
     
     if (DEBUG) console.log('Exceptional closure found:', exceptionalClosure);
     

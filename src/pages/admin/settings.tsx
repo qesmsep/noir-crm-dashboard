@@ -574,16 +574,13 @@ export default function Settings() {
             {/* Custom Open/Closed Days */}
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Custom Open/Closed Days</h2>
-              <p className={styles.inputHint}>
-                Note: Currently showing global settings. Location-specific custom days coming soon.
-              </p>
               <div className={styles.subsection}>
                 <h3 className={styles.subsectionTitle}>Custom Open Days</h3>
-                <CalendarAvailabilityControl section="custom_open" />
+                <CalendarAvailabilityControl section="custom_open" locationSlug="noirkc" />
               </div>
               <div className={styles.subsection}>
                 <h3 className={styles.subsectionTitle}>Custom Closed Days</h3>
-                <CalendarAvailabilityControl section="custom_closed" />
+                <CalendarAvailabilityControl section="custom_closed" locationSlug="noirkc" />
               </div>
             </div>
 
@@ -712,16 +709,13 @@ export default function Settings() {
             {/* Custom Open/Closed Days */}
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Custom Open/Closed Days</h2>
-              <p className={styles.inputHint}>
-                Note: Currently showing global settings. Location-specific custom days coming soon.
-              </p>
               <div className={styles.subsection}>
                 <h3 className={styles.subsectionTitle}>Custom Open Days</h3>
-                <CalendarAvailabilityControl section="custom_open" />
+                <CalendarAvailabilityControl section="custom_open" locationSlug="rooftopkc" />
               </div>
               <div className={styles.subsection}>
                 <h3 className={styles.subsectionTitle}>Custom Closed Days</h3>
-                <CalendarAvailabilityControl section="custom_closed" />
+                <CalendarAvailabilityControl section="custom_closed" locationSlug="rooftopkc" />
               </div>
             </div>
 

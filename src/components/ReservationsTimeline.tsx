@@ -68,6 +68,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
   const [scrollTime, setScrollTime] = useState<string>('18:00:00');
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
+  const [exceptionalClosures, setExceptionalClosures] = useState<any[]>([]);
   const { settings } = useSettings();
   const toast = useToast();
   
@@ -167,6 +168,44 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     };
 
     fetchPrivateEvents();
+  }, [reloadKey, localReloadKey, locationSlug]);
+
+  // Load exceptional closures (custom closed days)
+  useEffect(() => {
+    const fetchExceptionalClosures = async () => {
+      try {
+        if (!locationSlug) {
+          setExceptionalClosures([]);
+          return;
+        }
+
+        // Get location ID first
+        const { data: locationData, error: locationError } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', locationSlug)
+          .single();
+
+        if (locationError) {
+          console.error('Error fetching location:', locationError);
+          setExceptionalClosures([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('venue_hours')
+          .select('*')
+          .eq('type', 'exceptional_closure')
+          .eq('location_id', locationData.id);
+
+        if (error) throw error;
+        setExceptionalClosures(data || []);
+      } catch (error) {
+        console.error('Error fetching exceptional closures:', error);
+      }
+    };
+
+    fetchExceptionalClosures();
   }, [reloadKey, localReloadKey, locationSlug]);
 
   // Track if we're updating from props to prevent infinite loop
@@ -426,12 +465,12 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       // Add blocking events for private events
       const blockingEvents: any[] = [];
       const currentDayPrivateEvents = getCurrentDayPrivateEvents();
-      
+
       currentDayPrivateEvents.forEach((privateEvent: any) => {
         resources.forEach((resource: Resource) => {
           const startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
           const endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-          
+
           const blockingEvent = {
             id: `blocking-${privateEvent.id}-${resource.id}`,
             title: `🔒 ${privateEvent.title} - Private Event`,
@@ -451,11 +490,79 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             display: 'background',
             classNames: ['private-event-blocking']
           };
-          
+
           blockingEvents.push(blockingEvent);
         });
       });
-      
+
+      // Add blocking events for exceptional closures (custom closed days)
+      const currentDateStr = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone).toFormat('yyyy-MM-dd');
+      const currentDayClosures = exceptionalClosures.filter((closure: any) => closure.date === currentDateStr);
+
+      currentDayClosures.forEach((closure: any) => {
+        resources.forEach((resource: Resource) => {
+          let startTime, endTime;
+
+          if (closure.full_day) {
+            // Full day closure - block entire day
+            startTime = `${currentDateStr}T00:00:00`;
+            endTime = `${currentDateStr}T23:59:59`;
+          } else if (closure.time_ranges && closure.time_ranges.length > 0) {
+            // Partial day closure - create blocking events for each time range
+            closure.time_ranges.forEach((range: any, idx: number) => {
+              const closureEvent = {
+                id: `closure-${closure.id}-${resource.id}-${idx}`,
+                title: closure.reason || 'Closed',
+                extendedProps: {
+                  closure_id: closure.id,
+                  is_blocking: true,
+                  event_type: 'exceptional_closure',
+                  reason: closure.reason,
+                  ...closure
+                },
+                start: `${currentDateStr}T${range.start}:00`,
+                end: `${currentDateStr}T${range.end}:00`,
+                resourceId: resource.id,
+                type: 'blocking',
+                backgroundColor: '#6b7280',
+                borderColor: '#6b7280',
+                textColor: '#ffffff',
+                display: 'background',
+                classNames: ['exceptional-closure-blocking']
+              };
+              blockingEvents.push(closureEvent);
+            });
+            return; // Skip the default blocking event creation below
+          } else {
+            return; // No time ranges and not full day, skip
+          }
+
+          // Full day blocking event
+          const closureEvent = {
+            id: `closure-${closure.id}-${resource.id}`,
+            title: closure.reason || 'Closed',
+            extendedProps: {
+              closure_id: closure.id,
+              is_blocking: true,
+              event_type: 'exceptional_closure',
+              reason: closure.reason,
+              ...closure
+            },
+            start: startTime,
+            end: endTime,
+            resourceId: resource.id,
+            type: 'blocking',
+            backgroundColor: '#6b7280',
+            borderColor: '#6b7280',
+            textColor: '#ffffff',
+            display: 'background',
+            classNames: ['exceptional-closure-blocking']
+          };
+
+          blockingEvents.push(closureEvent);
+        });
+      });
+
       const allEvents = [...mapped, ...blockingEvents];
       setEvents(allEvents);
     };
@@ -479,7 +586,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         console.debug('scrollToTime not available:', e);
       }
     }
-  }, [resources, eventData, currentCalendarDate, privateEvents, settings.timezone, isMobile]);
+  }, [resources, eventData, currentCalendarDate, privateEvents, exceptionalClosures, settings.timezone, isMobile]);
 
   // Get private events for the current calendar date
   const getCurrentDayPrivateEvents = () => {
