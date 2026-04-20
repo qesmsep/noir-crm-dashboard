@@ -633,6 +633,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(memberId && { member_id: memberId }),
         // account_id - include if provided
         ...(body.account_id && { account_id: body.account_id }),
+        // payment_intent_id - map from stripe_payment_intent_id or use directly
+        ...((body.stripe_payment_intent_id || body.payment_intent_id) && {
+          payment_intent_id: body.stripe_payment_intent_id || body.payment_intent_id
+        }),
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));

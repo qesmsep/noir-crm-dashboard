@@ -1,6 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-12-18.acacia',
+});
 
 console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 console.log('Supabase Service Role Key:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'present' : 'MISSING');
@@ -273,6 +278,40 @@ export async function GET(request: Request, { params }: any) {
         { error: 'Reservation not found' },
         { status: 404 }
       );
+    }
+
+    // Map payment_intent_id to stripe_payment_intent_id for frontend compatibility
+    if (data.payment_intent_id) {
+      data.stripe_payment_intent_id = data.payment_intent_id;
+    }
+
+    // If reservation has a Stripe payment, fetch payment method details
+    const paymentIntentId = data.stripe_payment_intent_id || data.payment_intent_id;
+    if (paymentIntentId) {
+      try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        // Add payment amount from Stripe
+        data.payment_amount = paymentIntent.amount;
+
+        // Get payment method details if available
+        if (paymentIntent.payment_method) {
+          const paymentMethodId = typeof paymentIntent.payment_method === 'string'
+            ? paymentIntent.payment_method
+            : paymentIntent.payment_method.id;
+
+          const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+
+          // Add payment method details to reservation data
+          data.payment_method_last4 = paymentMethod.card?.last4;
+          data.payment_method_brand = paymentMethod.card?.brand;
+          data.payment_method_exp_month = paymentMethod.card?.exp_month;
+          data.payment_method_exp_year = paymentMethod.card?.exp_year;
+        }
+      } catch (stripeError) {
+        console.error('Error fetching Stripe payment details:', stripeError);
+        // Continue without payment details - don't fail the whole request
+      }
     }
 
     console.log('API: Successfully found reservation:', data);

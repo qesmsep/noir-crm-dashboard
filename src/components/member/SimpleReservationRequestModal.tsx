@@ -4,6 +4,10 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { DateTime } from 'luxon';
 import { X } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
 interface Props {
   isOpen: boolean;
@@ -73,6 +77,11 @@ export default function SimpleReservationRequestModal({
   // Booking window state
   const [bookingStartDate, setBookingStartDate] = useState<Date | null>(null);
   const [bookingEndDate, setBookingEndDate] = useState<Date | null>(null);
+
+  // Payment state for non-members
+  const [showPayment, setShowPayment] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
 
   // Initialize fields when memberName changes
   useEffect(() => {
@@ -302,6 +311,275 @@ export default function SimpleReservationRequestModal({
 
   const availableTimeSlots = getAvailableTimeSlots();
 
+  // Payment Step Component for non-members
+  function PaymentStep() {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [paymentProcessing, setPaymentProcessing] = useState(false);
+    const [paymentError, setPaymentError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    // Create PaymentIntent when component mounts
+    useEffect(() => {
+      const createPaymentIntent = async () => {
+        try {
+          const totalAmount = parseInt(partySize) * coverPrice;
+          const reservationDate = DateTime.fromJSDate(date!).toFormat('MMMM dd, yyyy');
+          const locationName = selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC';
+
+          const response = await fetch('/api/create-cover-charge-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: totalAmount,
+              partySize: parseInt(partySize),
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              email: email || undefined,
+              reservationDate,
+              location: locationName,
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to create payment');
+          }
+
+          setClientSecret(data.clientSecret);
+          setPaymentIntentId(data.paymentIntentId);
+        } catch (error: any) {
+          setPaymentError(error.message || 'Failed to initialize payment');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      createPaymentIntent();
+    }, []);
+
+    const handlePaymentSubmit = async (event: React.FormEvent) => {
+      event.preventDefault();
+
+      if (!stripe || !elements) {
+        setPaymentError('Stripe is not loaded. Please try again in a moment.');
+        return;
+      }
+
+      setPaymentProcessing(true);
+      setPaymentError(null);
+
+      try {
+        const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+          elements,
+          confirmParams: {
+            payment_method_data: {
+              billing_details: {
+                name: `${firstName} ${lastName}`.trim(),
+                email: email || undefined,
+              },
+            },
+          },
+          redirect: 'if_required',
+        });
+
+        if (stripeError) {
+          setPaymentError(stripeError.message || 'Payment failed');
+          setPaymentProcessing(false);
+          return;
+        }
+
+        if (paymentIntent && paymentIntent.status === 'succeeded') {
+          // Payment successful, now create reservation
+          await createReservationAfterPayment(paymentIntent.id);
+        }
+      } catch (error: any) {
+        setPaymentError(error.message);
+        setPaymentProcessing(false);
+      }
+    };
+
+    if (loading) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #E5E7EB',
+            borderTop: '4px solid #A59480',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            marginBottom: '1rem',
+          }} />
+          <p style={{ fontSize: '0.875rem', color: '#6B7280' }}>Preparing payment...</p>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      );
+    }
+
+    return (
+      <form onSubmit={handlePaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1F1F1F' }}>
+            Payment Details
+          </h3>
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#F9FAFB',
+            borderRadius: '10px',
+            marginBottom: '1rem',
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: '0 0 0.5rem 0' }}>
+              Reservation for {partySize} {parseInt(partySize) === 1 ? 'guest' : 'guests'}
+            </p>
+            <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+              Total: ${parseInt(partySize) * coverPrice}
+            </p>
+          </div>
+          {clientSecret && <PaymentElement />}
+        </div>
+
+        {paymentError && (
+          <div style={{
+            padding: '0.75rem',
+            backgroundColor: '#FEE2E2',
+            border: '1px solid #FCA5A5',
+            borderRadius: '8px',
+            color: '#991B1B',
+            fontSize: '0.875rem',
+          }}>
+            {paymentError}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setShowPayment(false);
+              setClientSecret(null);
+            }}
+            style={{
+              flex: 1,
+              height: '48px',
+              backgroundColor: '#F3F4F6',
+              color: '#1F1F1F',
+              fontSize: '1rem',
+              fontWeight: '600',
+              borderRadius: '10px',
+              border: '1px solid #D1D5DB',
+              cursor: 'pointer',
+            }}
+          >
+            Back
+          </button>
+          <button
+            type="submit"
+            disabled={!stripe || paymentProcessing}
+            style={{
+              flex: 2,
+              height: '48px',
+              backgroundColor: paymentProcessing ? '#D1D5DB' : '#A59480',
+              color: 'white',
+              fontSize: '1rem',
+              fontWeight: '600',
+              borderRadius: '10px',
+              border: 'none',
+              cursor: paymentProcessing ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
+            }}
+          >
+            {paymentProcessing ? 'Processing...' : `Pay $${parseInt(partySize) * coverPrice}`}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  // Create reservation after successful payment
+  const createReservationAfterPayment = async (paymentId: string) => {
+    setIsCreatingReservation(true);
+
+    try {
+      const [timeStr, period] = time.split(' ');
+      const [hourStr, minuteStr] = timeStr.split(':');
+      let hour = parseInt(hourStr);
+      const minute = parseInt(minuteStr);
+
+      if (period === 'PM' && hour !== 12) {
+        hour += 12;
+      } else if (period === 'AM' && hour === 12) {
+        hour = 0;
+      }
+
+      const startDateTime = DateTime.fromJSDate(date!)
+        .set({ hour, minute, second: 0, millisecond: 0 })
+        .setZone('America/Chicago');
+
+      const endDateTime = startDateTime.plus({ hours: 2 });
+
+      const response = await fetch('/api/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_time: startDateTime.toISO(),
+          end_time: endDateTime.toISO(),
+          party_size: parseInt(partySize),
+          phone: memberPhone,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email || undefined,
+          notes: notes || undefined,
+          table_id: tableId || undefined,
+          location_slug: selectedLocation,
+          cover_charge_applied: true,
+          cover_price: coverPrice,
+          source: 'public_booking',
+          create_visitor: true,
+          stripe_payment_intent_id: paymentId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create reservation');
+      }
+
+      toast({
+        title: 'Reservation Confirmed!',
+        description: 'Payment successful. Your table has been reserved.',
+        variant: 'success',
+      });
+
+      if (onReservationCreated) {
+        onReservationCreated();
+      }
+
+      // Reset and close
+      setDate(null);
+      setTime('');
+      setPartySize('2');
+      setNotes('');
+      setShowPayment(false);
+      setClientSecret(null);
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Payment succeeded but reservation failed. Please contact us.',
+        variant: 'error',
+      });
+    } finally {
+      setIsCreatingReservation(false);
+    }
+  };
+
   const handleMakeReservation = async () => {
     if (!date || !time) {
       toast({
@@ -322,6 +600,16 @@ export default function SimpleReservationRequestModal({
       return;
     }
 
+    // Determine if cover charge applies (enabled AND not a member)
+    const coverChargeApplies = coverEnabled && !memberId;
+
+    // If non-member with cover charge, show payment step (don't create PaymentIntent yet)
+    if (coverChargeApplies) {
+      setShowPayment(true);
+      return;
+    }
+
+    // Members proceed directly to reservation creation
     setIsCreatingReservation(true);
 
     try {
@@ -471,7 +759,7 @@ export default function SimpleReservationRequestModal({
         {/* Header */}
         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
-            Request a Reservation
+            {showPayment ? 'Complete Payment' : 'Request a Reservation'}
           </h2>
           <button
             onClick={onClose}
@@ -500,8 +788,18 @@ export default function SimpleReservationRequestModal({
           </button>
         </div>
 
-        {/* Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* Show payment step or reservation form */}
+        {showPayment ? (
+          clientSecret ? (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <PaymentStep />
+            </Elements>
+          ) : (
+            <PaymentStep />
+          )
+        ) : (
+          /* Form */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Guest Information - Always shown, editable (pre-filled if member found) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <input
@@ -573,38 +871,68 @@ export default function SimpleReservationRequestModal({
             />
           </div>
 
-          {/* Location Picker */}
-          <div>
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-              style={{
-                width: '100%',
-                height: '44px',
-                padding: '0 1rem',
-                border: '1px solid #D1D5DB',
-                borderRadius: '10px',
-                fontSize: '0.875rem',
-                backgroundColor: 'white',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="noirkc">Noir KC</option>
-              <option value="rooftopkc">RooftopKC</option>
-            </select>
-            {/* Cover charge notice for non-members */}
-            {coverEnabled && !memberId && (
+          {/* Location Picker - Only show for members */}
+          {memberId ? (
+            <div>
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  padding: '0 1rem',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="noirkc">Noir KC</option>
+                <option value="rooftopkc">RooftopKC</option>
+              </select>
+            </div>
+          ) : (
+            /* Location display for non-members */
+            <div style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              border: '1px solid #D1D5DB',
+              borderRadius: '10px',
+              backgroundColor: '#F9FAFB',
+            }}>
               <p style={{
-                marginTop: '0.5rem',
-                fontSize: '0.875rem',
-                color: '#A59480',
-                fontWeight: '600'
+                fontSize: '0.75rem',
+                color: '#6B7280',
+                margin: '0 0 0.25rem 0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
               }}>
-                ${coverPrice} cover charge applies for this location
+                Reservation Location
               </p>
-            )}
-          </div>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#1F1F1F',
+                fontWeight: '600',
+                margin: 0,
+              }}>
+                {selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC'}
+              </p>
+            </div>
+          )}
+
+          {/* Cover charge notice for non-members */}
+          {coverEnabled && !memberId && (
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#A59480',
+              fontWeight: '600',
+              margin: 0,
+            }}>
+              ${coverPrice} cover charge per person applies (includes first drink)
+            </p>
+          )}
 
           {/* Date and Time Row */}
           <div style={{ display: 'flex', gap: '1rem' }}>
@@ -773,6 +1101,7 @@ export default function SimpleReservationRequestModal({
             {isCreatingReservation ? 'Creating...' : 'Make Reservation'}
           </button>
         </div>
+        )}
       </div>
     </div>
   );

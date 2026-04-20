@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import BookMenuViewer from '../../components/BookMenuViewer';
-import SimpleReservationRequestModal from '../../components/member/SimpleReservationRequestModal';
+import PublicReservationFlow from '../../components/PublicReservationFlow';
 
 export default function RooftopKCHome() {
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
@@ -17,7 +17,7 @@ export default function RooftopKCHome() {
       <nav className="absolute top-0 left-0 right-0 w-full flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 bg-white/20 backdrop-blur-sm z-50" style={{ color: '#ECEDE8' }}>
         <div className="flex items-center gap-2">
           <Image
-            src="/images/noir-wedding-day.png"
+            src="/images/rooftopkc-logo.png"
             alt="RooftopKC Logo"
             width={60}
             height={45}
@@ -51,10 +51,24 @@ export default function RooftopKCHome() {
             priority
             className="responsive-image"
           />
-          {/* 20% Cork overlay */}
-          <div style={{ background: 'rgba(165, 148, 128, 0.2)', position: 'absolute', inset: 0, zIndex: 2 }} />
+          {/* 40% Dark overlay */}
+          <div style={{ background: 'rgba(0, 0, 0, 0.4)', position: 'absolute', inset: 0, zIndex: 2 }} />
           {/* Mobile-optimized text and button */}
           <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center text-center text-[#ECEDE8] px-4 sm:px-8">
+            <div className="mb-3 sm:mb-4">
+              <Image
+                src="/images/rooftopkc-logo.png"
+                alt="RooftopKC"
+                width={700}
+                height={400}
+                className="object-contain w-80 sm:w-96 md:w-[500px] lg:w-[600px] xl:w-[700px]"
+                style={{
+                  height: 'auto',
+                  filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4))'
+                }}
+                priority
+              />
+            </div>
             <h1
               className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl mb-4 sm:mb-6 leading-tight"
               style={{
@@ -66,7 +80,7 @@ export default function RooftopKCHome() {
                 textShadow: '0 2px 8px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
             >
-              ELEVATED SPIRITS.<br />UNFORGETTABLE SPACE.
+              ELEVATED SPIRITS.<br />UNFORGETTABLE VIEWS.
             </h1>
             <p
               className="mobile-text font-sans text-base sm:text-lg md:text-xl lg:text-2xl max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl mx-auto mb-6 sm:mb-8 md:mb-10 px-2"
@@ -93,7 +107,7 @@ export default function RooftopKCHome() {
             <div className="flex flex-col items-center text-center">
               <div className="mb-6 sm:mb-8">
                 <img
-                  src="/images/noir-wedding-day.png"
+                  src="/images/rooftopkc-logo.png"
                   alt="RooftopKC"
                   className="h-16 sm:h-20 md:h-24 object-contain mx-auto"
                 />
@@ -108,7 +122,7 @@ export default function RooftopKCHome() {
                   fontWeight: 600
                 }}
               >
-                <span style={{ color: '#BCA892' }}>Reserve Your Spot</span>
+                <span style={{ color: '#BCA892' }}>Make a Reservation</span>
               </h2>
               <p
                 className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-2xl"
@@ -118,7 +132,7 @@ export default function RooftopKCHome() {
                   lineHeight: 1.5
                 }}
               >
-                Experience RooftopKC with rooftop views and signature cocktails. Reserve your table for an unforgettable evening.
+                RooftopKC is reservation-only. Experience stunning rooftop views and signature cocktails in an elevated atmosphere. Reserve your table for an unforgettable evening.
               </p>
               <div className="mb-6 sm:mb-8 space-y-3">
                 <p
@@ -148,7 +162,12 @@ export default function RooftopKCHome() {
                     color: '#BCA892'
                   }}
                 >
-                  Members: No reservation fee required
+                  <a
+                    href="#membership"
+                    className="underline hover:text-[#ECEDE8] transition-colors"
+                  >
+                    Members of Noir
+                  </a>: No reservation fee required
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
@@ -247,8 +266,8 @@ export default function RooftopKCHome() {
       </section>
 
       {/* Mobile-Optimized Membership Section */}
-      <section className="w-full flex flex-col items-center justify-center py-12 sm:py-16 px-4 sm:px-8 bg-[#ECEDE8]">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-6 sm:mb-8 md:mb-12 text-center px-4"
+      <section id="membership" className="w-full flex flex-col items-center justify-center py-12 sm:py-16 px-4 sm:px-8 bg-[#ECEDE8] scroll-mt-20">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 text-center px-4"
             style={{
               fontFamily: 'Montserrat, sans-serif',
               fontWeight: 900,
@@ -256,8 +275,17 @@ export default function RooftopKCHome() {
               textTransform: 'uppercase',
               color: '#23201C',
             }}>
-          THE MEMBERSHIP
+          Membership at Noir
         </h2>
+        <p className="text-base sm:text-lg md:text-xl mb-8 sm:mb-10 md:mb-12 text-center max-w-3xl px-4"
+           style={{
+             fontFamily: 'Montserrat, sans-serif',
+             fontWeight: 400,
+             color: '#353535',
+             lineHeight: 1.6
+           }}>
+          RooftopKC is an extension of our Noir concept—elevated to the rooftop with stunning views and an open-air atmosphere. If you're interested in joining our community and gaining exclusive access to both locations, here are the membership details:
+        </p>
         <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
           {/* Main Membership Card */}
           <div className="bg-[#353535] rounded-2xl shadow-xl p-6 sm:p-8 flex flex-col items-center border-4 border-[#BCA892] min-h-[300px] sm:min-h-[340px]">
@@ -331,7 +359,7 @@ export default function RooftopKCHome() {
             }}
             aria-label="Text MEMBERSHIP to 913.777.4488 for membership information"
           >
-            Text MEMBERSHIP to 913.777.4488 to get access
+            Text MEMBERSHIP to 913.777.4488 for more information
           </button>
         </div>
       </section>
@@ -373,13 +401,12 @@ export default function RooftopKCHome() {
                    color: '#BCA892',
                    fontFamily: 'Montserrat, sans-serif'
                  }}>
-              <div><span className="font-semibold">Venue Rental:</span> $500/hr</div>
+              <div><span className="font-semibold">Venue Rental:</span> $1,000/hr</div>
               <div><span className="font-semibold">Beverage Minimum:</span> $500/hr + sales tax</div>
               <div><span className="font-semibold">Outside catering allowed</span></div>
-              <div><span className="font-semibold">*</span> private events are reserved for members</div>
             </div>
             <a
-              href="sms:9137774488?body=Hi%2C%20I%20am%20interested%20in%20booking%20a%20private%20event%20at%20RooftopKC.%20Can%20you%20share%20availability%3F"
+              href="sms:9137774488?body=Hi!%20This%20is%20YOUR_NAME%2C%20and%20I'm%20checking%20to%20see%20if%20RooftopKC%20is%20available%20on%20ENTER_DATE%20for%20an%20event.%20(Please%20include%20any%20additional%20information)."
               className="mobile-button mobile-accessible inline-block px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
               style={{
                 fontFamily: 'Montserrat, sans-serif',
@@ -409,7 +436,7 @@ export default function RooftopKCHome() {
           {/* RooftopKC Logo */}
           <div className="flex-1 flex justify-center lg:justify-start">
             <img
-              src="/images/noir-wedding-day.png"
+              src="/images/rooftopkc-logo.png"
               alt="RooftopKC Logo"
               className="h-16 sm:h-20 lg:h-24 max-w-48 sm:max-w-64 lg:max-w-80 object-contain"
             />
@@ -426,7 +453,7 @@ export default function RooftopKCHome() {
                   className="text-[#BCA892] underline hover:text-[#ECEDE8] transition-colors"
                   aria-label="Open location in Apple Maps"
                 >
-                  Corrigan Station<br />
+                  Corrigan Station Rooftop<br />
                   1828 Walnut<br />
                   Kansas City, MO 64108
                 </a>
@@ -479,7 +506,7 @@ export default function RooftopKCHome() {
       </footer>
 
       {/* Reservation Modal */}
-      <SimpleReservationRequestModal
+      <PublicReservationFlow
         isOpen={isReservationModalOpen}
         onClose={() => setIsReservationModalOpen(false)}
         locationSlug="rooftopkc"

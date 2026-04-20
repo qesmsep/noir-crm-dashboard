@@ -51,6 +51,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
   const [messageError, setMessageError] = useState('');
   const [messageSuccess, setMessageSuccess] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [isCancellingWithRefund, setIsCancellingWithRefund] = useState(false);
+  const [isCancellingWithCharge, setIsCancellingWithCharge] = useState(false);
   const { toast } = useToast();
   const { settings } = useSettings();
   const timezone = settings?.timezone || 'America/Chicago';
@@ -257,6 +259,54 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCancelWithRefund = async () => {
+    setIsCancellingWithRefund(true);
+    try {
+      const response = await fetch(`/api/reservations/${reservationId}/cancel-refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to cancel and refund');
+      }
+
+      toast({ title: 'Success', description: 'Reservation cancelled and payment refunded', variant: 'success' });
+      onReservationUpdated();
+      onClose();
+    } catch (error: any) {
+      console.error('Error cancelling with refund:', error);
+      toast({ title: 'Error', description: error.message || 'Failed to cancel and refund', variant: 'error' });
+    } finally {
+      setIsCancellingWithRefund(false);
+    }
+  };
+
+  const handleCancelWithCharge = async () => {
+    setIsCancellingWithCharge(true);
+    try {
+      const response = await fetch(`/api/reservations/${reservationId}/cancel-charge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to cancel and keep charge');
+      }
+
+      toast({ title: 'Success', description: 'Reservation cancelled, payment kept', variant: 'success' });
+      onReservationUpdated();
+      onClose();
+    } catch (error: any) {
+      console.error('Error cancelling with charge:', error);
+      toast({ title: 'Error', description: error.message || 'Failed to cancel', variant: 'error' });
+    } finally {
+      setIsCancellingWithCharge(false);
     }
   };
 
@@ -826,6 +876,39 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
                 </span>
               </div>
+
+              {/* Payment Information */}
+              {reservation.stripe_payment_intent_id && (
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '1rem',
+                  backgroundColor: '#F9FAFB',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                }}>
+                  <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1F1F1F', margin: '0 0 0.5rem 0' }}>
+                    Payment Information
+                  </p>
+                  <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    {reservation.payment_amount && (
+                      <p style={{ margin: 0 }}>
+                        <strong>Cover Charge:</strong> ${(reservation.payment_amount / reservation.party_size / 100).toFixed(2)} × {reservation.party_size} = ${(reservation.payment_amount / 100).toFixed(2)}
+                      </p>
+                    )}
+                    <p style={{ margin: 0 }}>
+                      <strong>Payment ID:</strong> {reservation.stripe_payment_intent_id}
+                    </p>
+                    {reservation.payment_method_last4 && (
+                      <p style={{ margin: 0 }}>
+                        <strong>Card:</strong> {reservation.payment_method_brand || 'Card'} •••• {reservation.payment_method_last4}
+                      </p>
+                    )}
+                    <p style={{ margin: 0 }}>
+                      <strong>Reserved:</strong> {reservation.created_at ? formatDateTime(new Date(reservation.created_at), timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : 'Unknown'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <p>Reservation not found</p>
@@ -909,6 +992,60 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                 <Trash2 size={16} />
               </button>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {/* Payment action buttons - only show if reservation has a payment */}
+                {reservation?.stripe_payment_intent_id && (
+                  <>
+                    <button
+                      onClick={handleCancelWithRefund}
+                      disabled={isCancellingWithRefund || isCancellingWithCharge}
+                      style={{
+                        height: '36px',
+                        padding: '0 1rem',
+                        backgroundColor: (isCancellingWithRefund || isCancellingWithCharge) ? '#D1D5DB' : '#10B981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: (isCancellingWithRefund || isCancellingWithCharge) ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isCancellingWithRefund && !isCancellingWithCharge) e.currentTarget.style.backgroundColor = '#059669';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isCancellingWithRefund && !isCancellingWithCharge) e.currentTarget.style.backgroundColor = '#10B981';
+                      }}
+                    >
+                      {isCancellingWithRefund ? 'Processing...' : 'Cancel + Refund'}
+                    </button>
+                    <button
+                      onClick={handleCancelWithCharge}
+                      disabled={isCancellingWithRefund || isCancellingWithCharge}
+                      style={{
+                        height: '36px',
+                        padding: '0 1rem',
+                        backgroundColor: (isCancellingWithRefund || isCancellingWithCharge) ? '#D1D5DB' : '#F59E0B',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: (isCancellingWithRefund || isCancellingWithCharge) ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isCancellingWithRefund && !isCancellingWithCharge) e.currentTarget.style.backgroundColor = '#D97706';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isCancellingWithRefund && !isCancellingWithCharge) e.currentTarget.style.backgroundColor = '#F59E0B';
+                      }}
+                    >
+                      {isCancellingWithCharge ? 'Processing...' : 'Cancel + Charge'}
+                    </button>
+                  </>
+                )}
+
                 <button
                   onClick={handleClose}
                   style={{

@@ -250,7 +250,7 @@ export default function Home() {
               textTransform: 'uppercase',
               color: '#23201C',
             }}>
-          THE MEMBERSHIP
+          Membership at Noir
         </h2>
         <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
           {/* Main Membership Card */}
@@ -272,9 +272,9 @@ export default function Home() {
               <li>• Unused credit rolls over each month</li>
               <li>• No deposit for reservations</li>
               <li>• You + up to 10 guests per visit</li>
-              
+
               <li>• Curated events & member experiences</li>
-             
+
               <li>• Concierge Reservations via Text</li>
               <li>• House account for seamless billing</li>
               <li>• Host Private Gatherings at Noir</li>
@@ -313,22 +313,22 @@ export default function Home() {
           </div>
         </div>
         <div className="w-full flex justify-center mt-8 sm:mt-10 px-4">
-          <button 
+          <button
             onClick={() => {
               const message = "MEMBERSHIP";
               const phoneNumber = "9137774488";
               const url = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
               window.open(url, '_blank');
             }}
-            className="mobile-button mobile-accessible inline-block px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95" 
-            style={{ 
-              fontFamily: 'Montserrat, sans-serif', 
+            className="mobile-button mobile-accessible inline-block px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
+            style={{
+              fontFamily: 'Montserrat, sans-serif',
               letterSpacing: '0.05em',
               touchAction: 'manipulation'
             }}
             aria-label="Text MEMBERSHIP to 913.777.4488 for membership information"
           >
-            Text MEMBERSHIP to 913.777.4488 to get access
+            Text MEMBERSHIP to 913.777.4488 for more information
           </button>
         </div>
       </section>
@@ -375,11 +375,11 @@ export default function Home() {
               <div><span className="font-semibold">Outside catering allowed</span></div>
               <div><span className="font-semibold">*</span> private events are reserved for members</div>
             </div>
-            <a 
-              href="sms:9137774488?body=Hi%2C%20I%20am%20interested%20in%20booking%20a%20private%20event%20at%20Noir.%20Can%20you%20share%20availability%3F" 
+            <a
+              href="sms:9137774488?body=Hi!%20This%20is%20YOUR_NAME%2C%20and%20I'm%20checking%20to%20see%20if%20Noir%20KC%20is%20available%20on%20ENTER_DATE%20for%20an%20event.%20(Please%20include%20any%20additional%20information)."
               className="mobile-button mobile-accessible inline-block px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
-              style={{ 
-                fontFamily: 'Montserrat, sans-serif', 
+              style={{
+                fontFamily: 'Montserrat, sans-serif',
                 letterSpacing: '0.05em',
                 touchAction: 'manipulation'
               }}
