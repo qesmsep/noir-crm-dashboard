@@ -7,7 +7,8 @@ export default function handler(req, res) {
   }
 
   try {
-    const menuDir = path.join(process.cwd(), 'public', 'menu');
+    const location = req.query.location || 'noirkc';
+    const menuDir = path.join(process.cwd(), 'public', 'menu', location);
 
     if (!fs.existsSync(menuDir)) {
       return res.status(404).json({ error: 'Menu directory not found' });
@@ -27,7 +28,7 @@ export default function handler(req, res) {
 
         return {
           name: file,
-          path: `/menu/${file}`,
+          path: `/menu/${location}/${file}`,
           size: stats.size
         };
       });

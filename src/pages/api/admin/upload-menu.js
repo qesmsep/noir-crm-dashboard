@@ -14,7 +14,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const menuDir = path.join(process.cwd(), 'public', 'menu');
+    const location = req.query.location || 'noirkc';
+    const menuDir = path.join(process.cwd(), 'public', 'menu', location);
     
     // Ensure menu directory exists
     if (!fs.existsSync(menuDir)) {
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
       
       return {
         name: file.originalFilename,
-        path: `/menu/${file.originalFilename}`,
+        path: `/menu/${location}/${file.originalFilename}`,
         size: file.size
       };
     });

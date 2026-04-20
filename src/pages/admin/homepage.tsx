@@ -121,6 +121,7 @@ export default function HomePageAdmin() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<string>('noirkc');
   const { toast } = useToast();
 
   const sensors = useSensors(
@@ -132,12 +133,12 @@ export default function HomePageAdmin() {
 
   useEffect(() => {
     fetchMenuFiles();
-  }, []);
+  }, [selectedLocation]);
 
   const fetchMenuFiles = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/menu-files');
+      const response = await fetch(`/api/admin/menu-files?location=${selectedLocation}`);
       if (!response.ok) {
         throw new Error('Failed to fetch menu files');
       }
@@ -166,7 +167,7 @@ export default function HomePageAdmin() {
         formData.append('menuFiles', file);
       });
 
-      const response = await fetch('/api/admin/upload-menu', {
+      const response = await fetch(`/api/admin/upload-menu?location=${selectedLocation}`, {
         method: 'POST',
         body: formData,
       });
@@ -196,7 +197,7 @@ export default function HomePageAdmin() {
     if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
 
     try {
-      const response = await fetch('/api/admin/delete-menu-file', {
+      const response = await fetch(`/api/admin/delete-menu-file?location=${selectedLocation}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName }),
@@ -233,7 +234,7 @@ export default function HomePageAdmin() {
       // Save the new order to the server
       setReordering(true);
       try {
-        const response = await fetch('/api/admin/reorder-menu-files', {
+        const response = await fetch(`/api/admin/reorder-menu-files?location=${selectedLocation}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -277,6 +278,30 @@ export default function HomePageAdmin() {
                 <p className="mt-2 text-gray-600 text-sm">
                   Drag to reorder • First page is the cover
                 </p>
+
+                {/* Location Selector */}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => setSelectedLocation('noirkc')}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      selectedLocation === 'noirkc'
+                        ? 'bg-[#1F1F1F] text-white'
+                        : 'bg-white text-[#2C2C2C] border border-[#DAD7D0] hover:bg-[#F6F5F2]'
+                    }`}
+                  >
+                    Noir KC
+                  </button>
+                  <button
+                    onClick={() => setSelectedLocation('rooftopkc')}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      selectedLocation === 'rooftopkc'
+                        ? 'bg-[#1F1F1F] text-white'
+                        : 'bg-white text-[#2C2C2C] border border-[#DAD7D0] hover:bg-[#F6F5F2]'
+                    }`}
+                  >
+                    RooftopKC
+                  </button>
+                </div>
               </div>
               <div className="flex gap-3">
                 <Button

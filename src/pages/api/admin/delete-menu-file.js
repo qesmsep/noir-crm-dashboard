@@ -7,13 +7,14 @@ export default function handler(req, res) {
   }
 
   try {
+    const location = req.query.location || 'noirkc';
     const { fileName } = req.body;
-    
+
     if (!fileName) {
       return res.status(400).json({ error: 'File name is required' });
     }
 
-    const filePath = path.join(process.cwd(), 'public', 'menu', fileName);
+    const filePath = path.join(process.cwd(), 'public', 'menu', location, fileName);
     
     // Check if file exists
     if (!fs.existsSync(filePath)) {

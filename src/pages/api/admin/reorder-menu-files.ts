@@ -11,6 +11,7 @@ export default async function handler(
   }
 
   try {
+    const location = (req.query.location as string) || 'noirkc';
     const { order } = req.body;
 
     if (!Array.isArray(order)) {
@@ -18,7 +19,7 @@ export default async function handler(
     }
 
     // Save the order to a JSON file
-    const orderFilePath = path.join(process.cwd(), 'public', 'menu', '.order.json');
+    const orderFilePath = path.join(process.cwd(), 'public', 'menu', location, '.order.json');
 
     await fs.writeFile(
       orderFilePath,
