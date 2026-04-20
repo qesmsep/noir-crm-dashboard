@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import BookMenuViewer from '../../components/BookMenuViewer';
-import RooftopKCReservationModal from '../../components/RooftopKCReservationModal';
+import SimpleReservationRequestModal from '../../components/member/SimpleReservationRequestModal';
 
 export default function RooftopKCHome() {
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
@@ -479,9 +479,10 @@ export default function RooftopKCHome() {
       </footer>
 
       {/* Reservation Modal */}
-      <RooftopKCReservationModal
+      <SimpleReservationRequestModal
         isOpen={isReservationModalOpen}
         onClose={() => setIsReservationModalOpen(false)}
+        locationSlug="rooftopkc"
         onReservationCreated={() => {
           setIsReservationModalOpen(false);
         }}

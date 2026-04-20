@@ -1,61 +1,45 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Global proxy for Next.js App Router (Next.js 16+)
- * Adds request ID tracking and basic security headers
- *
- * Migrated from middleware.ts to proxy.ts per Next.js 16 requirements
- */
 export function proxy(request: NextRequest) {
-  const requestId = uuidv4();
-  const startTime = Date.now();
+  const hostname = request.headers.get('host') || '';
 
-  // Clone the request headers
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-request-id', requestId);
-  requestHeaders.set('x-request-start', startTime.toString());
+  // Handle therooftopkc.com domain
+  if (hostname.includes('therooftopkc.com')) {
+    const url = request.nextUrl.clone();
 
-  // Create response with modified headers
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+    // If already on /rooftopkc path, continue normally
+    if (url.pathname.startsWith('/rooftopkc')) {
+      return NextResponse.next();
+    }
 
-  // Add security and tracking headers to response
-  response.headers.set('x-request-id', requestId);
-  response.headers.set('x-frame-options', 'DENY');
-  response.headers.set('x-content-type-options', 'nosniff');
-  response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
-  response.headers.set('x-xss-protection', '1; mode=block');
+    // If on root path, redirect to /rooftopkc
+    if (url.pathname === '/' || url.pathname === '') {
+      url.pathname = '/rooftopkc';
+      return NextResponse.rewrite(url);
+    }
 
-  // Add performance timing header
-  const duration = Date.now() - startTime;
-  response.headers.set('x-response-time', `${duration}ms`);
-
-  // Log request in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[${requestId}] ${request.method} ${request.nextUrl.pathname} - ${duration}ms`);
+    // For other paths, prepend /rooftopkc to maintain app functionality
+    // (e.g., /member/login -> /rooftopkc/member/login isn't needed,
+    //  keep member/admin paths as-is)
+    return NextResponse.next();
   }
 
-  return response;
+  // Handle noirkc.com or localhost - serve default homepage
+  return NextResponse.next();
 }
 
-/**
- * Configure which routes to run proxy on
- * Exclude static files and internal Next.js routes
- */
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder files
+     * - images (public images)
+     * - menu (menu images)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|images|menu).*)',
   ],
 };

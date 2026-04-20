@@ -1068,12 +1068,24 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 - **RooftopKC** (`rooftopkc`): 17 tables, $20 cover for non-members
 - **Future**: Noir OP and additional locations
 
+**Location Persistence** ✅ (As of 2026-04-19):
+- **Default**: Reservations page defaults to "Noir KC" on first visit
+- **Storage**: User's location preference saved to `localStorage` with key `reservations-location`
+- **Persistence**: Location selection persists across page refreshes and sessions
+- **Blocking**: Minaka events and custom closures now block reservation time slots
+
+**UI Improvements** (As of 2026-04-19):
+- Calendar title font size reduced to 1.0rem/400 weight for better readability
+- Blocking events (private events, closures) now display as normal-sized events with 🔒 icon
+- Removed full-height background blocking display for cleaner timeline view
+
 **Related Files**:
 - `src/components/ReservationModalFixed.tsx` - New reservation modal (passes `location_slug`)
 - `src/components/member/SimpleReservationRequestModal.tsx` - Member reservation request (cover charge UI)
-- `src/components/ReservationsTimeline.tsx` - Location-filtered timeline
+- `src/components/ReservationsTimeline.tsx` - Location-filtered timeline with Minaka event blocking
 - `src/components/FullCalendarTimeline.tsx` - Location-filtered calendar
-- `src/pages/admin/reservations.tsx` - Location switcher tabs
+- `src/pages/admin/reservations.tsx` - Location switcher tabs with localStorage persistence
+- `src/styles/ReservationsTimeline.module.css` - Timeline styling (title size, blocking events)
 - `src/app/api/available-slots/route.ts` - Availability checking
 - `src/app/api/find-alternative-times/route.ts` - Alternative time suggestions
 
@@ -1146,10 +1158,23 @@ See `migrations/rls_security_configuration*.sql` for detailed policies.
 - Total attendees limit
 - Deposit collection (optional)
 
+**Custom Dates (Exceptional Hours)** ✅ (As of 2026-04-19):
+- **Location-Specific**: Custom open/closed days are managed per location
+- **Storage**: `venue_hours` table with type `exceptional_open` or `exceptional_closure`
+- **Features**:
+  - Override normally closed days to allow reservations
+  - Override normally open days to block reservations
+  - Support for full-day or partial-day (time ranges) closures
+  - Shows reason for closure and time ranges in UI
+- **UI Location**: Admin Event Calendar → Custom Dates tab
+- **Design**: Converted from Chakra UI to pure HTML/CSS with Noir brand styling
+- **Blocking**: Custom closures automatically block reservation slots on timeline
+
 **Related Files**:
 - `src/components/PrivateEventsManager.tsx` - Event management
 - `src/app/rsvp/[rsvpUrl]/page.tsx` - Public RSVP page
 - `src/components/PrivateEventBooking.tsx` - RSVP form component
+- `src/pages/admin/event-calendar.tsx` - Custom Dates manager (CustomDaysManager component)
 - `README/PRIVATE_EVENTS_SETUP.md` - Full documentation
 
 ### 5. Member Signup & Onboarding System
@@ -5320,11 +5345,14 @@ Each location tab includes:
 - **Saves to**: `locations.cover_enabled`, `locations.cover_price`
 - **UI**: Cork-branded with 3-layer drop shadows, number input with increment buttons
 
-**Minaka Calendar Integration** ✅ Fully Functional (As of 2026-04-18)
+**Minaka Calendar Integration** ✅ Fully Functional (As of 2026-04-19)
 - **iCal URL Input**: Add Minaka calendar feed URL per location
 - **Saves to**: `locations.minaka_ical_url`
 - **Purpose**: Sync external events from Minaka to location-specific calendar
 - **Format**: `https://www.minaka.app/api/user/calendar/feed.ics?token=...`
+- **Event Filtering**: Automatically excludes "Noir Cocktail Lounge - Cocktail Lounge" recurring events
+- **Reservation Blocking**: Minaka events now block reservation slots on the reservations timeline
+- **Location Filtering**: Event calendar and reservations support filtering by location (All/Noir KC/RooftopKC)
 
 **Current Configuration**:
 - **Noir KC**: Cover charges typically disabled
