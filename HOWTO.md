@@ -5394,3 +5394,157 @@ The settings page now follows Noir brand guidelines:
 
 ---
 
+## Public Reservation Payment & Cancellation System
+
+**Added**: 2026-04-19
+
+### Overview
+
+Admins can now view payment information and process refunds/cancellations for public reservations that include cover charges.
+
+### Payment Information Display
+
+When viewing a public reservation with a payment in the admin reservation modal (`ReservationEditModal.tsx`):
+
+**Displays**:
+- **Cover Charge Breakdown**: `$price per person × party size = $total`
+- **Payment Intent ID**: Stripe payment ID (e.g., `pi_3TO7LFFdjSPifIH50sjy0e8K`)
+- **Card Details**: Card brand and last 4 digits (e.g., `amex •••• 1013`)
+- **Reservation Date**: When the reservation was created
+
+**Visibility**: Only shows when reservation has a `payment_intent_id`
+
+### Cancellation Actions
+
+Two buttons appear in the modal footer for paid reservations:
+
+1. **Cancel + Refund** (Green #10B981)
+   - Issues full refund via Stripe
+   - Deletes reservation from database
+   - Customer receives refund to original payment method
+
+2. **Cancel + Charge** (Amber #F59E0B)
+   - Deletes reservation without refunding
+   - Payment is kept (no-show fee)
+   - Customer keeps the charge
+
+### API Endpoints
+
+**GET `/api/reservations/[id]`**
+- Enhanced to fetch payment details from Stripe when `payment_intent_id` exists
+- Returns payment amount, card brand, last4, expiration
+- Maps `payment_intent_id` → `stripe_payment_intent_id` for frontend compatibility
+
+**POST `/api/reservations/[id]/cancel-refund`**
+- Creates Stripe refund for the payment
+- Deletes reservation
+- Returns: `{ success, refundId, amount, message }`
+
+**POST `/api/reservations/[id]/cancel-charge`**
+- Deletes reservation only (no refund)
+- Returns: `{ success, message, reservationId }`
+
+### Database Field
+
+- **Column**: `reservations.payment_intent_id` (existing)
+- **Fix Applied**: POST `/api/reservations` now correctly saves payment_intent_id from `stripe_payment_intent_id` field sent by frontend
+
+### Files Modified
+
+- `src/components/ReservationEditModal.tsx` - Payment info UI and cancellation buttons
+- `src/app/api/reservations/[id]/route.ts` - GET with Stripe payment details
+- `src/app/api/reservations/[id]/cancel-refund/route.ts` - Refund endpoint
+- `src/app/api/reservations/[id]/cancel-charge/route.ts` - Keep charge endpoint
+- `src/pages/api/reservations/index.ts` - Fixed payment_intent_id saving
+
+---
+
+## Per-Location Menu Management System
+
+**Added**: 2026-04-19
+
+### Overview
+
+Menu pages are now managed independently per location. Each location (Noir KC, RooftopKC) has its own set of menu images that can be uploaded, reordered, and deleted without affecting the other location.
+
+### Directory Structure
+
+```
+public/menu/
+├── noirkc/
+│   ├── .order.json
+│   ├── Cover.png
+│   ├── Blank.png
+│   └── [menu pages...]
+└── rooftopkc/
+    ├── .order.json
+    ├── Cover.png
+    ├── Blank.png
+    └── [menu pages...]
+```
+
+### Admin Interface
+
+**Location**: `/admin/homepage`
+
+**Features**:
+- **Location Selector**: Toggle between "Noir KC" and "RooftopKC"
+- **Upload Images**: Upload menu pages to selected location
+- **Drag to Reorder**: Reorder pages (saved per location)
+- **Delete**: Remove pages from selected location
+- **View**: Preview menu pages
+
+**State Management**:
+- `selectedLocation` state defaults to `'noirkc'`
+- Automatically refetches menu when location changes
+- All API calls include `?location=${selectedLocation}`
+
+### API Endpoints
+
+All menu APIs now accept `?location=` query parameter (defaults to `'noirkc'`):
+
+**GET `/api/admin/menu-files?location={slug}`**
+- Returns files from `public/menu/{location}/`
+- File paths include location: `/menu/{location}/{filename}`
+- Reads `.order.json` from location directory
+
+**POST `/api/admin/upload-menu?location={slug}`**
+- Uploads to `public/menu/{location}/`
+- Creates location directory if missing
+- Returns paths with location prefix
+
+**DELETE `/api/admin/delete-menu-file?location={slug}`**
+- Deletes from `public/menu/{location}/{filename}`
+- Body: `{ fileName: "image.png" }`
+
+**POST `/api/admin/reorder-menu-files?location={slug}`**
+- Saves to `public/menu/{location}/.order.json`
+- Body: `{ order: ["file1.png", "file2.png", ...] }`
+
+### Public Menu Viewer
+
+**Component**: `BookMenuViewer.tsx`
+
+Already correctly passes `?location=${locationSlug}` to fetch location-specific menus.
+
+**Locations**:
+- Noir KC: `locationSlug='noirkc'`
+- RooftopKC: `locationSlug='rooftopkc'`
+
+### Migration Notes
+
+- All existing Noir KC menu files moved to `public/menu/noirkc/`
+- RooftopKC initialized with copy of Noir KC menu as starting point
+- No menu files were deleted - all preserved
+- Backward compatible: defaults to 'noirkc' if no location specified
+
+### Files Modified
+
+- `src/pages/admin/homepage.tsx` - Location selector UI, state management
+- `src/pages/api/admin/menu-files.js` - Location parameter support
+- `src/pages/api/admin/upload-menu.js` - Location-specific uploads
+- `src/pages/api/admin/delete-menu-file.js` - Location-specific deletes
+- `src/pages/api/admin/reorder-menu-files.ts` - Location-specific ordering
+
+---
+
