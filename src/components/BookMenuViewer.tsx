@@ -7,9 +7,10 @@ import styles from './BookMenuViewer.module.css';
 
 interface BookMenuViewerProps {
   className?: string;
+  locationSlug?: string;
 }
 
-const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
+const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locationSlug }) => {
   const [menuImages, setMenuImages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,34 +31,47 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
     // Fetch all images from the menu directory
     const fetchMenuImages = async () => {
       try {
-        const response = await fetch('/api/admin/menu-files');
+        const locationParam = locationSlug ? `?location=${locationSlug}` : '';
+        const response = await fetch(`/api/admin/menu-files${locationParam}`);
         if (response.ok) {
           const files = await response.json();
           const imagePaths = files.map((file: any) => file.path);
           setMenuImages(imagePaths);
         } else {
           // Fallback to hardcoded list if API fails
-          const fallbackImages = [
-            '/menu/Noir Menu - 01.png',
-            '/menu/Noir Menu - 02.png',
-            '/menu/Noir Menu - 03.png',
-            '/menu/Noir Menu - 04.png',
-            '/menu/Noir Menu - 05.png',
-            '/menu/Noir Menu - 06.png',
-          ];
+          const fallbackImages = locationSlug === 'rooftopkc'
+            ? [
+                '/menu/rooftopkc/RooftopKC Menu - 01.png',
+                '/menu/rooftopkc/RooftopKC Menu - 02.png',
+                '/menu/rooftopkc/RooftopKC Menu - 03.png',
+              ]
+            : [
+                '/menu/Noir Menu - 01.png',
+                '/menu/Noir Menu - 02.png',
+                '/menu/Noir Menu - 03.png',
+                '/menu/Noir Menu - 04.png',
+                '/menu/Noir Menu - 05.png',
+                '/menu/Noir Menu - 06.png',
+              ];
           setMenuImages(fallbackImages);
         }
       } catch (error) {
         console.error('Error fetching menu images:', error);
         // Fallback to hardcoded list
-        const fallbackImages = [
-          '/menu/Noir Menu - 01.png',
-          '/menu/Noir Menu - 02.png',
-          '/menu/Noir Menu - 03.png',
-          '/menu/Noir Menu - 04.png',
-          '/menu/Noir Menu - 05.png',
-          '/menu/Noir Menu - 06.png',
-        ];
+        const fallbackImages = locationSlug === 'rooftopkc'
+          ? [
+              '/menu/rooftopkc/RooftopKC Menu - 01.png',
+              '/menu/rooftopkc/RooftopKC Menu - 02.png',
+              '/menu/rooftopkc/RooftopKC Menu - 03.png',
+            ]
+          : [
+              '/menu/Noir Menu - 01.png',
+              '/menu/Noir Menu - 02.png',
+              '/menu/Noir Menu - 03.png',
+              '/menu/Noir Menu - 04.png',
+              '/menu/Noir Menu - 05.png',
+              '/menu/Noir Menu - 06.png',
+            ];
         setMenuImages(fallbackImages);
       } finally {
         setIsLoading(false);
@@ -65,7 +79,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '' }) => {
     };
 
     fetchMenuImages();
-  }, []);
+  }, [locationSlug]);
 
   const nextPage = () => {
     if (bookRef.current) {
