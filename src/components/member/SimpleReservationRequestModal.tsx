@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { getSupabaseClient } from '@/pages/api/supabaseClient';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -658,9 +659,24 @@ export default function SimpleReservationRequestModal({
       // Determine if cover charge applies (enabled AND not a member)
       const coverChargeApplies = coverEnabled && !memberId;
 
+      // Get auth headers if admin override is enabled
+      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (adminOverride) {
+        const supabase = getSupabaseClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[ADMIN AUTH] Session:', session ? 'Found' : 'Not found');
+        console.log('[ADMIN AUTH] Access token:', session?.access_token ? 'Present' : 'Missing');
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+          console.log('[ADMIN AUTH] Authorization header added');
+        } else {
+          console.warn('[ADMIN AUTH] No access token available - request will fail auth check');
+        }
+      }
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           start_time: startDateTime.toISO(),
           end_time: endDateTime.toISO(),
