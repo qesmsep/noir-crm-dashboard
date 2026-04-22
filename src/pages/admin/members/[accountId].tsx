@@ -2919,6 +2919,7 @@ export default function MemberDetailAdmin() {
         memberPhone={members.find(m => m.member_type === 'primary')?.phone || ''}
         memberId={members.find(m => m.member_type === 'primary')?.member_id}
         accountId={accountId as string}
+        adminOverride={true}
         onReservationCreated={() => {
           setIsReservationModalOpen(false);
           // Optionally refresh reservations list if needed

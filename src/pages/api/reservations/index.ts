@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
+import { verifyAdmin } from '../../../lib/admin-auth';
 
 /**
  * Reservations API (Pages Router)
@@ -8,6 +9,56 @@ import { DateTime } from 'luxon';
  * POST: Creates a new reservation.
  * Uses service role when available to bypass RLS in production.
  */
+
+/**
+ * Type definition for reservation creation request body
+ */
+interface ReservationCreateBody {
+  // Required fields
+  start_time: string;
+  end_time: string;
+  party_size: number;
+  phone: string;
+
+  // Optional reservation details
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  event_type?: string;
+  notes?: string;
+  table_id?: string;
+  location_slug?: string;
+
+  // Member/account linking
+  member_id?: string;
+  account_id?: string;
+  membership_type?: string;
+  is_member?: boolean;
+
+  // Payment
+  stripe_payment_intent_id?: string;
+  payment_intent_id?: string;
+  cover_charge_applied?: boolean;
+  cover_price?: number;
+
+  // Source tracking
+  source?: string;
+  create_visitor?: boolean;
+
+  // Reservation state
+  status?: string;
+  is_checked_in?: boolean;
+  send_access_instructions?: boolean;
+  send_reminder?: boolean;
+  send_confirmation?: boolean;
+
+  // Private event
+  private_event_id?: string;
+
+  // Admin override - bypasses private event validation
+  // SECURITY: Server-side verification required
+  admin_override?: boolean;
+}
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
@@ -49,7 +100,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!supabaseAdmin) {
         console.warn('WARNING: SUPABASE_SERVICE_ROLE_KEY not set, using regular client. RLS policies may block inserts.');
       }
-      const body = req.body;
+      const body = req.body as ReservationCreateBody;
 
       // Log incoming request data for debugging
       console.log('=== RESERVATION POST REQUEST ===');
@@ -346,14 +397,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Validate against private events that block the date/time
-      try {
-        console.log('[PRIVATE EVENT CHECK] Request body times:', {
-          start_time: body.start_time,
-          end_time: body.end_time
-        });
+      // Skip this validation if admin_override is true (allows admins to book during private events)
+      const adminOverride = body.admin_override === true;
 
-        const reservationStart = DateTime.fromISO(body.start_time);
-        const reservationEnd = DateTime.fromISO(body.end_time);
+      // SECURITY: Verify admin authentication if override is requested
+      if (adminOverride) {
+        const isAdmin = await verifyAdmin(req);
+        if (!isAdmin) {
+          console.warn('[SECURITY] Non-admin attempted to use admin_override flag');
+          return res.status(403).json({
+            error: 'Unauthorized: admin_override requires admin privileges'
+          });
+        }
+        console.log('[PRIVATE EVENT CHECK] Admin override enabled - skipping private event validation');
+      }
+
+      if (!adminOverride) {
+        try {
+          console.log('[PRIVATE EVENT CHECK] Request body times:', {
+            start_time: body.start_time,
+            end_time: body.end_time
+          });
+
+          const reservationStart = DateTime.fromISO(body.start_time);
+          const reservationEnd = DateTime.fromISO(body.end_time);
         
         // Get the local date in America/Chicago timezone
         const localDate = reservationStart.setZone('America/Chicago');
@@ -423,10 +490,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log('[PRIVATE EVENT CHECK] No overlapping events found - reservation allowed');
           }
         }
-      } catch (privateEventCheckError) {
-        console.error('Error validating against private events:', privateEventCheckError);
-        // Don't block reservation if validation fails - log and continue
-        // This is a safety check, not a hard requirement
+        } catch (privateEventCheckError) {
+          console.error('Error validating against private events:', privateEventCheckError);
+          // Don't block reservation if validation fails - log and continue
+          // This is a safety check, not a hard requirement
+        }
       }
 
       // FINAL VALIDATION: Check table availability one more time right before insert
@@ -612,12 +680,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Extract only the fields that exist in the reservations table
       // The trigger function validates these columns exist, so they must be in the schema
       // Note: Some columns may not be in PostgREST schema cache - retry logic handles this
+
+      // Build notes with admin override audit trail if applicable
+      let auditedNotes = nullIfEmpty(body.notes);
+      if (adminOverride) {
+        const overrideTimestamp = new Date().toISOString();
+        const overrideNote = `[ADMIN OVERRIDE - ${overrideTimestamp}] Booked during private event period.`;
+        auditedNotes = auditedNotes ? `${overrideNote}\n\n${auditedNotes}` : overrideNote;
+      }
+
       const reservationData: any = {
         start_time: body.start_time,
         end_time: body.end_time, // Ensure end_time is always included
         party_size: body.party_size,
         event_type: nullIfEmpty(body.event_type),
-        notes: nullIfEmpty(body.notes),
+        notes: auditedNotes,
         phone: body.phone,
         email: email,
         first_name: firstName,

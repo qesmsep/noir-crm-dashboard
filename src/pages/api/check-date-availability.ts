@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { date, location } = req.query;
+    const { date, location, adminOverride } = req.query;
 
     if (!date || typeof date !== 'string') {
       return res.status(400).json({ error: 'Date is required' });
@@ -56,8 +56,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const blockedTimeRanges: any[] = [];
 
-    // Add exceptional closure time ranges
-    if (closures && closures.length > 0) {
+    // Skip exceptional closures if adminOverride is true
+    const skipExceptionalClosures = adminOverride === 'true';
+
+    // Add exceptional closure time ranges (unless admin override is enabled)
+    if (!skipExceptionalClosures && closures && closures.length > 0) {
       closures.forEach((closure) => {
         if (closure.full_day) {
           // Block entire day (00:00 to 23:59)
@@ -93,37 +96,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }
       });
+    } else if (skipExceptionalClosures && closures && closures.length > 0) {
+      console.log('[ADMIN OVERRIDE] Skipping exceptional closures for date:', date);
     }
 
     // Fetch private events for this date
-    const { data: events, error } = await supabase
-      .from('private_events')
-      .select('id, title, start_time, end_time')
-      .gte('end_time', requestDate.startOf('day').toISO())
-      .lte('start_time', requestDate.endOf('day').toISO())
-      .order('start_time', { ascending: true });
+    // Skip private events if adminOverride is true
+    const skipPrivateEvents = adminOverride === 'true';
 
-    if (error) {
-      console.error('Error fetching private events:', error);
-      return res.status(500).json({ error: 'Failed to fetch events' });
-    }
+    if (!skipPrivateEvents) {
+      const { data: events, error } = await supabase
+        .from('private_events')
+        .select('id, title, start_time, end_time')
+        .gte('end_time', requestDate.startOf('day').toISO())
+        .lte('start_time', requestDate.endOf('day').toISO())
+        .order('start_time', { ascending: true });
 
-    // Add private event time ranges
-    (events || []).forEach((event) => {
-      const start = DateTime.fromISO(event.start_time).setZone('America/Chicago');
-      const end = DateTime.fromISO(event.end_time).setZone('America/Chicago');
+      if (error) {
+        console.error('Error fetching private events:', error);
+        return res.status(500).json({ error: 'Failed to fetch events' });
+      }
 
-      blockedTimeRanges.push({
-        id: event.id,
-        title: event.title,
-        startTime: start.toFormat('h:mm a'),
-        endTime: end.toFormat('h:mm a'),
-        startHour: start.hour,
-        startMinute: start.minute,
-        endHour: end.hour,
-        endMinute: end.minute,
+      // Add private event time ranges
+      (events || []).forEach((event) => {
+        const start = DateTime.fromISO(event.start_time).setZone('America/Chicago');
+        const end = DateTime.fromISO(event.end_time).setZone('America/Chicago');
+
+        blockedTimeRanges.push({
+          id: event.id,
+          title: event.title,
+          startTime: start.toFormat('h:mm a'),
+          endTime: end.toFormat('h:mm a'),
+          startHour: start.hour,
+          startMinute: start.minute,
+          endHour: end.hour,
+          endMinute: end.minute,
+        });
       });
-    });
+    } else {
+      console.log('[ADMIN OVERRIDE] Skipping private event blocking for date:', date);
+    }
 
     return res.status(200).json({
       date,

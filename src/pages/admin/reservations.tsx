@@ -448,6 +448,7 @@ export default function Reservations() {
         memberPhone={memberData?.memberPhone || ''}
         memberId={memberData?.memberId}
         accountId={memberData?.accountId}
+        adminOverride={true}
         onReservationCreated={() => {
           setIsSimpleReservationModalOpen(false);
           setMemberData(null);

@@ -19,6 +19,13 @@ interface Props {
   onReservationCreated?: () => void;
   locationSlug?: string;
   hideTableSelection?: boolean;
+  /**
+   * When true, allows booking during private events.
+   * SECURITY: Only set to true in admin-authenticated pages.
+   * Server-side verification ensures only admins can use this.
+   * @default false
+   */
+  adminOverride?: boolean;
 }
 
 // Generate time options
@@ -49,6 +56,7 @@ export default function SimpleReservationRequestModal({
   onReservationCreated,
   locationSlug,
   hideTableSelection = false,
+  adminOverride = false,
 }: Props) {
   const { toast } = useToast();
   const [date, setDate] = useState<Date | null>(null);
@@ -154,6 +162,8 @@ export default function SimpleReservationRequestModal({
     const fetchBlockedDates = async () => {
       if (!isOpen) return;
 
+      console.log('[SimpleReservationRequestModal] Fetching blocked dates with adminOverride:', adminOverride);
+
       try {
         const blockedDatesSet = new Set<string>();
         const today = DateTime.now().setZone('America/Chicago');
@@ -164,10 +174,17 @@ export default function SimpleReservationRequestModal({
           const dateStr = checkDate.toFormat('yyyy-MM-dd');
 
           const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
-          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}`);
+          const overrideParam = adminOverride ? '&adminOverride=true' : '';
+          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}`);
 
           if (response.ok) {
             const result = await response.json();
+
+            // Debug logging for April 24
+            if (dateStr === '2026-04-24') {
+              console.log('[April 24 Check] blockedTimeRanges:', result.blockedTimeRanges);
+              console.log('[April 24 Check] adminOverride:', adminOverride);
+            }
 
             // If there are blocked time ranges that cover the full day, mark as blocked
             if (result.blockedTimeRanges && result.blockedTimeRanges.length > 0) {
@@ -176,6 +193,10 @@ export default function SimpleReservationRequestModal({
                 return (range.startHour === 0 && range.endHour === 23) ||
                        (range.startHour <= 16 && range.endHour >= 23);
               });
+
+              if (dateStr === '2026-04-24') {
+                console.log('[April 24 Check] hasFullDayBlock:', hasFullDayBlock);
+              }
 
               if (hasFullDayBlock) {
                 blockedDatesSet.add(dateStr);
@@ -191,7 +212,7 @@ export default function SimpleReservationRequestModal({
     };
 
     fetchBlockedDates();
-  }, [isOpen, selectedLocation]);
+  }, [isOpen, selectedLocation, adminOverride]);
 
   // Fetch tables and cover charge info based on selected location
   useEffect(() => {
@@ -251,7 +272,8 @@ export default function SimpleReservationRequestModal({
       // Fetch blocked times for this date
       const dateStr = DateTime.fromJSDate(newDate).toFormat('yyyy-MM-dd');
       const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
-      const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}`, {
+      const overrideParam = adminOverride ? '&adminOverride=true' : '';
+      const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}`, {
         signal: abortController.signal,
       });
       const result = await response.json();
@@ -542,6 +564,7 @@ export default function SimpleReservationRequestModal({
           source: 'public_booking',
           create_visitor: true,
           stripe_payment_intent_id: paymentId,
+          admin_override: adminOverride,
         }),
       });
 
@@ -655,6 +678,7 @@ export default function SimpleReservationRequestModal({
           member_id: memberId,
           account_id: accountId,
           create_visitor: !memberId && !accountId, // Create visitor if no member/account found
+          admin_override: adminOverride,
         }),
       });
 
@@ -693,12 +717,14 @@ export default function SimpleReservationRequestModal({
   };
 
   const filterDate = (date: Date) => {
-    // Check if date is within booking window
-    if (bookingStartDate && date < bookingStartDate) {
-      return false;
-    }
-    if (bookingEndDate && date > bookingEndDate) {
-      return false;
+    // Check if date is within booking window (skip for admin override)
+    if (!adminOverride) {
+      if (bookingStartDate && date < bookingStartDate) {
+        return false;
+      }
+      if (bookingEndDate && date > bookingEndDate) {
+        return false;
+      }
     }
 
     // Only allow Thursday (4), Friday (5), Saturday (6)
