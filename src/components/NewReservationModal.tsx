@@ -21,7 +21,7 @@ import {
   GridItem,
   Checkbox,
 } from '@chakra-ui/react';
-import { localInputToUTC } from '../utils/dateUtils';
+import { localInputToUTC, dateToLocalInput } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
 
 interface NewReservationModalProps {
@@ -78,7 +78,6 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
     send_confirmation: false,
   });
   const [tables, setTables] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const toast = useToast();
   const { settings } = useSettings();
@@ -91,12 +90,6 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
       const startTime = initialDate ? new Date(initialDate) : new Date();
       const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours later
 
-      console.log('NewReservationModal - initialDate:', initialDate);
-      console.log('NewReservationModal - startTime:', startTime);
-      console.log('NewReservationModal - endTime:', endTime);
-      console.log('NewReservationModal - startTime ISO:', startTime.toISOString().slice(0, 16));
-      console.log('NewReservationModal - endTime ISO:', endTime.toISOString().slice(0, 16));
-
       setFormData({
         first_name: initialMemberData?.first_name || '',
         last_name: initialMemberData?.last_name || '',
@@ -106,25 +99,15 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
         event_type: '',
         notes: '',
         table_id: initialTableId || '',
-        start_time: startTime.toISOString().slice(0, 16), // Format for datetime-local input
-        end_time: endTime.toISOString().slice(0, 16),
+        start_time: dateToLocalInput(startTime, timezone),
+        end_time: dateToLocalInput(endTime, timezone),
         is_checked_in: false,
         send_access_instructions: false,
         send_reminder: false,
         send_confirmation: false,
       });
     }
-  }, [isOpen, initialDate, initialMemberData]);
-
-  // Ensure table ID is set when modal opens
-  useEffect(() => {
-    if (isOpen && initialTableId) {
-      setFormData(prev => ({
-        ...prev,
-        table_id: initialTableId
-      }));
-    }
-  }, [isOpen, initialTableId]);
+  }, [isOpen, initialDate, initialMemberData, initialTableId, timezone]);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -215,7 +198,8 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
         send_access_instructions: formData.send_access_instructions,
         send_reminder: formData.send_reminder,
         send_confirmation: formData.send_confirmation,
-        source: 'manual' // Track that this reservation was made manually in the admin interface
+        source: 'manual', // Track that this reservation was made manually in the admin interface
+        admin_override: true // Allow admin to bypass private event validation
       };
 
       const response = await fetch('/api/reservations', {
