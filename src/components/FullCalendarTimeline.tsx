@@ -165,7 +165,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       try {
         let query = supabase
           .from('tables')
-          .select('id, table_number');
+          .select('id, table_number, seats');
 
         // Filter by location if provided
         if (locationSlug) {
@@ -189,7 +189,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
           .sort((a, b) => Number(a.table_number) - Number(b.table_number))
           .map(t => ({
             id: t.id,
-            title: `${t.table_number}`,
+            title: `${t.table_number} (${t.seats})`,
           }));
 
         setResources(tableResources);

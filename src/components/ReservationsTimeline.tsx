@@ -94,7 +94,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       try {
         let query = supabase
           .from('tables')
-          .select('id, table_number, location_id');
+          .select('id, table_number, location_id, seats');
 
         // Filter by location if provided
         if (locationSlug) {
@@ -119,7 +119,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           .sort((a, b) => Number(a.table_number) - Number(b.table_number))
           .map(t => ({
             id: t.id,
-            title: `${t.table_number}`,
+            title: `${t.table_number} (${t.seats})`,
           }));
 
         setResources(tableResources);
