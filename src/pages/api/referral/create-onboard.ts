@@ -38,6 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Create a placeholder waitlist entry with the agreement_token
     // This allows the onboard flow to validate the token
+    // Using placeholder values for required fields that will be updated during onboarding
     const { data: waitlistEntry, error: waitlistError } = await supabase
       .from('waitlist')
       .insert({
@@ -47,7 +48,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         referred_by_member_id: referrer.member_id,
         referral_code: referralCode.toUpperCase(),
         status: 'pending',
-        form_step: 0
+        form_step: 0,
+        // Placeholder values for required fields (will be replaced during onboarding)
+        first_name: 'FirstName',
+        last_name: 'LastName',
+        email: 'youremailaddress@gmail.com',
+        phone: '913.555.1234'
       })
       .select()
       .single();
