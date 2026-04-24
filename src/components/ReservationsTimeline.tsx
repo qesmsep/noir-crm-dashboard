@@ -1008,6 +1008,15 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           >
             Today
           </button>
+          {onPrivateEventRSVPClick && (
+            <button
+              className={styles.mobileNavNewRez}
+              onClick={onPrivateEventRSVPClick}
+              aria-label="Private Event RSVPs"
+            >
+              PE RSVPs
+            </button>
+          )}
           {onMakeReservationClick && (
             <button
               className={styles.mobileNavNewRez}
