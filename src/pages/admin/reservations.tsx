@@ -5,6 +5,7 @@ import ReservationsTimeline from '../../components/ReservationsTimeline';
 import ReservationEditModal from '../../components/ReservationEditModal';
 import ReservationModalFixed from '../../components/ReservationModalFixed';
 import SimpleReservationRequestModal from '../../components/member/SimpleReservationRequestModal';
+import PrivateEventRSVPModal from '../../components/PrivateEventRSVPModal';
 import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '@/hooks/useToast';
 import { debugLog } from '../../utils/debugLogger';
@@ -53,6 +54,10 @@ export default function Reservations() {
     memberId?: string;
     accountId?: string;
   } | null>(null);
+
+  // Private Event RSVP modal state
+  const [isPrivateEventRSVPModalOpen, setIsPrivateEventRSVPModalOpen] = useState(false);
+  const [hasPrivateEventsOnDate, setHasPrivateEventsOnDate] = useState(false);
 
   // Debug: Log component mount and router state
   useEffect(() => {
@@ -301,6 +306,15 @@ export default function Reservations() {
         locationSlug={activeLocation}
       />
 
+      {/* Private Event RSVP Modal */}
+      <PrivateEventRSVPModal
+        isOpen={isPrivateEventRSVPModalOpen}
+        onClose={() => setIsPrivateEventRSVPModalOpen(false)}
+        currentDate={currentDate}
+        locationSlug={activeLocation}
+        onAssignmentComplete={() => setReloadKey(prev => prev + 1)}
+      />
+
       <div className={`${styles.container} ${isFullScreen ? styles.fullScreen : ''}`}>
         <main className={styles.content}>
           <div className={styles.timelineContainer}>
@@ -327,6 +341,8 @@ export default function Reservations() {
               onReservationClick={handleReservationClick}
               onSlotClick={handleSlotClick}
               onMakeReservationClick={() => setIsLookupModalOpen(true)}
+              onPrivateEventRSVPClick={hasPrivateEventsOnDate ? () => setIsPrivateEventRSVPModalOpen(true) : undefined}
+              onPrivateEventsCheck={(hasEvents) => setHasPrivateEventsOnDate(hasEvents)}
               locationSlug={activeLocation}
             />
           </div>

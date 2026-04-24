@@ -22,6 +22,8 @@ interface ReservationsTimelineProps {
   onReservationClick?: (reservationId: string) => void;
   onSlotClick?: (slotInfo: { date: Date; resourceId: string }) => void;
   onMakeReservationClick?: () => void;
+  onPrivateEventRSVPClick?: () => void;
+  onPrivateEventsCheck?: (hasEvents: boolean) => void;
   locationSlug?: string;
 }
 
@@ -54,6 +56,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   onReservationClick,
   onSlotClick,
   onMakeReservationClick,
+  onPrivateEventRSVPClick,
+  onPrivateEventsCheck,
   locationSlug,
 }) => {
   const calendarRef = useRef<FullCalendar | null>(null);
@@ -194,6 +198,27 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
     fetchPrivateEvents();
   }, [reloadKey, localReloadKey, locationSlug]);
+
+  // Check for private events on current date
+  useEffect(() => {
+    if (!onPrivateEventsCheck || !locationSlug) return;
+
+    const checkPrivateEventsOnDate = () => {
+      const startOfDay = DateTime.fromJSDate(currentCalendarDate)
+        .setZone('America/Chicago')
+        .startOf('day');
+      const endOfDay = startOfDay.endOf('day');
+
+      const eventsOnDate = privateEvents.filter((event: any) => {
+        const eventStart = DateTime.fromISO(event.start_time, { zone: 'utc' }).setZone('America/Chicago');
+        return eventStart >= startOfDay && eventStart <= endOfDay && event.rsvp_enabled;
+      });
+
+      onPrivateEventsCheck(eventsOnDate.length > 0);
+    };
+
+    checkPrivateEventsOnDate();
+  }, [privateEvents, currentCalendarDate, locationSlug, onPrivateEventsCheck]);
 
   // Load exceptional closures (custom closed days)
   useEffect(() => {
@@ -1021,12 +1046,20 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
                 }
               },
             },
+            privateEventRSVPs: {
+              text: 'Private Event RSVPs',
+              click: () => {
+                if (onPrivateEventRSVPClick) {
+                  onPrivateEventRSVPClick();
+                }
+              },
+            },
           }}
 
           headerToolbar={isMobile ? false : {
             left: 'prev,next',
             center: 'title',
-            right: 'makeReservation,today',
+            right: onPrivateEventRSVPClick ? 'privateEventRSVPs,makeReservation,today' : 'makeReservation,today',
           }}
           titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
           resources={resources}
