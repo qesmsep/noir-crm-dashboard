@@ -44,7 +44,7 @@ export default function RooftopKCHome() {
         {/* Mobile-Optimized Hero Section */}
         <section className="hero-section relative w-full min-h-screen h-screen overflow-hidden">
           <Image
-            src="/images/Corrigan-Station-Crossroads-Rooftops-61655c04.jpeg"
+            src="/images/LPR60696.JPG.png"
             alt="RooftopKC"
             fill
             style={{ objectFit: 'cover', zIndex: 1 }}

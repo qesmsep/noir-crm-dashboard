@@ -188,13 +188,13 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
         >
           <HTMLFlipBook
             ref={bookRef}
-            width={800}
-            height={1030}
+            width={825}
+            height={1275}
             size="stretch"
-            minWidth={380}
-            maxWidth={1600}
-            minHeight={490}
-            maxHeight={2060}
+            minWidth={412}
+            maxWidth={1650}
+            minHeight={637}
+            maxHeight={2550}
             drawShadow={true}
             flippingTime={800}
             usePortrait={isMobile}
