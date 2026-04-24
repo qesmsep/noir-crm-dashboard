@@ -36,8 +36,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
+    // Create a placeholder waitlist entry with the agreement_token
+    // This allows the onboard flow to validate the token
+    const { data: waitlistEntry, error: waitlistError } = await supabase
+      .from('waitlist')
+      .insert({
+        agreement_token: applicationToken,
+        agreement_token_created_at: new Date().toISOString(),
+        application_expires_at: expiresAt.toISOString(),
+        referred_by_member_id: referrer.member_id,
+        referral_code: referralCode.toUpperCase(),
+        status: 'pending',
+        form_step: 0
+      })
+      .select()
+      .single();
+
+    if (waitlistError) {
+      console.error('Error creating waitlist entry:', waitlistError);
+      return res.status(500).json({ error: 'Failed to create onboarding session' });
+    }
+
     // Track the referral click in referral_clicks table (for analytics)
-    // This does NOT create a waitlist entry - that happens when they enter their phone number
     const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || null;
     const userAgent = req.headers['user-agent'] || null;
 
@@ -50,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ip_address: Array.isArray(ipAddress) ? ipAddress[0] : ipAddress,
         user_agent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
         converted: false,
-        waitlist_id: null
+        waitlist_id: waitlistEntry.id
       })
       .select()
       .single();
@@ -67,6 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       onboardUrl,
       token: applicationToken,
       clickId: clickEntry?.id || null,
+      waitlistId: waitlistEntry.id,
       referrerName: `${referrer.first_name} ${referrer.last_name}`,
       expiresAt: expiresAt.toISOString()
     });
