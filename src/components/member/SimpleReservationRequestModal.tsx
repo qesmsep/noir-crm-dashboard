@@ -841,7 +841,9 @@ export default function SimpleReservationRequestModal({
               <PaymentStep />
             </Elements>
           ) : (
-            <PaymentStep />
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <p>Loading payment form...</p>
+            </div>
           )
         ) : (
           /* Form */
