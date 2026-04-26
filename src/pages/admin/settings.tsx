@@ -572,9 +572,9 @@ export default function Settings() {
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Base Hours</h2>
               <p className={styles.inputHint}>
-                Note: Currently showing global settings. Location-specific hours coming soon.
+                Configure operating hours for Noir KC reservations.
               </p>
-              <CalendarAvailabilityControl section="base" />
+              <CalendarAvailabilityControl section="base" locationSlug="noirkc" />
             </div>
 
             {/* Custom Open/Closed Days */}
@@ -721,9 +721,9 @@ export default function Settings() {
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Base Hours</h2>
               <p className={styles.inputHint}>
-                Note: Currently showing global settings. Location-specific hours coming soon.
+                Configure operating hours for RooftopKC reservations.
               </p>
-              <CalendarAvailabilityControl section="base" />
+              <CalendarAvailabilityControl section="base" locationSlug="rooftopkc" />
             </div>
 
             {/* Custom Open/Closed Days */}
