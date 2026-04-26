@@ -589,14 +589,15 @@ export default function SimpleReservationRequestModal({
           const reservationDate = startDateTime.toFormat('MMMM d, yyyy');
           const locationName = selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC';
 
-          const response = await fetch('/api/create-cover-payment', {
+          const response = await fetch('/api/create-cover-charge-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              amount: coverPrice,
+              amount: parseInt(partySize) * coverPrice,
+              partySize: parseInt(partySize),
               firstName,
               lastName,
-              phone: memberPhone,
+              email: email || undefined,
               reservationDate,
               location: locationName,
             }),
