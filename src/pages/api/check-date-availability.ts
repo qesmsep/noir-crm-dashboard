@@ -105,12 +105,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const skipPrivateEvents = adminOverride === 'true';
 
     if (!skipPrivateEvents) {
-      const { data: events, error } = await supabase
+      // Filter by location if provided
+      let eventsQuery = supabase
         .from('private_events')
         .select('id, title, start_time, end_time')
         .gte('end_time', requestDate.startOf('day').toISO())
         .lte('start_time', requestDate.endOf('day').toISO())
         .order('start_time', { ascending: true });
+
+      if (locationId) {
+        eventsQuery = eventsQuery.eq('location_id', locationId);
+      }
+
+      const { data: events, error } = await eventsQuery;
 
       if (error) {
         console.error('Error fetching private events:', error);
