@@ -431,11 +431,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const endOfDayUtc = endOfDayLocal.toUTC().toISO({ suppressMilliseconds: true });
         
         // Query for private events that overlap with this date
-        const { data: privateEvents, error: privateEventsError } = await client
+        // Filter by location to ensure cross-location event isolation
+        let privateEventsQuery = client
           .from('private_events')
           .select('start_time, end_time, full_day, title')
           .lt('start_time', endOfDayUtc)
           .gt('end_time', startOfDayUtc);
+
+        if (locationId) {
+          privateEventsQuery = privateEventsQuery.eq('location_id', locationId);
+        }
+
+        const { data: privateEvents, error: privateEventsError } = await privateEventsQuery;
 
         console.log('[PRIVATE EVENT CHECK] Query params:', { startOfDayUtc, endOfDayUtc });
         console.log('[PRIVATE EVENT CHECK] Found events:', privateEvents?.length || 0);

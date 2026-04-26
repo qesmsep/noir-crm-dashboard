@@ -750,8 +750,8 @@ export default function SimpleReservationRequestModal({
   };
 
   // Use booking window dates if available, otherwise fall back to defaults
-  // Ensure minDate is never in the past
-  const today = new Date();
+  // Ensure minDate is never in the past (use America/Chicago timezone for consistency)
+  const today = DateTime.now().setZone('America/Chicago').startOf('day').toJSDate();
   const minDate = bookingStartDate
     ? new Date(Math.max(bookingStartDate.getTime(), today.getTime()))
     : today;
