@@ -150,12 +150,19 @@ export async function POST(request: Request) {
     if (DEBUG) console.log('🔍 UTC WINDOW FOR LOCAL DAY:', { startOfDayUtc, endOfDayUtc });
     
     // Fetch events that overlap the local day (start < endOfDayUtc AND end > startOfDayUtc)
-    const { data: privateEvents, error: privateEventsError } = await supabase
+    // Filter by location if provided
+    let privateEventsQuery = supabase
       .from('private_events')
       .select('start_time, end_time, full_day, title, status')
       .eq('status', 'active')
       .lt('start_time', endOfDayUtc)
       .gt('end_time', startOfDayUtc);
+
+    if (locationId) {
+      privateEventsQuery = privateEventsQuery.eq('location_id', locationId);
+    }
+
+    const { data: privateEvents, error: privateEventsError } = await privateEventsQuery;
     
     if (DEBUG) console.log('🎉 PRIVATE EVENTS QUERY RESULT:', { privateEvents, error: privateEventsError });
     
