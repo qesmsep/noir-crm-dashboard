@@ -759,7 +759,11 @@ export default function SimpleReservationRequestModal({
   };
 
   // Use booking window dates if available, otherwise fall back to defaults
-  const minDate = bookingStartDate || new Date();
+  // Ensure minDate is never in the past
+  const today = new Date();
+  const minDate = bookingStartDate
+    ? new Date(Math.max(bookingStartDate.getTime(), today.getTime()))
+    : today;
   const maxDate = bookingEndDate || (() => {
     const fallback = new Date();
     fallback.setDate(fallback.getDate() + 30);
