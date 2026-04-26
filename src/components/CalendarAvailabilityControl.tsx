@@ -244,6 +244,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         let baseQuery = supabase.from('venue_hours').select('*').eq('type', 'base');
         let opensQuery = supabase.from('venue_hours').select('*').eq('type', 'exceptional_open');
         let closuresQuery = supabase.from('venue_hours').select('*').eq('type', 'exceptional_closure');
+        let eventsQuery = supabase.from('private_events').select('*');
 
         // Filter by location if locationId is available
         if (locationId) {
@@ -251,6 +252,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           baseQuery = baseQuery.eq('location_id', locationId);
           opensQuery = opensQuery.eq('location_id', locationId);
           closuresQuery = closuresQuery.eq('location_id', locationId);
+          eventsQuery = eventsQuery.eq('location_id', locationId);
         } else {
           console.log('⚠️ [CalendarAvailabilityControl] No locationId set - loading ALL venue_hours!');
         }
@@ -258,12 +260,14 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         const { data: baseHoursData } = await baseQuery;
         const { data: opensData } = await opensQuery;
         const { data: closuresData } = await closuresQuery;
+        const { data: eventsData } = await eventsQuery;
 
         console.log('🔍 [CalendarAvailabilityControl] Loaded data:', {
           baseHours: baseHoursData?.length,
           opensData: opensData?.length,
           closuresData: closuresData?.length,
-          closures: closuresData
+          closures: closuresData,
+          privateEvents: eventsData?.length
         });
         if (baseHoursData) {
           const enabledDays = Array(7).fill(false);
@@ -276,6 +280,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         }
         if (opensData) setExceptionalOpens(opensData);
         if (closuresData) setExceptionalClosures(closuresData);
+        if (eventsData) setPrivateEvents(eventsData);
       } catch (error: any) {
         setError('Failed to load availability data. Please try again.');
       }
@@ -314,11 +319,20 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     setError('');
     setSuccessMessage('');
     try {
-      await supabase.from('venue_hours').delete().eq('type', 'base');
+      // Delete only base hours for this specific location
+      let deleteQuery = supabase.from('venue_hours').delete().eq('type', 'base');
+      if (locationId) {
+        deleteQuery = deleteQuery.eq('location_id', locationId);
+      } else {
+        deleteQuery = deleteQuery.is('location_id', null);
+      }
+      await deleteQuery;
+
       const baseHoursToSave = baseHours.map((day, index) => ({
         type: 'base',
         day_of_week: index,
-        time_ranges: day.enabled ? day.timeRanges : []
+        time_ranges: day.enabled ? day.timeRanges : [],
+        location_id: locationId // Include location_id in the saved records
       })).filter(day => day.time_ranges.length > 0);
       const { error: insertError } = await supabase.from('venue_hours').insert(baseHoursToSave);
       if (insertError) throw insertError;
@@ -449,16 +463,23 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleSaveEditOpen = async () => {
     if (!editingOpen) return;
     try {
-      const { data, error } = await supabase
+      // Add location filter to prevent cross-location updates
+      let updateQuery = supabase
         .from('venue_hours')
         .update({
           date: editingOpen.date,
           time_ranges: editingOpen.time_ranges,
           label: editingOpen.label,
         })
-        .eq('id', editingOpen.id)
-        .select()
-        .single();
+        .eq('id', editingOpen.id);
+
+      if (locationId) {
+        updateQuery = updateQuery.eq('location_id', locationId);
+      } else {
+        updateQuery = updateQuery.is('location_id', null);
+      }
+
+      const { data, error } = await updateQuery.select().single();
       if (error) throw error;
       setExceptionalOpens(exceptionalOpens.map(open => open.id === editingOpen.id ? data : open));
       setEditingOpenId(null);
@@ -480,7 +501,8 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleSaveEditClosure = async () => {
     if (!editingClosure) return;
     try {
-      const { data, error } = await supabase
+      // Add location filter to prevent cross-location updates
+      let updateQuery = supabase
         .from('venue_hours')
         .update({
           date: editingClosure.date,
@@ -489,9 +511,15 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           time_ranges: editingClosure.full_day ? null : editingClosure.time_ranges,
           sms_notification: editingClosure.sms_notification
         })
-        .eq('id', editingClosure.id)
-        .select()
-        .single();
+        .eq('id', editingClosure.id);
+
+      if (locationId) {
+        updateQuery = updateQuery.eq('location_id', locationId);
+      } else {
+        updateQuery = updateQuery.is('location_id', null);
+      }
+
+      const { data, error } = await updateQuery.select().single();
       if (error) throw error;
       setExceptionalClosures(exceptionalClosures.map(cl => cl.id === editingClosure.id ? data : cl));
       setEditingClosureId(null);
@@ -587,7 +615,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     if (!editingEvent) return;
     try {
       let start_time, end_time;
-      
+
       if (editEventForm.full_day) {
         // For full day events, set start to 00:00 and end to 23:59
         const eventDate = DateTime.fromJSDate(editEventForm.date).setZone('America/Chicago');
@@ -605,8 +633,9 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         const [endHour, endMinute] = editEventForm.end.split(':');
         end_time = eventDate.set({ hour: Number(endHour), minute: Number(endMinute) }).toUTC().toISO({ suppressMilliseconds: true });
       }
-      
-      const { data, error } = await supabase
+
+      // Add location filter to prevent cross-location updates
+      let updateQuery = supabase
         .from('private_events')
         .update({
           title: editEventForm.name,
@@ -615,9 +644,13 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           end_time: end_time.toISOString(),
           full_day: editEventForm.full_day,
         })
-        .eq('id', editingEvent.id)
-        .select()
-        .single();
+        .eq('id', editingEvent.id);
+
+      if (locationId) {
+        updateQuery = updateQuery.eq('location_id', locationId);
+      }
+
+      const { data, error } = await updateQuery.select().single();
       if (error) throw error;
       setPrivateEvents(privateEvents.map(ev => ev.id === editingEvent.id ? data : ev));
       setEditModalOpen(false);
@@ -631,10 +664,19 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   const handleDeleteEditEvent = async () => {
     if (!editingEvent) return;
     try {
-      const { error } = await supabase
+      // Add location filter to prevent cross-location deletions
+      let deleteQuery = supabase
         .from('private_events')
         .delete()
         .eq('id', editingEvent.id);
+
+      if (locationId) {
+        deleteQuery = deleteQuery.eq('location_id', locationId);
+      } else {
+        deleteQuery = deleteQuery.is('location_id', null);
+      }
+
+      const { error } = await deleteQuery;
       if (error) throw error;
       setPrivateEvents(privateEvents.filter(ev => ev.id !== editingEvent.id));
       setEditModalOpen(false);
@@ -647,10 +689,19 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   // Handler to delete a private event from the list
   const handleDeletePrivateEvent = async (id: number) => {
     try {
-      const { error } = await supabase
+      // Add location filter to prevent cross-location deletions
+      let deleteQuery = supabase
         .from('private_events')
         .delete()
         .eq('id', id);
+
+      if (locationId) {
+        deleteQuery = deleteQuery.eq('location_id', locationId);
+      } else {
+        deleteQuery = deleteQuery.is('location_id', null);
+      }
+
+      const { error } = await deleteQuery;
       if (error) throw error;
       setPrivateEvents(privateEvents.filter(ev => ev.id !== id));
     } catch (err: any) {
