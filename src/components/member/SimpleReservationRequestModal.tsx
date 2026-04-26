@@ -340,46 +340,6 @@ export default function SimpleReservationRequestModal({
     const elements = useElements();
     const [paymentProcessing, setPaymentProcessing] = useState(false);
     const [paymentError, setPaymentError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    // Create PaymentIntent when component mounts
-    useEffect(() => {
-      const createPaymentIntent = async () => {
-        try {
-          const totalAmount = parseInt(partySize) * coverPrice;
-          const reservationDate = DateTime.fromJSDate(date!).toFormat('MMMM dd, yyyy');
-          const locationName = selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC';
-
-          const response = await fetch('/api/create-cover-charge-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: totalAmount,
-              partySize: parseInt(partySize),
-              firstName: firstName.trim(),
-              lastName: lastName.trim(),
-              email: email || undefined,
-              reservationDate,
-              location: locationName,
-            }),
-          });
-
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.error || 'Failed to create payment');
-          }
-
-          setClientSecret(data.clientSecret);
-          setPaymentIntentId(data.paymentIntentId);
-        } catch (error: any) {
-          setPaymentError(error.message || 'Failed to initialize payment');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      createPaymentIntent();
-    }, []);
 
     const handlePaymentSubmit = async (event: React.FormEvent) => {
       event.preventDefault();
@@ -627,9 +587,62 @@ export default function SimpleReservationRequestModal({
     // Determine if cover charge applies (enabled AND not a member)
     const coverChargeApplies = coverEnabled && !memberId;
 
-    // If non-member with cover charge, show payment step (don't create PaymentIntent yet)
+    // If non-member with cover charge, create PaymentIntent and show payment step
     if (coverChargeApplies) {
       setShowPayment(true);
+
+      // Create PaymentIntent for cover charge
+      const createPaymentIntent = async () => {
+        try {
+          const [timeStr, period] = time.split(' ');
+          const [hourStr, minuteStr] = timeStr.split(':');
+          let hour = parseInt(hourStr);
+          const minute = parseInt(minuteStr);
+
+          if (period === 'PM' && hour !== 12) {
+            hour += 12;
+          } else if (period === 'AM' && hour === 12) {
+            hour = 0;
+          }
+
+          const startDateTime = DateTime.fromJSDate(date)
+            .set({ hour, minute, second: 0, millisecond: 0 })
+            .setZone('America/Chicago');
+
+          const reservationDate = startDateTime.toFormat('MMMM d, yyyy');
+          const locationName = selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC';
+
+          const response = await fetch('/api/create-cover-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: coverPrice,
+              firstName,
+              lastName,
+              phone: memberPhone,
+              reservationDate,
+              location: locationName,
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to create payment');
+          }
+
+          setClientSecret(data.clientSecret);
+          setPaymentIntentId(data.paymentIntentId);
+        } catch (error: any) {
+          toast({
+            title: 'Error',
+            description: error.message || 'Failed to initialize payment',
+            variant: 'error',
+          });
+          setShowPayment(false);
+        }
+      };
+
+      createPaymentIntent();
       return;
     }
 
