@@ -432,19 +432,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Query for private events that overlap with this date
         // Filter by location to ensure cross-location event isolation
+        console.log('[PRIVATE EVENT CHECK] locationId for filtering:', locationId);
+
         let privateEventsQuery = client
           .from('private_events')
-          .select('start_time, end_time, full_day, title')
+          .select('start_time, end_time, full_day, title, location_id')
           .lt('start_time', endOfDayUtc)
           .gt('end_time', startOfDayUtc);
 
         if (locationId) {
+          console.log('[PRIVATE EVENT CHECK] Filtering by location_id:', locationId);
           privateEventsQuery = privateEventsQuery.eq('location_id', locationId);
+        } else {
+          console.log('[PRIVATE EVENT CHECK] WARNING: No locationId provided - querying ALL private events!');
         }
 
         const { data: privateEvents, error: privateEventsError } = await privateEventsQuery;
 
-        console.log('[PRIVATE EVENT CHECK] Query params:', { startOfDayUtc, endOfDayUtc });
+        console.log('[PRIVATE EVENT CHECK] Query params:', { startOfDayUtc, endOfDayUtc, locationId });
         console.log('[PRIVATE EVENT CHECK] Found events:', privateEvents?.length || 0);
 
         if (privateEventsError) {
