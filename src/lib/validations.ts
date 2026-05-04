@@ -10,23 +10,160 @@ import { z } from 'zod';
 // ========================================
 
 export const memberSchema = z.object({
-  first_name: z.string().min(1, 'First name is required').max(50),
-  last_name: z.string().min(1, 'Last name is required').max(50),
-  email: z.string().email('Invalid email address').optional(),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
-  membership: z.string().optional(),
+  // Required identity fields
+  first_name: z.string().min(1, 'First name is required').max(50).trim(),
+  last_name: z.string().min(1, 'Last name is required').max(50).trim(),
+  email: z.string().email('Invalid email address').toLowerCase().optional(),
+  phone: z.string()
+    .min(10, 'Phone number too short')
+    .max(20, 'Phone number too long')
+    .regex(/^[\d\s\+\-\(\)]+$/, 'Phone number can only contain digits, spaces, +, -, ( )')
+    .transform((val) => {
+      // Remove all non-digit characters except leading +
+      const cleaned = val.replace(/[^\d+]/g, '');
+      // If starts with +, keep it; otherwise prepend +1 for US numbers if exactly 10 digits
+      if (cleaned.startsWith('+')) return cleaned;
+      return cleaned.length === 10 ? `+1${cleaned}` : cleaned.length === 11 && cleaned.startsWith('1') ? `+${cleaned}` : `+${cleaned}`;
+    }),
+
+  // PII - Sensitive
+  dob: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+    .refine((date) => {
+      // Parse date components directly to avoid timezone issues
+      const [year, month, day] = date.split('-').map(Number);
+      const birthDate = new Date(year, month - 1, day); // month is 0-indexed
+      const today = new Date();
+
+      // Set both to midnight for fair comparison
+      today.setHours(0, 0, 0, 0);
+      birthDate.setHours(0, 0, 0, 0);
+
+      // Validate date is valid (handles leap years, invalid dates like Feb 30)
+      if (birthDate.getFullYear() !== year || birthDate.getMonth() !== month - 1 || birthDate.getDate() !== day) {
+        return false; // Invalid date
+      }
+
+      // Calculate age properly
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      const dayDiff = today.getDate() - birthDate.getDate();
+
+      if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+        age--;
+      }
+
+      return age >= 18 && age <= 120;
+    }, 'Member must be at least 18 years old and date must be valid')
+    .optional()
+    .or(z.literal('')), // Allow empty string
+
+  // Address
+  address: z.string().max(200).trim().optional(),
+  address_2: z.string().max(200).trim().optional(),
+  city: z.string().max(100).trim().optional(),
+  state: z.string().max(2).toUpperCase().optional(),
+  zip: z.string().regex(/^\d{5}(-\d{4})?$/, 'Invalid ZIP code format').optional(),
+  country: z.string().max(100).trim().optional(),
+
+  // Membership details
+  membership: z.string().max(100).optional(),
+  member_type: z.enum(['primary', 'secondary']).optional(),
+  monthly_dues: z.number().nonnegative().optional(),
+  join_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional(),
+
+  // IDs (must be valid UUIDs)
+  member_id: z.string().uuid('Invalid member ID').optional(),
+  account_id: z.string().uuid('Invalid account ID').optional(),
+
+  // SECURITY: stripe_customer_id should NEVER be accepted from user input
+  // It will be generated server-side only
+  // stripe_customer_id: REMOVED FROM SCHEMA
+
+  // Metadata
+  company: z.string().max(200).trim().optional(),
+  referral: z.string().max(200).trim().optional(),
+  photo: z.string().url('Invalid photo URL').optional().or(z.literal('')),
+
+  // System fields
+  status: z.enum(['active', 'inactive', 'suspended']).default('active').optional(),
+  created_at: z.string().datetime().optional(),
+
+  // Notes
   notes: z.string().max(500).optional(),
-});
+}).strict(); // Reject unknown fields to prevent injection
 
 // Create update schema manually to avoid .partial() issue with refinements in Zod v4
 export const updateMemberSchema = z.object({
-  first_name: z.string().min(1, 'First name is required').max(50).optional(),
-  last_name: z.string().min(1, 'Last name is required').max(50).optional(),
-  email: z.string().email('Invalid email address').optional(),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
-  membership: z.string().optional(),
+  // Identity fields
+  first_name: z.string().min(1, 'First name is required').max(50).trim().optional(),
+  last_name: z.string().min(1, 'Last name is required').max(50).trim().optional(),
+  email: z.string().email('Invalid email address').toLowerCase().optional(),
+  phone: z.string()
+    .min(10, 'Phone number too short')
+    .max(20, 'Phone number too long')
+    .regex(/^[\d\s\+\-\(\)]+$/, 'Phone number can only contain digits, spaces, +, -, ( )')
+    .transform((val) => {
+      const cleaned = val.replace(/[^\d+]/g, '');
+      if (cleaned.startsWith('+')) return cleaned;
+      return cleaned.length === 10 ? `+1${cleaned}` : cleaned.length === 11 && cleaned.startsWith('1') ? `+${cleaned}` : `+${cleaned}`;
+    })
+    .optional(),
+
+  // PII - Sensitive (with same validation as memberSchema)
+  dob: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+    .refine((date) => {
+      // Parse date components directly to avoid timezone issues
+      const [year, month, day] = date.split('-').map(Number);
+      const birthDate = new Date(year, month - 1, day);
+      const today = new Date();
+
+      today.setHours(0, 0, 0, 0);
+      birthDate.setHours(0, 0, 0, 0);
+
+      // Validate date is valid (handles leap years, invalid dates like Feb 30)
+      if (birthDate.getFullYear() !== year || birthDate.getMonth() !== month - 1 || birthDate.getDate() !== day) {
+        return false;
+      }
+
+      // Calculate age
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      const dayDiff = today.getDate() - birthDate.getDate();
+
+      if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+        age--;
+      }
+
+      return age >= 18 && age <= 120;
+    }, 'Member must be at least 18 years old and date must be valid')
+    .optional(),
+
+  // Address
+  address: z.string().max(200).trim().optional(),
+  address_2: z.string().max(200).trim().optional(),
+  city: z.string().max(100).trim().optional(),
+  state: z.string().max(2).toUpperCase().optional(),
+  zip: z.string().regex(/^\d{5}(-\d{4})?$/, 'Invalid ZIP code').optional(),
+  country: z.string().max(100).trim().optional(),
+
+  // Membership
+  membership: z.string().max(100).optional(),
+  monthly_dues: z.number().nonnegative().optional(),
+  join_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+
+  // Metadata
+  company: z.string().max(200).trim().optional(),
+  referral: z.string().max(200).trim().optional(),
+  photo: z.string().url('Invalid photo URL').optional().or(z.literal('')),
+
+  // System fields
+  status: z.enum(['active', 'inactive', 'suspended']).optional(),
+
+  // Notes
   notes: z.string().max(500).optional(),
-});
+}).strict();
 
 export type MemberInput = z.infer<typeof memberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
