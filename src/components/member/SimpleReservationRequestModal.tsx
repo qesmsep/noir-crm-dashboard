@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/useToast';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getSupabaseClient } from '@/pages/api/supabaseClient';
+import { getMondayOfWeek } from '@/utils/dateUtils';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -46,6 +47,52 @@ const generateTimeSlots = (startHour: number, endHour: number) => {
 
 const thursdayTimeSlots = generateTimeSlots(16, 22); // 4:00 PM to 10:00 PM for Thursday
 const fridaySaturdayTimeSlots = generateTimeSlots(18, 23); // 6:00 PM to 11:00 PM for Fri/Sat
+
+/**
+ * Get operating hours for a specific date.
+ * Checks weekly hours first, then falls back to base hours.
+ * @param date - The date to check
+ * @param locationHours - Object containing weeklyHours, weeklyHoursWeekStart, and baseHours
+ * @returns Time ranges for the date, or null if not open
+ */
+const getHoursForDate = (date: Date, locationHours: any): Array<{ start: string; end: string }> | null => {
+  if (!locationHours) return null;
+
+  const dt = DateTime.fromJSDate(date).setZone('America/Chicago');
+  const dayOfWeek = dt.weekday % 7; // Luxon: 1=Monday, 7=Sunday -> convert to 0=Sunday, 6=Saturday
+  const dayName = dt.toFormat('EEEE').toLowerCase(); // "thursday", "friday", etc.
+
+  // Check weekly hours first
+  if (locationHours.weeklyHours) {
+    // Weekly hours are set for a specific week
+    // Check if the date is in the same week as the weekly hours
+    const dateWeekMonday = getMondayOfWeek(date, 'America/Chicago');
+
+    // Only use weekly hours if the date is in the same week
+    if (dateWeekMonday === locationHours.weeklyHoursWeekStart) {
+      const dayData = locationHours.weeklyHours[dayName];
+      if (dayData && dayData.open && dayData.close) {
+        return [{ start: dayData.open, end: dayData.close }];
+      }
+      // If weekly hours exist but this day is null/undefined, it means closed for this week
+      return null;
+    }
+
+    // Date is in a different week - weekly hours don't apply, return null
+    // (Don't fall back to base hours when weekly hours are set for the current week)
+    return null;
+  }
+
+  // Fall back to base hours (only when no weekly hours are set at all)
+  if (locationHours.baseHours && locationHours.baseHours.length > 0) {
+    const baseHoursForDay = locationHours.baseHours.filter((h: any) => h.day_of_week === dayOfWeek);
+    if (baseHoursForDay.length > 0 && baseHoursForDay[0].time_ranges) {
+      return baseHoursForDay[0].time_ranges;
+    }
+  }
+
+  return null;
+};
 
 export default function SimpleReservationRequestModal({
   isOpen,
@@ -91,6 +138,10 @@ export default function SimpleReservationRequestModal({
   const [showPayment, setShowPayment] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+
+  // Location hours state (weekly_hours with fallback to base_hours)
+  const [locationHours, setLocationHours] = useState<any>(null);
+  const [loadingHours, setLoadingHours] = useState(true);
 
   // Initialize fields when memberName changes
   useEffect(() => {
@@ -241,16 +292,36 @@ export default function SimpleReservationRequestModal({
 
         const { data: locationData } = await supabase
           .from('locations')
-          .select('cover_enabled, cover_price')
+          .select('cover_enabled, cover_price, weekly_hours, id')
           .eq('slug', selectedLocation)
           .single();
 
         if (locationData) {
           setCoverEnabled(locationData.cover_enabled || false);
           setCoverPrice(locationData.cover_price || 0);
+
+          // Fetch weekly hours + base hours for this location
+          const currentWeekMonday = getMondayOfWeek(new Date(), 'America/Chicago');
+          const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday] || null;
+
+          // Fetch base hours from venue_hours table
+          const { data: baseHoursData } = await supabase
+            .from('venue_hours')
+            .select('*')
+            .eq('type', 'base')
+            .eq('location_id', locationData.id);
+
+          setLocationHours({
+            weeklyHours: weeklyHoursForWeek,
+            weeklyHoursWeekStart: weeklyHoursForWeek ? currentWeekMonday : null,
+            baseHours: baseHoursData || []
+          });
+          setLoadingHours(false);
         } else {
           setCoverEnabled(false);
           setCoverPrice(0);
+          setLocationHours(null);
+          setLoadingHours(false);
         }
       } catch (error) {
         console.error('Error fetching cover charge info:', error);
@@ -299,12 +370,31 @@ export default function SimpleReservationRequestModal({
 
   // Filter time slots based on selected date and blocked times
   const getAvailableTimeSlots = () => {
-    if (!date) return [];
+    if (!date || !locationHours) return [];
 
-    const baseSlots = date.getDay() === 4 ? thursdayTimeSlots : fridaySaturdayTimeSlots;
+    // Get hours for the selected date (weekly hours or base hours)
+    const hoursForDate = getHoursForDate(date, locationHours);
+    if (!hoursForDate || hoursForDate.length === 0) return [];
+
+    // Generate time slots based on the actual operating hours
+    const allSlots: string[] = [];
+    hoursForDate.forEach((timeRange) => {
+      // Parse start and end times (format: "HH:MM" in 24-hour)
+      const [startHour, startMinute] = timeRange.start.split(':').map(Number);
+      let [endHour, endMinute] = timeRange.end.split(':').map(Number);
+
+      // Handle midnight crossing (e.g., "00:00" means end of day)
+      if (endHour === 0 && endMinute === 0) {
+        endHour = 24;
+      }
+
+      // Generate 15-minute slots
+      const slots = generateTimeSlots(startHour, endHour);
+      allSlots.push(...slots);
+    });
 
     // Filter out blocked times
-    return baseSlots.filter((slot) => {
+    return allSlots.filter((slot) => {
       // Parse the slot time (e.g., "6:00 PM")
       const [timeStr, period] = slot.split(' ');
       const [hourStr, minuteStr] = timeStr.split(':');
@@ -384,6 +474,52 @@ export default function SimpleReservationRequestModal({
 
     return (
       <form onSubmit={handlePaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Cover charge notice with membership link */}
+        <div style={{
+          padding: '1.25rem',
+          backgroundColor: '#F9FAFB',
+          borderLeft: '4px solid #A59480',
+          borderRadius: '8px',
+          fontSize: '0.875rem',
+        }}>
+          <p style={{ margin: '0 0 0.75rem 0', color: '#6B7280', lineHeight: '1.5' }}>
+            ${coverPrice} cover charge per person applies (includes first drink)
+          </p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              const message = "MEMBERSHIP";
+              const phoneNumber = "9137774488";
+              const url = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
+              window.open(url, '_blank');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#A59480',
+              cursor: 'pointer',
+              padding: 0,
+              font: 'inherit',
+              fontWeight: '600',
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#8C7C6D';
+              e.currentTarget.style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#A59480';
+              e.currentTarget.style.textDecoration = 'none';
+            }}
+          >
+            <span>→</span> Become a member and avoid the reservation fee
+          </button>
+        </div>
+
         <div>
           <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1F1F1F' }}>
             Payment Details
@@ -734,10 +870,13 @@ export default function SimpleReservationRequestModal({
       }
     }
 
-    // Only allow Thursday (4), Friday (5), Saturday (6)
-    const day = date.getDay();
-    if (day !== 4 && day !== 5 && day !== 6) {
-      return false;
+    // Check if date has operating hours (weekly or base)
+    // Skip if hours are still loading
+    if (!loadingHours) {
+      const hours = getHoursForDate(date, locationHours);
+      if (!hours || hours.length === 0) {
+        return false;
+      }
     }
 
     // Check if date is blocked (closure or private event)
@@ -788,6 +927,8 @@ export default function SimpleReservationRequestModal({
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
           maxWidth: '600px',
           width: '100%',
+          maxHeight: 'calc(100vh - 2rem)',
+          overflowY: 'auto',
           padding: '2rem',
           position: 'relative',
         }}
@@ -804,7 +945,9 @@ export default function SimpleReservationRequestModal({
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '0.5rem',
+              padding: '0.625rem',
+              minWidth: '44px',
+              minHeight: '44px',
               borderRadius: '0.375rem',
               display: 'flex',
               alignItems: 'center',
@@ -959,18 +1102,6 @@ export default function SimpleReservationRequestModal({
                 {selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC'}
               </p>
             </div>
-          )}
-
-          {/* Cover charge notice for non-members */}
-          {coverEnabled && !memberId && (
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#A59480',
-              fontWeight: '600',
-              margin: 0,
-            }}>
-              ${coverPrice} cover charge per person applies (includes first drink)
-            </p>
           )}
 
           {/* Date and Time Row */}
