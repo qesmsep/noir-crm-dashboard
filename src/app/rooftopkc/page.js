@@ -1,15 +1,145 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import BookMenuViewer from '../../components/BookMenuViewer';
 import PublicReservationFlow from '../../components/PublicReservationFlow';
+import { createClient } from '@supabase/supabase-js';
+import { getMondayOfWeek } from '@/utils/dateUtils';
+import { DateTime } from 'luxon';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  {
+    db: { schema: 'public' },
+    global: { headers: { 'x-client-info': 'supabase-js-web' } }
+  }
+);
 
 export default function RooftopKCHome() {
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+  const [hours, setHours] = useState(null);
+  const [loadingHours, setLoadingHours] = useState(true);
 
   // Apple Maps link helper
   const appleMapsUrl = 'https://maps.apple.com/?address=1828%20Walnut%20St,Kansas%20City,MO%2064108';
+
+  // Fetch weekly hours with fallback to base hours
+  useEffect(() => {
+    const fetchHours = async () => {
+      try {
+        // Get location data with weekly hours
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('id, timezone, weekly_hours')
+          .eq('slug', 'rooftopkc')
+          .single();
+
+        if (!locationData) {
+          setLoadingHours(false);
+          return;
+        }
+
+        const timezone = locationData.timezone || 'America/Chicago';
+        const currentWeekMonday = getMondayOfWeek(new Date(), timezone);
+        const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday];
+
+        if (weeklyHoursForWeek) {
+          // Use weekly hours if available
+          setHours(weeklyHoursForWeek);
+        } else {
+          // Fallback to base hours from venue_hours table
+          const { data: baseHoursData } = await supabase
+            .from('venue_hours')
+            .select('*')
+            .eq('type', 'base')
+            .eq('location_id', locationData.id);
+
+          if (baseHoursData && baseHoursData.length > 0) {
+            // Convert venue_hours format to weekly hours format
+            const convertedHours = {};
+            const dayMap = {
+              0: 'sunday',
+              1: 'monday',
+              2: 'tuesday',
+              3: 'wednesday',
+              4: 'thursday',
+              5: 'friday',
+              6: 'saturday'
+            };
+
+            baseHoursData.forEach(record => {
+              const dayKey = dayMap[record.day_of_week];
+              if (record.time_ranges && record.time_ranges.length > 0) {
+                // Use first time range (most common case)
+                convertedHours[dayKey] = {
+                  open: record.time_ranges[0].start,
+                  close: record.time_ranges[0].end
+                };
+              }
+            });
+
+            setHours(convertedHours);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching hours:', error);
+      } finally {
+        setLoadingHours(false);
+      }
+    };
+
+    fetchHours();
+  }, []);
+
+  // Helper function to format time from 24-hour to 12-hour format
+  const formatTime = (time) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+
+    // Handle midnight
+    if (hours === 0 && minutes === 0) {
+      return '12A';
+    }
+
+    // Handle noon
+    if (hours === 12) {
+      return minutes === 0 ? '12P' : `12:${minutes.toString().padStart(2, '0')}P`;
+    }
+
+    // Convert to 12-hour format
+    const hour12 = hours > 12 ? hours - 12 : hours;
+    const ampm = hours >= 12 ? 'P' : 'A';
+
+    // Only show minutes if not on the hour
+    if (minutes === 0) {
+      return `${hour12}${ampm}`;
+    }
+
+    return `${hour12}:${minutes.toString().padStart(2, '0')}${ampm}`;
+  };
+
+  // Helper function to get the date for a specific day name
+  const getDateForDay = (dayName) => {
+    const timezone = 'America/Chicago';
+    const now = DateTime.now().setZone(timezone);
+    const currentWeekMonday = DateTime.fromISO(getMondayOfWeek(new Date(), timezone), { zone: timezone });
+
+    const dayMap = {
+      'sunday': 0,
+      'monday': 1,
+      'tuesday': 2,
+      'wednesday': 3,
+      'thursday': 4,
+      'friday': 5,
+      'saturday': 6
+    };
+
+    const dayOffset = dayMap[dayName.toLowerCase()];
+    const targetDate = currentWeekMonday.plus({ days: dayOffset });
+    return targetDate.toFormat('M/d');
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#ECEDE8]">
@@ -184,6 +314,18 @@ export default function RooftopKCHome() {
                   Reserve Now
                 </button>
               </div>
+              <div className="mt-6 text-center">
+                <a
+                  href="#membership"
+                  className="inline-block text-base sm:text-lg text-[#BCA892] hover:text-[#ECEDE8] transition-colors underline"
+                  style={{
+                    fontFamily: 'Montserrat, sans-serif',
+                    fontWeight: '500'
+                  }}
+                >
+                  Learn about Noir Membership Benefits →
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -226,9 +368,35 @@ export default function RooftopKCHome() {
               Kansas City, MO 64108
             </a>
             <div className="mb-4 sm:mb-6 text-[#353535] text-base sm:text-lg space-y-1">
-              <div>Thursday – 4pm-10pm</div>
-              <div>Friday – 6pm-12am</div>
-              <div>Saturday – 6pm-12am</div>
+              {loadingHours ? (
+                <div>Loading hours...</div>
+              ) : hours ? (
+                <>
+                  {hours.thursday && (
+                    <div>Thursday {getDateForDay('thursday')} :: {formatTime(hours.thursday.open)}-{formatTime(hours.thursday.close)}</div>
+                  )}
+                  {hours.friday && (
+                    <div>Friday {getDateForDay('friday')} :: {formatTime(hours.friday.open)}-{formatTime(hours.friday.close)}</div>
+                  )}
+                  {hours.saturday && (
+                    <div>Saturday {getDateForDay('saturday')} :: {formatTime(hours.saturday.open)}-{formatTime(hours.saturday.close)}</div>
+                  )}
+                  {hours.sunday && (
+                    <div>Sunday {getDateForDay('sunday')} :: {formatTime(hours.sunday.open)}-{formatTime(hours.sunday.close)}</div>
+                  )}
+                  {hours.monday && (
+                    <div>Monday {getDateForDay('monday')} :: {formatTime(hours.monday.open)}-{formatTime(hours.monday.close)}</div>
+                  )}
+                  {hours.tuesday && (
+                    <div>Tuesday {getDateForDay('tuesday')} :: {formatTime(hours.tuesday.open)}-{formatTime(hours.tuesday.close)}</div>
+                  )}
+                  {hours.wednesday && (
+                    <div>Wednesday {getDateForDay('wednesday')} :: {formatTime(hours.wednesday.open)}-{formatTime(hours.wednesday.close)}</div>
+                  )}
+                </>
+              ) : (
+                <div>Hours not available</div>
+              )}
             </div>
           </div>
         </div>
@@ -256,7 +424,7 @@ export default function RooftopKCHome() {
                color: '#BCA892',
                lineHeight: 1.5
              }}>
-            Explore our curated selection of elevated cocktails, mocktails, and spirits under the stars.
+            Explore our curated selection of elevated cocktails, mocktails, and spirits under the stars. Food is not provided.
           </p>
           {/* Inline Book Menu Viewer with location prop */}
           <div className="w-full">
