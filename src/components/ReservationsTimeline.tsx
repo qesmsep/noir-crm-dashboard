@@ -3,7 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
-import { fromUTC, toUTC, formatDateTime, formatTime, isSameDay } from '../utils/dateUtils';
+import { fromUTC, toUTC, formatDateTime, formatTime, isSameDay, getMondayOfWeek } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { DateTime } from 'luxon';
@@ -140,6 +140,101 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     }
     loadTables();
   }, [reloadKey, locationSlug, toast]);
+
+  // Fetch and set operating hours based on weekly_hours + base_hours
+  useEffect(() => {
+    async function loadOperatingHours() {
+      try {
+        if (!locationSlug) return;
+
+        // Fetch location with weekly_hours and timezone
+        const { data: locationData, error: locationError } = await supabase
+          .from('locations')
+          .select('id, weekly_hours, timezone')
+          .eq('slug', locationSlug)
+          .single();
+
+        if (locationError) {
+          console.error('Error fetching location:', locationError);
+          return;
+        }
+
+        const timezone = locationData.timezone || 'America/Chicago';
+        const currentWeekMonday = getMondayOfWeek(currentCalendarDate, timezone);
+
+        // Check if there are weekly hours for the current week
+        const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday] || null;
+
+        // Get day of week for the current calendar date
+        const dt = DateTime.fromJSDate(currentCalendarDate, { zone: timezone });
+        const dayName = dt.toFormat('EEEE').toLowerCase(); // "saturday", "friday", etc.
+        const dayOfWeek = dt.weekday % 7; // 0=Sunday, 6=Saturday
+
+        let operatingHours = null;
+
+        // Check weekly hours first
+        if (weeklyHoursForWeek) {
+          const dayData = weeklyHoursForWeek[dayName];
+          if (dayData && dayData.open && dayData.close) {
+            operatingHours = { start: dayData.open, end: dayData.close };
+          }
+          // If weekly hours exist for this week but this day is null, it means closed
+          // Don't fall back to base hours
+        } else {
+          // Fall back to base hours (only when no weekly hours are set at all)
+          const { data: baseHoursData } = await supabase
+            .from('venue_hours')
+            .select('*')
+            .eq('type', 'base')
+            .eq('location_id', locationData.id)
+            .eq('day_of_week', dayOfWeek);
+
+          if (baseHoursData && baseHoursData.length > 0 && baseHoursData[0].time_ranges) {
+            const firstRange = baseHoursData[0].time_ranges[0];
+            if (firstRange) {
+              operatingHours = { start: firstRange.start, end: firstRange.end };
+            }
+          }
+        }
+
+        // Update calendar hours
+        if (operatingHours) {
+          // Convert time strings to calendar format (HH:MM:SS)
+          const startTime = operatingHours.start + ':00';
+
+          // Handle end times past midnight (e.g., 23:59 or 00:00)
+          let endTime = operatingHours.end;
+          if (endTime === '00:00' || endTime === '23:59') {
+            // If close time is midnight, show until 2 AM next day
+            endTime = '26:00:00';
+          } else {
+            endTime = endTime + ':00';
+          }
+
+          console.log('📅 [ReservationsTimeline] Setting hours for', dayName, ':', operatingHours);
+          setSlotMinTime(startTime);
+          setSlotMaxTime(endTime);
+          setScrollTime(startTime);
+        } else {
+          // No hours found - venue closed or no data
+          console.log('📅 [ReservationsTimeline] No operating hours found for', dayName);
+          // Use default hours
+          setSlotMinTime('18:00:00');
+          setSlotMaxTime('26:00:00');
+          setScrollTime('18:00:00');
+        }
+
+      } catch (err) {
+        console.error('Error loading operating hours:', err);
+        // Fall back to defaults
+        setSlotMinTime('18:00:00');
+        setSlotMaxTime('26:00:00');
+        setScrollTime('18:00:00');
+      }
+    }
+
+    loadOperatingHours();
+  }, [currentCalendarDate, locationSlug]);
 
   // Debug: Log what date FullCalendar is actually showing
   useEffect(() => {
