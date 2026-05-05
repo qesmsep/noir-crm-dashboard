@@ -170,7 +170,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         const dayName = dt.toFormat('EEEE').toLowerCase(); // "saturday", "friday", etc.
         const dayOfWeek = dt.weekday % 7; // 0=Sunday, 6=Saturday
 
-        let operatingHours = null;
+        let operatingHours: { start: string; end: string } | null = null;
 
         // Check weekly hours first
         if (weeklyHoursForWeek) {
