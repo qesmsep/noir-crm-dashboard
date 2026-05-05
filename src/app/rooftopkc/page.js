@@ -452,7 +452,7 @@ export default function RooftopKCHome() {
              color: '#353535',
              lineHeight: 1.6
            }}>
-          RooftopKC is an extension of our Noir concept—elevated to the rooftop with stunning views and an open-air atmosphere. If you're interested in joining our community and gaining exclusive access to both locations, here are the membership details:
+          RooftopKC is an extension of our Noir concept—elevated to the rooftop with stunning views and an open-air atmosphere.
         </p>
         <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
           {/* Main Membership Card */}
