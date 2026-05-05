@@ -34,8 +34,8 @@ interface Props {
 const generateTimeSlots = (startHour: number, endHour: number) => {
   const slots: string[] = [];
   for (let hour = startHour; hour <= endHour; hour++) {
-    const maxMinute = hour === endHour ? 0 : 45; // Last slot at end hour is :00
-    for (let minute = 0; minute <= maxMinute; minute += 15) {
+    const maxMinute = hour === endHour ? 0 : 30; // Last slot at end hour is :00
+    for (let minute = 0; minute <= maxMinute; minute += 30) {
       const h = hour > 12 ? hour - 12 : hour;
       const period = hour >= 12 ? 'PM' : 'AM';
       const m = minute.toString().padStart(2, '0');
