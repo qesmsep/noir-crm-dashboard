@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import PrivateEventBooking from './PrivateEventBooking';
 import { DateTime } from 'luxon';
 import { formatTime, formatDate, fromUTC, getMondayOfWeek } from '../utils/dateUtils';
+import styles from './CalendarAvailability.module.css';
 import {
   Box,
   Button,
@@ -841,13 +842,25 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
     switch (section) {
       case 'booking_window':
         return (
-          <Box bg="#faf9f7" p={4} borderRadius="8px" border="1px solid #ececec" maxW={"420px"}>
-            <Box borderBottom="2px solid #b7a78b" fontWeight={600} fontSize="1.5rem" mb={4} pb={1} color="#222">
-              Booking Window
-            </Box>
-            <Flex align="center" gap={4}>
-              <Box>
-                <Text color="#555" fontSize="0.98em">Start Date:</Text>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            border: '1px solid #ECEAE5',
+            boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+            maxWidth: '500px',
+            fontFamily: 'Montserrat, sans-serif'
+          }}>
+            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <div style={{
+                  fontSize: '0.8125rem',
+                  color: '#6e6e73',
+                  marginBottom: '0.5rem',
+                  fontWeight: '500'
+                }}>
+                  Start Date:
+                </div>
                 <DatePicker
                   selected={bookingStartDate}
                   onChange={date => { if (date) handleBookingDatesChange(date, bookingEndDate); }}
@@ -855,9 +868,16 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                   disabled={bookingDatesLoading || bookingDatesSaving}
                   className="chakra-input"
                 />
-              </Box>
-              <Box>
-                <Text color="#555" fontSize="0.98em">End Date:</Text>
+              </div>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <div style={{
+                  fontSize: '0.8125rem',
+                  color: '#6e6e73',
+                  marginBottom: '0.5rem',
+                  fontWeight: '500'
+                }}>
+                  End Date:
+                </div>
                 <DatePicker
                   selected={bookingEndDate}
                   onChange={date => { if (date) handleBookingDatesChange(bookingStartDate, date); }}
@@ -865,133 +885,90 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                   disabled={bookingDatesLoading || bookingDatesSaving}
                   className="chakra-input"
                 />
-              </Box>
-              {bookingDatesLoading && <Spinner color="gray.400" />}
-              {bookingDatesSaving && <Spinner color="blue.400" />}
-            </Flex>
-            <Button
-              colorScheme="blue"
-              isLoading={bookingDatesSaving}
-              onClick={() => handleBookingDatesChange(bookingStartDate, bookingEndDate)}
-              mt={4}
-            >
-              Save Booking Window
-            </Button>
-            <Text color="#888" fontSize="0.95em" ml={1}>
-              (Users can book between these dates)
-            </Text>
-          </Box>
+              </div>
+              {(bookingDatesLoading || bookingDatesSaving) && (
+                <Spinner size="sm" color="#A59480" />
+              )}
+            </div>
+          </div>
         );
       case 'base':
         return (
           <div style={{
             background: '#ffffff',
-            borderRadius: '16px',
-            padding: '1.5rem',
+            borderRadius: '12px',
+            padding: '0.75rem',
             border: '1px solid #ECEAE5',
-            boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+            boxShadow: '0 2px 8px rgba(165, 148, 128, 0.06)',
             maxWidth: '800px',
             fontFamily: 'Montserrat, sans-serif'
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               {WEEKDAYS.map((day, index) => (
-                <div key={day} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    cursor: 'pointer',
-                    minWidth: '150px',
-                    fontSize: '0.9375rem',
-                    fontWeight: '500',
-                    color: '#1F1F1F'
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={baseHours[index].enabled}
-                      onChange={() => toggleDay(index)}
+                <div key={day} style={{
+                  background: '#ffffff',
+                  border: '1px solid #F5F5F5',
+                  borderRadius: '6px',
+                  padding: '0.375rem 0.5rem',
+                  transition: 'all 0.15s ease'
+                }}>
+                  {/* Day Header with Add Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: baseHours[index].enabled ? '0.25rem' : '0' }}>
+                    <div style={{
+                      fontSize: '0.8125rem',
+                      fontWeight: baseHours[index].enabled ? '600' : '500',
+                      color: baseHours[index].enabled ? '#1F1F1F' : '#6e6e73'
+                    }}>
+                      {day}
+                    </div>
+                    <button
+                      onClick={() => baseHours[index].enabled ? addTimeRange(index) : toggleDay(index)}
                       style={{
-                        width: '18px',
-                        height: '18px',
+                        padding: 0,
+                        background: 'transparent',
+                        color: '#A59480',
+                        border: 'none',
+                        fontSize: '1.125rem',
+                        fontWeight: '300',
                         cursor: 'pointer',
-                        accentColor: '#A59480'
+                        transition: 'opacity 0.15s',
+                        fontFamily: 'inherit',
+                        lineHeight: 1,
+                        opacity: 0.7
                       }}
-                    />
-                    {day}
-                  </label>
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Time Ranges */}
                   {baseHours[index].enabled && (
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
                       {baseHours[index].timeRanges.map((range, rangeIndex) => (
-                        <div key={rangeIndex} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <div key={rangeIndex} className={styles.timeRow}>
                           <input
                             type="time"
                             value={range.start}
                             onChange={e => updateTimeRange(index, rangeIndex, 'start', e.target.value)}
-                            style={{
-                              width: '110px',
-                              height: '36px',
-                              padding: '0 0.75rem',
-                              border: '1px solid rgba(0, 0, 0, 0.12)',
-                              borderRadius: '6px',
-                              fontSize: '0.875rem',
-                              fontFamily: 'inherit'
-                            }}
+                            className={styles.timeInput}
                           />
-                          <span style={{ fontSize: '0.875rem', color: '#6e6e73' }}>to</span>
+                          <span className={styles.timeArrow}>→</span>
                           <input
                             type="time"
                             value={range.end}
                             onChange={e => updateTimeRange(index, rangeIndex, 'end', e.target.value)}
-                            style={{
-                              width: '110px',
-                              height: '36px',
-                              padding: '0 0.75rem',
-                              border: '1px solid rgba(0, 0, 0, 0.12)',
-                              borderRadius: '6px',
-                              fontSize: '0.875rem',
-                              fontFamily: 'inherit'
-                            }}
+                            className={styles.timeInput}
                           />
-                          {baseHours[index].timeRanges.length > 1 && (
-                            <button
-                              onClick={() => removeTimeRange(index, rangeIndex)}
-                              style={{
-                                height: '32px',
-                                padding: '0 1rem',
-                                background: 'transparent',
-                                color: '#c41e3a',
-                                border: '1px solid rgba(196, 30, 58, 0.3)',
-                                borderRadius: '6px',
-                                fontSize: '0.8125rem',
-                                fontWeight: '500',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                fontFamily: 'inherit'
-                              }}
-                            >
-                              Remove
-                            </button>
-                          )}
+                          <button
+                            onClick={() => removeTimeRange(index, rangeIndex)}
+                            className={styles.deleteButton}
+                          >
+                            ✕
+                          </button>
                         </div>
                       ))}
-                      <button
-                        onClick={() => addTimeRange(index)}
-                        style={{
-                          height: '32px',
-                          padding: '0 1rem',
-                          background: 'transparent',
-                          color: '#6e6e73',
-                          border: '1px solid rgba(0, 0, 0, 0.12)',
-                          borderRadius: '6px',
-                          fontSize: '0.8125rem',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          fontFamily: 'inherit'
-                        }}
-                      >
-                        + Add Time Range
-                      </button>
                     </div>
                   )}
                 </div>
@@ -1054,10 +1031,10 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         return (
           <div style={{
             background: '#ffffff',
-            borderRadius: '16px',
-            padding: '1.5rem',
+            borderRadius: '12px',
+            padding: '0.75rem',
             border: '1px solid #ECEAE5',
-            boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+            boxShadow: '0 2px 8px rgba(165, 148, 128, 0.06)',
             maxWidth: '800px',
             fontFamily: 'Montserrat, sans-serif'
           }}>
@@ -1069,111 +1046,78 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
             }}>
               {dateRangeLabel}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               {WEEKDAYS.map((day, index) => {
                 const dayDate = mondayDate.plus({ days: index });
                 const dateLabel = dayDate.toFormat('M/d');
 
                 return (
-                  <div key={day} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      cursor: 'pointer',
-                      minWidth: '150px',
-                      fontSize: '0.9375rem',
-                      fontWeight: '500',
-                      color: '#1F1F1F'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={weeklyHours[index].enabled}
-                        onChange={() => toggleWeeklyDay(index)}
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          cursor: 'pointer',
-                          accentColor: '#A59480'
-                        }}
-                      />
-                      {day} <span style={{ color: '#6e6e73', fontWeight: '400' }}>{dateLabel}</span>
-                    </label>
-                  {weeklyHours[index].enabled && (
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {weeklyHours[index].timeRanges.map((range, rangeIndex) => (
-                        <div key={rangeIndex} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <input
-                            type="time"
-                            value={range.start}
-                            onChange={e => updateWeeklyTimeRange(index, rangeIndex, 'start', e.target.value)}
-                            style={{
-                              width: '110px',
-                              height: '36px',
-                              padding: '0 0.75rem',
-                              border: '1px solid rgba(0, 0, 0, 0.12)',
-                              borderRadius: '6px',
-                              fontSize: '0.875rem',
-                              fontFamily: 'inherit'
-                            }}
-                          />
-                          <span style={{ fontSize: '0.875rem', color: '#6e6e73' }}>to</span>
-                          <input
-                            type="time"
-                            value={range.end}
-                            onChange={e => updateWeeklyTimeRange(index, rangeIndex, 'end', e.target.value)}
-                            style={{
-                              width: '110px',
-                              height: '36px',
-                              padding: '0 0.75rem',
-                              border: '1px solid rgba(0, 0, 0, 0.12)',
-                              borderRadius: '6px',
-                              fontSize: '0.875rem',
-                              fontFamily: 'inherit'
-                            }}
-                          />
-                          {weeklyHours[index].timeRanges.length > 1 && (
-                            <button
-                              onClick={() => removeWeeklyTimeRange(index, rangeIndex)}
-                              style={{
-                                height: '32px',
-                                padding: '0 1rem',
-                                background: 'transparent',
-                                color: '#c41e3a',
-                                border: '1px solid rgba(196, 30, 58, 0.3)',
-                                borderRadius: '6px',
-                                fontSize: '0.8125rem',
-                                fontWeight: '500',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                fontFamily: 'inherit'
-                              }}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                  <div key={day} style={{
+                    background: '#ffffff',
+                    border: '1px solid #F5F5F5',
+                    borderRadius: '6px',
+                    padding: '0.375rem 0.5rem',
+                    transition: 'all 0.15s ease'
+                  }}>
+                    {/* Day Header with Add Button */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: weeklyHours[index].enabled ? '0.25rem' : '0' }}>
+                      <div style={{
+                        fontSize: '0.8125rem',
+                        fontWeight: weeklyHours[index].enabled ? '600' : '500',
+                        color: weeklyHours[index].enabled ? '#1F1F1F' : '#6e6e73'
+                      }}>
+                        {day} <span style={{ color: '#A59480', fontWeight: '400', fontSize: '0.6875rem' }}>{dateLabel}</span>
+                      </div>
                       <button
-                        onClick={() => addWeeklyTimeRange(index)}
+                        onClick={() => weeklyHours[index].enabled ? addWeeklyTimeRange(index) : toggleWeeklyDay(index)}
                         style={{
-                          height: '32px',
-                          padding: '0 1rem',
+                          padding: 0,
                           background: 'transparent',
-                          color: '#6e6e73',
-                          border: '1px solid rgba(0, 0, 0, 0.12)',
-                          borderRadius: '6px',
-                          fontSize: '0.8125rem',
-                          fontWeight: '500',
+                          color: '#A59480',
+                          border: 'none',
+                          fontSize: '1.125rem',
+                          fontWeight: '300',
                           cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          fontFamily: 'inherit'
+                          transition: 'opacity 0.15s',
+                          fontFamily: 'inherit',
+                          lineHeight: 1,
+                          opacity: 0.7
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
                       >
-                        + Add Time Range
+                        +
                       </button>
                     </div>
-                  )}
+
+                    {/* Time Ranges */}
+                    {weeklyHours[index].enabled && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                        {weeklyHours[index].timeRanges.map((range, rangeIndex) => (
+                          <div key={rangeIndex} className={styles.timeRow}>
+                            <input
+                              type="time"
+                              value={range.start}
+                              onChange={e => updateWeeklyTimeRange(index, rangeIndex, 'start', e.target.value)}
+                              className={styles.timeInput}
+                            />
+                            <span className={styles.timeArrow}>→</span>
+                            <input
+                              type="time"
+                              value={range.end}
+                              onChange={e => updateWeeklyTimeRange(index, rangeIndex, 'end', e.target.value)}
+                              className={styles.timeInput}
+                            />
+                            <button
+                              onClick={() => removeWeeklyTimeRange(index, rangeIndex)}
+                              className={styles.deleteButton}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}

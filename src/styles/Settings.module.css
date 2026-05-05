@@ -4,7 +4,7 @@
   width: 100%;
   max-width: 100vw;
   margin: 0 auto;
-  padding: 1.5rem 1.5rem 2rem;
+  padding: 1rem; /* Reduced from 1.5rem for mobile */
   background: #ECEDE8; /* weddingDay */
   min-height: 100vh;
   box-sizing: border-box;
@@ -17,7 +17,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem; /* Reduced from 1.5rem for mobile */
   align-items: flex-start;
 }
 
@@ -25,13 +25,26 @@
 .tabs {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem; /* Reduced from 1.5rem for mobile */
   border-bottom: 1px solid #d2d2d7;
   padding-bottom: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar but keep functionality */
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .tab {
-  padding: 0.75rem 1.5rem;
+  padding: 0.875rem 1.25rem; /* Increased vertical padding for 44px touch target */
+  min-height: 44px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -42,6 +55,9 @@
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   bottom: -1px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .tab:hover {
@@ -72,8 +88,9 @@
 }
 
 .saveButton {
-  height: 40px;
-  padding: 0.5rem 1.5rem;
+  height: 44px;
+  min-height: 44px;
+  padding: 0.625rem 1.5rem;
   background: #A59480; /* cork */
   color: #ffffff;
   border: 1px solid #A59480;
@@ -83,6 +100,7 @@
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   font-family: 'Montserrat', sans-serif;
+  width: 100%; /* Full width on mobile */
   box-shadow:
     0 1px 2px rgba(165, 148, 128, 0.15),
     0 4px 8px rgba(165, 148, 128, 0.25),
@@ -119,13 +137,14 @@
 }
 
 .secondaryButton {
-  height: 32px;
-  padding: 0 1rem;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 1.25rem;
   background: transparent;
   color: #6e6e73;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 6px;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -177,22 +196,24 @@
 .sections {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem; /* Reduced from 1.5rem for mobile */
 }
 
 /* Cards */
 .card {
   background: #ffffff;
   border-radius: 16px;
-  padding: 1.5rem;
+  padding: 1rem; /* Reduced from 1.5rem for mobile */
   border: 1px solid #ECEAE5; /* earthTone */
   box-shadow: 0 4px 12px rgba(165, 148, 128, 0.08);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card:hover {
-  box-shadow: 0 6px 16px rgba(165, 148, 128, 0.12);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    box-shadow: 0 6px 16px rgba(165, 148, 128, 0.12);
+    transform: translateY(-2px);
+  }
 }
 
 .cardTitle {
@@ -206,8 +227,8 @@
 }
 
 .subsection {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
+  margin-top: 1rem; /* Reduced from 1.5rem for mobile */
+  padding-top: 1rem; /* Reduced from 1.5rem for mobile */
   border-top: 1px solid #ECEAE5; /* earthTone */
 }
 
@@ -228,7 +249,7 @@
 
 /* Form Elements */
 .formGroup {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem; /* Reduced from 1rem for mobile */
 }
 
 .formGroup:last-child {
@@ -357,11 +378,12 @@
 
 .switch {
   position: relative;
-  width: 51px;
-  height: 31px;
+  width: 64px;
+  height: 44px;
+  min-height: 44px;
   background: #DAD7D0; /* earthTone */
   border: none;
-  border-radius: 16px;
+  border-radius: 22px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
@@ -381,8 +403,8 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 27px;
-  height: 27px;
+  width: 40px;
+  height: 40px;
   background: #ffffff;
   border-radius: 50%;
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -435,6 +457,8 @@
   width: 44px;
   height: 100%;
   border: none;
+  border-left: 1px solid #ECEAE5; /* earthTone */
+  border-right: 1px solid #ECEAE5; /* earthTone */
   background: #F7F6F2; /* lightGreige */
   color: #353535; /* nightSky */
   font-size: 1.125rem;
@@ -445,6 +469,14 @@
   align-items: center;
   justify-content: center;
   font-family: 'Montserrat', sans-serif;
+}
+
+.numberButton:first-child {
+  border-left: none;
+}
+
+.numberButton:last-child {
+  border-right: none;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -477,42 +509,56 @@
 /* Tablet: 768px and up */
 @media (min-width: 768px) {
   .container {
-    padding: 2rem 1.5rem;
+    padding: 1.5rem;
   }
 
   .header {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .saveButton {
     width: auto;
-    min-width: auto;
+    min-width: 120px;
   }
 
   .card {
-    padding: 1.5rem;
+    padding: 1.25rem;
   }
 
   .sections {
-    gap: 1.5rem;
+    gap: 1.25rem;
+  }
+
+  .subsection {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+  }
+
+  .formGroup {
+    margin-bottom: 1rem;
   }
 }
 
 /* Desktop: 1024px and up */
 @media (min-width: 1024px) {
   .container {
-    padding: 3rem 2rem;
+    padding: 2rem;
     max-width: 1200px;
   }
 
   .sections {
-    gap: 2rem;
+    gap: 1.5rem;
   }
 
   .card {
-    padding: 1.75rem;
+    padding: 1.5rem;
+  }
+
+  .subsection {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
   }
 }

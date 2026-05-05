@@ -18,13 +18,19 @@ const supabase = createClient(
 // Function to send admin notification
 async function sendAdminNotification(reservationId: string, action: 'created' | 'modified') {
   try {
-    // Get reservation details
+    // Get reservation details with location
     const { data: reservation, error: reservationError } = await supabase
       .from('reservations')
       .select(`
         *,
         tables (
-          table_number
+          table_number,
+          location_id,
+          locations (
+            admin_notification_phone,
+            timezone,
+            name
+          )
         )
       `)
       .eq('id', reservationId)
@@ -35,25 +41,32 @@ async function sendAdminNotification(reservationId: string, action: 'created' | 
       return;
     }
 
-    // Get admin notification phone from settings
-    const { data: settings, error: settingsError } = await supabase
-      .from('settings')
-      .select('admin_notification_phone, timezone')
-      .single();
+    // Get location-specific or global admin notification phone
+    const locationPhone = reservation.tables?.locations?.admin_notification_phone;
 
-    if (settingsError || !settings?.admin_notification_phone) {
-      console.log('Admin notification phone not configured');
-      return;
+    // Fallback to global settings if location phone not configured
+    let adminPhone = locationPhone;
+    let timezone = reservation.tables?.locations?.timezone || 'America/Chicago';
+
+    if (!adminPhone) {
+      const { data: settings, error: settingsError } = await supabase
+        .from('settings')
+        .select('admin_notification_phone, timezone')
+        .single();
+
+      if (settingsError || !settings?.admin_notification_phone) {
+        console.log('Admin notification phone not configured');
+        return;
+      }
+
+      adminPhone = settings.admin_notification_phone;
+      timezone = settings.timezone || timezone;
     }
 
     // Format admin phone number (add +1 if not present)
-    let adminPhone = settings.admin_notification_phone;
     if (!adminPhone.startsWith('+')) {
       adminPhone = '+1' + adminPhone;
     }
-
-    // Use timezone from settings or default to America/Chicago
-    const timezone = settings.timezone || 'America/Chicago';
     // Format date and time in local timezone
     const startDate = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(timezone);
     const formattedDate = startDate.toLocaleString({

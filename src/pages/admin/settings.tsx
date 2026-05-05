@@ -73,13 +73,14 @@ export default function Settings() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [holdFeeSaving, setHoldFeeSaving] = useState(false);
   const [holdFeeMessage, setHoldFeeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'noirkc' | 'rooftopkc'>('general');
+  const [activeTab, setActiveTab] = useState<'noirkc' | 'rooftopkc'>('noirkc');
 
   // Noir KC location settings
   const [noirKCCoverEnabled, setNoirKCCoverEnabled] = useState(false);
   const [noirKCCoverPrice, setNoirKCCoverPrice] = useState(0);
   const [noirKCMinakaUrl, setNoirKCMinakaUrl] = useState('');
   const [noirKCDuration, setNoirKCDuration] = useState(2.0);
+  const [noirKCAdminPhone, setNoirKCAdminPhone] = useState('');
   const [noirKCSaving, setNoirKCSaving] = useState(false);
   const [noirKCMessage, setNoirKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -88,6 +89,7 @@ export default function Settings() {
   const [rooftopKCCoverPrice, setRooftopKCCoverPrice] = useState(0);
   const [rooftopKCMinakaUrl, setRooftopKCMinakaUrl] = useState('');
   const [rooftopKCDuration, setRooftopKCDuration] = useState(2.0);
+  const [rooftopKCAdminPhone, setRooftopKCAdminPhone] = useState('');
   const [rooftopKCSaving, setRooftopKCSaving] = useState(false);
   const [rooftopKCMessage, setRooftopKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -101,7 +103,7 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours')
+          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone')
           .eq('slug', 'noirkc')
           .single();
 
@@ -110,6 +112,7 @@ export default function Settings() {
           setNoirKCCoverPrice(data.cover_price || 0);
           setNoirKCMinakaUrl(data.minaka_ical_url || '');
           setNoirKCDuration(data.default_reservation_duration_hours || 2.0);
+          setNoirKCAdminPhone(data.admin_notification_phone || '');
         }
       } catch (error) {
         console.error('Error fetching Noir KC settings:', error);
@@ -124,7 +127,7 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours')
+          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone')
           .eq('slug', 'rooftopkc')
           .single();
 
@@ -133,6 +136,7 @@ export default function Settings() {
           setRooftopKCCoverPrice(data.cover_price || 0);
           setRooftopKCMinakaUrl(data.minaka_ical_url || '');
           setRooftopKCDuration(data.default_reservation_duration_hours || 2.0);
+          setRooftopKCAdminPhone(data.admin_notification_phone || '');
         }
       } catch (error) {
         console.error('Error fetching RooftopKC settings:', error);
@@ -153,6 +157,7 @@ export default function Settings() {
           cover_price: noirKCCoverPrice,
           minaka_ical_url: noirKCMinakaUrl,
           default_reservation_duration_hours: noirKCDuration,
+          admin_notification_phone: noirKCAdminPhone,
         })
         .eq('slug', 'noirkc');
 
@@ -179,6 +184,7 @@ export default function Settings() {
           cover_price: rooftopKCCoverPrice,
           minaka_ical_url: rooftopKCMinakaUrl,
           default_reservation_duration_hours: rooftopKCDuration,
+          admin_notification_phone: rooftopKCAdminPhone,
         })
         .eq('slug', 'rooftopkc');
 
@@ -348,12 +354,6 @@ export default function Settings() {
         {/* Tabs */}
         <div className={styles.tabs}>
           <button
-            className={`${styles.tab} ${activeTab === 'general' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('general')}
-          >
-            General Settings
-          </button>
-          <button
             className={`${styles.tab} ${activeTab === 'noirkc' ? styles.tabActive : ''}`}
             onClick={() => setActiveTab('noirkc')}
           >
@@ -366,194 +366,6 @@ export default function Settings() {
             RooftopKC
           </button>
         </div>
-
-        {/* General Settings Tab */}
-        {activeTab === 'general' && (
-          <div className={styles.sections}>
-          {/* Booking Window */}
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Booking Window</h2>
-            <CalendarAvailabilityControl section="booking_window" />
-          </div>
-
-          {/* Ledger Notification Settings */}
-          <LedgerNotificationSettingsCard />
-
-          {/* Base Hours */}
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Base Hours</h2>
-            <CalendarAvailabilityControl section="base" />
-          </div>
-
-          {/* Custom Open/Closed Days */}
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Custom Open/Closed Days</h2>
-            <div className={styles.subsection}>
-              <h3 className={styles.subsectionTitle}>Custom Open Days</h3>
-              <CalendarAvailabilityControl section="custom_open" />
-            </div>
-            <div className={styles.subsection}>
-              <h3 className={styles.subsectionTitle}>Custom Closed Days</h3>
-              <CalendarAvailabilityControl section="custom_closed" />
-            </div>
-          </div>
-
-          {/* Timezone */}
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Timezone</h2>
-            <div className={styles.formGroup}>
-              <input
-                type="text"
-                className={styles.input}
-                value={settings.timezone}
-                onChange={(e) => handleInputChange('timezone', '', e.target.value)}
-                placeholder="e.g., America/Chicago"
-              />
-              <p className={styles.inputHint}>
-                Enter IANA timezone, e.g., America/Chicago, America/New_York, Europe/London
-              </p>
-            </div>
-          </div>
-
-          {/* Admin Notifications */}
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Admin Notifications</h2>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Admin Notification Phone Number</label>
-              <input
-                type="tel"
-                className={styles.input}
-                value={typeof settings.admin_notification_phone === 'string' ? settings.admin_notification_phone : ''}
-                onChange={(e) => handleInputChange('admin_notification_phone', '', e.target.value)}
-                placeholder="9137774488"
-              />
-              <p className={styles.inputHint}>
-                Phone number for SMS notifications when reservations are created or modified.
-                The system will automatically add +1 prefix.
-              </p>
-              <p className={styles.currentValue}>
-                <strong>Current notification phone on file:</strong>{' '}
-                {typeof contextSettings.admin_notification_phone === 'string' && contextSettings.admin_notification_phone
-                  ? `+1${contextSettings.admin_notification_phone.replace(/^\+?1?/, '')}`
-                  : <span className={styles.notSet}>Not set</span>}
-              </p>
-              <div className={styles.formActions}>
-                <button
-                  className={styles.secondaryButton}
-                  onClick={handlePhoneSave}
-                  disabled={saving}
-                >
-                  {saving ? 'Saving...' : 'Save Phone'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Hold Fee Settings */}
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Reservation Hold Fee</h2>
-
-            {holdFeeMessage && (
-              <div className={`${styles.message} ${styles[holdFeeMessage.type]}`}>
-                {holdFeeMessage.text}
-              </div>
-            )}
-
-            <div className={styles.formGroup}>
-              <div className={styles.switchRow}>
-                <label className={styles.switchLabel}>
-                  {settings.hold_fee_enabled ? 'Disable Hold Fee' : 'Enable Hold Fee'}
-                </label>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={settings.hold_fee_enabled}
-                  onClick={() => handleInputChange('hold_fee_enabled', '', !settings.hold_fee_enabled)}
-                  className={`${styles.switch} ${settings.hold_fee_enabled ? styles.switchOn : ''}`}
-                >
-                  <span className={styles.switchThumb}></span>
-                </button>
-              </div>
-            </div>
-
-            {settings.hold_fee_enabled && (
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Hold Fee Amount ($)</label>
-                <div className={styles.numberInput}>
-                  <button
-                    type="button"
-                    onClick={() => handleInputChange('hold_fee_amount', '', Math.max(0, settings.hold_fee_amount - 1))}
-                    className={styles.numberButton}
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    className={styles.numberInputField}
-                    value={settings.hold_fee_amount}
-                    onChange={(e) => handleInputChange('hold_fee_amount', '', parseFloat(e.target.value) || 0)}
-                    min="0"
-                    max="1000"
-                    step="0.01"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleInputChange('hold_fee_amount', '', Math.min(1000, settings.hold_fee_amount + 1))}
-                    className={styles.numberButton}
-                  >
-                    +
-                  </button>
-                </div>
-                <p className={styles.inputHint}>
-                  Amount to hold on credit cards for non-member reservations
-                </p>
-              </div>
-            )}
-
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Credit Card Processing Fee (%)</label>
-              <div className={styles.numberInput}>
-                <button
-                  type="button"
-                  onClick={() => handleInputChange('credit_card_fee_percentage', '', Math.max(0, (settings.credit_card_fee_percentage || 4.0) - 0.1))}
-                  className={styles.numberButton}
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  className={styles.numberInputField}
-                  value={settings.credit_card_fee_percentage || 4.0}
-                  onChange={(e) => handleInputChange('credit_card_fee_percentage', '', parseFloat(e.target.value) || 0)}
-                  min="0"
-                  max="100"
-                  step="0.1"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleInputChange('credit_card_fee_percentage', '', Math.min(100, (settings.credit_card_fee_percentage || 4.0) + 0.1))}
-                  className={styles.numberButton}
-                >
-                  +
-                </button>
-              </div>
-              <p className={styles.inputHint}>
-                Percentage fee charged for credit card payments (applied to membership payments)
-              </p>
-            </div>
-
-            <div className={styles.formActions}>
-              <button
-                onClick={handleHoldFeeSave}
-                disabled={holdFeeSaving}
-                className={`${styles.saveButton} ${holdFeeSaving ? styles.saving : ''}`}
-              >
-                {holdFeeSaving ? 'Saving...' : 'Save Payment Settings'}
-              </button>
-            </div>
-          </div>
-          </div>
-        )}
 
         {/* Noir KC Location Settings Tab */}
         {activeTab === 'noirkc' && (
@@ -568,17 +380,17 @@ export default function Settings() {
             {/* Hours & Booking Configuration */}
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Hours & Booking Configuration</h2>
-              <p className={styles.inputHint} style={{ marginBottom: '2rem' }}>
+              <p className={styles.inputHint} style={{ marginBottom: '1.5rem' }}>
                 Configure reservation availability, operating hours, and booking window for Noir KC.
               </p>
 
               {/* Booking Window and Default Reservation Duration */}
-              <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 {/* Booking Window */}
                 <div style={{ flex: '1', minWidth: '300px' }}>
                   <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
                   <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                    Members can only book reservations within this date range.
+                    Reservations can be made within this date range.
                   </p>
                   <CalendarAvailabilityControl section="booking_window" locationSlug="noirkc" />
                 </div>
@@ -627,7 +439,7 @@ export default function Settings() {
               </div>
 
               {/* Base Hours and Weekly Hours */}
-              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {/* Base Hours */}
                 <div style={{ flex: '1', minWidth: '350px' }}>
                   <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Base Hours</h3>
@@ -648,7 +460,7 @@ export default function Settings() {
               </div>
 
               {/* Save Button for Hours & Booking Configuration */}
-              <div className={styles.formActions} style={{ marginTop: '2rem' }}>
+              <div className={styles.formActions} style={{ marginTop: '1.5rem' }}>
                 {noirKCMessage && (
                   <div className={`${styles.message} ${styles[noirKCMessage.type]}`}>
                     {noirKCMessage.text}
@@ -677,26 +489,9 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Timezone */}
+            {/* General Configuration */}
             <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Timezone</h2>
-              <div className={styles.formGroup}>
-                <input
-                  type="text"
-                  className={styles.input}
-                  value="America/Chicago"
-                  readOnly
-                  placeholder="America/Chicago"
-                />
-                <p className={styles.inputHint}>
-                  Noir KC timezone (currently read-only)
-                </p>
-              </div>
-            </div>
-
-            {/* Cover Charge Settings */}
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Cover Charge</h2>
+              <h2 className={styles.cardTitle}>General Configuration</h2>
 
               {noirKCMessage && (
                 <div className={`${styles.message} ${styles[noirKCMessage.type]}`}>
@@ -704,75 +499,115 @@ export default function Settings() {
                 </div>
               )}
 
-              <div className={styles.formGroup}>
-                <div className={styles.switchRow}>
-                  <label className={styles.switchLabel}>
-                    Cover Charge Enabled
-                  </label>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={noirKCCoverEnabled}
-                    onClick={() => setNoirKCCoverEnabled(!noirKCCoverEnabled)}
-                    className={`${styles.switch} ${noirKCCoverEnabled ? styles.switchOn : ''}`}
-                  >
-                    <span className={styles.switchThumb}></span>
-                  </button>
-                </div>
-                <p className={styles.inputHint}>
-                  Cover charge for non-members (members always free)
-                </p>
-              </div>
-
-              {noirKCCoverEnabled && (
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Cover Charge Amount ($)</label>
-                  <div className={styles.numberInput}>
-                    <button
-                      type="button"
-                      onClick={() => setNoirKCCoverPrice(Math.max(0, noirKCCoverPrice - 1))}
-                      className={styles.numberButton}
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      className={styles.numberInputField}
-                      value={noirKCCoverPrice}
-                      onChange={(e) => setNoirKCCoverPrice(parseFloat(e.target.value) || 0)}
-                      min="0"
-                      max="100"
-                      step="1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setNoirKCCoverPrice(Math.min(100, noirKCCoverPrice + 1))}
-                      className={styles.numberButton}
-                    >
-                      +
-                    </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
+                {/* Left Column */}
+                <div>
+                  {/* Cover Charge */}
+                  <div className={styles.formGroup}>
+                    <div className={styles.switchRow}>
+                      <label className={styles.switchLabel}>
+                        Cover Charge Enabled
+                      </label>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={noirKCCoverEnabled}
+                        onClick={() => setNoirKCCoverEnabled(!noirKCCoverEnabled)}
+                        className={`${styles.switch} ${noirKCCoverEnabled ? styles.switchOn : ''}`}
+                      >
+                        <span className={styles.switchThumb}></span>
+                      </button>
+                    </div>
+                    <p className={styles.inputHint}>
+                      Cover charge for non-members (members always free)
+                    </p>
                   </div>
-                  <p className={styles.inputHint}>
-                    Amount charged to non-members for entry
-                  </p>
-                </div>
-              )}
 
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Minaka Calendar iCal URL</label>
-                <input
-                  type="text"
-                  className={styles.input}
-                  value={noirKCMinakaUrl}
-                  onChange={(e) => setNoirKCMinakaUrl(e.target.value)}
-                  placeholder="https://www.minaka.app/api/user/calendar/feed.ics?token=..."
-                />
-                <p className={styles.inputHint}>
-                  iCal feed URL from Minaka to sync events to the calendar
-                </p>
+                  {noirKCCoverEnabled && (
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Cover Charge Amount ($)</label>
+                      <div className={styles.numberInput}>
+                        <button
+                          type="button"
+                          onClick={() => setNoirKCCoverPrice(Math.max(0, noirKCCoverPrice - 1))}
+                          className={styles.numberButton}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          className={styles.numberInputField}
+                          value={noirKCCoverPrice}
+                          onChange={(e) => setNoirKCCoverPrice(parseFloat(e.target.value) || 0)}
+                          min="0"
+                          max="100"
+                          step="1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setNoirKCCoverPrice(Math.min(100, noirKCCoverPrice + 1))}
+                          className={styles.numberButton}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className={styles.inputHint}>
+                        Amount charged to non-members for entry
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Admin Notification Phone */}
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Admin Notification Phone</label>
+                    <input
+                      type="tel"
+                      className={styles.input}
+                      value={noirKCAdminPhone}
+                      onChange={(e) => setNoirKCAdminPhone(e.target.value)}
+                      placeholder="9137774488"
+                    />
+                    <p className={styles.inputHint}>
+                      SMS notifications for reservations (auto-adds +1 prefix)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div>
+                  {/* Minaka Calendar */}
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Minaka Calendar iCal URL</label>
+                    <input
+                      type="text"
+                      className={styles.input}
+                      value={noirKCMinakaUrl}
+                      onChange={(e) => setNoirKCMinakaUrl(e.target.value)}
+                      placeholder="https://www.minaka.app/api/user/calendar/feed.ics?token=..."
+                    />
+                    <p className={styles.inputHint}>
+                      iCal feed URL from Minaka to sync events
+                    </p>
+                  </div>
+
+                  {/* Timezone */}
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Timezone</label>
+                    <input
+                      type="text"
+                      className={styles.input}
+                      value="America/Chicago"
+                      readOnly
+                      placeholder="America/Chicago"
+                    />
+                    <p className={styles.inputHint}>
+                      Noir KC timezone (currently read-only)
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className={styles.formActions}>
+              <div className={styles.formActions} style={{ marginTop: '1.5rem' }}>
                 <button
                   onClick={handleNoirKCSave}
                   disabled={noirKCSaving}
@@ -781,6 +616,13 @@ export default function Settings() {
                   {noirKCSaving ? 'Saving...' : 'Save Noir KC Settings'}
                 </button>
               </div>
+            </div>
+
+            {/* Priority Order Reference */}
+            <div className={styles.card}>
+              <p className={styles.cardDescription} style={{ fontSize: '0.875rem', color: '#6e6e73', fontStyle: 'italic', margin: 0 }}>
+                <strong>Priority Order:</strong> Private Events → Custom Open Days → Booking Window → Custom Closed Days → Weekly Hours → Base Hours
+              </p>
             </div>
           </div>
         )}
@@ -798,21 +640,66 @@ export default function Settings() {
             {/* Hours & Booking Configuration */}
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Hours & Booking Configuration</h2>
-              <p className={styles.inputHint} style={{ marginBottom: '2rem' }}>
+              <p className={styles.inputHint} style={{ marginBottom: '1.5rem' }}>
                 Configure reservation availability, operating hours, and booking window for RooftopKC.
               </p>
 
-              {/* Booking Window */}
-              <div style={{ marginBottom: '2rem' }}>
-                <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
-                <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                  Members can only book reservations within this date range.
-                </p>
-                <CalendarAvailabilityControl section="booking_window" locationSlug="rooftopkc" />
+              {/* Booking Window and Default Reservation Duration */}
+              <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                {/* Booking Window */}
+                <div style={{ flex: '1', minWidth: '300px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Reservations can be made within this date range.
+                  </p>
+                  <CalendarAvailabilityControl section="booking_window" locationSlug="rooftopkc" />
+                </div>
+
+                {/* Default Reservation Duration */}
+                <div style={{ flex: '0 1 300px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Default Reservation Duration</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Default length of time for reservations.
+                  </p>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Duration (hours)</label>
+                    <div className={styles.numberInput}>
+                      <button
+                        type="button"
+                        onClick={() => setRooftopKCDuration(Math.max(0.5, rooftopKCDuration - 0.5))}
+                        className={styles.numberButton}
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        className={styles.numberInputField}
+                        value={rooftopKCDuration}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 2.0;
+                          setRooftopKCDuration(Math.max(0.5, Math.min(8, value)));
+                        }}
+                        min="0.5"
+                        max="8"
+                        step="0.5"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRooftopKCDuration(Math.min(8, rooftopKCDuration + 0.5))}
+                        className={styles.numberButton}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className={styles.inputHint}>
+                      E.g., 1.5, 2.0, 2.5 hours
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Base Hours and Weekly Hours */}
-              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {/* Base Hours */}
                 <div style={{ flex: '1', minWidth: '350px' }}>
                   <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Base Hours</h3>
@@ -822,63 +709,18 @@ export default function Settings() {
                   <CalendarAvailabilityControl section="base" locationSlug="rooftopkc" />
                 </div>
 
-                {/* Weekly Hours Column */}
-                <div style={{ flex: '1', minWidth: '350px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                  {/* Default Reservation Duration */}
-                  <div>
-                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Default Reservation Duration</h3>
-                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                      Default length of time for reservations.
-                    </p>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Duration (hours)</label>
-                      <div className={styles.numberInput}>
-                        <button
-                          type="button"
-                          onClick={() => setRooftopKCDuration(Math.max(0.5, rooftopKCDuration - 0.5))}
-                          className={styles.numberButton}
-                        >
-                          −
-                        </button>
-                        <input
-                          type="number"
-                          className={styles.numberInputField}
-                          value={rooftopKCDuration}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value) || 2.0;
-                            setRooftopKCDuration(Math.max(0.5, Math.min(8, value)));
-                          }}
-                          min="0.5"
-                          max="8"
-                          step="0.5"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setRooftopKCDuration(Math.min(8, rooftopKCDuration + 0.5))}
-                          className={styles.numberButton}
-                        >
-                          +
-                        </button>
-                      </div>
-                      <p className={styles.inputHint}>
-                        E.g., 1.5, 2.0, 2.5 hours
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Weekly Hours */}
-                  <div>
-                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Weekly Hours</h3>
-                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                      Set hours for the current week. These override base hours and allow week-by-week schedule changes.
-                    </p>
-                    <CalendarAvailabilityControl section="weekly" locationSlug="rooftopkc" />
-                  </div>
+                {/* Weekly Hours */}
+                <div style={{ flex: '1', minWidth: '350px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Weekly Hours</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Set hours for the current week. These override base hours and allow week-by-week schedule changes.
+                  </p>
+                  <CalendarAvailabilityControl section="weekly" locationSlug="rooftopkc" />
                 </div>
               </div>
 
               {/* Save Button for Hours & Booking Configuration */}
-              <div className={styles.formActions} style={{ marginTop: '2rem' }}>
+              <div className={styles.formActions} style={{ marginTop: '1.5rem' }}>
                 {rooftopKCMessage && (
                   <div className={`${styles.message} ${styles[rooftopKCMessage.type]}`}>
                     {rooftopKCMessage.text}
@@ -907,26 +749,9 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Timezone */}
+            {/* General Configuration */}
             <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Timezone</h2>
-              <div className={styles.formGroup}>
-                <input
-                  type="text"
-                  className={styles.input}
-                  value="America/Chicago"
-                  readOnly
-                  placeholder="America/Chicago"
-                />
-                <p className={styles.inputHint}>
-                  RooftopKC timezone (currently read-only)
-                </p>
-              </div>
-            </div>
-
-            {/* Cover Charge Settings */}
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Cover Charge</h2>
+              <h2 className={styles.cardTitle}>General Configuration</h2>
 
               {rooftopKCMessage && (
                 <div className={`${styles.message} ${styles[rooftopKCMessage.type]}`}>
@@ -934,75 +759,115 @@ export default function Settings() {
                 </div>
               )}
 
-              <div className={styles.formGroup}>
-                <div className={styles.switchRow}>
-                  <label className={styles.switchLabel}>
-                    Cover Charge Enabled
-                  </label>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={rooftopKCCoverEnabled}
-                    onClick={() => setRooftopKCCoverEnabled(!rooftopKCCoverEnabled)}
-                    className={`${styles.switch} ${rooftopKCCoverEnabled ? styles.switchOn : ''}`}
-                  >
-                    <span className={styles.switchThumb}></span>
-                  </button>
-                </div>
-                <p className={styles.inputHint}>
-                  Cover charge for non-members (members always free)
-                </p>
-              </div>
-
-              {rooftopKCCoverEnabled && (
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Cover Charge Amount ($)</label>
-                  <div className={styles.numberInput}>
-                    <button
-                      type="button"
-                      onClick={() => setRooftopKCCoverPrice(Math.max(0, rooftopKCCoverPrice - 1))}
-                      className={styles.numberButton}
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      className={styles.numberInputField}
-                      value={rooftopKCCoverPrice}
-                      onChange={(e) => setRooftopKCCoverPrice(parseFloat(e.target.value) || 0)}
-                      min="0"
-                      max="100"
-                      step="1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setRooftopKCCoverPrice(Math.min(100, rooftopKCCoverPrice + 1))}
-                      className={styles.numberButton}
-                    >
-                      +
-                    </button>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
+                {/* Left Column */}
+                <div>
+                  {/* Cover Charge */}
+                  <div className={styles.formGroup}>
+                    <div className={styles.switchRow}>
+                      <label className={styles.switchLabel}>
+                        Cover Charge Enabled
+                      </label>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={rooftopKCCoverEnabled}
+                        onClick={() => setRooftopKCCoverEnabled(!rooftopKCCoverEnabled)}
+                        className={`${styles.switch} ${rooftopKCCoverEnabled ? styles.switchOn : ''}`}
+                      >
+                        <span className={styles.switchThumb}></span>
+                      </button>
+                    </div>
+                    <p className={styles.inputHint}>
+                      Cover charge for non-members (members always free)
+                    </p>
                   </div>
-                  <p className={styles.inputHint}>
-                    Amount charged to non-members for entry
-                  </p>
-                </div>
-              )}
 
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Minaka Calendar iCal URL</label>
-                <input
-                  type="text"
-                  className={styles.input}
-                  value={rooftopKCMinakaUrl}
-                  onChange={(e) => setRooftopKCMinakaUrl(e.target.value)}
-                  placeholder="https://www.minaka.app/api/user/calendar/feed.ics?token=..."
-                />
-                <p className={styles.inputHint}>
-                  iCal feed URL from Minaka to sync events to the calendar
-                </p>
+                  {rooftopKCCoverEnabled && (
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Cover Charge Amount ($)</label>
+                      <div className={styles.numberInput}>
+                        <button
+                          type="button"
+                          onClick={() => setRooftopKCCoverPrice(Math.max(0, rooftopKCCoverPrice - 1))}
+                          className={styles.numberButton}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          className={styles.numberInputField}
+                          value={rooftopKCCoverPrice}
+                          onChange={(e) => setRooftopKCCoverPrice(parseFloat(e.target.value) || 0)}
+                          min="0"
+                          max="100"
+                          step="1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setRooftopKCCoverPrice(Math.min(100, rooftopKCCoverPrice + 1))}
+                          className={styles.numberButton}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className={styles.inputHint}>
+                        Amount charged to non-members for entry
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Admin Notification Phone */}
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Admin Notification Phone</label>
+                    <input
+                      type="tel"
+                      className={styles.input}
+                      value={rooftopKCAdminPhone}
+                      onChange={(e) => setRooftopKCAdminPhone(e.target.value)}
+                      placeholder="9137774488"
+                    />
+                    <p className={styles.inputHint}>
+                      SMS notifications for reservations (auto-adds +1 prefix)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div>
+                  {/* Minaka Calendar */}
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Minaka Calendar iCal URL</label>
+                    <input
+                      type="text"
+                      className={styles.input}
+                      value={rooftopKCMinakaUrl}
+                      onChange={(e) => setRooftopKCMinakaUrl(e.target.value)}
+                      placeholder="https://www.minaka.app/api/user/calendar/feed.ics?token=..."
+                    />
+                    <p className={styles.inputHint}>
+                      iCal feed URL from Minaka to sync events
+                    </p>
+                  </div>
+
+                  {/* Timezone */}
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Timezone</label>
+                    <input
+                      type="text"
+                      className={styles.input}
+                      value="America/Chicago"
+                      readOnly
+                      placeholder="America/Chicago"
+                    />
+                    <p className={styles.inputHint}>
+                      RooftopKC timezone (currently read-only)
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className={styles.formActions}>
+              <div className={styles.formActions} style={{ marginTop: '1.5rem' }}>
                 <button
                   onClick={handleRooftopKCSave}
                   disabled={rooftopKCSaving}
@@ -1011,6 +876,13 @@ export default function Settings() {
                   {rooftopKCSaving ? 'Saving...' : 'Save RooftopKC Settings'}
                 </button>
               </div>
+            </div>
+
+            {/* Priority Order Reference */}
+            <div className={styles.card}>
+              <p className={styles.cardDescription} style={{ fontSize: '0.875rem', color: '#6e6e73', fontStyle: 'italic', margin: 0 }}>
+                <strong>Priority Order:</strong> Private Events → Custom Open Days → Booking Window → Custom Closed Days → Weekly Hours → Base Hours
+              </p>
             </div>
           </div>
         )}
