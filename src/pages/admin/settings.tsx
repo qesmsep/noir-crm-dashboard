@@ -172,14 +172,7 @@ export default function Settings() {
     setRooftopKCMessage(null);
 
     try {
-      console.log('💾 Saving RooftopKC settings:', {
-        cover_enabled: rooftopKCCoverEnabled,
-        cover_price: rooftopKCCoverPrice,
-        minaka_ical_url: rooftopKCMinakaUrl,
-        default_reservation_duration_hours: rooftopKCDuration,
-      });
-
-      const { data, error } = await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from('locations')
         .update({
           cover_enabled: rooftopKCCoverEnabled,
@@ -187,10 +180,7 @@ export default function Settings() {
           minaka_ical_url: rooftopKCMinakaUrl,
           default_reservation_duration_hours: rooftopKCDuration,
         })
-        .eq('slug', 'rooftopkc')
-        .select();
-
-      console.log('💾 Save result:', { data, error });
+        .eq('slug', 'rooftopkc');
 
       if (error) throw error;
 
@@ -624,7 +614,10 @@ export default function Settings() {
                           type="number"
                           className={styles.numberInputField}
                           value={noirKCDuration}
-                          onChange={(e) => setNoirKCDuration(parseFloat(e.target.value) || 2.0)}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 2.0;
+                            setNoirKCDuration(Math.max(0.5, Math.min(8, value)));
+                          }}
                           min="0.5"
                           max="8"
                           step="0.5"
@@ -851,7 +844,10 @@ export default function Settings() {
                           type="number"
                           className={styles.numberInputField}
                           value={rooftopKCDuration}
-                          onChange={(e) => setRooftopKCDuration(parseFloat(e.target.value) || 2.0)}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 2.0;
+                            setRooftopKCDuration(Math.max(0.5, Math.min(8, value)));
+                          }}
                           min="0.5"
                           max="8"
                           step="0.5"
