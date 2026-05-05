@@ -1266,32 +1266,52 @@ export default function SimpleReservationRequestModal({
           />
 
           {/* Make Reservation Button */}
-          <button
-            onClick={handleMakeReservation}
-            disabled={isCreatingReservation}
-            style={{
-              width: '100%',
-              height: '48px',
-              backgroundColor: isCreatingReservation ? '#D1D5DB' : '#A59480',
-              color: 'white',
-              fontSize: '1rem',
-              fontWeight: '600',
-              borderRadius: '10px',
-              border: 'none',
-              cursor: isCreatingReservation ? 'not-allowed' : 'pointer',
-              marginTop: '0.5rem',
-              boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              if (!isCreatingReservation) e.currentTarget.style.backgroundColor = '#8C7C6D';
-            }}
-            onMouseLeave={(e) => {
-              if (!isCreatingReservation) e.currentTarget.style.backgroundColor = '#A59480';
-            }}
-          >
-            {isCreatingReservation ? 'Creating...' : 'Make Reservation'}
-          </button>
+          {(() => {
+            const isFormComplete = firstName.trim() && lastName.trim() && date && time;
+            const isDisabled = isCreatingReservation || !isFormComplete;
+
+            return (
+              <>
+                {!isFormComplete && (
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: '#EF4444',
+                    marginTop: '0.5rem',
+                    textAlign: 'center'
+                  }}>
+                    Please fill in all required fields (*)
+                  </div>
+                )}
+                <button
+                  onClick={handleMakeReservation}
+                  disabled={isDisabled}
+                  style={{
+                    width: '100%',
+                    height: '48px',
+                    backgroundColor: isDisabled ? '#D1D5DB' : '#A59480',
+                    color: isDisabled ? '#9CA3AF' : 'white',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    borderRadius: '10px',
+                    border: 'none',
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    marginTop: '0.5rem',
+                    boxShadow: isDisabled ? 'none' : '0 2px 8px rgba(165, 148, 128, 0.2)',
+                    transition: 'all 0.2s',
+                    opacity: isDisabled ? 0.6 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isDisabled) e.currentTarget.style.backgroundColor = '#8C7C6D';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isDisabled) e.currentTarget.style.backgroundColor = '#A59480';
+                  }}
+                >
+                  {isCreatingReservation ? 'Creating...' : 'Make Reservation'}
+                </button>
+              </>
+            );
+          })()}
         </div>
         )}
       </div>
