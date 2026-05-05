@@ -237,7 +237,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       try {
         setError('');
 
-        console.log('🔍 [CalendarAvailabilityControl] Loading data with locationId:', locationId, 'locationSlug:', locationSlug);
+        console.log('🔍 [CalendarAvailabilityControl] Loading data with locationId:', locationId, 'locationSlug:', locationSlug, 'section:', section);
 
         // CRITICAL FIX: If locationSlug is provided but locationId hasn't been fetched yet, wait
         if (locationSlug && !locationId) {
@@ -258,7 +258,11 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           closuresQuery = closuresQuery.eq('location_id', locationId);
           eventsQuery = eventsQuery.eq('location_id', locationId);
         } else {
-          console.log('⚠️ [CalendarAvailabilityControl] No locationId set - loading ALL venue_hours!');
+          console.log('⚠️ [CalendarAvailabilityControl] No locationId set - loading global venue_hours');
+          baseQuery = baseQuery.is('location_id', null);
+          opensQuery = opensQuery.is('location_id', null);
+          closuresQuery = closuresQuery.is('location_id', null);
+          eventsQuery = eventsQuery.is('location_id', null);
         }
 
         const { data: baseHoursData } = await baseQuery;
@@ -273,7 +277,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           closures: closuresData,
           privateEvents: eventsData?.length
         });
-        if (baseHoursData) {
+        if (baseHoursData && baseHoursData.length > 0) {
           const enabledDays = Array(7).fill(false);
           const timeRanges = Array(7).fill(null).map(() => [{ start: '18:00', end: '23:00' }]);
           baseHoursData.forEach((hour: any) => {
@@ -281,6 +285,9 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
             timeRanges[hour.day_of_week] = hour.time_ranges;
           });
           setBaseHours(timeRanges.map((ranges, index) => ({ enabled: enabledDays[index], timeRanges: ranges })));
+        } else {
+          // Reset to default empty state if no base hours configured for this location
+          setBaseHours(Array(7).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
         }
 
         // Load weekly hours from locations table if locationId is available
@@ -310,19 +317,23 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
               });
 
               setWeeklyHours(timeRanges.map((ranges, index) => ({ enabled: enabledDays[index], timeRanges: ranges })));
+            } else {
+              // Reset to default if no data for current week
+              setWeeklyHours(Array(7).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
             }
           }
         }
 
-        if (opensData) setExceptionalOpens(opensData);
-        if (closuresData) setExceptionalClosures(closuresData);
-        if (eventsData) setPrivateEvents(eventsData);
+        // Always set the data arrays, even if empty, to prevent stale data from previous location
+        setExceptionalOpens(opensData || []);
+        setExceptionalClosures(closuresData || []);
+        setPrivateEvents(eventsData || []);
       } catch (error: any) {
         setError('Failed to load availability data. Please try again.');
       }
     }
     loadAvailabilityData();
-  }, [locationId]);
+  }, [locationId, section]);
 
   // Base Hours Handlers
   const toggleDay = (dayIndex: number) => {
@@ -873,34 +884,167 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
         );
       case 'base':
         return (
-          <Box className="availability-section" p={4} borderRadius="8px" border="1px solid #ececec" maxW={"600px"}>
-            <Heading size="md" mb={4}>Base Hours</Heading>
-            <VStack align="stretch" spacing={4}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            border: '1px solid #ECEAE5',
+            boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+            maxWidth: '800px',
+            fontFamily: 'Montserrat, sans-serif'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {WEEKDAYS.map((day, index) => (
-                <Box key={day} display="flex" alignItems="center" gap={4}>
-                  <Checkbox isChecked={baseHours[index].enabled} onChange={() => toggleDay(index)}>{day}</Checkbox>
+                <div key={day} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    minWidth: '150px',
+                    fontSize: '0.9375rem',
+                    fontWeight: '500',
+                    color: '#1F1F1F'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={baseHours[index].enabled}
+                      onChange={() => toggleDay(index)}
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        cursor: 'pointer',
+                        accentColor: '#A59480'
+                      }}
+                    />
+                    {day}
+                  </label>
                   {baseHours[index].enabled && (
-                    <HStack spacing={2}>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                       {baseHours[index].timeRanges.map((range, rangeIndex) => (
-                        <HStack key={rangeIndex} spacing={1}>
-                          <Input type="time" value={range.start} onChange={e => updateTimeRange(index, rangeIndex, 'start', e.target.value)} w="110px" />
-                          <Text>to</Text>
-                          <Input type="time" value={range.end} onChange={e => updateTimeRange(index, rangeIndex, 'end', e.target.value)} w="110px" />
+                        <div key={rangeIndex} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="time"
+                            value={range.start}
+                            onChange={e => updateTimeRange(index, rangeIndex, 'start', e.target.value)}
+                            style={{
+                              width: '110px',
+                              height: '36px',
+                              padding: '0 0.75rem',
+                              border: '1px solid rgba(0, 0, 0, 0.12)',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              fontFamily: 'inherit'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.875rem', color: '#6e6e73' }}>to</span>
+                          <input
+                            type="time"
+                            value={range.end}
+                            onChange={e => updateTimeRange(index, rangeIndex, 'end', e.target.value)}
+                            style={{
+                              width: '110px',
+                              height: '36px',
+                              padding: '0 0.75rem',
+                              border: '1px solid rgba(0, 0, 0, 0.12)',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              fontFamily: 'inherit'
+                            }}
+                          />
                           {baseHours[index].timeRanges.length > 1 && (
-                            <Button size="xs" colorScheme="red" onClick={() => removeTimeRange(index, rangeIndex)}>Remove</Button>
+                            <button
+                              onClick={() => removeTimeRange(index, rangeIndex)}
+                              style={{
+                                height: '32px',
+                                padding: '0 1rem',
+                                background: 'transparent',
+                                color: '#c41e3a',
+                                border: '1px solid rgba(196, 30, 58, 0.3)',
+                                borderRadius: '6px',
+                                fontSize: '0.8125rem',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                fontFamily: 'inherit'
+                              }}
+                            >
+                              Remove
+                            </button>
                           )}
-                        </HStack>
+                        </div>
                       ))}
-                      <Button size="xs" colorScheme="blue" onClick={() => addTimeRange(index)}>+ Add Time Range</Button>
-                    </HStack>
+                      <button
+                        onClick={() => addTimeRange(index)}
+                        style={{
+                          height: '32px',
+                          padding: '0 1rem',
+                          background: 'transparent',
+                          color: '#6e6e73',
+                          border: '1px solid rgba(0, 0, 0, 0.12)',
+                          borderRadius: '6px',
+                          fontSize: '0.8125rem',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        + Add Time Range
+                      </button>
+                    </div>
                   )}
-                </Box>
+                </div>
               ))}
-              <Button colorScheme="blue" onClick={saveBaseHours}>Save Base Hours</Button>
-              {successMessage && <Text color="green.500">{successMessage}</Text>}
-              {error && <Text color="red.500">{error}</Text>}
-            </VStack>
-          </Box>
+              <div style={{ marginTop: '1rem' }}>
+                <button
+                  onClick={saveBaseHours}
+                  style={{
+                    height: '40px',
+                    padding: '0.5rem 1.5rem',
+                    background: '#A59480',
+                    color: '#ffffff',
+                    border: '1px solid #A59480',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontFamily: 'Montserrat, sans-serif',
+                    boxShadow: '0 1px 2px rgba(165, 148, 128, 0.15), 0 4px 8px rgba(165, 148, 128, 0.25), 0 8px 16px rgba(165, 148, 128, 0.18)'
+                  }}
+                >
+                  Save Base Hours
+                </button>
+              </div>
+              {successMessage && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  background: 'rgba(52, 199, 89, 0.1)',
+                  color: '#0d6832',
+                  border: '1px solid #34c759'
+                }}>
+                  {successMessage}
+                </div>
+              )}
+              {error && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  background: 'rgba(255, 59, 48, 0.1)',
+                  color: '#c41e3a',
+                  border: '1px solid #ff3b30'
+                }}>
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
         );
       case 'weekly':
         const mondayDate = DateTime.fromISO(currentWeekMonday, { zone: 'America/Chicago' });

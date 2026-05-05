@@ -572,13 +572,58 @@ export default function Settings() {
                 Configure reservation availability, operating hours, and booking window for Noir KC.
               </p>
 
-              {/* Booking Window */}
-              <div style={{ marginBottom: '2rem' }}>
-                <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
-                <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                  Members can only book reservations within this date range.
-                </p>
-                <CalendarAvailabilityControl section="booking_window" locationSlug="noirkc" />
+              {/* Booking Window and Default Reservation Duration */}
+              <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+                {/* Booking Window */}
+                <div style={{ flex: '1', minWidth: '300px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Members can only book reservations within this date range.
+                  </p>
+                  <CalendarAvailabilityControl section="booking_window" locationSlug="noirkc" />
+                </div>
+
+                {/* Default Reservation Duration */}
+                <div style={{ flex: '0 1 300px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Default Reservation Duration</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Default length of time for reservations.
+                  </p>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Duration (hours)</label>
+                    <div className={styles.numberInput}>
+                      <button
+                        type="button"
+                        onClick={() => setNoirKCDuration(Math.max(0.5, noirKCDuration - 0.5))}
+                        className={styles.numberButton}
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        className={styles.numberInputField}
+                        value={noirKCDuration}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 2.0;
+                          setNoirKCDuration(Math.max(0.5, Math.min(8, value)));
+                        }}
+                        min="0.5"
+                        max="8"
+                        step="0.5"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNoirKCDuration(Math.min(8, noirKCDuration + 0.5))}
+                        className={styles.numberButton}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className={styles.inputHint}>
+                      E.g., 1.5, 2.0, 2.5 hours
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Base Hours and Weekly Hours */}
@@ -592,58 +637,13 @@ export default function Settings() {
                   <CalendarAvailabilityControl section="base" locationSlug="noirkc" />
                 </div>
 
-                {/* Weekly Hours Column */}
-                <div style={{ flex: '1', minWidth: '350px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                  {/* Default Reservation Duration */}
-                  <div>
-                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Default Reservation Duration</h3>
-                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                      Default length of time for reservations.
-                    </p>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Duration (hours)</label>
-                      <div className={styles.numberInput}>
-                        <button
-                          type="button"
-                          onClick={() => setNoirKCDuration(Math.max(0.5, noirKCDuration - 0.5))}
-                          className={styles.numberButton}
-                        >
-                          −
-                        </button>
-                        <input
-                          type="number"
-                          className={styles.numberInputField}
-                          value={noirKCDuration}
-                          onChange={(e) => {
-                            const value = parseFloat(e.target.value) || 2.0;
-                            setNoirKCDuration(Math.max(0.5, Math.min(8, value)));
-                          }}
-                          min="0.5"
-                          max="8"
-                          step="0.5"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setNoirKCDuration(Math.min(8, noirKCDuration + 0.5))}
-                          className={styles.numberButton}
-                        >
-                          +
-                        </button>
-                      </div>
-                      <p className={styles.inputHint}>
-                        E.g., 1.5, 2.0, 2.5 hours
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Weekly Hours */}
-                  <div>
-                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Weekly Hours</h3>
-                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                      Set hours for the current week. These override base hours and allow week-by-week schedule changes.
-                    </p>
-                    <CalendarAvailabilityControl section="weekly" locationSlug="noirkc" />
-                  </div>
+                {/* Weekly Hours */}
+                <div style={{ flex: '1', minWidth: '350px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Weekly Hours</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Set hours for the current week. These override base hours and allow week-by-week schedule changes.
+                  </p>
+                  <CalendarAvailabilityControl section="weekly" locationSlug="noirkc" />
                 </div>
               </div>
 
