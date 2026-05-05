@@ -145,7 +145,6 @@ export default function PublicReservationFlow({
   const handleClose = () => {
     setStep('phone');
     setPhone('');
-    setMemberData(null);
     onClose();
   };
 
