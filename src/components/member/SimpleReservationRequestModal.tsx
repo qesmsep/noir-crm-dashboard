@@ -187,11 +187,7 @@ export default function SimpleReservationRequestModal({
       if (!selectedLocation) return;
 
       try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        const supabase = getSupabaseClient();
 
         const { data, error } = await supabase
           .from('locations')
@@ -201,6 +197,8 @@ export default function SimpleReservationRequestModal({
 
         if (data && !error) {
           setLocationName(data.name);
+        } else if (error) {
+          console.error('Error fetching location name:', error);
         }
       } catch (error) {
         console.error('Error fetching location name:', error);
@@ -212,18 +210,27 @@ export default function SimpleReservationRequestModal({
     }
   }, [isOpen, selectedLocation]);
 
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isOpen, onClose]);
+
   // Fetch booking window for selected location
   useEffect(() => {
     const fetchBookingWindow = async () => {
       if (!isOpen || !selectedLocation) return;
 
       try {
-        // Import supabase client
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        const supabase = getSupabaseClient();
 
         // Fetch location-specific booking window and timezone
         // Use public_locations view to avoid exposing minaka_ical_url tokens
@@ -921,6 +928,9 @@ export default function SimpleReservationRequestModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reservation-modal-title"
         style={{
           backgroundColor: '#ECEDE8',
           borderRadius: '16px',
@@ -939,6 +949,7 @@ export default function SimpleReservationRequestModal({
           {onBack ? (
             <button
               onClick={onBack}
+              aria-label="Go back to previous step"
               style={{
                 background: 'none',
                 border: 'none',
@@ -967,11 +978,12 @@ export default function SimpleReservationRequestModal({
           ) : (
             <div style={{ width: '44px' }} />
           )}
-          <h2 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+          <h2 id="reservation-modal-title" style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
             {showPayment ? 'Complete Payment' : `Request a Reservation for ${locationName || selectedLocation}`}
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close reservation modal"
             style={{
               background: 'none',
               border: 'none',

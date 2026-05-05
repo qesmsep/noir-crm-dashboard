@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabase';
@@ -23,20 +23,55 @@ export default function PublicReservationFlow({
   const [step, setStep] = useState<'phone' | 'fee-notice' | 'reservation'>('phone');
   const [phone, setPhone] = useState('');
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
-  const [memberData, setMemberData] = useState<any>(null);
   const [locationName, setLocationName] = useState<string>(locationSlug);
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Constants
+  const MEMBERSHIP_PHONE = '9137774488';
+  const MEMBERSHIP_SMS_BODY = 'MEMBERSHIP';
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isOpen]);
 
   // Fetch location display name
   useEffect(() => {
     const fetchLocationName = async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('name')
-        .eq('slug', locationSlug)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('locations')
+          .select('name')
+          .eq('slug', locationSlug)
+          .single();
 
-      if (data && !error) {
-        setLocationName(data.name);
+        if (data && !error) {
+          setLocationName(data.name);
+        } else if (error) {
+          console.error('Error fetching location name:', error);
+          // Keep using slug as fallback
+        }
+      } catch (error) {
+        console.error('Error fetching location name:', error);
+        // Keep using slug as fallback
       }
     };
 
@@ -88,7 +123,7 @@ export default function PublicReservationFlow({
         });
 
         // Redirect to member login after a short delay
-        setTimeout(() => {
+        redirectTimeoutRef.current = setTimeout(() => {
           window.location.href = '/member/login';
         }, 2000);
       } else {
@@ -137,6 +172,9 @@ export default function PublicReservationFlow({
         onClick={handleClose}
       >
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="phone-modal-title"
           style={{
             backgroundColor: '#ECEDE8',
             borderRadius: '16px',
@@ -150,11 +188,12 @@ export default function PublicReservationFlow({
         >
           {/* Header */}
           <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+            <h2 id="phone-modal-title" style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
               Make a Reservation for {locationName}
             </h2>
             <button
               onClick={handleClose}
+              aria-label="Close reservation modal"
               style={{
                 background: 'none',
                 border: 'none',
@@ -257,6 +296,9 @@ export default function PublicReservationFlow({
         onClick={handleClose}
       >
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fee-modal-title"
           style={{
             backgroundColor: '#ECEDE8',
             borderRadius: '16px',
@@ -270,11 +312,12 @@ export default function PublicReservationFlow({
         >
           {/* Header */}
           <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+            <h2 id="fee-modal-title" style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
               Reservation Fee
             </h2>
             <button
               onClick={handleClose}
+              aria-label="Close reservation fee modal"
               style={{
                 background: 'none',
                 border: 'none',
@@ -345,7 +388,7 @@ export default function PublicReservationFlow({
               </p>
               <button
                 onClick={() => {
-                  window.location.href = 'sms:9137774488?body=MEMBERSHIP';
+                  window.location.href = `sms:${MEMBERSHIP_PHONE}?body=${MEMBERSHIP_SMS_BODY}`;
                 }}
                 style={{
                   width: '100%',
