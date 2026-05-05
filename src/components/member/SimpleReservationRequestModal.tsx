@@ -192,8 +192,9 @@ export default function SimpleReservationRequestModal({
         );
 
         // Fetch location-specific booking window and timezone
+        // Use public_locations view to avoid exposing minaka_ical_url tokens
         const { data: locationData } = await supabase
-          .from('locations')
+          .from('public_locations')
           .select('booking_start_date, booking_end_date, timezone')
           .eq('slug', selectedLocation)
           .single();
@@ -307,8 +308,9 @@ export default function SimpleReservationRequestModal({
           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         );
 
+        // Use public_locations view to avoid exposing minaka_ical_url tokens
         const { data: locationData } = await supabase
-          .from('locations')
+          .from('public_locations')
           .select('cover_enabled, cover_price, weekly_hours, id, timezone')
           .eq('slug', selectedLocation)
           .single();
@@ -363,7 +365,7 @@ export default function SimpleReservationRequestModal({
 
     try {
       // Fetch blocked times for this date
-      const dateStr = DateTime.fromJSDate(newDate).toFormat('yyyy-MM-dd');
+      const dateStr = DateTime.fromJSDate(newDate, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
       const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
       const overrideParam = adminOverride ? '&adminOverride=true' : '';
       const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}`, {
@@ -898,7 +900,7 @@ export default function SimpleReservationRequestModal({
     }
 
     // Check if date is blocked (closure or private event)
-    const dateStr = DateTime.fromJSDate(date).toFormat('yyyy-MM-dd');
+    const dateStr = DateTime.fromJSDate(date, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
     if (blockedDates.has(dateStr)) {
       return false;
     }
