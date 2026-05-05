@@ -702,6 +702,17 @@ export default function MemberSubscriptionCard({
               </div>
             )}
 
+            {/* Membership Benefits */}
+            <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid #E5E7EB' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Membership Benefits
+              </div>
+              <div style={{ fontSize: '0.8125rem', color: '#1F1F1F', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1rem' }}>🎟️</span>
+                <span>RooftopKC Access with <strong>NO Reservation Fee</strong></span>
+              </div>
+            </div>
+
             {/* Additional Members */}
             {additionalMembersCount > 0 && (
               <div className={styles.row}>
