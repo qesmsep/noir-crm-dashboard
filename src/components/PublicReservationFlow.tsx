@@ -43,7 +43,9 @@ export default function PublicReservationFlow({
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        handleClose();
+        setStep('phone');
+        setPhone('');
+        onClose();
       }
     };
 
@@ -51,7 +53,7 @@ export default function PublicReservationFlow({
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   // Fetch location display name
   useEffect(() => {
@@ -387,7 +389,7 @@ export default function PublicReservationFlow({
               </p>
               <button
                 onClick={() => {
-                  window.location.href = `sms:${MEMBERSHIP_PHONE}?body=${MEMBERSHIP_SMS_BODY}`;
+                  window.location.href = `sms:${MEMBERSHIP_PHONE}?body=${encodeURIComponent(MEMBERSHIP_SMS_BODY)}`;
                 }}
                 style={{
                   width: '100%',

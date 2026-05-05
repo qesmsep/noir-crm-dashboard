@@ -343,11 +343,7 @@ export default function SimpleReservationRequestModal({
 
       // Fetch cover charge info for selected location
       try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        const supabase = getSupabaseClient();
 
         // Use public_locations view to avoid exposing minaka_ical_url tokens
         const { data: locationData } = await supabase
@@ -910,6 +906,7 @@ export default function SimpleReservationRequestModal({
           box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
         }
       `}</style>
+      <div id="datepicker-portal" />
       <div
         style={{
           position: 'fixed',
@@ -946,7 +943,7 @@ export default function SimpleReservationRequestModal({
       >
         {/* Header */}
         <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {onBack ? (
+          {onBack && !showPayment ? (
             <button
               onClick={onBack}
               aria-label="Go back to previous step"
