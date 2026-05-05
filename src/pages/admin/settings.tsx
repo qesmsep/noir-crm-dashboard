@@ -577,6 +577,15 @@ export default function Settings() {
               <CalendarAvailabilityControl section="base" locationSlug="noirkc" />
             </div>
 
+            {/* Weekly Hours */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Weekly Hours</h2>
+              <p className={styles.inputHint}>
+                Set hours for the current week. These override base hours and allow week-by-week schedule changes.
+              </p>
+              <CalendarAvailabilityControl section="weekly" locationSlug="noirkc" />
+            </div>
+
             {/* Custom Open/Closed Days */}
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Custom Open/Closed Days</h2>
@@ -724,6 +733,15 @@ export default function Settings() {
                 Configure operating hours for RooftopKC reservations.
               </p>
               <CalendarAvailabilityControl section="base" locationSlug="rooftopkc" />
+            </div>
+
+            {/* Weekly Hours */}
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Weekly Hours</h2>
+              <p className={styles.inputHint}>
+                Set hours for the current week. These override base hours and allow week-by-week schedule changes.
+              </p>
+              <CalendarAvailabilityControl section="weekly" locationSlug="rooftopkc" />
             </div>
 
             {/* Custom Open/Closed Days */}

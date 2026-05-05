@@ -2,6 +2,10 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { DateTime } from 'luxon';
 
+// Constants for message timing windows
+const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
+const MESSAGE_SEND_WINDOW_PAST_MINUTES = 60; // Don't send messages more than 60 minutes late
+
 // Helper function to generate and upload ledger PDF (same as BALANCE command)
 async function generateLedgerPdf(memberId: string, accountId: string) {
   try {
@@ -99,8 +103,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized - Only Vercel cron jobs or authorized tokens allowed' });
     }
-    
-    if (token !== 'cron-secret-token-2024') {
+
+    if (token !== process.env.CRON_SECRET_TOKEN) {
       return res.status(401).json({ error: 'Invalid token' });
     }
   }
@@ -110,14 +114,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('==========================================');
 
     // Get all active campaign messages from the new table
-    const { data: messages, error: messagesError } = await supabaseAdmin
+    const { data: rawMessages, error: messagesError } = await supabaseAdmin
       .from('campaign_messages')
       .select(`
         *,
-        campaigns (
+        campaigns!inner (
           id,
           name,
-          trigger_type
+          trigger_type,
+          applies_to_all_locations,
+          campaign_locations(
+            location_id,
+            location:locations!inner(id, name, slug)
+          )
         )
       `)
       .eq('is_active', true);
@@ -126,6 +135,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('❌ Error fetching campaign messages:', messagesError);
       return res.status(500).json({ error: 'Failed to fetch campaign messages' });
     }
+
+    // Filter out campaigns with invalid location assignments
+    const messages = rawMessages?.filter(msg => {
+      if (!msg.campaigns) {
+        console.log('⚠️ Skipping message with no campaign:', msg.id);
+        return false;
+      }
+      // If applies to all locations, it's valid
+      if (msg.campaigns.applies_to_all_locations) return true;
+      // If location-specific, ensure at least one valid location exists
+      const hasValidLocations = msg.campaigns.campaign_locations?.some(cl => cl.location !== null);
+      if (!hasValidLocations) {
+        const totalLocations = msg.campaigns.campaign_locations?.length || 0;
+        const nullLocations = msg.campaigns.campaign_locations?.filter(cl => cl.location === null).length || 0;
+        console.log('⚠️ Skipping campaign with no valid locations:', {
+          campaign: msg.campaigns.name,
+          campaignId: msg.campaigns.id,
+          totalLocationAssignments: totalLocations,
+          nullLocationCount: nullLocations,
+          reason: nullLocations > 0 ? 'Locations have been deleted' : 'No locations assigned'
+        });
+      }
+      return hasValidLocations;
+    }) || [];
 
     if (!messages || messages.length === 0) {
       console.log('ℹ️  No active campaign messages found');
@@ -181,18 +214,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`✅ Created virtual member for specific phone: ${message.specific_phone}`);
         } else {
           // Get relevant members based on campaign trigger type
-      
+
+          // Extract location IDs from campaign
+          const rawLocationIds = message.campaigns?.applies_to_all_locations
+            ? null
+            : message.campaigns?.campaign_locations?.map(cl => cl.location_id).filter(Boolean);
+
+          // Validate all location IDs are valid UUIDs to prevent SQL injection
+          const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          const campaignLocationIds = rawLocationIds?.filter(id => UUID_REGEX.test(id)) || null;
+
+          if (rawLocationIds && rawLocationIds.length > 0 && (!campaignLocationIds || campaignLocationIds.length === 0)) {
+            console.error('⚠️ All location IDs failed UUID validation, skipping campaign');
+            continue;
+          }
+
+          console.log('📍 Campaign location filter:', {
+            applies_to_all_locations: message.campaigns?.applies_to_all_locations,
+            location_ids: campaignLocationIds
+          });
+
       if (triggerType === 'member_signup') {
         console.log('👥 Fetching members for member_signup trigger...');
         // Get members who joined recently (within last 30 days)
         const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
         console.log(`📅 Looking for members who joined after: ${thirtyDaysAgo}`);
-        
-        const { data: recentMembers, error: membersError } = await supabaseAdmin
+
+        let query = supabaseAdmin
           .from('members')
           .select('*')
           .gte('join_date', thirtyDaysAgo)
           .order('join_date', { ascending: false });
+
+        // Apply location filter if campaign is location-specific
+        if (campaignLocationIds && campaignLocationIds.length > 0) {
+          query = query.in('location_id', campaignLocationIds);
+          console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
+        }
+
+        const { data: recentMembers, error: membersError } = await query;
 
         if (membersError) {
           console.error('❌ Error fetching recent members:', membersError);
@@ -207,12 +267,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const searchStart = now.minus({ hours: 1 }).toISO();
         const searchEnd = now.plus({ days: 1 }).toISO();
         console.log(`📅 Looking for reservations between: ${searchStart} and ${searchEnd}`);
-        
-        const { data: reservationData, error: reservationError } = await supabaseAdmin
+
+        let reservationQuery = supabaseAdmin
           .from('reservations')
-          .select('phone, start_time, end_time, party_size')
+          .select('phone, start_time, end_time, party_size, location_id')
           .gte('start_time', searchStart) // Include reservations from 1 hour ago
           .lte('start_time', searchEnd); // Up to 1 day in the future
+
+        // Apply location filter if campaign is location-specific
+        if (campaignLocationIds && campaignLocationIds.length > 0) {
+          reservationQuery = reservationQuery.in('location_id', campaignLocationIds);
+          console.log(`📍 Filtering reservations by location_ids: ${campaignLocationIds.join(', ')}`);
+        }
+
+        const { data: reservationData, error: reservationError } = await reservationQuery;
 
         if (reservationError) {
           console.error('❌ Error fetching reservations:', reservationError);
@@ -248,7 +316,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Convert phone number to international format
           let formattedPhone = reservation.phone;
           const digits = reservation.phone.replace(/\D/g, '');
-          
+
           if (digits.length === 10) {
             formattedPhone = '+1' + digits;
           } else if (digits.length === 11 && digits.startsWith('1')) {
@@ -256,7 +324,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else if (!formattedPhone.startsWith('+')) {
             formattedPhone = '+' + digits;
           }
-          
+
           return {
             member_id: crypto.randomUUID(), // Generate proper UUID
             account_id: crypto.randomUUID(), // Generate proper UUID
@@ -268,6 +336,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             join_date: reservation.start_time, // Store start_time in join_date
             end_time: reservation.end_time, // Store end_time for after messages
             party_size: reservation.party_size, // Store party_size for placeholders
+            location_id: reservation.location_id, // Preserve location for filtering
             created_at: reservation.start_time,
             updated_at: reservation.start_time
           };
@@ -281,12 +350,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const searchStart = now.minus({ hours: 24 }).toISO();
         const searchEnd = now.toISO();
         console.log(`📅 Looking for reservations created between: ${searchStart} and ${searchEnd}`);
-        
-        const { data: reservationData, error: reservationError } = await supabaseAdmin
+
+        let reservationQuery = supabaseAdmin
           .from('reservations')
-          .select('phone, start_time, end_time, party_size, created_at, first_name, last_name')
+          .select('phone, start_time, end_time, party_size, created_at, first_name, last_name, location_id')
           .gte('created_at', searchStart) // Reservations created in last 24 hours
           .lte('created_at', searchEnd); // Up to now
+
+        // Apply location filter if campaign is location-specific
+        if (campaignLocationIds && campaignLocationIds.length > 0) {
+          reservationQuery = reservationQuery.in('location_id', campaignLocationIds);
+          console.log(`📍 Filtering reservations by location_ids: ${campaignLocationIds.join(', ')}`);
+        }
+
+        const { data: reservationData, error: reservationError } = await reservationQuery;
 
         if (reservationError) {
           console.error('❌ Error fetching recent reservations:', reservationError);
@@ -310,7 +387,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Convert phone number to international format
           let formattedPhone = reservation.phone;
           const digits = reservation.phone.replace(/\D/g, '');
-          
+
           if (digits.length === 10) {
             formattedPhone = '+1' + digits;
           } else if (digits.length === 11 && digits.startsWith('1')) {
@@ -318,7 +395,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else if (!formattedPhone.startsWith('+')) {
             formattedPhone = '+' + digits;
           }
-          
+
           return {
             member_id: crypto.randomUUID(),
             account_id: crypto.randomUUID(),
@@ -330,6 +407,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             join_date: reservation.created_at, // Use created_at as trigger point
             end_time: reservation.end_time,
             party_size: reservation.party_size,
+            location_id: reservation.location_id, // Preserve location for filtering
             created_at: reservation.created_at,
             updated_at: reservation.created_at
           };
@@ -340,10 +418,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else if (triggerType === 'member_birthday') {
         console.log('🎂 Fetching members for birthday check...');
         // Get all members with dob and filter by birthday in JavaScript
-        const { data: allMembers, error: membersError } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('members')
           .select('*')
           .not('dob', 'is', null);
+
+        // Apply location filter if campaign is location-specific
+        if (campaignLocationIds && campaignLocationIds.length > 0) {
+          query = query.in('location_id', campaignLocationIds);
+          console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
+        }
+
+        const { data: allMembers, error: membersError } = await query;
 
         if (membersError) {
           console.error('❌ Error fetching members for birthday check:', membersError);
@@ -355,25 +441,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Filter members whose birthday is today
         const today = now.toFormat('MM-dd');
         console.log(`📅 Looking for birthdays on: ${today}`);
-        
+
         members = (allMembers || []).filter(member => {
           if (!member.dob) return false;
-          
+
           // Convert dob to MM-dd format for comparison
           const dobDate = DateTime.fromISO(member.dob);
           const dobFormatted = dobDate.toFormat('MM-dd');
-          
+
           return dobFormatted === today;
         });
-        
+
         console.log(`🎂 Found ${members.length} members with birthdays today`);
       } else if (triggerType === 'member_renewal') {
         console.log('🔄 Fetching members for renewal check...');
         // Get all members and filter by renewal date calculated from join_date
-        const { data: allMembers, error: membersError } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('members')
           .select('*')
           .not('join_date', 'is', null);
+
+        // Apply location filter if campaign is location-specific
+        if (campaignLocationIds && campaignLocationIds.length > 0) {
+          query = query.in('location_id', campaignLocationIds);
+          console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
+        }
+
+        const { data: allMembers, error: membersError } = await query;
 
         if (membersError) {
           console.error('❌ Error fetching members for renewal check:', membersError);
@@ -385,34 +479,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Filter members whose renewal date is today (calculated from join_date)
         const today = now.toFormat('yyyy-MM-dd');
         console.log(`📅 Looking for renewals on: ${today}`);
-        
+
         members = (allMembers || []).filter(member => {
           if (!member.join_date) return false;
-          
+
           // Calculate renewal date based on join_date
           const joinDate = DateTime.fromISO(member.join_date);
           const todayDate = now.startOf('day');
-          
+
           // Calculate how many months have passed since join date
           const monthsSinceJoin = todayDate.diff(joinDate, 'months').months;
-          
+
           // Calculate the next renewal date
           const nextRenewalDate = joinDate.plus({ months: Math.ceil(monthsSinceJoin) });
-          
+
           // Check if today is the renewal date
           const isRenewalToday = nextRenewalDate.toFormat('yyyy-MM-dd') === today;
-          
+
           return isRenewalToday;
         });
-        
+
         console.log(`🔄 Found ${members.length} members with renewals today`);
       } else if (triggerType === 'all_members') {
         console.log('👥 Fetching all active members for all_members campaign...');
         // Get all active members for all_members campaigns
-        const { data: allMembers, error: membersError } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('members')
           .select('*')
           .in('status', ['active', 'paused']);
+
+        // Apply location filter if campaign is location-specific
+        if (campaignLocationIds && campaignLocationIds.length > 0) {
+          query = query.in('location_id', campaignLocationIds);
+          console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
+        }
+
+        const { data: allMembers, error: membersError } = await query;
 
         if (membersError) {
           console.error('❌ Error fetching all members:', membersError);
@@ -542,9 +644,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`⏰ Campaign message ${message.name}: target time (business): ${targetSendTime.setZone(businessTimezone).toISO()}, now (business): ${now.setZone(businessTimezone).toISO()}`);
           console.log(`⏰ Timing check: timeDiff=${timeDiff}, should send: ${timeDiff <= 5 && timeDiff >= -60}`);
           
-          // Only send if we're within 5 minutes AFTER the target time (not before)
-          if (timeDiff > 5 || timeDiff < -60) {
-            console.log(`⏳ Message not ready to send yet (diff: ${timeDiff} minutes)`);
+          // Only send if we're within the configured time window
+          if (timeDiff > MESSAGE_SEND_WINDOW_FUTURE_MINUTES || timeDiff < -MESSAGE_SEND_WINDOW_PAST_MINUTES) {
+            console.log(`⏳ Message not ready to send yet (diff: ${timeDiff} minutes, window: +${MESSAGE_SEND_WINDOW_FUTURE_MINUTES}/-${MESSAGE_SEND_WINDOW_PAST_MINUTES})`);
             continue; // Not time to send yet
           }
           
@@ -600,13 +702,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
           
-          // Add ledger PDF link if enabled (only for member-related triggers)
-          if (message.include_ledger_pdf && triggerType !== 'reservation_time') {
+          // Add ledger PDF link if enabled (only for actual members, not virtual members)
+          if (message.include_ledger_pdf &&
+              triggerType !== 'reservation_time' &&
+              triggerType !== 'reservation_created' &&
+              member.member_type !== 'guest' &&
+              member.member_type !== 'specific_phone') {
             try {
               console.log('Generating ledger PDF for campaign message');
-              const pdfUrl = await generateLedgerPdf(member.member_id, member.account_id);
-              messageContent += `\n\nYour ledger statement: ${pdfUrl}`;
-              console.log('Added ledger PDF link to message:', pdfUrl);
+
+              // Validate member exists in database before generating PDF
+              const { data: realMember, error: memberError } = await supabaseAdmin
+                .from('members')
+                .select('member_id, account_id')
+                .eq('member_id', member.member_id)
+                .single();
+
+              if (!memberError && realMember) {
+                const pdfUrl = await generateLedgerPdf(member.member_id, member.account_id);
+                messageContent += `\n\nYour ledger statement: ${pdfUrl}`;
+                console.log('Added ledger PDF link to message:', pdfUrl);
+              } else {
+                console.log('⚠️ Skipping PDF generation: member not found in database');
+              }
             } catch (error) {
               console.error('Failed to generate ledger PDF for campaign message:', error);
               // Continue without the PDF link rather than failing the entire message
@@ -697,16 +815,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
 
-          // Check if message already sent
-          const { data: existingMessage } = await supabaseAdmin
+          // Check if message already sent (use .limit(1) to handle multiple results gracefully)
+          const { data: existingMessages } = await supabaseAdmin
             .from('scheduled_messages')
             .select('id')
             .eq('campaign_message_id', message.id)
             .eq('phone_number', formattedPhone)
             .eq('status', 'sent')
-            .single();
+            .limit(1);
 
-          if (existingMessage) {
+          if (existingMessages && existingMessages.length > 0) {
             console.log(`⏭️  Message already sent for campaign message ${message.id} to phone ${formattedPhone}`);
             continue;
           }

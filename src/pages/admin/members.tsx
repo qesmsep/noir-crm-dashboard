@@ -43,7 +43,17 @@ export default function MembersAdmin() {
   const [noSubscriptionAccounts, setNoSubscriptionAccounts] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
   const [lookupQuery, setLookupQuery] = useState("");
+
+  // Debounce search input for better performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLookupQuery(searchInput);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isArchivedModalOpen, setIsArchivedModalOpen] = useState(false);
   const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
@@ -523,17 +533,38 @@ export default function MembersAdmin() {
   const handleSaveMember = async (memberData: any) => {
     setSaving(true);
     try {
+      // Get session for authentication
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch('/api/members', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify(memberData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create member');
+        // API returns { success: false, error: { message, code, details } }
+        let errorMessage = errorData.error?.message || errorData.message || 'Failed to create member';
+
+        // If there are validation details, include them
+        if (errorData.error?.details) {
+          const details = errorData.error.details;
+          if (typeof details === 'object') {
+            const fieldErrors = Object.entries(details).map(([field, msg]) => `${field}: ${msg}`).join(', ');
+            errorMessage += ` (${fieldErrors})`;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       await fetchMembers();
@@ -607,8 +638,8 @@ export default function MembersAdmin() {
                 type="text"
                 className={styles.searchInput}
                 placeholder="Search"
-                value={lookupQuery}
-                onChange={(e) => setLookupQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
             {/* Status Filter */}

@@ -6,16 +6,10 @@ import CampaignDrawer from '../../components/CampaignDrawer';
 import CampaignTemplateDrawer from '../../components/CampaignTemplateDrawer';
 import { sortCampaignTemplates } from '../../utils/campaignSorting';
 import styles from '../../styles/Communication.module.css';
+import { Campaign as BaseCampaign, CampaignLocation } from '../../types';
 
-interface Campaign {
-  id: string;
+interface Campaign extends BaseCampaign {
   campaign_id: string;
-  name: string;
-  description: string;
-  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members';
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
   message_count?: number;
   recurring_schedule?: any;
   recurring_start_date?: string;
@@ -25,6 +19,7 @@ interface Campaign {
   selected_private_event_id?: string;
   include_event_list?: boolean;
   event_list_date_range?: any;
+  updated_at: string;
 }
 
 interface CampaignTemplate {
@@ -91,7 +86,15 @@ export default function CommunicationPage() {
     try {
       const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
-        .select('*')
+        .select(`
+          *,
+          campaign_locations(
+            location_id,
+            created_at,
+            location:locations(id, name, slug)
+          ),
+          campaign_messages(count)
+        `)
         .order('created_at', { ascending: false });
 
       if (campaignsError) {
@@ -103,21 +106,11 @@ export default function CommunicationPage() {
         throw campaignsError;
       }
 
-      const campaignsWithCounts = await Promise.all(
-        (campaignsData || []).map(async (campaign) => {
-          const { count, error: countError } = await supabase
-            .from('campaign_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('campaign_id', campaign.id);
-
-          if (countError) {
-            console.error(`Error fetching message count for campaign ${campaign.id}:`, countError);
-            return { ...campaign, message_count: 0 };
-          }
-
-          return { ...campaign, message_count: count || 0 };
-        })
-      );
+      // Map the aggregated count from the query result
+      const campaignsWithCounts = (campaignsData || []).map((campaign: any) => ({
+        ...campaign,
+        message_count: campaign.campaign_messages?.[0]?.count || 0,
+      }));
 
       setCampaigns(campaignsWithCounts);
     } catch (error) {
@@ -263,7 +256,7 @@ export default function CommunicationPage() {
   const formatRecipient = (template: CampaignTemplate) => {
     switch (template.recipient_type) {
       case 'member':
-        return (selectedCampaign?.trigger_type === 'reservation' || selectedCampaign?.trigger_type === 'reservation_time' || selectedCampaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
+        return (selectedCampaign?.trigger_type === 'reservation_time' || selectedCampaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
       case 'specific_phone':
@@ -448,6 +441,19 @@ export default function CommunicationPage() {
                       <div className={styles.detailRow}>
                         <span className={styles.detailLabel}>Messages:</span>
                         <span className={styles.detailValue}>{campaign.message_count || 0}</span>
+                      </div>
+                      <div className={styles.detailRow}>
+                        <span className={styles.detailLabel}>Locations:</span>
+                        <span className={styles.detailValue}>
+                          {campaign.applies_to_all_locations
+                            ? 'All Locations'
+                            : (campaign.campaign_locations && campaign.campaign_locations.length > 0
+                              ? campaign.campaign_locations
+                                  .filter(cl => cl.location != null)
+                                  .map(cl => cl.location!.name)
+                                  .join(', ') || 'No valid locations'
+                              : 'No locations assigned')}
+                        </span>
                       </div>
                     </div>
 

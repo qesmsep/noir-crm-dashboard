@@ -82,6 +82,9 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [appliesToAllLocations, setAppliesToAllLocations] = useState(false);
   const toast = useToast();
 
   // Initialization effect: runs when drawer opens or mode/campaign changes
@@ -102,6 +105,13 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       }
     }
   }, [isOpen, campaignId, isCreateMode]);
+
+  // Fetch locations when drawer opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchLocations();
+    }
+  }, [isOpen]);
 
   // Fetch private events only when private_event trigger type is selected
   useEffect(() => {
@@ -146,6 +156,14 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
         include_event_list: data.include_event_list,
         event_list_date_range: data.event_list_date_range,
       });
+
+      // Set location data
+      setAppliesToAllLocations(data.applies_to_all_locations || false);
+      if (data.campaign_locations && data.campaign_locations.length > 0) {
+        setSelectedLocationIds(data.campaign_locations.map((cl: any) => cl.location_id));
+      } else {
+        setSelectedLocationIds([]);
+      }
     } catch (error) {
       console.error('Error fetching campaign:', error);
       toast({
@@ -156,6 +174,18 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch('/api/locations');
+      if (response.ok) {
+        const data = await response.json();
+        setLocations(data);
+      }
+    } catch (error) {
+      console.error('Error fetching locations:', error);
     }
   };
 
@@ -401,12 +431,8 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
   };
 
   const handleSave = async () => {
-    console.log('Save button clicked!');
-    console.log('Form data:', formData);
-    console.log('Is create mode:', isCreateMode);
-    
+    // Validate required fields
     if (!formData.name.trim()) {
-      console.log('Validation failed: name is empty');
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
@@ -416,37 +442,45 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       return;
     }
 
+    // Validate location selection
+    if (!appliesToAllLocations && selectedLocationIds.length === 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select at least one location or enable "Apply to all locations"',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const url = isCreateMode 
-        ? '/api/campaigns' 
+      const url = isCreateMode
+        ? '/api/campaigns'
         : `/api/campaigns/${campaignId}`;
-      
+
       const method = isCreateMode ? 'POST' : 'PUT';
-      
-      console.log('Making request to:', url);
-      console.log('Method:', method);
-      console.log('Request body:', JSON.stringify(formData, null, 2));
-      
+
+      const payload = {
+        ...formData,
+        applies_to_all_locations: appliesToAllLocations,
+        location_ids: appliesToAllLocations ? [] : selectedLocationIds,
+      };
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.log('Error response:', errorText);
         throw new Error('Failed to save campaign');
       }
 
       const result = await response.json();
-      console.log('Success response:', result);
 
       toast({
         title: 'Success',
@@ -591,6 +625,47 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
                   </Box>
                 </>
               )}
+
+              {/* Location Assignment */}
+              <Divider borderColor="#a59480" />
+              <Box>
+                <Text fontSize="lg" fontWeight="bold" color="#353535" mb={4}>
+                  Locations
+                </Text>
+                <VStack align="stretch" spacing={4}>
+                  <FormControl display="flex" alignItems="center">
+                    <FormLabel htmlFor="all-locations" mb="0" fontFamily="'Montserrat', sans-serif" color="#a59480">
+                      Apply to all locations
+                    </FormLabel>
+                    <Switch
+                      id="all-locations"
+                      isChecked={appliesToAllLocations}
+                      onChange={(e) => setAppliesToAllLocations(e.target.checked)}
+                      colorScheme="green"
+                    />
+                  </FormControl>
+
+                  {!appliesToAllLocations && (
+                    <CheckboxGroup
+                      value={selectedLocationIds}
+                      onChange={(values) => setSelectedLocationIds(values as string[])}
+                    >
+                      <Stack spacing={2}>
+                        {locations.map((location) => (
+                          <Checkbox
+                            key={location.id}
+                            value={location.id}
+                            fontFamily="'Montserrat', sans-serif"
+                            color="#353535"
+                          >
+                            {location.name}
+                          </Checkbox>
+                        ))}
+                      </Stack>
+                    </CheckboxGroup>
+                  )}
+                </VStack>
+              </Box>
 
               {/* Status */}
               <Divider borderColor="#a59480" />

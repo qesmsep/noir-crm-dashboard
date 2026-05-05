@@ -45,6 +45,7 @@ import {
 import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
 import { useSettings } from '../context/SettingsContext';
 import { InfoIcon } from '@chakra-ui/icons';
+import { CampaignTriggerType } from '../types';
 
 interface CampaignTemplate {
   id?: string;
@@ -92,7 +93,7 @@ interface CampaignTemplateDrawerProps {
   onTemplateUpdated: () => void;
   campaignId?: string;
   isCampaignMode?: boolean;
-  campaignTriggerType?: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members';
+  campaignTriggerType?: CampaignTriggerType;
 }
 
 const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
@@ -486,11 +487,25 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
           if (!campaignResponse.ok) {
             console.error('Failed to update campaign event list settings');
+            // Show warning to user but don't fail the entire save
+            toast({
+              title: 'Warning',
+              description: 'Message saved but campaign settings update failed. Please try updating campaign settings separately.',
+              status: 'warning',
+              duration: 5000,
+            });
           } else {
             console.log('Campaign event list settings updated successfully');
           }
         } catch (error) {
           console.error('Error updating campaign event list settings:', error);
+          // Show warning to user but don't fail the entire save
+          toast({
+            title: 'Warning',
+            description: 'Message saved but campaign settings update encountered an error. Please try updating campaign settings separately.',
+            status: 'warning',
+            duration: 5000,
+          });
         }
       }
       
@@ -650,55 +665,61 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
   const getRecipientOptions = () => {
     if (!campaignTriggerType) return [];
-    
+
+    // Add location context hint if campaign is location-specific
+    const validLocationCount = campaignData?.campaign_locations?.filter(cl => cl.location != null).length || 0;
+    const locationHint = campaignData?.applies_to_all_locations
+      ? ''
+      : ` (filtered by ${validLocationCount} location(s))`;
+
     switch (campaignTriggerType) {
       case 'member_signup':
       case 'member_birthday':
       case 'member_renewal':
         return [
-          { value: 'member', label: 'Member' },
+          { value: 'member', label: `Member${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
-      
+
       case 'reservation':
       case 'reservation_time':
       case 'reservation_created':
         return [
-          { value: 'member', label: 'Phone number on reservation' },
+          { value: 'member', label: `Phone number on reservation${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
-      
+
       case 'recurring':
         return [
-          { value: 'member', label: 'Member' },
-          { value: 'all_members', label: 'All Members' },
+          { value: 'member', label: `Member${locationHint}` },
+          { value: 'all_members', label: `All Members${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
-      
+
       case 'reservation_range':
         return [
-          { value: 'reservation_phones', label: 'Phone numbers on Reservations within time period' },
+          { value: 'reservation_phones', label: `Phone numbers on Reservations within time period${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
-      
+
       case 'private_event':
         return [
-          { value: 'private_event_rsvps', label: 'Phone numbers of RSVPs for Private event' },
+          { value: 'private_event_rsvps', label: `Phone numbers of RSVPs for Private event${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
-      
+
       case 'all_members':
         return [
-          { value: 'all_members', label: 'Phone numbers of all existing members' },
-          { value: 'all_primary_members', label: 'All primary members' },
+          { value: 'all_members', label: `Phone numbers of all existing members${locationHint}` },
+          { value: 'all_primary_members', label: `All primary members${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
-      
+
       default:
         // member_signup, member_birthday, member_renewal
         return [
-          { value: 'member', label: 'Primary member' },
-          { value: 'all_members', label: 'All members' },
+          { value: 'member', label: `Primary member${locationHint}` },
+          { value: 'all_members', label: `All members${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
     }

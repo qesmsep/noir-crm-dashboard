@@ -4,7 +4,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { supabase } from '../lib/supabase';
 import PrivateEventBooking from './PrivateEventBooking';
 import { DateTime } from 'luxon';
-import { formatTime, formatDate, fromUTC } from '../utils/dateUtils';
+import { formatTime, formatDate, fromUTC, getMondayOfWeek } from '../utils/dateUtils';
 import {
   Box,
   Button,
@@ -47,7 +47,7 @@ type ExceptionalOpen = { id: number; date: string; time_ranges: TimeRange[]; lab
 type ExceptionalClosure = { id: number; date: string; reason?: string; full_day?: boolean; time_ranges?: TimeRange[]; sms_notification?: string };
 
 type CalendarAvailabilityControlProps = {
-  section: 'booking_window' | 'base' | 'custom_open' | 'custom_closed' | 'private_events';
+  section: 'booking_window' | 'base' | 'weekly' | 'custom_open' | 'custom_closed' | 'private_events';
   locationSlug?: string;
 };
 
@@ -194,6 +194,10 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   // Base Hours State
   const [baseHours, setBaseHours] = useState<BaseHour[]>(Array(7).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
 
+  // Weekly Hours State (for current week)
+  const [weeklyHours, setWeeklyHours] = useState<BaseHour[]>(Array(7).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
+  const currentWeekMonday = getMondayOfWeek(new Date(), 'America/Chicago');
+
   // Exceptional Opens State
   const [exceptionalOpens, setExceptionalOpens] = useState<ExceptionalOpen[]>([]);
   const [newOpenDate, setNewOpenDate] = useState<Date | null>(null);
@@ -278,6 +282,38 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
           });
           setBaseHours(timeRanges.map((ranges, index) => ({ enabled: enabledDays[index], timeRanges: ranges })));
         }
+
+        // Load weekly hours from locations table if locationId is available
+        if (locationId && section === 'weekly') {
+          const { data: locationData } = await supabase
+            .from('locations')
+            .select('weekly_hours')
+            .eq('id', locationId)
+            .single();
+
+          if (locationData?.weekly_hours) {
+            const weeklyHoursData = locationData.weekly_hours as Record<string, any>;
+            const currentWeekData = weeklyHoursData[currentWeekMonday];
+
+            if (currentWeekData) {
+              const enabledDays = Array(7).fill(false);
+              const timeRanges = Array(7).fill(null).map(() => [{ start: '18:00', end: '23:00' }]);
+
+              WEEKDAYS.forEach((day, index) => {
+                const dayKey = day.toLowerCase() as 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
+                const dayData = currentWeekData[dayKey];
+
+                if (dayData && dayData.open && dayData.close) {
+                  enabledDays[index] = true;
+                  timeRanges[index] = [{ start: dayData.open, end: dayData.close }];
+                }
+              });
+
+              setWeeklyHours(timeRanges.map((ranges, index) => ({ enabled: enabledDays[index], timeRanges: ranges })));
+            }
+          }
+        }
+
         if (opensData) setExceptionalOpens(opensData);
         if (closuresData) setExceptionalClosures(closuresData);
         if (eventsData) setPrivateEvents(eventsData);
@@ -340,6 +376,87 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: any) {
       setError('Failed to save base hours: ' + err.message);
+    }
+  };
+
+  // Weekly Hours Handlers
+  const toggleWeeklyDay = (dayIndex: number) => {
+    const newWeeklyHours = [...weeklyHours];
+    newWeeklyHours[dayIndex].enabled = !newWeeklyHours[dayIndex].enabled;
+    setWeeklyHours(newWeeklyHours);
+  };
+  const updateWeeklyTimeRange = (dayIndex: number, rangeIndex: number, field: 'start' | 'end', value: string) => {
+    const newTimeRanges = [...weeklyHours[dayIndex].timeRanges];
+    newTimeRanges[rangeIndex][field] = value;
+    const newWeeklyHours = [...weeklyHours];
+    newWeeklyHours[dayIndex].timeRanges = newTimeRanges;
+    setWeeklyHours(newWeeklyHours);
+  };
+  const addWeeklyTimeRange = (dayIndex: number) => {
+    const newTimeRanges = [...weeklyHours[dayIndex].timeRanges];
+    newTimeRanges.push({ start: '18:00', end: '23:00' });
+    const newWeeklyHours = [...weeklyHours];
+    newWeeklyHours[dayIndex].timeRanges = newTimeRanges;
+    setWeeklyHours(newWeeklyHours);
+  };
+  const removeWeeklyTimeRange = (dayIndex: number, rangeIndex: number) => {
+    const newTimeRanges = [...weeklyHours[dayIndex].timeRanges];
+    newTimeRanges.splice(rangeIndex, 1);
+    const newWeeklyHours = [...weeklyHours];
+    newWeeklyHours[dayIndex].timeRanges = newTimeRanges;
+    setWeeklyHours(newWeeklyHours);
+  };
+  const saveWeeklyHours = async () => {
+    setError('');
+    setSuccessMessage('');
+    try {
+      if (!locationId) {
+        setError('Location is required for weekly hours');
+        return;
+      }
+
+      // Fetch current weekly_hours from the location
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('weekly_hours')
+        .eq('id', locationId)
+        .single();
+
+      const existingWeeklyHours = (locationData?.weekly_hours as Record<string, any>) || {};
+
+      // Convert weekly hours to the format expected for storage
+      const weekHoursData: Record<string, any> = {};
+      WEEKDAYS.forEach((day, index) => {
+        const dayKey = day.toLowerCase() as 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
+        if (weeklyHours[index].enabled && weeklyHours[index].timeRanges.length > 0) {
+          // For now, we only support one time range per day in the weekly_hours structure
+          // If there are multiple, we'll use the first one
+          weekHoursData[dayKey] = {
+            open: weeklyHours[index].timeRanges[0].start,
+            close: weeklyHours[index].timeRanges[0].end
+          };
+        } else {
+          weekHoursData[dayKey] = null;
+        }
+      });
+
+      // Update the current week's hours
+      const updatedWeeklyHours = {
+        ...existingWeeklyHours,
+        [currentWeekMonday]: weekHoursData
+      };
+
+      const { error: updateError } = await supabase
+        .from('locations')
+        .update({ weekly_hours: updatedWeeklyHours })
+        .eq('id', locationId);
+
+      if (updateError) throw updateError;
+
+      setSuccessMessage(`Weekly hours for week of ${currentWeekMonday} updated successfully!`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: any) {
+      setError('Failed to save weekly hours: ' + err.message);
     }
   };
 
@@ -784,6 +901,187 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
               {error && <Text color="red.500">{error}</Text>}
             </VStack>
           </Box>
+        );
+      case 'weekly':
+        const mondayDate = DateTime.fromISO(currentWeekMonday, { zone: 'America/Chicago' });
+        const sundayDate = mondayDate.plus({ days: 6 });
+        const dateRangeLabel = `${mondayDate.toFormat('EEE MMM d')} - ${sundayDate.toFormat('EEE MMM d, yyyy')}`;
+
+        return (
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            border: '1px solid #ECEAE5',
+            boxShadow: '0 4px 12px rgba(165, 148, 128, 0.08)',
+            maxWidth: '800px',
+            fontFamily: 'Montserrat, sans-serif'
+          }}>
+            <div style={{
+              fontSize: '0.8125rem',
+              color: '#6e6e73',
+              marginBottom: '1rem',
+              fontWeight: '500'
+            }}>
+              {dateRangeLabel}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {WEEKDAYS.map((day, index) => {
+                const dayDate = mondayDate.plus({ days: index });
+                const dateLabel = dayDate.toFormat('M/d');
+
+                return (
+                  <div key={day} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      cursor: 'pointer',
+                      minWidth: '150px',
+                      fontSize: '0.9375rem',
+                      fontWeight: '500',
+                      color: '#1F1F1F'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={weeklyHours[index].enabled}
+                        onChange={() => toggleWeeklyDay(index)}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          cursor: 'pointer',
+                          accentColor: '#A59480'
+                        }}
+                      />
+                      {day} <span style={{ color: '#6e6e73', fontWeight: '400' }}>{dateLabel}</span>
+                    </label>
+                  {weeklyHours[index].enabled && (
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {weeklyHours[index].timeRanges.map((range, rangeIndex) => (
+                        <div key={rangeIndex} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="time"
+                            value={range.start}
+                            onChange={e => updateWeeklyTimeRange(index, rangeIndex, 'start', e.target.value)}
+                            style={{
+                              width: '110px',
+                              height: '36px',
+                              padding: '0 0.75rem',
+                              border: '1px solid rgba(0, 0, 0, 0.12)',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              fontFamily: 'inherit'
+                            }}
+                          />
+                          <span style={{ fontSize: '0.875rem', color: '#6e6e73' }}>to</span>
+                          <input
+                            type="time"
+                            value={range.end}
+                            onChange={e => updateWeeklyTimeRange(index, rangeIndex, 'end', e.target.value)}
+                            style={{
+                              width: '110px',
+                              height: '36px',
+                              padding: '0 0.75rem',
+                              border: '1px solid rgba(0, 0, 0, 0.12)',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              fontFamily: 'inherit'
+                            }}
+                          />
+                          {weeklyHours[index].timeRanges.length > 1 && (
+                            <button
+                              onClick={() => removeWeeklyTimeRange(index, rangeIndex)}
+                              style={{
+                                height: '32px',
+                                padding: '0 1rem',
+                                background: 'transparent',
+                                color: '#c41e3a',
+                                border: '1px solid rgba(196, 30, 58, 0.3)',
+                                borderRadius: '6px',
+                                fontSize: '0.8125rem',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                fontFamily: 'inherit'
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => addWeeklyTimeRange(index)}
+                        style={{
+                          height: '32px',
+                          padding: '0 1rem',
+                          background: 'transparent',
+                          color: '#6e6e73',
+                          border: '1px solid rgba(0, 0, 0, 0.12)',
+                          borderRadius: '6px',
+                          fontSize: '0.8125rem',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        + Add Time Range
+                      </button>
+                    </div>
+                  )}
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: '1rem' }}>
+                <button
+                  onClick={saveWeeklyHours}
+                  style={{
+                    height: '40px',
+                    padding: '0.5rem 1.5rem',
+                    background: '#A59480',
+                    color: '#ffffff',
+                    border: '1px solid #A59480',
+                    borderRadius: '10px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontFamily: 'Montserrat, sans-serif',
+                    boxShadow: '0 1px 2px rgba(165, 148, 128, 0.15), 0 4px 8px rgba(165, 148, 128, 0.25), 0 8px 16px rgba(165, 148, 128, 0.18)'
+                  }}
+                >
+                  Save Weekly Hours
+                </button>
+              </div>
+              {successMessage && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  background: 'rgba(52, 199, 89, 0.1)',
+                  color: '#0d6832',
+                  border: '1px solid #34c759'
+                }}>
+                  {successMessage}
+                </div>
+              )}
+              {error && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  background: 'rgba(255, 59, 48, 0.1)',
+                  color: '#c41e3a',
+                  border: '1px solid #ff3b30'
+                }}>
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
         );
       case 'custom_open':
         return (

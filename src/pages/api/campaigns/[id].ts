@@ -7,10 +7,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     try {
       console.log('Fetching campaign with ID:', id);
-      
+
       const { data, error } = await supabaseAdmin
         .from('campaigns')
-        .select('*')
+        .select(`
+          *,
+          campaign_locations(
+            location_id,
+            created_at,
+            location:locations(id, name, slug)
+          )
+        `)
         .eq('id', id)
         .single();
 
@@ -59,10 +66,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'PUT') {
     try {
-      const campaign = req.body;
+      const { location_ids, ...campaign } = req.body;
       console.log('Updating campaign with ID:', id);
       console.log('Update data:', campaign);
-      
+      console.log('Location IDs:', location_ids);
+
       const { data, error } = await supabaseAdmin
         .from('campaigns')
         .update(campaign)
@@ -87,6 +95,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return;
       }
 
+      // Update campaign location assignments with proper error handling
+      try {
+        // First, delete existing assignments
+        const { error: deleteError } = await supabaseAdmin
+          .from('campaign_locations')
+          .delete()
+          .eq('campaign_id', id);
+
+        if (deleteError) {
+          throw new Error(`Failed to delete existing locations: ${deleteError.message}`);
+        }
+
+        // Then insert new assignments if not applies_to_all_locations
+        if (location_ids && location_ids.length > 0 && !campaign.applies_to_all_locations) {
+          const locationInserts = location_ids.map((location_id: string) => ({
+            campaign_id: id as string,
+            location_id: location_id,
+          }));
+
+          const { error: locationError } = await supabaseAdmin
+            .from('campaign_locations')
+            .insert(locationInserts);
+
+          if (locationError) {
+            throw new Error(`Failed to insert new locations: ${locationError.message}`);
+          }
+        }
+      } catch (locationUpdateError) {
+        console.error('Error updating campaign locations:', locationUpdateError);
+        return res.status(500).json({
+          error: 'Failed to update campaign locations',
+          details: locationUpdateError instanceof Error ? locationUpdateError.message : 'Unknown error'
+        });
+      }
+
       console.log('Campaign updated successfully:', data);
       res.status(200).json(data);
     } catch (error) {
@@ -94,8 +137,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Error type:', typeof error);
       console.error('Error instanceof Error:', error instanceof Error);
       console.error('Error message:', error instanceof Error ? error.message : 'No message');
-      
-      res.status(500).json({ 
+
+      res.status(500).json({
         error: 'Failed to update campaign',
         details: error instanceof Error ? error.message : 'Unknown error',
         type: typeof error

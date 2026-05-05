@@ -152,6 +152,25 @@ export class ApiResponse {
   }
 
   /**
+   * Conflict error - 409
+   */
+  static conflict(
+    res: NextApiResponse,
+    message: string = 'Resource already exists',
+    requestId?: string
+  ): void {
+    const response: ApiErrorResponse = {
+      success: false,
+      error: {
+        message,
+        code: 'CONFLICT',
+        ...(requestId && { requestId }),
+      },
+    };
+    res.status(409).json(response);
+  }
+
+  /**
    * Method not allowed error - 405
    */
   static methodNotAllowed(

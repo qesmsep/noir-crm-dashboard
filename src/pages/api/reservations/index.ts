@@ -165,6 +165,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .eq('slug', body.location_slug)
           .single();
         locationId = locationData?.id || null;
+      } else if (body.private_event_id) {
+        // For RSVP reservations, inherit location from the private event
+        console.log('[RSVP Location] Fetching location_id from private_event:', body.private_event_id);
+        const { data: eventData } = await client
+          .from('private_events')
+          .select('location_id')
+          .eq('id', body.private_event_id)
+          .single();
+        locationId = eventData?.location_id || null;
+        console.log('[RSVP Location] Inherited location_id:', locationId);
       }
 
       // If table_id is provided, validate it first
@@ -889,8 +899,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     const digits = formattedPhone.replace(/\D/g, '');
                     formattedPhone = digits.length === 10 ? '+1' + digits : '+' + digits;
                   }
-                  
-                  const confirmationMessage = `Hi ${customerName}! Your reservation for ${finalData.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
+
+                  // Fetch location name for confirmation message
+                  let locationName = 'Noir KC'; // default
+                  if (finalData.location_id) {
+                    const { data: locData } = await client
+                      .from('locations')
+                      .select('name')
+                      .eq('id', finalData.location_id)
+                      .single();
+                    if (locData) locationName = locData.name;
+                  }
+
+                  const confirmationMessage = `Hi ${customerName}! Your reservation for ${finalData.party_size} guests on ${formattedDate} at ${formattedTime} at ${locationName} is confirmed. See you then!`;
                   
                   console.log('Sending confirmation SMS to:', formattedPhone);
                   console.log('Message:', confirmationMessage);
@@ -1059,8 +1080,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   formattedPhone = '+' + digits;
                 }
               }
-              
-              const confirmationMessage = `Hi ${customerName}! Your reservation for ${data.party_size} guests on ${formattedDate} at ${formattedTime} is confirmed. See you then!`;
+
+              // Fetch location name for confirmation message
+              let locationName = 'Noir KC'; // default
+              if (data.location_id) {
+                const { data: locData } = await client
+                  .from('locations')
+                  .select('name')
+                  .eq('id', data.location_id)
+                  .single();
+                if (locData) locationName = locData.name;
+              }
+
+              const confirmationMessage = `Hi ${customerName}! Your reservation for ${data.party_size} guests on ${formattedDate} at ${formattedTime} at ${locationName} is confirmed. See you then!`;
               
               console.log('Sending confirmation SMS to:', formattedPhone);
               console.log('Message:', confirmationMessage);

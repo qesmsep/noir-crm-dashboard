@@ -18,9 +18,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === 'POST') {
     try {
-      const campaign = req.body;
+      const { location_ids, ...campaign } = req.body;
       console.log('Creating campaign with data:', campaign);
-      
+      console.log('Location IDs:', location_ids);
+
       // Validate required fields
       if (!campaign.name || !campaign.trigger_type) {
         console.log('Validation failed:', { name: campaign.name, trigger_type: campaign.trigger_type });
@@ -35,9 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ];
       if (!validTriggerTypes.includes(campaign.trigger_type)) {
         console.log('Invalid trigger_type:', campaign.trigger_type);
-        res.status(400).json({ 
-          error: 'Invalid trigger_type', 
-          details: `Must be one of: ${validTriggerTypes.join(', ')}` 
+        res.status(400).json({
+          error: 'Invalid trigger_type',
+          details: `Must be one of: ${validTriggerTypes.join(', ')}`
         });
         return;
       }
@@ -51,14 +52,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (existingCampaign) {
         console.log('Campaign with this name already exists:', existingCampaign);
-        res.status(409).json({ 
+        res.status(409).json({
           error: 'Campaign with this name already exists',
           existingCampaign: existingCampaign
         });
         return;
       }
 
-      // Use supabaseAdmin to bypass RLS for admin operations
+      // Create campaign
       const { data, error } = await supabaseAdmin
         .from('campaigns')
         .insert([campaign])
@@ -70,11 +71,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw error;
       }
 
+      // Insert campaign location assignments if provided and not applies_to_all_locations
+      if (location_ids && location_ids.length > 0 && !campaign.applies_to_all_locations) {
+        const locationInserts = location_ids.map((location_id: string) => ({
+          campaign_id: data.id,
+          location_id: location_id,
+        }));
+
+        const { error: locationError } = await supabaseAdmin
+          .from('campaign_locations')
+          .insert(locationInserts);
+
+        if (locationError) {
+          console.error('Error inserting campaign locations:', locationError);
+          // Rollback by deleting the campaign
+          await supabaseAdmin.from('campaigns').delete().eq('id', data.id);
+          return res.status(500).json({
+            error: 'Failed to assign campaign to locations',
+            details: locationError.message
+          });
+        }
+      }
+
       console.log('Campaign created successfully:', data);
       res.status(201).json(data);
     } catch (error) {
       console.error('Error creating campaign:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to create campaign',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
