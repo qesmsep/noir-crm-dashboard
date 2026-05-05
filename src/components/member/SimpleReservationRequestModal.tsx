@@ -535,20 +535,14 @@ export default function SimpleReservationRequestModal({
     return (
       <form onSubmit={handlePaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1F1F1F' }}>
-            Payment Details
-          </h3>
           <div style={{
             padding: '1rem',
             backgroundColor: '#F9FAFB',
             borderRadius: '10px',
             marginBottom: '1rem',
           }}>
-            <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: '0 0 0.5rem 0' }}>
-              Reservation for {partySize} {parseInt(partySize) === 1 ? 'guest' : 'guests'}
-            </p>
-            <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
-              Total: ${parseInt(partySize) * coverPrice}
+            <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1F1F1F', margin: 0, textAlign: 'center' }}>
+              Reservation: {partySize} {parseInt(partySize) === 1 ? 'Guest' : 'Guests'} = ${parseInt(partySize) * coverPrice}
             </p>
           </div>
           {clientSecret && <PaymentElement />}
@@ -1011,7 +1005,22 @@ export default function SimpleReservationRequestModal({
         {/* Show payment step or reservation form */}
         {showPayment ? (
           clientSecret ? (
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <Elements stripe={stripePromise} options={{
+              clientSecret,
+              appearance: {
+                rules: {
+                  '.Label': {
+                    display: 'none'
+                  },
+                  '.TabLabel': {
+                    display: 'none'
+                  },
+                  '.Tab': {
+                    display: 'none'
+                  }
+                }
+              }
+            }}>
               <PaymentStep />
             </Elements>
           ) : (
@@ -1108,7 +1117,7 @@ export default function SimpleReservationRequestModal({
             textAlign: 'center',
             lineHeight: '1.5',
           }}>
-            Due to weather and events, we release our calendar on a week-by-week basis on Mondays.
+            Due to weather, we release our calendar on a week-by-week basis on Mondays.
           </div>
 
           {/* Date and Time Row */}
@@ -1130,6 +1139,7 @@ export default function SimpleReservationRequestModal({
                 calendarClassName="simple-calendar"
                 customInput={
                   <input
+                    readOnly
                     style={{
                       width: '100%',
                       height: '44px',
