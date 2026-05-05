@@ -87,10 +87,81 @@ export interface Table {
 }
 
 // ========================================
+// Location & Hours Types
+// ========================================
+
+/**
+ * Hours for a specific day.
+ * Times are in 24-hour format (HH:mm) in the location's local timezone.
+ */
+export interface DayHours {
+  /** Opening time in 24-hour format (HH:mm) in location's local timezone */
+  open: string;
+  /** Closing time in 24-hour format (HH:mm) in location's local timezone */
+  close: string;
+}
+
+/**
+ * Hours for each day of a week.
+ * null = closed that day
+ */
+export interface WeekHours {
+  sunday?: DayHours | null;
+  monday?: DayHours | null;
+  tuesday?: DayHours | null;
+  wednesday?: DayHours | null;
+  thursday?: DayHours | null;
+  friday?: DayHours | null;
+  saturday?: DayHours | null;
+}
+
+/**
+ * Weekly hours structure for locations.
+ * Keys are Monday dates in YYYY-MM-DD format (in the location's timezone).
+ * Values are daily hours or null for closed days.
+ *
+ * CRITICAL: Week keys MUST be calculated using getMondayOfWeek(date, location.timezone)
+ * from @/utils/dateUtils. Never use UTC or server timezone!
+ */
+export interface WeeklyHours {
+  /**
+   * Week key format: YYYY-MM-DD
+   * MUST be a Monday date calculated in the location's timezone.
+   * Use getMondayOfWeek(date, location.timezone) to generate keys.
+   */
+  [weekStartMonday: string]: WeekHours;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  slug: string;
+  /** IANA timezone identifier (e.g., "America/Chicago") */
+  timezone: string;
+  status: 'active' | 'inactive';
+  cover_enabled: boolean;
+  cover_price: number;
+  booking_start_date?: string | null;
+  booking_end_date?: string | null;
+  /**
+   * Week-specific hours. Falls back to settings.operating_hours if null.
+   * Keys are Monday dates in the location's timezone (YYYY-MM-DD).
+   */
+  weekly_hours?: WeeklyHours | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ========================================
 // Campaign Types
 // ========================================
 
 export type CampaignTriggerType =
+  | 'member_signup'
+  | 'member_birthday'
+  | 'member_renewal'
+  | 'reservation'
+  | 'reservation_time'
   | 'reservation_created'
   | 'reservation_reminder'
   | 'recurring'
@@ -111,13 +182,22 @@ export interface Campaign {
   id: string;
   name: string;
   trigger_type: CampaignTriggerType;
-  active: boolean;
+  is_active: boolean;
   description?: string;
   recurring_schedule?: RecurringSchedule;
   recurring_start_date?: string;
   recurring_end_date?: string;
+  applies_to_all_locations?: boolean;
   created_at: string;
   updated_at?: string;
+  campaign_locations?: CampaignLocation[];
+}
+
+export interface CampaignLocation {
+  campaign_id: string;
+  location_id: string;
+  created_at: string;
+  location?: Location | null; // Explicitly nullable since it's a joined relationship
 }
 
 export interface RecurringSchedule {

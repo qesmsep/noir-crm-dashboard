@@ -339,6 +339,70 @@ export function parseNaturalDate(dateStr: string | null | undefined, timezone: T
   return null;
 }
 
+/**
+ * Get the Monday of the week for a given date in the specified timezone.
+ * This is used as the key for weekly_hours data in the locations table.
+ *
+ * CRITICAL: Always pass the location's timezone to ensure correct week calculation.
+ * Using UTC or server timezone will cause incorrect hours to display!
+ *
+ * @param date - The date to find the Monday for (defaults to now)
+ * @param timezone - The timezone to calculate in (defaults to America/Chicago)
+ * @returns Monday date in YYYY-MM-DD format in the specified timezone
+ *
+ * @example
+ * // Get current week's Monday for a Chicago location
+ * getMondayOfWeek(new Date(), 'America/Chicago')
+ * // => "2026-05-05"
+ *
+ * // IMPORTANT: Always use the location's timezone!
+ * getMondayOfWeek(new Date(), location.timezone)
+ *
+ * // Edge case: Sunday 11:30 PM Chicago = Monday 5:30 AM UTC
+ * // Using location timezone: returns "2026-05-05" (correct - this week's Monday)
+ * // Using UTC: would return "2026-05-12" (WRONG - next week's Monday!)
+ */
+export function getMondayOfWeek(
+  date: DateInput = new Date(),
+  timezone: TimeZone = DEFAULT_TIMEZONE
+): string {
+  // Convert to DateTime in the location's timezone
+  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date as Date);
+
+  // Get the start of the week (Monday) in that timezone
+  // Luxon weekdays: 1=Monday, 7=Sunday
+  const monday = dt.setZone(timezone).startOf('week');
+
+  // Return in YYYY-MM-DD format (ISO date format)
+  return monday.toFormat('yyyy-LL-dd');
+}
+
+/**
+ * Get the current week's hours for a location, falling back to global settings.
+ *
+ * @param location - Location object with weekly_hours and timezone
+ * @param globalSettings - Global settings with operating_hours fallback
+ * @param date - Date to check (defaults to now)
+ * @returns Hours object for the week, or null if no hours are set
+ *
+ * @example
+ * const location = await getLocationBySlug('rooftopkc');
+ * const hours = getLocationWeeklyHours(location, settings);
+ *
+ * if (hours?.thursday) {
+ *   console.log(`Open Thursday ${hours.thursday.open} - ${hours.thursday.close}`);
+ * }
+ */
+export function getLocationWeeklyHours(
+  location: { weekly_hours?: Record<string, any>; timezone: string },
+  globalSettings: { operating_hours?: any },
+  date: DateInput = new Date()
+): any {
+  const weekStart = getMondayOfWeek(date, location.timezone);
+  const weeklyHours = location.weekly_hours?.[weekStart];
+  return weeklyHours ?? globalSettings.operating_hours ?? null;
+}
+
 // Backward compatibility functions
 export function toZone(date: Date, timezone: TimeZone = DEFAULT_TIMEZONE): Date {
   const dt = DateTime.fromJSDate(date).setZone(timezone);
