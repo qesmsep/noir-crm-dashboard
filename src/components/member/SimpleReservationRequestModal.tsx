@@ -156,6 +156,9 @@ export default function SimpleReservationRequestModal({
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
 
+  // Time picker modal state
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   // Location hours state (weekly_hours with fallback to base_hours)
   const [locationHours, setLocationHours] = useState<any>(null);
   const [loadingHours, setLoadingHours] = useState(true);
@@ -428,8 +431,8 @@ export default function SimpleReservationRequestModal({
     return () => abortController.abort();
   };
 
-  // Filter time slots based on selected date and blocked times
-  const getAvailableTimeSlots = () => {
+  // Get all time slots for the selected date
+  const getAllTimeSlots = () => {
     if (!date || !locationHours) return [];
 
     // Get hours for the selected date (weekly hours or base hours)
@@ -452,6 +455,13 @@ export default function SimpleReservationRequestModal({
       const slots = generateTimeSlots(startHour, endHour);
       allSlots.push(...slots);
     });
+
+    return allSlots;
+  };
+
+  // Filter time slots based on selected date and blocked times
+  const getAvailableTimeSlots = () => {
+    const allSlots = getAllTimeSlots();
 
     // Filter out blocked times
     return allSlots.filter((slot) => {
@@ -482,6 +492,7 @@ export default function SimpleReservationRequestModal({
     });
   };
 
+  const allTimeSlots = getAllTimeSlots();
   const availableTimeSlots = getAvailableTimeSlots();
 
   // Payment Step Component for non-members
@@ -901,6 +912,83 @@ export default function SimpleReservationRequestModal({
         }
       `}</style>
       <div id="datepicker-portal" />
+
+      {/* Time Picker Modal */}
+      {showTimePicker && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+          }}
+          onClick={() => setShowTimePicker(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '10px',
+              padding: '1.5rem',
+              maxWidth: '90vw',
+              width: '400px',
+              maxHeight: '60vh',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.4)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              maxHeight: '50vh',
+              overflowY: 'auto',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr 1fr',
+              gap: '0.5rem',
+            }}>
+              {allTimeSlots.map((slot) => {
+                const isAvailable = availableTimeSlots.includes(slot);
+                return (
+                  <button
+                    key={slot}
+                    onClick={() => {
+                      if (!isAvailable) return;
+                      setTime(slot);
+                      setShowTimePicker(false);
+                    }}
+                    disabled={!isAvailable}
+                    style={{
+                      padding: '0.5rem',
+                      border: time === slot ? '2px solid #A59480' : '1px solid #D1D5DB',
+                      borderRadius: '8px',
+                      backgroundColor: !isAvailable ? '#F3F4F6' : time === slot ? '#F9FAFB' : 'white',
+                      fontSize: '0.75rem',
+                      cursor: isAvailable ? 'pointer' : 'not-allowed',
+                      textAlign: 'center',
+                      fontWeight: time === slot ? '600' : '400',
+                      aspectRatio: '1',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: '1.2',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      opacity: isAvailable ? 1 : 0.4,
+                      color: isAvailable ? 'inherit' : '#9CA3AF',
+                    }}
+                  >
+                    <div>{slot.replace(/ (AM|PM)/, '')}</div>
+                    <div style={{ fontSize: '0.625rem' }}>{slot.match(/(AM|PM)/)?.[0]}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           position: 'fixed',
@@ -1140,6 +1228,7 @@ export default function SimpleReservationRequestModal({
                 customInput={
                   <input
                     readOnly
+                    inputMode="none"
                     style={{
                       width: '100%',
                       height: '44px',
@@ -1158,9 +1247,15 @@ export default function SimpleReservationRequestModal({
 
             {/* Time Select */}
             <div style={{ flex: '0 0 35%' }}>
-              <select
+              <input
+                readOnly
+                inputMode="none"
                 value={time}
-                onChange={(e) => setTime(e.target.value)}
+                placeholder={loadingTimes ? 'Loading times...' : availableTimeSlots.length === 0 && date ? 'No times available' : 'Time*'}
+                onClick={() => {
+                  if (!date || loadingTimes || availableTimeSlots.length === 0) return;
+                  setShowTimePicker(true);
+                }}
                 disabled={!date || loadingTimes || availableTimeSlots.length === 0}
                 style={{
                   width: '100%',
@@ -1174,16 +1269,7 @@ export default function SimpleReservationRequestModal({
                   cursor: !date || loadingTimes || availableTimeSlots.length === 0 ? 'not-allowed' : 'pointer',
                   opacity: !date || loadingTimes || availableTimeSlots.length === 0 ? 0.6 : 1,
                 }}
-              >
-                <option value="">
-                  {loadingTimes ? 'Loading times...' : availableTimeSlots.length === 0 && date ? 'No times available' : 'Time*'}
-                </option>
-                {availableTimeSlots.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {slot}
-                  </option>
-                ))}
-              </select>
+              />
               {date && !loadingTimes && availableTimeSlots.length === 0 && (
                 <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#EF4444' }}>
                   No times available on this date. Please select another date.
