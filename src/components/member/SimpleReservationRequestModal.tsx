@@ -1151,6 +1151,8 @@ export default function SimpleReservationRequestModal({
                       cursor: 'pointer',
                     }}
                     readOnly
+                    inputMode="none"
+                    onFocus={(e) => e.target.blur()}
                   />
                 }
                 popperPlacement="bottom-start"
