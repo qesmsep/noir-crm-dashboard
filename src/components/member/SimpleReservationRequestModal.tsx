@@ -91,12 +91,10 @@ const getHoursForDate = (date: Date, locationHours: any): Array<{ start: string;
       return null;
     }
 
-    // Date is in a different week - weekly hours don't apply, return null
-    // (Don't fall back to base hours when weekly hours are set for the current week)
-    return null;
+    // Date is in a different week - fall through to base hours
   }
 
-  // Fall back to base hours (only when no weekly hours are set at all)
+  // Fall back to base hours (when no weekly hours are set, or date is in a different week)
   if (locationHours.baseHours && locationHours.baseHours.length > 0) {
     const baseHoursForDay = locationHours.baseHours.filter((h: any) => h.day_of_week === dayOfWeek);
     if (baseHoursForDay.length > 0 && baseHoursForDay[0].time_ranges) {
