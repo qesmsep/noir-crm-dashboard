@@ -2,6 +2,15 @@ import React from 'react';
 import CalendarAvailabilityControl from './CalendarAvailabilityControl';
 import styles from '../styles/Settings.module.css';
 
+// Constants
+const DURATION_MIN = 0.5;
+const DURATION_MAX = 8;
+const DURATION_STEP = 0.5;
+const DURATION_DEFAULT = 2.0;
+const COVER_PRICE_MIN = 0;
+const COVER_PRICE_MAX = 100;
+const TIMEZONE = 'America/Chicago';
+
 interface LocationSettingsTabProps {
   locationSlug: 'noirkc' | 'rooftopkc';
   locationName: string;
@@ -37,6 +46,24 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
   message,
   onSave,
 }) => {
+  // Validation helpers
+  const isValidUrl = (url: string): boolean => {
+    if (!url) return true; // Empty is valid
+    try {
+      new URL(url);
+      return url.startsWith('http://') || url.startsWith('https://');
+    } catch {
+      return false;
+    }
+  };
+
+  const isValidPhone = (phone: string): boolean => {
+    if (!phone) return true; // Empty is valid
+    // Basic validation: 10 digits
+    const cleaned = phone.replace(/\D/g, '');
+    return cleaned.length === 10;
+  };
+
   return (
     <div className={styles.sections}>
       <div className={styles.card}>
@@ -44,37 +71,27 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
         <p className={styles.cardDescription}>
           Configure location-specific settings for {locationName} including booking windows, hours, and cover charges.
         </p>
+
+        {/* Single message display at top */}
+        {message && (
+          <div className={`${styles.message} ${styles[message.type]}`} style={{ marginTop: '1rem' }}>
+            {message.text}
+          </div>
+        )}
       </div>
 
       {/* Hours & Booking Configuration */}
       <div className={styles.card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h2 className={styles.cardTitle} style={{ marginBottom: '0.5rem' }}>Hours & Booking Configuration</h2>
-            <p className={styles.inputHint} style={{ margin: 0 }}>
-              Configure reservation availability, operating hours, and booking window for {locationName}.
-            </p>
-          </div>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className={`${styles.saveButton} ${saving ? styles.saving : ''}`}
-            style={{ width: 'auto', minWidth: '200px' }}
-          >
-            {saving ? 'Saving...' : `Save ${locationName} Settings`}
-          </button>
-        </div>
-        {message && (
-          <div className={`${styles.message} ${styles[message.type]}`} style={{ marginBottom: '1.5rem' }}>
-            {message.text}
-          </div>
-        )}
+        <h2 className={styles.cardTitle}>Hours & Booking Configuration</h2>
+        <p className={styles.inputHint} style={{ marginBottom: '1.5rem' }}>
+          Configure reservation availability, operating hours, and booking window for {locationName}.
+        </p>
 
         {/* Booking Window and Default Reservation Duration */}
-        <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <div className={styles.locationSettingsRow}>
           {/* Booking Window */}
-          <div style={{ flex: '1', minWidth: '300px' }}>
-            <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
+          <div className={styles.locationSettingsColumn}>
+            <h3 className={styles.subsectionTitle}>Booking Window</h3>
             <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
               Reservations can be made within this date range.
             </p>
@@ -82,37 +99,44 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
           </div>
 
           {/* Default Reservation Duration */}
-          <div style={{ flex: '0 1 300px' }}>
-            <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Default Reservation Duration</h3>
+          <div className={styles.locationSettingsDurationColumn}>
+            <h3 className={styles.subsectionTitle}>Default Reservation Duration</h3>
             <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
               Default length of time for reservations.
             </p>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Duration (hours)</label>
+              <label className={styles.label} htmlFor={`duration-${locationSlug}`}>
+                Duration (hours)
+              </label>
               <div className={styles.numberInput}>
                 <button
                   type="button"
-                  onClick={() => setDuration(Math.max(0.5, duration - 0.5))}
+                  onClick={() => setDuration(Math.max(DURATION_MIN, duration - DURATION_STEP))}
                   className={styles.numberButton}
+                  aria-label="Decrease duration"
                 >
                   −
                 </button>
                 <input
+                  id={`duration-${locationSlug}`}
                   type="number"
                   className={styles.numberInputField}
                   value={duration}
                   onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 2.0;
-                    setDuration(Math.max(0.5, Math.min(8, value)));
+                    const value = parseFloat(e.target.value) || DURATION_DEFAULT;
+                    setDuration(Math.max(DURATION_MIN, Math.min(DURATION_MAX, value)));
                   }}
-                  min="0.5"
-                  max="8"
-                  step="0.5"
+                  min={DURATION_MIN}
+                  max={DURATION_MAX}
+                  step={DURATION_STEP}
+                  aria-valuemin={DURATION_MIN}
+                  aria-valuemax={DURATION_MAX}
                 />
                 <button
                   type="button"
-                  onClick={() => setDuration(Math.min(8, duration + 0.5))}
+                  onClick={() => setDuration(Math.min(DURATION_MAX, duration + DURATION_STEP))}
                   className={styles.numberButton}
+                  aria-label="Increase duration"
                 >
                   +
                 </button>
@@ -125,10 +149,10 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
         </div>
 
         {/* Base Hours and Weekly Hours */}
-        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+        <div className={styles.locationSettingsRow}>
           {/* Base Hours */}
-          <div style={{ flex: '1', minWidth: '350px' }}>
-            <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Base Hours</h3>
+          <div className={styles.locationSettingsColumn}>
+            <h3 className={styles.subsectionTitle}>Base Hours</h3>
             <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
               Standard operating hours for {locationName} reservations.
             </p>
@@ -136,8 +160,8 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
           </div>
 
           {/* Weekly Hours */}
-          <div style={{ flex: '1', minWidth: '350px' }}>
-            <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Weekly Hours</h3>
+          <div className={styles.locationSettingsColumn}>
+            <h3 className={styles.subsectionTitle}>Weekly Hours</h3>
             <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
               Set hours for the current week. These override base hours and allow week-by-week schedule changes.
             </p>
@@ -163,22 +187,17 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
       <div className={styles.card}>
         <h2 className={styles.cardTitle}>General Configuration</h2>
 
-        {message && (
-          <div className={`${styles.message} ${styles[message.type]}`}>
-            {message.text}
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
+        <div className={styles.locationSettingsGrid}>
           {/* Left Column */}
           <div>
             {/* Cover Charge */}
             <div className={styles.formGroup}>
               <div className={styles.switchRow}>
-                <label className={styles.switchLabel}>
+                <label className={styles.switchLabel} htmlFor={`cover-enabled-${locationSlug}`}>
                   Cover Charge Enabled
                 </label>
                 <button
+                  id={`cover-enabled-${locationSlug}`}
                   type="button"
                   role="switch"
                   aria-checked={coverEnabled}
@@ -195,28 +214,38 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
 
             {coverEnabled && (
               <div className={styles.formGroup}>
-                <label className={styles.label}>Cover Charge Amount ($)</label>
+                <label className={styles.label} htmlFor={`cover-price-${locationSlug}`}>
+                  Cover Charge Amount ($)
+                </label>
                 <div className={styles.numberInput}>
                   <button
                     type="button"
-                    onClick={() => setCoverPrice(Math.max(0, coverPrice - 1))}
+                    onClick={() => setCoverPrice(Math.max(COVER_PRICE_MIN, coverPrice - 1))}
                     className={styles.numberButton}
+                    aria-label="Decrease cover price"
                   >
                     −
                   </button>
                   <input
+                    id={`cover-price-${locationSlug}`}
                     type="number"
                     className={styles.numberInputField}
                     value={coverPrice}
-                    onChange={(e) => setCoverPrice(parseFloat(e.target.value) || 0)}
-                    min="0"
-                    max="100"
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0;
+                      setCoverPrice(Math.max(COVER_PRICE_MIN, Math.min(COVER_PRICE_MAX, value)));
+                    }}
+                    min={COVER_PRICE_MIN}
+                    max={COVER_PRICE_MAX}
                     step="1"
+                    aria-valuemin={COVER_PRICE_MIN}
+                    aria-valuemax={COVER_PRICE_MAX}
                   />
                   <button
                     type="button"
-                    onClick={() => setCoverPrice(Math.min(100, coverPrice + 1))}
+                    onClick={() => setCoverPrice(Math.min(COVER_PRICE_MAX, coverPrice + 1))}
                     className={styles.numberButton}
+                    aria-label="Increase cover price"
                   >
                     +
                   </button>
@@ -229,17 +258,25 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
 
             {/* Admin Notification Phone */}
             <div className={styles.formGroup}>
-              <label className={styles.label}>Admin Notification Phone</label>
+              <label className={styles.label} htmlFor={`admin-phone-${locationSlug}`}>
+                Admin Notification Phone
+              </label>
               <input
+                id={`admin-phone-${locationSlug}`}
                 type="tel"
-                className={styles.input}
+                className={`${styles.input} ${adminPhone && !isValidPhone(adminPhone) ? styles.inputError : ''}`}
                 value={adminPhone}
                 onChange={(e) => setAdminPhone(e.target.value)}
                 placeholder="9137774488"
+                inputMode="tel"
+                pattern="[0-9]{10}"
               />
               <p className={styles.inputHint}>
-                SMS notifications for reservations (auto-adds +1 prefix)
+                SMS notifications for reservations (10 digits, auto-adds +1 prefix)
               </p>
+              {adminPhone && !isValidPhone(adminPhone) && (
+                <p className={styles.errorText}>Please enter a valid 10-digit phone number</p>
+              )}
             </div>
           </div>
 
@@ -247,10 +284,13 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
           <div>
             {/* Minaka Calendar */}
             <div className={styles.formGroup}>
-              <label className={styles.label}>Minaka Calendar iCal URL</label>
+              <label className={styles.label} htmlFor={`minaka-url-${locationSlug}`}>
+                Minaka Calendar iCal URL
+              </label>
               <input
-                type="text"
-                className={styles.input}
+                id={`minaka-url-${locationSlug}`}
+                type="url"
+                className={`${styles.input} ${minakaUrl && !isValidUrl(minakaUrl) ? styles.inputError : ''}`}
                 value={minakaUrl}
                 onChange={(e) => setMinakaUrl(e.target.value)}
                 placeholder="https://www.minaka.app/api/user/calendar/feed.ics?token=..."
@@ -258,33 +298,29 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
               <p className={styles.inputHint}>
                 iCal feed URL from Minaka to sync events
               </p>
+              {minakaUrl && !isValidUrl(minakaUrl) && (
+                <p className={styles.errorText}>Please enter a valid URL starting with http:// or https://</p>
+              )}
             </div>
 
             {/* Timezone */}
             <div className={styles.formGroup}>
-              <label className={styles.label}>Timezone</label>
+              <label className={styles.label} htmlFor={`timezone-${locationSlug}`}>
+                Timezone
+              </label>
               <input
+                id={`timezone-${locationSlug}`}
                 type="text"
                 className={styles.input}
-                value="America/Chicago"
+                value={TIMEZONE}
                 readOnly
-                placeholder="America/Chicago"
+                placeholder={TIMEZONE}
               />
               <p className={styles.inputHint}>
                 {locationName} timezone (currently read-only)
               </p>
             </div>
           </div>
-        </div>
-
-        <div className={styles.formActions} style={{ marginTop: '1.5rem' }}>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className={`${styles.saveButton} ${saving ? styles.saving : ''}`}
-          >
-            {saving ? 'Saving...' : `Save ${locationName} Settings`}
-          </button>
         </div>
       </div>
 
@@ -293,6 +329,19 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
         <p className={styles.cardDescription} style={{ fontSize: '0.875rem', color: '#6e6e73', fontStyle: 'italic', margin: 0 }}>
           <strong>Priority Order:</strong> Private Events → Custom Open Days → Booking Window → Custom Closed Days → Weekly Hours → Base Hours
         </p>
+      </div>
+
+      {/* Single Save Button at Bottom */}
+      <div className={styles.card}>
+        <div className={styles.formActions}>
+          <button
+            onClick={onSave}
+            disabled={saving || (adminPhone && !isValidPhone(adminPhone)) || (minakaUrl && !isValidUrl(minakaUrl))}
+            className={`${styles.saveButton} ${saving ? styles.saving : ''}`}
+          >
+            {saving ? 'Saving...' : `Save ${locationName} Settings`}
+          </button>
+        </div>
       </div>
     </div>
   );

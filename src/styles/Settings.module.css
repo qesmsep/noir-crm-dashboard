@@ -562,3 +562,39 @@
     padding-top: 1.5rem;
   }
 }
+
+/* Location Settings Layout */
+.locationSettingsRow {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.locationSettingsColumn {
+  flex: 1;
+  min-width: 300px;
+}
+
+.locationSettingsDurationColumn {
+  flex: 0 1 300px;
+}
+
+.locationSettingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 1.5rem;
+}
+
+/* Input Error States */
+.inputError {
+  border-color: #ff3b30 !important;
+  background-color: rgba(255, 59, 48, 0.05);
+}
+
+.errorText {
+  color: #c41e3a;
+  font-size: 0.8125rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
