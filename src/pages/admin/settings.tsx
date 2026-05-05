@@ -79,6 +79,7 @@ export default function Settings() {
   const [noirKCCoverEnabled, setNoirKCCoverEnabled] = useState(false);
   const [noirKCCoverPrice, setNoirKCCoverPrice] = useState(0);
   const [noirKCMinakaUrl, setNoirKCMinakaUrl] = useState('');
+  const [noirKCDuration, setNoirKCDuration] = useState(2.0);
   const [noirKCSaving, setNoirKCSaving] = useState(false);
   const [noirKCMessage, setNoirKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -86,6 +87,7 @@ export default function Settings() {
   const [rooftopKCCoverEnabled, setRooftopKCCoverEnabled] = useState(false);
   const [rooftopKCCoverPrice, setRooftopKCCoverPrice] = useState(0);
   const [rooftopKCMinakaUrl, setRooftopKCMinakaUrl] = useState('');
+  const [rooftopKCDuration, setRooftopKCDuration] = useState(2.0);
   const [rooftopKCSaving, setRooftopKCSaving] = useState(false);
   const [rooftopKCMessage, setRooftopKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -99,7 +101,7 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url')
+          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours')
           .eq('slug', 'noirkc')
           .single();
 
@@ -107,6 +109,7 @@ export default function Settings() {
           setNoirKCCoverEnabled(data.cover_enabled || false);
           setNoirKCCoverPrice(data.cover_price || 0);
           setNoirKCMinakaUrl(data.minaka_ical_url || '');
+          setNoirKCDuration(data.default_reservation_duration_hours || 2.0);
         }
       } catch (error) {
         console.error('Error fetching Noir KC settings:', error);
@@ -121,7 +124,7 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url')
+          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours')
           .eq('slug', 'rooftopkc')
           .single();
 
@@ -129,6 +132,7 @@ export default function Settings() {
           setRooftopKCCoverEnabled(data.cover_enabled || false);
           setRooftopKCCoverPrice(data.cover_price || 0);
           setRooftopKCMinakaUrl(data.minaka_ical_url || '');
+          setRooftopKCDuration(data.default_reservation_duration_hours || 2.0);
         }
       } catch (error) {
         console.error('Error fetching RooftopKC settings:', error);
@@ -148,6 +152,7 @@ export default function Settings() {
           cover_enabled: noirKCCoverEnabled,
           cover_price: noirKCCoverPrice,
           minaka_ical_url: noirKCMinakaUrl,
+          default_reservation_duration_hours: noirKCDuration,
         })
         .eq('slug', 'noirkc');
 
@@ -167,20 +172,31 @@ export default function Settings() {
     setRooftopKCMessage(null);
 
     try {
-      const { error } = await supabaseAdmin
+      console.log('💾 Saving RooftopKC settings:', {
+        cover_enabled: rooftopKCCoverEnabled,
+        cover_price: rooftopKCCoverPrice,
+        minaka_ical_url: rooftopKCMinakaUrl,
+        default_reservation_duration_hours: rooftopKCDuration,
+      });
+
+      const { data, error } = await supabaseAdmin
         .from('locations')
         .update({
           cover_enabled: rooftopKCCoverEnabled,
           cover_price: rooftopKCCoverPrice,
           minaka_ical_url: rooftopKCMinakaUrl,
+          default_reservation_duration_hours: rooftopKCDuration,
         })
-        .eq('slug', 'rooftopkc');
+        .eq('slug', 'rooftopkc')
+        .select();
+
+      console.log('💾 Save result:', { data, error });
 
       if (error) throw error;
 
       setRooftopKCMessage({ type: 'success', text: 'RooftopKC settings saved successfully' });
     } catch (error: any) {
-      console.error('Error saving RooftopKC settings:', error);
+      console.error('❌ Error saving RooftopKC settings:', error);
       setRooftopKCMessage({ type: 'error', text: error.message || 'Failed to save settings' });
     } finally {
       setRooftopKCSaving(false);
@@ -559,31 +575,100 @@ export default function Settings() {
               </p>
             </div>
 
-            {/* Booking Window */}
+            {/* Hours & Booking Configuration */}
             <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Booking Window</h2>
-              <p className={styles.inputHint}>
-                Set booking availability window for Noir KC. Members can only book reservations within this date range.
+              <h2 className={styles.cardTitle}>Hours & Booking Configuration</h2>
+              <p className={styles.inputHint} style={{ marginBottom: '2rem' }}>
+                Configure reservation availability, operating hours, and booking window for Noir KC.
               </p>
-              <CalendarAvailabilityControl section="booking_window" locationSlug="noirkc" />
-            </div>
 
-            {/* Base Hours */}
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Base Hours</h2>
-              <p className={styles.inputHint}>
-                Configure operating hours for Noir KC reservations.
-              </p>
-              <CalendarAvailabilityControl section="base" locationSlug="noirkc" />
-            </div>
+              {/* Booking Window */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
+                <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                  Members can only book reservations within this date range.
+                </p>
+                <CalendarAvailabilityControl section="booking_window" locationSlug="noirkc" />
+              </div>
 
-            {/* Weekly Hours */}
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Weekly Hours</h2>
-              <p className={styles.inputHint}>
-                Set hours for the current week. These override base hours and allow week-by-week schedule changes.
-              </p>
-              <CalendarAvailabilityControl section="weekly" locationSlug="noirkc" />
+              {/* Base Hours and Weekly Hours */}
+              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                {/* Base Hours */}
+                <div style={{ flex: '1', minWidth: '350px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Base Hours</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Standard operating hours for Noir KC reservations.
+                  </p>
+                  <CalendarAvailabilityControl section="base" locationSlug="noirkc" />
+                </div>
+
+                {/* Weekly Hours Column */}
+                <div style={{ flex: '1', minWidth: '350px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {/* Default Reservation Duration */}
+                  <div>
+                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Default Reservation Duration</h3>
+                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                      Default length of time for reservations.
+                    </p>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Duration (hours)</label>
+                      <div className={styles.numberInput}>
+                        <button
+                          type="button"
+                          onClick={() => setNoirKCDuration(Math.max(0.5, noirKCDuration - 0.5))}
+                          className={styles.numberButton}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          className={styles.numberInputField}
+                          value={noirKCDuration}
+                          onChange={(e) => setNoirKCDuration(parseFloat(e.target.value) || 2.0)}
+                          min="0.5"
+                          max="8"
+                          step="0.5"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setNoirKCDuration(Math.min(8, noirKCDuration + 0.5))}
+                          className={styles.numberButton}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className={styles.inputHint}>
+                        E.g., 1.5, 2.0, 2.5 hours
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Weekly Hours */}
+                  <div>
+                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Weekly Hours</h3>
+                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                      Set hours for the current week. These override base hours and allow week-by-week schedule changes.
+                    </p>
+                    <CalendarAvailabilityControl section="weekly" locationSlug="noirkc" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button for Hours & Booking Configuration */}
+              <div className={styles.formActions} style={{ marginTop: '2rem' }}>
+                {noirKCMessage && (
+                  <div className={`${styles.message} ${styles[noirKCMessage.type]}`}>
+                    {noirKCMessage.text}
+                  </div>
+                )}
+                <button
+                  onClick={handleNoirKCSave}
+                  disabled={noirKCSaving}
+                  className={`${styles.saveButton} ${noirKCSaving ? styles.saving : ''}`}
+                >
+                  {noirKCSaving ? 'Saving...' : 'Save Noir KC Settings'}
+                </button>
+              </div>
             </div>
 
             {/* Custom Open/Closed Days */}
@@ -717,31 +802,100 @@ export default function Settings() {
               </p>
             </div>
 
-            {/* Booking Window */}
+            {/* Hours & Booking Configuration */}
             <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Booking Window</h2>
-              <p className={styles.inputHint}>
-                Set booking availability window for RooftopKC. Members can only book reservations within this date range.
+              <h2 className={styles.cardTitle}>Hours & Booking Configuration</h2>
+              <p className={styles.inputHint} style={{ marginBottom: '2rem' }}>
+                Configure reservation availability, operating hours, and booking window for RooftopKC.
               </p>
-              <CalendarAvailabilityControl section="booking_window" locationSlug="rooftopkc" />
-            </div>
 
-            {/* Base Hours */}
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Base Hours</h2>
-              <p className={styles.inputHint}>
-                Configure operating hours for RooftopKC reservations.
-              </p>
-              <CalendarAvailabilityControl section="base" locationSlug="rooftopkc" />
-            </div>
+              {/* Booking Window */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Booking Window</h3>
+                <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                  Members can only book reservations within this date range.
+                </p>
+                <CalendarAvailabilityControl section="booking_window" locationSlug="rooftopkc" />
+              </div>
 
-            {/* Weekly Hours */}
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Weekly Hours</h2>
-              <p className={styles.inputHint}>
-                Set hours for the current week. These override base hours and allow week-by-week schedule changes.
-              </p>
-              <CalendarAvailabilityControl section="weekly" locationSlug="rooftopkc" />
+              {/* Base Hours and Weekly Hours */}
+              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                {/* Base Hours */}
+                <div style={{ flex: '1', minWidth: '350px' }}>
+                  <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Base Hours</h3>
+                  <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                    Standard operating hours for RooftopKC reservations.
+                  </p>
+                  <CalendarAvailabilityControl section="base" locationSlug="rooftopkc" />
+                </div>
+
+                {/* Weekly Hours Column */}
+                <div style={{ flex: '1', minWidth: '350px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {/* Default Reservation Duration */}
+                  <div>
+                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Default Reservation Duration</h3>
+                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                      Default length of time for reservations.
+                    </p>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Duration (hours)</label>
+                      <div className={styles.numberInput}>
+                        <button
+                          type="button"
+                          onClick={() => setRooftopKCDuration(Math.max(0.5, rooftopKCDuration - 0.5))}
+                          className={styles.numberButton}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          className={styles.numberInputField}
+                          value={rooftopKCDuration}
+                          onChange={(e) => setRooftopKCDuration(parseFloat(e.target.value) || 2.0)}
+                          min="0.5"
+                          max="8"
+                          step="0.5"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setRooftopKCDuration(Math.min(8, rooftopKCDuration + 0.5))}
+                          className={styles.numberButton}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className={styles.inputHint}>
+                        E.g., 1.5, 2.0, 2.5 hours
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Weekly Hours */}
+                  <div>
+                    <h3 className={styles.subsectionTitle} style={{ marginBottom: '0.5rem' }}>Weekly Hours</h3>
+                    <p className={styles.inputHint} style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+                      Set hours for the current week. These override base hours and allow week-by-week schedule changes.
+                    </p>
+                    <CalendarAvailabilityControl section="weekly" locationSlug="rooftopkc" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button for Hours & Booking Configuration */}
+              <div className={styles.formActions} style={{ marginTop: '2rem' }}>
+                {rooftopKCMessage && (
+                  <div className={`${styles.message} ${styles[rooftopKCMessage.type]}`}>
+                    {rooftopKCMessage.text}
+                  </div>
+                )}
+                <button
+                  onClick={handleRooftopKCSave}
+                  disabled={rooftopKCSaving}
+                  className={`${styles.saveButton} ${rooftopKCSaving ? styles.saving : ''}`}
+                >
+                  {rooftopKCSaving ? 'Saving...' : 'Save RooftopKC Settings'}
+                </button>
+              </div>
             </div>
 
             {/* Custom Open/Closed Days */}

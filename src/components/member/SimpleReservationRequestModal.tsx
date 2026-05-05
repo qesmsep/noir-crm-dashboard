@@ -147,6 +147,9 @@ export default function SimpleReservationRequestModal({
   const [coverEnabled, setCoverEnabled] = useState(false);
   const [coverPrice, setCoverPrice] = useState(0);
 
+  // Reservation duration state
+  const [reservationDuration, setReservationDuration] = useState(2.0);
+
   // Booking window state
   const [bookingStartDate, setBookingStartDate] = useState<Date | null>(null);
   const [bookingEndDate, setBookingEndDate] = useState<Date | null>(null);
@@ -351,13 +354,14 @@ export default function SimpleReservationRequestModal({
         // Use public_locations view to avoid exposing minaka_ical_url tokens
         const { data: locationData } = await supabase
           .from('public_locations')
-          .select('cover_enabled, cover_price, weekly_hours, id, timezone')
+          .select('cover_enabled, cover_price, weekly_hours, id, timezone, default_reservation_duration_hours')
           .eq('slug', selectedLocation)
           .single();
 
         if (locationData) {
           setCoverEnabled(locationData.cover_enabled || false);
           setCoverPrice(locationData.cover_price || 0);
+          setReservationDuration(locationData.default_reservation_duration_hours || 2.0);
 
           // Get location timezone (fallback to Chicago if not set)
           const timezone = locationData.timezone || 'America/Chicago';
@@ -613,7 +617,7 @@ export default function SimpleReservationRequestModal({
       const startDateTime = DateTime.fromJSDate(date!, { zone: locationTimezone })
         .set({ hour, minute, second: 0, millisecond: 0 });
 
-      const endDateTime = startDateTime.plus({ hours: 2 });
+      const endDateTime = startDateTime.plus({ hours: reservationDuration });
 
       const response = await fetch('/api/reservations', {
         method: 'POST',
@@ -774,8 +778,8 @@ export default function SimpleReservationRequestModal({
       const startDateTime = DateTime.fromJSDate(date, { zone: locationTimezone })
         .set({ hour, minute, second: 0, millisecond: 0 });
 
-      // End time is 2 hours after start
-      const endDateTime = startDateTime.plus({ hours: 2 });
+      // End time is based on location's default reservation duration
+      const endDateTime = startDateTime.plus({ hours: reservationDuration });
 
       // Determine if cover charge applies (enabled AND not a member)
       const coverChargeApplies = coverEnabled && !memberId;

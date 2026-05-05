@@ -1501,18 +1501,35 @@ Thank you.`;
       return res.status(200).end();
     }
 
+    // Fetch default reservation duration from location
+    let reservationDuration = 2.0; // Default fallback
+    try {
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('default_reservation_duration_hours')
+        .eq('slug', 'noirkc')
+        .single();
+
+      if (locationData && locationData.default_reservation_duration_hours) {
+        reservationDuration = locationData.default_reservation_duration_hours;
+      }
+    } catch (error) {
+      console.log('Could not fetch reservation duration, using default 2 hours:', error);
+    }
+
     // Convert parsed local date/time (America/Chicago) to UTC ISO strings
     console.log('=== TIMEZONE CONVERSION ===');
     console.log('Parsed date:', parsed.date);
     console.log('Parsed time:', parsed.time);
     console.log('Default timezone:', DEFAULT_TIMEZONE);
-    
+    console.log('Reservation duration (hours):', reservationDuration);
+
     const localDt = DateTime.fromISO(`${parsed.date}T${parsed.time}`, { zone: DEFAULT_TIMEZONE });
     console.log('Local DateTime object:', localDt.toISO());
     console.log('Local DateTime in CST:', localDt.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ'));
-    
+
     const start_time = localDt.toUTC().toISO();
-    const end_time = localDt.plus({ hours: 2 }).toUTC().toISO();
+    const end_time = localDt.plus({ hours: reservationDuration }).toUTC().toISO();
     
     console.log('Start time (UTC):', start_time);
     console.log('End time (UTC):', end_time);
