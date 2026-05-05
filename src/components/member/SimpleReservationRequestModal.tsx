@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { DateTime } from 'luxon';
-import { X } from 'lucide-react';
+import { X, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -28,6 +28,7 @@ interface Props {
    * @default false
    */
   adminOverride?: boolean;
+  onBack?: () => void;
 }
 
 // Generate time options
@@ -119,6 +120,7 @@ export default function SimpleReservationRequestModal({
   locationSlug,
   hideTableSelection = false,
   adminOverride = false,
+  onBack,
 }: Props) {
   const { toast } = useToast();
   const [date, setDate] = useState<Date | null>(null);
@@ -139,6 +141,7 @@ export default function SimpleReservationRequestModal({
 
   // Location state - defaults to prop, but user can change
   const [selectedLocation, setSelectedLocation] = useState(locationSlug || 'noirkc');
+  const [locationName, setLocationName] = useState<string>('');
 
   // Cover charge state
   const [coverEnabled, setCoverEnabled] = useState(false);
@@ -177,6 +180,37 @@ export default function SimpleReservationRequestModal({
       setSelectedLocation(locationSlug);
     }
   }, [locationSlug]);
+
+  // Fetch location display name
+  useEffect(() => {
+    const fetchLocationName = async () => {
+      if (!selectedLocation) return;
+
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const { data, error } = await supabase
+          .from('locations')
+          .select('name')
+          .eq('slug', selectedLocation)
+          .single();
+
+        if (data && !error) {
+          setLocationName(data.name);
+        }
+      } catch (error) {
+        console.error('Error fetching location name:', error);
+      }
+    };
+
+    if (isOpen && selectedLocation) {
+      fetchLocationName();
+    }
+  }, [isOpen, selectedLocation]);
 
   // Fetch booking window for selected location
   useEffect(() => {
@@ -497,52 +531,6 @@ export default function SimpleReservationRequestModal({
 
     return (
       <form onSubmit={handlePaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {/* Cover charge notice with membership link */}
-        <div style={{
-          padding: '1.25rem',
-          backgroundColor: '#F9FAFB',
-          borderLeft: '4px solid #A59480',
-          borderRadius: '8px',
-          fontSize: '0.875rem',
-        }}>
-          <p style={{ margin: '0 0 0.75rem 0', color: '#6B7280', lineHeight: '1.5' }}>
-            ${coverPrice} cover charge per person applies (includes first drink)
-          </p>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              const message = "MEMBERSHIP";
-              const phoneNumber = "9137774488";
-              const url = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-              window.open(url, '_blank');
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#A59480',
-              cursor: 'pointer',
-              padding: 0,
-              font: 'inherit',
-              fontWeight: '600',
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.375rem',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#8C7C6D';
-              e.currentTarget.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#A59480';
-              e.currentTarget.style.textDecoration = 'none';
-            }}
-          >
-            <span>→</span> Become a member and avoid the reservation fee
-          </button>
-        </div>
-
         <div>
           <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1F1F1F' }}>
             Payment Details
@@ -576,46 +564,24 @@ export default function SimpleReservationRequestModal({
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => {
-              setShowPayment(false);
-              setClientSecret(null);
-            }}
-            style={{
-              flex: 1,
-              height: '48px',
-              backgroundColor: '#F3F4F6',
-              color: '#1F1F1F',
-              fontSize: '1rem',
-              fontWeight: '600',
-              borderRadius: '10px',
-              border: '1px solid #D1D5DB',
-              cursor: 'pointer',
-            }}
-          >
-            Back
-          </button>
-          <button
-            type="submit"
-            disabled={!stripe || paymentProcessing}
-            style={{
-              flex: 2,
-              height: '48px',
-              backgroundColor: paymentProcessing ? '#D1D5DB' : '#A59480',
-              color: 'white',
-              fontSize: '1rem',
-              fontWeight: '600',
-              borderRadius: '10px',
-              border: 'none',
-              cursor: paymentProcessing ? 'not-allowed' : 'pointer',
-              boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
-            }}
-          >
-            {paymentProcessing ? 'Processing...' : `Pay $${parseInt(partySize) * coverPrice}`}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={!stripe || paymentProcessing}
+          style={{
+            width: '100%',
+            height: '48px',
+            backgroundColor: paymentProcessing ? '#D1D5DB' : '#A59480',
+            color: 'white',
+            fontSize: '1rem',
+            fontWeight: '600',
+            borderRadius: '10px',
+            border: 'none',
+            cursor: paymentProcessing ? 'not-allowed' : 'pointer',
+            boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
+          }}
+        >
+          {paymentProcessing ? 'Processing...' : `Pay $${parseInt(partySize) * coverPrice}`}
+        </button>
       </form>
     );
   }
@@ -923,13 +889,27 @@ export default function SimpleReservationRequestModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+    <>
+      <style>{`
+        .react-datepicker__portal {
+          position: fixed !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
+          z-index: 10000 !important;
+        }
+        .react-datepicker__portal .react-datepicker {
+          font-size: 0.875rem;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
+        }
+      `}</style>
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.6)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
@@ -955,9 +935,40 @@ export default function SimpleReservationRequestModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
-            {showPayment ? 'Complete Payment' : 'Request a Reservation'}
+        <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {onBack ? (
+            <button
+              onClick={onBack}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.625rem',
+                minWidth: '44px',
+                minHeight: '44px',
+                borderRadius: '0.375rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6B7280',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                e.currentTarget.style.color = '#1F1F1F';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#6B7280';
+              }}
+            >
+              <ArrowLeft size={24} />
+            </button>
+          ) : (
+            <div style={{ width: '44px' }} />
+          )}
+          <h2 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+            {showPayment ? 'Complete Payment' : `Request a Reservation for ${locationName || selectedLocation}`}
           </h2>
           <button
             onClick={onClose}
@@ -1037,22 +1048,6 @@ export default function SimpleReservationRequestModal({
               }}
             />
           </div>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email (Optional)"
-            style={{
-              width: '100%',
-              height: '44px',
-              padding: '0 1rem',
-              border: '1px solid #D1D5DB',
-              borderRadius: '10px',
-              fontSize: '0.875rem',
-              backgroundColor: 'white',
-              outline: 'none',
-            }}
-          />
           <div>
             <input
               type="tel"
@@ -1074,7 +1069,7 @@ export default function SimpleReservationRequestModal({
           </div>
 
           {/* Location Picker - Only show for members */}
-          {memberId ? (
+          {memberId && (
             <div>
               <select
                 value={selectedLocation}
@@ -1095,34 +1090,17 @@ export default function SimpleReservationRequestModal({
                 <option value="rooftopkc">RooftopKC</option>
               </select>
             </div>
-          ) : (
-            /* Location display for non-members */
-            <div style={{
-              width: '100%',
-              padding: '0.75rem 1rem',
-              border: '1px solid #D1D5DB',
-              borderRadius: '10px',
-              backgroundColor: '#F9FAFB',
-            }}>
-              <p style={{
-                fontSize: '0.75rem',
-                color: '#6B7280',
-                margin: '0 0 0.25rem 0',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                Reservation Location
-              </p>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#1F1F1F',
-                fontWeight: '600',
-                margin: 0,
-              }}>
-                {selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC'}
-              </p>
-            </div>
           )}
+
+          {/* Availability Notice */}
+          <div style={{
+            fontSize: '0.8125rem',
+            color: '#374151',
+            textAlign: 'center',
+            lineHeight: '1.5',
+          }}>
+            Due to weather and events, we release our calendar on a week-by-week basis on Mondays.
+          </div>
 
           {/* Date and Time Row */}
           <div style={{ display: 'flex', gap: '1rem' }}>
@@ -1137,6 +1115,10 @@ export default function SimpleReservationRequestModal({
                 dateFormat="MMMM d, yyyy"
                 placeholderText="Date*"
                 openToDate={new Date()}
+                withPortal
+                portalId="datepicker-portal"
+                wrapperClassName="datepicker-wrapper"
+                calendarClassName="simple-calendar"
                 customInput={
                   <input
                     style={{
@@ -1150,13 +1132,8 @@ export default function SimpleReservationRequestModal({
                       outline: 'none',
                       cursor: 'pointer',
                     }}
-                    readOnly
-                    inputMode="none"
-                    onFocus={(e) => e.target.blur()}
                   />
                 }
-                popperPlacement="bottom-start"
-                withPortal={false}
               />
             </div>
 
@@ -1246,24 +1223,16 @@ export default function SimpleReservationRequestModal({
             )}
           </div>
 
-          {/* Special Requests */}
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Special requests or dietary restrictions (optional)"
-            style={{
-              width: '100%',
-              minHeight: '100px',
-              padding: '0.75rem 1rem',
-              border: '1px solid #D1D5DB',
-              borderRadius: '10px',
-              fontSize: '0.875rem',
-              backgroundColor: 'white',
-              outline: 'none',
-              resize: 'vertical',
-              fontFamily: 'inherit',
-            }}
-          />
+          {/* Food Notice */}
+          <div style={{
+            width: '100%',
+            fontSize: '0.875rem',
+            color: '#6B7280',
+            textAlign: 'center',
+            fontWeight: '600',
+          }}>
+            please note, we do not serve food.
+          </div>
 
           {/* Make Reservation Button */}
           {(() => {
@@ -1272,16 +1241,6 @@ export default function SimpleReservationRequestModal({
 
             return (
               <>
-                {!isFormComplete && (
-                  <div style={{
-                    fontSize: '0.875rem',
-                    color: '#EF4444',
-                    marginTop: '0.5rem',
-                    textAlign: 'center'
-                  }}>
-                    Please fill in all required fields (*)
-                  </div>
-                )}
                 <button
                   onClick={handleMakeReservation}
                   disabled={isDisabled}
@@ -1316,5 +1275,6 @@ export default function SimpleReservationRequestModal({
         )}
       </div>
     </div>
+    </>
   );
 }

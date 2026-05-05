@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import { supabase } from '@/lib/supabase';
 import SimpleReservationRequestModal from './member/SimpleReservationRequestModal';
 
 interface Props {
@@ -19,10 +20,30 @@ export default function PublicReservationFlow({
   onReservationCreated,
 }: Props) {
   const { toast } = useToast();
-  const [step, setStep] = useState<'phone' | 'reservation'>('phone');
+  const [step, setStep] = useState<'phone' | 'fee-notice' | 'reservation'>('phone');
   const [phone, setPhone] = useState('');
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const [memberData, setMemberData] = useState<any>(null);
+  const [locationName, setLocationName] = useState<string>(locationSlug);
+
+  // Fetch location display name
+  useEffect(() => {
+    const fetchLocationName = async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('name')
+        .eq('slug', locationSlug)
+        .single();
+
+      if (data && !error) {
+        setLocationName(data.name);
+      }
+    };
+
+    if (isOpen && locationSlug) {
+      fetchLocationName();
+    }
+  }, [isOpen, locationSlug]);
 
   // Format phone number as (XXX)XXX-XXXX
   const formatPhoneNumber = (value: string) => {
@@ -71,8 +92,8 @@ export default function PublicReservationFlow({
           window.location.href = '/member/login';
         }, 2000);
       } else {
-        // Not a member - proceed to reservation form
-        setStep('reservation');
+        // Not a member - show fee notice first
+        setStep('fee-notice');
       }
     } catch (error) {
       console.error('Error checking phone:', error);
@@ -128,9 +149,9 @@ export default function PublicReservationFlow({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
-              Make a Reservation
+          <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+              Make a Reservation for {locationName}
             </h2>
             <button
               onClick={handleClose}
@@ -178,6 +199,18 @@ export default function PublicReservationFlow({
                 outline: 'none',
               }}
             />
+
+            {/* SMS Agreement */}
+            <div style={{
+              fontSize: '0.8125rem',
+              color: '#6B7280',
+              textAlign: 'center',
+              lineHeight: '1.5',
+              marginTop: '0.5rem',
+            }}>
+              By requesting this reservation, you agree to receive SMS messages regarding your reservation. Message and data rates may apply. We are not responsible for carrier charges or delivery failures. You can opt out at any time.
+            </div>
+
             <button
               onClick={handlePhoneSubmit}
               disabled={isCheckingPhone}
@@ -203,7 +236,140 @@ export default function PublicReservationFlow({
     );
   }
 
-  // Step 2: Reservation form (non-members only)
+  // Step 2: Fee notice
+  if (step === 'fee-notice') {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+        }}
+        onClick={handleClose}
+      >
+        <div
+          style={{
+            backgroundColor: '#ECEDE8',
+            borderRadius: '16px',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+            maxWidth: '500px',
+            width: '100%',
+            padding: '2rem',
+            position: 'relative',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+              Reservation Fee
+            </h2>
+            <button
+              onClick={handleClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0.5rem',
+                borderRadius: '0.375rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6B7280',
+                transition: 'all 0.2s',
+              }}
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Fee Notice */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Reservation Fee Section */}
+            <div style={{
+              backgroundColor: 'white',
+              padding: '1.25rem',
+              borderRadius: '10px',
+              border: '1px solid #D1D5DB',
+            }}>
+              <p style={{ fontSize: '0.9375rem', color: '#1F2937', fontWeight: '600', margin: '0 0 0.5rem 0', lineHeight: '1.5', textAlign: 'center' }}>
+                $20/person Reservation Fee
+              </p>
+              <p style={{ fontSize: '0.875rem', color: '#4B5563', margin: '0 0 0.5rem 0', lineHeight: '1.5', textAlign: 'center' }}>
+                (includes first drink)
+              </p>
+              <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '0 0 1rem 0', lineHeight: '1.4', textAlign: 'center' }}>
+                Non-refundable unless cancelled by RooftopKC
+              </p>
+              <button
+                onClick={() => setStep('reservation')}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  backgroundColor: '#A59480',
+                  color: 'white',
+                  fontSize: '0.9375rem',
+                  fontWeight: '600',
+                  borderRadius: '10px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
+                  transition: 'background-color 0.2s',
+                }}
+              >
+                Continue with Reservation
+              </button>
+            </div>
+
+            {/* Membership Benefits Section */}
+            <div style={{
+              backgroundColor: '#F9FAFB',
+              padding: '1.25rem',
+              borderRadius: '12px',
+              border: '1px solid #E5E7EB',
+            }}>
+              <p style={{ fontSize: '0.9375rem', color: '#1F2937', fontWeight: '600', margin: '0 0 0.5rem 0', textAlign: 'center' }}>
+                Request Invitation to Noir
+              </p>
+              <p style={{ fontSize: '0.875rem', color: '#4B5563', margin: '0 0 1rem 0', lineHeight: '1.5', textAlign: 'center' }}>
+                No reservation fee + exclusive benefits
+              </p>
+              <button
+                onClick={() => {
+                  window.location.href = 'sms:9137774488?body=MEMBERSHIP';
+                }}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  backgroundColor: 'white',
+                  color: '#A59480',
+                  fontSize: '0.9375rem',
+                  fontWeight: '600',
+                  borderRadius: '10px',
+                  border: '2px solid #A59480',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Request Membership
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 3: Reservation form (non-members only)
   return (
     <SimpleReservationRequestModal
       isOpen={true}
@@ -211,6 +377,7 @@ export default function PublicReservationFlow({
       memberPhone={phone}
       locationSlug={locationSlug}
       hideTableSelection={true}
+      onBack={() => setStep('fee-notice')}
       onReservationCreated={() => {
         if (onReservationCreated) {
           onReservationCreated();
