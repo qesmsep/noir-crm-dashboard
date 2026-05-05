@@ -473,6 +473,7 @@ export default function RooftopKCHome() {
               <li>• $100 Monthly beverage credit</li>
               <li>• Unused credit rolls over each month</li>
               <li>• No deposit for reservations</li>
+              <li>• RooftopKC Access with no Reservation Fee</li>
               <li>• You + up to 10 guests per visit</li>
               <li>• Curated events & member experiences</li>
               <li>• Concierge Reservations via Text</li>

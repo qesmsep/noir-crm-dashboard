@@ -709,7 +709,7 @@ export default function MemberSubscriptionCard({
               </div>
               <div style={{ fontSize: '0.8125rem', color: '#1F1F1F', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1rem' }}>🎟️</span>
-                <span>RooftopKC Access with <strong>NO Reservation Fee</strong></span>
+                <span>RooftopKC Access with no Reservation Fee</span>
               </div>
             </div>
 
