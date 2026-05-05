@@ -379,10 +379,27 @@ export default function Settings() {
 
             {/* Hours & Booking Configuration */}
             <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Hours & Booking Configuration</h2>
-              <p className={styles.inputHint} style={{ marginBottom: '1.5rem' }}>
-                Configure reservation availability, operating hours, and booking window for Noir KC.
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 className={styles.cardTitle} style={{ marginBottom: '0.5rem' }}>Hours & Booking Configuration</h2>
+                  <p className={styles.inputHint} style={{ margin: 0 }}>
+                    Configure reservation availability, operating hours, and booking window for Noir KC.
+                  </p>
+                </div>
+                <button
+                  onClick={handleNoirKCSave}
+                  disabled={noirKCSaving}
+                  className={`${styles.saveButton} ${noirKCSaving ? styles.saving : ''}`}
+                  style={{ width: 'auto', minWidth: '200px' }}
+                >
+                  {noirKCSaving ? 'Saving...' : 'Save Noir KC Settings'}
+                </button>
+              </div>
+              {noirKCMessage && (
+                <div className={`${styles.message} ${styles[noirKCMessage.type]}`} style={{ marginBottom: '1.5rem' }}>
+                  {noirKCMessage.text}
+                </div>
+              )}
 
               {/* Booking Window and Default Reservation Duration */}
               <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -459,21 +476,6 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Save Button for Hours & Booking Configuration */}
-              <div className={styles.formActions} style={{ marginTop: '1.5rem' }}>
-                {noirKCMessage && (
-                  <div className={`${styles.message} ${styles[noirKCMessage.type]}`}>
-                    {noirKCMessage.text}
-                  </div>
-                )}
-                <button
-                  onClick={handleNoirKCSave}
-                  disabled={noirKCSaving}
-                  className={`${styles.saveButton} ${noirKCSaving ? styles.saving : ''}`}
-                >
-                  {noirKCSaving ? 'Saving...' : 'Save Noir KC Settings'}
-                </button>
-              </div>
             </div>
 
             {/* Custom Open/Closed Days */}
@@ -639,10 +641,27 @@ export default function Settings() {
 
             {/* Hours & Booking Configuration */}
             <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Hours & Booking Configuration</h2>
-              <p className={styles.inputHint} style={{ marginBottom: '1.5rem' }}>
-                Configure reservation availability, operating hours, and booking window for RooftopKC.
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <h2 className={styles.cardTitle} style={{ marginBottom: '0.5rem' }}>Hours & Booking Configuration</h2>
+                  <p className={styles.inputHint} style={{ margin: 0 }}>
+                    Configure reservation availability, operating hours, and booking window for RooftopKC.
+                  </p>
+                </div>
+                <button
+                  onClick={handleRooftopKCSave}
+                  disabled={rooftopKCSaving}
+                  className={`${styles.saveButton} ${rooftopKCSaving ? styles.saving : ''}`}
+                  style={{ width: 'auto', minWidth: '200px' }}
+                >
+                  {rooftopKCSaving ? 'Saving...' : 'Save RooftopKC Settings'}
+                </button>
+              </div>
+              {rooftopKCMessage && (
+                <div className={`${styles.message} ${styles[rooftopKCMessage.type]}`} style={{ marginBottom: '1.5rem' }}>
+                  {rooftopKCMessage.text}
+                </div>
+              )}
 
               {/* Booking Window and Default Reservation Duration */}
               <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -719,21 +738,6 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Save Button for Hours & Booking Configuration */}
-              <div className={styles.formActions} style={{ marginTop: '1.5rem' }}>
-                {rooftopKCMessage && (
-                  <div className={`${styles.message} ${styles[rooftopKCMessage.type]}`}>
-                    {rooftopKCMessage.text}
-                  </div>
-                )}
-                <button
-                  onClick={handleRooftopKCSave}
-                  disabled={rooftopKCSaving}
-                  className={`${styles.saveButton} ${rooftopKCSaving ? styles.saving : ''}`}
-                >
-                  {rooftopKCSaving ? 'Saving...' : 'Save RooftopKC Settings'}
-                </button>
-              </div>
             </div>
 
             {/* Custom Open/Closed Days */}
