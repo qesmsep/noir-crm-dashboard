@@ -1184,24 +1184,45 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                   minDate={new Date()}
                   className="chakra-input"
                 />
-                <HStack>
+                <VStack align="stretch" spacing={2}>
                   {newOpenTimeRanges.map((range, index) => (
-                    <HStack key={index} spacing={1}>
-                      <Input type="time" value={range.start} onChange={e => {
-                        const newRanges = [...newOpenTimeRanges];
-                        newRanges[index].start = e.target.value;
-                        setNewOpenTimeRanges(newRanges);
-                      }} w="110px" />
-                      <Text>to</Text>
-                      <Input type="time" value={range.end} onChange={e => {
-                        const newRanges = [...newOpenTimeRanges];
-                        newRanges[index].end = e.target.value;
-                        setNewOpenTimeRanges(newRanges);
-                      }} w="110px" />
-                    </HStack>
+                    <div key={index} className={styles.timeRow}>
+                      <input
+                        type="time"
+                        value={range.start}
+                        onChange={e => {
+                          const newRanges = [...newOpenTimeRanges];
+                          newRanges[index].start = e.target.value;
+                          setNewOpenTimeRanges(newRanges);
+                        }}
+                        className={styles.timeInput}
+                      />
+                      <span className={styles.timeArrow}>→</span>
+                      <input
+                        type="time"
+                        value={range.end}
+                        onChange={e => {
+                          const newRanges = [...newOpenTimeRanges];
+                          newRanges[index].end = e.target.value;
+                          setNewOpenTimeRanges(newRanges);
+                        }}
+                        className={styles.timeInput}
+                      />
+                      {newOpenTimeRanges.length > 1 && (
+                        <button
+                          onClick={() => {
+                            const newRanges = newOpenTimeRanges.filter((_, i) => i !== index);
+                            setNewOpenTimeRanges(newRanges);
+                          }}
+                          className={styles.deleteButton}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   ))}
                   <Button size="xs" colorScheme="blue" onClick={() => setNewOpenTimeRanges([...newOpenTimeRanges, { start: '18:00', end: '23:00' }])}>+ Add Time Range</Button>
-                </HStack>
+                </VStack>
                 <Input value={newOpenLabel} onChange={e => setNewOpenLabel(e.target.value)} placeholder="Event label (optional)" w="200px" />
                 <Button colorScheme="green" onClick={addExceptionalOpen}>Add Custom Open Day</Button>
               </HStack>
@@ -1216,16 +1237,34 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                           minDate={new Date()}
                           className="chakra-input"
                         />
-                        <HStack>
+                        <VStack align="stretch" spacing={2}>
                           {editingOpen?.time_ranges.map((range: TimeRange, index: number) => (
-                            <HStack key={index} spacing={1}>
-                              <Input type="time" value={range.start} onChange={e => setEditingOpen((ed: any) => ({ ...ed, time_ranges: ed.time_ranges.map((r: TimeRange, i: number) => i === index ? { ...r, start: e.target.value } : r) }))} w="110px" />
-                              <Text>to</Text>
-                              <Input type="time" value={range.end} onChange={e => setEditingOpen((ed: any) => ({ ...ed, time_ranges: ed.time_ranges.map((r: TimeRange, i: number) => i === index ? { ...r, end: e.target.value } : r) }))} w="110px" />
-                            </HStack>
+                            <div key={index} className={styles.timeRow}>
+                              <input
+                                type="time"
+                                value={range.start}
+                                onChange={e => setEditingOpen((ed: any) => ({ ...ed, time_ranges: ed.time_ranges.map((r: TimeRange, i: number) => i === index ? { ...r, start: e.target.value } : r) }))}
+                                className={styles.timeInput}
+                              />
+                              <span className={styles.timeArrow}>→</span>
+                              <input
+                                type="time"
+                                value={range.end}
+                                onChange={e => setEditingOpen((ed: any) => ({ ...ed, time_ranges: ed.time_ranges.map((r: TimeRange, i: number) => i === index ? { ...r, end: e.target.value } : r) }))}
+                                className={styles.timeInput}
+                              />
+                              {editingOpen?.time_ranges.length > 1 && (
+                                <button
+                                  onClick={() => setEditingOpen((e: any) => ({ ...e, time_ranges: e.time_ranges.filter((_: any, i: number) => i !== index) }))}
+                                  className={styles.deleteButton}
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
                           ))}
                           <Button size="xs" colorScheme="blue" onClick={() => setEditingOpen((e: any) => ({ ...e, time_ranges: [...e.time_ranges, { start: '18:00', end: '23:00' }] }))}>+ Add Time Range</Button>
-                        </HStack>
+                        </VStack>
                         <Input value={editingOpen.label} onChange={e => setEditingOpen((ed: any) => ({ ...ed, label: e.target.value }))} placeholder="Event label (optional)" w="200px" />
                         <Button colorScheme="blue" onClick={handleSaveEditOpen}>Save</Button>
                         <Button colorScheme="gray" onClick={handleCancelEditOpen}>Cancel</Button>
@@ -1335,60 +1374,40 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                       <Text fontSize="0.875rem" fontWeight={600} color="#1d1d1f" mb={2} fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">Time Ranges</Text>
                       <VStack align="stretch" spacing={2}>
                         {newClosureTimeRanges.map((range, index) => (
-                          <HStack key={index} spacing={2}>
-                            <Input 
-                              type="time" 
-                              value={range.start} 
+                          <div key={index} className={styles.timeRow}>
+                            <input
+                              type="time"
+                              value={range.start}
                               onChange={e => {
                                 const newRanges = [...newClosureTimeRanges];
                                 newRanges[index].start = e.target.value;
                                 setNewClosureTimeRanges(newRanges);
-                              }} 
-                              flex="0 0 140px"
-                              h="44px"
-                              bg="#f5f5f7"
-                              borderColor="rgba(0, 0, 0, 0.08)"
-                              borderRadius="10px"
-                              fontSize="1rem"
-                              _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                              }}
+                              className={styles.timeInput}
                             />
-                            <Text fontSize="0.875rem" color="#6e6e73" alignSelf="center">to</Text>
-                            <Input 
-                              type="time" 
-                              value={range.end} 
+                            <span className={styles.timeArrow}>→</span>
+                            <input
+                              type="time"
+                              value={range.end}
                               onChange={e => {
                                 const newRanges = [...newClosureTimeRanges];
                                 newRanges[index].end = e.target.value;
                                 setNewClosureTimeRanges(newRanges);
-                              }} 
-                              flex="0 0 140px"
-                              h="44px"
-                              bg="#f5f5f7"
-                              borderColor="rgba(0, 0, 0, 0.08)"
-                              borderRadius="10px"
-                              fontSize="1rem"
-                              _focus={{ bg: '#ffffff', borderColor: '#007aff', boxShadow: '0 0 0 3px rgba(0, 122, 255, 0.1)' }}
+                              }}
+                              className={styles.timeInput}
                             />
                             {newClosureTimeRanges.length > 1 && (
-                              <Button 
-                                size="sm" 
+                              <button
                                 onClick={() => {
                                   const newRanges = newClosureTimeRanges.filter((_, i) => i !== index);
                                   setNewClosureTimeRanges(newRanges);
                                 }}
-                                h="32px"
-                                w="32px"
-                                fontSize="0.875rem"
-                                bg="transparent"
-                                color="#6e6e73"
-                                border="1px solid rgba(0, 0, 0, 0.12)"
-                                borderRadius="6px"
-                                _hover={{ bg: 'rgba(0, 0, 0, 0.04)', borderColor: 'rgba(0, 0, 0, 0.16)', color: '#1d1d1f' }}
+                                className={styles.deleteButton}
                               >
-                                ×
-                              </Button>
+                                ✕
+                              </button>
                             )}
-                          </HStack>
+                          </div>
                         ))}
                         <Button 
                           size="sm" 
