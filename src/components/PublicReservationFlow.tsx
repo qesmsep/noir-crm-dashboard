@@ -24,6 +24,23 @@ export default function PublicReservationFlow({
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const [memberData, setMemberData] = useState<any>(null);
 
+  // Format phone number as (XXX)XXX-XXXX
+  const formatPhoneNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 3) {
+      return digits;
+    } else if (digits.length <= 6) {
+      return `(${digits.slice(0, 3)})${digits.slice(3)}`;
+    } else {
+      return `(${digits.slice(0, 3)})${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setPhone(formatted);
+  };
+
   const handlePhoneSubmit = async () => {
     if (!phone.trim()) {
       toast({
@@ -135,20 +152,21 @@ export default function PublicReservationFlow({
           </div>
 
           {/* Phone input */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
             <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: 0 }}>
               Enter your phone number to get started
             </p>
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={handlePhoneChange}
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
                   handlePhoneSubmit();
                 }
               }}
-              placeholder="Phone Number*"
+              placeholder="(555)555-5555"
+              maxLength={13}
               style={{
                 width: '100%',
                 height: '44px',

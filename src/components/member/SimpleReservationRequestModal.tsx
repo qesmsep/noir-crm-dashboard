@@ -48,6 +48,19 @@ const generateTimeSlots = (startHour: number, endHour: number) => {
 const thursdayTimeSlots = generateTimeSlots(16, 22); // 4:00 PM to 10:00 PM for Thursday
 const fridaySaturdayTimeSlots = generateTimeSlots(18, 23); // 6:00 PM to 11:00 PM for Fri/Sat
 
+// Format phone number as (XXX)XXX-XXXX
+const formatPhoneNumber = (value: string) => {
+  if (!value) return '';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length <= 3) {
+    return digits;
+  } else if (digits.length <= 6) {
+    return `(${digits.slice(0, 3)})${digits.slice(3)}`;
+  } else {
+    return `(${digits.slice(0, 3)})${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  }
+};
+
 /**
  * Get operating hours for a specific date.
  * Checks weekly hours first, then falls back to base hours.
@@ -981,7 +994,7 @@ export default function SimpleReservationRequestModal({
           )
         ) : (
           /* Form */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
           {/* Guest Information - Always shown, editable (pre-filled if member found) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <input
@@ -1036,7 +1049,7 @@ export default function SimpleReservationRequestModal({
           <div>
             <input
               type="tel"
-              value={memberPhone}
+              value={formatPhoneNumber(memberPhone)}
               readOnly
               placeholder="Phone Number*"
               style={{
