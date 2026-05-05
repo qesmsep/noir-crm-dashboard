@@ -367,7 +367,10 @@ export function getMondayOfWeek(
   timezone: TimeZone = DEFAULT_TIMEZONE
 ): string {
   // Convert to DateTime in the location's timezone
-  const dt = DateTime.isDateTime(date) ? date : DateTime.fromJSDate(date as Date);
+  // CRITICAL: Pass zone parameter to fromJSDate to avoid device timezone issues
+  const dt = DateTime.isDateTime(date)
+    ? date
+    : DateTime.fromJSDate(date as Date, { zone: timezone });
 
   // Get the start of the week (Monday) in that timezone
   // Luxon weekdays: 1=Monday, 7=Sunday

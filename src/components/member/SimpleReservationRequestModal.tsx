@@ -71,7 +71,8 @@ const formatPhoneNumber = (value: string) => {
 const getHoursForDate = (date: Date, locationHours: any): Array<{ start: string; end: string }> | null => {
   if (!locationHours) return null;
 
-  const dt = DateTime.fromJSDate(date).setZone('America/Chicago');
+  const timezone = locationHours.timezone || 'America/Chicago';
+  const dt = DateTime.fromJSDate(date, { zone: timezone });
   const dayOfWeek = dt.weekday % 7; // Luxon: 1=Monday, 7=Sunday -> convert to 0=Sunday, 6=Saturday
   const dayName = dt.toFormat('EEEE').toLowerCase(); // "thursday", "friday", etc.
 
@@ -79,7 +80,7 @@ const getHoursForDate = (date: Date, locationHours: any): Array<{ start: string;
   if (locationHours.weeklyHours) {
     // Weekly hours are set for a specific week
     // Check if the date is in the same week as the weekly hours
-    const dateWeekMonday = getMondayOfWeek(date, 'America/Chicago');
+    const dateWeekMonday = getMondayOfWeek(date, timezone);
 
     // Only use weekly hours if the date is in the same week
     if (dateWeekMonday === locationHours.weeklyHoursWeekStart) {
@@ -155,6 +156,7 @@ export default function SimpleReservationRequestModal({
   // Location hours state (weekly_hours with fallback to base_hours)
   const [locationHours, setLocationHours] = useState<any>(null);
   const [loadingHours, setLoadingHours] = useState(true);
+  const [locationTimezone, setLocationTimezone] = useState<string>('America/Chicago');
 
   // Initialize fields when memberName changes
   useEffect(() => {
@@ -189,10 +191,10 @@ export default function SimpleReservationRequestModal({
           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         );
 
-        // Fetch location-specific booking window
+        // Fetch location-specific booking window and timezone
         const { data: locationData } = await supabase
           .from('locations')
-          .select('booking_start_date, booking_end_date')
+          .select('booking_start_date, booking_end_date, timezone')
           .eq('slug', selectedLocation)
           .single();
 
@@ -205,9 +207,11 @@ export default function SimpleReservationRequestModal({
         // Use COALESCE logic: location-specific first, then global
         const effectiveStart = locationData?.booking_start_date || settingsData?.booking_start_date;
         const effectiveEnd = locationData?.booking_end_date || settingsData?.booking_end_date;
+        const effectiveTimezone = locationData?.timezone || 'America/Chicago';
 
         setBookingStartDate(effectiveStart ? new Date(effectiveStart) : null);
         setBookingEndDate(effectiveEnd ? new Date(effectiveEnd) : null);
+        setLocationTimezone(effectiveTimezone);
 
         console.log('📅 [SimpleReservationModal] Booking window:', {
           location: selectedLocation,
@@ -231,7 +235,7 @@ export default function SimpleReservationRequestModal({
 
       try {
         const blockedDatesSet = new Set<string>();
-        const today = DateTime.now().setZone('America/Chicago');
+        const today = DateTime.now().setZone(locationTimezone);
 
         // Check next 30 days
         for (let i = 0; i <= 30; i++) {
@@ -277,7 +281,7 @@ export default function SimpleReservationRequestModal({
     };
 
     fetchBlockedDates();
-  }, [isOpen, selectedLocation, adminOverride]);
+  }, [isOpen, selectedLocation, adminOverride, locationTimezone]);
 
   // Fetch tables and cover charge info based on selected location
   useEffect(() => {
@@ -305,7 +309,7 @@ export default function SimpleReservationRequestModal({
 
         const { data: locationData } = await supabase
           .from('locations')
-          .select('cover_enabled, cover_price, weekly_hours, id')
+          .select('cover_enabled, cover_price, weekly_hours, id, timezone')
           .eq('slug', selectedLocation)
           .single();
 
@@ -313,8 +317,11 @@ export default function SimpleReservationRequestModal({
           setCoverEnabled(locationData.cover_enabled || false);
           setCoverPrice(locationData.cover_price || 0);
 
+          // Get location timezone (fallback to Chicago if not set)
+          const timezone = locationData.timezone || 'America/Chicago';
+
           // Fetch weekly hours + base hours for this location
-          const currentWeekMonday = getMondayOfWeek(new Date(), 'America/Chicago');
+          const currentWeekMonday = getMondayOfWeek(new Date(), timezone);
           const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday] || null;
 
           // Fetch base hours from venue_hours table
@@ -327,7 +334,8 @@ export default function SimpleReservationRequestModal({
           setLocationHours({
             weeklyHours: weeklyHoursForWeek,
             weeklyHoursWeekStart: weeklyHoursForWeek ? currentWeekMonday : null,
-            baseHours: baseHoursData || []
+            baseHours: baseHoursData || [],
+            timezone: timezone
           });
           setLoadingHours(false);
         } else {
@@ -626,9 +634,8 @@ export default function SimpleReservationRequestModal({
         hour = 0;
       }
 
-      const startDateTime = DateTime.fromJSDate(date!)
-        .set({ hour, minute, second: 0, millisecond: 0 })
-        .setZone('America/Chicago');
+      const startDateTime = DateTime.fromJSDate(date!, { zone: locationTimezone })
+        .set({ hour, minute, second: 0, millisecond: 0 });
 
       const endDateTime = startDateTime.plus({ hours: 2 });
 
@@ -731,9 +738,8 @@ export default function SimpleReservationRequestModal({
             hour = 0;
           }
 
-          const startDateTime = DateTime.fromJSDate(date)
-            .set({ hour, minute, second: 0, millisecond: 0 })
-            .setZone('America/Chicago');
+          const startDateTime = DateTime.fromJSDate(date, { zone: locationTimezone })
+            .set({ hour, minute, second: 0, millisecond: 0 });
 
           const reservationDate = startDateTime.toFormat('MMMM d, yyyy');
           const locationName = selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC';
@@ -789,9 +795,8 @@ export default function SimpleReservationRequestModal({
         hour = 0;
       }
 
-      const startDateTime = DateTime.fromJSDate(date)
-        .set({ hour, minute, second: 0, millisecond: 0 })
-        .setZone('America/Chicago');
+      const startDateTime = DateTime.fromJSDate(date, { zone: locationTimezone })
+        .set({ hour, minute, second: 0, millisecond: 0 });
 
       // End time is 2 hours after start
       const endDateTime = startDateTime.plus({ hours: 2 });
@@ -902,8 +907,8 @@ export default function SimpleReservationRequestModal({
   };
 
   // Use booking window dates if available, otherwise fall back to defaults
-  // Ensure minDate is never in the past (use America/Chicago timezone for consistency)
-  const today = DateTime.now().setZone('America/Chicago').startOf('day').toJSDate();
+  // Ensure minDate is never in the past (use location's timezone for consistency)
+  const today = DateTime.now().setZone(locationTimezone).startOf('day').toJSDate();
   const minDate = bookingStartDate
     ? new Date(Math.max(bookingStartDate.getTime(), today.getTime()))
     : today;
