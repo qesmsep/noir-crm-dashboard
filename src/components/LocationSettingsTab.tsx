@@ -78,6 +78,17 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
             {message.text}
           </div>
         )}
+
+        {/* Mobile-only Save Button at Top */}
+        <div className={styles.mobileOnlySaveButton} style={{ marginTop: '1rem' }}>
+          <button
+            onClick={onSave}
+            disabled={saving || !!(adminPhone && !isValidPhone(adminPhone)) || !!(minakaUrl && !isValidUrl(minakaUrl))}
+            className={`${styles.saveButton} ${saving ? styles.saving : ''}`}
+          >
+            {saving ? 'Saving...' : `Save ${locationName} Settings`}
+          </button>
+        </div>
       </div>
 
       {/* Hours & Booking Configuration */}
@@ -331,16 +342,18 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
         </p>
       </div>
 
-      {/* Single Save Button at Bottom */}
-      <div className={styles.card}>
-        <div className={styles.formActions}>
-          <button
-            onClick={onSave}
-            disabled={saving || (adminPhone && !isValidPhone(adminPhone)) || (minakaUrl && !isValidUrl(minakaUrl))}
-            className={`${styles.saveButton} ${saving ? styles.saving : ''}`}
-          >
-            {saving ? 'Saving...' : `Save ${locationName} Settings`}
-          </button>
+      {/* Mobile-only Save Button at Bottom */}
+      <div className={styles.mobileOnlySaveButton}>
+        <div className={styles.card}>
+          <div className={styles.formActions}>
+            <button
+              onClick={onSave}
+              disabled={saving || !!(adminPhone && !isValidPhone(adminPhone)) || !!(minakaUrl && !isValidUrl(minakaUrl))}
+              className={`${styles.saveButton} ${saving ? styles.saving : ''}`}
+            >
+              {saving ? 'Saving...' : `Save ${locationName} Settings`}
+            </button>
+          </div>
         </div>
       </div>
     </div>

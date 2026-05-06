@@ -598,3 +598,14 @@
   margin-top: 0.25rem;
   font-weight: 500;
 }
+
+/* Mobile-only Save Button */
+.mobileOnlySaveButton {
+  display: none; /* Hidden on desktop by default */
+}
+
+@media (max-width: 768px) {
+  .mobileOnlySaveButton {
+    display: block; /* Show on mobile */
+  }
+}
