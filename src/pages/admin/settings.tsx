@@ -337,13 +337,6 @@ export default function Settings() {
       <div className={styles.container}>
         <div className={styles.header}>
           <h1 className={styles.title}>Settings</h1>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`${styles.saveButton} ${styles.desktopOnlySaveButton} ${saving ? styles.saving : ''}`}
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
         </div>
 
         {message && (

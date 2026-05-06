@@ -67,7 +67,20 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
   return (
     <div className={styles.sections}>
       <div className={styles.card}>
-        <h2 className={styles.cardTitle}>{locationName} - Location Settings</h2>
+        {/* Title and Desktop Save Button Row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h2 className={styles.cardTitle} style={{ margin: 0 }}>{locationName} - Location Settings</h2>
+
+          {/* Desktop-only Save Button */}
+          <button
+            onClick={onSave}
+            disabled={saving || !!(adminPhone && !isValidPhone(adminPhone)) || !!(minakaUrl && !isValidUrl(minakaUrl))}
+            className={`${styles.saveButton} ${styles.desktopOnlySaveButton} ${saving ? styles.saving : ''}`}
+          >
+            {saving ? 'Saving...' : `Save ${locationName} Settings`}
+          </button>
+        </div>
+
         <p className={styles.cardDescription}>
           Configure location-specific settings for {locationName} including booking windows, hours, and cover charges.
         </p>
