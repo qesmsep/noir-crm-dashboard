@@ -340,7 +340,7 @@ export default function Settings() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className={`${styles.saveButton} ${saving ? styles.saving : ''}`}
+            className={`${styles.saveButton} ${styles.desktopOnlySaveButton} ${saving ? styles.saving : ''}`}
           >
             {saving ? 'Saving...' : 'Save'}
           </button>

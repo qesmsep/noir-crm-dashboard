@@ -5319,17 +5319,28 @@ The settings page now features a tabbed interface for managing global and locati
 
 Each location tab includes:
 
-**Booking Window** (Coming Soon)
-- Currently shows global settings
-- Will support location-specific booking windows
+**Hours & Booking Configuration** ✅ Fully Functional (As of 2026-05-05)
+- **Booking Window**: Per-location date range for accepting reservations
+- **Default Reservation Duration**: Configurable reservation length (0.5-8 hours)
+- **Base Hours**: Standard weekly operating hours per location
+- **Weekly Hours**: Override base hours for specific weeks
+- Component: `LocationSettingsTab.tsx` (reusable across locations)
+- Saves to:
+  - `locations.default_reservation_duration_hours`
+  - `venue_hours` table (with `location_id` and `type` differentiation)
+  - Weekly hours stored in `locations.weekly_hours` JSONB column
 
-**Base Hours** (Coming Soon)
-- Currently shows global settings
-- Will support location-specific operating hours
+**Priority Order** (Availability Logic):
+1. **Private Events** - Highest priority, blocks all availability
+2. **Custom Open Days** - Override other settings to open on typically closed days
+3. **Booking Window** - Date range filter (outside = no availability)
+4. **Custom Closed Days** - Override other settings to close on specific dates
+5. **Weekly Hours** - Week-specific hours override base hours
+6. **Base Hours** - Default weekly schedule (fallback)
 
 **Custom Open/Closed Days** ✅ Fully Functional (As of 2026-04-18)
-- Location-specific exceptional closures
-- Each location maintains independent closed days
+- Location-specific exceptional closures and openings
+- Each location maintains independent custom days
 - Component: `CalendarAvailabilityControl.tsx` with `locationSlug` prop
 - Saves to: `venue_hours.location_id`
 - Migration: `migrations/20260418_add_location_id_to_venue_hours.sql`
@@ -5388,9 +5399,45 @@ The settings page now follows Noir brand guidelines:
 - No horizontal scrolling
 - Font sizes ≥ 12px minimum
 
+**Component Architecture** (As of 2026-05-05):
+- **Reusable Component**: `src/components/LocationSettingsTab.tsx`
+  - Eliminates code duplication between location tabs (~460 lines saved)
+  - Single source of truth for location settings UI
+  - Props-based configuration for location-specific data
+- **Parent Component**: `src/pages/admin/settings.tsx`
+  - Manages state for both Noir KC and RooftopKC
+  - Renders `LocationSettingsTab` with location-specific props
+- **Styles**: `src/styles/Settings.module.css`
+  - Responsive CSS modules with mobile-first design
+  - Mobile time input optimization (42% width on mobile, 130px on desktop)
+  - `.locationSettingsRow`, `.locationSettingsColumn`, `.locationSettingsGrid` classes
+
+**Input Validation**:
+- **Phone Numbers**: Must be 10 digits (auto-adds +1 prefix on save)
+- **URLs**: Must start with http:// or https://
+- **Duration**: Range 0.5-8 hours in 0.5 hour increments
+- **Cover Price**: Range $0-$100
+- Visual error states with inline error messages
+- Save button disabled when validation fails
+
+**Accessibility**:
+- All inputs have `htmlFor` labels with unique IDs
+- Number inputs include `aria-valuemin`/`aria-valuemax`
+- Buttons have `aria-label` attributes
+- Phone inputs use `inputMode="tel"` and `pattern`
+
+**Mobile UX** (As of 2026-05-05):
+- Save button appears at both top and bottom on mobile
+- Compact time input layout (42% width, tight spacing)
+- Touch-friendly 44px minimum tap targets
+- Responsive flexbox layouts with wrap
+
 **Files**:
-- Component: `src/pages/admin/settings.tsx`
+- Component: `src/components/LocationSettingsTab.tsx` (reusable)
+- Parent: `src/pages/admin/settings.tsx`
 - Styles: `src/styles/Settings.module.css`
+- Calendar Controls: `src/components/CalendarAvailabilityControl.tsx`
+- Calendar Styles: `src/components/CalendarAvailability.module.css`
 
 ---
 

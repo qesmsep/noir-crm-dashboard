@@ -609,3 +609,10 @@
     display: block; /* Show on mobile */
   }
 }
+
+/* Desktop-only Save Button (hide on mobile) */
+@media (max-width: 768px) {
+  .desktopOnlySaveButton {
+    display: none !important; /* Hide on mobile */
+  }
+}
