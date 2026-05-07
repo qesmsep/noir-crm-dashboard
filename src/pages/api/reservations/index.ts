@@ -41,6 +41,12 @@ interface ReservationCreateBody {
   cover_charge_applied?: boolean;
   cover_price?: number;
 
+  // Bypass code fields
+  bypass_code_used?: string;
+  bypass_code_id?: string;
+  cover_charge_waived?: boolean;
+  validation_id?: string; // For idempotency in usage logging
+
   // Source tracking
   source?: string;
   create_visitor?: boolean;
@@ -738,6 +744,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...((body.stripe_payment_intent_id || body.payment_intent_id) && {
           payment_intent_id: body.stripe_payment_intent_id || body.payment_intent_id
         }),
+        // Bypass code fields
+        ...(body.bypass_code_used && { bypass_code_used: body.bypass_code_used }),
+        ...(body.bypass_code_id && { bypass_code_id: body.bypass_code_id }),
+        ...(body.cover_charge_waived !== undefined && { cover_charge_waived: body.cover_charge_waived }),
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));
@@ -1129,7 +1139,75 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         console.error('WARNING: Reservation insert returned no ID. Data:', JSON.stringify(data, null, 2));
       }
-      
+
+      // Increment bypass code usage and log if applicable
+      if (data && data.id && body.bypass_code_id && body.bypass_code_used && body.validation_id) {
+        try {
+          console.log('Incrementing bypass code usage for reservation:', data.id);
+
+          // Call database function to increment usage atomically with idempotency
+          const { data: incrementResult, error: incrementError } = await client.rpc('increment_bypass_code_usage', {
+            p_bypass_code_id: body.bypass_code_id,
+            p_validation_id: body.validation_id,
+          });
+
+          if (incrementError) {
+            console.error('Failed to increment bypass code usage (non-critical):', incrementError);
+            // Don't fail the reservation if increment fails
+          } else {
+            console.log('Bypass code usage increment result:', incrementResult);
+          }
+
+          // Log detailed usage information
+          const { error: logError } = await client
+            .from('location_bypass_code_usage_log')
+            .insert({
+              bypass_code_id: body.bypass_code_id,
+              reservation_id: data.id,
+              validation_id: body.validation_id,
+              user_phone: body.phone || null,
+              user_email: email || null,
+              user_name: firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null,
+              party_size: body.party_size,
+              amount_waived: body.cover_price ? body.cover_price * body.party_size : 0,
+              ip_address: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || null,
+              user_agent: req.headers['user-agent'] || null,
+            });
+
+          if (logError) {
+            console.error('Failed to log bypass code usage (non-critical):', logError);
+            // Don't fail the reservation if logging fails
+          }
+        } catch (logErr) {
+          console.error('Error logging bypass code usage (non-critical):', logErr);
+        }
+      } else if (data && data.id && body.bypass_code_id && body.bypass_code_used && !body.validation_id) {
+        console.warn('Bypass code used but validation_id is missing - this indicates the old validation flow was used');
+        // Still log for backwards compatibility, but without incrementing
+        try {
+          const { error: logError } = await client
+            .from('location_bypass_code_usage_log')
+            .insert({
+              bypass_code_id: body.bypass_code_id,
+              reservation_id: data.id,
+              validation_id: null,
+              user_phone: body.phone || null,
+              user_email: email || null,
+              user_name: firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null,
+              party_size: body.party_size,
+              amount_waived: body.cover_price ? body.cover_price * body.party_size : 0,
+              ip_address: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || null,
+              user_agent: req.headers['user-agent'] || null,
+            });
+
+          if (logError) {
+            console.error('Failed to log bypass code usage (non-critical):', logError);
+          }
+        } catch (logErr) {
+          console.error('Error logging bypass code usage (non-critical):', logErr);
+        }
+      }
+
       return res.status(201).json({ data });
     } catch (err) {
       console.error('Unhandled error creating reservation:', err);

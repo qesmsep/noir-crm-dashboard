@@ -29,6 +29,10 @@ interface Props {
    */
   adminOverride?: boolean;
   onBack?: () => void;
+  bypassCodeValidated?: boolean;
+  bypassCodeId?: string | null;
+  bypassCodeUsed?: string | null;
+  validationId?: string | null; // For idempotency in usage logging
 }
 
 // Generate time options
@@ -121,6 +125,10 @@ export default function SimpleReservationRequestModal({
   hideTableSelection = false,
   adminOverride = false,
   onBack,
+  bypassCodeValidated = false,
+  bypassCodeId = null,
+  bypassCodeUsed = null,
+  validationId = null,
 }: Props) {
   const { toast } = useToast();
   const [date, setDate] = useState<Date | null>(null);
@@ -638,6 +646,10 @@ export default function SimpleReservationRequestModal({
           source: 'public_booking',
           create_visitor: true,
           stripe_payment_intent_id: paymentId,
+          // No bypass code used since payment was made
+          bypass_code_used: undefined,
+          bypass_code_id: undefined,
+          cover_charge_waived: false,
           admin_override: adminOverride,
         }),
       });
@@ -697,8 +709,8 @@ export default function SimpleReservationRequestModal({
       return;
     }
 
-    // Determine if cover charge applies (enabled AND not a member)
-    const coverChargeApplies = coverEnabled && !memberId;
+    // Determine if cover charge applies (enabled AND not a member AND no valid bypass code)
+    const coverChargeApplies = coverEnabled && !memberId && !bypassCodeValidated;
 
     // If non-member with cover charge, create PaymentIntent and show payment step
     if (coverChargeApplies) {
@@ -818,6 +830,11 @@ export default function SimpleReservationRequestModal({
           source: memberId ? 'member_dashboard' : 'admin_portal',
           member_id: memberId,
           account_id: accountId,
+          // Bypass code fields
+          bypass_code_used: bypassCodeUsed || undefined,
+          bypass_code_id: bypassCodeId || undefined,
+          cover_charge_waived: bypassCodeValidated || false,
+          validation_id: validationId || undefined, // For idempotency
           create_visitor: !memberId && !accountId, // Create visitor if no member/account found
           admin_override: adminOverride,
         }),
