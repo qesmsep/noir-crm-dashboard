@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Edit2, Plus, Copy, Check } from 'lucide-react';
+import { Trash2, Edit2, Plus, Copy, Check, X } from 'lucide-react';
 import AddBypassCodeModal from './AddBypassCodeModal';
 import styles from '../styles/Settings.module.css';
 import { DateTime } from 'luxon';
@@ -34,6 +34,7 @@ const BypassCodeManager: React.FC<BypassCodeManagerProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCode, setEditingCode] = useState<BypassCode | null>(null);
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   // Fetch bypass codes
   const fetchCodes = async () => {
@@ -81,11 +82,14 @@ const BypassCodeManager: React.FC<BypassCodeManagerProps> = ({
     });
   };
 
-  // Delete (deactivate) a code
+  // Delete (deactivate) a code — first click arms confirmation, second click executes
   const handleDelete = async (codeId: string) => {
-    if (!confirm('Are you sure you want to deactivate this bypass code?')) {
+    if (confirmingDeleteId !== codeId) {
+      setConfirmingDeleteId(codeId);
       return;
     }
+
+    setConfirmingDeleteId(null);
 
     try {
       // Get admin session for authentication
@@ -112,7 +116,7 @@ const BypassCodeManager: React.FC<BypassCodeManagerProps> = ({
       fetchCodes();
     } catch (err: any) {
       console.error('Error deactivating bypass code:', err);
-      alert(err.message || 'Failed to deactivate bypass code');
+      setError(err.message || 'Failed to deactivate bypass code');
     }
   };
 
@@ -223,22 +227,47 @@ const BypassCodeManager: React.FC<BypassCodeManagerProps> = ({
                     </span>
                   </div>
                   <div className={styles.codeActions}>
-                    <button
-                      onClick={() => setEditingCode(code)}
-                      className={styles.iconButton}
-                      title="Edit code"
-                      disabled={!code.is_active}
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(code.id)}
-                      className={styles.iconButton}
-                      title="Deactivate code"
-                      disabled={!code.is_active}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {confirmingDeleteId === code.id ? (
+                      <>
+                        <span style={{ fontSize: '0.75rem', color: '#DC2626', marginRight: '0.5rem' }}>
+                          Confirm?
+                        </span>
+                        <button
+                          onClick={() => handleDelete(code.id)}
+                          className={styles.iconButton}
+                          title="Confirm deactivation"
+                          style={{ color: '#DC2626' }}
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmingDeleteId(null)}
+                          className={styles.iconButton}
+                          title="Cancel"
+                        >
+                          <X size={16} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setEditingCode(code)}
+                          className={styles.iconButton}
+                          title="Edit code"
+                          disabled={!code.is_active}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(code.id)}
+                          className={styles.iconButton}
+                          title="Deactivate code"
+                          disabled={!code.is_active}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 

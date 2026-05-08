@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { validateBypassCode, validatePartySize, getClientIP, generateRequestId } from '../../../../lib/validation';
-import { ApiErrorHandler } from '../../../../lib/error-handler';
+import { ApiErrorHandler, setCorsHeaders } from '../../../../lib/error-handler';
 import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -9,10 +9,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const requestId = req.headers['x-request-id'] as string || generateRequestId();
   const errorHandler = new ApiErrorHandler(requestId);
 
-  // Add CORS headers
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Set CORS headers (fails closed in production without ALLOWED_ORIGIN)
+  setCorsHeaders(res, 'POST, OPTIONS');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -119,7 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       coverPricePerPerson: result.cover_price,
       requestId,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     ApiErrorHandler.logError(requestId, 'Unexpected error in validate-bypass-code', error);
     return errorHandler.internalError(res, error);
   }

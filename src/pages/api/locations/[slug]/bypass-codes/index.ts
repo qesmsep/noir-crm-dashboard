@@ -2,17 +2,15 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../../../lib/supabase';
 import { verifyAdmin } from '../../../../../lib/admin-auth';
 import { validateBypassCode, validateDescription, validateMaxUses, getClientIP, generateRequestId } from '../../../../../lib/validation';
-import { ApiErrorHandler } from '../../../../../lib/error-handler';
+import { ApiErrorHandler, setCorsHeaders } from '../../../../../lib/error-handler';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Generate request ID for tracing
   const requestId = req.headers['x-request-id'] as string || generateRequestId();
   const errorHandler = new ApiErrorHandler(requestId);
 
-  // Add CORS headers
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Set CORS headers (fails closed in production without ALLOWED_ORIGIN)
+  setCorsHeaders(res, 'GET, POST, OPTIONS');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -74,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         codes: codesWithStats || [],
         requestId,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       ApiErrorHandler.logError(requestId, 'Unexpected error fetching bypass codes', error);
       return errorHandler.internalError(res, error);
     }
@@ -179,7 +177,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         code: newCode,
         requestId,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       ApiErrorHandler.logError(requestId, 'Unexpected error creating bypass code', error);
       return errorHandler.internalError(res, error);
     }

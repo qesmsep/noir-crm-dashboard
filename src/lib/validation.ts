@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 /**
  * Input validation utilities for bypass codes and other user input
  */
@@ -113,36 +115,29 @@ export function validateMaxUses(maxUses: number | null | undefined, currentUses?
 }
 
 /**
- * Sanitize text for safe display (prevent XSS)
- * Strips all HTML tags and encodes special characters
- */
-export function sanitizeText(text: string): string {
-  if (!text) return '';
-
-  return text
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
-}
-
-/**
- * Get client IP address from request
+ * Get client IP address from request.
+ *
+ * Only trusts the X-Forwarded-For header when TRUSTED_PROXY=true is set in the
+ * environment, because clients can fabricate this header to bypass rate limiting.
+ * Without that flag we use the socket address, which cannot be spoofed.
  */
 export function getClientIP(req: any): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    return typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : forwarded[0];
+  if (process.env.TRUSTED_PROXY === 'true') {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      return typeof forwarded === 'string'
+        ? forwarded.split(',')[0].trim()
+        : forwarded[0];
+    }
+    const realIp = req.headers['x-real-ip'];
+    if (realIp) return typeof realIp === 'string' ? realIp : realIp[0];
   }
-  return req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown';
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 /**
- * Generate request ID for tracing
+ * Generate a cryptographically random request ID for tracing.
  */
 export function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+  return `req_${randomUUID()}`;
 }

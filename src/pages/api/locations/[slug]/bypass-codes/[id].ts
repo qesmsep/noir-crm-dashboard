@@ -2,17 +2,29 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../../../lib/supabase';
 import { verifyAdmin } from '../../../../../lib/admin-auth';
 import { validateDescription, validateMaxUses, getClientIP, generateRequestId } from '../../../../../lib/validation';
-import { ApiErrorHandler } from '../../../../../lib/error-handler';
+import { ApiErrorHandler, setCorsHeaders } from '../../../../../lib/error-handler';
+
+interface UpdateBypassCodeData {
+  description?: string | null;
+  expires_at?: string | null;
+  max_uses?: number | null;
+  is_active?: boolean;
+}
+
+interface BypassCodeChangeRecord {
+  description?: string | null;
+  expires_at?: string | null;
+  max_uses?: number | null;
+  is_active?: boolean;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Generate request ID for tracing
   const requestId = req.headers['x-request-id'] as string || generateRequestId();
   const errorHandler = new ApiErrorHandler(requestId);
 
-  // Add CORS headers
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Set CORS headers (fails closed in production without ALLOWED_ORIGIN)
+  setCorsHeaders(res, 'PUT, DELETE, OPTIONS');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -80,9 +92,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Build update data
-      const updateData: any = {};
-      const oldValues: any = {};
-      const newValues: any = {};
+      const updateData: UpdateBypassCodeData = {};
+      const oldValues: BypassCodeChangeRecord = {};
+      const newValues: BypassCodeChangeRecord = {};
 
       if (description !== undefined && description !== existingCode.description) {
         updateData.description = description;
@@ -154,7 +166,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         code: updatedCode,
         requestId,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       ApiErrorHandler.logError(requestId, 'Unexpected error updating bypass code', error);
       return errorHandler.internalError(res, error);
     }
@@ -225,7 +237,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: 'Bypass code deactivated successfully',
         requestId,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       ApiErrorHandler.logError(requestId, 'Unexpected error deactivating bypass code', error);
       return errorHandler.internalError(res, error);
     }

@@ -69,9 +69,14 @@ const AddBypassCodeModal: React.FC<AddBypassCodeModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    // Validate code
+    // Validate code — mirrors server-side validateBypassCode rules
     if (!code || code.length < 6) {
       setError('Code must be at least 6 characters long');
+      return;
+    }
+
+    if (!/^[A-Z0-9]+$/i.test(code)) {
+      setError('Code can only contain letters and numbers');
       return;
     }
 

@@ -1140,72 +1140,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.error('WARNING: Reservation insert returned no ID. Data:', JSON.stringify(data, null, 2));
       }
 
-      // Increment bypass code usage and log if applicable
+      // Increment bypass code usage — the DB function atomically increments
+      // the counter AND inserts the usage log row in one transaction, which
+      // prevents double-increment on concurrent requests with the same
+      // validation_id.
       if (data && data.id && body.bypass_code_id && body.bypass_code_used && body.validation_id) {
         try {
           console.log('Incrementing bypass code usage for reservation:', data.id);
 
-          // Call database function to increment usage atomically with idempotency
-          const { data: incrementResult, error: incrementError } = await client.rpc('increment_bypass_code_usage', {
-            p_bypass_code_id: body.bypass_code_id,
-            p_validation_id: body.validation_id,
-          });
+          const { data: incrementResult, error: incrementError } = await client.rpc(
+            'increment_bypass_code_usage',
+            {
+              p_bypass_code_id:  body.bypass_code_id,
+              p_validation_id:   body.validation_id,
+              p_reservation_id:  data.id,
+              p_user_phone:      body.phone || null,
+              p_user_email:      email || null,
+              p_user_name:       firstName && lastName
+                                   ? `${firstName} ${lastName}`
+                                   : firstName || lastName || null,
+              p_party_size:      body.party_size,
+              p_amount_waived:   body.cover_price ? body.cover_price * body.party_size : 0,
+              p_ip_address:      req.socket?.remoteAddress || null,
+              p_user_agent:      req.headers['user-agent'] || null,
+            }
+          );
 
           if (incrementError) {
             console.error('Failed to increment bypass code usage (non-critical):', incrementError);
-            // Don't fail the reservation if increment fails
           } else {
             console.log('Bypass code usage increment result:', incrementResult);
           }
-
-          // Log detailed usage information
-          const { error: logError } = await client
-            .from('location_bypass_code_usage_log')
-            .insert({
-              bypass_code_id: body.bypass_code_id,
-              reservation_id: data.id,
-              validation_id: body.validation_id,
-              user_phone: body.phone || null,
-              user_email: email || null,
-              user_name: firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null,
-              party_size: body.party_size,
-              amount_waived: body.cover_price ? body.cover_price * body.party_size : 0,
-              ip_address: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || null,
-              user_agent: req.headers['user-agent'] || null,
-            });
-
-          if (logError) {
-            console.error('Failed to log bypass code usage (non-critical):', logError);
-            // Don't fail the reservation if logging fails
-          }
         } catch (logErr) {
-          console.error('Error logging bypass code usage (non-critical):', logErr);
+          console.error('Error incrementing bypass code usage (non-critical):', logErr);
         }
       } else if (data && data.id && body.bypass_code_id && body.bypass_code_used && !body.validation_id) {
-        console.warn('Bypass code used but validation_id is missing - this indicates the old validation flow was used');
-        // Still log for backwards compatibility, but without incrementing
-        try {
-          const { error: logError } = await client
-            .from('location_bypass_code_usage_log')
-            .insert({
-              bypass_code_id: body.bypass_code_id,
-              reservation_id: data.id,
-              validation_id: null,
-              user_phone: body.phone || null,
-              user_email: email || null,
-              user_name: firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null,
-              party_size: body.party_size,
-              amount_waived: body.cover_price ? body.cover_price * body.party_size : 0,
-              ip_address: req.headers['x-forwarded-for']?.toString() || req.socket.remoteAddress || null,
-              user_agent: req.headers['user-agent'] || null,
-            });
-
-          if (logError) {
-            console.error('Failed to log bypass code usage (non-critical):', logError);
-          }
-        } catch (logErr) {
-          console.error('Error logging bypass code usage (non-critical):', logErr);
-        }
+        // The old validation flow did not generate a validation_id, which means
+        // we cannot guarantee idempotency. Reject rather than silently logging
+        // a usage event without incrementing the counter (which creates an
+        // audit/counter discrepancy).
+        console.error(
+          '[SECURITY] Bypass code reservation rejected post-insert: missing validation_id. ' +
+          'Client must use the new validate-bypass-code endpoint.'
+        );
+        // Reservation was already created; log the anomaly but do not fail the response.
+        // This case should not occur once all clients are updated.
       }
 
       return res.status(201).json({ data });

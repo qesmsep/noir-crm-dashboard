@@ -4,7 +4,28 @@ export interface ApiError {
   error: string;
   errorCode?: string;
   requestId?: string;
-  details?: any;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * Set CORS headers, failing closed in production.
+ *
+ * Uses ALLOWED_ORIGIN env var when set, falls back to NEXT_PUBLIC_SITE_URL,
+ * and defaults to '*' only in non-production environments. In production
+ * without either env var no CORS header is emitted (same-origin requests
+ * work without it, and a wildcard would allow any origin).
+ */
+export function setCorsHeaders(res: NextApiResponse, methods: string): void {
+  const origin =
+    process.env.ALLOWED_ORIGIN ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.NODE_ENV !== 'production' ? '*' : null);
+
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', methods);
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 /**
@@ -22,7 +43,7 @@ export class ApiErrorHandler {
   /**
    * Handle 400 Bad Request errors
    */
-  badRequest(res: NextApiResponse, message: string, details?: any): void {
+  badRequest(res: NextApiResponse, message: string, details?: Record<string, unknown>): void {
     const response: ApiError = {
       error: message,
       errorCode: 'BAD_REQUEST',
@@ -89,7 +110,7 @@ export class ApiErrorHandler {
   /**
    * Handle 500 Internal Server Error
    */
-  internalError(res: NextApiResponse, error: any, userMessage?: string): void {
+  internalError(res: NextApiResponse, error: unknown, userMessage?: string): void {
     // Log error for debugging
     console.error(`[${this.requestId}] Internal error:`, error);
 
@@ -100,10 +121,10 @@ export class ApiErrorHandler {
     };
 
     // Include error details in development
-    if (this.isDevelopment) {
+    if (this.isDevelopment && error instanceof Error) {
       response.details = {
-        message: error?.message,
-        stack: error?.stack,
+        message: error.message,
+        stack: error.stack,
       };
     }
 
@@ -124,7 +145,7 @@ export class ApiErrorHandler {
   /**
    * Log error message with request ID
    */
-  static logError(requestId: string, message: string, error?: any): void {
+  static logError(requestId: string, message: string, error?: unknown): void {
     if (error) {
       console.error(`[${requestId}] ${message}`, error);
     } else {
