@@ -436,9 +436,6 @@ export default function PublicReservationFlow({
                 borderRadius: '8px',
                 border: '1px solid #E5E7EB',
               }}>
-                <p style={{ fontSize: '0.875rem', color: '#1F2937', fontWeight: '600', margin: '0 0 0.75rem 0' }}>
-                  Have a bypass code?
-                </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <input
                     type="text"
@@ -453,7 +450,7 @@ export default function PublicReservationFlow({
                         validateBypassCode();
                       }
                     }}
-                    placeholder="Enter code"
+                    placeholder="Access Code"
                     style={{
                       width: '100%',
                       height: '44px',
