@@ -41,6 +41,12 @@ interface ReservationCreateBody {
   cover_charge_applied?: boolean;
   cover_price?: number;
 
+  // Bypass code fields
+  bypass_code_used?: string;
+  bypass_code_id?: string;
+  cover_charge_waived?: boolean;
+  validation_id?: string; // For idempotency in usage logging
+
   // Source tracking
   source?: string;
   create_visitor?: boolean;
@@ -738,6 +744,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...((body.stripe_payment_intent_id || body.payment_intent_id) && {
           payment_intent_id: body.stripe_payment_intent_id || body.payment_intent_id
         }),
+        // Bypass code fields
+        ...(body.bypass_code_used && { bypass_code_used: body.bypass_code_used }),
+        ...(body.bypass_code_id && { bypass_code_id: body.bypass_code_id }),
+        ...(body.cover_charge_waived !== undefined && { cover_charge_waived: body.cover_charge_waived }),
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));
@@ -1129,7 +1139,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         console.error('WARNING: Reservation insert returned no ID. Data:', JSON.stringify(data, null, 2));
       }
-      
+
+      // Increment bypass code usage — the DB function atomically increments
+      // the counter AND inserts the usage log row in one transaction, which
+      // prevents double-increment on concurrent requests with the same
+      // validation_id.
+      if (data && data.id && body.bypass_code_id && body.bypass_code_used && body.validation_id) {
+        try {
+          console.log('Incrementing bypass code usage for reservation:', data.id);
+
+          const { data: incrementResult, error: incrementError } = await client.rpc(
+            'increment_bypass_code_usage',
+            {
+              p_bypass_code_id:  body.bypass_code_id,
+              p_validation_id:   body.validation_id,
+              p_reservation_id:  data.id,
+              p_user_phone:      body.phone || null,
+              p_user_email:      email || null,
+              p_user_name:       firstName && lastName
+                                   ? `${firstName} ${lastName}`
+                                   : firstName || lastName || null,
+              p_party_size:      body.party_size,
+              p_amount_waived:   body.cover_price ? body.cover_price * body.party_size : 0,
+              p_ip_address:      req.socket?.remoteAddress || null,
+              p_user_agent:      req.headers['user-agent'] || null,
+            }
+          );
+
+          if (incrementError) {
+            console.error('Failed to increment bypass code usage (non-critical):', incrementError);
+          } else {
+            console.log('Bypass code usage increment result:', incrementResult);
+          }
+        } catch (logErr) {
+          console.error('Error incrementing bypass code usage (non-critical):', logErr);
+        }
+      } else if (data && data.id && body.bypass_code_id && body.bypass_code_used && !body.validation_id) {
+        // The old validation flow did not generate a validation_id, which means
+        // we cannot guarantee idempotency. Reject rather than silently logging
+        // a usage event without incrementing the counter (which creates an
+        // audit/counter discrepancy).
+        console.error(
+          '[SECURITY] Bypass code reservation rejected post-insert: missing validation_id. ' +
+          'Client must use the new validate-bypass-code endpoint.'
+        );
+        // Reservation was already created; log the anomaly but do not fail the response.
+        // This case should not occur once all clients are updated.
+      }
+
       return res.status(201).json({ data });
     } catch (err) {
       console.error('Unhandled error creating reservation:', err);

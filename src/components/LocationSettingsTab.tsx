@@ -1,5 +1,6 @@
 import React from 'react';
 import CalendarAvailabilityControl from './CalendarAvailabilityControl';
+import BypassCodeManager from './BypassCodeManager';
 import styles from '../styles/Settings.module.css';
 
 // Constants
@@ -345,6 +346,14 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Bypass Codes Section */}
+        <div style={{ gridColumn: 'span 2', marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #E5E7EB' }}>
+          <BypassCodeManager
+            locationSlug={locationSlug}
+            locationName={locationName}
+          />
         </div>
       </div>
 

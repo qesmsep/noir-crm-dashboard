@@ -616,3 +616,257 @@
     display: none !important; /* Hide on mobile */
   }
 }
+
+/* Bypass Code Manager Styles */
+.bypassCodeManager {
+  margin-top: 1rem;
+}
+
+.bypassCodeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.addCodeButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #a59480;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.addCodeButton:hover {
+  background-color: #8b7a68;
+}
+
+.codesList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.codeCard {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem;
+  transition: all 0.2s;
+}
+
+.codeCardInactive {
+  opacity: 0.6;
+  background: #f9fafb;
+}
+
+.codeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.codeMain {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.codeDisplay {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.codeText {
+  font-family: monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #1f2937;
+  background: #f3f4f6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.copyButton {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.copyButton:hover {
+  color: #4b5563;
+}
+
+.statusBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statusActive {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.statusInactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.statusExpired {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.statusMaxed {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.codeActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.iconButton {
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: #f9fafb;
+  color: #4b5563;
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.codeDescription {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.codeStats {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.codeStat {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.statLabel {
+  color: #6b7280;
+}
+
+.statValue {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.statPercent {
+  color: #6b7280;
+}
+
+.usageBar {
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  margin-top: 0.75rem;
+  overflow: hidden;
+}
+
+.usageBarFill {
+  height: 100%;
+  background: #a59480;
+  transition: width 0.3s ease;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+.primaryButton {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #a59480;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.primaryButton:hover {
+  background-color: #8b7a68;
+}
+
+.retryButton {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: white;
+  color: #a59480;
+  border: 1px solid #a59480;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.retryButton:hover {
+  background-color: #f9fafb;
+}
+
+.loadingContainer {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+.errorContainer {
+  text-align: center;
+  padding: 2rem;
+}

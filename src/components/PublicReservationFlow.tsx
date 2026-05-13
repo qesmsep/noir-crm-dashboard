@@ -19,12 +19,21 @@ export default function PublicReservationFlow({
   locationSlug,
   onReservationCreated,
 }: Props) {
+  console.log('PublicReservationFlow - isOpen:', isOpen, 'locationSlug:', locationSlug);
   const { toast } = useToast();
   const [step, setStep] = useState<'phone' | 'fee-notice' | 'reservation'>('phone');
   const [phone, setPhone] = useState('');
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const [locationName, setLocationName] = useState<string>(locationSlug);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Bypass code state
+  const [bypassCode, setBypassCode] = useState('');
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [codeValidated, setCodeValidated] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [validatedCodeId, setValidatedCodeId] = useState<string | null>(null);
+  const [validationId, setValidationId] = useState<string | null>(null); // For idempotency
 
   // Constants
   const MEMBERSHIP_PHONE = '9137774488';
@@ -147,7 +156,71 @@ export default function PublicReservationFlow({
   const handleClose = () => {
     setStep('phone');
     setPhone('');
+    setBypassCode('');
+    setCodeValidated(false);
+    setCodeError(null);
+    setValidatedCodeId(null);
+    setValidationId(null);
     onClose();
+  };
+
+  const validateBypassCode = async () => {
+    if (!bypassCode.trim()) {
+      setCodeError('Please enter a code');
+      return;
+    }
+
+    setIsValidatingCode(true);
+    setCodeError(null);
+
+    try {
+      const response = await fetch(`/api/locations/${locationSlug}/validate-bypass-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: bypassCode.trim(),
+          partySize: 1, // We don't know party size yet, but it's mainly for logging
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.isValid) {
+        setCodeValidated(true);
+        setValidatedCodeId(data.bypassCodeId);
+        setValidationId(data.validationId); // Store for idempotency
+        toast({
+          title: 'Code validated!',
+          description: 'Reservation fee has been waived.',
+          variant: 'default',
+        });
+      } else {
+        setCodeError(data.message || 'Invalid code');
+        setCodeValidated(false);
+        setValidatedCodeId(null);
+        setValidationId(null);
+      }
+    } catch (error) {
+      console.error('Error validating bypass code:', error);
+      setCodeError('Failed to validate code. Please try again.');
+      setCodeValidated(false);
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
+  const handleProceedToReservation = () => {
+    // If code is entered but not validated, validate it first
+    if (bypassCode.trim() && !codeValidated && !isValidatingCode) {
+      validateBypassCode().then(() => {
+        // After validation attempt, proceed regardless
+        setStep('reservation');
+      });
+    } else {
+      setStep('reservation');
+    }
   };
 
   if (!isOpen) return null;
@@ -352,25 +425,96 @@ export default function PublicReservationFlow({
                 (includes first drink)
               </p>
               <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: '0 0 1rem 0', lineHeight: '1.4', textAlign: 'center' }}>
-                Non-refundable unless cancelled by RooftopKC
+                Non-refundable unless cancelled by {locationName}
               </p>
+
+              {/* Bypass Code Section */}
+              <div style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: '#F9FAFB',
+                borderRadius: '8px',
+                border: '1px solid #E5E7EB',
+              }}>
+                <p style={{ fontSize: '0.875rem', color: '#1F2937', fontWeight: '600', margin: '0 0 0.75rem 0' }}>
+                  Have a bypass code?
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={bypassCode}
+                    onChange={(e) => {
+                      setBypassCode(e.target.value.toUpperCase());
+                      setCodeError(null);
+                      setCodeValidated(false);
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        validateBypassCode();
+                      }
+                    }}
+                    placeholder="Enter code"
+                    style={{
+                      flex: 1,
+                      height: '40px',
+                      padding: '0 0.75rem',
+                      border: codeError ? '1px solid #DC2626' : (codeValidated ? '1px solid #10B981' : '1px solid #D1D5DB'),
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      backgroundColor: 'white',
+                      outline: 'none',
+                      fontFamily: 'monospace',
+                      letterSpacing: '0.05em',
+                    }}
+                  />
+                  <button
+                    onClick={validateBypassCode}
+                    disabled={isValidatingCode || !bypassCode.trim()}
+                    style={{
+                      height: '40px',
+                      padding: '0 1rem',
+                      backgroundColor: isValidatingCode ? '#D1D5DB' : '#A59480',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: isValidatingCode || !bypassCode.trim() ? 'not-allowed' : 'pointer',
+                      transition: 'background-color 0.2s',
+                    }}
+                  >
+                    {isValidatingCode ? 'Checking...' : 'Validate'}
+                  </button>
+                </div>
+                {codeError && (
+                  <p style={{ fontSize: '0.75rem', color: '#DC2626', margin: '0.25rem 0 0 0' }}>
+                    {codeError}
+                  </p>
+                )}
+                {codeValidated && (
+                  <p style={{ fontSize: '0.75rem', color: '#10B981', margin: '0.25rem 0 0 0', fontWeight: '600' }}>
+                    ✓ Code valid! Reservation fee waived.
+                  </p>
+                )}
+              </div>
+
               <button
-                onClick={() => setStep('reservation')}
+                onClick={handleProceedToReservation}
                 style={{
                   width: '100%',
                   height: '44px',
-                  backgroundColor: '#A59480',
+                  backgroundColor: codeValidated ? '#10B981' : '#A59480',
                   color: 'white',
                   fontSize: '0.9375rem',
                   fontWeight: '600',
                   borderRadius: '10px',
                   border: 'none',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
-                  transition: 'background-color 0.2s',
+                  boxShadow: codeValidated ? '0 2px 8px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(165, 148, 128, 0.2)',
+                  transition: 'all 0.2s',
                 }}
               >
-                Continue with Reservation
+                {codeValidated ? 'Continue (No Fee)' : 'Continue with Reservation'}
               </button>
             </div>
 
@@ -421,6 +565,10 @@ export default function PublicReservationFlow({
       memberPhone={phone}
       locationSlug={locationSlug}
       hideTableSelection={true}
+      bypassCodeValidated={codeValidated}
+      bypassCodeId={validatedCodeId}
+      bypassCodeUsed={codeValidated ? bypassCode : null}
+      validationId={validationId}
       onBack={() => setStep('fee-notice')}
       onReservationCreated={() => {
         if (onReservationCreated) {

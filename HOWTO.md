@@ -782,6 +782,9 @@ While focusing on aesthetics, maintain accessibility:
 - `checked_in` (BOOLEAN)
 - `source` (TEXT) - 'website', 'text', 'manual', 'rsvp_private_event'
 - `private_event_id` (UUID, FK) - For RSVP reservations
+- `bypass_code_used` (TEXT) - The bypass code that was used (if any)
+- `bypass_code_id` (UUID, FK → location_bypass_codes) - References bypass code
+- `cover_charge_waived` (BOOLEAN) - Whether cover charge was waived via bypass code
 - `notes` (TEXT)
 - `created_at`, `updated_at`
 
@@ -813,6 +816,69 @@ While focusing on aesthetics, maintain accessibility:
 **Constraints**:
 - Composite unique: `(location_id, table_number)` - Allows duplicate table numbers across locations
 - Tables are location-specific (e.g., Noir KC has 20 tables, RooftopKC has 17 tables)
+
+#### `location_bypass_codes`
+- `id` (UUID, PK)
+- `location_id` (UUID, FK → locations) - References location
+- `code` (TEXT) - Bypass code (minimum 6 characters, stored in UPPERCASE)
+- `description` (TEXT) - Optional description of code purpose
+- `expires_at` (TIMESTAMPTZ) - Optional expiration date
+- `max_uses` (INTEGER) - Optional maximum usage limit
+- `current_uses` (INTEGER) - Number of times code has been used (default: 0)
+- `is_active` (BOOLEAN) - Whether code is active (default: true)
+- `created_at`, `updated_at` (TIMESTAMPTZ)
+
+**Purpose**: Allows non-members to bypass reservation fees for specific locations (e.g., building tenants at RooftopKC).
+
+**Constraints**:
+- `code_min_length` CHECK constraint: Code must be at least 6 characters
+- `uses_not_exceed_max` CHECK constraint: current_uses cannot exceed max_uses
+- `unique_active_code_per_location` UNIQUE INDEX: Only one active code with the same value per location (case-insensitive via UPPER())
+
+**Notes**:
+- Codes are case-insensitive (validated using UPPER() comparison)
+- Soft-delete via `is_active` flag (deactivation instead of deletion)
+- Usage tracking is atomic via database function with row-level locking
+- Validation occurs before payment screen in reservation flow
+
+**Indexes**:
+- `idx_location_bypass_codes_location_id` - Fast location lookup
+- `idx_location_bypass_codes_code` - Fast code lookup
+- `idx_active_codes` (partial) - WHERE is_active = true
+- `unique_active_code_per_location` (partial unique) - Prevents duplicate active codes
+
+#### `location_bypass_code_usage_log`
+- `id` (UUID, PK)
+- `bypass_code_id` (UUID, FK → location_bypass_codes) - References bypass code
+- `reservation_id` (UUID, FK → reservations) - References reservation
+- `user_phone` (TEXT) - User's phone number
+- `user_email` (TEXT) - User's email address
+- `party_size` (INTEGER) - Number of guests in reservation
+- `amount_waived` (DECIMAL) - Dollar amount of fee waived
+- `ip_address` (TEXT) - User's IP address for audit trail
+- `used_at` (TIMESTAMPTZ) - Timestamp of code usage (default: NOW())
+
+**Purpose**: Audit trail for bypass code usage, tracks who used codes and when.
+
+**Constraints**:
+- ON DELETE CASCADE: Deleting bypass code removes associated logs
+
+**Notes**:
+- Separate from reservations table for dedicated audit tracking
+- Logs are created during reservation creation, not during validation
+- Stores detailed information for compliance and analytics
+
+**Indexes**:
+- `idx_bypass_usage_code_id` - Fast lookup by code
+- `idx_bypass_usage_reservation_id` - Fast lookup by reservation
+- `idx_bypass_usage_used_at` - Chronological sorting
+
+**Database Function**: `validate_and_use_bypass_code(p_location_slug TEXT, p_code TEXT)`
+- Returns: TABLE(is_valid BOOLEAN, bypass_code_id UUID, message TEXT)
+- Validates code existence, expiration, max uses, and active status
+- Atomically increments `current_uses` using row-level locking (FOR UPDATE)
+- Case-insensitive matching via UPPER() comparison
+- Used by validation API endpoint before payment
 
 #### `campaigns`
 - `id` (UUID, PK)
@@ -2069,6 +2135,90 @@ Database-level security via Supabase RLS:
    - `schedule-reservation-reminders` API called
    - Creates `scheduled_reservation_reminders` entries
    - Based on active templates
+
+### Bypass Code Workflow (Fee Waiver for Non-Members)
+
+**Purpose**: Allow specific non-members (e.g., building tenants) to make reservations without paying cover charges by using special bypass codes.
+
+**Admin Configuration** (`/admin/settings` → Location Tab):
+1. **Create bypass code**
+   - Click "Add New Code" button
+   - Enter code (min 6 characters) or click "Generate" for random code
+   - Optional: Add description (e.g., "Building tenants access")
+   - Optional: Set expiration date
+   - Optional: Set maximum usage limit
+   - Code is stored in UPPERCASE, case-insensitive validation
+2. **Manage codes**
+   - View list of all codes with usage statistics
+   - Edit code details (description, expiration, max uses)
+   - Copy code to clipboard
+   - Deactivate unused/compromised codes (soft delete)
+
+**Public Reservation Flow** (Step 2: Fee Notice):
+1. **User enters phone number** → Proceeds to fee notice screen
+2. **Fee notice displays**:
+   - Shows cover charge amount: `$XX per person`
+   - Optional bypass code input field: "Have a bypass code?"
+   - User enters code (case-insensitive)
+3. **Code validation**:
+   - `POST /api/locations/{slug}/validate-bypass-code`
+   - Backend checks:
+     - Code exists for this location
+     - Code is active (`is_active = true`)
+     - Code has not expired (`expires_at > NOW()` or NULL)
+     - Code has not reached max uses (`current_uses < max_uses` or NULL)
+   - If valid: Increments `current_uses` atomically (row-level locking)
+   - Rate limiting: 5 attempts per minute per IP
+4. **Valid code flow**:
+   - ✓ Success message: "Code validated! Reservation fee has been waived."
+   - Button text changes: "Continue (No Fee)"
+   - Proceeds directly to reservation form (skips payment)
+5. **Invalid code flow**:
+   - Error message: "Invalid code" / "Code has expired" / "Code has reached maximum uses"
+   - User can try again or proceed to payment normally
+6. **Reservation creation**:
+   - Reservation saved with bypass code data:
+     - `bypass_code_used`: The code string
+     - `bypass_code_id`: UUID of bypass code
+     - `cover_charge_waived`: true
+   - Usage logged in `location_bypass_code_usage_log`:
+     - User phone, email, party size
+     - Amount waived (`cover_price * party_size`)
+     - IP address, timestamp
+
+**API Endpoints**:
+- `GET /api/locations/{slug}/bypass-codes` - List codes (admin)
+- `POST /api/locations/{slug}/bypass-codes` - Create code (admin)
+- `PUT /api/locations/{slug}/bypass-codes/{id}` - Update code (admin)
+- `DELETE /api/locations/{slug}/bypass-codes/{id}` - Deactivate code (admin)
+- `POST /api/locations/{slug}/validate-bypass-code` - Validate code (public)
+
+**Components**:
+- `src/components/BypassCodeManager.tsx` - Admin management interface
+- `src/components/AddBypassCodeModal.tsx` - Create/edit modal
+- `src/components/PublicReservationFlow.tsx` - Code input on step 2
+- `src/components/member/SimpleReservationRequestModal.tsx` - Skip payment when code valid
+
+**Database Function**:
+- `validate_and_use_bypass_code(p_location_slug TEXT, p_code TEXT)`
+  - Atomic validation and usage increment
+  - Returns: `(is_valid BOOLEAN, bypass_code_id UUID, message TEXT)`
+
+**Security Features**:
+- Rate limiting: 5 validation attempts per minute per IP
+- Row-level security (RLS) policies: Admin-only access to management
+- Service role policy: Allows public validation API
+- Audit trail: All usage logged with IP addresses
+- Row-level locking: Prevents race conditions on usage increment
+- Case-insensitive validation: User-friendly code entry
+
+**Business Rules**:
+- Codes are location-specific (RooftopKC codes don't work at NoirKC)
+- Members never need bypass codes (always free)
+- Codes can be unlimited (no expiration, no max uses) or restricted
+- Deactivated codes cannot be reactivated (create new code instead)
+- Code strings cannot be changed after creation (prevents confusion)
+- Usage count increments during validation (not reservation creation)
 
 ### Campaign Processing Workflow
 
