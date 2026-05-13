@@ -1064,9 +1064,26 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
                       <div style={{
                         fontSize: '0.8125rem',
                         fontWeight: weeklyHours[index].enabled ? '600' : '500',
-                        color: weeklyHours[index].enabled ? '#1F1F1F' : '#6e6e73'
+                        color: weeklyHours[index].enabled ? '#1F1F1F' : '#6e6e73',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
                       }}>
-                        {day} <span style={{ color: '#A59480', fontWeight: '400', fontSize: '0.6875rem' }}>{dateLabel}</span>
+                        <span>{day} <span style={{ color: '#A59480', fontWeight: '400', fontSize: '0.6875rem' }}>{dateLabel}</span></span>
+                        {!weeklyHours[index].enabled && (
+                          <span style={{
+                            fontSize: '0.625rem',
+                            fontWeight: '600',
+                            color: '#c41e3a',
+                            background: 'rgba(196, 30, 58, 0.1)',
+                            padding: '0.125rem 0.375rem',
+                            borderRadius: '4px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.025em'
+                          }}>
+                            Closed
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => weeklyHours[index].enabled ? addWeeklyTimeRange(index) : toggleWeeklyDay(index)}
