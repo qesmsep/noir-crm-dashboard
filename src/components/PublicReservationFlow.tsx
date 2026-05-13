@@ -439,7 +439,7 @@ export default function PublicReservationFlow({
                 <p style={{ fontSize: '0.875rem', color: '#1F2937', fontWeight: '600', margin: '0 0 0.75rem 0' }}>
                   Have a bypass code?
                 </p>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <input
                     type="text"
                     value={bypassCode}
@@ -455,8 +455,8 @@ export default function PublicReservationFlow({
                     }}
                     placeholder="Enter code"
                     style={{
-                      flex: 1,
-                      height: '40px',
+                      width: '100%',
+                      height: '44px',
                       padding: '0 0.75rem',
                       border: codeError ? '1px solid #DC2626' : (codeValidated ? '1px solid #10B981' : '1px solid #D1D5DB'),
                       borderRadius: '8px',
@@ -471,7 +471,8 @@ export default function PublicReservationFlow({
                     onClick={validateBypassCode}
                     disabled={isValidatingCode || !bypassCode.trim()}
                     style={{
-                      height: '40px',
+                      width: '100%',
+                      height: '44px',
                       padding: '0 1rem',
                       backgroundColor: isValidatingCode ? '#D1D5DB' : '#A59480',
                       color: 'white',
