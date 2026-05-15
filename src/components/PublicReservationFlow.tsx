@@ -19,7 +19,6 @@ export default function PublicReservationFlow({
   locationSlug,
   onReservationCreated,
 }: Props) {
-  console.log('PublicReservationFlow - isOpen:', isOpen, 'locationSlug:', locationSlug);
   const { toast } = useToast();
   const [step, setStep] = useState<'phone' | 'fee-notice' | 'reservation'>('phone');
   const [phone, setPhone] = useState('');
@@ -52,9 +51,7 @@ export default function PublicReservationFlow({
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        setStep('phone');
-        setPhone('');
-        onClose();
+        handleClose();
       }
     };
 
@@ -62,7 +59,7 @@ export default function PublicReservationFlow({
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   // Fetch location display name
   useEffect(() => {
@@ -211,16 +208,12 @@ export default function PublicReservationFlow({
     }
   };
 
-  const handleProceedToReservation = () => {
+  const handleProceedToReservation = async () => {
     // If code is entered but not validated, validate it first
     if (bypassCode.trim() && !codeValidated && !isValidatingCode) {
-      validateBypassCode().then(() => {
-        // After validation attempt, proceed regardless
-        setStep('reservation');
-      });
-    } else {
-      setStep('reservation');
+      await validateBypassCode();
     }
+    setStep('reservation');
   };
 
   if (!isOpen) return null;
@@ -294,7 +287,7 @@ export default function PublicReservationFlow({
               type="tel"
               value={phone}
               onChange={handlePhoneChange}
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handlePhoneSubmit();
                 }
@@ -428,14 +421,36 @@ export default function PublicReservationFlow({
                 Non-refundable unless cancelled by {locationName}
               </p>
 
+              <button
+                onClick={handleProceedToReservation}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  backgroundColor: codeValidated ? '#10B981' : '#A59480',
+                  color: 'white',
+                  fontSize: '0.9375rem',
+                  fontWeight: '600',
+                  borderRadius: '10px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: codeValidated ? '0 2px 8px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(165, 148, 128, 0.2)',
+                  transition: 'all 0.2s',
+                  marginBottom: '1rem',
+                }}
+              >
+                {codeValidated ? 'Continue (No Fee)' : 'Continue with Reservation'}
+              </button>
+
               {/* Bypass Code Section */}
               <div style={{
-                marginBottom: '1rem',
                 padding: '1rem',
                 backgroundColor: '#F9FAFB',
                 borderRadius: '8px',
                 border: '1px solid #E5E7EB',
               }}>
+                <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: '0 0 0.75rem 0', textAlign: 'center' }}>
+                  Have an access code?
+                </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <input
                     type="text"
@@ -445,12 +460,12 @@ export default function PublicReservationFlow({
                       setCodeError(null);
                       setCodeValidated(false);
                     }}
-                    onKeyPress={(e) => {
+                    onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         validateBypassCode();
                       }
                     }}
-                    placeholder="Access Code"
+                    placeholder="Enter code here"
                     style={{
                       width: '100%',
                       height: '44px',
@@ -495,25 +510,6 @@ export default function PublicReservationFlow({
                   </p>
                 )}
               </div>
-
-              <button
-                onClick={handleProceedToReservation}
-                style={{
-                  width: '100%',
-                  height: '44px',
-                  backgroundColor: codeValidated ? '#10B981' : '#A59480',
-                  color: 'white',
-                  fontSize: '0.9375rem',
-                  fontWeight: '600',
-                  borderRadius: '10px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: codeValidated ? '0 2px 8px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(165, 148, 128, 0.2)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {codeValidated ? 'Continue (No Fee)' : 'Continue with Reservation'}
-              </button>
             </div>
 
             {/* Membership Benefits Section */}
