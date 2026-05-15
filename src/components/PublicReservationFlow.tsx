@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabase';
@@ -38,6 +38,17 @@ export default function PublicReservationFlow({
   const MEMBERSHIP_PHONE = '9137774488';
   const MEMBERSHIP_SMS_BODY = 'MEMBERSHIP';
 
+  const handleClose = useCallback(() => {
+    setStep('phone');
+    setPhone('');
+    setBypassCode('');
+    setCodeValidated(false);
+    setCodeError(null);
+    setValidatedCodeId(null);
+    setValidationId(null);
+    onClose();
+  }, [onClose]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -59,7 +70,7 @@ export default function PublicReservationFlow({
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }
-  }, [isOpen]);
+  }, [isOpen, handleClose]);
 
   // Fetch location display name
   useEffect(() => {
@@ -106,10 +117,21 @@ export default function PublicReservationFlow({
   };
 
   const handlePhoneSubmit = async () => {
-    if (!phone.trim()) {
+    const digits = phone.replace(/\D/g, '');
+
+    if (digits.length === 0) {
       toast({
         title: 'Phone Required',
         description: 'Please enter your phone number',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (digits.length !== 10) {
+      toast({
+        title: 'Invalid Phone',
+        description: 'Please enter a valid 10-digit phone number',
         variant: 'error',
       });
       return;
@@ -150,16 +172,6 @@ export default function PublicReservationFlow({
     }
   };
 
-  const handleClose = () => {
-    setStep('phone');
-    setPhone('');
-    setBypassCode('');
-    setCodeValidated(false);
-    setCodeError(null);
-    setValidatedCodeId(null);
-    setValidationId(null);
-    onClose();
-  };
 
   const validateBypassCode = async () => {
     if (!bypassCode.trim()) {
@@ -466,6 +478,7 @@ export default function PublicReservationFlow({
                       }
                     }}
                     placeholder="Enter code here"
+                    disabled={isValidatingCode}
                     style={{
                       width: '100%',
                       height: '44px',
@@ -473,10 +486,11 @@ export default function PublicReservationFlow({
                       border: codeError ? '1px solid #DC2626' : (codeValidated ? '1px solid #10B981' : '1px solid #D1D5DB'),
                       borderRadius: '8px',
                       fontSize: '0.875rem',
-                      backgroundColor: 'white',
+                      backgroundColor: isValidatingCode ? '#F3F4F6' : 'white',
                       outline: 'none',
                       fontFamily: 'monospace',
                       letterSpacing: '0.05em',
+                      cursor: isValidatingCode ? 'not-allowed' : 'text',
                     }}
                   />
                   <button
