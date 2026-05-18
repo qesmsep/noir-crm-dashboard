@@ -46,7 +46,7 @@ async function checkExistingLedgerEntry(stripeInvoiceId, stripePaymentIntentId, 
       .from('ledger')
       .select('id')
       .eq('stripe_payment_intent_id', stripePaymentIntentId)
-      .eq('type', 'credit') // Only check for main payment/credit entry
+      .in('type', ['payment', 'credit']) // Check for main payment/credit entry
       .limit(1);
     if (existingPaymentIntent && existingPaymentIntent.length > 0) return true;
   }
@@ -444,7 +444,7 @@ export default async function handler(req, res) {
             .from('ledger')
             .select('id, account_id')
             .eq('stripe_payment_intent_id', charge.payment_intent)
-            .eq('type', 'credit')
+            .eq('type', 'payment')
             .single();
 
           if (existingEntry) {
