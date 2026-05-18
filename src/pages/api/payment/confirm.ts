@@ -361,6 +361,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     date: string;
     note: string;
     stripe_payment_intent_id: string;
+    ledger_entry_key: string;
     status: string;
   }> = [];
 
@@ -373,6 +374,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
     date: getTodayLocalDate(),
     note: `Initial ${waitlist.selected_membership} membership payment`,
     stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+    ledger_entry_key: waitlist.stripe_payment_intent_id,
     status: paymentStatus
   });
 
@@ -386,6 +388,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       date: getTodayLocalDate(),
       note: 'Membership administration fee',
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+      ledger_entry_key: `${waitlist.stripe_payment_intent_id}_admin_fee`,
       status: 'cleared' // Fees are always cleared immediately
     });
   }
@@ -401,6 +404,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       date: getTodayLocalDate(),
       note: `Additional members fee (${additionalMemberCount} member${additionalMemberCount > 1 ? 's' : ''})`,
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+      ledger_entry_key: `${waitlist.stripe_payment_intent_id}_additional_members`,
       status: 'cleared' // Fees are always cleared immediately
     });
   }
@@ -415,6 +419,7 @@ async function createMemberFromWaitlist(waitlist: any, paymentIntent: any) {
       date: getTodayLocalDate(),
       note: 'Credit card processing fee',
       stripe_payment_intent_id: waitlist.stripe_payment_intent_id,
+      ledger_entry_key: `${waitlist.stripe_payment_intent_id}_processing_fee`,
       status: 'cleared' // Fees are always cleared immediately
     });
   }
