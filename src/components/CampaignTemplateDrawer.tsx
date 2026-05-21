@@ -371,6 +371,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       return;
     }
 
+    // Validate recipient type matches campaign trigger type
+    const validRecipients = getRecipientOptions().map(opt => opt.value);
+    if (!validRecipients.includes(formData.recipient_type)) {
+      toast({
+        title: 'Validation Error',
+        description: `Recipient type "${formData.recipient_type}" is not valid for ${campaignTriggerType} campaigns. Please select a valid recipient type.`,
+        status: 'error',
+        duration: 5000,
+      });
+      return;
+    }
+
     // Log timing information for message sending
     console.log('=== MESSAGE TIMING ANALYSIS ===');
     if (formData.timing_type === 'specific_time') {

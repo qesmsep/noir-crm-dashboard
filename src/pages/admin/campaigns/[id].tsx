@@ -32,7 +32,6 @@ import { sortCampaignTemplates } from '../../../utils/campaignSorting';
 
 interface Campaign {
   id: string;
-  campaign_id: string;
   name: string;
   description: string;
   trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members';
@@ -108,8 +107,7 @@ export default function CampaignEditPage() {
       
       const data = await response.json();
       console.log('Campaign data received:', data);
-      console.log('Campaign campaign_id:', data?.campaign_id);
-      
+
       if (!data) {
         throw new Error('Campaign not found');
       }
@@ -494,7 +492,7 @@ export default function CampaignEditPage() {
                       Campaign ID
                     </Text>
                     <Text fontSize="md" fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="#353535">
-                      {campaign.campaign_id}
+                      {campaign.id}
                     </Text>
                   </GridItem>
                   {/* Status */}
