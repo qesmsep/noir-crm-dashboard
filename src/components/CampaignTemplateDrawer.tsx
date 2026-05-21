@@ -383,7 +383,6 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       return;
     }
 
-
     setIsSaving(true);
     try {
       const url = isCreateMode 
