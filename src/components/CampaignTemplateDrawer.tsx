@@ -266,8 +266,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch template',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -300,8 +299,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         toast({
           title: 'Error',
           description: 'Failed to fetch private events',
-          status: 'error',
-          duration: 3000,
+          variant: 'destructive',
         });
       }
     } catch (error) {
@@ -309,8 +307,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch private events',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsLoadingPrivateEvents(false);
@@ -365,8 +362,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
       return;
     }
@@ -377,8 +373,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: `Recipient type "${formData.recipient_type}" is not valid for ${campaignTriggerType} campaigns. Please select a valid recipient type.`,
-        status: 'error',
-        duration: 5000,
+        variant: 'destructive',
       });
       return;
     }
@@ -499,8 +494,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to save template',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -535,8 +529,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to delete template',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);

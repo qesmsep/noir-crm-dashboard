@@ -17,6 +17,11 @@ function maskPhoneNumber(phone: string): string {
 }
 
 function formatPhoneForStorage(phone: string): string {
+  // Handle null/undefined/empty strings
+  if (!phone) {
+    return '';
+  }
+
   // Check if already in international format first (before removing non-digits)
   if (phone.startsWith('+')) {
     const digits = phone.replace(/\D/g, '');
@@ -27,6 +32,11 @@ function formatPhoneForStorage(phone: string): string {
 
   // Remove all non-digits
   const digits = phone.replace(/\D/g, '');
+
+  // Return empty string if no digits
+  if (!digits) {
+    return '';
+  }
 
   // Convert to international format +1XXXXXXXXXX
   if (digits.length === 10) {
@@ -274,7 +284,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // For reservation campaigns, use location timezone if available
           // KNOWN LIMITATION: Multi-location campaigns with different timezones
           // Currently uses the first location's timezone for ALL messages in the campaign.
-          // TODO(#multi-location-tz): Future enhancement - process each location's messages in their respective timezone
+          // TODO: Future enhancement - process each location's messages in their respective timezone
+          // Create GitHub issue to track: https://github.com/qesmsep/noir-crm-dashboard/issues
           if ((triggerType === 'reservation_time' || triggerType === 'reservation_created') &&
               campaignLocationIds && campaignLocationIds.length > 0) {
             const { data: locationData } = await supabaseAdmin
@@ -375,8 +386,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // For reservation_time triggers, we'll create "virtual members" from reservations
             // This allows sending messages to anyone with a reservation, not just members
             const virtualMembers = reservations.map(reservation => {
-          // Convert phone number to international format using utility
-          const formattedPhone = formatPhoneForStorage(reservation.phone);
+          // Convert phone number to international format using utility (guard against null)
+          const formattedPhone = formatPhoneForStorage(reservation.phone || '');
 
           return {
             member_id: crypto.randomUUID(), // Generate proper UUID
@@ -437,8 +448,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             // Create virtual members from recently created reservations
             const virtualMembers = reservationData.map(reservation => {
-          // Convert phone number to international format using utility
-          const formattedPhone = formatPhoneForStorage(reservation.phone);
+          // Convert phone number to international format using utility (guard against null)
+          const formattedPhone = formatPhoneForStorage(reservation.phone || '');
 
           return {
             member_id: crypto.randomUUID(),
@@ -676,6 +687,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           if (message.timing_type === 'specific_time') {
             // Send at specific time on trigger date (or specific date if provided)
+            // NOTE: specific_time_quantity, specific_time_unit, specific_time_proximity fields are deprecated
+            // These offset fields were removed as they were not in the actual database schema
+            // Existing campaigns using 'specific_time' will send at the specified time on the trigger date
+            // without any day offset calculation. If offset behavior is needed, use 'relative' timing_type instead.
             const [hours, minutes] = message.specific_time?.split(':').map(Number) || [10, 0];
 
             console.log(`Specific time: ${hours}:${minutes} on ${message.specific_date || 'trigger date'}`);
@@ -965,9 +980,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (triggerType === 'member_birthday' || triggerType === 'member_renewal') {
             const todayStart = now.setZone(businessTimezone).startOf('day').toISO();
             const todayEnd = now.setZone(businessTimezone).endOf('day').toISO();
-            // Check both scheduled_for (for pending) and sent_time (for sent) to catch all today's messages
+            // Check both scheduled_time (for pending) and sent_time (for sent) to catch all today's messages
+            // Use proper AND grouping: (scheduled_time between today) OR (sent_time between today)
             duplicateCheckQuery = duplicateCheckQuery
-              .or(`scheduled_time.gte.${todayStart},scheduled_time.lte.${todayEnd},sent_time.gte.${todayStart},sent_time.lte.${todayEnd}`);
+              .or(`and(scheduled_time.gte.${todayStart},scheduled_time.lte.${todayEnd}),and(sent_time.gte.${todayStart},sent_time.lte.${todayEnd})`);
             console.log(`🔄 Birthday/Renewal campaign - checking for duplicates TODAY only in ${businessTimezone} (${todayStart} to ${todayEnd})`);
           }
 
