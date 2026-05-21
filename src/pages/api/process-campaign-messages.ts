@@ -22,6 +22,14 @@ function formatPhoneForDisplay(phone: string): string {
 }
 
 function formatPhoneForStorage(phone: string): string {
+  // Check if already in international format first (before removing non-digits)
+  if (phone.startsWith('+')) {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length >= 11) {
+      return phone; // Already in valid international format
+    }
+  }
+
   // Remove all non-digits
   const digits = phone.replace(/\D/g, '');
 
@@ -30,8 +38,6 @@ function formatPhoneForStorage(phone: string): string {
     return '+1' + digits;
   } else if (digits.length === 11 && digits.startsWith('1')) {
     return '+' + digits;
-  } else if (digits.startsWith('+')) {
-    return phone; // Already in international format
   }
 
   return '+' + digits; // Add + prefix for other international numbers
@@ -154,6 +160,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name,
           trigger_type,
           applies_to_all_locations,
+          selected_private_event_id,
           campaign_locations(
             location_id,
             location:locations!inner(id, name, slug)
@@ -270,6 +277,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           // Update timezone based on campaign type and locations
           // For reservation campaigns, use location timezone if available
+          // KNOWN LIMITATION: Multi-location campaigns with different timezones
+          // Currently uses the first location's timezone for ALL messages in the campaign.
+          // TODO: Future enhancement - process each location's messages in their respective timezone
           if ((triggerType === 'reservation_time' || triggerType === 'reservation_created') &&
               campaignLocationIds && campaignLocationIds.length > 0) {
             const { data: locationData } = await supabaseAdmin
@@ -281,6 +291,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             if (locationData?.timezone) {
               businessTimezone = locationData.timezone;
               console.log(`📍 Using location timezone: ${businessTimezone} (location: ${campaignLocationIds[0]})`);
+              if (campaignLocationIds.length > 1) {
+                console.log(`⚠️  WARNING: Multi-location campaign using only first location's timezone. ${campaignLocationIds.length - 1} other locations may have different timezones.`);
+              }
             } else {
               console.log(`⚠️  Location ${campaignLocationIds[0]} has no timezone, using default: ${businessTimezone}`);
             }
@@ -288,85 +301,85 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`🕐 Using default timezone: ${businessTimezone} (trigger: ${triggerType})`);
           }
 
-      if (triggerType === 'member_signup') {
-        console.log('👥 Fetching members for member_signup trigger...');
-        // Get members who joined recently (within last 30 days)
-        const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
-        console.log(`📅 Looking for members who joined after: ${thirtyDaysAgo}`);
+          if (triggerType === 'member_signup') {
+            console.log('👥 Fetching members for member_signup trigger...');
+            // Get members who joined recently (within last 30 days)
+            const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
+            console.log(`📅 Looking for members who joined after: ${thirtyDaysAgo}`);
 
-        let query = supabaseAdmin
-          .from('members')
-          .select('*')
-          .gte('join_date', thirtyDaysAgo)
-          .order('join_date', { ascending: false });
+            let query = supabaseAdmin
+              .from('members')
+              .select('*')
+              .gte('join_date', thirtyDaysAgo)
+              .order('join_date', { ascending: false });
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
-          query = query.in('location_id', campaignLocationIds);
-          console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
+              query = query.in('location_id', campaignLocationIds);
+              console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
+            }
 
-        const { data: recentMembers, error: membersError } = await query;
+            const { data: recentMembers, error: membersError } = await query;
 
-        if (membersError) {
-          console.error('❌ Error fetching recent members:', membersError);
-          continue;
-        }
-        members = recentMembers || [];
-        console.log(`✅ Found ${members.length} recent members for member_signup trigger`);
-      } else if (triggerType === 'reservation_time') {
-        console.log('📅 Fetching reservations for reservation_time trigger...');
-        // Get members with upcoming reservations
-        // Look for reservations in the next 24 hours to catch messages that should be sent soon
-        const searchStart = now.minus({ hours: 1 }).toISO();
-        const searchEnd = now.plus({ days: 1 }).toISO();
-        console.log(`📅 Looking for reservations between: ${searchStart} and ${searchEnd}`);
+            if (membersError) {
+              console.error('❌ Error fetching recent members:', membersError);
+              continue;
+            }
+            members = recentMembers || [];
+            console.log(`✅ Found ${members.length} recent members for member_signup trigger`);
+          } else if (triggerType === 'reservation_time') {
+            console.log('📅 Fetching reservations for reservation_time trigger...');
+            // Get members with upcoming reservations
+            // Look for reservations in the next 24 hours to catch messages that should be sent soon
+            const searchStart = now.minus({ hours: 1 }).toISO();
+            const searchEnd = now.plus({ days: 1 }).toISO();
+            console.log(`📅 Looking for reservations between: ${searchStart} and ${searchEnd}`);
 
-        let reservationQuery = supabaseAdmin
+            let reservationQuery = supabaseAdmin
           .from('reservations')
           .select('phone, start_time, end_time, party_size, first_name, last_name, email, location_id')
           .gte('start_time', searchStart) // Include reservations from 1 hour ago
           .lte('start_time', searchEnd); // Up to 1 day in the future
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           reservationQuery = reservationQuery.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering reservations by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: reservationData, error: reservationError } = await reservationQuery;
+            const { data: reservationData, error: reservationError } = await reservationQuery;
 
-        if (reservationError) {
+            if (reservationError) {
           console.error('❌ Error fetching reservations:', reservationError);
           continue;
-        }
+            }
 
-        if (!reservationData || reservationData.length === 0) {
+            if (!reservationData || reservationData.length === 0) {
           console.log('ℹ️  No upcoming reservations found');
           continue;
-        }
+            }
 
-        console.log('📋 Found reservations:', reservationData.map(r => ({
+            console.log('📋 Found reservations:', reservationData.map(r => ({
           phone: r.phone,
           start_time: r.start_time,
           party_size: r.party_size
-        })));
+            })));
 
-        // Store reservations for later use
-        reservations = reservationData;
+            // Store reservations for later use
+            reservations = reservationData;
 
-        // Get unique phone numbers from reservations
-        const phoneNumbers = [...new Set(reservations.map(r => r.phone).filter(Boolean))];
-        console.log('📱 Found phone numbers in reservations:', phoneNumbers);
-        
-        if (phoneNumbers.length === 0) {
+            // Get unique phone numbers from reservations
+            const phoneNumbers = [...new Set(reservations.map(r => r.phone).filter(Boolean))];
+            console.log('📱 Found phone numbers in reservations:', phoneNumbers);
+            
+            if (phoneNumbers.length === 0) {
           console.log('⚠️  No phone numbers found in reservations');
           continue;
-        }
-        
-        // For reservation_time triggers, we'll create "virtual members" from reservations
-        // This allows sending messages to anyone with a reservation, not just members
-        const virtualMembers = reservations.map(reservation => {
+            }
+            
+            // For reservation_time triggers, we'll create "virtual members" from reservations
+            // This allows sending messages to anyone with a reservation, not just members
+            const virtualMembers = reservations.map(reservation => {
           // Convert phone number to international format
           let formattedPhone = reservation.phone;
           const digits = reservation.phone.replace(/\D/g, '');
@@ -398,46 +411,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log(`✅ Created ${virtualMembers.length} virtual members from reservations`);
         members = virtualMembers;
-      } else if (triggerType === 'reservation_created') {
-        console.log('🆕 Fetching recently created reservations...');
-        // Get reservations created recently (within last 24 hours)
-        const searchStart = now.minus({ hours: 24 }).toISO();
-        const searchEnd = now.toISO();
-        console.log(`📅 Looking for reservations created between: ${searchStart} and ${searchEnd}`);
+          } else if (triggerType === 'reservation_created') {
+            console.log('🆕 Fetching recently created reservations...');
+            // Get reservations created recently (within last 24 hours)
+            const searchStart = now.minus({ hours: 24 }).toISO();
+            const searchEnd = now.toISO();
+            console.log(`📅 Looking for reservations created between: ${searchStart} and ${searchEnd}`);
 
-        let reservationQuery = supabaseAdmin
+            let reservationQuery = supabaseAdmin
           .from('reservations')
           .select('phone, start_time, end_time, party_size, created_at, first_name, last_name, email, location_id')
           .gte('created_at', searchStart) // Reservations created in last 24 hours
           .lte('created_at', searchEnd); // Up to now
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           reservationQuery = reservationQuery.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering reservations by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: reservationData, error: reservationError } = await reservationQuery;
+            const { data: reservationData, error: reservationError } = await reservationQuery;
 
-        if (reservationError) {
+            if (reservationError) {
           console.error('❌ Error fetching recent reservations:', reservationError);
           continue;
-        }
+            }
 
-        if (!reservationData || reservationData.length === 0) {
+            if (!reservationData || reservationData.length === 0) {
           console.log('ℹ️  No recently created reservations found');
           continue;
-        }
+            }
 
-        console.log('📋 Found recently created reservations:', reservationData.map(r => ({
+            console.log('📋 Found recently created reservations:', reservationData.map(r => ({
           phone: r.phone,
           created_at: r.created_at,
           first_name: r.first_name,
           last_name: r.last_name
-        })));
+            })));
 
-        // Create virtual members from recently created reservations
-        const virtualMembers = reservationData.map(reservation => {
+            // Create virtual members from recently created reservations
+            const virtualMembers = reservationData.map(reservation => {
           // Convert phone number to international format
           let formattedPhone = reservation.phone;
           const digits = reservation.phone.replace(/\D/g, '');
@@ -469,34 +482,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log(`✅ Created ${virtualMembers.length} virtual members from recent reservations`);
         members = virtualMembers;
-      } else if (triggerType === 'member_birthday') {
-        console.log('🎂 Fetching members for birthday check...');
-        // Get all members with dob and filter by birthday in JavaScript
-        let query = supabaseAdmin
+          } else if (triggerType === 'member_birthday') {
+            console.log('🎂 Fetching members for birthday check...');
+            // Get all members with dob and filter by birthday in JavaScript
+            let query = supabaseAdmin
           .from('members')
           .select('*')
           .not('dob', 'is', null);
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           query = query.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: allMembers, error: membersError } = await query;
+            const { data: allMembers, error: membersError } = await query;
 
-        if (membersError) {
+            if (membersError) {
           console.error('❌ Error fetching members for birthday check:', membersError);
           continue;
-        }
+            }
 
-        console.log(`📊 Found ${allMembers?.length || 0} members with DOB`);
+            console.log(`📊 Found ${allMembers?.length || 0} members with DOB`);
 
-        // Filter members whose birthday is today
-        const today = now.toFormat('MM-dd');
-        console.log(`📅 Looking for birthdays on: ${today}`);
+            // Filter members whose birthday is today
+            const today = now.toFormat('MM-dd');
+            console.log(`📅 Looking for birthdays on: ${today}`);
 
-        members = (allMembers || []).filter(member => {
+            members = (allMembers || []).filter(member => {
           if (!member.dob) return false;
 
           // Convert dob to MM-dd format for comparison
@@ -504,37 +517,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const dobFormatted = dobDate.toFormat('MM-dd');
 
           return dobFormatted === today;
-        });
+            });
 
-        console.log(`🎂 Found ${members.length} members with birthdays today`);
-      } else if (triggerType === 'member_renewal') {
-        console.log('🔄 Fetching members for renewal check...');
-        // Get all members and filter by renewal date calculated from join_date
-        let query = supabaseAdmin
+            console.log(`🎂 Found ${members.length} members with birthdays today`);
+          } else if (triggerType === 'member_renewal') {
+            console.log('🔄 Fetching members for renewal check...');
+            // Get all members and filter by renewal date calculated from join_date
+            let query = supabaseAdmin
           .from('members')
           .select('*')
           .not('join_date', 'is', null);
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           query = query.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: allMembers, error: membersError } = await query;
+            const { data: allMembers, error: membersError } = await query;
 
-        if (membersError) {
+            if (membersError) {
           console.error('❌ Error fetching members for renewal check:', membersError);
           continue;
-        }
+            }
 
-        console.log(`📊 Found ${allMembers?.length || 0} members with join_date`);
+            console.log(`📊 Found ${allMembers?.length || 0} members with join_date`);
 
-        // Filter members whose renewal date is today (calculated from join_date)
-        const today = now.toFormat('yyyy-MM-dd');
-        console.log(`📅 Looking for renewals on: ${today}`);
+            // Filter members whose renewal date is today (calculated from join_date)
+            const today = now.toFormat('yyyy-MM-dd');
+            console.log(`📅 Looking for renewals on: ${today}`);
 
-        members = (allMembers || []).filter(member => {
+            members = (allMembers || []).filter(member => {
           if (!member.join_date) return false;
 
           // Calculate renewal date based on join_date
@@ -551,50 +564,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const isRenewalToday = nextRenewalDate.toFormat('yyyy-MM-dd') === today;
 
           return isRenewalToday;
-        });
+            });
 
-        console.log(`🔄 Found ${members.length} members with renewals today`);
-      } else if (triggerType === 'all_members') {
-        console.log('👥 Fetching all active members for all_members campaign...');
-        // Get all active members for all_members campaigns
-        let query = supabaseAdmin
+            console.log(`🔄 Found ${members.length} members with renewals today`);
+          } else if (triggerType === 'all_members') {
+            console.log('👥 Fetching all active members for all_members campaign...');
+            // Get all active members for all_members campaigns
+            let query = supabaseAdmin
           .from('members')
           .select('*')
           .in('status', ['active', 'paused']);
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           query = query.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: allMembers, error: membersError } = await query;
+            const { data: allMembers, error: membersError } = await query;
 
-        if (membersError) {
+            if (membersError) {
           console.error('❌ Error fetching all members:', membersError);
           continue;
-        }
+            }
 
-        members = allMembers || [];
-        console.log(`✅ Found ${members.length} active members for all_members campaign`);
+            members = allMembers || [];
+            console.log(`✅ Found ${members.length} active members for all_members campaign`);
       }
     }
 
       console.log(`👤 Processing ${members.length} members for campaign message: ${message.name}`);
       
       if (members.length === 0) {
-        console.log(`⚠️  No members found for campaign message: ${message.name} (trigger type: ${triggerType})`);
-        console.log(`📝 Message details:`, {
+            console.log(`⚠️  No members found for campaign message: ${message.name} (trigger type: ${triggerType})`);
+            console.log(`📝 Message details:`, {
           name: message.name,
           recipient_type: message.recipient_type,
           specific_phone: message.specific_phone,
           timing_type: message.timing_type,
           specific_time: message.specific_time
-        });
+            });
       }
 
       for (const member of members) {
-        try {
+            try {
           console.log(`\n👤 Processing member: ${member.first_name} ${member.last_name} (${member.phone})`);
           
           // Calculate send time based on message timing
@@ -691,7 +704,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             targetSendTime = relativeDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
             console.log(`Relative send time: ${targetSendTime.toISO()} (trigger: ${triggerDate.toISO()})`);
           } else {
-            console.log(`⚠️  Unknown timing_type: ${message.timing_type}`);
+            console.error(`❌ ERROR: Unknown timing_type: ${message.timing_type} for message ${message.id} (${message.name})`);
+
+            // Log to scheduled_messages table with failed status for visibility
+            const errorMessage = `Unknown timing_type: ${message.timing_type}`;
+            await supabaseAdmin
+              .from('scheduled_messages')
+              .insert({
+                member_id: member.member_id,
+                campaign_id: message.campaign_id,
+                campaign_message_id: message.id,
+                message_content: message.content,
+                scheduled_for: now.toISO(),
+                status: 'failed',
+                error_message: errorMessage,
+                created_at: now.toISO(),
+                updated_at: now.toISO()
+              });
+
+            // Also alert ops team if this is a critical campaign
+            if (message.campaigns?.name?.includes('URGENT') || message.campaigns?.name?.includes('CRITICAL')) {
+              console.error(`🚨 CRITICAL: Campaign "${message.campaigns.name}" has message with unknown timing_type`);
+            }
+
             continue;
           }
 
@@ -786,7 +821,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
               // {{event_time}} - Event time (e.g., "7:00 PM")
               if (eventData.event_time) {
-                const eventTime = DateTime.fromISO(eventData.event_time).toFormat('h:mm a');
+                const eventTime = DateTime.fromISO(eventData.event_time, { zone: businessTimezone }).toFormat('h:mm a');
                 messageContent = messageContent.replace(/\{\{event_time\}\}/g, eventTime);
               }
             }
@@ -917,12 +952,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           // For recurring triggers, only check TODAY's sends to allow annual/monthly repeats
           if (triggerType === 'member_birthday' || triggerType === 'member_renewal') {
-            const todayStart = now.startOf('day').toISO();
-            const todayEnd = now.endOf('day').toISO();
+            const todayStart = now.setZone(businessTimezone).startOf('day').toISO();
+            const todayEnd = now.setZone(businessTimezone).endOf('day').toISO();
             duplicateCheckQuery = duplicateCheckQuery
               .gte('sent_time', todayStart)
               .lte('sent_time', todayEnd);
-            console.log(`🔄 Birthday/Renewal campaign - checking for duplicates TODAY only (${todayStart} to ${todayEnd})`);
+            console.log(`🔄 Birthday/Renewal campaign - checking for duplicates TODAY only in ${businessTimezone} (${todayStart} to ${todayEnd})`);
           }
 
           const { data: existingMessages } = await duplicateCheckQuery.limit(1);
