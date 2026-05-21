@@ -1199,6 +1199,16 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           nowIndicator
           resourceAreaWidth={isMobile ? "40px" : "80px"}
           resourceAreaHeaderContent=""
+
+          // Prevent row expansion from events overflowing time window
+          resourceLaneDidMount={(arg) => {
+            // Force consistent row height
+            if (arg.el) {
+              arg.el.style.height = '32px';
+              arg.el.style.minHeight = '32px';
+              arg.el.style.maxHeight = '32px';
+            }
+          }}
           
           eventContent={(arg) => {
             if (arg.event.extendedProps.is_blocking) {
