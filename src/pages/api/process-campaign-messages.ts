@@ -6,6 +6,48 @@ import { DateTime } from 'luxon';
 const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
 const MESSAGE_SEND_WINDOW_PAST_MINUTES = 60; // Don't send messages more than 60 minutes late
 
+// Phone number utilities
+function maskPhoneNumber(phone: string): string {
+  // Show only last 4 digits for privacy
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length >= 4) {
+    return '***-' + digits.slice(-4);
+  }
+  return '****';
+}
+
+function formatPhoneForStorage(phone: string): string {
+  // Handle null/undefined/empty strings
+  if (!phone) {
+    return '';
+  }
+
+  // Check if already in international format first (before removing non-digits)
+  if (phone.startsWith('+')) {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length >= 11) {
+      return phone; // Already in valid international format
+    }
+  }
+
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, '');
+
+  // Return empty string if no digits
+  if (!digits) {
+    return '';
+  }
+
+  // Convert to international format +1XXXXXXXXXX
+  if (digits.length === 10) {
+    return '+1' + digits;
+  } else if (digits.length === 11 && digits.startsWith('1')) {
+    return '+' + digits;
+  }
+
+  return '+' + digits; // Add + prefix for other international numbers
+}
+
 // Helper function to generate and upload ledger PDF (same as BALANCE command)
 async function generateLedgerPdf(memberId: string, accountId: string) {
   try {
@@ -123,6 +165,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name,
           trigger_type,
           applies_to_all_locations,
+          selected_private_event_id,
           campaign_locations(
             location_id,
             location:locations!inner(id, name, slug)
@@ -166,9 +209,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const now = DateTime.now();
-    const businessTimezone = 'America/Chicago'; // Adjust as needed
+    const defaultTimezone = 'America/Chicago'; // Default fallback timezone
     console.log('⏰ Current time (UTC):', now.toISO());
-    console.log('⏰ Current time (business timezone):', now.setZone(businessTimezone).toISO());
+    console.log('⏰ Current time (default timezone):', now.setZone(defaultTimezone).toISO());
     console.log(`📊 Found ${messages.length} active campaign messages to process`);
     let processedCount = 0;
 
@@ -177,7 +220,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log(`📝 Processing campaign message: ${message.name}`);
         console.log(`🔍 DEBUG: Starting detailed processing for message: ${message.name}`);
         console.log(`📝 Message ID: ${message.id}`);
-        console.log(`📝 Campaign ID: ${message.campaign_id}`);
+        console.log(`📝 Campaign ID: ${message.campaigns?.id || 'Unknown'}`);
         console.log(`📝 Campaign Name: ${message.campaigns?.name || 'Unknown'}`);
         console.log(`📝 Recipient Type: ${message.recipient_type}`);
         console.log(`📝 Timing Type: ${message.timing_type}`);
@@ -190,10 +233,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const triggerType = message.campaigns?.trigger_type || 'member_signup';
         console.log(`🎯 Campaign trigger type: ${triggerType}`);
 
+        // Determine timezone - default to CST, will be updated for location-specific campaigns
+        let businessTimezone = defaultTimezone;
+
         // Special handling for specific_phone messages - always send to the specified phone
         let members: any[] = [];
         let reservations: any[] = []; // Add this to store reservations for reservation_time trigger
-        
+
         if (message.recipient_type === 'specific_phone' && message.specific_phone) {
           console.log('📱 Processing specific_phone message - will send to:', message.specific_phone);
           
@@ -234,103 +280,121 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             location_ids: campaignLocationIds
           });
 
-      if (triggerType === 'member_signup') {
-        console.log('👥 Fetching members for member_signup trigger...');
-        // Get members who joined recently (within last 30 days)
-        const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
-        console.log(`📅 Looking for members who joined after: ${thirtyDaysAgo}`);
+          // Update timezone based on campaign type and locations
+          // For reservation campaigns, use location timezone if available
+          // KNOWN LIMITATION: Multi-location campaigns with different timezones
+          // Currently uses the first location's timezone for ALL messages in the campaign.
+          // TODO: Future enhancement - process each location's messages in their respective timezone
+          // Create GitHub issue to track: https://github.com/qesmsep/noir-crm-dashboard/issues
+          if ((triggerType === 'reservation_time' || triggerType === 'reservation_created') &&
+              campaignLocationIds && campaignLocationIds.length > 0) {
+            const { data: locationData } = await supabaseAdmin
+              .from('locations')
+              .select('timezone')
+              .eq('id', campaignLocationIds[0])
+              .single();
 
-        let query = supabaseAdmin
-          .from('members')
-          .select('*')
-          .gte('join_date', thirtyDaysAgo)
-          .order('join_date', { ascending: false });
+            if (locationData?.timezone) {
+              businessTimezone = locationData.timezone;
+              console.log(`📍 Using location timezone: ${businessTimezone} (location: ${campaignLocationIds[0]})`);
+              if (campaignLocationIds.length > 1) {
+                console.log(`⚠️  WARNING: Multi-location campaign using only first location's timezone. ${campaignLocationIds.length - 1} other locations may have different timezones.`);
+              }
+            } else {
+              console.log(`⚠️  Location ${campaignLocationIds[0]} has no timezone, using default: ${businessTimezone}`);
+            }
+          } else {
+            console.log(`🕐 Using default timezone: ${businessTimezone} (trigger: ${triggerType})`);
+          }
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
-          query = query.in('location_id', campaignLocationIds);
-          console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+          if (triggerType === 'member_signup') {
+            console.log('👥 Fetching members for member_signup trigger...');
+            // Get members who joined recently (within last 30 days)
+            const thirtyDaysAgo = now.minus({ days: 30 }).toISO();
+            console.log(`📅 Looking for members who joined after: ${thirtyDaysAgo}`);
 
-        const { data: recentMembers, error: membersError } = await query;
+            let query = supabaseAdmin
+              .from('members')
+              .select('member_id, account_id, first_name, last_name, email, phone, member_type, join_date, location_id, status, created_at, updated_at')
+              .gte('join_date', thirtyDaysAgo)
+              .order('join_date', { ascending: false });
 
-        if (membersError) {
-          console.error('❌ Error fetching recent members:', membersError);
-          continue;
-        }
-        members = recentMembers || [];
-        console.log(`✅ Found ${members.length} recent members for member_signup trigger`);
-      } else if (triggerType === 'reservation_time') {
-        console.log('📅 Fetching reservations for reservation_time trigger...');
-        // Get members with upcoming reservations
-        // Look for reservations in the next 24 hours to catch messages that should be sent soon
-        const searchStart = now.minus({ hours: 1 }).toISO();
-        const searchEnd = now.plus({ days: 1 }).toISO();
-        console.log(`📅 Looking for reservations between: ${searchStart} and ${searchEnd}`);
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
+              query = query.in('location_id', campaignLocationIds);
+              console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
+            }
 
-        let reservationQuery = supabaseAdmin
+            const { data: recentMembers, error: membersError } = await query;
+
+            if (membersError) {
+              console.error('❌ Error fetching recent members:', membersError);
+              continue;
+            }
+            members = recentMembers || [];
+            console.log(`✅ Found ${members.length} recent members for member_signup trigger`);
+          } else if (triggerType === 'reservation_time') {
+            console.log('📅 Fetching reservations for reservation_time trigger...');
+            // Get members with upcoming reservations
+            // Look for reservations in the next 24 hours to catch messages that should be sent soon
+            const searchStart = now.minus({ hours: 1 }).toISO();
+            const searchEnd = now.plus({ days: 1 }).toISO();
+            console.log(`📅 Looking for reservations between: ${searchStart} and ${searchEnd}`);
+
+            let reservationQuery = supabaseAdmin
           .from('reservations')
-          .select('phone, start_time, end_time, party_size, location_id')
+          .select('phone, start_time, end_time, party_size, first_name, last_name, email, location_id')
           .gte('start_time', searchStart) // Include reservations from 1 hour ago
           .lte('start_time', searchEnd); // Up to 1 day in the future
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           reservationQuery = reservationQuery.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering reservations by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: reservationData, error: reservationError } = await reservationQuery;
+            const { data: reservationData, error: reservationError } = await reservationQuery;
 
-        if (reservationError) {
+            if (reservationError) {
           console.error('❌ Error fetching reservations:', reservationError);
           continue;
-        }
+            }
 
-        if (!reservationData || reservationData.length === 0) {
+            if (!reservationData || reservationData.length === 0) {
           console.log('ℹ️  No upcoming reservations found');
           continue;
-        }
+            }
 
-        console.log('📋 Found reservations:', reservationData.map(r => ({
-          phone: r.phone,
+            console.log('📋 Found reservations:', reservationData.map(r => ({
+          phone: maskPhoneNumber(r.phone || ''),
           start_time: r.start_time,
           party_size: r.party_size
-        })));
+            })));
 
-        // Store reservations for later use
-        reservations = reservationData;
+            // Store reservations for later use
+            reservations = reservationData;
 
-        // Get unique phone numbers from reservations
-        const phoneNumbers = [...new Set(reservations.map(r => r.phone).filter(Boolean))];
-        console.log('📱 Found phone numbers in reservations:', phoneNumbers);
-        
-        if (phoneNumbers.length === 0) {
+            // Get unique phone numbers from reservations
+            const phoneNumbers = [...new Set(reservations.map(r => r.phone).filter(Boolean))];
+            console.log('📱 Found phone numbers in reservations:', phoneNumbers.map(maskPhoneNumber));
+            
+            if (phoneNumbers.length === 0) {
           console.log('⚠️  No phone numbers found in reservations');
           continue;
-        }
-        
-        // For reservation_time triggers, we'll create "virtual members" from reservations
-        // This allows sending messages to anyone with a reservation, not just members
-        const virtualMembers = reservations.map(reservation => {
-          // Convert phone number to international format
-          let formattedPhone = reservation.phone;
-          const digits = reservation.phone.replace(/\D/g, '');
-
-          if (digits.length === 10) {
-            formattedPhone = '+1' + digits;
-          } else if (digits.length === 11 && digits.startsWith('1')) {
-            formattedPhone = '+' + digits;
-          } else if (!formattedPhone.startsWith('+')) {
-            formattedPhone = '+' + digits;
-          }
+            }
+            
+            // For reservation_time triggers, we'll create "virtual members" from reservations
+            // This allows sending messages to anyone with a reservation, not just members
+            const virtualMembers = reservations.map(reservation => {
+          // Convert phone number to international format using utility (guard against null)
+          const formattedPhone = formatPhoneForStorage(reservation.phone || '');
 
           return {
             member_id: crypto.randomUUID(), // Generate proper UUID
             account_id: crypto.randomUUID(), // Generate proper UUID
-            first_name: 'Guest', // We'll get this from the reservation
-            last_name: '',
-            email: '',
+            first_name: reservation.first_name || 'Guest', // Use real first name from reservation
+            last_name: reservation.last_name || '', // Use real last name from reservation
+            email: reservation.email || '', // Use real email from reservation
             phone: formattedPhone, // Use the formatted phone number
             member_type: 'guest',
             join_date: reservation.start_time, // Store start_time in join_date
@@ -344,64 +408,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log(`✅ Created ${virtualMembers.length} virtual members from reservations`);
         members = virtualMembers;
-      } else if (triggerType === 'reservation_created') {
-        console.log('🆕 Fetching recently created reservations...');
-        // Get reservations created recently (within last 24 hours)
-        const searchStart = now.minus({ hours: 24 }).toISO();
-        const searchEnd = now.toISO();
-        console.log(`📅 Looking for reservations created between: ${searchStart} and ${searchEnd}`);
+          } else if (triggerType === 'reservation_created') {
+            console.log('🆕 Fetching recently created reservations...');
+            // Get reservations created recently (within last 24 hours)
+            const searchStart = now.minus({ hours: 24 }).toISO();
+            const searchEnd = now.toISO();
+            console.log(`📅 Looking for reservations created between: ${searchStart} and ${searchEnd}`);
 
-        let reservationQuery = supabaseAdmin
+            let reservationQuery = supabaseAdmin
           .from('reservations')
-          .select('phone, start_time, end_time, party_size, created_at, first_name, last_name, location_id')
+          .select('phone, start_time, end_time, party_size, created_at, first_name, last_name, email, location_id')
           .gte('created_at', searchStart) // Reservations created in last 24 hours
           .lte('created_at', searchEnd); // Up to now
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           reservationQuery = reservationQuery.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering reservations by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: reservationData, error: reservationError } = await reservationQuery;
+            const { data: reservationData, error: reservationError } = await reservationQuery;
 
-        if (reservationError) {
+            if (reservationError) {
           console.error('❌ Error fetching recent reservations:', reservationError);
           continue;
-        }
+            }
 
-        if (!reservationData || reservationData.length === 0) {
+            if (!reservationData || reservationData.length === 0) {
           console.log('ℹ️  No recently created reservations found');
           continue;
-        }
+            }
 
-        console.log('📋 Found recently created reservations:', reservationData.map(r => ({
-          phone: r.phone,
+            console.log('📋 Found recently created reservations:', reservationData.map(r => ({
+          phone: maskPhoneNumber(r.phone || ''),
           created_at: r.created_at,
           first_name: r.first_name,
           last_name: r.last_name
-        })));
+            })));
 
-        // Create virtual members from recently created reservations
-        const virtualMembers = reservationData.map(reservation => {
-          // Convert phone number to international format
-          let formattedPhone = reservation.phone;
-          const digits = reservation.phone.replace(/\D/g, '');
-
-          if (digits.length === 10) {
-            formattedPhone = '+1' + digits;
-          } else if (digits.length === 11 && digits.startsWith('1')) {
-            formattedPhone = '+' + digits;
-          } else if (!formattedPhone.startsWith('+')) {
-            formattedPhone = '+' + digits;
-          }
+            // Create virtual members from recently created reservations
+            const virtualMembers = reservationData.map(reservation => {
+          // Convert phone number to international format using utility (guard against null)
+          const formattedPhone = formatPhoneForStorage(reservation.phone || '');
 
           return {
             member_id: crypto.randomUUID(),
             account_id: crypto.randomUUID(),
-            first_name: reservation.first_name || 'Guest',
-            last_name: reservation.last_name || '',
-            email: '',
+            first_name: reservation.first_name || 'Guest', // Use real first name from reservation
+            last_name: reservation.last_name || '', // Use real last name from reservation
+            email: reservation.email || '', // Use real email from reservation
             phone: formattedPhone,
             member_type: 'guest',
             join_date: reservation.created_at, // Use created_at as trigger point
@@ -415,34 +470,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         console.log(`✅ Created ${virtualMembers.length} virtual members from recent reservations`);
         members = virtualMembers;
-      } else if (triggerType === 'member_birthday') {
-        console.log('🎂 Fetching members for birthday check...');
-        // Get all members with dob and filter by birthday in JavaScript
-        let query = supabaseAdmin
+          } else if (triggerType === 'member_birthday') {
+            console.log('🎂 Fetching members for birthday check...');
+            // Get all members with dob and filter by birthday in JavaScript
+            let query = supabaseAdmin
           .from('members')
-          .select('*')
+          .select('member_id, account_id, first_name, last_name, email, phone, member_type, join_date, dob, location_id, status, created_at, updated_at')
           .not('dob', 'is', null);
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           query = query.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: allMembers, error: membersError } = await query;
+            const { data: allMembers, error: membersError } = await query;
 
-        if (membersError) {
+            if (membersError) {
           console.error('❌ Error fetching members for birthday check:', membersError);
           continue;
-        }
+            }
 
-        console.log(`📊 Found ${allMembers?.length || 0} members with DOB`);
+            console.log(`📊 Found ${allMembers?.length || 0} members with DOB`);
 
-        // Filter members whose birthday is today
-        const today = now.toFormat('MM-dd');
-        console.log(`📅 Looking for birthdays on: ${today}`);
+            // Filter members whose birthday is today (in business timezone)
+            const today = now.setZone(businessTimezone).toFormat('MM-dd');
+            console.log(`📅 Looking for birthdays on: ${today} (${businessTimezone})`);
 
-        members = (allMembers || []).filter(member => {
+            members = (allMembers || []).filter(member => {
           if (!member.dob) return false;
 
           // Convert dob to MM-dd format for comparison
@@ -450,37 +505,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const dobFormatted = dobDate.toFormat('MM-dd');
 
           return dobFormatted === today;
-        });
+            });
 
-        console.log(`🎂 Found ${members.length} members with birthdays today`);
-      } else if (triggerType === 'member_renewal') {
-        console.log('🔄 Fetching members for renewal check...');
-        // Get all members and filter by renewal date calculated from join_date
-        let query = supabaseAdmin
+            console.log(`🎂 Found ${members.length} members with birthdays today`);
+          } else if (triggerType === 'member_renewal') {
+            console.log('🔄 Fetching members for renewal check...');
+            // Get all members and filter by renewal date calculated from join_date
+            let query = supabaseAdmin
           .from('members')
-          .select('*')
+          .select('member_id, account_id, first_name, last_name, email, phone, member_type, join_date, location_id, status, created_at, updated_at')
           .not('join_date', 'is', null);
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           query = query.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: allMembers, error: membersError } = await query;
+            const { data: allMembers, error: membersError } = await query;
 
-        if (membersError) {
+            if (membersError) {
           console.error('❌ Error fetching members for renewal check:', membersError);
           continue;
-        }
+            }
 
-        console.log(`📊 Found ${allMembers?.length || 0} members with join_date`);
+            console.log(`📊 Found ${allMembers?.length || 0} members with join_date`);
 
-        // Filter members whose renewal date is today (calculated from join_date)
-        const today = now.toFormat('yyyy-MM-dd');
-        console.log(`📅 Looking for renewals on: ${today}`);
+            // Filter members whose renewal date is today (calculated from join_date, in business timezone)
+            const today = now.setZone(businessTimezone).toFormat('yyyy-MM-dd');
+            console.log(`📅 Looking for renewals on: ${today} (${businessTimezone})`);
 
-        members = (allMembers || []).filter(member => {
+            members = (allMembers || []).filter(member => {
           if (!member.join_date) return false;
 
           // Calculate renewal date based on join_date
@@ -497,52 +552,90 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const isRenewalToday = nextRenewalDate.toFormat('yyyy-MM-dd') === today;
 
           return isRenewalToday;
-        });
+            });
 
-        console.log(`🔄 Found ${members.length} members with renewals today`);
-      } else if (triggerType === 'all_members') {
-        console.log('👥 Fetching all active members for all_members campaign...');
-        // Get all active members for all_members campaigns
-        let query = supabaseAdmin
+            console.log(`🔄 Found ${members.length} members with renewals today`);
+          } else if (triggerType === 'all_members') {
+            console.log('👥 Fetching all active members for all_members campaign...');
+            // Get all active members for all_members campaigns
+            let query = supabaseAdmin
           .from('members')
-          .select('*')
+          .select('member_id, account_id, first_name, last_name, email, phone, member_type, join_date, location_id, status, created_at, updated_at')
           .in('status', ['active', 'paused']);
 
-        // Apply location filter if campaign is location-specific
-        if (campaignLocationIds && campaignLocationIds.length > 0) {
+            // Apply location filter if campaign is location-specific
+            if (campaignLocationIds && campaignLocationIds.length > 0) {
           query = query.in('location_id', campaignLocationIds);
           console.log(`📍 Filtering members by location_ids: ${campaignLocationIds.join(', ')}`);
-        }
+            }
 
-        const { data: allMembers, error: membersError } = await query;
+            const { data: allMembers, error: membersError } = await query;
 
-        if (membersError) {
+            if (membersError) {
           console.error('❌ Error fetching all members:', membersError);
           continue;
-        }
+            }
 
-        members = allMembers || [];
-        console.log(`✅ Found ${members.length} active members for all_members campaign`);
+            members = allMembers || [];
+            console.log(`✅ Found ${members.length} active members for all_members campaign`);
       }
     }
 
       console.log(`👤 Processing ${members.length} members for campaign message: ${message.name}`);
-      
+
       if (members.length === 0) {
-        console.log(`⚠️  No members found for campaign message: ${message.name} (trigger type: ${triggerType})`);
-        console.log(`📝 Message details:`, {
+            console.log(`⚠️  No members found for campaign message: ${message.name} (trigger type: ${triggerType})`);
+            console.log(`📝 Message details:`, {
           name: message.name,
           recipient_type: message.recipient_type,
           specific_phone: message.specific_phone,
           timing_type: message.timing_type,
           specific_time: message.specific_time
-        });
+            });
+      }
+
+      // Pre-fetch private event data if needed (to avoid N+1 queries)
+      let privateEventData: any = null;
+      if (triggerType === 'private_event' && message.campaigns?.selected_private_event_id) {
+        const { data: eventData } = await supabaseAdmin
+          .from('private_events')
+          .select('title, event_date, event_time')
+          .eq('id', message.campaigns.selected_private_event_id)
+          .single();
+
+        if (eventData) {
+          privateEventData = eventData;
+          console.log(`📅 Pre-fetched private event data: ${eventData.title}`);
+        }
+      }
+
+      // Pre-fetch primary member phones if needed (to avoid N+1 queries for all_members campaigns)
+      const primaryMemberPhones: Map<string, string> = new Map();
+      if (message.recipient_type === 'member' && members.length > 0) {
+        const accountIds = [...new Set(members
+          .filter(m => m.member_type !== 'guest' && m.member_type !== 'specific_phone')
+          .map(m => m.account_id))];
+
+        if (accountIds.length > 0) {
+          const { data: primaryMembers } = await supabaseAdmin
+            .from('members')
+            .select('account_id, phone')
+            .in('account_id', accountIds)
+            .eq('member_type', 'primary');
+
+          if (primaryMembers) {
+            primaryMembers.forEach(pm => {
+              if (pm.phone) primaryMemberPhones.set(pm.account_id, pm.phone);
+            });
+            console.log(`📱 Pre-fetched ${primaryMemberPhones.size} primary member phones`);
+          }
+        }
       }
 
       for (const member of members) {
-        try {
-          console.log(`\n👤 Processing member: ${member.first_name} ${member.last_name} (${member.phone})`);
-          
+            try {
+          console.log(`\n👤 Processing member: ${member.first_name} ${member.last_name} (${maskPhoneNumber(member.phone || '')})`);
+
           // Calculate send time based on message timing
           let targetSendTime: DateTime;
           let triggerDate: DateTime;
@@ -561,13 +654,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
             
             console.log(`Found reservation for virtual member ${member.member_id}:`, {
-              phone: member.phone,
+              phone: maskPhoneNumber(member.phone || ''),
               start_time: reservationStartTime,
               end_time: reservationEndTime
             });
             
             // Use start_time for 'before' messages and end_time for 'after' messages
-            const isAfterMessage = message.duration_proximity === 'after';
+            const isAfterMessage = message.relative_proximity === 'after';
             const triggerTime = isAfterMessage && reservationEndTime ? reservationEndTime : reservationStartTime;
             triggerDate = DateTime.fromISO(triggerTime, { zone: 'utc' }).setZone(businessTimezone);
             console.log(`Trigger date (business timezone): ${triggerDate.toISO()} (using ${isAfterMessage ? 'end_time' : 'start_time'})`);
@@ -593,49 +686,78 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
 
           if (message.timing_type === 'specific_time') {
-            // Send at specific time relative to trigger date
+            // Send at specific time on trigger date (or specific date if provided)
+            // NOTE: specific_time_quantity, specific_time_unit, specific_time_proximity fields are deprecated
+            // These offset fields were removed as they were not in the actual database schema
+            // Existing campaigns using 'specific_time' will send at the specified time on the trigger date
+            // without any day offset calculation. If offset behavior is needed, use 'relative' timing_type instead.
             const [hours, minutes] = message.specific_time?.split(':').map(Number) || [10, 0];
-            const quantity = message.specific_time_quantity || 0;
-            const unit = message.specific_time_unit || 'day';
-            const proximity = message.specific_time_proximity || 'after';
-            
-            console.log(`Specific time calculation: hours=${hours}, minutes=${minutes}, quantity=${quantity}, unit=${unit}, proximity=${proximity}`);
-            
+
+            console.log(`Specific time: ${hours}:${minutes} on ${message.specific_date || 'trigger date'}`);
+
+            // Use specific_date if provided, otherwise use trigger date
+            let targetDate = triggerDate;
+            if (message.specific_date) {
+              targetDate = DateTime.fromISO(message.specific_date, { zone: businessTimezone });
+              console.log(`Using specific date: ${targetDate.toISO()}`);
+            }
+
+            // Set the specific time on the target date
+            targetSendTime = targetDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+            console.log(`Target send time: ${targetSendTime.toISO()}`);
+          } else if (message.timing_type === 'relative') {
+            // Send based on relative time to trigger (e.g., "2 hours before reservation")
+            const [hours, minutes] = message.relative_time?.split(':').map(Number) || [10, 0];
+            const quantity = message.relative_quantity || 0;
+            const unit = message.relative_unit || 'day';
+            const proximity = message.relative_proximity || 'after';
+
+            console.log(`Relative timing: ${quantity} ${unit} ${proximity} trigger at ${hours}:${minutes}`);
+
             // Convert database unit names to Luxon unit names
-            const luxonUnit = unit === 'min' ? 'minutes' : 
-                             unit === 'hr' ? 'hours' : 
-                             unit === 'day' ? 'days' : 
-                             unit === 'month' ? 'months' : 
+            const luxonUnit = unit === 'minute' ? 'minutes' :
+                             unit === 'hour' ? 'hours' :
+                             unit === 'day' ? 'days' :
+                             unit === 'week' ? 'weeks' :
+                             unit === 'month' ? 'months' :
                              unit === 'year' ? 'years' : 'days';
-            
-            // Calculate the relative date first
+
+            // Calculate the relative date
             let relativeDate = triggerDate;
             if (quantity > 0) {
               relativeDate = triggerDate.plus({
                 [luxonUnit]: proximity === 'after' ? quantity : -quantity
               });
             }
-            
-            console.log(`Trigger date: ${triggerDate.toISO()}, Relative date: ${relativeDate.toISO()}`);
-            
-            // Then set the specific time on that date
+
+            // Set the specific time on the relative date
             targetSendTime = relativeDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+            console.log(`Relative send time: ${targetSendTime.toISO()} (trigger: ${triggerDate.toISO()})`);
           } else {
-            // Send based on duration relative to trigger
-            const quantity = message.duration_quantity || 1;
-            const unit = message.duration_unit || 'hr';
-            const proximity = message.duration_proximity || 'before';
-            
-            // Convert database unit names to Luxon unit names
-            const luxonUnit = unit === 'min' ? 'minutes' : 
-                             unit === 'hr' ? 'hours' : 
-                             unit === 'day' ? 'days' : 
-                             unit === 'month' ? 'months' : 
-                             unit === 'year' ? 'years' : 'hours';
-            
-            targetSendTime = triggerDate.plus({
-              [luxonUnit]: proximity === 'after' ? quantity : -quantity
-            });
+            console.error(`❌ ERROR: Unknown timing_type: ${message.timing_type} for message ${message.id} (${message.name})`);
+
+            // Log to scheduled_messages table with failed status for visibility
+            const errorMessage = `Unknown timing_type: ${message.timing_type}`;
+            await supabaseAdmin
+              .from('scheduled_messages')
+              .insert({
+                member_id: member.member_id,
+                campaign_id: message.campaigns?.id || null,
+                campaign_message_id: message.id,
+                message_content: message.content,
+                scheduled_for: now.toISO(),
+                status: 'failed',
+                error_message: errorMessage,
+                created_at: now.toISO(),
+                updated_at: now.toISO()
+              });
+
+            // Also alert ops team if this is a critical campaign
+            if (message.campaigns?.name?.includes('URGENT') || message.campaigns?.name?.includes('CRITICAL')) {
+              console.error(`🚨 CRITICAL: Campaign "${message.campaigns.name}" has message with unknown timing_type`);
+            }
+
+            continue;
           }
 
           // Check if message should be sent now (within 5 minutes of target time)
@@ -654,20 +776,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           // Determine recipient phone
           let recipientPhone = member.phone;
-          if (message.recipient_type === 'member') {
-            // For virtual members (reservations), use the reservation phone
-            if (member.member_type === 'guest') {
-              recipientPhone = member.phone; // Use the phone from the reservation
-            } else {
-              // For real members, get primary member's phone
-              const { data: primaryMember } = await supabaseAdmin
-                .from('members')
-                .select('phone')
-                .eq('account_id', member.account_id)
-                .eq('member_type', 'primary')
-                .single();
-              if (primaryMember?.phone) {
-                recipientPhone = primaryMember.phone;
+
+          // For reservation campaigns, ALWAYS use the phone from the reservation
+          if (triggerType === 'reservation_time' || triggerType === 'reservation_created') {
+            recipientPhone = member.phone; // This is the phone number from the reservation
+          } else if (message.recipient_type === 'member') {
+            // For member-based campaigns (not reservations), get primary member's phone
+            if (member.member_type !== 'guest' && member.member_type !== 'specific_phone') {
+              // Use pre-fetched primary member phone data
+              const primaryPhone = primaryMemberPhones.get(member.account_id);
+              if (primaryPhone) {
+                recipientPhone = primaryPhone;
               }
             }
           } else if (message.recipient_type === 'specific_phone' && message.specific_phone) {
@@ -689,16 +808,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           // Add reservation-specific placeholders for reservation_time and reservation_created triggers
           if (triggerType === 'reservation_time' || triggerType === 'reservation_created') {
-            // Format reservation time
+            // Format reservation time and date
             if (member.join_date) {
-              const reservationTime = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
-              const formattedTime = reservationTime.toFormat('h:mm a');
+              const reservationDateTime = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
+
+              // {{reservation_time}} - Time only (e.g., "7:00 PM")
+              const formattedTime = reservationDateTime.toFormat('h:mm a');
               messageContent = messageContent.replace(/\{\{reservation_time\}\}/g, formattedTime);
+
+              // {{reservation_date}} - Date only (e.g., "March 15, 2024")
+              const formattedDate = reservationDateTime.toFormat('MMMM d, yyyy');
+              messageContent = messageContent.replace(/\{\{reservation_date\}\}/g, formattedDate);
             }
-            
-            // Add party size
+
+            // {{party_size}} - Number of guests
             if (member.party_size) {
               messageContent = messageContent.replace(/\{\{party_size\}\}/g, member.party_size.toString());
+            }
+          }
+
+          // Add private event placeholders for private_event trigger
+          if (triggerType === 'private_event' && privateEventData) {
+            const eventData = privateEventData;
+
+            if (eventData) {
+              // {{event_name}} - Event title
+              messageContent = messageContent.replace(/\{\{event_name\}\}/g, eventData.title || '');
+
+              // {{event_date}} - Event date (e.g., "March 15, 2024")
+              if (eventData.event_date) {
+                const eventDate = DateTime.fromISO(eventData.event_date).toFormat('MMMM d, yyyy');
+                messageContent = messageContent.replace(/\{\{event_date\}\}/g, eventDate);
+              }
+
+              // {{event_time}} - Event time (e.g., "7:00 PM")
+              if (eventData.event_time) {
+                let eventTime;
+                // Try parsing as ISO datetime first, then as time-only format
+                const isoDateTime = DateTime.fromISO(eventData.event_time, { zone: businessTimezone });
+                if (isoDateTime.isValid) {
+                  eventTime = isoDateTime.toFormat('h:mm a');
+                } else {
+                  // Try parsing as time-only format HH:mm:ss or HH:mm
+                  const timeOnly = DateTime.fromFormat(eventData.event_time, 'HH:mm:ss', { zone: businessTimezone });
+                  if (timeOnly.isValid) {
+                    eventTime = timeOnly.toFormat('h:mm a');
+                  } else {
+                    const timeOnlyShort = DateTime.fromFormat(eventData.event_time, 'HH:mm', { zone: businessTimezone });
+                    eventTime = timeOnlyShort.isValid ? timeOnlyShort.toFormat('h:mm a') : eventData.event_time;
+                  }
+                }
+                messageContent = messageContent.replace(/\{\{event_time\}\}/g, eventTime);
+              }
             }
           }
           
@@ -739,7 +900,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const { data: campaignData, error: campaignError } = await supabaseAdmin
                 .from('campaigns')
                 .select('include_event_list, event_list_date_range')
-                .eq('id', message.campaign_id)
+                .eq('id', message.campaigns?.id || '')
                 .single();
 
               if (campaignError) {
@@ -802,30 +963,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           }
 
-          // Format phone number for OpenPhone
-          let formattedPhone = recipientPhone;
-          if (!formattedPhone.startsWith('+')) {
-            const digits = formattedPhone.replace(/\D/g, '');
-            if (digits.length === 10) {
-              formattedPhone = '+1' + digits;
-            } else if (digits.length === 11 && digits.startsWith('1')) {
-              formattedPhone = '+' + digits;
-            } else {
-              formattedPhone = '+' + digits;
-            }
-          }
+          // Format phone number for OpenPhone using utility
+          const formattedPhone = formatPhoneForStorage(recipientPhone);
 
-          // Check if message already sent (use .limit(1) to handle multiple results gracefully)
-          const { data: existingMessages } = await supabaseAdmin
+          // Check if message already sent
+          // For recurring triggers (birthday, renewal), only check if sent TODAY
+          // This allows the same message to be sent annually/monthly
+          let duplicateCheckQuery = supabaseAdmin
             .from('scheduled_messages')
             .select('id')
             .eq('campaign_message_id', message.id)
             .eq('phone_number', formattedPhone)
-            .eq('status', 'sent')
-            .limit(1);
+            .eq('status', 'sent');
+
+          // For recurring triggers, only check TODAY's sends to allow annual/monthly repeats
+          if (triggerType === 'member_birthday' || triggerType === 'member_renewal') {
+            const todayStart = now.setZone(businessTimezone).startOf('day').toISO();
+            const todayEnd = now.setZone(businessTimezone).endOf('day').toISO();
+            // Check both scheduled_time (for pending) and sent_time (for sent) to catch all today's messages
+            // Use proper AND grouping: (scheduled_time between today) OR (sent_time between today)
+            duplicateCheckQuery = duplicateCheckQuery
+              .or(`and(scheduled_time.gte.${todayStart},scheduled_time.lte.${todayEnd}),and(sent_time.gte.${todayStart},sent_time.lte.${todayEnd})`);
+            console.log(`🔄 Birthday/Renewal campaign - checking for duplicates TODAY only in ${businessTimezone} (${todayStart} to ${todayEnd})`);
+          }
+
+          const { data: existingMessages } = await duplicateCheckQuery.limit(1);
 
           if (existingMessages && existingMessages.length > 0) {
-            console.log(`⏭️  Message already sent for campaign message ${message.id} to phone ${formattedPhone}`);
+            console.log(`⏭️  Message already sent for campaign message ${message.id} to phone ${maskPhoneNumber(formattedPhone)}`);
             continue;
           }
 
@@ -910,7 +1075,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Send SMS via OpenPhone API
           console.log('📤 Sending SMS via OpenPhone API...');
           console.log('🔑 OpenPhone API Key exists:', !!process.env.OPENPHONE_API_KEY);
-          console.log('📱 Recipient phone:', formattedPhone);
+          console.log('📱 Recipient phone:', maskPhoneNumber(formattedPhone));
           console.log('📄 Message content:', messageContent);
 
           const openphoneResponse = await fetch('https://api.openphone.com/v1/messages', {
@@ -952,7 +1117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (insertError) {
             console.error('❌ Error recording sent message:', insertError);
           } else {
-            console.log(`✅ Successfully sent campaign message to ${formattedPhone}`);
+            console.log(`✅ Successfully sent campaign message to ${maskPhoneNumber(formattedPhone)}`);
             processedCount++;
           }
 

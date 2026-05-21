@@ -266,8 +266,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch template',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -300,8 +299,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         toast({
           title: 'Error',
           description: 'Failed to fetch private events',
-          status: 'error',
-          duration: 3000,
+          variant: 'destructive',
         });
       }
     } catch (error) {
@@ -309,8 +307,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch private events',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsLoadingPrivateEvents(false);
@@ -365,47 +362,21 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
       return;
     }
 
-    // Log timing information for message sending
-    console.log('=== MESSAGE TIMING ANALYSIS ===');
-    if (formData.timing_type === 'specific_time') {
-      console.log(`Message will be sent at: ${formData.specific_time} on trigger date`);
-    } else if (formData.timing_type === 'recurring') {
-      console.log(`Message will be sent: ${formData.recurring_type} at ${formData.recurring_time}`);
-      if (formData.recurring_type === 'weekly') {
-        console.log(`Selected weekdays: ${formData.recurring_weekdays?.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}`);
-      } else if (formData.recurring_type === 'monthly') {
-        console.log(`Monthly type: ${formData.recurring_monthly_type}, day/weekday: ${formData.recurring_monthly_day}, value: ${formData.recurring_monthly_value}`);
-      } else if (formData.recurring_type === 'yearly') {
-        console.log(`Yearly date: ${formData.recurring_yearly_date}`);
-      }
-    } else if (formData.timing_type === 'relative') {
-      console.log(`Message will be sent: ${formData.relative_quantity} ${formData.relative_unit} ${formData.relative_proximity} trigger`);
+    // Validate recipient type matches campaign trigger type
+    const validRecipients = getRecipientOptions().map(opt => opt.value);
+    if (!validRecipients.includes(formData.recipient_type)) {
+      toast({
+        title: 'Validation Error',
+        description: `Recipient type "${formData.recipient_type}" is not valid for ${campaignTriggerType} campaigns. Please select a valid recipient type.`,
+        variant: 'destructive',
+      });
+      return;
     }
-    
-    // Log recipient information
-    console.log('=== RECIPIENT ANALYSIS ===');
-    console.log('Recipient type:', formData.recipient_type);
-    if (formData.recipient_type === 'specific_phone') {
-      console.log('Specific phone:', formData.specific_phone);
-    }
-    
-    // Log message content analysis
-    console.log('=== MESSAGE CONTENT ANALYSIS ===');
-    console.log('Message length:', formData.content.length, 'characters');
-    console.log('Contains placeholders:', {
-      first_name: formData.content.includes('{{first_name}}'),
-      last_name: formData.content.includes('{{last_name}}'),
-      member_name: formData.content.includes('{{member_name}}'),
-      phone: formData.content.includes('{{phone}}'),
-      email: formData.content.includes('{{email}}'),
-      reservation_time: formData.content.includes('{{reservation_time}}'),
-    });
 
     setIsSaving(true);
     try {
@@ -523,8 +494,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to save template',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -559,8 +529,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to delete template',
-        status: 'error',
-        duration: 3000,
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
