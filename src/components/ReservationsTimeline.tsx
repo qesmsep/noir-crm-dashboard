@@ -631,31 +631,36 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       const currentDayPrivateEvents = getCurrentDayPrivateEvents();
 
       currentDayPrivateEvents.forEach((privateEvent: any) => {
-        resources.forEach((resource: Resource) => {
+        // Only create ONE blocking event for ALL tables
+        // Use the first resource as the display row
+        if (resources.length > 0) {
           const startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
           const endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
 
           const blockingEvent = {
-            id: `blocking-${privateEvent.id}-${resource.id}`,
-            title: `🔒 ${privateEvent.title}`,
+            id: `blocking-${privateEvent.id}`,
+            title: `🔒 ${privateEvent.title} (All Tables Blocked)`,
             extendedProps: {
               private_event_id: privateEvent.id,
               is_blocking: true,
               event_type: 'private_event',
+              blocks_all_tables: true,
               ...privateEvent
             },
             start: startTime,
             end: endTime,
-            resourceId: resource.id,
+            resourceId: resources[0].id, // Display on first table only
             type: 'blocking',
             backgroundColor: '#6b7280',
             borderColor: '#6b7280',
             textColor: '#ffffff',
-            classNames: ['private-event-blocking']
+            classNames: ['private-event-blocking', 'blocks-all-tables'],
+            // Make it render behind regular reservations
+            display: 'background'
           };
 
           blockingEvents.push(blockingEvent);
-        });
+        }
       });
 
       // Add blocking events for exceptional closures (custom closed days)
@@ -1176,6 +1181,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           eventClick={handleEventClick}
           select={handleSlotClick}
           height={isMobile ? 'auto' : 'auto'}
+
+          // Prevent event stacking - force overlap instead
+          eventMaxStack={1}
+          slotEventOverlap={true}
           
           scrollTime={scrollTime}
           scrollTimeReset={false}
@@ -1201,6 +1210,13 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           resourceAreaHeaderContent=""
           
           eventContent={(arg) => {
+            // Background events (blocking events with display: 'background')
+            // are rendered automatically by FullCalendar, so we don't need custom rendering
+            if (arg.event.extendedProps.is_blocking && arg.event.display === 'background') {
+              return null; // Let FullCalendar handle background rendering
+            }
+
+            // Legacy blocking events (if any remain without display: 'background')
             if (arg.event.extendedProps.is_blocking) {
               return (
                 <div className={styles.blockingEvent}>
@@ -1208,11 +1224,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
                 </div>
               );
             }
-            
+
             const isCheckedIn = arg.event.extendedProps.checked_in;
             const backgroundColor = isCheckedIn ? '#a59480' : '#353535';
             const textColor = isCheckedIn ? '#353535' : '#ecede8';
-            
+
             return (
               <div
                 className={styles.reservationEvent}

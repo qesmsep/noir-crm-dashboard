@@ -113,11 +113,50 @@
   opacity: 0.8;
 }
 
+/* Background blocking events (display: 'background' in FullCalendar) */
+.calendarContainer :global(.fc-bg-event) {
+  background-color: rgba(107, 114, 128, 0.15) !important; /* Light gray overlay */
+  border: none !important;
+  opacity: 1 !important;
+  z-index: 0 !important; /* Behind regular events */
+}
+
+/* Private event blocking - shows as background */
+.calendarContainer :global(.private-event-blocking.fc-bg-event) {
+  background-color: rgba(107, 114, 128, 0.2) !important;
+}
+
 /* Exceptional closure blocking events (custom closed days) */
 .calendarContainer :global(.exceptional-closure-blocking) {
   background-color: #6b7280 !important;
   border-color: #6b7280 !important;
   opacity: 0.8 !important;
+}
+
+/* Force consistent row height - prevent expansion from stacked events */
+.calendarContainer :global(.fc-timeline-lane) {
+  min-height: 32px !important; /* Minimum height for touch targets */
+  max-height: 32px !important; /* Maximum height prevents expansion */
+  overflow: visible !important; /* Allow events to overlap visually */
+}
+
+/* Ensure events can overlap within the constrained row height */
+.calendarContainer :global(.fc-timeline-events) {
+  position: relative !important;
+  height: 100% !important;
+}
+
+/* Position events to overlap rather than stack */
+.calendarContainer :global(.fc-timeline-event-harness) {
+  position: absolute !important;
+  top: 0 !important;
+  height: 24px !important;
+  z-index: 1 !important;
+}
+
+/* Regular reservation events stay on top */
+.calendarContainer :global(.fc-event:not(.fc-bg-event)) {
+  z-index: 2 !important;
 }
 
 /* Mobile Navigation Bar */
