@@ -46,6 +46,7 @@
 .content {
   max-width: 100%;
   padding: 24px;
+  padding-top: 32px;
 }
 
 .timelineContainer {
@@ -74,6 +75,14 @@
   padding-bottom: 8px;
   border-bottom: 1px solid #e5e5e7;
   margin-bottom: 16px;
+  margin-top: 16px;
+}
+
+/* Mobile spacing adjustment */
+@media (max-width: 768px) {
+  .locationTabs {
+    margin-top: 24px;
+  }
 }
 
 .locationTab {
@@ -140,5 +149,18 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  /* Mobile location button styles */
+  .locationTab {
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 30px;
+    padding: 0 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
 }

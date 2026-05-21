@@ -211,13 +211,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             endTime = endTime + ':00';
           }
 
-          console.log('📅 [ReservationsTimeline] Setting hours for', dayName, ':', operatingHours);
           setSlotMinTime(startTime);
           setSlotMaxTime(endTime);
           setScrollTime(startTime);
         } else {
           // No hours found - venue closed or no data
-          console.log('📅 [ReservationsTimeline] No operating hours found for', dayName);
           // Use default hours
           setSlotMinTime('18:00:00');
           setSlotMaxTime('26:00:00');
@@ -241,10 +239,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     if (calendarRef.current) {
       const calendarApi = calendarRef.current.getApi();
       const currentDate = calendarApi.getDate();
-      console.log('=== CALENDAR CURRENT DATE ===');
-      console.log('FullCalendar is showing:', currentDate);
-      console.log('As ISO:', currentDate.toISOString());
-      console.log('============================');
     }
   }, [events, resources]); // Run after events/resources load
 
@@ -371,20 +365,21 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         if (calendarRef.current) {
           const calendarApi = calendarRef.current.getApi();
           calendarApi.gotoDate(propCurrentDate);
-          // Scroll to correct time based on day of week
+          // Scroll to correct time based on day of week - but only on desktop
           const isThursday = propCurrentDate.getDay() === 4;
-          const scrollToTime = isThursday ? '16:00:00' : (isMobile ? '18:00:00' : '18:00:00');
-          // Use scrollToTime method if available, otherwise set scrollTime via options
-          try {
-            const calendarApi = calendarRef.current?.getApi();
-            if (calendarApi && typeof calendarApi.scrollToTime === 'function') {
-              calendarApi.scrollToTime(scrollToTime);
-            } else {
+          const scrollToTime = isThursday ? '16:00:00' : '18:00:00';
+          // Only auto-scroll on desktop, let mobile users control their scroll position
+          if (!isMobile) {
+            try {
+              if (calendarApi && typeof calendarApi.scrollToTime === 'function') {
+                calendarApi.scrollToTime(scrollToTime);
+              } else {
+                setScrollTime(scrollToTime);
+              }
+            } catch (e) {
+              // Fallback: update scrollTime state
               setScrollTime(scrollToTime);
             }
-          } catch (e) {
-            // Fallback: update scrollTime state
-            setScrollTime(scrollToTime);
           }
         }
         // Reset flag after a short delay
@@ -399,7 +394,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   useEffect(() => {
     const fetchReservations = async () => {
       try {
-        console.log('🔍 fetchReservations called with locationSlug:', locationSlug);
         if (!locationSlug) {
           setEventData({ resRes: { data: [] } });
           return;
@@ -411,8 +405,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           .select('id')
           .eq('slug', locationSlug)
           .single();
-
-        console.log('🔍 Location lookup result:', { locationSlug, locationData, locationError });
 
         if (locationError) {
           console.error('Error fetching location:', locationError);
@@ -446,15 +438,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         } else {
           allReservations = allReservations.concat(privateEventReservations || []);
         }
-
-        console.log('Reservations API response:', {
-          locationSlug,
-          locationId: locationData.id,
-          tableReservationsCount: allReservations.filter(r => r.table_id).length,
-          privateEventReservationsCount: allReservations.filter(r => !r.table_id).length,
-          totalCount: allReservations.length,
-          timWirick: allReservations.find(r => r.first_name === 'Tim' && r.last_name === 'Wirick')
-        });
 
         setEventData({ resRes: { data: allReservations } });
       } catch (error) {
@@ -492,23 +475,18 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   // Map reservations to FullCalendar events
   useEffect(() => {
     if (!resources.length || !eventData.resRes) {
-      console.log('Skipping event mapping:', {
-        hasResources: !!resources.length,
-        hasEventData: !!eventData.resRes,
-        resourcesCount: resources.length
-      });
+      return;
+    }
+
+    // Prevent running if we're still loading other dependencies
+    if (!privateEvents || exceptionalClosures == null) {
       return;
     }
     
     const rawReservations = Array.isArray(eventData.resRes)
       ? eventData.resRes
       : eventData.resRes.data || [];
-    
-    console.log('Mapping reservations to events:', {
-      rawReservationsCount: rawReservations.length,
-      firstReservation: rawReservations[0]
-    });
-    
+
     // Fetch member data for reservations missing names and then map to events
     const fetchMemberNamesAndMap = async () => {
       const reservationsNeedingNames = rawReservations.filter((r: any) => 
@@ -553,9 +531,15 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           }
         });
       }
-      
+
       // Map reservations to events
-      const mapped = rawReservations.map((r: Record<string, any>) => {
+      const mapped = rawReservations
+        .filter((r: Record<string, any>) => {
+          // Skip private event RSVPs - they'll be shown as blocking events only
+          const shouldSkip = (r.table_id === null && r.private_event_id);
+          return !shouldSkip;
+        })
+        .map((r: Record<string, any>) => {
         const heart = r.membership_type === 'member' ? '🖤 ' : '';
         let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
 
@@ -564,41 +548,18 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           ? `${r.first_name}${r.last_name ? ' ' + r.last_name : ''}`
           : (r.phone ? `Guest (${r.phone.slice(-4)})` : 'Guest');
 
-        // Debug logging for Tim Wirick
-        if (r.first_name === 'Tim' && r.last_name === 'Wirick') {
-          console.log('🔍 Mapping Tim Wirick reservation:', {
-            id: r.id,
-            start_time_utc: r.start_time,
-            end_time_utc: r.end_time,
-            table_id: r.table_id
-          });
-        }
-        
-        // Handle private event reservations
+        // Handle table reservations
         let resourceId, startTime, endTime;
-        if (r.table_id === null && r.private_event_id) {
-          resourceId = 'private-events';
-          emoji = '🔒';
-          const privateEvent = privateEvents.find((pe: any) => pe.id === r.private_event_id);
-          if (privateEvent && !privateEvent.require_time_selection) {
-            startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-            endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-          } else {
-            startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-            endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-          }
+        // After filter, we only have regular reservations with table_id
+        if (r.table_id) {
+          const tableResource = resources.find(res => res.id === String(r.table_id));
+          resourceId = String(r.table_id);
         } else {
-          // Handle reservations with or without table_id
-          if (r.table_id) {
-            const tableResource = resources.find(res => res.id === String(r.table_id));
-            resourceId = String(r.table_id);
-          } else {
-            // If no table_id, assign to first available table or a default
-            resourceId = resources.length > 0 ? resources[0].id : 'unassigned';
-          }
-          startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-          endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+          // If no table_id, assign to first available table or a default
+          resourceId = resources.length > 0 ? resources[0].id : 'unassigned';
         }
+        startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
+        endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
         
         const event = {
           id: String(r.id),
@@ -617,11 +578,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           resourceId: resourceId,
           type: 'reservation',
         };
-
-        // Debug logging for Tim Wirick
-        if (r.first_name === 'Tim' && r.last_name === 'Wirick') {
-          console.log('🔍 Mapped Tim Wirick event:', event);
-        }
 
         return event;
       });
@@ -734,11 +690,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     setSlotMinTime(isThursday ? '16:00:00' : '18:00:00');
     setSlotMaxTime(isThursday ? '24:00:00' : '26:00:00');
     // Scroll to 4pm on Thursdays, otherwise use default scroll time
-    const newScrollTime = isThursday ? '16:00:00' : (isMobile ? '18:00:00' : '18:00:00');
+    const newScrollTime = isThursday ? '16:00:00' : '18:00:00';
     setScrollTime(newScrollTime);
-    
-    // Programmatically scroll to the correct time when date changes
-    if (calendarRef.current) {
+
+    // Only programmatically scroll on desktop - let mobile users control their own scroll
+    if (calendarRef.current && !isMobile) {
       try {
         const calendarApi = calendarRef.current.getApi();
         calendarApi.scrollToTime(newScrollTime);
@@ -968,11 +924,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     
     // Scroll to correct time based on day of week
     const isThursday = newDate.getDay() === 4;
-    const scrollToTime = isThursday ? '16:00:00' : (isMobile ? '18:00:00' : '18:00:00');
+    const scrollToTime = isThursday ? '16:00:00' : '18:00:00';
     setScrollTime(scrollToTime);
-    
-    // Programmatically scroll after a short delay to ensure calendar is rendered
-    if (calendarRef.current) {
+
+    // Only programmatically scroll on desktop - let mobile users control their own scroll
+    if (calendarRef.current && !isMobile) {
       setTimeout(() => {
         try {
           const calendarApi = calendarRef.current?.getApi();
@@ -1131,11 +1087,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           initialDate={(() => {
             const chicagoNow = DateTime.now().setZone('America/Chicago');
             const dateString = chicagoNow.toFormat('yyyy-MM-dd');
-            console.log('=== FULLCALENDAR INIT ===');
-            console.log('Current time UTC:', DateTime.now().toISO());
-            console.log('Current time Chicago:', chicagoNow.toISO());
-            console.log('Passing initialDate to FC (plain date):', dateString);
-            console.log('========================');
             return propCurrentDate || dateString;
           })()}
           timeZone={settings.timezone}
@@ -1208,11 +1159,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
                 </div>
               );
             }
-            
+
             const isCheckedIn = arg.event.extendedProps.checked_in;
             const backgroundColor = isCheckedIn ? '#a59480' : '#353535';
             const textColor = isCheckedIn ? '#353535' : '#ecede8';
-            
+
             return (
               <div
                 className={styles.reservationEvent}
