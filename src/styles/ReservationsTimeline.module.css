@@ -156,7 +156,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.2rem 0.5rem;
+    padding: 0.5rem;
     background: #ffffff;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     position: sticky;
@@ -164,35 +164,40 @@
     z-index: 10;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     flex-shrink: 0;
-    min-height: 38px;
+    min-height: 54px;
+    gap: 0.25rem;
   }
 
   .mobileNavButton {
-    width: 24px;
-    height: 30px !important;
-    min-height: 30px !important;
-    max-height: 30px !important;
-    line-height: 30px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    line-height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f5f5f7;
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
     color: #1d1d1f;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.2s;
     -webkit-tap-highlight-color: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     box-sizing: border-box;
     padding: 2px;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .mobileNavButton:active {
     background: #e5e5e7;
-    transform: scale(0.95);
   }
 
   .mobileNavTitle {
@@ -210,27 +215,30 @@
     color: #ffffff;
     border: none;
     border-radius: 4px;
-    font-size: 0.625rem;
+    font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.2s;
     -webkit-tap-highlight-color: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     white-space: nowrap;
-    height: 30px !important;
-    min-height: 30px !important;
-    max-height: 30px !important;
-    line-height: 30px;
-    padding: 2px 0.5rem;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    line-height: 44px;
+    padding: 0 0.75rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .mobileNavToday:active {
     background: #0051d5;
-    transform: scale(0.95);
   }
 
   .mobileNavNewRez {
@@ -238,28 +246,31 @@
     color: #ffffff;
     border: none;
     border-radius: 4px;
-    font-size: 0.625rem;
+    font-size: 0.7rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.2s;
     -webkit-tap-highlight-color: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     white-space: nowrap;
     margin-left: 0.25rem;
-    height: 30px !important;
-    min-height: 30px !important;
-    max-height: 30px !important;
-    line-height: 30px;
-    padding: 2px 0.5rem;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    line-height: 44px;
+    padding: 0 0.5rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .mobileNavNewRez:active {
     background: #28a745;
-    transform: scale(0.95);
   }
 
   .timelineWrapper {

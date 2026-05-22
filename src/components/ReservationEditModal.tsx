@@ -56,6 +56,17 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
   const { toast } = useToast();
   const { settings } = useSettings();
   const timezone = settings?.timezone || 'America/Chicago';
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -469,10 +480,10 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         backgroundColor: 'rgba(0, 0, 0, 0.6)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        justifyContent: isMobile ? 'flex-start' : 'center',
         zIndex: 9999,
-        padding: '1rem',
+        padding: isMobile ? '0' : '1rem',
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isConfirmingDelete) {
@@ -483,11 +494,12 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       <div
         style={{
           backgroundColor: '#ECEDE8',
-          borderRadius: '16px',
+          borderRadius: isMobile ? '0' : '16px',
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-          maxWidth: '600px',
-          width: '100%',
-          maxHeight: '90vh',
+          maxWidth: isMobile ? '100%' : '600px',
+          width: isMobile ? '100vw' : '100%',
+          maxHeight: isMobile ? '100vh' : '90vh',
+          height: isMobile ? '100vh' : 'auto',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
@@ -495,13 +507,13 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ borderBottom: '1px solid #D1D5DB', padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ borderBottom: '1px solid #D1D5DB', padding: isMobile ? '1rem' : '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {isLoading ? (
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>Loading...</h2>
+            <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>Loading...</h2>
           ) : reservation ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, paddingRight: '3rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, paddingRight: isMobile ? '3.5rem' : '3rem' }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '0.5rem' : '0', width: '100%' }}>
+                <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
                   {formData.first_name} {formData.last_name}
                 </h2>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -518,7 +530,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   <button
                     onClick={handleCheckInToggle}
                     style={{
-                      minHeight: '36px',
+                      minHeight: isMobile ? '44px' : '36px',
                       padding: '0 1rem',
                       backgroundColor: reservation.checked_in ? '#16A34A' : 'transparent',
                       color: reservation.checked_in ? 'white' : '#1F1F1F',
@@ -528,6 +540,10 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       fontWeight: '600',
                       cursor: 'pointer',
                       transition: 'background-color 0.2s',
+                      touchAction: 'manipulation',
+                      WebkitTouchCallout: 'none',
+                      WebkitUserSelect: 'none',
+                      userSelect: 'none',
                     }}
                     onMouseEnter={(e) => {
                       if (reservation.checked_in) {
@@ -557,7 +573,9 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '0.5rem',
+              padding: isMobile ? '0.75rem' : '0.5rem',
+              minWidth: isMobile ? '44px' : 'auto',
+              minHeight: isMobile ? '44px' : 'auto',
               borderRadius: '0.375rem',
               display: 'flex',
               alignItems: 'center',
@@ -565,8 +583,12 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
               color: '#6B7280',
               transition: 'all 0.2s',
               position: 'absolute',
-              top: '1.5rem',
-              right: '1.5rem',
+              top: isMobile ? '1rem' : '1.5rem',
+              right: isMobile ? '1rem' : '1.5rem',
+              touchAction: 'manipulation',
+              WebkitTouchCallout: 'none',
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
@@ -582,7 +604,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         </div>
 
         {/* Body */}
-        <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: isMobile ? '1rem' : '1.5rem', overflowY: 'auto', flex: 1, maxHeight: isMobile ? 'calc(100vh - 140px)' : 'auto' }}>
           {isLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
               <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>Loading...</div>
@@ -590,7 +612,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
           ) : reservation ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Contact Information */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
                 <input
                   type="text"
                   value={formData.first_name}
@@ -658,7 +680,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
               </div>
 
               {/* Reservation Details */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
                 <select
                   value={formData.party_size}
                   onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))}
@@ -828,7 +850,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   onClick={handleSendMessage}
                   disabled={isSendingMessage || !messageText.trim() || !reservation?.phone}
                   style={{
-                    height: '36px',
+                    height: isMobile ? '44px' : '36px',
+                    minHeight: '44px',
                     padding: '0 1rem',
                     backgroundColor: isSendingMessage || !messageText.trim() || !reservation?.phone ? '#D1D5DB' : '#353535',
                     color: 'white',
@@ -838,6 +861,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     fontWeight: '600',
                     cursor: isSendingMessage || !messageText.trim() || !reservation?.phone ? 'not-allowed' : 'pointer',
                     transition: 'background-color 0.2s',
+                    touchAction: 'manipulation',
+                    width: isMobile ? '100%' : 'auto',
                   }}
                   onMouseEnter={(e) => {
                     if (!isSendingMessage && messageText.trim() && reservation?.phone) {
@@ -916,7 +941,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div style={{ borderTop: '1px solid #D1D5DB', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ borderTop: '1px solid #D1D5DB', padding: isMobile ? '1rem' : '1rem 1.5rem', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '0.5rem' : '0' }}>
           {isConfirmingDelete ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
               <p style={{ fontWeight: '600', fontSize: '0.875rem', color: '#1F1F1F', margin: 0 }}>Are you sure?</p>
@@ -924,7 +949,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                 <button
                   onClick={() => setIsConfirmingDelete(false)}
                   style={{
-                    height: '36px',
+                    height: isMobile ? '44px' : '36px',
+                    minHeight: '44px',
                     padding: '0 1rem',
                     backgroundColor: 'white',
                     color: '#1F1F1F',
@@ -933,6 +959,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     fontSize: '0.875rem',
                     fontWeight: '600',
                     cursor: 'pointer',
+                    touchAction: 'manipulation',
                   }}
                 >
                   Cancel
@@ -941,7 +968,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   onClick={handleDelete}
                   disabled={isSaving}
                   style={{
-                    height: '36px',
+                    height: isMobile ? '44px' : '36px',
+                    minHeight: '44px',
                     padding: '0 1rem',
                     backgroundColor: isSaving ? '#D1D5DB' : '#DC2626',
                     color: 'white',
@@ -951,6 +979,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     fontWeight: '600',
                     cursor: isSaving ? 'not-allowed' : 'pointer',
                     transition: 'background-color 0.2s',
+                    touchAction: 'manipulation',
                   }}
                   onMouseEnter={(e) => {
                     if (!isSaving) e.currentTarget.style.backgroundColor = '#B91C1C';
@@ -971,13 +1000,17 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: '0.5rem',
+                  padding: isMobile ? '0.75rem' : '0.5rem',
+                  minWidth: isMobile ? '44px' : 'auto',
+                  minHeight: isMobile ? '44px' : 'auto',
                   borderRadius: '0.375rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#DC2626',
                   transition: 'all 0.2s',
+                  touchAction: 'manipulation',
+                  WebkitTouchCallout: 'none',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.1)';
@@ -991,7 +1024,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
               >
                 <Trash2 size={16} />
               </button>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '0.5rem', width: isMobile ? '100%' : 'auto' }}>
                 {/* Payment action buttons - only show if reservation has a payment */}
                 {reservation?.stripe_payment_intent_id && (
                   <>
@@ -999,7 +1032,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       onClick={handleCancelWithRefund}
                       disabled={isCancellingWithRefund || isCancellingWithCharge}
                       style={{
-                        height: '36px',
+                        height: isMobile ? '44px' : '36px',
+                        minHeight: '44px',
                         padding: '0 1rem',
                         backgroundColor: (isCancellingWithRefund || isCancellingWithCharge) ? '#D1D5DB' : '#10B981',
                         color: 'white',
@@ -1009,6 +1043,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                         fontWeight: '600',
                         cursor: (isCancellingWithRefund || isCancellingWithCharge) ? 'not-allowed' : 'pointer',
                         transition: 'background-color 0.2s',
+                        touchAction: 'manipulation',
+                        width: isMobile ? '100%' : 'auto',
                       }}
                       onMouseEnter={(e) => {
                         if (!isCancellingWithRefund && !isCancellingWithCharge) e.currentTarget.style.backgroundColor = '#059669';
@@ -1023,7 +1059,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       onClick={handleCancelWithCharge}
                       disabled={isCancellingWithRefund || isCancellingWithCharge}
                       style={{
-                        height: '36px',
+                        height: isMobile ? '44px' : '36px',
+                        minHeight: '44px',
                         padding: '0 1rem',
                         backgroundColor: (isCancellingWithRefund || isCancellingWithCharge) ? '#D1D5DB' : '#F59E0B',
                         color: 'white',
@@ -1033,6 +1070,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                         fontWeight: '600',
                         cursor: (isCancellingWithRefund || isCancellingWithCharge) ? 'not-allowed' : 'pointer',
                         transition: 'background-color 0.2s',
+                        touchAction: 'manipulation',
+                        width: isMobile ? '100%' : 'auto',
                       }}
                       onMouseEnter={(e) => {
                         if (!isCancellingWithRefund && !isCancellingWithCharge) e.currentTarget.style.backgroundColor = '#D97706';
@@ -1049,7 +1088,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                 <button
                   onClick={handleClose}
                   style={{
-                    height: '36px',
+                    height: isMobile ? '44px' : '36px',
+                    minHeight: '44px',
                     padding: '0 1rem',
                     backgroundColor: 'white',
                     color: '#1F1F1F',
@@ -1058,6 +1098,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     fontSize: '0.875rem',
                     fontWeight: '600',
                     cursor: 'pointer',
+                    touchAction: 'manipulation',
+                    width: isMobile ? '100%' : 'auto',
                   }}
                 >
                   Cancel
@@ -1066,7 +1108,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   onClick={handleSave}
                   disabled={isSaving}
                   style={{
-                    height: '36px',
+                    height: isMobile ? '44px' : '36px',
+                    minHeight: '44px',
                     padding: '0 1rem',
                     backgroundColor: isSaving ? '#D1D5DB' : '#A59480',
                     color: 'white',
@@ -1076,6 +1119,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     fontWeight: '600',
                     cursor: isSaving ? 'not-allowed' : 'pointer',
                     transition: 'background-color 0.2s',
+                    touchAction: 'manipulation',
+                    width: isMobile ? '100%' : 'auto',
                   }}
                   onMouseEnter={(e) => {
                     if (!isSaving) e.currentTarget.style.backgroundColor = '#8C7C6D';
