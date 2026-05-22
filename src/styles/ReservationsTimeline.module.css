@@ -120,6 +120,32 @@
   opacity: 0.8 !important;
 }
 
+/* Fix for private event blocking - remove ALL ::before pseudo-elements from timeline events */
+.calendarContainer :global(.fc-timeline-event:before),
+.calendarContainer :global(.fc-timeline-event:not(.fc-event-end):before),
+.calendarContainer :global(.fc-timeline-event:not(.fc-event-start):before),
+.calendarContainer :global(.fc-event.private-event-blocking:before),
+.calendarContainer :global(.fc-event.exceptional-closure-blocking:before),
+.calendarContainer :global(.private-event-blocking):before,
+.calendarContainer :global(.exceptional-closure-blocking):before {
+  content: none !important;
+}
+
+/* Force correct height for private event blocking events */
+.calendarContainer :global(.fc-event.private-event-blocking),
+.calendarContainer :global(.fc-event.exceptional-closure-blocking) {
+  height: auto !important;
+  max-height: 30px !important;
+}
+
+/* Ensure the event main content doesn't have extra height */
+.calendarContainer :global(.fc-event.private-event-blocking .fc-event-main),
+.calendarContainer :global(.fc-event.exceptional-closure-blocking .fc-event-main) {
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
 /* Mobile Navigation Bar */
 .mobileNavBar {
   display: none;
@@ -130,7 +156,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem 0.75rem;
+    padding: 0.2rem 0.5rem;
     background: #ffffff;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     position: sticky;
@@ -138,24 +164,30 @@
     z-index: 10;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     flex-shrink: 0;
+    min-height: 38px;
   }
 
   .mobileNavButton {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f5f5f7;
     border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 6px;
-    font-size: 18px;
+    border-radius: 4px;
+    font-size: 12px;
     font-weight: 600;
     color: #1d1d1f;
     cursor: pointer;
     transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-sizing: border-box;
+    padding: 2px;
   }
 
   .mobileNavButton:active {
@@ -166,26 +198,34 @@
   .mobileNavTitle {
     flex: 1;
     text-align: center;
-    font-size: 0.8125rem;
+    font-size: 0.6875rem;
     font-weight: 500;
     color: #1d1d1f;
-    padding: 0 0.5rem;
+    padding: 0 0.25rem;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   .mobileNavToday {
-    padding: 0.375rem 0.75rem;
     background: #007aff;
     color: #ffffff;
     border: none;
-    border-radius: 6px;
-    font-size: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.625rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     white-space: nowrap;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 30px;
+    padding: 2px 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .mobileNavToday:active {
@@ -194,19 +234,27 @@
   }
 
   .mobileNavNewRez {
-    padding: 0.375rem 0.75rem;
     background: #34c759;
     color: #ffffff;
     border: none;
-    border-radius: 6px;
-    font-size: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.625rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     white-space: nowrap;
-    margin-left: 0.5rem;
+    margin-left: 0.25rem;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 30px;
+    padding: 2px 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .mobileNavNewRez:active {
@@ -229,6 +277,23 @@
     display: flex;
     flex-direction: column;
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent scroll snap-back on mobile timeline */
+  .calendarContainer :global(.fc-scroller) {
+    scroll-snap-type: none !important;
+    overscroll-behavior-x: contain !important;
+  }
+
+  .calendarContainer :global(.fc-scroller-liquid) {
+    scroll-snap-type: none !important;
+    overscroll-behavior-x: contain !important;
+  }
+
+  .calendarContainer :global(.fc-timeline .fc-scroller-liquid-absolute) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-x: contain !important;
   }
 
   .reservationEvent {
@@ -280,6 +345,314 @@
 
   .calendarContainer :global(.fc-col-header-cell) {
     font-size: 10px !important;
+  }
+
+  /* Fix mobile event harness height to fit content */
+  .calendarContainer :global(.fc-timeline-event-harness) {
+    min-height: 24px !important;
+  }
+
+  /* Ensure the event itself also uses auto height */
+  .calendarContainer :global(.fc-timeline-event) {
+    min-height: 24px !important;
+  }
+
+  /* Make sure the inner event takes up full space */
+  .calendarContainer :global(.fc-event.fc-h-event) {
+    min-height: 24px !important;
+  }
+
+  /* Make timeline slot frames dynamic height on mobile */
+  .calendarContainer :global(.fc-timeline-slot-frame) {
+    height: auto !important;
+    min-height: 30px !important;
+  }
+
+  /* Also override datagrid cell frame heights on mobile */
+  .calendarContainer :global(.fc-datagrid-cell-frame) {
+    height: auto !important;
+    min-height: 30px !important;
+  }
+
+  /* Force timeline lanes and datagrid rows to match heights - COMPACT for mobile */
+  .calendarContainer :global(.fc-timeline-lane) {
+    height: 30px !important; /* Compact height for mobile */
+  }
+
+  /* Force timeline lane frames to match */
+  .calendarContainer :global(.fc-timeline-lane-frame),
+  .calendarContainer :global(.fc-timeline-lane .fc-timeline-lane-frame),
+  .calendarContainer :global(td.fc-timeline-lane .fc-timeline-lane-frame) {
+    height: 30px !important;
+  }
+
+  /* Force datagrid rows to match the same height */
+  .calendarContainer :global(.fc-datagrid-body tr) {
+    height: 30px !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-cell) {
+    height: 30px !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-cell-frame) {
+    height: 30px !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-cell-cushion) {
+    height: 30px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+
+  /* Override timeline header row heights - REDUCED FOR MOBILE */
+  .calendarContainer :global(.fc-timeline-header-row) {
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  /* Target the actual TR element in the scrollgrid */
+  .calendarContainer :global(.fc-scrollgrid-sync-table tbody tr) {
+    height: 24px !important;
+  }
+
+  /* Target header tbody specifically */
+  .calendarContainer :global(.fc-scrollgrid-section-header tbody tr) {
+    height: 24px !important;
+  }
+
+  /* Target all TDs in the header row */
+  .calendarContainer :global(.fc-scrollgrid-section-header tbody tr td) {
+    height: 24px !important;
+    padding: 0 !important;
+  }
+
+  /* Target the scrollgrid sync inner that controls heights */
+  .calendarContainer :global(.fc-scrollgrid-section-header .fc-scrollgrid-sync-inner) {
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  /* Override the scroller element if it exists */
+  .calendarContainer :global(.fc-scrollgrid-section-header .fc-scroller) {
+    height: 24px !important;
+    overflow: hidden !important;
+  }
+
+  /* Target table element directly in header */
+  .calendarContainer :global(.fc-scrollgrid-section-header table) {
+    height: 24px !important;
+  }
+
+  /* Force all nested divs in header cells to be 24px */
+  .calendarContainer :global(.fc-scrollgrid-section-header td > div) {
+    height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  /* Override timeline slot labels in header - SMALLER ON MOBILE */
+  .calendarContainer :global(.fc-timeline-slot-label) {
+    height: 24px !important;
+    line-height: 24px !important;
+    padding: 0 !important;
+  }
+
+  /* Specifically target the datagrid cells in the timeline header - COMPACT */
+  .calendarContainer :global(.fc-timeline-header .fc-datagrid-cell-frame) {
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  /* Override inline styles on datagrid cell frames in header */
+  .calendarContainer :global(.fc-scrollgrid-section-header .fc-datagrid-cell-frame[style]) {
+    height: 24px !important;
+  }
+
+  /* Override inline styles on timeline slot frames in header */
+  .calendarContainer :global(.fc-scrollgrid-section-header .fc-timeline-slot-frame[style]) {
+    height: 24px !important;
+  }
+
+  /* Also target timeline slots in the header row */
+  .calendarContainer :global(.fc-timeline-header .fc-timeline-slot-frame[style]) {
+    height: 24px !important;
+  }
+
+
+  /* Override the datagrid header table that has inline style */
+  .calendarContainer :global(.fc-datagrid-header) {
+    width: auto !important;
+    height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  /* Target the sync table in the header */
+  .calendarContainer :global(.fc-datagrid-header.fc-scrollgrid-sync-table) {
+    height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  /* Override header table height */
+  .calendarContainer :global(table.fc-datagrid-header) {
+    height: 24px !important;
+  }
+
+  /* Force the header row in resource column to match */
+  .calendarContainer :global(.fc-datagrid-header tr) {
+    height: 24px !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-header td) {
+    height: 24px !important;
+    padding: 0 !important;
+  }
+
+  /* Also target the row element in the header */
+  .calendarContainer :global(.fc-timeline-header tr) {
+    height: 24px !important;
+  }
+
+  /* Override the timeline slot cushion - COMPACT FOR MOBILE */
+  .calendarContainer :global(.fc-timeline-slot-cushion) {
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+    padding: 0 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Also target the scrollgrid sync inner elements - COMPACT */
+  .calendarContainer :global(.fc-scrollgrid-sync-inner) {
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+  }
+
+  /* Reduce font size for time labels on mobile */
+  .calendarContainer :global(.fc-timeline-header .fc-timeline-slot-label) {
+    font-size: 9px !important;
+    font-weight: 500 !important;
+  }
+
+  /* Ensure the timeline header container is compact */
+  .calendarContainer :global(.fc-timeline-header) {
+    height: 24px !important;
+  }
+
+  /* Compact the timeline header table cells */
+  .calendarContainer :global(.fc-timeline-header td) {
+    height: 24px !important;
+    padding: 0 !important;
+  }
+
+  /* Make the entire scrollgrid header compact */
+  .calendarContainer :global(.fc-scrollgrid-section-header) {
+    height: 24px !important;
+  }
+
+  /* Remove gap between header and body sections */
+  .calendarContainer :global(.fc-scrollgrid-section) {
+    border: none !important;
+  }
+
+  .calendarContainer :global(.fc-scrollgrid-section-body) {
+    border-top: none !important;
+  }
+
+  .calendarContainer :global(.fc-timeline .fc-scrollgrid-section > td) {
+    border: none !important;
+  }
+
+  /* Remove any margins/padding that create gaps */
+  .calendarContainer :global(.fc-timeline-body) {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-body) {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  /* Remove border spacing and collapse borders on tables */
+  .calendarContainer :global(.fc-scrollgrid) {
+    border-spacing: 0 !important;
+    border-collapse: collapse !important;
+  }
+
+  .calendarContainer :global(.fc-scrollgrid table) {
+    border-spacing: 0 !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Remove any top border from the first body row */
+  .calendarContainer :global(.fc-scrollgrid-section-body tr:first-child td) {
+    border-top: none !important;
+  }
+
+  .calendarContainer :global(.fc-timeline-body tr:first-child td) {
+    border-top: none !important;
+  }
+
+  /* Make the resource column (table numbers) narrower on mobile */
+  .calendarContainer :global(.fc-resource-timeline colgroup col:first-child) {
+    width: 40px !important;
+    max-width: 40px !important;
+  }
+
+  /* Make the resource timeline divider column specifically 3px */
+  .calendarContainer :global(colgroup col:nth-child(2)) {
+    width: 3px !important;
+    min-width: 3px !important;
+    max-width: 3px !important;
+  }
+
+  /* Also ensure the td cell containing the divider is thin */
+  .calendarContainer :global(td.fc-resource-timeline-divider) {
+    width: 3px !important;
+    min-width: 3px !important;
+    max-width: 3px !important;
+    padding: 0 !important;
+    height: auto !important;
+  }
+
+  /* Fix divider header cell */
+  .calendarContainer :global(.fc-timeline-header td.fc-resource-timeline-divider) {
+    height: 24px !important;
+    vertical-align: top !important;
+  }
+
+  /* Ensure divider doesn't create gaps */
+  .calendarContainer :global(.fc-resource-timeline-divider .fc-datagrid-cell-frame) {
+    height: 24px !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Make table numbers same font size as reservations on mobile */
+  .calendarContainer :global(.fc-datagrid-cell-main) {
+    font-size: 10px !important;
+  }
+
+  /* Also target the resource cell text specifically */
+  .calendarContainer :global(.fc-resource-timeline .fc-datagrid-cell) {
+    font-size: 10px !important;
+  }
+
+  /* Remove height overrides on mobile to allow JS sync */
+  /* The datagrid cells should match timeline naturally */
+  .calendarContainer :global(.fc-datagrid-body .fc-datagrid-cell-cushion) {
+    padding: 8px 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 }
 
