@@ -1035,7 +1035,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     <Box className={styles.timelineWrapper}>
       {isMobile && (
         <div className={styles.mobileNavBar}>
-          <button 
+          <button
             className={styles.mobileNavButton}
             onClick={handlePrevDay}
             aria-label="Previous day"
@@ -1045,7 +1045,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           <div className={styles.mobileNavTitle}>
             {formatMobileDate(currentCalendarDate)}
           </div>
-          <button 
+          <button
             className={styles.mobileNavButton}
             onClick={handleNextDay}
             aria-label="Next day"
@@ -1091,7 +1091,20 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           })()}
           timeZone={settings.timezone}
           schedulerLicenseKey="CC-Attribution-NonCommercial-NoDerivatives"
-          
+
+          // Enhanced custom views for mobile vs desktop
+          views={{
+            resourceTimelineDay: {
+              type: 'resourceTimeline',
+              duration: { days: 1 },
+              slotDuration: '00:15:00',
+              slotLabelInterval: '01:00:00',
+              slotMinWidth: isMobile ? 40 : 60,
+              eventMinHeight: isMobile ? 20 : 25,
+            }
+          }}
+
+          // Custom buttons
           customButtons={{
             makeReservation: {
               text: 'Make Reservation',
@@ -1111,46 +1124,59 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             },
           }}
 
+          // Header configuration
           headerToolbar={isMobile ? false : {
             left: 'prev,next',
             center: 'title',
             right: onPrivateEventRSVPClick ? 'privateEventRSVPs,makeReservation,today' : 'makeReservation,today',
           }}
-          titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
-          resources={resources}
-          events={events}
-          editable={true}
-          droppable={true}
-          selectable={!isTouchDevice()}
-          eventDrop={handleEventDrop}
-          eventResize={handleEventResize}
-          eventClick={handleEventClick}
-          select={handleSlotClick}
-          height={isMobile ? 'auto' : 'auto'}
-          
-          scrollTime={scrollTime}
-          scrollTimeReset={false}
+
+          // Layout configuration
+          height="auto"
+          expandRows={true}
+          stickyHeaderDates={true}
           handleWindowResize={true}
-          
-          longPressDelay={isTouchDeviceState ? 300 : 1000}
-          eventLongPressDelay={isTouchDeviceState ? 300 : 1000}
-          selectLongPressDelay={isTouchDeviceState ? 300 : 1000}
-          
-          eventDragMinDistance={isTouchDeviceState ? 5 : 3}
-          eventDragStart={handleEventDragStart}
-          eventDragStop={handleEventDragStop}
-          
+
+          // Time configuration
           slotMinTime={slotMinTime}
           slotMaxTime={slotMaxTime}
           slotDuration="00:15:00"
           slotLabelInterval="01:00:00"
-          slotLabelFormat={[
-            { hour: 'numeric', hour12: true },
-          ]}
-          nowIndicator
+          slotLabelFormat={{ hour: 'numeric', hour12: true }}
+          scrollTime={scrollTime}
+          scrollTimeReset={false}
+          nowIndicator={true}
+
+          // Resource configuration
           resourceAreaWidth={isMobile ? "40px" : "80px"}
           resourceAreaHeaderContent=""
-          
+          resources={resources}
+
+          // Format configuration
+          titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
+
+          // Events
+          events={events}
+
+          // Interaction configuration
+          editable={true}
+          droppable={true}
+          selectable={!isTouchDevice()}
+          longPressDelay={isTouchDeviceState ? 300 : 1000}
+          eventLongPressDelay={isTouchDeviceState ? 300 : 1000}
+          selectLongPressDelay={isTouchDeviceState ? 300 : 1000}
+          eventDragMinDistance={isTouchDeviceState ? 5 : 3}
+
+          // Event handlers
+          eventDrop={handleEventDrop}
+          eventResize={handleEventResize}
+          eventClick={handleEventClick}
+          select={handleSlotClick}
+          datesSet={handleDatesSet}
+          eventDragStart={handleEventDragStart}
+          eventDragStop={handleEventDragStop}
+
+          // Use eventContent to render with proper React components
           eventContent={(arg) => {
             if (arg.event.extendedProps.is_blocking) {
               return (
@@ -1176,7 +1202,28 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
               </div>
             );
           }}
-          datesSet={handleDatesSet}
+
+          // Mount hooks for additional customization without CSS overrides
+          viewDidMount={(arg) => {
+            // Add mobile class for targeted styling
+            if (isMobile) {
+              arg.el.classList.add('fc-mobile');
+            }
+          }}
+
+          resourceLaneDidMount={(arg) => {
+            // Ensure proper min-height without forcing exact height
+            if (isMobile) {
+              arg.el.style.minHeight = '30px';
+            }
+          }}
+
+          slotLaneDidMount={(arg) => {
+            // Ensure slot lanes have proper min-height
+            if (isMobile) {
+              arg.el.style.minHeight = '30px';
+            }
+          }}
         />
       </Box>
     </Box>
