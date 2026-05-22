@@ -1,5 +1,4 @@
-/* Reservations Timeline - Essential Styles Only */
-/* Layout/sizing handled via FullCalendar configuration API */
+/* Reservations Timeline Styles */
 
 .timelineWrapper {
   width: 100%;
@@ -13,89 +12,138 @@
   width: 100%;
   height: 100%;
   font-family: 'Montserrat', sans-serif;
-  flex: 1;
-  overflow: auto;
 }
 
-/* Typography */
+/* FullCalendar overrides */
 .calendarContainer :global(.fc) {
   font-family: 'Montserrat', sans-serif;
 }
 
+/* Reduce title font size */
 .calendarContainer :global(.fc-toolbar-title) {
-  font-size: 1.0rem;
-  font-weight: 400;
+  font-size: 1.0rem !important;
+  font-weight: 400 !important;
 }
 
-/* Custom button styling */
-.calendarContainer :global(.fc-button-primary) {
-  background-color: #353535;
-  border-color: #353535;
+/* Custom button styling for new reservation button */
+.calendarContainer :global(.fc-newRez-button) {
+  background-color: #34c759 !important;
+  border-color: #34c759 !important;
+  color: #ffffff !important;
+  margin-right: 0.5em !important;
 }
 
-.calendarContainer :global(.fc-button-primary:hover) {
-  background-color: #4a4a4a;
-  border-color: #4a4a4a;
+.calendarContainer :global(.fc-newRez-button:hover) {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
 }
 
-/* Resource area styling */
 .calendarContainer :global(.fc-resource-area) {
   background-color: #ecede8;
+  color: white;
+  vertical-align: middle;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  min-width: 80px;
+  width: 80px;
+  flex-shrink: 0;
 }
 
-.calendarContainer :global(.fc-datagrid-cell-main) {
-  color: #353535;
+.calendarContainer :global(.fc-resource-area .fc-resource-title) {
+  color: white;
+  vertical-align: middle;
+  font-family: 'Montserrat', sans-serif;
   font-size: 12px;
+  padding: 8px 2px;
   text-align: center;
 }
 
-/* Timeline background */
 .calendarContainer :global(.fc-timeline-header),
 .calendarContainer :global(.fc-timeline-body) {
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   background-color: #ecede8;
 }
 
-/* Event base styling */
 .calendarContainer :global(.fc-event) {
-  border: none;
-  border-radius: 4px;
+  border: 0 !important;
+  outline: 0 !important;
+  padding: 0px !important;
+  border-radius: 5px !important;
+  box-shadow: 5px 5px 15px 0.5px !important;
+  margin: 0px;
   cursor: pointer;
   user-select: none;
 }
 
 .reservationEvent {
   font-family: 'Montserrat', sans-serif;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
+  white-space: normal;
+  margin: 0px;
+  display: center;
   align-items: center;
-  padding: 2px 4px;
-  font-size: 12px;
+  justify-content: center;
+  height: 24px;
+  font-size: 14px;
   border-radius: 4px;
+  padding: 0 2px;
   border: 1px solid #353535;
   cursor: pointer;
   user-select: none;
-  min-height: 24px;
+  touch-action: manipulation;
 }
 
 .blockingEvent {
   font-family: 'Montserrat', sans-serif;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
+  white-space: normal;
+  margin: 0px;
+  display: center;
   align-items: center;
-  padding: 2px 4px;
-  font-size: 12px;
+  justify-content: center;
+  height: 24px;
+  font-size: 14px;
   background: #6b7280;
   color: #ffffff;
   border-radius: 4px;
+  padding: 0 2px;
   border: 1px solid #6b7280;
   cursor: not-allowed;
   user-select: none;
+  touch-action: manipulation;
   opacity: 0.8;
-  min-height: 24px;
+}
+
+/* Exceptional closure blocking events (custom closed days) */
+.calendarContainer :global(.exceptional-closure-blocking) {
+  background-color: #6b7280 !important;
+  border-color: #6b7280 !important;
+  opacity: 0.8 !important;
+}
+
+/* Fix for private event blocking - remove ALL ::before pseudo-elements from timeline events */
+.calendarContainer :global(.fc-timeline-event:before),
+.calendarContainer :global(.fc-timeline-event:not(.fc-event-end):before),
+.calendarContainer :global(.fc-timeline-event:not(.fc-event-start):before),
+.calendarContainer :global(.fc-event.private-event-blocking:before),
+.calendarContainer :global(.fc-event.exceptional-closure-blocking:before),
+.calendarContainer :global(.private-event-blocking):before,
+.calendarContainer :global(.exceptional-closure-blocking):before {
+  content: none !important;
+}
+
+/* Force correct height for private event blocking events */
+.calendarContainer :global(.fc-event.private-event-blocking),
+.calendarContainer :global(.fc-event.exceptional-closure-blocking) {
+  height: auto !important;
+  max-height: 30px !important;
+}
+
+/* Ensure the event main content doesn't have extra height */
+.calendarContainer :global(.fc-event.private-event-blocking .fc-event-main),
+.calendarContainer :global(.fc-event.exceptional-closure-blocking .fc-event-main) {
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
 }
 
 /* Mobile Navigation Bar */
@@ -108,28 +156,38 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.25rem 0.5rem;
+    padding: 0.2rem 0.5rem;
     background: #ffffff;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    gap: 0.25rem;
-    min-height: 44px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    flex-shrink: 0;
+    min-height: 38px;
   }
 
   .mobileNavButton {
-    min-width: 30px;
-    height: 35px;
+    width: 24px;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f5f5f7;
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: #1d1d1f;
     cursor: pointer;
     transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-sizing: border-box;
+    padding: 2px;
   }
 
   .mobileNavButton:active {
@@ -140,10 +198,11 @@
   .mobileNavTitle {
     flex: 1;
     text-align: center;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     font-weight: 500;
     color: #1d1d1f;
     padding: 0 0.25rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   .mobileNavToday {
@@ -151,14 +210,22 @@
     color: #ffffff;
     border: none;
     border-radius: 4px;
-    padding: 0 0.75rem;
-    height: 35px;
-    font-size: 0.75rem;
+    font-size: 0.625rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     white-space: nowrap;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 30px;
+    padding: 2px 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .mobileNavToday:active {
@@ -171,15 +238,23 @@
     color: #ffffff;
     border: none;
     border-radius: 4px;
-    padding: 0 0.5rem;
-    height: 35px;
-    font-size: 0.7rem;
+    font-size: 0.625rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     white-space: nowrap;
     margin-left: 0.25rem;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 30px;
+    padding: 2px 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .mobileNavNewRez:active {
@@ -187,76 +262,185 @@
     transform: scale(0.95);
   }
 
-  /* Mobile-specific adjustments */
+  .timelineWrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .calendarContainer {
+    flex: 1;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Let FullCalendar handle its own scrolling - remove all overrides */
+
   .reservationEvent {
+    min-height: 24px;
     font-size: 10px;
-    min-height: 20px;
+    padding: 0 3px;
   }
 
   .blockingEvent {
+    min-height: 24px;
     font-size: 10px;
-    min-height: 20px;
+    padding: 0 3px;
   }
 
-  .calendarContainer :global(.fc-datagrid-cell-main) {
-    font-size: 10px;
+  .calendarContainer :global(.fc-resource-area) {
+    min-width: 40px;
+    width: 40px;
   }
 
-  /* Prevent scroll snap-back */
-  .calendarContainer :global(.fc-scroller) {
-    overscroll-behavior-x: contain;
+  /* Remove height constraints that break scrolling */
+
+  /* Smaller fonts for timeline elements */
+  .calendarContainer :global(.fc-timeline-slot-label) {
+    font-size: 10px !important;
   }
 
-  /* Force 30px row heights on mobile */
-  .calendarContainer :global(.fc-timeline-lane) {
-    height: 30px !important;
+  .calendarContainer :global(.fc-timeline-slot) {
+    font-size: 10px !important;
   }
 
-  .calendarContainer :global(.fc-timeline-lane-frame) {
-    height: 30px !important;
+  .calendarContainer :global(.fc-timegrid-slot-label) {
+    font-size: 10px !important;
   }
 
-  /* Force resource column rows to match */
-  .calendarContainer :global(.fc-datagrid-body tr) {
-    height: 30px !important;
+  .calendarContainer :global(.fc-resource-area .fc-resource-title) {
+    font-size: 10px !important;
+    padding: 4px 2px !important;
   }
 
-  .calendarContainer :global(.fc-datagrid-cell) {
-    height: 30px !important;
+  .calendarContainer :global(.fc-timeline-header-cell) {
+    font-size: 10px !important;
   }
 
-  .calendarContainer :global(.fc-datagrid-cell-frame) {
-    height: 30px !important;
+  .calendarContainer :global(.fc-col-header-cell) {
+    font-size: 10px !important;
   }
 
-  .calendarContainer :global(.fc-datagrid-cell-cushion) {
-    height: 30px !important;
-    padding: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-
-  /* Timeline slot frames */
-  .calendarContainer :global(.fc-timeline-slot-frame) {
-    height: 30px !important;
-  }
-
-  /* Event harness height */
+  /* Fix mobile event harness height to fit content */
   .calendarContainer :global(.fc-timeline-event-harness) {
-    height: auto !important;
-    min-height: 20px !important;
-    max-height: 28px !important;
+    min-height: 24px !important;
   }
 
-  /* Header row heights */
-  .calendarContainer :global(.fc-timeline-header-row) {
-    height: 24px !important;
+  /* Ensure the event itself also uses auto height */
+  .calendarContainer :global(.fc-timeline-event) {
+    min-height: 24px !important;
   }
 
-  .calendarContainer :global(.fc-timeline-slot-cushion) {
-    height: 24px !important;
-    padding: 0 2px !important;
+  /* Make sure the inner event takes up full space */
+  .calendarContainer :global(.fc-event.fc-h-event) {
+    min-height: 24px !important;
+  }
+
+  /* Remove ALL height forcing - let FullCalendar handle it */
+
+
+  /* Keep header compact but don't force heights that break scrolling */
+  .calendarContainer :global(.fc-timeline-header .fc-timeline-slot-label) {
     font-size: 9px !important;
+    font-weight: 500 !important;
+  }
+
+  /* Remove gap between header and body sections */
+  .calendarContainer :global(.fc-scrollgrid-section) {
+    border: none !important;
+  }
+
+  .calendarContainer :global(.fc-scrollgrid-section-body) {
+    border-top: none !important;
+  }
+
+  .calendarContainer :global(.fc-timeline .fc-scrollgrid-section > td) {
+    border: none !important;
+  }
+
+  /* Remove any margins/padding that create gaps */
+  .calendarContainer :global(.fc-timeline-body) {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-body) {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  /* Remove border spacing and collapse borders on tables */
+  .calendarContainer :global(.fc-scrollgrid) {
+    border-spacing: 0 !important;
+    border-collapse: collapse !important;
+  }
+
+  .calendarContainer :global(.fc-scrollgrid table) {
+    border-spacing: 0 !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Remove any top border from the first body row */
+  .calendarContainer :global(.fc-scrollgrid-section-body tr:first-child td) {
+    border-top: none !important;
+  }
+
+  .calendarContainer :global(.fc-timeline-body tr:first-child td) {
+    border-top: none !important;
+  }
+
+  /* Make the resource column (table numbers) narrower on mobile */
+  .calendarContainer :global(.fc-resource-timeline colgroup col:first-child) {
+    width: 40px !important;
+    max-width: 40px !important;
+  }
+
+  /* Make the resource timeline divider column specifically 3px */
+  .calendarContainer :global(colgroup col:nth-child(2)) {
+    width: 3px !important;
+    min-width: 3px !important;
+    max-width: 3px !important;
+  }
+
+  /* Also ensure the td cell containing the divider is thin */
+  .calendarContainer :global(td.fc-resource-timeline-divider) {
+    width: 3px !important;
+    min-width: 3px !important;
+    max-width: 3px !important;
+    padding: 0 !important;
+    height: auto !important;
+  }
+
+  /* Fix divider header cell */
+  .calendarContainer :global(.fc-timeline-header td.fc-resource-timeline-divider) {
+    vertical-align: top !important;
+  }
+
+  /* Ensure divider doesn't create gaps */
+  .calendarContainer :global(.fc-resource-timeline-divider .fc-datagrid-cell-frame) {
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Make table numbers same font size as reservations on mobile */
+  .calendarContainer :global(.fc-datagrid-cell-main) {
+    font-size: 10px !important;
+  }
+
+  /* Also target the resource cell text specifically */
+  .calendarContainer :global(.fc-resource-timeline .fc-datagrid-cell) {
+    font-size: 10px !important;
+  }
+
+  /* Simple styling for datagrid cells */
+  .calendarContainer :global(.fc-datagrid-body .fc-datagrid-cell-cushion) {
+    padding: 8px 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
+
+
