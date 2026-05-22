@@ -1100,7 +1100,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
               slotDuration: '00:15:00',
               slotLabelInterval: '01:00:00',
               slotMinWidth: isMobile ? 40 : 60,
-              eventMinHeight: isMobile ? 20 : 25,
+              eventMinHeight: isMobile ? 18 : 25, // Smaller to fit in 30px rows
+              eventMaxHeight: isMobile ? 28 : 40, // Cap max height on mobile
             }
           }}
 
@@ -1133,7 +1134,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
           // Layout configuration
           height="auto"
-          expandRows={true}
+          expandRows={!isMobile} // Only expand rows on desktop, fixed height on mobile
           stickyHeaderDates={true}
           handleWindowResize={true}
 
@@ -1203,27 +1204,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             );
           }}
 
-          // Mount hooks for additional customization without CSS overrides
-          viewDidMount={(arg) => {
-            // Add mobile class for targeted styling
-            if (isMobile) {
-              arg.el.classList.add('fc-mobile');
-            }
-          }}
-
-          resourceLaneDidMount={(arg) => {
-            // Ensure proper min-height without forcing exact height
-            if (isMobile) {
-              arg.el.style.minHeight = '30px';
-            }
-          }}
-
-          slotLaneDidMount={(arg) => {
-            // Ensure slot lanes have proper min-height
-            if (isMobile) {
-              arg.el.style.minHeight = '30px';
-            }
-          }}
         />
       </Box>
     </Box>

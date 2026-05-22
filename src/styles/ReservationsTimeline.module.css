@@ -206,4 +206,57 @@
   .calendarContainer :global(.fc-scroller) {
     overscroll-behavior-x: contain;
   }
+
+  /* Force 30px row heights on mobile */
+  .calendarContainer :global(.fc-timeline-lane) {
+    height: 30px !important;
+  }
+
+  .calendarContainer :global(.fc-timeline-lane-frame) {
+    height: 30px !important;
+  }
+
+  /* Force resource column rows to match */
+  .calendarContainer :global(.fc-datagrid-body tr) {
+    height: 30px !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-cell) {
+    height: 30px !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-cell-frame) {
+    height: 30px !important;
+  }
+
+  .calendarContainer :global(.fc-datagrid-cell-cushion) {
+    height: 30px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Timeline slot frames */
+  .calendarContainer :global(.fc-timeline-slot-frame) {
+    height: 30px !important;
+  }
+
+  /* Event harness height */
+  .calendarContainer :global(.fc-timeline-event-harness) {
+    height: auto !important;
+    min-height: 20px !important;
+    max-height: 28px !important;
+  }
+
+  /* Header row heights */
+  .calendarContainer :global(.fc-timeline-header-row) {
+    height: 24px !important;
+  }
+
+  .calendarContainer :global(.fc-timeline-slot-cushion) {
+    height: 24px !important;
+    padding: 0 2px !important;
+    font-size: 9px !important;
+  }
 }
