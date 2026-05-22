@@ -215,14 +215,14 @@ export default function MemberDetailAdmin() {
 
         // Get who referred this person
         const member = members.find(m => m.member_id === memberId);
-        let referredBy = null;
+        let referredBy: { member_id: any; first_name: any; last_name: any; } | null = null;
         if (member?.referred_by) {
           const { data: referrer } = await supabase
             .from('members')
             .select('member_id, first_name, last_name')
             .ilike('referral_code', member.referred_by)
             .single();
-          referredBy = referrer;
+          referredBy = referrer || null;
         }
 
         setReferralDetails(prev => ({

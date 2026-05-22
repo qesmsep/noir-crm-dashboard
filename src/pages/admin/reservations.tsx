@@ -250,7 +250,7 @@ export default function Reservations() {
     };
 
     const handleRouteChangeError = (err: Error, url: string) => {
-      debugLog.error('RESERVATIONS PAGE', 'Navigation error', err, { url });
+      debugLog.error('RESERVATIONS PAGE', 'Navigation error', { error: err.message, url });
       // Ensure body scroll is unlocked even if navigation fails
       if (typeof document !== 'undefined') {
         document.body.style.overflow = '';
