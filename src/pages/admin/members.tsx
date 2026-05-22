@@ -4,7 +4,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/useToast";
 import { useRouter } from "next/router";
 import Image from "next/image";
-import { getSupabaseClient } from "../api/supabaseClient";
+import { supabase } from "../../lib/supabase";
 import AdminLayout from '../../components/layouts/AdminLayout';
 import AddMemberModal from '../../components/members/AddMemberModal';
 import ArchivedMembersModal from '../../components/ArchivedMembersModal';
@@ -136,8 +136,6 @@ export default function MembersAdmin() {
 
   async function fetchMembers() {
     try {
-      const supabase = getSupabaseClient();
-
       // Fetch members (active, paused, and inactive/archived)
       const { data: membersData, error: membersError} = await supabase
         .from('members')
@@ -534,7 +532,6 @@ export default function MembersAdmin() {
     setSaving(true);
     try {
       // Get session for authentication
-      const supabase = getSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {

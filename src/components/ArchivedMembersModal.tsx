@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useToast } from '@/hooks/useToast';
-import { getSupabaseClient } from '@/pages/api/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import styles from '../styles/ArchivedMembersModal.module.css';
 
@@ -39,7 +39,6 @@ export default function ArchivedMembersModal({ isOpen, onClose, onUnarchiveSucce
   const fetchArchivedMembers = async () => {
     setLoading(true);
     try {
-      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('members')
         .select('*')

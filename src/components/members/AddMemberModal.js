@@ -172,8 +172,7 @@ const AddMemberModal = ({ isOpen, onClose, onSave }) => {
     const fetchPlans = async () => {
       try {
         // Get Supabase client and session for authentication
-        const { getSupabaseClient } = await import('../../pages/api/supabaseClient');
-        const supabase = getSupabaseClient();
+        const { supabase } = await import('@/lib/supabase');
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.access_token) {

@@ -11,11 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
-import { getSupabaseClient } from '@/pages/api/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import { Plus, Edit, Trash2, MessageSquare, UserPlus, Zap } from 'lucide-react';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const supabase = getSupabaseClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) {
     throw new Error('Not authenticated — please log in again');

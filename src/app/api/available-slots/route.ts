@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClient } from '../../../pages/api/supabaseClient';
+import { supabase } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
 
 // Enable debug by default to help diagnose issues
@@ -9,22 +9,22 @@ const DEBUG_SLOTS = process.env.DEBUG_SLOTS === '1' || true;
 // Helper: generate time slots based on venue hours
 function generateTimeSlots(timeRanges: any[] = [{ start: '18:00', end: '23:00' }]) {
   const slots: string[] = [];
-  
+
   for (const range of timeRanges) {
     const startHour = parseInt(range.start.split(':')[0]);
     const startMinute = parseInt(range.start.split(':')[1]);
     const endHour = parseInt(range.end.split(':')[0]);
     const endMinute = parseInt(range.end.split(':')[1]);
-    
+
     let currentHour = startHour;
     let currentMinute = startMinute;
-    
+
     while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
       const displayHour = currentHour % 12 === 0 ? 12 : currentHour % 12;
       const ampm = currentHour < 12 ? 'am' : 'pm';
       const min = currentMinute.toString().padStart(2, '0');
       slots.push(`${displayHour}:${min}${ampm}`);
-      
+
       currentMinute += 15;
       if (currentMinute >= 60) {
         currentMinute = 0;
@@ -32,7 +32,7 @@ function generateTimeSlots(timeRanges: any[] = [{ start: '18:00', end: '23:00' }
       }
     }
   }
-  
+
   return slots;
 }
 
@@ -46,8 +46,6 @@ export async function POST(request: Request) {
     if (DEBUG) console.log('🚨 AVAILABLE SLOTS API CALLED:', { date, party_size, location });
     if (DEBUG) console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
     if (DEBUG) console.log('🚨 DEPLOYMENT TIMESTAMP:', new Date().toISOString());
-
-    const supabase = getSupabaseClient();
 
     // date should already be in YYYY-MM-DD format from frontend
     const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);

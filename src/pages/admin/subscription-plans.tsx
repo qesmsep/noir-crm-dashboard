@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import { SubscriptionPlan } from '../../types';
 import { Settings, Plus, Pencil, Trash2, DollarSign, CreditCard } from 'lucide-react';
-import { getSupabaseClient } from '../api/supabaseClient';
+import { supabase } from '../../lib/supabase';
 
 export default function SubscriptionPlansAdmin() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -34,7 +34,6 @@ export default function SubscriptionPlansAdmin() {
     try {
       setLoading(true);
 
-      const supabase = getSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
@@ -97,7 +96,6 @@ export default function SubscriptionPlansAdmin() {
     setSaving(true);
 
     try {
-      const supabase = getSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
@@ -148,7 +146,6 @@ export default function SubscriptionPlansAdmin() {
     }
 
     try {
-      const supabase = getSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {

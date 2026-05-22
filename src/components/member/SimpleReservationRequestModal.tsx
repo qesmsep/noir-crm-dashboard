@@ -6,7 +6,7 @@ import { X, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { getSupabaseClient } from '@/pages/api/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import { getMondayOfWeek } from '@/utils/dateUtils';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
@@ -201,7 +201,6 @@ export default function SimpleReservationRequestModal({
       if (!selectedLocation) return;
 
       try {
-        const supabase = getSupabaseClient();
 
         const { data, error } = await supabase
           .from('locations')
@@ -244,7 +243,6 @@ export default function SimpleReservationRequestModal({
       if (!isOpen || !selectedLocation) return;
 
       try {
-        const supabase = getSupabaseClient();
 
         // Fetch location-specific booking window and timezone
         // Use public_locations view to avoid exposing minaka_ical_url tokens
@@ -357,7 +355,6 @@ export default function SimpleReservationRequestModal({
 
       // Fetch cover charge info for selected location
       try {
-        const supabase = getSupabaseClient();
 
         // Use public_locations view to avoid exposing minaka_ical_url tokens
         const { data: locationData } = await supabase
@@ -799,7 +796,6 @@ export default function SimpleReservationRequestModal({
       // Get auth headers if admin override is enabled
       let headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (adminOverride) {
-        const supabase = getSupabaseClient();
         const { data: { session } } = await supabase.auth.getSession();
         console.log('[ADMIN AUTH] Session:', session ? 'Found' : 'Not found');
         console.log('[ADMIN AUTH] Access token:', session?.access_token ? 'Present' : 'Missing');

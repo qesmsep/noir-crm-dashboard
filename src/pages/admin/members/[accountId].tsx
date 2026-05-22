@@ -4,7 +4,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/useToast";
 import Image from "next/image";
-import { getSupabaseClient } from "../../api/supabaseClient";
+import { supabase } from "../../../lib/supabase";
 import AdminLayout from '../../../components/layouts/AdminLayout';
 import InlineAttachments from '../../../components/InlineAttachments';
 import MemberSubscriptionCard from '../../../components/MemberSubscriptionCard';
@@ -207,8 +207,6 @@ export default function MemberDetailAdmin() {
     // Fetch referral details when expanding
     if (isExpanding && !referralDetails[memberId]) {
       try {
-        const supabase = getSupabaseClient();
-
         // Get members this person referred
         const { data: referred } = await supabase
           .from('members')
@@ -244,7 +242,6 @@ export default function MemberDetailAdmin() {
   useEffect(() => {
     async function fetchAllAccountIds() {
       try {
-        const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('members')
           .select('account_id')
@@ -292,7 +289,6 @@ export default function MemberDetailAdmin() {
 
     async function fetchMembers() {
       try {
-        const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('members')
           .select('*')
@@ -330,7 +326,6 @@ export default function MemberDetailAdmin() {
 
     async function fetchAccountSettings() {
       try {
-        const supabase = getSupabaseClient();
         const { data, error } = await supabase
           .from('accounts')
           .select('credit_card_fee_enabled, subscription_cancel_at, subscription_status, last_payment_failed_at')
@@ -601,7 +596,6 @@ export default function MemberDetailAdmin() {
     }
 
     try {
-      const supabase = getSupabaseClient();
       const searchLower = query.toLowerCase();
 
       // Search members by name, email, or phone
@@ -623,7 +617,6 @@ export default function MemberDetailAdmin() {
   // Member update handler
   const handleUpdateMember = async (memberId: string) => {
     try {
-      const supabase = getSupabaseClient();
       const { error } = await supabase
         .from('members')
         .update(editingMemberData)
@@ -1055,7 +1048,6 @@ export default function MemberDetailAdmin() {
   const handlePhotoUpdate = async (memberId: string, photoDataUrl: string) => {
     try {
       console.log('Updating photo for member:', memberId);
-      const supabase = getSupabaseClient();
 
       // Convert data URL to blob
       const response = await fetch(photoDataUrl);
@@ -1543,8 +1535,6 @@ export default function MemberDetailAdmin() {
     }
 
     try {
-      const supabase = getSupabaseClient();
-
       // First, demote current primary to secondary
       const { error: demoteError } = await supabase
         .from('members')
@@ -2871,7 +2861,6 @@ export default function MemberDetailAdmin() {
             // Refresh members list
             const fetchMembers = async () => {
               try {
-                const supabase = getSupabaseClient();
                 const { data, error } = await supabase
                   .from('members')
                   .select('*')

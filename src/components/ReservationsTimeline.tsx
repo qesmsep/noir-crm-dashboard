@@ -6,6 +6,7 @@ import '@fullcalendar/common/main.css';
 import { fromUTC, toUTC, formatDateTime, formatTime, isSameDay, getMondayOfWeek } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
+import { useAsyncEffect } from '../hooks/useAsyncEffect';
 import { DateTime } from 'luxon';
 import { Box, useToast } from '@chakra-ui/react';
 import styles from '../styles/ReservationsTimeline.module.css';
@@ -93,42 +94,45 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   }, []);
 
   // Load tables as resources
-  useEffect(() => {
-    async function loadTables() {
-      try {
-        let query = supabase
-          .from('tables')
-          .select('id, table_number, location_id, seats');
+  useAsyncEffect(async (isActive) => {
+    try {
+      let query = supabase
+        .from('tables')
+        .select('id, table_number, location_id, seats');
 
-        // Filter by location if provided
-        if (locationSlug) {
-          const { data: locationData, error: locationError } = await supabase
-            .from('locations')
-            .select('id')
-            .eq('slug', locationSlug)
-            .single();
+      // Filter by location if provided
+      if (locationSlug) {
+        const { data: locationData, error: locationError } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('slug', locationSlug)
+          .single();
 
-          if (locationError) {
-            console.error('Error fetching location:', locationError);
-            throw locationError;
-          }
-
-          query = query.eq('location_id', locationData.id);
+        if (locationError) {
+          console.error('Error fetching location:', locationError);
+          throw locationError;
         }
 
-        const { data: tables, error } = await query;
-        if (error) throw error;
+        if (!isActive()) return;
+        query = query.eq('location_id', locationData.id);
+      }
 
-        const tableResources = tables
-          .sort((a, b) => Number(a.table_number) - Number(b.table_number))
-          .map(t => ({
-            id: t.id,
-            title: `${t.table_number} (${t.seats})`,
-          }));
+      const { data: tables, error } = await query;
+      if (error) throw error;
 
-        setResources(tableResources);
-        setTableIds(tables.map(t => t.id));
-      } catch (err) {
+      if (!isActive()) return;
+
+      const tableResources = tables
+        .sort((a, b) => Number(a.table_number) - Number(b.table_number))
+        .map(t => ({
+          id: t.id,
+          title: `${t.table_number} (${t.seats})`,
+        }));
+
+      setResources(tableResources);
+      setTableIds(tables.map(t => t.id));
+    } catch (err) {
+      if (isActive()) {
         console.error('Error loading tables:', err);
         toast({
           title: 'Error loading tables',
@@ -138,91 +142,97 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         });
       }
     }
-    loadTables();
   }, [reloadKey, locationSlug, toast]);
 
   // Fetch and set operating hours based on weekly_hours + base_hours
-  useEffect(() => {
-    async function loadOperatingHours() {
-      try {
-        if (!locationSlug) return;
+  useAsyncEffect(async (isActive) => {
+    try {
+      if (!locationSlug) return;
 
-        // Fetch location with weekly_hours and timezone
-        const { data: locationData, error: locationError } = await supabase
-          .from('locations')
-          .select('id, weekly_hours, timezone')
-          .eq('slug', locationSlug)
-          .single();
+      // Fetch location with weekly_hours and timezone
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('id, weekly_hours, timezone')
+        .eq('slug', locationSlug)
+        .single();
 
-        if (locationError) {
+      if (!isActive()) return;
+
+      if (locationError) {
+        if (isActive()) {
           console.error('Error fetching location:', locationError);
-          return;
         }
+        return;
+      }
 
-        const timezone = locationData.timezone || 'America/Chicago';
-        const currentWeekMonday = getMondayOfWeek(currentCalendarDate, timezone);
+      const timezone = locationData.timezone || 'America/Chicago';
+      const currentWeekMonday = getMondayOfWeek(currentCalendarDate, timezone);
 
-        // Check if there are weekly hours for the current week
-        const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday] || null;
+      // Check if there are weekly hours for the current week
+      const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday] || null;
 
-        // Get day of week for the current calendar date
-        const dt = DateTime.fromJSDate(currentCalendarDate, { zone: timezone });
-        const dayName = dt.toFormat('EEEE').toLowerCase(); // "saturday", "friday", etc.
-        const dayOfWeek = dt.weekday % 7; // 0=Sunday, 6=Saturday
+      // Get day of week for the current calendar date
+      const dt = DateTime.fromJSDate(currentCalendarDate, { zone: timezone });
+      const dayName = dt.toFormat('EEEE').toLowerCase(); // "saturday", "friday", etc.
+      const dayOfWeek = dt.weekday % 7; // 0=Sunday, 6=Saturday
 
-        let operatingHours: { start: string; end: string } | null = null;
+      let operatingHours: { start: string; end: string } | null = null;
 
-        // Check weekly hours first
-        if (weeklyHoursForWeek) {
-          const dayData = weeklyHoursForWeek[dayName];
-          if (dayData && dayData.open && dayData.close) {
-            operatingHours = { start: dayData.open, end: dayData.close };
+      // Check weekly hours first
+      if (weeklyHoursForWeek) {
+        const dayData = weeklyHoursForWeek[dayName];
+        if (dayData && dayData.open && dayData.close) {
+          operatingHours = { start: dayData.open, end: dayData.close };
+        }
+        // If weekly hours exist for this week but this day is null, it means closed
+        // Don't fall back to base hours
+      } else {
+        // Fall back to base hours (only when no weekly hours are set at all)
+        const { data: baseHoursData } = await supabase
+          .from('venue_hours')
+          .select('*')
+          .eq('type', 'base')
+          .eq('location_id', locationData.id)
+          .eq('day_of_week', dayOfWeek);
+
+        if (!isActive()) return;
+
+        if (baseHoursData && baseHoursData.length > 0 && baseHoursData[0].time_ranges) {
+          const firstRange = baseHoursData[0].time_ranges[0];
+          if (firstRange) {
+            operatingHours = { start: firstRange.start, end: firstRange.end };
           }
-          // If weekly hours exist for this week but this day is null, it means closed
-          // Don't fall back to base hours
+        }
+      }
+
+      if (!isActive()) return;
+
+      // Update calendar hours
+      if (operatingHours) {
+        // Convert time strings to calendar format (HH:MM:SS)
+        const startTime = operatingHours.start + ':00';
+
+        // Handle end times past midnight (e.g., 23:59 or 00:00)
+        let endTime = operatingHours.end;
+        if (endTime === '00:00' || endTime === '23:59') {
+          // If close time is midnight, show until 2 AM next day
+          endTime = '26:00:00';
         } else {
-          // Fall back to base hours (only when no weekly hours are set at all)
-          const { data: baseHoursData } = await supabase
-            .from('venue_hours')
-            .select('*')
-            .eq('type', 'base')
-            .eq('location_id', locationData.id)
-            .eq('day_of_week', dayOfWeek);
-
-          if (baseHoursData && baseHoursData.length > 0 && baseHoursData[0].time_ranges) {
-            const firstRange = baseHoursData[0].time_ranges[0];
-            if (firstRange) {
-              operatingHours = { start: firstRange.start, end: firstRange.end };
-            }
-          }
+          endTime = endTime + ':00';
         }
 
-        // Update calendar hours
-        if (operatingHours) {
-          // Convert time strings to calendar format (HH:MM:SS)
-          const startTime = operatingHours.start + ':00';
-
-          // Handle end times past midnight (e.g., 23:59 or 00:00)
-          let endTime = operatingHours.end;
-          if (endTime === '00:00' || endTime === '23:59') {
-            // If close time is midnight, show until 2 AM next day
-            endTime = '26:00:00';
-          } else {
-            endTime = endTime + ':00';
-          }
-
-          setSlotMinTime(startTime);
-          setSlotMaxTime(endTime);
-          setScrollTime(startTime);
-        } else {
-          // No hours found - venue closed or no data
-          // Use default hours
-          setSlotMinTime('18:00:00');
-          setSlotMaxTime('26:00:00');
-          setScrollTime('18:00:00');
-        }
-
-      } catch (err) {
+        setSlotMinTime(startTime);
+        setSlotMaxTime(endTime);
+        setScrollTime(startTime);
+      } else {
+        // No hours found - venue closed or no data
+        // Use default hours
+        setSlotMinTime('18:00:00');
+        setSlotMaxTime('26:00:00');
+        setScrollTime('18:00:00');
+      }
+    } catch (err) {
+      if (isActive()) {
         console.error('Error loading operating hours:', err);
         // Fall back to defaults
         setSlotMinTime('18:00:00');
@@ -230,8 +240,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         setScrollTime('18:00:00');
       }
     }
-
-    loadOperatingHours();
   }, [currentCalendarDate, locationSlug]);
 
   // Debug: Log what date FullCalendar is actually showing
@@ -1126,8 +1134,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           eventResize={handleEventResize}
           eventClick={handleEventClick}
           select={handleSlotClick}
-          height="auto"
-          
+          height={isMobile ? "100%" : "auto"}
+
           scrollTime={scrollTime}
           scrollTimeReset={false}
           handleWindowResize={true}

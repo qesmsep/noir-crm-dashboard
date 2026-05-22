@@ -1,7 +1,12 @@
 /**
  * Debug Logger Utility
  * Logs to both browser console and server terminal (via API endpoint)
+ *
+ * Set NEXT_PUBLIC_DEBUG_LOGGING=true in .env.local to enable debug logs
  */
+
+// Check if debug logging is enabled
+const DEBUG_ENABLED = process.env.NEXT_PUBLIC_DEBUG_LOGGING === 'true';
 
 type LogLevel = 'info' | 'warn' | 'error' | 'nav' | 'setup';
 
@@ -18,8 +23,8 @@ async function logToServer(
   message: string,
   data?: LogData
 ): Promise<void> {
-  // Only send to server in browser environment
-  if (typeof window === 'undefined') return;
+  // Only send to server if debug is enabled and in browser environment
+  if (!DEBUG_ENABLED || typeof window === 'undefined') return;
 
   try {
     // Fire and forget - don't block on logging
@@ -50,6 +55,7 @@ export const debugLog = {
    * Log navigation events (blue)
    */
   nav: (component: string, message: string, data?: LogData) => {
+    if (!DEBUG_ENABLED) return;
     console.log(`🔵 [${component}] ${message}`, data || '');
     logToServer('nav', component, message, data);
   },
@@ -58,6 +64,7 @@ export const debugLog = {
    * Log setup/info events (yellow)
    */
   setup: (component: string, message: string, data?: LogData) => {
+    if (!DEBUG_ENABLED) return;
     console.log(`🟡 [${component}] ${message}`, data || '');
     logToServer('setup', component, message, data);
   },
@@ -66,6 +73,7 @@ export const debugLog = {
    * Log success/info events (green)
    */
   info: (component: string, message: string, data?: LogData) => {
+    if (!DEBUG_ENABLED) return;
     console.log(`🟢 [${component}] ${message}`, data || '');
     logToServer('info', component, message, data);
   },
@@ -74,6 +82,7 @@ export const debugLog = {
    * Log warnings (yellow with warning icon)
    */
   warn: (component: string, message: string, data?: LogData) => {
+    if (!DEBUG_ENABLED) return;
     console.warn(`⚠️ [${component}] ${message}`, data || '');
     logToServer('warn', component, message, data);
   },
@@ -81,13 +90,9 @@ export const debugLog = {
   /**
    * Log errors (red)
    */
-  error: (component: string, message: string, error?: Error | unknown, data?: LogData) => {
-    const errorData = error instanceof Error
-      ? { error: { message: error.message, stack: error.stack, name: error.name }, ...data }
-      : { error, ...data };
-    
-    console.error(`🔴 [${component}] ${message}`, errorData || '');
-    logToServer('error', component, message, errorData);
+  error: (component: string, message: string, data?: LogData) => {
+    // Always log errors regardless of debug setting
+    console.error(`🔴 [${component}] ${message}`, data || '');
+    logToServer('error', component, message, data);
   },
 };
-

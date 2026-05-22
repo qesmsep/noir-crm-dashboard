@@ -18,7 +18,7 @@ import {
   Text,
   useToast
 } from '@chakra-ui/react';
-import { getSupabaseClient } from '../pages/api/supabaseClient';
+import { supabase } from '../lib/supabase';
 
 interface LedgerNotificationSettings {
   id: string;
@@ -41,7 +41,7 @@ const LedgerNotificationSettingsCard: React.FC = () => {
 
   const fetchSettings = async () => {
     try {
-      const { data: settingsData, error: settingsError } = await getSupabaseClient()
+      const { data: settingsData, error: settingsError } = await supabase
         .from('ledger_notification_settings')
         .select('*')
         .eq('is_enabled', true)
@@ -60,7 +60,7 @@ const LedgerNotificationSettingsCard: React.FC = () => {
     if (!settings) return;
     try {
       setSaving(true);
-      const { error } = await getSupabaseClient()
+      const { error } = await supabase
         .from('ledger_notification_settings')
         .upsert(settings);
       if (error) {

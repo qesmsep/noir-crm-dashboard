@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import PDFDocument from 'pdfkit';
-import { getSupabaseClient } from './supabaseClient';
+import { supabase } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Fetch member data
-    const { data: member, error: memberError } = await getSupabaseClient()
+    const { data: member, error: memberError } = await supabase
       .from('members')
       .select('*')
       .eq('id', memberId)
@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Fetch renewal dates (assuming you have a 'renewals' table or similar)
     // For demo, we'll use ledger entries with note containing 'renewal'
-    const { data: renewalEntries } = await getSupabaseClient()
+    const { data: renewalEntries } = await supabase
       .from('ledger')
       .select('date')
       .eq('account_id', member.account_id)
@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Fetch ledger entries for the period
-    const { data: ledgerEntries, error: ledgerError } = await getSupabaseClient()
+    const { data: ledgerEntries, error: ledgerError } = await supabase
       .from('ledger')
       .select('*')
       .eq('account_id', member.account_id)
@@ -58,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Calculate prior balance (sum of all entries before startDate)
-    const { data: priorEntries } = await getSupabaseClient()
+    const { data: priorEntries } = await supabase
       .from('ledger')
       .select('amount')
       .eq('account_id', member.account_id)
@@ -68,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch previous membership period entries if renewal dates found
     let previousPeriodEntries: any[] = [];
     if (lastRenewalDate && nextRenewalDate) {
-      const { data: prevPeriod } = await getSupabaseClient()
+      const { data: prevPeriod } = await supabase
         .from('ledger')
         .select('*')
         .eq('account_id', member.account_id)

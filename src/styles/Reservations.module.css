@@ -148,7 +148,8 @@
     box-shadow: none;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: auto; /* Changed from hidden to auto to allow scrolling */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   }
 
   /* Mobile location button styles */

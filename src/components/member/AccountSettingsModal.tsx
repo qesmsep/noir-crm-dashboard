@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/useToast';
 import { Shield, Bell, Lock, LogOut, Key, Smartphone, Mail } from 'lucide-react';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import { useRouter } from 'next/navigation';
-import { getSupabaseClient } from '@/pages/api/supabaseClient';
+import { supabase } from '@/lib/supabase';
 
 interface AccountSettingsModalProps {
   isOpen: boolean;
@@ -49,7 +49,6 @@ export default function AccountSettingsModal({ isOpen, onClose }: AccountSetting
   useEffect(() => {
     async function fetchSupportPhone() {
       try {
-        const supabase = getSupabaseClient();
         const { data } = await supabase
           .from('settings')
           .select('support_phone')

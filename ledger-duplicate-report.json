@@ -1,0 +1,132 @@
+{
+  "pendingPayments": [
+    {
+      "accountId": "87dca026-4743-486c-ac7b-dc784ce78315",
+      "pendingEntry": {
+        "id": "8ef8620e-c862-4a44-acd4-81c9748a1ddb",
+        "date": "2026-05-12",
+        "amount": 1800,
+        "note": "Initial Annual membership payment",
+        "paymentIntentId": "pi_3TWPIaFdjSPifIH50ymwlTxl"
+      },
+      "clearedDuplicates": [
+        {
+          "id": "4413f0de-e03a-4f6b-9a7c-912af36c13f0",
+          "date": "2026-05-18",
+          "amount": 1800,
+          "note": "Manual payment: Noir Annual Membership - Shamara Parre",
+          "chargeId": null
+        }
+      ]
+    }
+  ],
+  "duplicatePaymentIntents": [
+    {
+      "accountId": "166f5596-ca09-450e-b03c-441a9c53d9b1",
+      "paymentIntentId": "pi_3TK1qxFdjSPifIH50vWMHezH",
+      "entries": [
+        {
+          "id": "d5b2be2d-d006-471f-84fb-1777b50d306f",
+          "date": "2026-04-08",
+          "amount": 206.68,
+          "note": "Manual payment: Balance charged via Stripe",
+          "status": "cleared",
+          "source": "stripe_webhook",
+          "ledgerEntryKey": "pi_3TK1qxFdjSPifIH50vWMHezH"
+        },
+        {
+          "id": "06db27d6-c586-46d9-aac6-0697b2ff0198",
+          "date": "2026-04-08",
+          "amount": 206.68,
+          "note": "Balance charged via Stripe",
+          "status": "cleared",
+          "source": null,
+          "ledgerEntryKey": null
+        }
+      ],
+      "totalDuplicateAmount": 206.68
+    },
+    {
+      "accountId": "0b873687-bebf-4e02-8f1f-7290b7542b7d",
+      "paymentIntentId": "pi_3TOOuAFdjSPifIH51rcUEnZB",
+      "entries": [
+        {
+          "id": "3247f5e0-959d-41c8-a65b-34af3a4878b8",
+          "date": "2026-04-20",
+          "amount": 103.68,
+          "note": "Balance charged via Stripe",
+          "status": "cleared",
+          "source": null,
+          "ledgerEntryKey": null
+        },
+        {
+          "id": "3a75905c-49d8-4df5-a0c8-a04a79315f9f",
+          "date": "2026-04-24",
+          "amount": 103.68,
+          "note": "Manual payment: Balance charged via Stripe",
+          "status": "cleared",
+          "source": "stripe_webhook",
+          "ledgerEntryKey": "pi_3TOOuAFdjSPifIH51rcUEnZB"
+        }
+      ],
+      "totalDuplicateAmount": 103.68
+    },
+    {
+      "accountId": "87dca026-4743-486c-ac7b-dc784ce78315",
+      "paymentIntentId": "pi_3TWPIaFdjSPifIH50ymwlTxl",
+      "entries": [
+        {
+          "id": "8ef8620e-c862-4a44-acd4-81c9748a1ddb",
+          "date": "2026-05-12",
+          "amount": 1800,
+          "note": "Initial Annual membership payment",
+          "status": "pending",
+          "source": null,
+          "ledgerEntryKey": null
+        },
+        {
+          "id": "4413f0de-e03a-4f6b-9a7c-912af36c13f0",
+          "date": "2026-05-18",
+          "amount": 1800,
+          "note": "Manual payment: Noir Annual Membership - Shamara Parre",
+          "status": "cleared",
+          "source": "stripe_webhook",
+          "ledgerEntryKey": "pi_3TWPIaFdjSPifIH50ymwlTxl"
+        }
+      ],
+      "totalDuplicateAmount": 1800
+    },
+    {
+      "accountId": "8292106d-c205-4256-904a-b9f0dab9d4f7",
+      "paymentIntentId": "pi_3TWTaJFdjSPifIH51hnqLKPZ",
+      "entries": [
+        {
+          "id": "a37789a9-8006-40c5-91d0-796a35b94d36",
+          "date": "2026-05-13",
+          "amount": 155.05,
+          "note": "Balance charged via Stripe",
+          "status": "cleared",
+          "source": null,
+          "ledgerEntryKey": null
+        },
+        {
+          "id": "1ae0002e-9049-446b-bc87-9a36d71c777a",
+          "date": "2026-05-13",
+          "amount": 161.25,
+          "note": "Manual payment: Balance charged via Stripe",
+          "status": "cleared",
+          "source": "stripe_webhook",
+          "ledgerEntryKey": "pi_3TWTaJFdjSPifIH51hnqLKPZ"
+        }
+      ],
+      "totalDuplicateAmount": 161.25
+    }
+  ],
+  "duplicateCharges": [],
+  "summary": {
+    "totalAffectedAccounts": 4,
+    "totalDuplicateEntries": 5,
+    "totalPendingPayments": 1,
+    "totalExcessAmount": "4071.61"
+  }
+}

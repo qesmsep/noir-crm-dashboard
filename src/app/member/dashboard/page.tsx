@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Calendar, Clock, Wallet, User, List, ArrowUpIcon, ArrowDownIcon, CreditCard, CalendarDays, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemberAuth } from '@/context/MemberAuthContext';
-import { getSupabaseClient } from '@/pages/api/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import BalanceModal from '@/components/member/BalanceModal';
 import ReservationsModal from '@/components/member/ReservationsModal';
 import ProfileModal from '@/components/member/ProfileModal';

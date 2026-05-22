@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClient } from '../../../pages/api/supabaseClient';
+import { supabase } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
 
 export async function POST(request: Request) {
@@ -8,8 +8,6 @@ export async function POST(request: Request) {
     if (!date || !party_size) {
       return NextResponse.json({ error: 'Missing date or party_size' }, { status: 400 });
     }
-    
-    const supabase = getSupabaseClient();
     const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);
     
     const diagnostics: any = {

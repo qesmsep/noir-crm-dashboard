@@ -1,22 +1,18 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * @deprecated This file is deprecated and will be removed in a future version.
+ * Please use: import { supabase } from '@/lib/supabase' instead
+ *
+ * This file is kept for backward compatibility only.
+ */
 
-// Singleton instance
-let supabaseInstance = null;
+// Log deprecation warning in development
+if (process.env.NODE_ENV === 'development') {
+  console.warn(
+    '\x1b[33m%s\x1b[0m', // Yellow color in terminal
+    'DEPRECATED: src/pages/api/supabaseClient.js is deprecated.\n' +
+    'Please update your import to: import { supabase } from "@/lib/supabase"'
+  );
+}
 
-export function getSupabaseClient() {
-  // Return existing instance if available
-  if (supabaseInstance) {
-    return supabaseInstance;
-  }
-
-  // Create new instance only if it doesn't exist
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
-  supabaseInstance = createClient(supabaseUrl, supabaseKey);
-  return supabaseInstance;
-} 
+// Re-export from the new location for backward compatibility
+export { supabase as getSupabaseClient } from '../../lib/supabase';

@@ -1,5 +1,27 @@
 /* Reservations Timeline Styles */
 
+/* CSS Custom Properties for better maintainability */
+:root {
+  --timeline-font-family: 'Montserrat', sans-serif;
+  --timeline-font-size: 14px;
+  --timeline-mobile-font-size: 10px;
+  --timeline-mobile-tiny-font: 9px;
+  --timeline-event-height: 24px;
+  --timeline-mobile-touch-target: 44px;
+  --timeline-resource-width: 80px;
+  --timeline-mobile-resource-width: 40px;
+  --timeline-divider-width: 3px;
+  --timeline-bg-color: #ecede8;
+  --timeline-border-color: rgba(0, 0, 0, 0.12);
+  --timeline-border-light: rgba(0, 0, 0, 0.08);
+  --timeline-shadow: 5px 5px 15px 0.5px;
+  --timeline-button-green: #34c759;
+  --timeline-button-green-hover: #28a745;
+  --timeline-button-blue: #007aff;
+  --timeline-button-blue-hover: #0051d5;
+  --timeline-blocking-color: #6b7280;
+}
+
 .timelineWrapper {
   width: 100%;
   height: 100%;
@@ -11,12 +33,12 @@
 .calendarContainer {
   width: 100%;
   height: 100%;
-  font-family: 'Montserrat', sans-serif;
+  font-family: var(--timeline-font-family);
 }
 
 /* FullCalendar overrides */
 .calendarContainer :global(.fc) {
-  font-family: 'Montserrat', sans-serif;
+  font-family: var(--timeline-font-family);
 }
 
 /* Reduce title font size */
@@ -27,15 +49,15 @@
 
 /* Custom button styling for new reservation button */
 .calendarContainer :global(.fc-newRez-button) {
-  background-color: #34c759 !important;
-  border-color: #34c759 !important;
+  background-color: var(--timeline-button-green) !important;
+  border-color: var(--timeline-button-green) !important;
   color: #ffffff !important;
   margin-right: 0.5em !important;
 }
 
 .calendarContainer :global(.fc-newRez-button:hover) {
-  background-color: #28a745 !important;
-  border-color: #28a745 !important;
+  background-color: var(--timeline-button-green-hover) !important;
+  border-color: var(--timeline-button-green-hover) !important;
 }
 
 .calendarContainer :global(.fc-resource-area) {
@@ -284,26 +306,40 @@
   .calendarContainer {
     flex: 1;
     min-height: 0;
-    -webkit-overflow-scrolling: touch;
+    width: 100%;
   }
 
-  /* Let FullCalendar handle its own scrolling - remove all overrides */
+  /* Let FullCalendar handle its own scrolling */
+  .calendarContainer :global(.fc-scroller) {
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  }
+
+  /* Ensure horizontal scrolling works */
+  .calendarContainer :global(.fc-scroller-liquid) {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+  }
+
+  .calendarContainer :global(.fc-timeline-body .fc-scroller) {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+  }
 
   .reservationEvent {
-    min-height: 24px;
-    font-size: 10px;
+    min-height: var(--timeline-event-height);
+    font-size: var(--timeline-mobile-font-size);
     padding: 0 3px;
   }
 
   .blockingEvent {
-    min-height: 24px;
-    font-size: 10px;
+    min-height: var(--timeline-event-height);
+    font-size: var(--timeline-mobile-font-size);
     padding: 0 3px;
   }
 
   .calendarContainer :global(.fc-resource-area) {
-    min-width: 40px;
-    width: 40px;
+    min-width: var(--timeline-mobile-resource-width);
+    width: var(--timeline-mobile-resource-width);
   }
 
   /* Remove height constraints that break scrolling */

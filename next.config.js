@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  // Temporarily disable React Strict Mode to avoid double-mounting in dev
+  // Re-enable this for production builds to catch potential issues
+  reactStrictMode: process.env.NODE_ENV === 'production',
   images: {
     remotePatterns: [
       {

@@ -3,7 +3,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/useToast';
 import { SubscriptionPlan } from '../../types';
 import { Plus, Pencil, Trash2, DollarSign, CreditCard } from 'lucide-react';
-import { getSupabaseClient } from '../../pages/api/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import styles from '../../styles/SubscriptionPlansManager.module.css';
 
 export default function SubscriptionPlansManager() {
@@ -36,7 +36,6 @@ export default function SubscriptionPlansManager() {
     try {
       setLoading(true);
 
-      const supabase = getSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
@@ -106,7 +105,6 @@ export default function SubscriptionPlansManager() {
     setSaving(true);
 
     try {
-      const supabase = getSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
@@ -171,7 +169,6 @@ export default function SubscriptionPlansManager() {
     }
 
     try {
-      const supabase = getSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
