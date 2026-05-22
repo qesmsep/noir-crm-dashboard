@@ -68,7 +68,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     };
     
     const handleRouteChangeError = (err: Error, url: string) => {
-      debugLog.error('ADMIN LAYOUT', 'Navigation error', err, { url });
+      debugLog.error('ADMIN LAYOUT', 'Navigation error', { error: err.message, url });
       setIsNavigating(false);
     };
 
