@@ -164,7 +164,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
         // Desktop: On cover page, shift to 0 first, then flip
         setCurrentPage(0.5); // Trigger shift animation to 0
         setTimeout(() => {
-          bookRef.current.pageFlip().flipNext();
+          bookRef.current?.pageFlip().flipNext();
         }, 700); // Wait for 700ms shift transition, then flip
       } else {
         bookRef.current.pageFlip().flipNext();
