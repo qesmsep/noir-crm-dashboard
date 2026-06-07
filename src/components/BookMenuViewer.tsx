@@ -42,8 +42,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
     const fetchMenuImages = async () => {
       try {
         const locationParam = locationSlug ? `?location=${locationSlug}` : '';
-        // Use public endpoint that handles both dev and production
-        const response = await fetch(`/api/menu/list${locationParam}`);
+        const response = await fetch(`/api/admin/menu-files${locationParam}`);
         if (response.ok) {
           const files = await response.json();
           const imagePaths = files.map((file: any) => file.path);
@@ -57,12 +56,12 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
                 '/menu/rooftopkc/RooftopKC Menu - 03.png',
               ]
             : [
-                '/menu/noirkc/Noir Menu - 01.png',
-                '/menu/noirkc/Noir Menu - 02.png',
-                '/menu/noirkc/Noir Menu - 03.png',
-                '/menu/noirkc/Noir Menu - 04.png',
-                '/menu/noirkc/Noir Menu - 05.png',
-                '/menu/noirkc/Noir Menu - 06.png',
+                '/menu/Noir Menu - 01.png',
+                '/menu/Noir Menu - 02.png',
+                '/menu/Noir Menu - 03.png',
+                '/menu/Noir Menu - 04.png',
+                '/menu/Noir Menu - 05.png',
+                '/menu/Noir Menu - 06.png',
               ];
           setMenuImages(fallbackImages);
         }

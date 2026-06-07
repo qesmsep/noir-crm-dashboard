@@ -46,14 +46,8 @@ export default function WebsiteAdmin() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Use Supabase storage endpoint in production
-      const isProduction = process.env.NODE_ENV === 'production';
-      const menuEndpoint = isProduction
-        ? '/api/admin/menu-storage/list?location=noirkc'
-        : '/api/admin/menu-files';
-
       const [menuResponse, imagesResponse] = await Promise.all([
-        fetch(menuEndpoint),
+        fetch('/api/admin/menu-files'),
         fetch('/api/admin/homepage-images'),
       ]);
 
@@ -90,13 +84,7 @@ export default function WebsiteAdmin() {
         formData.append('menuFiles', file);
       });
 
-      // Use Supabase storage endpoint in production
-      const isProduction = process.env.NODE_ENV === 'production';
-      const endpoint = isProduction
-        ? '/api/admin/menu-storage/upload?location=noirkc'
-        : '/api/admin/upload-menu';
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/admin/upload-menu', {
         method: 'POST',
         body: formData,
       });
@@ -127,13 +115,7 @@ export default function WebsiteAdmin() {
     if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
 
     try {
-      // Use Supabase storage endpoint in production
-      const isProduction = process.env.NODE_ENV === 'production';
-      const endpoint = isProduction
-        ? '/api/admin/menu-storage/delete?location=noirkc'
-        : '/api/admin/delete-menu-file';
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/admin/delete-menu-file', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName }),

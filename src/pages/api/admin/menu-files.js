@@ -1,13 +1,49 @@
 import fs from 'fs';
 import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     const location = req.query.location || 'noirkc';
+
+    // In production, use Supabase Storage
+    if (process.env.NODE_ENV === 'production') {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      );
+
+      const bucketName = 'menu-images';
+      const { data: files, error } = await supabase.storage
+        .from(bucketName)
+        .list(location, {
+          sortBy: { column: 'name', order: 'asc' }
+        });
+
+      if (error || !files) {
+        return res.status(200).json([]);
+      }
+
+      const filesWithUrls = files.map(file => {
+        const { data: { publicUrl } } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(`${location}/${file.name}`);
+
+        return {
+          name: file.name,
+          path: publicUrl,
+          size: file.metadata?.size || 0
+        };
+      });
+
+      return res.status(200).json(filesWithUrls);
+    }
+
+    // In development, use filesystem
     const menuDir = path.join(process.cwd(), 'public', 'menu', location);
 
     if (!fs.existsSync(menuDir)) {
