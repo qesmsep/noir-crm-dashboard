@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import InventoryList from '../../components/inventory/InventoryList';
-import InventoryItemDrawer from '../../components/inventory/InventoryItemDrawer';
+import InventoryItemModal from '../../components/inventory/InventoryItemModal';
 import InventoryPhotoScanner from '../../components/inventory/InventoryPhotoScanner';
 import RecipeBuilder from '../../components/inventory/RecipeBuilder';
 import RecipeDrawer from '../../components/inventory/RecipeDrawer';
-import SalesUpload from '../../components/inventory/SalesUpload';
+import EnhancedSalesUpload from '../../components/inventory/EnhancedSalesUpload';
 import InventorySettings from '../../components/inventory/InventorySettings';
 import {
   Package,
@@ -19,6 +19,7 @@ import {
   Download,
   History,
   Settings,
+  MapPin,
 } from 'lucide-react';
 import type {
   InventoryItem,
@@ -30,10 +31,21 @@ import type {
   RecipeCategory,
   SalesRecord,
   ScannedItem,
+  LocationSlug,
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 
+const LOCATIONS: { slug: LocationSlug; name: string }[] = [
+  { slug: 'all', name: 'All Locations' },
+  { slug: 'noirkc', name: 'Noir KC' },
+  { slug: 'rooftopkc', name: 'RooftopKC' },
+  { slug: 'noirop', name: 'Noir OP' },
+];
+
 export default function InventoryPage() {
+  // Location state
+  const [currentLocation, setCurrentLocation] = useState<LocationSlug>('noirkc');
+
   // Tab state
   const [activeTab, setActiveTab] = useState<InventoryTab>('inventory');
 
@@ -61,10 +73,32 @@ export default function InventoryPage() {
   // Sales state
   const [salesHistory, setSalesHistory] = useState<SalesRecord[]>([]);
 
+  // Locations data for badges
+  const [locationsData, setLocationsData] = useState<Array<{ id: string; slug: string; name: string }>>([]);
+
+  // Fetch locations for badges
+  useEffect(() => {
+    async function fetchLocations() {
+      try {
+        const res = await fetch('/api/locations');
+        if (res.ok) {
+          const data = await res.json();
+          setLocationsData(data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch locations:', err);
+      }
+    }
+    fetchLocations();
+  }, []);
+
   // Load data
   const fetchInventory = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory');
+      const url = currentLocation === 'all'
+        ? '/api/inventory' // Fetch all locations
+        : `/api/inventory?location_slug=${currentLocation}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setInventory(data.data || []);
@@ -72,11 +106,14 @@ export default function InventoryPage() {
     } catch (err) {
       console.error('Failed to fetch inventory:', err);
     }
-  }, []);
+  }, [currentLocation]);
 
   const fetchRecipes = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory/recipes');
+      const url = currentLocation === 'all'
+        ? '/api/inventory/recipes' // Fetch all locations
+        : `/api/inventory/recipes?location_slug=${currentLocation}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setRecipes(data.data || []);
@@ -84,7 +121,7 @@ export default function InventoryPage() {
     } catch (err) {
       console.error('Failed to fetch recipes:', err);
     }
-  }, []);
+  }, [currentLocation]);
 
   const fetchSalesHistory = useCallback(async () => {
     try {
@@ -120,7 +157,9 @@ export default function InventoryPage() {
     setSavingItem(true);
     try {
       const method = editingItem ? 'PUT' : 'POST';
-      const body = editingItem ? { ...data, id: editingItem.id } : data;
+      const body = editingItem
+        ? { ...data, id: editingItem.id }
+        : { ...data, location_slug: currentLocation === 'all' ? 'noirkc' : currentLocation };
       const res = await fetch('/api/inventory', {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -386,6 +425,19 @@ export default function InventoryPage() {
         )}
       </div>
 
+      {/* Location Tabs */}
+      <div className={styles.locationTabs}>
+        {LOCATIONS.map((location) => (
+          <button
+            key={location.slug}
+            className={`${styles.locationTab} ${currentLocation === location.slug ? styles.locationTabActive : ''}`}
+            onClick={() => setCurrentLocation(location.slug)}
+          >
+            {location.name}
+          </button>
+        ))}
+      </div>
+
       {/* Stats Bar */}
       <div className={styles.statsBar}>
         <div className={styles.statCard}>
@@ -472,6 +524,8 @@ export default function InventoryPage() {
           onEdit={handleEditItem}
           onDelete={handleDeleteItem}
           onAdjustStock={handleAdjustStock}
+          showLocationBadges={currentLocation === 'all'}
+          locations={locationsData}
         />
       )}
 
@@ -489,16 +543,17 @@ export default function InventoryPage() {
       )}
 
       {activeTab === 'sales' && (
-        <SalesUpload
-          inventory={inventory}
-          recipes={recipes}
-          salesHistory={salesHistory}
-          onProcessSales={handleProcessSales}
+        <EnhancedSalesUpload
+          currentLocation={currentLocation}
+          onUploadComplete={() => {
+            fetchInventory();
+            fetchRecipes();
+          }}
         />
       )}
 
-      {/* Drawers */}
-      <InventoryItemDrawer
+      {/* Modals */}
+      <InventoryItemModal
         isOpen={isItemDrawerOpen}
         onClose={() => {
           setIsItemDrawerOpen(false);
@@ -508,6 +563,7 @@ export default function InventoryPage() {
         onDelete={handleDeleteItem}
         editItem={editingItem}
         saving={savingItem}
+        currentLocation={currentLocation}
       />
 
       <InventoryPhotoScanner

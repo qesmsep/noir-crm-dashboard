@@ -40,6 +40,7 @@ export interface InventoryItem {
   notes: string;
   image_url: string;
   last_counted: string;
+  location_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +57,7 @@ export interface InventoryItemFormData {
   price_per_serving: number;
   par_level: number;
   notes: string;
+  location_id?: string;
 }
 
 // ========================================
@@ -84,10 +86,11 @@ export interface Recipe {
   description: string;
   instructions: string;
   ingredients: RecipeIngredient[];
-  estimated_cost: number;
+  estimated_cost?: number;
   menu_price: number;
-  margin: number;
+  margin?: number;
   image_url: string;
+  location_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -99,6 +102,7 @@ export interface RecipeFormData {
   instructions: string;
   ingredients: RecipeIngredient[];
   menu_price: number;
+  location_id?: string;
 }
 
 // ========================================
@@ -161,4 +165,33 @@ export interface InventoryStats {
   total_value: number;
   low_stock_count: number;
   categories: { category: InventoryCategory; count: number }[];
+}
+
+// ========================================
+// Location Types
+// ========================================
+
+export type LocationSlug = 'noirkc' | 'rooftopkc' | 'noirop' | 'all';
+
+export interface InventoryLocation {
+  id: string;
+  slug: LocationSlug;
+  name: string;
+  is_active: boolean;
+}
+
+export interface SalesReportItem {
+  item_name: string;
+  quantity_sold: number;
+  unit_price?: number;
+  total_revenue?: number;
+}
+
+export interface SalesReport {
+  location_id: string;
+  report_date: string;
+  items: SalesReportItem[];
+  total_revenue: number;
+  processed: boolean;
+  verification_notes?: string;
 }
