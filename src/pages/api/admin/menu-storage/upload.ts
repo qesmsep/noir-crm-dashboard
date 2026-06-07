@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import formidable from 'formidable';
-import fs from 'fs';
+import * as fs from 'fs';
 
 // Initialize Supabase client with service role for admin operations
 const supabase = createClient(
@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No files provided' });
     }
 
-    const results = [];
+    const results: Array<{ name: string | null; path: string; size: number }> = [];
 
     for (const file of uploadedFiles) {
       if (!file) continue;
