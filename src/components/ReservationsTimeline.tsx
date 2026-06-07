@@ -3,7 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
-import { fromUTC, toUTC, formatDateTime, formatTime, isSameDay, getMondayOfWeek } from '../utils/dateUtils';
+import { fromUTC, toUTC, formatDateTime, formatTime, isSameDay, getSundayOfWeek } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { useAsyncEffect } from '../hooks/useAsyncEffect';
@@ -166,10 +166,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       }
 
       const timezone = locationData.timezone || 'America/Chicago';
-      const currentWeekMonday = getMondayOfWeek(currentCalendarDate, timezone);
+      const currentWeekSunday = getSundayOfWeek(currentCalendarDate, timezone);
 
       // Check if there are weekly hours for the current week
-      const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday] || null;
+      const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekSunday] || null;
 
       // Get day of week for the current calendar date
       const dt = DateTime.fromJSDate(currentCalendarDate, { zone: timezone });

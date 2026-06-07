@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/useToast';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { supabase } from '@/lib/supabase';
-import { getMondayOfWeek } from '@/utils/dateUtils';
+import { getSundayOfWeek } from '@/utils/dateUtils';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -81,19 +81,30 @@ const getHoursForDate = (date: Date, locationHours: any): Array<{ start: string;
   const dayOfWeek = dt.weekday % 7; // Luxon: 1=Monday, 7=Sunday -> convert to 0=Sunday, 6=Saturday
   const dayName = dt.toFormat('EEEE').toLowerCase(); // "thursday", "friday", etc.
 
+  console.log('🕐 [getHoursForDate] Checking date:', date.toDateString());
+  console.log('🕐 [getHoursForDate] Day name:', dayName);
+  console.log('🕐 [getHoursForDate] Location hours object:', locationHours);
+
   // Check weekly hours first
   if (locationHours.weeklyHours) {
     // Weekly hours are set for a specific week
     // Check if the date is in the same week as the weekly hours
-    const dateWeekMonday = getMondayOfWeek(date, timezone);
+    const dateWeekSunday = getSundayOfWeek(date, timezone);
+
+    console.log('🕐 [getHoursForDate] Date week Sunday:', dateWeekSunday);
+    console.log('🕐 [getHoursForDate] Weekly hours week start:', locationHours.weeklyHoursWeekStart);
+    console.log('🕐 [getHoursForDate] Weekly hours available:', locationHours.weeklyHours);
 
     // Only use weekly hours if the date is in the same week
-    if (dateWeekMonday === locationHours.weeklyHoursWeekStart) {
+    if (dateWeekSunday === locationHours.weeklyHoursWeekStart) {
       const dayData = locationHours.weeklyHours[dayName];
+      console.log('🕐 [getHoursForDate] Found day data for', dayName + ':', dayData);
       if (dayData && dayData.open && dayData.close) {
+        console.log('🕐 [getHoursForDate] ✅ Returning weekly hours:', dayData);
         return [{ start: dayData.open, end: dayData.close }];
       }
       // If weekly hours exist but this day is null/undefined, it means closed for this week
+      console.log('🕐 [getHoursForDate] ❌ Day is closed in weekly hours');
       return null;
     }
 
@@ -174,6 +185,7 @@ export default function SimpleReservationRequestModal({
   const [locationHours, setLocationHours] = useState<any>(null);
   const [loadingHours, setLoadingHours] = useState(true);
   const [locationTimezone, setLocationTimezone] = useState<string>('America/Chicago');
+  const [allWeeklyHours, setAllWeeklyHours] = useState<Record<string, any>>({});
 
   // Initialize fields when memberName changes
   useEffect(() => {
@@ -371,9 +383,17 @@ export default function SimpleReservationRequestModal({
           // Get location timezone (fallback to Chicago if not set)
           const timezone = locationData.timezone || 'America/Chicago';
 
+          // Store all weekly hours for later reference
+          setAllWeeklyHours(locationData.weekly_hours || {});
+
+          console.log('🔍 [DEBUG] Location weekly_hours data:', locationData.weekly_hours);
+          console.log('🔍 [DEBUG] All weekly_hours keys:', Object.keys(locationData.weekly_hours || {}));
+
           // Fetch weekly hours + base hours for this location
-          const currentWeekMonday = getMondayOfWeek(new Date(), timezone);
-          const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekMonday] || null;
+          const currentWeekSunday = getSundayOfWeek(new Date(), timezone);
+          console.log('🔍 [DEBUG] Current week Sunday key:', currentWeekSunday);
+          const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekSunday] || null;
+          console.log('🔍 [DEBUG] Weekly hours for current week:', weeklyHoursForWeek);
 
           // Fetch base hours from venue_hours table
           const { data: baseHoursData } = await supabase
@@ -384,7 +404,7 @@ export default function SimpleReservationRequestModal({
 
           setLocationHours({
             weeklyHours: weeklyHoursForWeek,
-            weeklyHoursWeekStart: weeklyHoursForWeek ? currentWeekMonday : null,
+            weeklyHoursWeekStart: weeklyHoursForWeek ? currentWeekSunday : null,
             baseHours: baseHoursData || [],
             timezone: timezone
           });
@@ -393,6 +413,7 @@ export default function SimpleReservationRequestModal({
           setCoverEnabled(false);
           setCoverPrice(0);
           setLocationHours(null);
+          setAllWeeklyHours({});
           setLoadingHours(false);
         }
       } catch (error) {
@@ -409,6 +430,22 @@ export default function SimpleReservationRequestModal({
     setDate(newDate);
     setTime('');
     setLoadingTimes(true);
+
+    // Update weekly hours for the selected date's week
+    const selectedWeekSunday = getSundayOfWeek(newDate, locationTimezone);
+    const weeklyHoursForSelectedWeek = allWeeklyHours[selectedWeekSunday] || null;
+
+    console.log('📅 [DEBUG] Date selected:', newDate);
+    console.log('📅 [DEBUG] Selected week Sunday:', selectedWeekSunday);
+    console.log('📅 [DEBUG] All weekly hours available:', allWeeklyHours);
+    console.log('📅 [DEBUG] Hours for selected week:', weeklyHoursForSelectedWeek);
+
+    // Update locationHours with the selected week's hours
+    setLocationHours(prevHours => ({
+      ...prevHours,
+      weeklyHours: weeklyHoursForSelectedWeek,
+      weeklyHoursWeekStart: weeklyHoursForSelectedWeek ? selectedWeekSunday : null,
+    }));
 
     const abortController = new AbortController();
 
@@ -884,7 +921,18 @@ export default function SimpleReservationRequestModal({
     // Check if date has operating hours (weekly or base)
     // Skip if hours are still loading
     if (!loadingHours) {
-      const hours = getHoursForDate(date, locationHours);
+      // For dates in different weeks, we need to check the appropriate week's data
+      const dateWeekSunday = getSundayOfWeek(date, locationTimezone);
+      const weeklyHoursForDateWeek = allWeeklyHours[dateWeekSunday] || null;
+
+      // Create a temporary locationHours object with the correct week's data
+      const tempLocationHours = {
+        ...locationHours,
+        weeklyHours: weeklyHoursForDateWeek,
+        weeklyHoursWeekStart: weeklyHoursForDateWeek ? dateWeekSunday : null,
+      };
+
+      const hours = getHoursForDate(date, tempLocationHours);
       if (!hours || hours.length === 0) {
         return false;
       }

@@ -381,6 +381,40 @@ export function getMondayOfWeek(
 }
 
 /**
+ * Get the Sunday of the current week for a given date.
+ * This ensures the week starts on Sunday (US convention) rather than Monday (ISO convention).
+ *
+ * @param date - The reference date to find the week for
+ * @param timezone - The timezone to calculate in (defaults to America/Chicago)
+ * @returns Sunday date in YYYY-MM-DD format in the specified timezone
+ */
+export function getSundayOfWeek(
+  date: DateInput = new Date(),
+  timezone: TimeZone = DEFAULT_TIMEZONE
+): string {
+  // Convert to DateTime in the location's timezone
+  // CRITICAL: Use zone parameter to ensure correct timezone handling
+  const dt = DateTime.isDateTime(date)
+    ? date.setZone(timezone)
+    : DateTime.fromJSDate(date as Date).setZone(timezone);
+
+  // Get the weekday (1=Monday, 7=Sunday in Luxon)
+  const weekday = dt.weekday;
+
+  // Calculate days to subtract to get to Sunday
+  // If weekday is 7 (Sunday), we're already there (subtract 0)
+  // If weekday is 1 (Monday), subtract 1 day to get to previous Sunday
+  // If weekday is 2 (Tuesday), subtract 2 days, etc.
+  const daysToSubtract = weekday === 7 ? 0 : weekday;
+
+  // Get Sunday by subtracting the appropriate number of days
+  const sunday = dt.minus({ days: daysToSubtract }).startOf('day');
+
+  // Return in YYYY-MM-DD format (ISO date format) - using LL for zero-padded month
+  return sunday.toFormat('yyyy-LL-dd');
+}
+
+/**
  * Get the current week's hours for a location, falling back to global settings.
  *
  * @param location - Location object with weekly_hours and timezone
@@ -401,7 +435,7 @@ export function getLocationWeeklyHours(
   globalSettings: { operating_hours?: any },
   date: DateInput = new Date()
 ): any {
-  const weekStart = getMondayOfWeek(date, location.timezone);
+  const weekStart = getSundayOfWeek(date, location.timezone);
   const weeklyHours = location.weekly_hours?.[weekStart];
   return weeklyHours ?? globalSettings.operating_hours ?? null;
 }
