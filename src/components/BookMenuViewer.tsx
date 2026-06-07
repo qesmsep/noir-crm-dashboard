@@ -42,7 +42,13 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
     const fetchMenuImages = async () => {
       try {
         const locationParam = locationSlug ? `?location=${locationSlug}` : '';
-        const response = await fetch(`/api/admin/menu-files${locationParam}`);
+        // Use the appropriate endpoint based on environment
+        const isProduction = process.env.NODE_ENV === 'production';
+        const endpoint = isProduction
+          ? `/api/admin/menu-storage/list${locationParam}`
+          : `/api/admin/menu-files${locationParam}`;
+
+        const response = await fetch(endpoint);
         if (response.ok) {
           const files = await response.json();
           const imagePaths = files.map((file: any) => file.path);
