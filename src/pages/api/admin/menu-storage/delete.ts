@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
-import { getServerSession } from '../../../lib/auth';
 
 // Initialize Supabase client with service role for admin operations
 const supabase = createClient(
@@ -14,12 +13,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Check admin authentication
-    const session = await getServerSession(req, res);
-    if (!session?.isAdmin) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     const location = (req.query.location as string) || 'noirkc';
     const { fileName } = req.body;
 
