@@ -6,6 +6,8 @@ import PrivateEventBooking from './PrivateEventBooking';
 import { DateTime } from 'luxon';
 import { formatTime, formatDate, fromUTC, getSundayOfWeek } from '../utils/dateUtils';
 import styles from './CalendarAvailability.module.css';
+import type { TimeRange, BaseHour, ExceptionalOpen, ExceptionalClosure } from '../types/hours';
+import { WEEKDAYS, DAYS_IN_WEEK } from '../types/hours';
 import {
   Box,
   Button,
@@ -39,13 +41,6 @@ import {
   Td,
   IconButton,
 } from '@chakra-ui/react';
-
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-type TimeRange = { start: string; end: string };
-type BaseHour = { enabled: boolean; timeRanges: TimeRange[] };
-type ExceptionalOpen = { id: number; date: string; time_ranges: TimeRange[]; label?: string };
-type ExceptionalClosure = { id: number; date: string; reason?: string; full_day?: boolean; time_ranges?: TimeRange[]; sms_notification?: string };
 
 type CalendarAvailabilityControlProps = {
   section: 'booking_window' | 'base' | 'weekly' | 'custom_open' | 'custom_closed' | 'private_events';
@@ -193,11 +188,11 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
   }
 
   // Base Hours State
-  const [baseHours, setBaseHours] = useState<BaseHour[]>(Array(7).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
+  const [baseHours, setBaseHours] = useState<BaseHour[]>(Array(DAYS_IN_WEEK).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
 
   // Weekly Hours State (for current and next week)
-  const [weeklyHours, setWeeklyHours] = useState<BaseHour[]>(Array(7).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
-  const [nextWeeklyHours, setNextWeeklyHours] = useState<BaseHour[]>(Array(7).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
+  const [weeklyHours, setWeeklyHours] = useState<BaseHour[]>(Array(DAYS_IN_WEEK).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
+  const [nextWeeklyHours, setNextWeeklyHours] = useState<BaseHour[]>(Array(DAYS_IN_WEEK).fill(null).map(() => ({ enabled: false, timeRanges: [{ start: '18:00', end: '23:00' }] })));
   const currentWeekSunday = getSundayOfWeek(new Date(), 'America/Chicago');
   const nextWeekSunday = DateTime.fromISO(currentWeekSunday, { zone: 'America/Chicago' }).plus({ weeks: 1 }).toFormat('yyyy-MM-dd');
 
@@ -309,13 +304,7 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
             const weeklyHoursData = locationData.weekly_hours as Record<string, any>;
 
             // Load current week data
-            console.log('📅 [LOAD] Loading weekly hours for location:', locationId);
-            console.log('📅 [LOAD] Current week Sunday:', currentWeekSunday);
-            console.log('📅 [LOAD] Next week Sunday:', nextWeekSunday);
-            console.log('📅 [LOAD] Available weekly hours keys:', Object.keys(weeklyHoursData));
-
             const currentWeekData = weeklyHoursData[currentWeekSunday];
-            console.log('📅 [LOAD] Current week data found:', currentWeekData);
 
             if (currentWeekData) {
               const enabledDays = Array(7).fill(false);
@@ -533,13 +522,6 @@ const CalendarAvailabilityControl: React.FC<CalendarAvailabilityControlProps> = 
       });
 
       // Update both weeks' hours
-      console.log('💾 [SAVE] Saving weekly hours with keys:', {
-        currentWeekSunday,
-        nextWeekSunday,
-        currentWeekData: currentWeekHoursData,
-        nextWeekData: nextWeekHoursData
-      });
-
       const updatedWeeklyHours = {
         ...existingWeeklyHours,
         [currentWeekSunday]: currentWeekHoursData,

@@ -392,26 +392,37 @@ export function getSundayOfWeek(
   date: DateInput = new Date(),
   timezone: TimeZone = DEFAULT_TIMEZONE
 ): string {
-  // Convert to DateTime in the location's timezone
-  // CRITICAL: Use zone parameter to ensure correct timezone handling
-  const dt = DateTime.isDateTime(date)
-    ? date.setZone(timezone)
-    : DateTime.fromJSDate(date as Date).setZone(timezone);
+  try {
+    // Convert to DateTime in the location's timezone
+    // CRITICAL: Use zone parameter to ensure correct timezone handling
+    const dt = DateTime.isDateTime(date)
+      ? date.setZone(timezone)
+      : DateTime.fromJSDate(date as Date).setZone(timezone);
 
-  // Get the weekday (1=Monday, 7=Sunday in Luxon)
-  const weekday = dt.weekday;
+    // Validate the date is valid
+    if (!dt.isValid) {
+      throw new Error(`Invalid date input: ${date}`);
+    }
 
-  // Calculate days to subtract to get to Sunday
-  // If weekday is 7 (Sunday), we're already there (subtract 0)
-  // If weekday is 1 (Monday), subtract 1 day to get to previous Sunday
-  // If weekday is 2 (Tuesday), subtract 2 days, etc.
-  const daysToSubtract = weekday === 7 ? 0 : weekday;
+    // Get the weekday (1=Monday, 7=Sunday in Luxon)
+    const weekday = dt.weekday;
 
-  // Get Sunday by subtracting the appropriate number of days
-  const sunday = dt.minus({ days: daysToSubtract }).startOf('day');
+    // Calculate days to subtract to get to Sunday
+    // If weekday is 7 (Sunday), we're already there (subtract 0)
+    // If weekday is 1 (Monday), subtract 1 day to get to previous Sunday
+    // If weekday is 2 (Tuesday), subtract 2 days, etc.
+    const daysToSubtract = weekday === 7 ? 0 : weekday;
 
-  // Return in YYYY-MM-DD format (ISO date format) - using LL for zero-padded month
-  return sunday.toFormat('yyyy-LL-dd');
+    // Get Sunday by subtracting the appropriate number of days
+    const sunday = dt.minus({ days: daysToSubtract }).startOf('day');
+
+    // Return in YYYY-MM-DD format (ISO date format) - using LL for zero-padded month
+    return sunday.toFormat('yyyy-LL-dd');
+  } catch (error) {
+    console.error('Error calculating Sunday of week:', error);
+    // Return current date as fallback
+    return DateTime.now().setZone(timezone).startOf('day').toFormat('yyyy-LL-dd');
+  }
 }
 
 /**

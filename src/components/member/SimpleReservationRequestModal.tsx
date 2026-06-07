@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { DateTime } from 'luxon';
@@ -8,6 +8,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { supabase } from '@/lib/supabase';
 import { getSundayOfWeek } from '@/utils/dateUtils';
+import type { LocationHours, WeeklyHours } from '@/types/hours';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -73,55 +74,49 @@ const formatPhoneNumber = (value: string) => {
  * @param locationHours - Object containing weeklyHours, weeklyHoursWeekStart, and baseHours
  * @returns Time ranges for the date, or null if not open
  */
-const getHoursForDate = (date: Date, locationHours: any): Array<{ start: string; end: string }> | null => {
+const getHoursForDate = (date: Date, locationHours: LocationHours | null): Array<{ start: string; end: string }> | null => {
   if (!locationHours) return null;
 
-  const timezone = locationHours.timezone || 'America/Chicago';
-  const dt = DateTime.fromJSDate(date, { zone: timezone });
-  const dayOfWeek = dt.weekday % 7; // Luxon: 1=Monday, 7=Sunday -> convert to 0=Sunday, 6=Saturday
-  const dayName = dt.toFormat('EEEE').toLowerCase(); // "thursday", "friday", etc.
+  try {
+    const timezone = locationHours.timezone || 'America/Chicago';
+    const dt = DateTime.fromJSDate(date, { zone: timezone });
+    const dayOfWeek = dt.weekday % 7; // Luxon: 1=Monday, 7=Sunday -> convert to 0=Sunday, 6=Saturday
+    const dayName = dt.toFormat('EEEE').toLowerCase(); // "thursday", "friday", etc.
 
-  console.log('🕐 [getHoursForDate] Checking date:', date.toDateString());
-  console.log('🕐 [getHoursForDate] Day name:', dayName);
-  console.log('🕐 [getHoursForDate] Location hours object:', locationHours);
+    // Check weekly hours first
+    if (locationHours.weeklyHours) {
+      // Weekly hours are set for a specific week
+      // Check if the date is in the same week as the weekly hours
+      const dateWeekSunday = getSundayOfWeek(date, timezone);
 
-  // Check weekly hours first
-  if (locationHours.weeklyHours) {
-    // Weekly hours are set for a specific week
-    // Check if the date is in the same week as the weekly hours
-    const dateWeekSunday = getSundayOfWeek(date, timezone);
-
-    console.log('🕐 [getHoursForDate] Date week Sunday:', dateWeekSunday);
-    console.log('🕐 [getHoursForDate] Weekly hours week start:', locationHours.weeklyHoursWeekStart);
-    console.log('🕐 [getHoursForDate] Weekly hours available:', locationHours.weeklyHours);
-
-    // Only use weekly hours if the date is in the same week
-    if (dateWeekSunday === locationHours.weeklyHoursWeekStart) {
-      const dayData = locationHours.weeklyHours[dayName];
-      console.log('🕐 [getHoursForDate] Found day data for', dayName + ':', dayData);
-      if (dayData && dayData.open && dayData.close) {
-        console.log('🕐 [getHoursForDate] ✅ Returning weekly hours:', dayData);
-        return [{ start: dayData.open, end: dayData.close }];
+      // Only use weekly hours if the date is in the same week
+      if (dateWeekSunday === locationHours.weeklyHoursWeekStart) {
+        const dayData = locationHours.weeklyHours[dayName];
+        if (dayData && dayData.open && dayData.close) {
+          return [{ start: dayData.open, end: dayData.close }];
+        }
+        // If weekly hours exist but this day is null/undefined, it means closed for this week
+        return null;
       }
-      // If weekly hours exist but this day is null/undefined, it means closed for this week
-      console.log('🕐 [getHoursForDate] ❌ Day is closed in weekly hours');
+
+      // Date is in a different week - weekly hours don't apply, return null
+      // (Don't fall back to base hours when weekly hours are set for the current week)
       return null;
     }
 
-    // Date is in a different week - weekly hours don't apply, return null
-    // (Don't fall back to base hours when weekly hours are set for the current week)
+    // Fall back to base hours (only when no weekly hours are set at all)
+    if (locationHours.baseHours && locationHours.baseHours.length > 0) {
+      const baseHoursForDay = locationHours.baseHours.filter((h: any) => h.day_of_week === dayOfWeek);
+      if (baseHoursForDay.length > 0 && baseHoursForDay[0].time_ranges) {
+        return baseHoursForDay[0].time_ranges;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting hours for date:', error);
     return null;
   }
-
-  // Fall back to base hours (only when no weekly hours are set at all)
-  if (locationHours.baseHours && locationHours.baseHours.length > 0) {
-    const baseHoursForDay = locationHours.baseHours.filter((h: any) => h.day_of_week === dayOfWeek);
-    if (baseHoursForDay.length > 0 && baseHoursForDay[0].time_ranges) {
-      return baseHoursForDay[0].time_ranges;
-    }
-  }
-
-  return null;
 };
 
 export default function SimpleReservationRequestModal({
@@ -386,14 +381,9 @@ export default function SimpleReservationRequestModal({
           // Store all weekly hours for later reference
           setAllWeeklyHours(locationData.weekly_hours || {});
 
-          console.log('🔍 [DEBUG] Location weekly_hours data:', locationData.weekly_hours);
-          console.log('🔍 [DEBUG] All weekly_hours keys:', Object.keys(locationData.weekly_hours || {}));
-
           // Fetch weekly hours + base hours for this location
           const currentWeekSunday = getSundayOfWeek(new Date(), timezone);
-          console.log('🔍 [DEBUG] Current week Sunday key:', currentWeekSunday);
           const weeklyHoursForWeek = locationData.weekly_hours?.[currentWeekSunday] || null;
-          console.log('🔍 [DEBUG] Weekly hours for current week:', weeklyHoursForWeek);
 
           // Fetch base hours from venue_hours table
           const { data: baseHoursData } = await supabase
@@ -434,11 +424,6 @@ export default function SimpleReservationRequestModal({
     // Update weekly hours for the selected date's week
     const selectedWeekSunday = getSundayOfWeek(newDate, locationTimezone);
     const weeklyHoursForSelectedWeek = allWeeklyHours[selectedWeekSunday] || null;
-
-    console.log('📅 [DEBUG] Date selected:', newDate);
-    console.log('📅 [DEBUG] Selected week Sunday:', selectedWeekSunday);
-    console.log('📅 [DEBUG] All weekly hours available:', allWeeklyHours);
-    console.log('📅 [DEBUG] Hours for selected week:', weeklyHoursForSelectedWeek);
 
     // Update locationHours with the selected week's hours
     setLocationHours(prevHours => ({
@@ -907,45 +892,59 @@ export default function SimpleReservationRequestModal({
     }
   };
 
-  const filterDate = (date: Date) => {
-    // Check if date is within booking window (skip for admin override)
-    if (!adminOverride) {
-      if (bookingStartDate && date < bookingStartDate) {
+  // Memoize weekly hours lookup for performance
+  const weeklyHoursMap = useMemo(() => {
+    const map = new Map<string, WeeklyHours>();
+    Object.entries(allWeeklyHours).forEach(([week, hours]) => {
+      map.set(week, hours as WeeklyHours);
+    });
+    return map;
+  }, [allWeeklyHours]);
+
+  const filterDate = useCallback((date: Date) => {
+    try {
+      // Check if date is within booking window (skip for admin override)
+      if (!adminOverride) {
+        if (bookingStartDate && date < bookingStartDate) {
+          return false;
+        }
+        if (bookingEndDate && date > bookingEndDate) {
+          return false;
+        }
+      }
+
+      // Check if date has operating hours (weekly or base)
+      // Skip if hours are still loading
+      if (!loadingHours) {
+        // For dates in different weeks, we need to check the appropriate week's data
+        const dateWeekSunday = getSundayOfWeek(date, locationTimezone);
+        const weeklyHoursForDateWeek = weeklyHoursMap.get(dateWeekSunday) || null;
+
+        // Create a temporary locationHours object with the correct week's data
+        const tempLocationHours: LocationHours = {
+          ...locationHours,
+          weeklyHours: weeklyHoursForDateWeek,
+          weeklyHoursWeekStart: weeklyHoursForDateWeek ? dateWeekSunday : null,
+        };
+
+        const hours = getHoursForDate(date, tempLocationHours);
+        if (!hours || hours.length === 0) {
+          return false;
+        }
+      }
+
+      // Check if date is blocked (closure or private event)
+      const dateStr = DateTime.fromJSDate(date, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
+      if (blockedDates.has(dateStr)) {
         return false;
       }
-      if (bookingEndDate && date > bookingEndDate) {
-        return false;
-      }
+
+      return true;
+    } catch (error) {
+      console.error('Error filtering date:', error);
+      return false; // Safer to block date on error
     }
-
-    // Check if date has operating hours (weekly or base)
-    // Skip if hours are still loading
-    if (!loadingHours) {
-      // For dates in different weeks, we need to check the appropriate week's data
-      const dateWeekSunday = getSundayOfWeek(date, locationTimezone);
-      const weeklyHoursForDateWeek = allWeeklyHours[dateWeekSunday] || null;
-
-      // Create a temporary locationHours object with the correct week's data
-      const tempLocationHours = {
-        ...locationHours,
-        weeklyHours: weeklyHoursForDateWeek,
-        weeklyHoursWeekStart: weeklyHoursForDateWeek ? dateWeekSunday : null,
-      };
-
-      const hours = getHoursForDate(date, tempLocationHours);
-      if (!hours || hours.length === 0) {
-        return false;
-      }
-    }
-
-    // Check if date is blocked (closure or private event)
-    const dateStr = DateTime.fromJSDate(date, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
-    if (blockedDates.has(dateStr)) {
-      return false;
-    }
-
-    return true;
-  };
+  }, [adminOverride, bookingStartDate, bookingEndDate, loadingHours, weeklyHoursMap, locationHours, locationTimezone, blockedDates]);
 
   // Use booking window dates if available, otherwise fall back to defaults
   // Ensure minDate is never in the past (use location's timezone for consistency)
