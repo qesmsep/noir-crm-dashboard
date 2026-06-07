@@ -138,7 +138,13 @@ export default function HomePageAdmin() {
   const fetchMenuFiles = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin/menu-files?location=${selectedLocation}`);
+      // Use Supabase storage endpoint in production
+      const isProduction = process.env.NODE_ENV === 'production';
+      const endpoint = isProduction
+        ? `/api/admin/menu-storage/list?location=${selectedLocation}`
+        : `/api/admin/menu-files?location=${selectedLocation}`;
+
+      const response = await fetch(endpoint);
       if (!response.ok) {
         throw new Error('Failed to fetch menu files');
       }
@@ -167,7 +173,13 @@ export default function HomePageAdmin() {
         formData.append('menuFiles', file);
       });
 
-      const response = await fetch(`/api/admin/upload-menu?location=${selectedLocation}`, {
+      // Use Supabase storage endpoint in production
+      const isProduction = process.env.NODE_ENV === 'production';
+      const endpoint = isProduction
+        ? `/api/admin/menu-storage/upload?location=${selectedLocation}`
+        : `/api/admin/upload-menu?location=${selectedLocation}`;
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       });
@@ -197,7 +209,13 @@ export default function HomePageAdmin() {
     if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
 
     try {
-      const response = await fetch(`/api/admin/delete-menu-file?location=${selectedLocation}`, {
+      // Use Supabase storage endpoint in production
+      const isProduction = process.env.NODE_ENV === 'production';
+      const endpoint = isProduction
+        ? `/api/admin/menu-storage/delete?location=${selectedLocation}`
+        : `/api/admin/delete-menu-file?location=${selectedLocation}`;
+
+      const response = await fetch(endpoint, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName }),
