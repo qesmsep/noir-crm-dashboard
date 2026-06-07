@@ -10,12 +10,22 @@ interface BookMenuViewerProps {
   locationSlug?: string;
 }
 
+// Type definition for react-pageflip ref
+interface FlipBookRef {
+  pageFlip: () => {
+    flip: (pageNumber: number) => void;
+    flipNext: () => void;
+    flipPrev: () => void;
+  };
+}
+
 const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locationSlug }) => {
   const [menuImages, setMenuImages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const bookRef = useRef<any>(null);
+  const [bookDimensions, setBookDimensions] = useState({ width: 825, height: 1275 });
+  const bookRef = useRef<FlipBookRef | null>(null);
 
   // Detect mobile on mount and resize
   useEffect(() => {
@@ -81,6 +91,70 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
     fetchMenuImages();
   }, [locationSlug]);
 
+  // Detect image dimensions and set book dimensions accordingly
+  useEffect(() => {
+    if (menuImages.length > 0) {
+      let mounted = true;
+      const img = new Image();
+
+      img.onload = () => {
+        if (!mounted) return;
+
+        const aspectRatio = img.naturalWidth / img.naturalHeight;
+
+        // Define max dimensions for the book viewer
+        const maxBookWidth = 1100;
+        const maxBookHeight = 1400;
+        const minBookWidth = 400;
+        const minBookHeight = 500;
+
+        let newWidth, newHeight;
+
+        // Calculate dimensions based on aspect ratio
+        if (aspectRatio > 0.7) {
+          // Wider images (like RooftopKC menu)
+          newWidth = Math.min(maxBookWidth, Math.max(minBookWidth, img.naturalWidth * 0.8));
+          newHeight = newWidth / aspectRatio;
+
+          // Ensure height is within bounds
+          if (newHeight > maxBookHeight) {
+            newHeight = maxBookHeight;
+            newWidth = newHeight * aspectRatio;
+          }
+        } else {
+          // Taller images (like Noir menu)
+          newHeight = Math.min(maxBookHeight, Math.max(minBookHeight, img.naturalHeight * 0.6));
+          newWidth = newHeight * aspectRatio;
+
+          // Ensure width is within bounds
+          if (newWidth > maxBookWidth) {
+            newWidth = maxBookWidth;
+            newHeight = newWidth / aspectRatio;
+          }
+        }
+
+        setBookDimensions({
+          width: Math.round(newWidth),
+          height: Math.round(newHeight)
+        });
+      };
+
+      img.onerror = () => {
+        if (!mounted) return;
+        console.error('Failed to load menu image for dimension detection');
+        // Use default dimensions on error
+        setBookDimensions({ width: 825, height: 1275 });
+      };
+
+      img.src = menuImages[0];
+
+      // Cleanup function to prevent memory leak
+      return () => {
+        mounted = false;
+      };
+    }
+  }, [menuImages]);
+
   const nextPage = () => {
     if (bookRef.current) {
       // Mobile: skip page 2 (index 1)
@@ -129,7 +203,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
 
   if (isLoading) {
     return (
-      <div className="w-full h-[600px] flex items-center justify-center bg-[#23201C] rounded-2xl">
+      <div className="w-full min-h-[400px] md:min-h-[600px] flex items-center justify-center bg-[#23201C] rounded-2xl">
         <div className="text-center">
           <div className="inline-block w-12 h-12 border-4 border-[#BCA892] border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-[#ECEDE8] text-lg" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -142,7 +216,7 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
 
   if (menuImages.length === 0) {
     return (
-      <div className="w-full h-[600px] flex items-center justify-center bg-[#23201C] rounded-2xl">
+      <div className="w-full min-h-[400px] md:min-h-[600px] flex items-center justify-center bg-[#23201C] rounded-2xl">
         <p className="text-[#ECEDE8] text-lg" style={{ fontFamily: 'Montserrat, sans-serif' }}>
           No menu pages available
         </p>
@@ -150,6 +224,57 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
     );
   }
 
+  // Single image display for one-page menus
+  if (menuImages.length === 1) {
+    return (
+      <div className={`w-full flex flex-col items-center justify-center ${className}`}>
+        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center px-4">
+          {/* Spotlight gradient background */}
+          <div
+            className="absolute inset-0 rounded-3xl"
+            style={{
+              background: 'radial-gradient(ellipse at center, rgba(165, 148, 128, 0.1) 0%, rgba(26, 26, 26, 0) 70%)',
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Single centered image */}
+          <div className="relative bg-[#1a1a1a] rounded-xl shadow-2xl overflow-hidden group cursor-pointer"
+               style={{
+                 maxWidth: isMobile ? '95%' : '85%',
+                 width: 'auto',
+                 height: 'auto',
+                 maxHeight: isMobile ? '70vh' : '85vh',
+                 transition: 'transform 0.3s ease',
+                 boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(165, 148, 128, 0.1)',
+               }}
+               onMouseEnter={(e) => {
+                 if (!isMobile) {
+                   e.currentTarget.style.transform = 'scale(1.02)';
+                 }
+               }}
+               onMouseLeave={(e) => {
+                 if (!isMobile) {
+                   e.currentTarget.style.transform = 'scale(1)';
+                 }
+               }}>
+            <img
+              src={menuImages[0]}
+              alt="Menu"
+              className="w-auto h-auto max-w-full object-contain"
+              style={{
+                display: 'block',
+                margin: '0 auto',
+                maxHeight: isMobile ? '70vh' : '85vh',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Multi-page book display
   return (
     <div className={`w-full flex flex-col items-center justify-center ${className}`}>
       {/* Book Container with Spotlight Effect */}
@@ -188,12 +313,12 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
         >
           <HTMLFlipBook
             ref={bookRef}
-            width={825}
-            height={1275}
+            width={bookDimensions.width}
+            height={bookDimensions.height}
             size="stretch"
-            minWidth={412}
+            minWidth={300}
             maxWidth={1650}
-            minHeight={637}
+            minHeight={400}
             maxHeight={2550}
             drawShadow={true}
             flippingTime={800}
@@ -215,14 +340,11 @@ const BookMenuViewer: React.FC<BookMenuViewerProps> = ({ className = '', locatio
           >
             {menuImages.map((src, idx) => (
               <div key={idx} className={styles.page} data-density="hard">
-                <div className={`${styles.pageContent} bg-[#ECEDE8] overflow-hidden`}>
+                <div className={`${styles.pageContent} bg-[#1a1a1a] overflow-hidden`}>
                   <img
                     src={src}
                     alt={`Menu page ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    style={{
-                      boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.1)',
-                    }}
+                    className="w-full h-full object-contain"
                   />
                 </div>
               </div>
