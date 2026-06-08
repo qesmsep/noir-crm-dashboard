@@ -47,7 +47,7 @@ BEGIN
   FROM system_settings s
   ORDER BY s.key;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 COMMENT ON FUNCTION identify_sensitive_settings IS 'Returns list of settings with encryption status and recommendation';
 

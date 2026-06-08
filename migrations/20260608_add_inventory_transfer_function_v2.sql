@@ -203,10 +203,11 @@ BEGIN
       RAISE EXCEPTION 'Transfer failed: %', SQLERRM;
   END;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
--- Grant execute permission to authenticated users (will be restricted by RLS in API)
-GRANT EXECUTE ON FUNCTION transfer_inventory_between_locations TO authenticated;
+-- Execute is restricted to service_role: the function is only ever called via
+-- the admin-gated /api/inventory/transfer endpoint using the service-role key.
+GRANT EXECUTE ON FUNCTION transfer_inventory_between_locations TO service_role;
 
 -- Add comments for documentation
 COMMENT ON FUNCTION transfer_inventory_between_locations IS

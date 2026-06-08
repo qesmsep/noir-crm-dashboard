@@ -146,7 +146,7 @@ BEGIN
 
   RETURN QUERY SELECT events_count, errors_count;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 COMMENT ON FUNCTION cleanup_old_monitoring_data IS 'Removes monitoring data older than specified days (default 30). Run via scheduled job or manually.';
 

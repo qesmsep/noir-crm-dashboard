@@ -149,7 +149,7 @@ export default function InventoryList({
                         {item.brand && (
                           <div className={styles.itemBrand}>{item.brand}</div>
                         )}
-                        {showLocationBadges && (
+                        {showLocationBadges && item.location_id && (
                           <span className={styles.locationBadge}>
                             {getLocationName(item.location_id)}
                           </span>
@@ -230,6 +230,11 @@ export default function InventoryList({
                       <h4 className={styles.cardTitle}>{item.name}</h4>
                       {item.brand && (
                         <p className={styles.cardBrand}>{item.brand}</p>
+                      )}
+                      {showLocationBadges && item.location_id && (
+                        <span className={styles.locationBadge}>
+                          {getLocationName(item.location_id)}
+                        </span>
                       )}
                     </div>
                     <span

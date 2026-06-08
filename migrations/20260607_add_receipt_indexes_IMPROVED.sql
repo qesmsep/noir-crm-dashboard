@@ -99,7 +99,7 @@ RETURNS void AS $$
 BEGIN
   REFRESH MATERIALIZED VIEW CONCURRENTLY mv_receipt_stats;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 COMMENT ON FUNCTION refresh_receipt_stats() IS 'Refresh receipt statistics materialized view. Run daily via scheduled job or after bulk receipt processing.';
 

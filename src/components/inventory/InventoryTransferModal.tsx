@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowRight, X, AlertCircle } from 'lucide-react';
 import type { InventoryItem, LocationSlug, UILocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
@@ -36,9 +36,17 @@ export default function InventoryTransferModal({
     [items, selectedItemId]
   );
 
-  // Locations are already real (no synthetic 'all'); kept as a memo so the
-  // dependent effects have a stable reference.
-  const availableLocations = useMemo(() => locations, [locations]);
+  // Locations are already real (no synthetic 'all').
+  const availableLocations = locations;
+
+  // Tracks the post-success close timer so it can be cleared if the component
+  // unmounts (or the modal closes) before it fires.
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -107,7 +115,7 @@ export default function InventoryTransferModal({
       }
 
       setSuccess(true);
-      setTimeout(() => {
+      successTimerRef.current = setTimeout(() => {
         onTransferComplete();
         onClose();
       }, 1500);
@@ -236,7 +244,7 @@ export default function InventoryTransferModal({
                   value={quantity}
                   onChange={(e) => {
                     const value = parseInt(e.target.value, 10);
-                    setQuantity(isNaN(value) ? 0 : Math.max(0, value));
+                    setQuantity(isNaN(value) ? 1 : Math.max(1, value));
                   }}
                   min={1}
                   max={selectedItem?.quantity || 999}

@@ -56,8 +56,10 @@ export function calculateIngredientCost(
   if (!itemCostPerUnit || !itemVolumeML) return 0;
 
   const mlPerUnit = convertToMilliliters(ingredient.quantity, ingredient.unit);
+  // Non-volumetric units (each, slice, sprig, ...) have a 0 conversion factor
+  // by design, so they contribute no volumetric cost. This is expected, not an
+  // error, so return 0 quietly.
   if (mlPerUnit === 0) {
-    console.warn(`Cannot calculate cost for unit: ${ingredient.unit}`);
     return 0;
   }
 
