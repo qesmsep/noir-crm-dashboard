@@ -36,6 +36,17 @@ import type {
   LocationSlug,
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
+import { supabase } from '../../lib/supabase';
+
+/**
+ * Build auth headers (Bearer token) for admin-protected API routes.
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token
+    ? { Authorization: `Bearer ${session.access_token}` }
+    : {};
+}
 
 const LOCATIONS: { slug: LocationSlug; name: string }[] = [
   { slug: 'all', name: 'All Locations' },
@@ -116,7 +127,7 @@ export default function InventoryPage() {
       const url = currentLocation === 'all'
         ? '/api/inventory/recipes' // Fetch all locations
         : `/api/inventory/recipes?location_slug=${currentLocation}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: await getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setRecipes(data.data || []);
@@ -156,7 +167,9 @@ export default function InventoryPage() {
   const recipeCount = recipes.length;
 
   // Inventory CRUD
-  const handleSaveItem = async (data: InventoryItemFormData) => {
+  const handleSaveItem = async (
+    data: InventoryItemFormData
+  ): Promise<InventoryItem | null> => {
     setSavingItem(true);
     try {
       const method = editingItem ? 'PUT' : 'POST';
@@ -169,12 +182,16 @@ export default function InventoryPage() {
         body: JSON.stringify(body),
       });
       if (res.ok) {
+        const result = await res.json().catch(() => null);
         await fetchInventory();
         setIsItemDrawerOpen(false);
         setEditingItem(null);
+        return (result?.data as InventoryItem) || null;
       }
+      return null;
     } catch (err) {
       console.error('Failed to save item:', err);
+      return null;
     } finally {
       setSavingItem(false);
     }
@@ -335,7 +352,7 @@ export default function InventoryPage() {
       const body = editingRecipe ? { ...data, id: editingRecipe.id } : data;
       const res = await fetch('/api/inventory/recipes', {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify(body),
       });
       if (res.ok) {
@@ -355,7 +372,7 @@ export default function InventoryPage() {
     try {
       await fetch('/api/inventory/recipes', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({ id }),
       });
       await fetchRecipes();

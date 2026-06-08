@@ -49,18 +49,20 @@ function getAvailability(
 }
 
 function getMarginClass(recipe: Recipe): string {
-  if (recipe.menu_price <= 0 || recipe.estimated_cost <= 0) return styles.marginOk;
+  const estimatedCost = recipe.estimated_cost ?? 0;
+  if (recipe.menu_price <= 0 || estimatedCost <= 0) return styles.marginOk;
   const margin =
-    ((recipe.menu_price - recipe.estimated_cost) / recipe.menu_price) * 100;
+    ((recipe.menu_price - estimatedCost) / recipe.menu_price) * 100;
   if (margin >= 70) return styles.marginGood;
   if (margin >= 50) return styles.marginOk;
   return styles.marginLow;
 }
 
 function getMarginPercent(recipe: Recipe): string {
-  if (recipe.menu_price <= 0 || recipe.estimated_cost <= 0) return '—';
+  const estimatedCost = recipe.estimated_cost ?? 0;
+  if (recipe.menu_price <= 0 || estimatedCost <= 0) return '—';
   const margin =
-    ((recipe.menu_price - recipe.estimated_cost) / recipe.menu_price) * 100;
+    ((recipe.menu_price - estimatedCost) / recipe.menu_price) * 100;
   return margin.toFixed(0) + '%';
 }
 
@@ -194,7 +196,7 @@ export default function RecipeBuilder({
                   <span className={styles.recipeCost}>
                     Cost{' '}
                     <span className={styles.recipeCostValue}>
-                      {formatCurrency(recipe.estimated_cost)}
+                      {formatCurrency(recipe.estimated_cost ?? 0)}
                     </span>
                     {' / '}
                     Price{' '}

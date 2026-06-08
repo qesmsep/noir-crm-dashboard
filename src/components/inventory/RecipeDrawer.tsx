@@ -77,7 +77,11 @@ export default function RecipeDrawer({
 
   // Ingredient search values for dropdowns
   const [searchTerms, setSearchTerms] = useState<Record<number, string>>({});
+  // Per-ingredient dropdown visibility
+  const [showDropdown, setShowDropdown] = useState<Record<number, boolean>>({});
   const [batchSearchTerms, setBatchSearchTerms] = useState<Record<number, string>>({});
+  // Per-batch-ingredient dropdown visibility
+  const [showBatchDropdown, setShowBatchDropdown] = useState<Record<number, boolean>>({});
 
   // Portal container for batch modal (for proper cleanup)
   const [batchPortalContainer] = useState(() => {
