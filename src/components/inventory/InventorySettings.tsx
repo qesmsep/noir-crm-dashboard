@@ -152,26 +152,15 @@ export default function InventorySettings({ isOpen, onClose }: InventorySettings
     });
   };
 
+  if (!isOpen) return null;
+
   return (
     <>
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className={`${styles.drawerOverlay} ${isOpen ? styles.drawerOverlayVisible : ''}`}
-          onClick={onClose}
-        />
-      )}
-
-      {/* Settings Drawer */}
-      <div
-        className={`${styles.drawer} ${styles.settingsDrawer} ${isOpen ? styles.drawerVisible : ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Inventory Settings"
-      >
-        <div className={styles.drawerHeader}>
-          <h2 className={styles.drawerTitle}>Inventory Settings</h2>
-          <button className={styles.drawerClose} onClick={onClose}>
+      <div className={styles.modalOverlay} onClick={onClose} />
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-label="Inventory Settings">
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>Inventory Settings</h2>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
             <X size={20} />
           </button>
         </div>
@@ -191,7 +180,7 @@ export default function InventorySettings({ isOpen, onClose }: InventorySettings
           </button>
         </div>
 
-        <div className={styles.drawerBody}>
+        <div className={styles.modalBody}>
           {activeTab === 'inventory' && (
             <div className={styles.settingsSection}>
               <h3 className={styles.settingsSectionTitle}>Inventory Categories</h3>
@@ -321,7 +310,7 @@ export default function InventorySettings({ isOpen, onClose }: InventorySettings
           )}
         </div>
 
-        <div className={styles.drawerFooter}>
+        <div className={styles.modalFooter}>
           <button className={styles.btnTertiary} onClick={onClose} type="button">
             Cancel
           </button>

@@ -146,19 +146,16 @@ export default function InventoryPhotoScanner({
 
   return (
     <>
-      <div
-        className={`${styles.drawerOverlay} ${styles.drawerOverlayVisible}`}
-        onClick={onClose}
-      />
-      <div className={`${styles.drawer} ${styles.drawerVisible}`} role="dialog" aria-modal="true" aria-label="Scan Inventory">
-        <div className={styles.drawerHeader}>
-          <h2 className={styles.drawerTitle}>Scan Inventory</h2>
-          <button className={styles.drawerClose} onClick={onClose}>
+      <div className={styles.modalOverlay} onClick={onClose} />
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-label="Scan Inventory">
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>Scan Inventory</h2>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
-        <div className={styles.drawerBody}>
+        <div className={styles.modalBody}>
           {/* Hidden file inputs */}
           <input
             ref={fileInputRef}
@@ -343,7 +340,7 @@ export default function InventoryPhotoScanner({
           )}
         </div>
 
-        <div className={styles.drawerFooter}>
+        <div className={styles.modalFooter}>
           <button className={styles.btnTertiary} onClick={onClose}>
             Cancel
           </button>

@@ -123,25 +123,22 @@ export default function RecipeDrawer({
     onSave(form);
   };
 
+  if (!isOpen) return null;
+
   return (
     <>
-      {isOpen && (
-        <div
-          className={`${styles.drawerOverlay} ${styles.drawerOverlayVisible}`}
-          onClick={onClose}
-        />
-      )}
-      <div className={`${styles.drawer} ${isOpen ? styles.drawerVisible : ''}`} role="dialog" aria-modal="true" aria-label={editRecipe ? 'Edit Recipe' : 'New Recipe'}>
-        <div className={styles.drawerHeader}>
-          <h2 className={styles.drawerTitle}>
+      <div className={styles.modalOverlay} onClick={onClose} />
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-label={editRecipe ? 'Edit Recipe' : 'New Recipe'}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>
             {editRecipe ? 'Edit Recipe' : 'New Recipe'}
           </h2>
-          <button className={styles.drawerClose} onClick={onClose}>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className={styles.drawerBody}>
+        <form onSubmit={handleSubmit} className={styles.modalBody}>
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Name</label>
             <input
@@ -362,7 +359,7 @@ export default function RecipeDrawer({
           </div>
         </form>
 
-        <div className={styles.drawerFooter}>
+        <div className={styles.modalFooter}>
           {editRecipe && onDelete && (
             <button
               className={styles.btnDanger}
