@@ -25,6 +25,18 @@ export type InventoryUnit =
   | 'oz'
   | 'case';
 
+export type RecipeIngredientUnit =
+  | 'oz'
+  | 'ml'
+  | 'dash'
+  | 'splash'
+  | 'barspoon'
+  | 'each'
+  | 'slice'
+  | 'sprig'
+  | 'wheel'
+  | 'drop';
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -76,7 +88,7 @@ export interface RecipeIngredient {
   inventory_item_id: string;
   name: string;
   quantity: number;
-  unit: string;
+  unit: RecipeIngredientUnit;
 }
 
 export interface Recipe {
@@ -93,10 +105,44 @@ export interface Recipe {
   image_url: string;
   glass_type?: string;
   garnish?: string;
-  location_id: string; // Primary location (for backward compatibility)
-  location_ids?: string[]; // Multi-location support
+  location_id?: string | null; // Primary location (nullable, deprecated)
+  location_ids?: string[]; // Multi-location support (recommended)
+  batch_ingredients?: RecipeIngredient[]; // Saved batch quantities
+  batch_yield?: number; // How many cocktails the batch makes
+  batch_instructions?: string; // Batch-specific instructions
   created_at: string;
   updated_at: string;
+}
+
+// Database types for API layer (more specific than client types)
+export interface DBRecipe {
+  id: string;
+  name: string;
+  category: string;
+  descriptors?: string[] | null;
+  description: string;
+  instructions: string;
+  ingredients: string | RecipeIngredient[]; // Can be JSON string from DB
+  estimated_cost?: number | null;
+  menu_price: number;
+  margin?: number | null;
+  image_url: string;
+  glass_type?: string | null;
+  garnish?: string | null;
+  location_id?: string | null;
+  location_ids?: string[] | null;
+  batch_ingredients?: string | RecipeIngredient[] | null;
+  batch_yield?: number | null;
+  batch_instructions?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DBInventoryItem {
+  id: string;
+  name: string;
+  cost_per_unit: number;
+  volume_ml: number;
 }
 
 export interface RecipeFormData {
@@ -111,6 +157,9 @@ export interface RecipeFormData {
   garnish?: string;
   location_id?: string; // For backward compatibility
   location_ids?: string[]; // Multi-location assignment
+  batch_ingredients?: RecipeIngredient[]; // Saved batch quantities
+  batch_yield?: number; // How many cocktails the batch makes
+  batch_instructions?: string; // Batch-specific instructions
 }
 
 // ========================================

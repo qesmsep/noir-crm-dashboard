@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plus, Trash2 } from 'lucide-react';
 import InventoryItemModal from './InventoryItemModal';
+import IngredientSearchDropdown from './IngredientSearchDropdown';
 import type {
   Recipe,
   RecipeFormData,
@@ -9,6 +11,8 @@ import type {
   InventoryItemFormData,
   LocationSlug,
 } from '../../types/inventory';
+import { Z_INDEX } from '../../constants/inventory';
+import { convertToMilliliters } from '../../lib/inventory-utils';
 import styles from '../../styles/Inventory.module.css';
 
 interface RecipeDrawerProps {
@@ -19,7 +23,7 @@ interface RecipeDrawerProps {
   editRecipe: Recipe | null;
   inventory: InventoryItem[];
   saving: boolean;
-  onSaveNewItem?: (data: InventoryItemFormData) => void;
+  onSaveNewItem?: (data: InventoryItemFormData) => Promise<InventoryItem | null>;
   currentLocation?: LocationSlug;
   locations?: Array<{ id: string; slug: LocationSlug; name: string }>;
 }
@@ -35,6 +39,9 @@ const EMPTY_FORM: RecipeFormData = {
   glass_type: '',
   garnish: '',
   location_ids: [],
+  batch_ingredients: undefined,
+  batch_yield: undefined,
+  batch_instructions: undefined,
 };
 
 const EMPTY_INGREDIENT: RecipeIngredient = {
@@ -61,12 +68,42 @@ export default function RecipeDrawer({
   const [form, setForm] = useState<RecipeFormData>(EMPTY_FORM);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [pendingIngredientIndex, setPendingIngredientIndex] = useState<number | null>(null);
+  const [pendingBatchIngredientIndex, setPendingBatchIngredientIndex] = useState<number | null>(null);
   const [savingNewItem, setSavingNewItem] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [batchIngredients, setBatchIngredients] = useState<RecipeIngredient[]>([]);
+  const [batchYield, setBatchYield] = useState<number>(1);
+  const [batchInstructions, setBatchInstructions] = useState<string>('');
+
+  // Ingredient search values for dropdowns
+  const [searchTerms, setSearchTerms] = useState<Record<number, string>>({});
+  const [batchSearchTerms, setBatchSearchTerms] = useState<Record<number, string>>({});
+
+  // Portal container for batch modal (for proper cleanup)
+  const [batchPortalContainer] = useState(() => {
+    if (typeof document === 'undefined') return null;
+    const container = document.createElement('div');
+    container.setAttribute('id', 'batch-modal-portal');
+    return container;
+  });
 
   // Get available locations (exclude 'all')
   const availableLocations = locations.filter(loc => loc.slug !== 'all');
 
+  // Portal cleanup effect
   useEffect(() => {
+    if (batchPortalContainer) {
+      document.body.appendChild(batchPortalContainer);
+      return () => {
+        document.body.removeChild(batchPortalContainer);
+      };
+    }
+  }, [batchPortalContainer]);
+
+  // Initialize form when modal opens (FIX: removed inventory from deps to prevent reset)
+  useEffect(() => {
+    if (!isOpen) return;
+
     if (editRecipe) {
       setForm({
         name: editRecipe.name,
@@ -79,11 +116,28 @@ export default function RecipeDrawer({
         glass_type: editRecipe.glass_type || '',
         garnish: editRecipe.garnish || '',
         location_ids: editRecipe.location_ids || [],
+        batch_ingredients: editRecipe.batch_ingredients,
+        batch_yield: editRecipe.batch_yield,
+        batch_instructions: editRecipe.batch_instructions,
       });
     } else {
       setForm(EMPTY_FORM);
     }
   }, [editRecipe, isOpen]);
+
+  // Separate effect for search terms that depends on inventory
+  useEffect(() => {
+    if (!isOpen || !editRecipe) return;
+
+    const terms: Record<number, string> = {};
+    editRecipe.ingredients.forEach((ing, idx) => {
+      const item = inventory.find(i => i.id === ing.inventory_item_id);
+      if (item) {
+        terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+      }
+    });
+    setSearchTerms(terms);
+  }, [inventory, editRecipe?.ingredients, isOpen]);
 
   const handleChange = (
     field: keyof RecipeFormData,
@@ -111,10 +165,13 @@ export default function RecipeDrawer({
   };
 
   const addIngredient = () => {
+    const newIndex = form.ingredients.length;
     setForm((prev) => ({
       ...prev,
       ingredients: [...prev.ingredients, { ...EMPTY_INGREDIENT }],
     }));
+    // Initialize empty search term for new ingredient
+    setSearchTerms(prev => ({ ...prev, [newIndex]: '' }));
   };
 
   const updateIngredient = (
@@ -126,14 +183,6 @@ export default function RecipeDrawer({
       const updated = [...prev.ingredients];
       updated[index] = { ...updated[index], [field]: value };
 
-      // Auto-fill name when inventory item is selected
-      if (field === 'inventory_item_id' && typeof value === 'string') {
-        const item = inventory.find((i) => i.id === value);
-        if (item) {
-          updated[index].name = item.brand ? `${item.brand} ${item.name}` : item.name;
-        }
-      }
-
       return { ...prev, ingredients: updated };
     });
   };
@@ -143,6 +192,48 @@ export default function RecipeDrawer({
       ...prev,
       ingredients: prev.ingredients.filter((_, i) => i !== index),
     }));
+    // Clean up search state
+    setSearchTerms(prev => {
+      const newTerms = { ...prev };
+      delete newTerms[index];
+      return newTerms;
+    });
+    setShowDropdown(prev => {
+      const newDropdown = { ...prev };
+      delete newDropdown[index];
+      return newDropdown;
+    });
+  };
+
+  const getFilteredInventory = (searchTerm: string) => {
+    if (!searchTerm) return inventory;
+    const term = searchTerm.toLowerCase();
+    return inventory.filter(item => {
+      const fullName = `${item.brand ? item.brand + ' ' : ''}${item.name}`.toLowerCase();
+      return fullName.includes(term);
+    });
+  };
+
+  const handleIngredientSearch = (index: number, value: string) => {
+    setSearchTerms(prev => ({ ...prev, [index]: value }));
+    setShowDropdown(prev => ({ ...prev, [index]: true }));
+  };
+
+  const handleSelectInventoryItem = (index: number, item: InventoryItem) => {
+    const displayName = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+
+    setForm((prev) => {
+      const updated = [...prev.ingredients];
+      updated[index] = {
+        ...updated[index],
+        inventory_item_id: item.id,
+        name: displayName
+      };
+      return { ...prev, ingredients: updated };
+    });
+
+    setSearchTerms(prev => ({ ...prev, [index]: displayName }));
+    setShowDropdown(prev => ({ ...prev, [index]: false }));
   };
 
   const estimatedCost = form.ingredients.reduce((total, ing) => {
@@ -169,24 +260,187 @@ export default function RecipeDrawer({
     setIsAddItemModalOpen(true);
   };
 
+  const handleAddNewItemFromBatch = (ingredientIndex: number) => {
+    setPendingBatchIngredientIndex(ingredientIndex);
+    setIsAddItemModalOpen(true);
+  };
+
   const handleSaveNewItemComplete = async (data: InventoryItemFormData) => {
     if (!onSaveNewItem) return;
 
     setSavingNewItem(true);
     try {
       // Save the new item via parent callback
-      await onSaveNewItem(data);
+      const newItem = await onSaveNewItem(data);
 
-      // The parent will refresh inventory, but we need to wait a moment
-      // In a real scenario, onSaveNewItem should return the new item
-      // For now, we'll close the modal and the user can select from refreshed list
+      // Auto-populate the ingredient row with the new item
+      if (newItem) {
+        // Check if we're adding from batch mode
+        if (pendingBatchIngredientIndex !== null) {
+          updateBatchIngredient(pendingBatchIngredientIndex, 'inventory_item_id', newItem.id);
+          setPendingBatchIngredientIndex(null);
+        }
+        // Check if we're adding from regular mode
+        else if (pendingIngredientIndex !== null) {
+          updateIngredient(pendingIngredientIndex, 'inventory_item_id', newItem.id);
+          setPendingIngredientIndex(null);
+        }
+      }
+
       setIsAddItemModalOpen(false);
-      setPendingIngredientIndex(null);
     } catch (err) {
       console.error('Failed to save new item:', err);
     } finally {
       setSavingNewItem(false);
     }
+  };
+
+  const handleOpenBatchEntry = () => {
+    // Load saved batch data if it exists, otherwise initialize from current recipe
+    if (form.batch_ingredients && form.batch_ingredients.length > 0) {
+      setBatchIngredients([...form.batch_ingredients]);
+      setBatchYield(form.batch_yield || 1);
+      setBatchInstructions(form.batch_instructions || '');
+
+      // Initialize batch search terms
+      const terms: Record<number, string> = {};
+      form.batch_ingredients.forEach((ing, idx) => {
+        const item = inventory.find(i => i.id === ing.inventory_item_id);
+        if (item) {
+          terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+        }
+      });
+      setBatchSearchTerms(terms);
+    } else {
+      setBatchIngredients(form.ingredients.length > 0 ? [...form.ingredients] : [{ ...EMPTY_INGREDIENT }]);
+      setBatchYield(1);
+      setBatchInstructions(form.instructions || '');
+
+      // Initialize batch search terms from current ingredients
+      const terms: Record<number, string> = {};
+      form.ingredients.forEach((ing, idx) => {
+        const item = inventory.find(i => i.id === ing.inventory_item_id);
+        if (item) {
+          terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+        }
+      });
+      setBatchSearchTerms(terms);
+    }
+    setShowBatchDropdown({});
+    setIsBatchModalOpen(true);
+  };
+
+  const handleSaveBatchEntry = () => {
+    // Validate batch yield
+    if (batchYield <= 0) {
+      alert('Batch yield must be greater than 0');
+      return;
+    }
+
+    // Validate all ingredients have valid selections and quantities
+    const invalidIngredients = batchIngredients.filter(
+      ing => !ing.inventory_item_id || ing.quantity <= 0
+    );
+
+    if (invalidIngredients.length > 0) {
+      alert('All ingredients must have an item selected and quantity > 0');
+      return;
+    }
+
+    // Verify all items still exist in inventory
+    const allItemsExist = batchIngredients.every(ing =>
+      inventory.some(item => item.id === ing.inventory_item_id)
+    );
+
+    if (!allItemsExist) {
+      alert('Some selected items no longer exist. Please refresh and try again.');
+      return;
+    }
+
+    // Convert batch quantities to per-cocktail quantities
+    const perCocktailIngredients = batchIngredients.map(ing => ({
+      ...ing,
+      quantity: parseFloat((ing.quantity / batchYield).toFixed(4))
+    }));
+
+    // Update the main form with per-cocktail ingredients AND save batch data
+    setForm(prev => ({
+      ...prev,
+      ingredients: perCocktailIngredients,
+      instructions: batchInstructions,
+      batch_ingredients: [...batchIngredients], // Save batch quantities
+      batch_yield: batchYield, // Save batch yield
+      batch_instructions: batchInstructions // Save batch instructions
+    }));
+
+    // Update search terms for the main recipe ingredients
+    const terms: Record<number, string> = {};
+    perCocktailIngredients.forEach((ing, idx) => {
+      const item = inventory.find(i => i.id === ing.inventory_item_id);
+      if (item) {
+        terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+      }
+    });
+    setSearchTerms(terms);
+
+    setIsBatchModalOpen(false);
+  };
+
+  const updateBatchIngredient = (
+    index: number,
+    field: keyof RecipeIngredient,
+    value: string | number
+  ) => {
+    setBatchIngredients(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+
+      return updated;
+    });
+  };
+
+  const addBatchIngredient = () => {
+    const newIndex = batchIngredients.length;
+    setBatchIngredients(prev => [...prev, { ...EMPTY_INGREDIENT }]);
+    // Initialize empty search term for new batch ingredient
+    setBatchSearchTerms(prev => ({ ...prev, [newIndex]: '' }));
+  };
+
+  const removeBatchIngredient = (index: number) => {
+    setBatchIngredients(prev => prev.filter((_, i) => i !== index));
+    // Clean up search state
+    setBatchSearchTerms(prev => {
+      const newTerms = { ...prev };
+      delete newTerms[index];
+      return newTerms;
+    });
+    setShowBatchDropdown(prev => {
+      const newDropdown = { ...prev };
+      delete newDropdown[index];
+      return newDropdown;
+    });
+  };
+
+  const handleBatchIngredientSearch = (index: number, value: string) => {
+    setBatchSearchTerms(prev => ({ ...prev, [index]: value }));
+    setShowBatchDropdown(prev => ({ ...prev, [index]: true }));
+  };
+
+  const handleSelectBatchInventoryItem = (index: number, item: InventoryItem) => {
+    const displayName = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+
+    setBatchIngredients(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        inventory_item_id: item.id,
+        name: displayName
+      };
+      return updated;
+    });
+
+    setBatchSearchTerms(prev => ({ ...prev, [index]: displayName }));
+    setShowBatchDropdown(prev => ({ ...prev, [index]: false }));
   };
 
   if (!isOpen) return null;
@@ -343,22 +597,53 @@ export default function RecipeDrawer({
             <ul className={styles.ingredientsList}>
               {form.ingredients.map((ing, idx) => (
                 <li key={idx} className={styles.ingredientRow}>
-                  <div className={styles.ingredientSelectWrapper}>
-                    <select
-                      className={`${styles.formSelect} ${styles.ingredientSelect}`}
-                      value={ing.inventory_item_id}
-                      onChange={(e) =>
-                        updateIngredient(idx, 'inventory_item_id', e.target.value)
-                      }
-                    >
-                      <option value="">Select item...</option>
-                      {inventory.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.brand ? `${item.brand} ` : ''}
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
+                  <div className={styles.ingredientSelectWrapper} style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      className={`${styles.formInput} ${styles.ingredientSelect}`}
+                      placeholder="Search inventory..."
+                      value={searchTerms[idx] || ''}
+                      onChange={(e) => handleIngredientSearch(idx, e.target.value)}
+                      onFocus={() => setShowDropdown(prev => ({ ...prev, [idx]: true }))}
+                      onBlur={() => setTimeout(() => setShowDropdown(prev => ({ ...prev, [idx]: false })), 200)}
+                    />
+                    {showDropdown[idx] && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        backgroundColor: 'white',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '0.5rem',
+                        marginTop: '0.25rem',
+                        zIndex: 1000,
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}>
+                        {getFilteredInventory(searchTerms[idx] || '').map((item) => (
+                          <div
+                            key={item.id}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #F3F4F6'
+                            }}
+                            onMouseDown={() => handleSelectInventoryItem(idx, item)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                          >
+                            {item.brand ? `${item.brand} ` : ''}{item.name}
+                          </div>
+                        ))}
+                        {getFilteredInventory(searchTerms[idx] || '').length === 0 && (
+                          <div style={{ padding: '0.5rem 0.75rem', color: '#9CA3AF' }}>
+                            No items found
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <button
                       type="button"
                       className={styles.addNewItemBtn}
@@ -406,13 +691,44 @@ export default function RecipeDrawer({
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              className={styles.addIngredientBtn}
-              onClick={addIngredient}
-            >
-              <Plus size={14} /> Add Ingredient
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                className={styles.addIngredientBtn}
+                onClick={addIngredient}
+              >
+                <Plus size={14} /> Add Ingredient
+              </button>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: '#1F1F1F',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isBatchModalOpen}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      handleOpenBatchEntry();
+                    } else {
+                      setIsBatchModalOpen(false);
+                    }
+                  }}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    cursor: 'pointer',
+                  }}
+                />
+                <span>Batch Entry</span>
+              </label>
+            </div>
           </div>
 
           {/* Cost Summary */}
@@ -505,7 +821,7 @@ export default function RecipeDrawer({
             <textarea
               className={styles.formTextarea}
               placeholder="Step by step preparation..."
-              value={form.instructions}
+              value={form.instructions || ''}
               onChange={(e) => handleChange('instructions', e.target.value)}
               style={{ minHeight: 100 }}
             />
@@ -540,12 +856,194 @@ export default function RecipeDrawer({
         </div>
       </div>
 
-      {/* Nested Add Item Modal */}
+      {/* Batch Entry Modal - Using Portal to escape stacking context */}
+      {isBatchModalOpen && batchPortalContainer && createPortal(
+        <>
+          <div
+            className={styles.modalOverlay}
+            onClick={() => setIsBatchModalOpen(false)}
+            style={{ zIndex: Z_INDEX.NESTED_MODAL_OVERLAY }}
+          />
+          <div
+            className={styles.modal}
+            style={{ maxWidth: '800px', zIndex: Z_INDEX.NESTED_MODAL }}
+          >
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Batch Entry</h2>
+              <button className={styles.modalClose} onClick={() => setIsBatchModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className={styles.modalBody}>
+              <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
+                Enter ingredients at <strong>batch quantities</strong>, then specify how many cocktails the batch makes.
+                The app will automatically convert to per-cocktail amounts.
+              </p>
+
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>How many cocktails does this batch make?</label>
+                <input
+                  className={styles.formInput}
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="e.g., 15"
+                  value={batchYield || ''}
+                  onChange={(e) => setBatchYield(parseInt(e.target.value) || 1)}
+                  required
+                  style={{ maxWidth: '200px' }}
+                />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Instructions</label>
+                <textarea
+                  className={styles.formTextarea}
+                  placeholder="Step by step preparation for the batch..."
+                  value={batchInstructions}
+                  onChange={(e) => setBatchInstructions(e.target.value)}
+                  style={{ minHeight: 80 }}
+                />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Batch Ingredients</label>
+                <ul className={styles.ingredientsList}>
+                  {batchIngredients.map((ing, idx) => (
+                    <li key={idx} className={styles.ingredientRow}>
+                      <div className={styles.ingredientSelectWrapper} style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          className={`${styles.formInput} ${styles.ingredientSelect}`}
+                          placeholder="Search inventory..."
+                          value={batchSearchTerms[idx] || ''}
+                          onChange={(e) => handleBatchIngredientSearch(idx, e.target.value)}
+                          onFocus={() => setShowBatchDropdown(prev => ({ ...prev, [idx]: true }))}
+                          onBlur={() => setTimeout(() => setShowBatchDropdown(prev => ({ ...prev, [idx]: false })), 200)}
+                        />
+                        {showBatchDropdown[idx] && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            backgroundColor: 'white',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '0.5rem',
+                            marginTop: '0.25rem',
+                            zIndex: 1000,
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                          }}>
+                            {getFilteredInventory(batchSearchTerms[idx] || '').map((item) => (
+                              <div
+                                key={item.id}
+                                style={{
+                                  padding: '0.5rem 0.75rem',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #F3F4F6'
+                                }}
+                                onMouseDown={() => handleSelectBatchInventoryItem(idx, item)}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                              >
+                                {item.brand ? `${item.brand} ` : ''}{item.name}
+                              </div>
+                            ))}
+                            {getFilteredInventory(batchSearchTerms[idx] || '').length === 0 && (
+                              <div style={{ padding: '0.5rem 0.75rem', color: '#9CA3AF' }}>
+                                No items found
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className={styles.addNewItemBtn}
+                          onClick={() => handleAddNewItemFromBatch(idx)}
+                          title="Add new inventory item"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        placeholder="Qty"
+                        className={styles.ingredientQuantityInput}
+                        value={ing.quantity || ''}
+                        onChange={(e) =>
+                          updateBatchIngredient(
+                            idx,
+                            'quantity',
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                      <select
+                        className={styles.ingredientUnitSelect}
+                        value={ing.unit}
+                        onChange={(e) =>
+                          updateBatchIngredient(idx, 'unit', e.target.value)
+                        }
+                      >
+                        {UNIT_OPTIONS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className={styles.ingredientRemoveBtn}
+                        onClick={() => removeBatchIngredient(idx)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className={styles.addIngredientBtn}
+                  onClick={addBatchIngredient}
+                >
+                  <Plus size={14} /> Add Ingredient
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.btnTertiary}
+                onClick={() => setIsBatchModalOpen(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.btnPrimary}
+                onClick={handleSaveBatchEntry}
+                disabled={batchYield <= 0 || batchIngredients.length === 0}
+              >
+                Convert to Per-Cocktail & Save
+              </button>
+            </div>
+          </div>
+        </>,
+        batchPortalContainer
+      )}
+
+      {/* Nested Add Item Modal - Rendered after Batch Modal so it appears on top */}
       <InventoryItemModal
         isOpen={isAddItemModalOpen}
         onClose={() => {
           setIsAddItemModalOpen(false);
           setPendingIngredientIndex(null);
+          setPendingBatchIngredientIndex(null);
         }}
         onSave={handleSaveNewItemComplete}
         editItem={null}
