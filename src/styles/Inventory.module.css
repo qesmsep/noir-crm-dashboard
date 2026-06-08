@@ -1494,6 +1494,41 @@
   background: #FEF2F2;
 }
 
+.ingredientSelectWrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.ingredientSelectWrapper .formSelect {
+  flex: 1;
+  min-width: 0;
+}
+
+.addNewItemBtn {
+  padding: 0.375rem;
+  min-width: 32px;
+  min-height: 32px;
+  background: #F7F6F2;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  color: #A59480;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.addNewItemBtn:hover {
+  background: #ECEAE5;
+  border-color: #A59480;
+  color: #8C7C6D;
+}
+
 .addIngredientBtn {
   display: flex;
   align-items: center;

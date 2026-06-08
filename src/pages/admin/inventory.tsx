@@ -616,6 +616,8 @@ export default function InventoryPage() {
         editRecipe={editingRecipe}
         inventory={inventory}
         saving={savingRecipe}
+        onSaveNewItem={handleSaveItem}
+        currentLocation={currentLocation}
       />
 
       {/* Settings Drawer */}

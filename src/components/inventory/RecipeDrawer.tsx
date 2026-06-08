@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
+import InventoryItemModal from './InventoryItemModal';
 import type {
   Recipe,
   RecipeFormData,
   RecipeIngredient,
   InventoryItem,
+  InventoryItemFormData,
+  LocationSlug,
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 
@@ -16,6 +19,8 @@ interface RecipeDrawerProps {
   editRecipe: Recipe | null;
   inventory: InventoryItem[];
   saving: boolean;
+  onSaveNewItem?: (data: InventoryItemFormData) => void;
+  currentLocation?: LocationSlug;
 }
 
 const EMPTY_FORM: RecipeFormData = {
@@ -44,8 +49,13 @@ export default function RecipeDrawer({
   editRecipe,
   inventory,
   saving,
+  onSaveNewItem,
+  currentLocation = 'noirkc',
 }: RecipeDrawerProps) {
   const [form, setForm] = useState<RecipeFormData>(EMPTY_FORM);
+  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+  const [pendingIngredientIndex, setPendingIngredientIndex] = useState<number | null>(null);
+  const [savingNewItem, setSavingNewItem] = useState(false);
 
   useEffect(() => {
     if (editRecipe) {
@@ -121,6 +131,31 @@ export default function RecipeDrawer({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(form);
+  };
+
+  const handleAddNewItem = (ingredientIndex: number) => {
+    setPendingIngredientIndex(ingredientIndex);
+    setIsAddItemModalOpen(true);
+  };
+
+  const handleSaveNewItemComplete = async (data: InventoryItemFormData) => {
+    if (!onSaveNewItem) return;
+
+    setSavingNewItem(true);
+    try {
+      // Save the new item via parent callback
+      await onSaveNewItem(data);
+
+      // The parent will refresh inventory, but we need to wait a moment
+      // In a real scenario, onSaveNewItem should return the new item
+      // For now, we'll close the modal and the user can select from refreshed list
+      setIsAddItemModalOpen(false);
+      setPendingIngredientIndex(null);
+    } catch (err) {
+      console.error('Failed to save new item:', err);
+    } finally {
+      setSavingNewItem(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -200,21 +235,31 @@ export default function RecipeDrawer({
             <ul className={styles.ingredientsList}>
               {form.ingredients.map((ing, idx) => (
                 <li key={idx} className={styles.ingredientRow}>
-                  <select
-                    className={`${styles.formSelect} ${styles.ingredientSelect}`}
-                    value={ing.inventory_item_id}
-                    onChange={(e) =>
-                      updateIngredient(idx, 'inventory_item_id', e.target.value)
-                    }
-                  >
-                    <option value="">Select item...</option>
-                    {inventory.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.brand ? `${item.brand} ` : ''}
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className={styles.ingredientSelectWrapper}>
+                    <select
+                      className={`${styles.formSelect} ${styles.ingredientSelect}`}
+                      value={ing.inventory_item_id}
+                      onChange={(e) =>
+                        updateIngredient(idx, 'inventory_item_id', e.target.value)
+                      }
+                    >
+                      <option value="">Select item...</option>
+                      {inventory.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.brand ? `${item.brand} ` : ''}
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className={styles.addNewItemBtn}
+                      onClick={() => handleAddNewItem(idx)}
+                      title="Add new inventory item"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
                   <input
                     type="number"
                     min="0"
@@ -386,6 +431,19 @@ export default function RecipeDrawer({
           </button>
         </div>
       </div>
+
+      {/* Nested Add Item Modal */}
+      <InventoryItemModal
+        isOpen={isAddItemModalOpen}
+        onClose={() => {
+          setIsAddItemModalOpen(false);
+          setPendingIngredientIndex(null);
+        }}
+        onSave={handleSaveNewItemComplete}
+        editItem={null}
+        saving={savingNewItem}
+        currentLocation={currentLocation}
+      />
     </>
   );
 }
