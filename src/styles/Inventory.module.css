@@ -1969,3 +1969,233 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* ========================================
+   TRANSFER MODAL - Mobile First
+   ======================================== */
+
+/* Modal Overlay */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Modal Container */
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 2rem);
+  max-width: 500px;
+  max-height: calc(100vh - 4rem);
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, -45%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+}
+
+/* Modal Header */
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid #ECEAE5;
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.modalClose {
+  background: #F7F6F2;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #5A5A5A;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modalClose:hover {
+  background: #ECEAE5;
+  color: #1F1F1F;
+  transform: scale(1.05);
+}
+
+/* Modal Body */
+.modalBody {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modal Footer */
+.modalFooter {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid #ECEAE5;
+}
+
+.modalFooter button {
+  flex: 1;
+  min-height: 44px;
+}
+
+/* Transfer-Specific Styles */
+.transferLocations {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.transferArrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #A59480;
+  padding-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.formLabelHint {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  color: #ABA8A1;
+  font-size: 0.6875rem;
+  text-transform: none;
+}
+
+/* Success Message */
+.successMessage {
+  text-align: center;
+  padding: 3rem 1.5rem;
+}
+
+.successIcon {
+  width: 64px;
+  height: 64px;
+  background: #A59480;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: white;
+  margin: 0 auto 1rem;
+  animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.successMessage p {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+/* Error Message */
+.errorMessage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #FEF2F2;
+  border: 1px solid #FEE2E2;
+  border-radius: 10px;
+  color: #DC2626;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+.errorMessage svg {
+  flex-shrink: 0;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .modal {
+    width: calc(100% - 1rem);
+    max-height: calc(100vh - 2rem);
+    border-radius: 16px;
+  }
+
+  .modalHeader {
+    padding: 1.25rem 1.25rem 0.875rem;
+  }
+
+  .modalTitle {
+    font-size: 1.125rem;
+  }
+
+  .modalBody {
+    padding: 1.25rem;
+  }
+
+  .modalFooter {
+    padding: 0.875rem 1.25rem 1.25rem;
+  }
+
+  .transferLocations {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .transferArrow {
+    transform: rotate(90deg);
+    padding: 0.5rem 0;
+  }
+}

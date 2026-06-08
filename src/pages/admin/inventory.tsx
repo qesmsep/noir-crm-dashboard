@@ -3,6 +3,7 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import InventoryList from '../../components/inventory/InventoryList';
 import InventoryItemModal from '../../components/inventory/InventoryItemModal';
 import InventoryPhotoScanner from '../../components/inventory/InventoryPhotoScanner';
+import InventoryTransferModal from '../../components/inventory/InventoryTransferModal';
 import RecipeBuilder from '../../components/inventory/RecipeBuilder';
 import RecipeDrawer from '../../components/inventory/RecipeDrawer';
 import EnhancedSalesUpload from '../../components/inventory/EnhancedSalesUpload';
@@ -20,6 +21,7 @@ import {
   History,
   Settings,
   MapPin,
+  ArrowRightLeft,
 } from 'lucide-react';
 import type {
   InventoryItem,
@@ -56,6 +58,7 @@ export default function InventoryPage() {
   const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -417,6 +420,9 @@ export default function InventoryPage() {
             <button className={styles.btnTertiary} onClick={handleExportCSV}>
               <Download size={16} /> Export
             </button>
+            <button className={styles.btnTertiary} onClick={() => setIsTransferModalOpen(true)}>
+              <ArrowRightLeft size={16} /> Transfer
+            </button>
             <button className={styles.btnTertiary} onClick={() => setIsScannerOpen(true)}>
               <Camera size={16} /> Scan
             </button>
@@ -581,6 +587,22 @@ export default function InventoryPage() {
         onConfirm={handleScanConfirm}
         existingItems={inventory}
         locations={LOCATIONS}
+      />
+
+      <InventoryTransferModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransferComplete={() => {
+          fetchInventory();
+          setIsTransferModalOpen(false);
+        }}
+        items={inventory}
+        locations={locationsData.map(loc => ({
+          id: loc.id,
+          slug: loc.slug as LocationSlug,
+          name: loc.name
+        }))}
+        currentLocation={currentLocation}
       />
 
       <RecipeDrawer
