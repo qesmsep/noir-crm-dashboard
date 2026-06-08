@@ -8,16 +8,24 @@ import { monitoring } from '../../../lib/monitoring';
 /**
  * Inventory Transfer API
  * POST: Transfer inventory items between locations atomically
+ *
+ * CSRF Protection: Uses Supabase httpOnly, SameSite cookies for CSRF mitigation.
+ * Authentication is required via withAdminAuth middleware.
  */
 async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
 
-  // Rate limiting
+  // Rate limiting with headers
   const rateLimitPassed = await rateLimiters.standard.check(req);
   if (!rateLimitPassed) {
+    const retryAfter = rateLimiters.standard.getRetryAfter(req);
+    res.setHeader('Retry-After', retryAfter.toString());
+    res.setHeader('X-RateLimit-Limit', '100');
+    res.setHeader('X-RateLimit-Remaining', '0');
     return res.status(429).json({
       error: 'Too many requests',
-      message: 'Please wait before making another request'
+      message: 'Please wait before making another request',
+      retryAfter
     });
   }
 
@@ -83,7 +91,7 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
       console.error('Unhandled error during transfer:', err);
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_transfer',
-        item_id: req.body?.item_id,
+        // Only log safe identifiers, not user input
         user: req.user?.email
       });
       return res.status(500).json({ error: 'Internal server error' });

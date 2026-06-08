@@ -181,6 +181,7 @@ export default function InventoryTransferModal({
                     onChange={(e) => {
                       setFromLocationId(e.target.value);
                       setSelectedItemId(''); // Reset item selection
+                      setQuantity(1); // Reset quantity when changing location
                     }}
                     disabled={loading}
                   >
@@ -234,7 +235,10 @@ export default function InventoryTransferModal({
                   type="number"
                   className={styles.formInput}
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value, 10);
+                    setQuantity(isNaN(value) ? 0 : Math.max(0, value));
+                  }}
                   min={1}
                   max={selectedItem?.quantity || 999}
                   disabled={loading || !selectedItem}
