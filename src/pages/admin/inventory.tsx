@@ -618,6 +618,11 @@ export default function InventoryPage() {
         saving={savingRecipe}
         onSaveNewItem={handleSaveItem}
         currentLocation={currentLocation}
+        locations={locationsData.map(loc => ({
+          id: loc.id,
+          slug: loc.slug as LocationSlug,
+          name: loc.name
+        }))}
       />
 
       {/* Settings Drawer */}

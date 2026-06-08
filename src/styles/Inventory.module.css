@@ -1541,6 +1541,50 @@
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* Recipe Location Selection */
+.recipeLocationOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.recipeLocationCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: #F7F6F2;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 44px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1F1F1F;
+  font-family: 'Montserrat', sans-serif;
+  flex: 1;
+  min-width: 140px;
+}
+
+.recipeLocationCheckbox:hover {
+  background: #ECEAE5;
+  border-color: #DAD7D0;
+}
+
+.recipeLocationCheckbox:has(input:checked) {
+  background: #FFF;
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.recipeLocationCheckbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #A59480;
   margin-top: 0.5rem;
 }
 

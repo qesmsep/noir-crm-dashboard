@@ -92,7 +92,8 @@ export interface Recipe {
   image_url: string;
   glass_type?: string;
   garnish?: string;
-  location_id: string;
+  location_id: string; // Primary location (for backward compatibility)
+  location_ids?: string[]; // Multi-location support
   created_at: string;
   updated_at: string;
 }
@@ -106,7 +107,8 @@ export interface RecipeFormData {
   menu_price: number;
   glass_type?: string;
   garnish?: string;
-  location_id?: string;
+  location_id?: string; // For backward compatibility
+  location_ids?: string[]; // Multi-location assignment
 }
 
 // ========================================

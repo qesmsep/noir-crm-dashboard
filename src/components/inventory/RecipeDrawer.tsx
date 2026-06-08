@@ -21,6 +21,7 @@ interface RecipeDrawerProps {
   saving: boolean;
   onSaveNewItem?: (data: InventoryItemFormData) => void;
   currentLocation?: LocationSlug;
+  locations?: Array<{ id: string; slug: LocationSlug; name: string }>;
 }
 
 const EMPTY_FORM: RecipeFormData = {
@@ -32,6 +33,7 @@ const EMPTY_FORM: RecipeFormData = {
   menu_price: 0,
   glass_type: '',
   garnish: '',
+  location_ids: [],
 };
 
 const EMPTY_INGREDIENT: RecipeIngredient = {
@@ -53,11 +55,15 @@ export default function RecipeDrawer({
   saving,
   onSaveNewItem,
   currentLocation = 'noirkc',
+  locations = [],
 }: RecipeDrawerProps) {
   const [form, setForm] = useState<RecipeFormData>(EMPTY_FORM);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [pendingIngredientIndex, setPendingIngredientIndex] = useState<number | null>(null);
   const [savingNewItem, setSavingNewItem] = useState(false);
+
+  // Get available locations (exclude 'all')
+  const availableLocations = locations.filter(loc => loc.slug !== 'all');
 
   useEffect(() => {
     if (editRecipe) {
@@ -70,6 +76,7 @@ export default function RecipeDrawer({
         menu_price: editRecipe.menu_price,
         glass_type: editRecipe.glass_type || '',
         garnish: editRecipe.garnish || '',
+        location_ids: editRecipe.location_ids || [],
       });
     } else {
       setForm(EMPTY_FORM);
@@ -81,6 +88,16 @@ export default function RecipeDrawer({
     value: string | number
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleLocation = (locationId: string) => {
+    setForm((prev) => {
+      const currentLocations = prev.location_ids || [];
+      const newLocations = currentLocations.includes(locationId)
+        ? currentLocations.filter(id => id !== locationId)
+        : [...currentLocations, locationId];
+      return { ...prev, location_ids: newLocations };
+    });
   };
 
   const addIngredient = () => {
@@ -253,6 +270,29 @@ export default function RecipeDrawer({
                 value={form.garnish || ''}
                 onChange={(e) => handleChange('garnish', e.target.value)}
               />
+            </div>
+          </div>
+
+          {/* Location Assignment */}
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>Available At Locations</label>
+            <p className={styles.formHint} style={{ marginBottom: '0.75rem' }}>
+              Select which locations can serve this recipe
+            </p>
+            <div className={styles.recipeLocationOptions}>
+              {availableLocations.map((location) => (
+                <label
+                  key={location.id}
+                  className={styles.recipeLocationCheckbox}
+                >
+                  <input
+                    type="checkbox"
+                    checked={(form.location_ids || []).includes(location.id)}
+                    onChange={() => toggleLocation(location.id)}
+                  />
+                  <span>{location.name}</span>
+                </label>
+              ))}
             </div>
           </div>
 
