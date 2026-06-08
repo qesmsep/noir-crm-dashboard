@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowRight, X, AlertCircle } from 'lucide-react';
 import type { InventoryItem, LocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
-import { supabase } from '../../lib/supabase';
+import { getAuthHeaders } from '../../lib/client-auth';
 
 interface InventoryTransferModalProps {
   isOpen: boolean;
@@ -90,15 +90,9 @@ export default function InventoryTransferModal({
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/inventory/transfer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {}),
-        },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           item_id: selectedItemId,
           from_location_id: fromLocationId,
@@ -119,8 +113,8 @@ export default function InventoryTransferModal({
         onTransferComplete();
         onClose();
       }, 1500);
-    } catch (err: any) {
-      setError(err.message || 'Failed to transfer inventory');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transfer inventory');
     } finally {
       setLoading(false);
     }

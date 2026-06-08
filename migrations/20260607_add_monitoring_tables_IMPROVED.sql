@@ -154,20 +154,6 @@ COMMENT ON FUNCTION cleanup_old_monitoring_data IS 'Removes monitoring data olde
 -- MIGRATION COMPLETE
 -- ========================================
 
--- Verify tables created
-SELECT COUNT(*) FROM information_schema.tables
-WHERE table_name IN ('monitoring_events', 'monitoring_errors');
--- Expected: 2
-
--- Verify RLS enabled
-SELECT relname, relrowsecurity
-FROM pg_class
-WHERE relname IN ('monitoring_events', 'monitoring_errors');
--- Expected: 2 rows with relrowsecurity = true
-
--- Verify policies created
-SELECT tablename, policyname
-FROM pg_policies
-WHERE tablename IN ('monitoring_events', 'monitoring_errors')
-ORDER BY tablename, policyname;
--- Expected: 4 policies (2 per table)
+-- Verification queries (table count, RLS status, policies) live in the
+-- companion README so this migration is safe to run in CI/CD migration
+-- runners that error on statements returning result sets.

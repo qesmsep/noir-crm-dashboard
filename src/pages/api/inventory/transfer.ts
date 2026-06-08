@@ -15,7 +15,11 @@ import { monitoring } from '../../../lib/monitoring';
 async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
 
-  // Rate limiting with headers
+  // Rate limiting with headers.
+  // NOTE: the standard limiter is in-memory and per-instance, so on serverless
+  // (Vercel) its state resets on cold start and is not shared across instances.
+  // Treat this as best-effort abuse mitigation, not a hard guarantee.
+  // TODO: back with Redis/Upstash for a distributed limit.
   const rateLimitPassed = await rateLimiters.standard.check(req);
   if (!rateLimitPassed) {
     const retryAfter = rateLimiters.standard.getRetryAfter(req);

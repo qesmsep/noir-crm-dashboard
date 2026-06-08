@@ -71,5 +71,6 @@ SELECT
     ELSE 'ok'
   END as stock_status
 FROM inventory_items i
-JOIN locations l ON i.location_id = l.id
-ORDER BY i.name, l.slug;
+JOIN locations l ON i.location_id = l.id;
+-- NOTE: ordering is the consumer's responsibility; ORDER BY in a view
+-- definition is not guaranteed to be honored by the query planner.

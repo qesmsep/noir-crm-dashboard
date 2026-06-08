@@ -94,24 +94,6 @@ COMMENT ON VIEW v_encryption_status IS 'Monitoring view for encryption status of
 -- MIGRATION COMPLETE
 -- ========================================
 
--- Verify column added
-SELECT column_name, data_type, column_default
-FROM information_schema.columns
-WHERE table_name = 'system_settings' AND column_name = 'is_encrypted';
--- Expected: 1 row showing is_encrypted column
-
--- Verify function created
-SELECT routine_name, routine_type
-FROM information_schema.routines
-WHERE routine_name = 'identify_sensitive_settings';
--- Expected: 1 row
-
--- Verify view created
-SELECT table_name, table_type
-FROM information_schema.tables
-WHERE table_name = 'v_encryption_status';
--- Expected: 1 row with table_type = 'VIEW'
-
--- Check current encryption status
-SELECT * FROM v_encryption_status;
--- Expected: Summary of encryption status (likely all unencrypted initially)
+-- Verification queries (column, function, view, encryption status) live in
+-- the companion README so this migration is safe to run in CI/CD migration
+-- runners that error on statements returning result sets.

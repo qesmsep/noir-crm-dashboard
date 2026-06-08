@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import InventoryList from '../../components/inventory/InventoryList';
 import InventoryItemModal from '../../components/inventory/InventoryItemModal';
@@ -36,24 +36,13 @@ import type {
   LocationSlug,
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
-import { supabase } from '../../lib/supabase';
+import { getAuthHeaders } from '../../lib/client-auth';
 
-/**
- * Build auth headers (Bearer token) for admin-protected API routes.
- */
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token
-    ? { Authorization: `Bearer ${session.access_token}` }
-    : {};
-}
-
-const LOCATIONS: { slug: LocationSlug; name: string }[] = [
-  { slug: 'all', name: 'All Locations' },
-  { slug: 'noirkc', name: 'Noir KC' },
-  { slug: 'rooftopkc', name: 'RooftopKC' },
-  { slug: 'noirop', name: 'Noir OP' },
-];
+// The "All Locations" aggregate tab; real locations are loaded from the API.
+const ALL_LOCATIONS_TAB: { slug: LocationSlug; name: string } = {
+  slug: 'all',
+  name: 'All Locations',
+};
 
 export default function InventoryPage() {
   // Location state
@@ -89,6 +78,20 @@ export default function InventoryPage() {
 
   // Locations data for badges
   const [locationsData, setLocationsData] = useState<Array<{ id: string; slug: string; name: string }>>([]);
+
+  // Location tabs derived from the API (single source of truth), with the
+  // "All Locations" aggregate tab prepended. Falls back to just the aggregate
+  // tab until locations have loaded.
+  const locationTabs = useMemo<{ slug: LocationSlug; name: string }[]>(
+    () => [
+      ALL_LOCATIONS_TAB,
+      ...locationsData.map((loc) => ({
+        slug: loc.slug as LocationSlug,
+        name: loc.name,
+      })),
+    ],
+    [locationsData]
+  );
 
   // Fetch locations for badges
   useEffect(() => {
@@ -170,12 +173,18 @@ export default function InventoryPage() {
   const handleSaveItem = async (
     data: InventoryItemFormData
   ): Promise<InventoryItem | null> => {
+    // Require an explicit location when creating a new item so it isn't
+    // silently assigned to a default while viewing "All Locations".
+    if (!editingItem && currentLocation === 'all') {
+      alert('Please select a specific location before adding a new item.');
+      return null;
+    }
     setSavingItem(true);
     try {
       const method = editingItem ? 'PUT' : 'POST';
       const body = editingItem
         ? { ...data, id: editingItem.id }
-        : { ...data, location_slug: currentLocation === 'all' ? 'noirkc' : currentLocation };
+        : { ...data, location_slug: currentLocation };
       const res = await fetch('/api/inventory', {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -293,6 +302,10 @@ export default function InventoryPage() {
 
   // AI Scan handler - supports multi-location assignment
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
+    // Build the set of independent write requests, then run them concurrently
+    // rather than awaiting each in sequence.
+    const requests: Promise<Response>[] = [];
+
     for (const scanned of scannedItems) {
       const selectedLocations = scanned.selected_locations || [];
 
@@ -307,39 +320,45 @@ export default function InventoryPage() {
           (i) => i.id === scanned.matched_inventory_id
         );
         if (existing) {
-          await fetch('/api/inventory', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: existing.id,
-              quantity: existing.quantity + scanned.estimated_quantity,
-            }),
-          });
+          requests.push(
+            fetch('/api/inventory', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: existing.id,
+                quantity: existing.quantity + scanned.estimated_quantity,
+              }),
+            })
+          );
         }
       } else {
         // Create new inventory item at each selected location
         for (const locationSlug of selectedLocations) {
-          await fetch('/api/inventory', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: scanned.name,
-              brand: scanned.brand,
-              category: scanned.category,
-              quantity: scanned.estimated_quantity,
-              unit: scanned.unit || 'bottle',
-              subcategory: '',
-              volume_ml: 750,
-              cost_per_unit: 0,
-              price_per_serving: 0,
-              par_level: 0,
-              notes: 'Added from AI scan',
-              location_slug: locationSlug,
-            }),
-          });
+          requests.push(
+            fetch('/api/inventory', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: scanned.name,
+                brand: scanned.brand,
+                category: scanned.category,
+                quantity: scanned.estimated_quantity,
+                unit: scanned.unit || 'bottle',
+                subcategory: '',
+                volume_ml: 750,
+                cost_per_unit: 0,
+                price_per_serving: 0,
+                par_level: 0,
+                notes: 'Added from AI scan',
+                location_slug: locationSlug,
+              }),
+            })
+          );
         }
       }
     }
+
+    await Promise.all(requests);
     await fetchInventory();
     setIsScannerOpen(false);
   };
@@ -459,7 +478,7 @@ export default function InventoryPage() {
 
       {/* Location Tabs */}
       <div className={styles.locationTabs}>
-        {LOCATIONS.map((location) => (
+        {locationTabs.map((location) => (
           <button
             key={location.slug}
             className={`${styles.locationTab} ${currentLocation === location.slug ? styles.locationTabActive : ''}`}
@@ -603,7 +622,7 @@ export default function InventoryPage() {
         onClose={() => setIsScannerOpen(false)}
         onConfirm={handleScanConfirm}
         existingItems={inventory}
-        locations={LOCATIONS}
+        locations={locationTabs}
       />
 
       <InventoryTransferModal

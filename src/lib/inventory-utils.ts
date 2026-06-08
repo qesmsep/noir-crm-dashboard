@@ -13,11 +13,16 @@ import type { RecipeIngredient } from '../types/inventory';
  */
 export function safeJSONParse<T>(str: string | T, fallback: T): T {
   if (typeof str !== 'string') return str;
+  // Empty/null-ish strings are a normal initial state, not a parse failure.
+  if (str === '' || str === 'null') return fallback;
   try {
     const parsed = JSON.parse(str);
     return parsed;
   } catch (err) {
-    console.error('JSON parse error:', err);
+    // Only log in development to avoid noisy production logs.
+    if (process.env.NODE_ENV === 'development') {
+      console.error('JSON parse error:', err);
+    }
     return fallback;
   }
 }
@@ -86,21 +91,4 @@ export function validateIngredients(
 export function sanitizeInput(input: string | null | undefined, maxLength: number): string {
   if (!input) return '';
   return input.trim().substring(0, maxLength);
-}
-
-/**
- * Escapes HTML special characters to prevent XSS
- * @param str - String to escape
- * @returns Escaped string
- */
-export function escapeHTML(str: string): string {
-  const htmlEscapes: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#x27;',
-    '/': '&#x2F;',
-  };
-  return str.replace(/[&<>"'/]/g, (char) => htmlEscapes[char]);
 }

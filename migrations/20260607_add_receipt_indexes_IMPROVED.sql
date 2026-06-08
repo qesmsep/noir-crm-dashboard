@@ -123,25 +123,6 @@ GRANT SELECT ON mv_receipt_stats TO authenticated;
 -- MIGRATION COMPLETE
 -- ========================================
 
--- Verify indexes created
-SELECT
-  tablename,
-  indexname,
-  indexdef
-FROM pg_indexes
-WHERE tablename IN ('inventory_receipts', 'inventory_receipt_items', 'inventory_items')
-  AND indexname LIKE 'idx_%'
-ORDER BY tablename, indexname;
-
--- Verify materialized view created
-SELECT
-  schemaname,
-  matviewname,
-  definition
-FROM pg_matviews
-WHERE matviewname = 'mv_receipt_stats';
-
--- Check materialized view data
-SELECT * FROM mv_receipt_stats
-ORDER BY month DESC, status
-LIMIT 10;
+-- Verification queries (index list, materialized view, sample data) live in
+-- the companion README so this migration is safe to run in CI/CD migration
+-- runners that error on statements returning result sets.
