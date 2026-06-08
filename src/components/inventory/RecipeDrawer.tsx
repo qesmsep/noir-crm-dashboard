@@ -10,6 +10,7 @@ import type {
   InventoryItem,
   InventoryItemFormData,
   LocationSlug,
+  UILocationSlug,
 } from '../../types/inventory';
 import { Z_INDEX } from '../../constants/inventory';
 import { convertToMilliliters } from '../../lib/inventory-utils';
@@ -24,7 +25,7 @@ interface RecipeDrawerProps {
   inventory: InventoryItem[];
   saving: boolean;
   onSaveNewItem?: (data: InventoryItemFormData) => Promise<InventoryItem | null>;
-  currentLocation?: LocationSlug;
+  currentLocation?: UILocationSlug;
   locations?: Array<{ id: string; slug: LocationSlug; name: string }>;
 }
 
@@ -91,8 +92,8 @@ export default function RecipeDrawer({
     return container;
   });
 
-  // Get available locations (exclude 'all')
-  const availableLocations = locations.filter(loc => loc.slug !== 'all');
+  // Locations are already real (no synthetic 'all').
+  const availableLocations = locations;
 
   // Portal cleanup effect
   useEffect(() => {

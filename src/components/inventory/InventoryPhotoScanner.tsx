@@ -305,7 +305,7 @@ export default function InventoryPhotoScanner({
                           Assign to:
                         </label>
                         <div className={styles.scanItemLocationOptions}>
-                          {locations.filter(loc => loc.slug !== 'all').map((location) => (
+                          {locations.map((location) => (
                             <label
                               key={location.slug}
                               className={styles.scanItemLocationCheckbox}

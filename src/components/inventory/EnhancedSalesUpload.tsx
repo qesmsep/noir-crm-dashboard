@@ -1,11 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, FileText, X, Check, AlertTriangle, Clock } from 'lucide-react';
-import type { SalesRecord, SalesItem, LocationSlug } from '../../types/inventory';
+import type { SalesRecord, SalesItem, UILocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 
 interface EnhancedSalesUploadProps {
   /** The currently selected location (or 'all'). */
-  currentLocation: LocationSlug;
+  currentLocation: UILocationSlug;
   /** Called after a sales upload has been confirmed and inventory deducted. */
   onUploadComplete: () => void;
 }

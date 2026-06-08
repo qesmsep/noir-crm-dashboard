@@ -229,7 +229,13 @@ export interface InventoryStats {
 // Location Types
 // ========================================
 
-export type LocationSlug = 'noirkc' | 'rooftopkc' | 'noirop' | 'all';
+// A real, persisted location. This is the only set of values that may reach
+// the API/DB layer, and it matches LocationSlugSchema in inventory-validation.
+export type LocationSlug = 'noirkc' | 'rooftopkc' | 'noirop';
+
+// Frontend-only superset that adds the synthetic "All Locations" selection.
+// 'all' must be stripped before any value is sent to an API/DB call.
+export type UILocationSlug = LocationSlug | 'all';
 
 export interface InventoryLocation {
   id: string;

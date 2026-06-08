@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowRight, X, AlertCircle } from 'lucide-react';
-import type { InventoryItem, LocationSlug } from '../../types/inventory';
+import type { InventoryItem, LocationSlug, UILocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 import { getAuthHeaders } from '../../lib/client-auth';
 
@@ -10,7 +10,7 @@ interface InventoryTransferModalProps {
   onTransferComplete: () => void;
   items: InventoryItem[];
   locations: Array<{ id: string; slug: LocationSlug; name: string }>;
-  currentLocation: LocationSlug;
+  currentLocation: UILocationSlug;
 }
 
 export default function InventoryTransferModal({
@@ -36,11 +36,9 @@ export default function InventoryTransferModal({
     [items, selectedItemId]
   );
 
-  // Get available locations (exclude 'all')
-  const availableLocations = useMemo(
-    () => locations.filter(loc => loc.slug !== 'all'),
-    [locations]
-  );
+  // Locations are already real (no synthetic 'all'); kept as a memo so the
+  // dependent effects have a stable reference.
+  const availableLocations = useMemo(() => locations, [locations]);
 
   // Reset form when modal opens/closes
   useEffect(() => {

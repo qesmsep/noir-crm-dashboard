@@ -86,9 +86,10 @@ COMMENT ON VIEW v_encryption_status IS 'Monitoring view for encryption status of
 -- STEP 5: UPDATE RLS POLICIES
 -- ========================================
 
--- Grant view access to admins only (not all authenticated users)
--- Note: View inherits RLS from underlying table (system_settings)
--- Additional application-level checks should verify admin role
+-- Access for v_encryption_status and identify_sensitive_settings is locked
+-- down to service_role only in the companion migration
+-- 20260608_restrict_encryption_metadata_access.sql, so this sensitive metadata
+-- is never exposed to authenticated/anon callers via PostgREST.
 
 -- ========================================
 -- MIGRATION COMPLETE

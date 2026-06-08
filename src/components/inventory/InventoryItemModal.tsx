@@ -6,7 +6,7 @@ import type {
   InventoryItemFormData,
   InventoryCategory,
   InventoryUnit,
-  LocationSlug,
+  UILocationSlug,
 } from '../../types/inventory';
 import { Z_INDEX, OZ_TO_ML, DEFAULT_SUBCATEGORY_OPTIONS as DEFAULTS } from '../../constants/inventory';
 import styles from '../../styles/Inventory.module.css';
@@ -18,7 +18,7 @@ interface InventoryItemModalProps {
   onDelete?: (id: string) => void;
   editItem: InventoryItem | null;
   saving: boolean;
-  currentLocation: LocationSlug;
+  currentLocation: UILocationSlug;
 }
 
 const EMPTY_FORM: InventoryItemFormData = {
