@@ -27,6 +27,7 @@ interface RecipeDrawerProps {
 const EMPTY_FORM: RecipeFormData = {
   name: '',
   category: 'cocktail',
+  descriptors: ['', '', ''],
   description: '',
   instructions: '',
   ingredients: [],
@@ -70,6 +71,7 @@ export default function RecipeDrawer({
       setForm({
         name: editRecipe.name,
         category: editRecipe.category,
+        descriptors: editRecipe.descriptors || ['', '', ''],
         description: editRecipe.description,
         instructions: editRecipe.instructions,
         ingredients: [...editRecipe.ingredients],
@@ -97,6 +99,14 @@ export default function RecipeDrawer({
         ? currentLocations.filter(id => id !== locationId)
         : [...currentLocations, locationId];
       return { ...prev, location_ids: newLocations };
+    });
+  };
+
+  const updateDescriptor = (index: number, value: string) => {
+    setForm((prev) => {
+      const descriptors = [...(prev.descriptors || ['', '', ''])];
+      descriptors[index] = value;
+      return { ...prev, descriptors };
     });
   };
 
@@ -235,6 +245,37 @@ export default function RecipeDrawer({
                 onChange={(e) =>
                   handleChange('menu_price', parseFloat(e.target.value) || 0)
                 }
+              />
+            </div>
+          </div>
+
+          {/* Descriptor Words */}
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>Descriptor Words</label>
+            <div className={styles.descriptorInputs}>
+              <input
+                className={styles.descriptorInput}
+                type="text"
+                placeholder="e.g., Sweet"
+                maxLength={20}
+                value={(form.descriptors || ['', '', ''])[0]}
+                onChange={(e) => updateDescriptor(0, e.target.value)}
+              />
+              <input
+                className={styles.descriptorInput}
+                type="text"
+                placeholder="e.g., Citrus"
+                maxLength={20}
+                value={(form.descriptors || ['', '', ''])[1]}
+                onChange={(e) => updateDescriptor(1, e.target.value)}
+              />
+              <input
+                className={styles.descriptorInput}
+                type="text"
+                placeholder="e.g., Refreshing"
+                maxLength={20}
+                value={(form.descriptors || ['', '', ''])[2]}
+                onChange={(e) => updateDescriptor(2, e.target.value)}
               />
             </div>
           </div>

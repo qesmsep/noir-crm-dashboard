@@ -83,6 +83,7 @@ export interface Recipe {
   id: string;
   name: string;
   category: RecipeCategory;
+  descriptors?: string[]; // 3 descriptor words
   description: string;
   instructions: string;
   ingredients: RecipeIngredient[];
@@ -101,6 +102,7 @@ export interface Recipe {
 export interface RecipeFormData {
   name: string;
   category: RecipeCategory;
+  descriptors?: string[]; // 3 descriptor words
   description: string;
   instructions: string;
   ingredients: RecipeIngredient[];

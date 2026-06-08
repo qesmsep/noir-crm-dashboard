@@ -1160,6 +1160,50 @@
   margin-top: 0.25rem;
 }
 
+/* Descriptor Words */
+.descriptorInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.descriptorInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  min-height: 44px;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  color: #1F1F1F;
+  background: white;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.descriptorInput:focus {
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.1);
+}
+
+.descriptorInput::placeholder {
+  color: #ABA8A1;
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 768px) {
+  .descriptorInputs {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .descriptorInput {
+    text-align: left;
+  }
+}
+
 /* Photo Scanner */
 .scannerArea {
   border: 2px dashed #DAD7D0;
