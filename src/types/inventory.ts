@@ -90,6 +90,8 @@ export interface Recipe {
   menu_price: number;
   margin?: number;
   image_url: string;
+  glass_type?: string;
+  garnish?: string;
   location_id: string;
   created_at: string;
   updated_at: string;
@@ -102,6 +104,8 @@ export interface RecipeFormData {
   instructions: string;
   ingredients: RecipeIngredient[];
   menu_price: number;
+  glass_type?: string;
+  garnish?: string;
   location_id?: string;
 }
 

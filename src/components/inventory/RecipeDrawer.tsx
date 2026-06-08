@@ -30,6 +30,8 @@ const EMPTY_FORM: RecipeFormData = {
   instructions: '',
   ingredients: [],
   menu_price: 0,
+  glass_type: '',
+  garnish: '',
 };
 
 const EMPTY_INGREDIENT: RecipeIngredient = {
@@ -66,6 +68,8 @@ export default function RecipeDrawer({
         instructions: editRecipe.instructions,
         ingredients: [...editRecipe.ingredients],
         menu_price: editRecipe.menu_price,
+        glass_type: editRecipe.glass_type || '',
+        garnish: editRecipe.garnish || '',
       });
     } else {
       setForm(EMPTY_FORM);
@@ -227,6 +231,29 @@ export default function RecipeDrawer({
               value={form.description}
               onChange={(e) => handleChange('description', e.target.value)}
             />
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Glass Type</label>
+              <input
+                className={styles.formInput}
+                type="text"
+                placeholder="e.g., Rocks, Coupe, Highball"
+                value={form.glass_type || ''}
+                onChange={(e) => handleChange('glass_type', e.target.value)}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Garnish</label>
+              <input
+                className={styles.formInput}
+                type="text"
+                placeholder="e.g., Orange peel, Cherry"
+                value={form.garnish || ''}
+                onChange={(e) => handleChange('garnish', e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Ingredients */}
