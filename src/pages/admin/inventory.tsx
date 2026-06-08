@@ -271,10 +271,16 @@ export default function InventoryPage() {
     setIsItemDrawerOpen(true);
   };
 
-  // AI Scan handler
+  // AI Scan handler - supports multi-location assignment
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
-    // For each scanned item, either update existing or create new
     for (const scanned of scannedItems) {
+      const selectedLocations = scanned.selected_locations || [];
+
+      // Skip items with no locations selected
+      if (selectedLocations.length === 0) {
+        continue;
+      }
+
       if (scanned.matched_inventory_id) {
         // Update existing item quantity
         const existing = inventory.find(
@@ -286,29 +292,32 @@ export default function InventoryPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               id: existing.id,
-              quantity: scanned.estimated_quantity,
+              quantity: existing.quantity + scanned.estimated_quantity,
             }),
           });
         }
       } else {
-        // Create new inventory item
-        await fetch('/api/inventory', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: scanned.name,
-            brand: scanned.brand,
-            category: scanned.category,
-            quantity: scanned.estimated_quantity,
-            unit: scanned.unit || 'bottle',
-            subcategory: '',
-            volume_ml: 750,
-            cost_per_unit: 0,
-            price_per_serving: 0,
-            par_level: 0,
-            notes: 'Added from AI scan',
-          }),
-        });
+        // Create new inventory item at each selected location
+        for (const locationSlug of selectedLocations) {
+          await fetch('/api/inventory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: scanned.name,
+              brand: scanned.brand,
+              category: scanned.category,
+              quantity: scanned.estimated_quantity,
+              unit: scanned.unit || 'bottle',
+              subcategory: '',
+              volume_ml: 750,
+              cost_per_unit: 0,
+              price_per_serving: 0,
+              par_level: 0,
+              notes: 'Added from AI scan',
+              location_slug: locationSlug,
+            }),
+          });
+        }
       }
     }
     await fetchInventory();
@@ -571,6 +580,7 @@ export default function InventoryPage() {
         onClose={() => setIsScannerOpen(false)}
         onConfirm={handleScanConfirm}
         existingItems={inventory}
+        locations={LOCATIONS}
       />
 
       <RecipeDrawer

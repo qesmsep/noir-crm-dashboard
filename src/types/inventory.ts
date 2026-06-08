@@ -152,6 +152,7 @@ export interface ScannedItem {
   unit: InventoryUnit;
   confidence: number;
   matched_inventory_id?: string;
+  selected_locations?: LocationSlug[];
 }
 
 // ========================================

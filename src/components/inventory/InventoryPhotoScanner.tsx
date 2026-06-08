@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Camera, Upload, X, Check, Loader2 } from 'lucide-react';
-import type { ScannedItem, InventoryItem } from '../../types/inventory';
+import type { ScannedItem, InventoryItem, LocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 
 interface InventoryPhotoScannerProps {
@@ -8,6 +8,7 @@ interface InventoryPhotoScannerProps {
   onClose: () => void;
   onConfirm: (items: ScannedItem[]) => void;
   existingItems: InventoryItem[];
+  locations: Array<{ slug: LocationSlug; name: string }>;
 }
 
 export default function InventoryPhotoScanner({
@@ -15,6 +16,7 @@ export default function InventoryPhotoScanner({
   onClose,
   onConfirm,
   existingItems,
+  locations,
 }: InventoryPhotoScannerProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -85,7 +87,12 @@ export default function InventoryPhotoScanner({
       }
 
       const data = await res.json();
-      setScanResults(data.items || []);
+      // Initialize selected_locations as empty array for each item
+      const itemsWithLocations = (data.items || []).map((item: ScannedItem) => ({
+        ...item,
+        selected_locations: [],
+      }));
+      setScanResults(itemsWithLocations);
     } catch (err: any) {
       setError(err.message || 'Failed to scan image.');
     } finally {
@@ -97,6 +104,23 @@ export default function InventoryPhotoScanner({
     if (!scanResults) return;
     const updated = [...scanResults];
     updated[index] = { ...updated[index], estimated_quantity: quantity };
+    setScanResults(updated);
+  };
+
+  const toggleLocation = (itemIndex: number, locationSlug: LocationSlug) => {
+    if (!scanResults) return;
+    const updated = [...scanResults];
+    const item = updated[itemIndex];
+    const currentLocations = item.selected_locations || [];
+
+    if (currentLocations.includes(locationSlug)) {
+      // Remove location
+      item.selected_locations = currentLocations.filter(loc => loc !== locationSlug);
+    } else {
+      // Add location
+      item.selected_locations = [...currentLocations, locationSlug];
+    }
+
     setScanResults(updated);
   };
 
@@ -240,39 +264,65 @@ export default function InventoryPhotoScanner({
 
                   {scanResults.map((item, idx) => (
                     <div key={idx} className={styles.scanItem}>
-                      <div className={styles.scanItemInfo}>
-                        <p className={styles.scanItemName}>
-                          {item.brand ? `${item.brand} ` : ''}
-                          {item.name}
-                        </p>
-                        <p className={styles.scanItemMeta}>
-                          {item.category}
-                          {item.matched_inventory_id && ' — matches existing item'}
-                        </p>
+                      <div className={styles.scanItemHeader}>
+                        <div className={styles.scanItemInfo}>
+                          <p className={styles.scanItemName}>
+                            {item.brand ? `${item.brand} ` : ''}
+                            {item.name}
+                          </p>
+                          <p className={styles.scanItemMeta}>
+                            {item.category}
+                            {item.matched_inventory_id && ' — matches existing item'}
+                          </p>
+                        </div>
+                        <div className={styles.scanItemControls}>
+                          <span
+                            className={`${styles.scanConfidence} ${getConfidenceClass(item.confidence)}`}
+                          >
+                            {Math.round(item.confidence * 100)}%
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            className={styles.scanItemQuantity}
+                            value={item.estimated_quantity}
+                            onChange={(e) =>
+                              updateScannedQuantity(
+                                idx,
+                                parseInt(e.target.value) || 0
+                              )
+                            }
+                          />
+                          <button
+                            className={styles.ingredientRemoveBtn}
+                            onClick={() => removeScannedItem(idx)}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
                       </div>
-                      <span
-                        className={`${styles.scanConfidence} ${getConfidenceClass(item.confidence)}`}
-                      >
-                        {Math.round(item.confidence * 100)}%
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        className={styles.scanItemQuantity}
-                        value={item.estimated_quantity}
-                        onChange={(e) =>
-                          updateScannedQuantity(
-                            idx,
-                            parseInt(e.target.value) || 0
-                          )
-                        }
-                      />
-                      <button
-                        className={styles.ingredientRemoveBtn}
-                        onClick={() => removeScannedItem(idx)}
-                      >
-                        <X size={16} />
-                      </button>
+
+                      {/* Location Selection */}
+                      <div className={styles.scanItemLocations}>
+                        <label className={styles.scanItemLocationLabel}>
+                          Assign to:
+                        </label>
+                        <div className={styles.scanItemLocationOptions}>
+                          {locations.filter(loc => loc.slug !== 'all').map((location) => (
+                            <label
+                              key={location.slug}
+                              className={styles.scanItemLocationCheckbox}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={(item.selected_locations || []).includes(location.slug)}
+                                onChange={() => toggleLocation(idx, location.slug)}
+                              />
+                              <span>{location.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
