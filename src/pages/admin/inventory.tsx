@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import InventoryList from '../../components/inventory/InventoryList';
 import InventoryItemModal from '../../components/inventory/InventoryItemModal';
@@ -8,6 +8,7 @@ import RecipeBuilder from '../../components/inventory/RecipeBuilder';
 import RecipeDrawer from '../../components/inventory/RecipeDrawer';
 import EnhancedSalesUpload from '../../components/inventory/EnhancedSalesUpload';
 import InventorySettings from '../../components/inventory/InventorySettings';
+import { supabase } from '../../lib/supabase';
 import {
   Package,
   ChefHat,
@@ -34,20 +35,31 @@ import type {
   SalesRecord,
   ScannedItem,
   LocationSlug,
-  UILocationSlug,
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
-import { getAuthHeaders } from '../../lib/client-auth';
 
-// The "All Locations" aggregate tab; real locations are loaded from the API.
-const ALL_LOCATIONS_TAB: { slug: UILocationSlug; name: string } = {
-  slug: 'all',
-  name: 'All Locations',
-};
+const LOCATIONS: { slug: LocationSlug; name: string }[] = [
+  { slug: 'all', name: 'All Locations' },
+  { slug: 'noirkc', name: 'Noir KC' },
+  { slug: 'rooftopkc', name: 'RooftopKC' },
+  { slug: 'noirop', name: 'Noir OP' },
+];
+
+// Helper to get auth headers for API requests
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
+  return headers;
+}
 
 export default function InventoryPage() {
   // Location state
-  const [currentLocation, setCurrentLocation] = useState<UILocationSlug>('noirkc');
+  const [currentLocation, setCurrentLocation] = useState<LocationSlug>('noirkc');
 
   // Tab state
   const [activeTab, setActiveTab] = useState<InventoryTab>('inventory');
@@ -80,27 +92,12 @@ export default function InventoryPage() {
   // Locations data for badges
   const [locationsData, setLocationsData] = useState<Array<{ id: string; slug: string; name: string }>>([]);
 
-  // Real locations from the API (single source of truth). Never includes 'all'.
-  const realLocations = useMemo<{ slug: LocationSlug; name: string }[]>(
-    () =>
-      locationsData.map((loc) => ({
-        slug: loc.slug as LocationSlug,
-        name: loc.name,
-      })),
-    [locationsData]
-  );
-
-  // Tab bar list: the synthetic "All Locations" tab plus the real locations.
-  const locationTabs = useMemo<{ slug: UILocationSlug; name: string }[]>(
-    () => [ALL_LOCATIONS_TAB, ...realLocations],
-    [realLocations]
-  );
-
   // Fetch locations for badges
   useEffect(() => {
     async function fetchLocations() {
       try {
-        const res = await fetch('/api/locations');
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/locations', { headers });
         if (res.ok) {
           const data = await res.json();
           setLocationsData(data || []);
@@ -118,7 +115,8 @@ export default function InventoryPage() {
       const url = currentLocation === 'all'
         ? '/api/inventory' // Fetch all locations
         : `/api/inventory?location_slug=${currentLocation}`;
-      const res = await fetch(url);
+      const headers = await getAuthHeaders();
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
         setInventory(data.data || []);
@@ -133,7 +131,8 @@ export default function InventoryPage() {
       const url = currentLocation === 'all'
         ? '/api/inventory/recipes' // Fetch all locations
         : `/api/inventory/recipes?location_slug=${currentLocation}`;
-      const res = await fetch(url, { headers: await getAuthHeaders() });
+      const headers = await getAuthHeaders();
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
         setRecipes(data.data || []);
@@ -145,7 +144,8 @@ export default function InventoryPage() {
 
   const fetchSalesHistory = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory/sales');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/inventory/sales', { headers });
       if (res.ok) {
         const data = await res.json();
         setSalesHistory(data.data || []);
@@ -173,32 +173,26 @@ export default function InventoryPage() {
   const recipeCount = recipes.length;
 
   // Inventory CRUD
-  const handleSaveItem = async (
-    data: InventoryItemFormData
-  ): Promise<InventoryItem | null> => {
-    // Require an explicit location when creating a new item so it isn't
-    // silently assigned to a default while viewing "All Locations".
-    if (!editingItem && currentLocation === 'all') {
-      alert('Please select a specific location before adding a new item.');
-      return null;
-    }
+  const handleSaveItem = async (data: InventoryItemFormData): Promise<InventoryItem | null> => {
     setSavingItem(true);
     try {
       const method = editingItem ? 'PUT' : 'POST';
+      const { location_id, ...dataWithoutLocationId } = data;
       const body = editingItem
         ? { ...data, id: editingItem.id }
-        : { ...data, location_slug: currentLocation };
+        : { ...dataWithoutLocationId, location_slug: currentLocation === 'all' ? 'noirkc' : currentLocation };
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory', {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        const result = await res.json().catch(() => null);
+        const result = await res.json();
         await fetchInventory();
         setIsItemDrawerOpen(false);
         setEditingItem(null);
-        return (result?.data as InventoryItem) || null;
+        return result.data; // Return the newly created/updated item
       }
       return null;
     } catch (err) {
@@ -212,9 +206,10 @@ export default function InventoryPage() {
   const handleDeleteItem = async (id: string) => {
     if (!confirm('Delete this inventory item?')) return;
     try {
+      const headers = await getAuthHeaders();
       await fetch('/api/inventory', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ id }),
       });
       await fetchInventory();
@@ -235,9 +230,10 @@ export default function InventoryPage() {
 
     try {
       // Log the transaction and update quantity
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory/transactions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           item_id: id,
           transaction_type: transactionType,
@@ -305,12 +301,6 @@ export default function InventoryPage() {
 
   // AI Scan handler - supports multi-location assignment
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
-    // Aggregate quantity deltas per existing item so that two scanned lines
-    // matching the same inventory item don't each overwrite with a stale base
-    // quantity (the last write would clobber the first).
-    const deltasByExistingId = new Map<string, number>();
-    const createRequests: Promise<Response>[] = [];
-
     for (const scanned of scannedItems) {
       const selectedLocations = scanned.selected_locations || [];
 
@@ -320,73 +310,46 @@ export default function InventoryPage() {
       }
 
       if (scanned.matched_inventory_id) {
-        // Accumulate the delta for this existing item.
-        const existing = inventory.find(
-          (i) => i.id === scanned.matched_inventory_id
-        );
-        if (existing) {
-          deltasByExistingId.set(
-            existing.id,
-            (deltasByExistingId.get(existing.id) ?? 0) + scanned.estimated_quantity
-          );
-        }
-      } else {
-        // Create new inventory item at each selected location
-        for (const locationSlug of selectedLocations) {
-          createRequests.push(
-            fetch('/api/inventory', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                name: scanned.name,
-                brand: scanned.brand,
-                category: scanned.category,
-                quantity: scanned.estimated_quantity,
-                unit: scanned.unit || 'bottle',
-                subcategory: '',
-                volume_ml: 750,
-                cost_per_unit: 0,
-                price_per_serving: 0,
-                par_level: 0,
-                notes: 'Added from AI scan',
-                location_slug: locationSlug,
-              }),
-            })
-          );
-        }
-      }
-    }
-
-    // Build update requests from the aggregated deltas.
-    const updateRequests = Array.from(deltasByExistingId.entries()).map(
-      ([id, delta]) => {
-        const existing = inventory.find((i) => i.id === id);
-        return fetch('/api/inventory', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+        // Update existing item quantity using transaction API to avoid race conditions
+        // (stale React state could cause incorrect absolute quantity if another user/tab updates concurrently)
+        const headers = await getAuthHeaders();
+        await fetch('/api/inventory/transactions', {
+          method: 'POST',
+          headers,
           body: JSON.stringify({
-            id,
-            quantity: (existing?.quantity ?? 0) + delta,
+            item_id: scanned.matched_inventory_id,
+            transaction_type: 'add',
+            quantity_change: scanned.estimated_quantity,
+            notes: 'Added from AI scan'
           }),
         });
+      } else {
+        // Create new inventory item at each selected location
+        const headers = await getAuthHeaders();
+        for (const locationSlug of selectedLocations) {
+          await fetch('/api/inventory', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              name: scanned.name,
+              brand: scanned.brand,
+              category: scanned.category,
+              quantity: scanned.estimated_quantity,
+              unit: scanned.unit || 'bottle',
+              subcategory: '',
+              volume_ml: 750,
+              cost_per_unit: 0,
+              price_per_serving: 0,
+              par_level: 0,
+              notes: 'Added from AI scan',
+              location_slug: locationSlug,
+            }),
+          });
+        }
       }
-    );
-
-    try {
-      const responses = await Promise.all([...createRequests, ...updateRequests]);
-      const failed = responses.filter((res) => !res.ok).length;
-      await fetchInventory();
-      setIsScannerOpen(false);
-      if (failed > 0) {
-        alert(
-          `${failed} of ${responses.length} item updates failed. Please review the inventory and retry the affected items.`
-        );
-      }
-    } catch (err) {
-      console.error('Failed to apply scanned items:', err);
-      await fetchInventory();
-      alert('Failed to apply some scanned items. Please review the inventory and try again.');
     }
+    await fetchInventory();
+    setIsScannerOpen(false);
   };
 
   // Recipe CRUD
@@ -395,9 +358,10 @@ export default function InventoryPage() {
     try {
       const method = editingRecipe ? 'PUT' : 'POST';
       const body = editingRecipe ? { ...data, id: editingRecipe.id } : data;
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory/recipes', {
         method,
-        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+        headers,
         body: JSON.stringify(body),
       });
       if (res.ok) {
@@ -415,9 +379,10 @@ export default function InventoryPage() {
   const handleDeleteRecipe = async (id: string) => {
     if (!confirm('Delete this recipe?')) return;
     try {
+      const headers = await getAuthHeaders();
       await fetch('/api/inventory/recipes', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+        headers,
         body: JSON.stringify({ id }),
       });
       await fetchRecipes();
@@ -441,9 +406,10 @@ export default function InventoryPage() {
   // Sales processing
   const handleProcessSales = async (record: SalesRecord) => {
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory/sales', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(record),
       });
       if (res.ok) {
@@ -504,7 +470,7 @@ export default function InventoryPage() {
 
       {/* Location Tabs */}
       <div className={styles.locationTabs}>
-        {locationTabs.map((location) => (
+        {LOCATIONS.map((location) => (
           <button
             key={location.slug}
             className={`${styles.locationTab} ${currentLocation === location.slug ? styles.locationTabActive : ''}`}
@@ -648,7 +614,7 @@ export default function InventoryPage() {
         onClose={() => setIsScannerOpen(false)}
         onConfirm={handleScanConfirm}
         existingItems={inventory}
-        locations={realLocations}
+        locations={LOCATIONS}
       />
 
       <InventoryTransferModal

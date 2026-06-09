@@ -6,6 +6,15 @@ import { MAX_RECIPE_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../../../constan
 import type { DBRecipe, DBInventoryItem, RecipeIngredient } from '../../../types/inventory';
 
 /**
+ * Inventory Recipes API
+ *
+ * Auth: Admin-only (withAdminAuth)
+ * Rationale: Recipes are business-sensitive data (costs, margins) used only in admin
+ * inventory management. No public or member-facing pages access this endpoint.
+ * All callers are in admin/inventory.tsx and admin-only components.
+ */
+
+/**
  * API Error Response Helper
  */
 function errorResponse(

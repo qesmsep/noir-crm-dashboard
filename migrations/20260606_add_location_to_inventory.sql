@@ -6,47 +6,112 @@
 
 -- Step 1: Add location_id to inventory_items table
 ALTER TABLE inventory_items
-ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id) ON DELETE CASCADE;
+ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id) ON DELETE RESTRICT;
+
+-- Step 1a: Fix existing CASCADE constraint if present (for already-applied migrations)
+DO $$
+BEGIN
+  -- Drop existing constraint if it's CASCADE
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage ccu USING (constraint_schema, constraint_name)
+    WHERE tc.table_name = 'inventory_items'
+    AND ccu.column_name = 'location_id'
+    AND tc.constraint_type = 'FOREIGN KEY'
+  ) THEN
+    ALTER TABLE inventory_items DROP CONSTRAINT IF EXISTS inventory_items_location_id_fkey;
+    ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_location_id_fkey
+      FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 -- Step 2: Create index for faster location-based queries
 CREATE INDEX IF NOT EXISTS idx_inventory_items_location ON inventory_items(location_id);
 
 -- Step 3: Add location_id to inventory_transactions for audit trail
 ALTER TABLE inventory_transactions
-ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id) ON DELETE CASCADE;
+ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id) ON DELETE RESTRICT;
+
+-- Step 3a: Fix existing CASCADE constraint if present
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage ccu USING (constraint_schema, constraint_name)
+    WHERE tc.table_name = 'inventory_transactions'
+    AND ccu.column_name = 'location_id'
+    AND tc.constraint_type = 'FOREIGN KEY'
+  ) THEN
+    ALTER TABLE inventory_transactions DROP CONSTRAINT IF EXISTS inventory_transactions_location_id_fkey;
+    ALTER TABLE inventory_transactions ADD CONSTRAINT inventory_transactions_location_id_fkey
+      FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 -- Step 4: Create index for faster location-based transaction queries
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_location ON inventory_transactions(location_id);
 
 -- Step 5: Add location_id to inventory_recipes (recipes are location-specific)
 ALTER TABLE inventory_recipes
-ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id) ON DELETE CASCADE;
+ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id) ON DELETE RESTRICT;
+
+-- Step 5a: Fix existing CASCADE constraint if present
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage ccu USING (constraint_schema, constraint_name)
+    WHERE tc.table_name = 'inventory_recipes'
+    AND ccu.column_name = 'location_id'
+    AND tc.constraint_type = 'FOREIGN KEY'
+  ) THEN
+    ALTER TABLE inventory_recipes DROP CONSTRAINT IF EXISTS inventory_recipes_location_id_fkey;
+    ALTER TABLE inventory_recipes ADD CONSTRAINT inventory_recipes_location_id_fkey
+      FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 -- Step 6: Create index for recipe location queries
 CREATE INDEX IF NOT EXISTS idx_inventory_recipes_location ON inventory_recipes(location_id);
 
 -- Step 7: Update existing data to assign to default location (Noir KC)
-UPDATE inventory_items
-SET location_id = (SELECT id FROM locations WHERE slug = 'noirkc')
-WHERE location_id IS NULL;
+-- Only backfill if the default location exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM locations WHERE slug = 'noirkc') THEN
+    UPDATE inventory_items
+    SET location_id = (SELECT id FROM locations WHERE slug = 'noirkc')
+    WHERE location_id IS NULL;
 
-UPDATE inventory_transactions
-SET location_id = (SELECT id FROM locations WHERE slug = 'noirkc')
-WHERE location_id IS NULL;
+    UPDATE inventory_transactions
+    SET location_id = (SELECT id FROM locations WHERE slug = 'noirkc')
+    WHERE location_id IS NULL;
 
-UPDATE inventory_recipes
-SET location_id = (SELECT id FROM locations WHERE slug = 'noirkc')
-WHERE location_id IS NULL;
+    UPDATE inventory_recipes
+    SET location_id = (SELECT id FROM locations WHERE slug = 'noirkc')
+    WHERE location_id IS NULL;
+  END IF;
+END $$;
 
 -- Step 8: Make location_id NOT NULL after data migration (idempotent)
-ALTER TABLE inventory_items
-ALTER COLUMN location_id SET NOT NULL;
+-- Only set NOT NULL if all rows have been backfilled
+DO $$
+BEGIN
+  -- For inventory_items
+  IF NOT EXISTS (SELECT 1 FROM inventory_items WHERE location_id IS NULL) THEN
+    ALTER TABLE inventory_items ALTER COLUMN location_id SET NOT NULL;
+  END IF;
 
-ALTER TABLE inventory_transactions
-ALTER COLUMN location_id SET NOT NULL;
+  -- For inventory_transactions
+  IF NOT EXISTS (SELECT 1 FROM inventory_transactions WHERE location_id IS NULL) THEN
+    ALTER TABLE inventory_transactions ALTER COLUMN location_id SET NOT NULL;
+  END IF;
 
-ALTER TABLE inventory_recipes
-ALTER COLUMN location_id SET NOT NULL;
+  -- For inventory_recipes
+  IF NOT EXISTS (SELECT 1 FROM inventory_recipes WHERE location_id IS NULL) THEN
+    ALTER TABLE inventory_recipes ALTER COLUMN location_id SET NOT NULL;
+  END IF;
+END $$;
 
 -- Step 9: Add composite unique constraint to prevent duplicate items per location
 DO $$

@@ -2107,7 +2107,7 @@
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 1000;
+  z-index: 500;
   animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -2123,7 +2123,7 @@
   background: white;
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  z-index: 1001;
+  z-index: 501;
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);

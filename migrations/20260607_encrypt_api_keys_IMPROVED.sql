@@ -83,13 +83,23 @@ FROM system_settings;
 COMMENT ON VIEW v_encryption_status IS 'Monitoring view for encryption status of system settings (admin-only access)';
 
 -- ========================================
--- STEP 5: UPDATE RLS POLICIES
+-- STEP 5: RESTRICT ACCESS TO ENCRYPTION METADATA
 -- ========================================
 
--- Access for v_encryption_status and identify_sensitive_settings is locked
--- down to service_role only in the companion migration
--- 20260608_restrict_encryption_metadata_access.sql, so this sensitive metadata
--- is never exposed to authenticated/anon callers via PostgREST.
+-- CRITICAL SECURITY: The v_encryption_status view and identify_sensitive_settings()
+-- function expose sensitive metadata (which settings exist and whether they are
+-- encrypted, including sensitive key names). Lock both down to service_role only
+-- so they can never be reached via PostgREST by an authenticated or anonymous user.
+
+-- Function: revoke the implicit PUBLIC execute grant, allow service_role only
+REVOKE ALL ON FUNCTION identify_sensitive_settings() FROM PUBLIC;
+REVOKE ALL ON FUNCTION identify_sensitive_settings() FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION identify_sensitive_settings() TO service_role;
+
+-- View: ensure only service_role can read it
+REVOKE ALL ON v_encryption_status FROM PUBLIC;
+REVOKE ALL ON v_encryption_status FROM anon, authenticated;
+GRANT SELECT ON v_encryption_status TO service_role;
 
 -- ========================================
 -- MIGRATION COMPLETE

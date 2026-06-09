@@ -411,7 +411,6 @@ export default function InventoryItemModal({
               </button>
               <button
                 className={styles.btnPrimary}
-                onClick={handleSubmit}
                 disabled={saving || !form.name.trim()}
                 type="submit"
               >

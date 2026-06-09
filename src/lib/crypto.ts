@@ -1,0 +1,148 @@
+import crypto from 'crypto';
+
+/**
+ * Crypto utility for encrypting/decrypting sensitive data
+ * Uses AES-256-GCM for encryption with authentication
+ */
+
+// Get encryption key from environment or generate one for development
+const getEncryptionKey = (): string => {
+  const envKey = process.env.ENCRYPTION_KEY;
+
+  if (process.env.NODE_ENV === 'production' && !envKey) {
+    throw new Error(
+      'ENCRYPTION_KEY environment variable is required in production. ' +
+      'Generate one using: openssl rand -hex 32'
+    );
+  }
+
+  if (!envKey) {
+    console.warn(
+      '⚠️  WARNING: Using auto-generated encryption key. ' +
+      'Set ENCRYPTION_KEY environment variable for production use.'
+    );
+    // Generate a deterministic key for development (so encrypted values persist during dev)
+    return crypto.createHash('sha256').update('development-key').digest('hex');
+  }
+
+  // Validate the key format
+  if (!/^[0-9a-f]{64}$/i.test(envKey)) {
+    throw new Error(
+      'ENCRYPTION_KEY must be a 32-byte hex string (64 hex characters). ' +
+      'Generate one using: openssl rand -hex 32'
+    );
+  }
+
+  return envKey;
+};
+
+const ENCRYPTION_KEY = getEncryptionKey();
+const IV_LENGTH = 16; // For AES, this is always 16
+const TAG_LENGTH = 16; // GCM authentication tag length
+const SALT_LENGTH = 64; // Salt length for key derivation
+
+/**
+ * Derives a key from the encryption key and salt
+ */
+function deriveKey(salt: Buffer): Buffer {
+  return crypto.pbkdf2Sync(ENCRYPTION_KEY, salt, 100000, 32, 'sha256');
+}
+
+/**
+ * Encrypts sensitive data (like API keys)
+ */
+export async function encrypt(text: string): Promise<string> {
+  try {
+    // Generate random salt and IV
+    const salt = crypto.randomBytes(SALT_LENGTH);
+    const iv = crypto.randomBytes(IV_LENGTH);
+
+    // Derive key from salt
+    const key = deriveKey(salt);
+
+    // Create cipher
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+    // Encrypt the text
+    const encrypted = Buffer.concat([
+      cipher.update(text, 'utf8'),
+      cipher.final()
+    ]);
+
+    // Get the authentication tag
+    const tag = cipher.getAuthTag();
+
+    // Combine salt, iv, tag, and encrypted data
+    const combined = Buffer.concat([salt, iv, tag, encrypted]);
+
+    // Return as base64 string
+    return combined.toString('base64');
+  } catch (error) {
+    console.error('Encryption error:', error);
+    throw new Error('Failed to encrypt data');
+  }
+}
+
+/**
+ * Decrypts sensitive data (like API keys)
+ */
+export async function decrypt(encryptedText: string): Promise<string> {
+  try {
+    // Decode from base64
+    const combined = Buffer.from(encryptedText, 'base64');
+
+    // Extract components
+    const salt = combined.slice(0, SALT_LENGTH);
+    const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+    const tag = combined.slice(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+    const encrypted = combined.slice(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+
+    // Derive key from salt
+    const key = deriveKey(salt);
+
+    // Create decipher
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+
+    // Decrypt the text
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final()
+    ]);
+
+    return decrypted.toString('utf8');
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Failed to decrypt data');
+  }
+}
+
+/**
+ * Hash a value for comparison (one-way)
+ */
+export function hash(text: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(text)
+    .digest('hex');
+}
+
+/**
+ * Generate a secure random token
+ */
+export function generateToken(length: number = 32): string {
+  return crypto
+    .randomBytes(length)
+    .toString('hex');
+}
+
+/**
+ * Validate that a value matches a hash
+ */
+export function validateHash(text: string, hashValue: string): boolean {
+  const textHash = crypto
+    .createHash('sha256')
+    .update(text)
+    .digest('hex');
+  return textHash === hashValue;
+}

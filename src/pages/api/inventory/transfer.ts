@@ -15,24 +15,6 @@ import { monitoring } from '../../../lib/monitoring';
 async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
 
-  // Rate limiting with headers.
-  // NOTE: the standard limiter is in-memory and per-instance, so on serverless
-  // (Vercel) its state resets on cold start and is not shared across instances.
-  // Treat this as best-effort abuse mitigation, not a hard guarantee.
-  // TODO: back with Redis/Upstash for a distributed limit.
-  const rateLimitPassed = await rateLimiters.standard.check(req);
-  if (!rateLimitPassed) {
-    const retryAfter = rateLimiters.standard.getRetryAfter(req);
-    res.setHeader('Retry-After', retryAfter.toString());
-    res.setHeader('X-RateLimit-Limit', '100');
-    res.setHeader('X-RateLimit-Remaining', '0');
-    return res.status(429).json({
-      error: 'Too many requests',
-      message: 'Please wait before making another request',
-      retryAfter
-    });
-  }
-
   if (req.method === 'POST') {
     try {
       // Validate input
@@ -105,5 +87,32 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-// Export with admin authentication
-export default withAdminAuth(transferHandler);
+/**
+ * Rate limiting middleware wrapper
+ * Applied BEFORE authentication to prevent auth DB calls from being exhausted
+ *
+ * NOTE: the standard limiter is in-memory and per-instance, so on serverless
+ * (Vercel) its state resets on cold start and is not shared across instances.
+ * Treat this as best-effort abuse mitigation, not a hard guarantee.
+ * TODO: back with Redis/Upstash for a distributed limit.
+ */
+async function withRateLimit(req: NextApiRequest, res: NextApiResponse) {
+  const rateLimitPassed = await rateLimiters.standard.check(req);
+  if (!rateLimitPassed) {
+    const retryAfter = rateLimiters.standard.getRetryAfter(req);
+    res.setHeader('Retry-After', retryAfter.toString());
+    res.setHeader('X-RateLimit-Limit', '100');
+    res.setHeader('X-RateLimit-Remaining', '0');
+    return res.status(429).json({
+      error: 'Too many requests',
+      message: 'Please wait before making another request',
+      retryAfter
+    });
+  }
+
+  // Rate limit passed, proceed to auth check
+  return withAdminAuth(transferHandler)(req, res);
+}
+
+// Export with rate limiting applied BEFORE admin authentication
+export default withRateLimit;

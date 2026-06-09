@@ -130,7 +130,10 @@ export default function SalesUpload({
     setPendingRecord(null);
   };
 
-  const formatCurrency = (val: number) => '$' + val.toFixed(2);
+  const formatCurrency = (val: number | undefined | null) => {
+    if (val === undefined || val === null || isNaN(val)) return '$0.00';
+    return '$' + val.toFixed(2);
+  };
 
   return (
     <>
