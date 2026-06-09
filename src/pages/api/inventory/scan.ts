@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import fs from 'fs';
 import OpenAI from 'openai';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 
 export const config = {
   api: {
@@ -12,8 +13,10 @@ export const config = {
 /**
  * Inventory Photo Scan API
  * POST: Upload an image and use AI (OpenAI Vision) to identify bottles and quantities
+ *
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function scanHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -112,3 +115,5 @@ Return ONLY valid JSON. No markdown, no explanation. Just the JSON array.`,
     return res.status(500).json({ error: err.message || 'Failed to scan image' });
   }
 }
+
+export default withRateLimitAndAuth(scanHandler);

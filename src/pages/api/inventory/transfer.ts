@@ -1,16 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { withAdminAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { TransferSchema, validateRequest, formatZodErrors } from '../../../lib/inventory-validation';
-import { rateLimiters } from '../../../lib/rate-limiter';
 import { monitoring } from '../../../lib/monitoring';
 
 /**
  * Inventory Transfer API
  * POST: Transfer inventory items between locations atomically
  *
- * CSRF Protection: Uses Supabase httpOnly, SameSite cookies for CSRF mitigation.
- * Authentication is required via withAdminAuth middleware.
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
  */
 async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
@@ -87,36 +85,4 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-/**
- * Rate limiting middleware wrapper
- * Applied BEFORE authentication to prevent auth DB calls from being exhausted
- *
- * SECURITY NOTE: Uses IP-based rate limiting (via x-forwarded-for header)
- * since this runs before authentication and we don't have user.id yet.
- * This is best-effort protection against DDoS, not a guarantee.
- *
- * NOTE: The standard limiter is in-memory and per-instance, so on serverless
- * (Vercel) its state resets on cold start and is not shared across instances.
- * TODO: Back with Redis/Upstash for distributed limit + use Cloudflare rate limiting
- */
-async function withRateLimit(req: NextApiRequest, res: NextApiResponse) {
-  // IP-based rate limiting (spoofable but applied before auth to protect DB)
-  const rateLimitPassed = await rateLimiters.standard.check(req);
-  if (!rateLimitPassed) {
-    const retryAfter = rateLimiters.standard.getRetryAfter(req);
-    res.setHeader('Retry-After', retryAfter.toString());
-    res.setHeader('X-RateLimit-Limit', '100');
-    res.setHeader('X-RateLimit-Remaining', '0');
-    return res.status(429).json({
-      error: 'Too many requests',
-      message: 'Please wait before making another request',
-      retryAfter
-    });
-  }
-
-  // Rate limit passed, proceed to auth check
-  return withAdminAuth(transferHandler)(req, res);
-}
-
-// Export with rate limiting applied BEFORE admin authentication
-export default withRateLimit;
+export default withRateLimitAndAuth(transferHandler);
