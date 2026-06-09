@@ -35,16 +35,28 @@ const getEncryptionKey = (): string => {
   return envKey;
 };
 
-const ENCRYPTION_KEY = getEncryptionKey();
+// Lazy-loaded encryption key (only initialized when actually encrypting/decrypting)
+let ENCRYPTION_KEY: string | null = null;
+
 const IV_LENGTH = 16; // For AES, this is always 16
 const TAG_LENGTH = 16; // GCM authentication tag length
 const SALT_LENGTH = 64; // Salt length for key derivation
 
 /**
+ * Get or initialize the encryption key (lazy-loaded to prevent module load crashes)
+ */
+function ensureEncryptionKey(): string {
+  if (!ENCRYPTION_KEY) {
+    ENCRYPTION_KEY = getEncryptionKey();
+  }
+  return ENCRYPTION_KEY;
+}
+
+/**
  * Derives a key from the encryption key and salt
  */
 function deriveKey(salt: Buffer): Buffer {
-  return crypto.pbkdf2Sync(ENCRYPTION_KEY, salt, 100000, 32, 'sha256');
+  return crypto.pbkdf2Sync(ensureEncryptionKey(), salt, 100000, 32, 'sha256');
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
-import { withAdminAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import formidable from 'formidable';
 import fs from 'fs';
 import OpenAI from 'openai';
@@ -300,4 +300,4 @@ Try to match item names to the known recipes if possible. Return ONLY valid JSON
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withAdminAuth(salesHandler);
+export default withRateLimitAndAuth(salesHandler);

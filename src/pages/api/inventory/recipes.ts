@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../../lib/supabase';
-import { withAdminAuth, type AuthenticatedRequest } from '../../../lib/api-auth';
+import { withRateLimitAndAuth, type AuthenticatedRequest } from '../../../lib/api-auth';
 import { safeJSONParse, calculateIngredientCost, sanitizeInput, validateIngredients } from '../../../lib/inventory-utils';
 import { MAX_RECIPE_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../../../constants/inventory';
 import type { DBRecipe, DBInventoryItem, RecipeIngredient } from '../../../types/inventory';
@@ -331,4 +331,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 }
 
 // Export with authentication middleware
-export default withAdminAuth(handler);
+export default withRateLimitAndAuth(handler);

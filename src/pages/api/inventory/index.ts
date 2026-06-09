@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
-import { withAdminAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { InventoryItemSchema, UpdateInventoryItemSchema, validateRequest, formatZodErrors } from '../../../lib/inventory-validation';
-import { rateLimiters } from '../../../lib/rate-limiter';
 import { monitoring } from '../../../lib/monitoring';
 
 /**
@@ -11,18 +10,11 @@ import { monitoring } from '../../../lib/monitoring';
  * POST: Create a new inventory item
  * PUT: Update an existing inventory item
  * DELETE: Delete an inventory item
+ *
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
  */
 async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin || supabase;
-
-  // Rate limiting
-  const rateLimitPassed = await rateLimiters.standard.check(req);
-  if (!rateLimitPassed) {
-    return res.status(429).json({
-      error: 'Too many requests',
-      message: 'Please wait before making another request'
-    });
-  }
 
   if (req.method === 'GET') {
     try {
@@ -232,4 +224,4 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
 }
 
 // Export with admin authentication
-export default withAdminAuth(inventoryHandler);
+export default withRateLimitAndAuth(inventoryHandler);

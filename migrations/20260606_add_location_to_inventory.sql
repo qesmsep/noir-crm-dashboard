@@ -11,13 +11,15 @@ ADD COLUMN IF NOT EXISTS location_id UUID REFERENCES locations(id) ON DELETE RES
 -- Step 1a: Fix existing CASCADE constraint if present (for already-applied migrations)
 DO $$
 BEGIN
-  -- Drop existing constraint if it's CASCADE
+  -- Drop existing constraint ONLY if it's CASCADE (avoid no-op on fresh installs)
   IF EXISTS (
     SELECT 1 FROM information_schema.table_constraints tc
     JOIN information_schema.constraint_column_usage ccu USING (constraint_schema, constraint_name)
+    JOIN information_schema.referential_constraints rc USING (constraint_schema, constraint_name)
     WHERE tc.table_name = 'inventory_items'
     AND ccu.column_name = 'location_id'
     AND tc.constraint_type = 'FOREIGN KEY'
+    AND rc.delete_rule = 'CASCADE'
   ) THEN
     ALTER TABLE inventory_items DROP CONSTRAINT IF EXISTS inventory_items_location_id_fkey;
     ALTER TABLE inventory_items ADD CONSTRAINT inventory_items_location_id_fkey
@@ -38,9 +40,11 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.table_constraints tc
     JOIN information_schema.constraint_column_usage ccu USING (constraint_schema, constraint_name)
+    JOIN information_schema.referential_constraints rc USING (constraint_schema, constraint_name)
     WHERE tc.table_name = 'inventory_transactions'
     AND ccu.column_name = 'location_id'
     AND tc.constraint_type = 'FOREIGN KEY'
+    AND rc.delete_rule = 'CASCADE'
   ) THEN
     ALTER TABLE inventory_transactions DROP CONSTRAINT IF EXISTS inventory_transactions_location_id_fkey;
     ALTER TABLE inventory_transactions ADD CONSTRAINT inventory_transactions_location_id_fkey
@@ -61,9 +65,11 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.table_constraints tc
     JOIN information_schema.constraint_column_usage ccu USING (constraint_schema, constraint_name)
+    JOIN information_schema.referential_constraints rc USING (constraint_schema, constraint_name)
     WHERE tc.table_name = 'inventory_recipes'
     AND ccu.column_name = 'location_id'
     AND tc.constraint_type = 'FOREIGN KEY'
+    AND rc.delete_rule = 'CASCADE'
   ) THEN
     ALTER TABLE inventory_recipes DROP CONSTRAINT IF EXISTS inventory_recipes_location_id_fkey;
     ALTER TABLE inventory_recipes ADD CONSTRAINT inventory_recipes_location_id_fkey

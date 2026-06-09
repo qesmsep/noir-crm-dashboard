@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { withAdminAuth, AuthenticatedRequest } from '../../../lib/api-auth';
-import { rateLimiters } from '../../../lib/rate-limiter';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { monitoring } from '../../../lib/monitoring';
 import Papa from 'papaparse';
 
@@ -28,17 +27,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Rate limiting - sales reports are heavy operations
-  const rateLimitPassed = await rateLimiters.standard.check(req);
-  if (!rateLimitPassed) {
-    await monitoring.trackEvent('sales_report_rate_limited', {
-      user: req.user?.email
-    });
-    return res.status(429).json({
-      error: 'Too many requests',
-      message: 'Please wait before making another request'
-    });
-  }
+  // Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication
 
   try {
     const { csv_content, location_slug, report_date, verify_only = false } = req.body;
@@ -318,4 +307,4 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
   }
 }
 
-export default withAdminAuth(salesReportHandler);
+export default withRateLimitAndAuth(salesReportHandler);

@@ -1,21 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { withAdminAuth, AuthenticatedRequest } from '../../../lib/api-auth';
-import { rateLimiters } from '../../../lib/rate-limiter';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { monitoring } from '../../../lib/monitoring';
 
+/**
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
+ */
 async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
-
-  // Rate limiting using user ID (not IP) to prevent spoofing via x-forwarded-for header
-  const rateLimitKey = req.user?.id || 'unauthenticated';
-  const rateLimitPassed = await rateLimiters.standard.check(req, rateLimitKey);
-  if (!rateLimitPassed) {
-    return res.status(429).json({
-      error: 'Too many requests',
-      message: 'Please wait before making another request'
-    });
-  }
 
   if (req.method === 'POST') {
     try {
@@ -287,4 +279,4 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withAdminAuth(recipeCostHandler);
+export default withRateLimitAndAuth(recipeCostHandler);

@@ -44,12 +44,18 @@ class Monitoring {
     context: Record<string, unknown> = {}
   ): Promise<void> {
     try {
+      // Truncate stack trace to first 5 lines to avoid storing full file paths
+      // and internal server structure details
+      const truncatedStack = error.stack
+        ? error.stack.split('\n').slice(0, 5).join('\n')
+        : null;
+
       const { error: insertError } = await supabaseAdmin
         .from('monitoring_errors')
         .insert({
           error_type: error.name || 'Error',
           error_message: error.message,
-          error_stack: error.stack || null,
+          error_stack: truncatedStack,
           context_data: context,
         });
 

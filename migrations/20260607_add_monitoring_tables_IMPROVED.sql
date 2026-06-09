@@ -151,6 +151,27 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 COMMENT ON FUNCTION cleanup_old_monitoring_data IS 'Removes monitoring data older than specified days (default 30). Run via scheduled job or manually.';
 
 -- ========================================
+-- STEP 6: SCHEDULE CLEANUP (OPTIONAL)
+-- ========================================
+--
+-- IMPORTANT: The cleanup function is defined but NOT automatically scheduled.
+-- Tables will grow unbounded without regular cleanup (~200-400 events/day = 6K-12K rows/month).
+--
+-- To schedule automatic cleanup using pg_cron (if enabled on your Supabase project):
+--
+-- SELECT cron.schedule(
+--   'cleanup-monitoring-data',  -- job name
+--   '0 3 * * 0',                 -- every Sunday at 3am (cron syntax)
+--   $$SELECT cleanup_old_monitoring_data(30)$$  -- keep 30 days of data
+-- );
+--
+-- Verify the schedule:
+-- SELECT * FROM cron.job WHERE jobname = 'cleanup-monitoring-data';
+--
+-- Alternative: Use Supabase Database Webhooks or a manual cron job to call
+-- the function weekly/monthly.
+
+-- ========================================
 -- MIGRATION COMPLETE
 -- ========================================
 

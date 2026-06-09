@@ -1,21 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { withAdminAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { TransactionSchema, validateRequest, formatZodErrors } from '../../../lib/inventory-validation';
-import { rateLimiters } from '../../../lib/rate-limiter';
 import { monitoring } from '../../../lib/monitoring';
 
+/**
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
+ */
 async function transactionsHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
-
-  // Rate limiting
-  const rateLimitPassed = await rateLimiters.standard.check(req);
-  if (!rateLimitPassed) {
-    return res.status(429).json({
-      error: 'Too many requests',
-      message: 'Please wait before making another request'
-    });
-  }
 
   if (req.method === 'GET') {
     try {
@@ -124,4 +117,4 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
 }
 
 // Export with admin authentication
-export default withAdminAuth(transactionsHandler);
+export default withRateLimitAndAuth(transactionsHandler);

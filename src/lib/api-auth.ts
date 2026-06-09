@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from './supabase';
+import { rateLimiters } from './rate-limiter';
 
 /**
  * Authenticated user attached to the request by withAdminAuth.
@@ -72,5 +73,40 @@ export function withAdminAuth(handler: AuthenticatedHandler) {
       console.error('Authentication error:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
+  };
+}
+
+/**
+ * Composed middleware that applies rate limiting BEFORE authentication.
+ *
+ * CRITICAL: Rate limiting must run before withAdminAuth to prevent
+ * unauthenticated flood requests from exhausting the auth database.
+ *
+ * Usage:
+ *   async function myHandler(req: AuthenticatedRequest, res: NextApiResponse) { ... }
+ *   export default withRateLimitAndAuth(myHandler);
+ *
+ * SECURITY NOTE: Uses IP-based rate limiting (via x-forwarded-for header)
+ * since this runs before authentication. This is best-effort DDoS protection.
+ * For stronger guarantees, use Cloudflare rate limiting or Redis-backed limits.
+ */
+export function withRateLimitAndAuth(handler: AuthenticatedHandler) {
+  return async (req: NextApiRequest, res: NextApiResponse) => {
+    // Apply rate limiting BEFORE auth check
+    const rateLimitPassed = await rateLimiters.standard.check(req);
+    if (!rateLimitPassed) {
+      const retryAfter = rateLimiters.standard.getRetryAfter(req);
+      res.setHeader('Retry-After', retryAfter.toString());
+      res.setHeader('X-RateLimit-Limit', '100');
+      res.setHeader('X-RateLimit-Remaining', '0');
+      return res.status(429).json({
+        error: 'Too many requests',
+        message: 'Please wait before making another request',
+        retryAfter
+      });
+    }
+
+    // Rate limit passed, proceed to auth check
+    return withAdminAuth(handler)(req, res);
   };
 }
