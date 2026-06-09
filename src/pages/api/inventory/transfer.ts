@@ -91,12 +91,16 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
  * Rate limiting middleware wrapper
  * Applied BEFORE authentication to prevent auth DB calls from being exhausted
  *
- * NOTE: the standard limiter is in-memory and per-instance, so on serverless
+ * SECURITY NOTE: Uses IP-based rate limiting (via x-forwarded-for header)
+ * since this runs before authentication and we don't have user.id yet.
+ * This is best-effort protection against DDoS, not a guarantee.
+ *
+ * NOTE: The standard limiter is in-memory and per-instance, so on serverless
  * (Vercel) its state resets on cold start and is not shared across instances.
- * Treat this as best-effort abuse mitigation, not a hard guarantee.
- * TODO: back with Redis/Upstash for a distributed limit.
+ * TODO: Back with Redis/Upstash for distributed limit + use Cloudflare rate limiting
  */
 async function withRateLimit(req: NextApiRequest, res: NextApiResponse) {
+  // IP-based rate limiting (spoofable but applied before auth to protect DB)
   const rateLimitPassed = await rateLimiters.standard.check(req);
   if (!rateLimitPassed) {
     const retryAfter = rateLimiters.standard.getRetryAfter(req);

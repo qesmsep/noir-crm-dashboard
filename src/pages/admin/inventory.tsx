@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import InventoryList from '../../components/inventory/InventoryList';
 import InventoryItemModal from '../../components/inventory/InventoryItemModal';
@@ -35,31 +35,23 @@ import type {
   SalesRecord,
   ScannedItem,
   LocationSlug,
+  UILocationSlug,
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
+import { getAuthHeaders as getBaseAuthHeaders } from '../../lib/client-auth';
 
-const LOCATIONS: { slug: LocationSlug; name: string }[] = [
-  { slug: 'all', name: 'All Locations' },
-  { slug: 'noirkc', name: 'Noir KC' },
-  { slug: 'rooftopkc', name: 'RooftopKC' },
-  { slug: 'noirop', name: 'Noir OP' },
-];
-
-// Helper to get auth headers for API requests
+// Helper to get auth headers with Content-Type for API requests
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const headers: HeadersInit = {
+  const baseHeaders = await getBaseAuthHeaders();
+  return {
     'Content-Type': 'application/json',
+    ...baseHeaders,
   };
-  if (session?.access_token) {
-    headers['Authorization'] = `Bearer ${session.access_token}`;
-  }
-  return headers;
 }
 
 export default function InventoryPage() {
-  // Location state
-  const [currentLocation, setCurrentLocation] = useState<LocationSlug>('noirkc');
+  // Location state (UILocationSlug includes 'all' for filtering)
+  const [currentLocation, setCurrentLocation] = useState<UILocationSlug>('noirkc');
 
   // Tab state
   const [activeTab, setActiveTab] = useState<InventoryTab>('inventory');
@@ -91,6 +83,18 @@ export default function InventoryPage() {
 
   // Locations data for badges
   const [locationsData, setLocationsData] = useState<Array<{ id: string; slug: string; name: string }>>([]);
+
+  // Build location tabs: "All Locations" synthetic tab + real locations from API
+  const locationTabs = useMemo<{ slug: UILocationSlug; name: string }[]>(() => {
+    const realLocations = locationsData.map(loc => ({
+      slug: loc.slug as LocationSlug,
+      name: loc.name
+    }));
+    return [
+      { slug: 'all' as UILocationSlug, name: 'All Locations' },
+      ...realLocations
+    ];
+  }, [locationsData]);
 
   // Fetch locations for badges
   useEffect(() => {
@@ -470,7 +474,7 @@ export default function InventoryPage() {
 
       {/* Location Tabs */}
       <div className={styles.locationTabs}>
-        {LOCATIONS.map((location) => (
+        {locationTabs.map((location) => (
           <button
             key={location.slug}
             className={`${styles.locationTab} ${currentLocation === location.slug ? styles.locationTabActive : ''}`}
@@ -614,7 +618,7 @@ export default function InventoryPage() {
         onClose={() => setIsScannerOpen(false)}
         onConfirm={handleScanConfirm}
         existingItems={inventory}
-        locations={LOCATIONS}
+        locations={locationsData.map(loc => ({ slug: loc.slug as LocationSlug, name: loc.name }))}
       />
 
       <InventoryTransferModal

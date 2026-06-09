@@ -22,6 +22,10 @@ interface RequestRecord {
 /**
  * Derive a client identifier from the request. Prefers the forwarded client
  * IP, falling back to the socket address.
+ *
+ * SECURITY NOTE: x-forwarded-for header can be spoofed by attackers.
+ * For authenticated routes, prefer using a custom key (e.g., user.id)
+ * by passing it to check() and getRetryAfter() instead of relying on this.
  */
 function getClientKey(req: NextApiRequest): string {
   const forwarded = req.headers['x-forwarded-for'];
@@ -38,6 +42,8 @@ class RateLimiter {
   private readonly limit: number;
   private readonly windowMs: number;
   private readonly hits = new Map<string, RequestRecord>();
+  private lastCleanup = Date.now();
+  private readonly cleanupIntervalMs = 60 * 1000; // Clean up every minute
 
   constructor(options: RateLimiterOptions) {
     this.limit = options.limit;
@@ -45,11 +51,37 @@ class RateLimiter {
   }
 
   /**
-   * Returns true if the request is within the allowed rate, false otherwise.
+   * Remove expired entries to prevent memory leak
    */
-  async check(req: NextApiRequest): Promise<boolean> {
-    const key = getClientKey(req);
+  private cleanup(): void {
     const now = Date.now();
+
+    // Only run cleanup periodically to avoid overhead on every request
+    if (now - this.lastCleanup < this.cleanupIntervalMs) {
+      return;
+    }
+
+    for (const [key, record] of this.hits.entries()) {
+      if (now > record.resetAt) {
+        this.hits.delete(key);
+      }
+    }
+
+    this.lastCleanup = now;
+  }
+
+  /**
+   * Returns true if the request is within the allowed rate, false otherwise.
+   * @param req - The request object
+   * @param customKey - Optional custom key (e.g., user ID) instead of IP-based key
+   */
+  async check(req: NextApiRequest, customKey?: string): Promise<boolean> {
+    const key = customKey || getClientKey(req);
+    const now = Date.now();
+
+    // Periodically clean up expired entries
+    this.cleanup();
+
     const record = this.hits.get(key);
 
     if (!record || now > record.resetAt) {
@@ -67,9 +99,11 @@ class RateLimiter {
 
   /**
    * Returns the number of seconds the client should wait before retrying.
+   * @param req - The request object
+   * @param customKey - Optional custom key (e.g., user ID) instead of IP-based key
    */
-  getRetryAfter(req: NextApiRequest): number {
-    const key = getClientKey(req);
+  getRetryAfter(req: NextApiRequest, customKey?: string): number {
+    const key = customKey || getClientKey(req);
     const record = this.hits.get(key);
     if (!record) return 0;
     return Math.max(0, Math.ceil((record.resetAt - Date.now()) / 1000));

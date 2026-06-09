@@ -7,8 +7,9 @@ import { monitoring } from '../../../lib/monitoring';
 async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
 
-  // Rate limiting
-  const rateLimitPassed = await rateLimiters.standard.check(req);
+  // Rate limiting using user ID (not IP) to prevent spoofing via x-forwarded-for header
+  const rateLimitKey = req.user?.id || 'unauthenticated';
+  const rateLimitPassed = await rateLimiters.standard.check(req, rateLimitKey);
   if (!rateLimitPassed) {
     return res.status(429).json({
       error: 'Too many requests',
@@ -91,7 +92,10 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
         let costPerIngredientUnit = inventoryItem.cost_per_unit;
 
         if (ingredient.unit === 'oz' && inventoryItem.unit === 'bottle') {
-          costPerIngredientUnit = inventoryItem.cost_per_unit / 25.36;
+          // Convert bottle cost to per-oz cost using actual bottle volume
+          const bottleVolumeMl = inventoryItem.volume_ml || 750;
+          const bottleVolumeOz = bottleVolumeMl / 29.5735; // ml to oz conversion
+          costPerIngredientUnit = inventoryItem.cost_per_unit / bottleVolumeOz;
         } else if (ingredient.unit === 'ml' && inventoryItem.unit === 'bottle') {
           costPerIngredientUnit = inventoryItem.cost_per_unit / (inventoryItem.volume_ml || 750);
         }
@@ -209,7 +213,10 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
           let costPerIngredientUnit = item.cost_per_unit;
 
           if (ingredient.unit === 'oz' && item.unit === 'bottle') {
-            costPerIngredientUnit = item.cost_per_unit / 25.36;
+            // Convert bottle cost to per-oz cost using actual bottle volume
+            const bottleVolumeMl = item.volume_ml || 750;
+            const bottleVolumeOz = bottleVolumeMl / 29.5735; // ml to oz conversion
+            costPerIngredientUnit = item.cost_per_unit / bottleVolumeOz;
           } else if (ingredient.unit === 'ml' && item.unit === 'bottle') {
             costPerIngredientUnit = item.cost_per_unit / (item.volume_ml || 750);
           }
