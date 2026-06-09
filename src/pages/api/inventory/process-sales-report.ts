@@ -237,17 +237,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
       });
     }
 
-    // SECURITY: Block processing if failures
-    if (verification.failed_deductions > 0) {
-      return res.status(400).json({
-        error: 'Cannot process - insufficient stock',
-        verification,
-        processed_items: processedItems,
-        message: `${verification.failed_deductions} items have insufficient stock`
-      });
-    }
-
-    // Apply updates using atomic function
+    // Apply updates using atomic function (DB validates stock atomically - no TOCTOU race)
     const adjustments: any[] = [];
     for (const item of processedItems) {
       for (const matched of item.matched_items) {
@@ -260,31 +250,48 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
       }
     }
 
-    if (adjustments.length > 0) {
-      const { data: batchResult, error: batchError } = await client.rpc('process_sales_adjustments', {
-        p_adjustments: adjustments,
-        p_created_by: req.user?.email || 'Sales Report'
+    if (adjustments.length === 0) {
+      return res.status(400).json({
+        error: 'No items matched',
+        message: 'No inventory items could be matched to the sales report'
       });
-
-      if (batchError) {
-        return res.status(500).json({ error: 'Failed to apply adjustments', details: batchError });
-      }
     }
+
+    const { data: batchResult, error: batchError } = await client.rpc('process_sales_adjustments', {
+      p_adjustments: adjustments,
+      p_created_by: req.user?.id || 'Unknown'
+    });
+
+    if (batchError) {
+      return res.status(500).json({ error: 'Failed to apply adjustments', details: batchError });
+    }
+
+    // Check if any items failed (partial success)
+    const result = batchResult?.[0];
+    const itemsProcessed = result?.items_processed || 0;
+    const itemsFailed = result?.items_failed || 0;
 
     monitoring.trackEvent('sales_report_processed', {
       location: location_slug,
-      items_processed: verification.total_items_processed,
-      successful: verification.successful_deductions,
+      items_processed: itemsProcessed,
+      items_failed: itemsFailed,
       revenue: verification.total_revenue,
-      inventory_change: verification.inventory_value_change,
       user_id: req.user?.id
     });
 
-    return res.status(200).json({
-      success: true,
-      verification,
+    // Return 207 Multi-Status if partial failure, 200 if all succeeded
+    const statusCode = itemsFailed > 0 ? 207 : 200;
+    const success = itemsFailed === 0;
+
+    return res.status(statusCode).json({
+      success,
+      items_processed: itemsProcessed,
+      items_failed: itemsFailed,
+      verification, // Keep for UI display of what was attempted
       processed_items: processedItems,
-      message: `Successfully processed ${verification.successful_deductions} deductions`,
+      message: success
+        ? `Successfully processed ${itemsProcessed} deductions`
+        : `Processed ${itemsProcessed} deductions, ${itemsFailed} failed (insufficient stock)`,
     });
 
   } catch (error) {

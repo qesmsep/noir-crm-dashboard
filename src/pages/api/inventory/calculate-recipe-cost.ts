@@ -182,7 +182,12 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
 
   if (req.method === 'GET') {
     try {
-      const { location_slug } = req.query;
+      const location_slug = req.query.location_slug;
+
+      // Validate location_slug is a string (not array or undefined)
+      if (!location_slug || typeof location_slug !== 'string') {
+        return res.status(400).json({ error: 'location_slug query parameter is required and must be a string' });
+      }
 
       const { data: locationData, error: locationError } = await client
         .from('locations')
@@ -206,27 +211,32 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       // Calculate costs for all recipes
       const recipeCosts: RecipeCostAnalysis[] = [];
 
-      for (const dbRecipe of recipes || []) {
-        // Parse ingredients from JSON
-        const recipeIngredients: RecipeIngredient[] = typeof dbRecipe.ingredients === 'string'
+      // Batch fetch: Collect all unique ingredient IDs from ALL recipes (avoid N+1)
+      const allIngredientIds = new Set<string>();
+      const recipesParsed = (recipes || []).map(dbRecipe => {
+        const ingredients: RecipeIngredient[] = typeof dbRecipe.ingredients === 'string'
           ? JSON.parse(dbRecipe.ingredients)
           : dbRecipe.ingredients || [];
+        ingredients.forEach(ing => allIngredientIds.add(ing.inventory_item_id));
+        return { recipe: dbRecipe, ingredients };
+      });
 
-        // Fetch all inventory items for this recipe
-        const ingredientItemIds = recipeIngredients.map(ing => ing.inventory_item_id);
-        const { data: items } = await client
-          .from('inventory_items')
-          .select('*')
-          .eq('location_id', locationData.id)
-          .in('id', ingredientItemIds);
+      // Single batched query for ALL inventory items
+      const { data: allItems } = await client
+        .from('inventory_items')
+        .select('*')
+        .eq('location_id', locationData.id)
+        .in('id', Array.from(allIngredientIds));
 
-        const itemsMap = new Map(items?.map(item => [item.id, item]) || []);
+      const globalItemsMap = new Map(allItems?.map(item => [item.id, item]) || []);
+
+      for (const { recipe: dbRecipe, ingredients: recipeIngredients } of recipesParsed) {
 
         let totalCost = 0;
         const ingredientCosts: IngredientCost[] = [];
 
         for (const ingredient of recipeIngredients) {
-          const item = itemsMap.get(ingredient.inventory_item_id);
+          const item = globalItemsMap.get(ingredient.inventory_item_id);
           if (!item) continue;
           let costPerIngredientUnit = item.cost_per_unit;
 
