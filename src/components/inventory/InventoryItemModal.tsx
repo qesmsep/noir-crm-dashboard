@@ -368,7 +368,6 @@ export default function InventoryItemModal({
               />
             </div>
           </div>
-            </form>
 
             <div className={styles.modalFooter}>
               {editItem && onDelete && (
@@ -421,6 +420,7 @@ export default function InventoryItemModal({
                     : 'Add Item'}
               </button>
             </div>
+            </form>
           </div>
         </>,
         document.body

@@ -117,9 +117,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
       // Check for unencrypted sensitive settings
       const { data: settings, error } = await supabase
         .from('system_settings')
-        .select('setting_key, is_encrypted')
-        .or('setting_key.like.%api_key%,setting_key.like.%secret%,setting_key.like.%token%')
-        .eq('is_active', true);
+        .select('key, is_encrypted')
+        .or('key.like.%api_key%,key.like.%secret%,key.like.%token%');
 
       if (error) {
         console.warn('⚠️  Could not query database:', error.message);
@@ -129,7 +128,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
         if (unencrypted.length > 0) {
           console.warn(`⚠️  Found ${unencrypted.length} unencrypted sensitive settings:`);
           unencrypted.forEach(s => {
-            console.warn(`   - ${s.setting_key}`);
+            console.warn(`   - ${s.key}`);
           });
           console.warn('\n   Run: node scripts/encrypt-api-keys.js to encrypt them');
         } else {

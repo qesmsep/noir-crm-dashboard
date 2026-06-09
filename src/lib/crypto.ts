@@ -17,12 +17,11 @@ const getEncryptionKey = (): string => {
   }
 
   if (!envKey) {
-    console.warn(
-      '⚠️  WARNING: Using auto-generated encryption key. ' +
-      'Set ENCRYPTION_KEY environment variable for production use.'
+    throw new Error(
+      'ENCRYPTION_KEY environment variable is required. ' +
+      'Generate one using: openssl rand -hex 32\n' +
+      'Add it to your .env.local file for development.'
     );
-    // Generate a deterministic key for development (so encrypted values persist during dev)
-    return crypto.createHash('sha256').update('development-key').digest('hex');
   }
 
   // Validate the key format
@@ -137,12 +136,22 @@ export function generateToken(length: number = 32): string {
 }
 
 /**
- * Validate that a value matches a hash
+ * Validate that a value matches a hash (constant-time comparison)
  */
 export function validateHash(text: string, hashValue: string): boolean {
   const textHash = crypto
     .createHash('sha256')
     .update(text)
     .digest('hex');
-  return textHash === hashValue;
+
+  // Use constant-time comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(textHash, 'hex'),
+      Buffer.from(hashValue, 'hex')
+    );
+  } catch {
+    // If lengths don't match or invalid hex, return false
+    return false;
+  }
 }

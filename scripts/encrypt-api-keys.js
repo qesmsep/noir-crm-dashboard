@@ -35,12 +35,11 @@ async function encryptApiKeys() {
   console.log('🔐 Starting API key encryption...\n');
 
   try {
-    // Fetch all active settings that should be encrypted
+    // Fetch all settings that should be encrypted
     const { data: settings, error: fetchError } = await supabase
       .from('system_settings')
-      .select('id, setting_key, setting_value, is_encrypted')
-      .in('setting_key', SENSITIVE_KEYS)
-      .eq('is_active', true)
+      .select('id, key, value, is_encrypted')
+      .in('key', SENSITIVE_KEYS)
       .eq('is_encrypted', false);
 
     if (fetchError) {
@@ -48,7 +47,8 @@ async function encryptApiKeys() {
     }
 
     if (!settings || settings.length === 0) {
-      console.log('✅ No unencrypted API keys found');
+      console.log('✅ No unencrypted sensitive API keys found');
+      console.log(`   (Searched for: ${SENSITIVE_KEYS.join(', ')})`);
       return;
     }
 
@@ -60,28 +60,28 @@ async function encryptApiKeys() {
     // Encrypt each setting
     for (const setting of settings) {
       try {
-        console.log(`  Encrypting: ${setting.setting_key}...`);
+        console.log(`  Encrypting: ${setting.key}...`);
 
-        // Skip if already encrypted
+        // Skip if already encrypted (double-check)
         if (setting.is_encrypted) {
           console.log(`    ⚠️  Already encrypted, skipping`);
           continue;
         }
 
         // Skip empty values
-        if (!setting.setting_value || setting.setting_value.trim() === '') {
+        if (!setting.value || setting.value.trim() === '') {
           console.log(`    ⚠️  Empty value, skipping`);
           continue;
         }
 
         // Encrypt the value
-        const encryptedValue = await encrypt(setting.setting_value);
+        const encryptedValue = await encrypt(setting.value);
 
         // Update the database
         const { error: updateError } = await supabase
           .from('system_settings')
           .update({
-            setting_value: encryptedValue,
+            value: encryptedValue,
             is_encrypted: true,
             updated_at: new Date().toISOString()
           })

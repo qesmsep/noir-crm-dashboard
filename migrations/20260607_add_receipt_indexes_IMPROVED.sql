@@ -116,8 +116,12 @@ ANALYZE inventory_items;
 -- STEP 7: PERMISSIONS
 -- ========================================
 
--- Grant SELECT on materialized view to authenticated users
-GRANT SELECT ON mv_receipt_stats TO authenticated;
+-- CRITICAL SECURITY: Grant SELECT on materialized view to service_role only
+-- Materialized views do not inherit RLS from underlying tables. Granting to
+-- authenticated would expose business metrics (revenue, vendor counts) to all members.
+REVOKE ALL ON mv_receipt_stats FROM PUBLIC;
+REVOKE ALL ON mv_receipt_stats FROM anon, authenticated;
+GRANT SELECT ON mv_receipt_stats TO service_role;
 
 -- ========================================
 -- MIGRATION COMPLETE
