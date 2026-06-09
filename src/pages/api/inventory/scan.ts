@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import fs from 'fs';
 import OpenAI from 'openai';
-import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import { withStrictRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 
 export const config = {
   api: {
@@ -14,7 +14,8 @@ export const config = {
  * Inventory Photo Scan API
  * POST: Upload an image and use AI (OpenAI Vision) to identify bottles and quantities
  *
- * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
+ * STRICT rate limiting (20 req/min) is applied BEFORE authentication to prevent
+ * OpenAI API cost abuse. This endpoint is significantly more expensive than standard CRUD operations.
  */
 async function scanHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -116,4 +117,4 @@ Return ONLY valid JSON. No markdown, no explanation. Just the JSON array.`,
   }
 }
 
-export default withRateLimitAndAuth(scanHandler);
+export default withStrictRateLimitAndAuth(scanHandler);

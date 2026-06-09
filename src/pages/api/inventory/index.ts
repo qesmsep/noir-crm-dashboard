@@ -53,7 +53,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_fetch',
         location: req.query?.location_slug,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Internal server error' });
     }
@@ -124,7 +124,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
         item_id: data.id,
         category: data.category,
         location: req.body?.location_slug,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       return res.status(201).json({ data });
@@ -132,7 +132,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       console.error('Unhandled error creating inventory item:', err);
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_create',
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Internal server error' });
     }
@@ -171,7 +171,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
 
       await monitoring.trackEvent('inventory_item_updated', {
         item_id: id,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       return res.status(200).json({ data });
@@ -180,7 +180,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_update',
         item_id: req.body?.id,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Internal server error' });
     }
@@ -205,7 +205,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
 
       await monitoring.trackEvent('inventory_item_deleted', {
         item_id: id,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       return res.status(200).json({ success: true });
@@ -214,7 +214,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_delete',
         item_id: req.body?.id,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Internal server error' });
     }

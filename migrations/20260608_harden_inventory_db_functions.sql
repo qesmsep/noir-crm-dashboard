@@ -33,7 +33,7 @@ BEGIN
 
     RAISE NOTICE 'Hardened transfer_inventory_between_locations function';
   ELSE
-    RAISE WARNING 'Function transfer_inventory_between_locations not found - skipping hardening. Apply 20260608_add_inventory_transfer_function_v2.sql first.';
+    RAISE EXCEPTION 'Function transfer_inventory_between_locations not found. Apply 20260608_add_inventory_transfer_function_v2.sql first.';
   END IF;
 END $$;
 
@@ -49,7 +49,7 @@ BEGIN
 
     RAISE NOTICE 'Hardened refresh_receipt_stats function';
   ELSE
-    RAISE WARNING 'Function refresh_receipt_stats not found - skipping. Apply 20260607_add_receipt_indexes_IMPROVED.sql first.';
+    RAISE EXCEPTION 'Function refresh_receipt_stats not found. Apply 20260607_add_receipt_indexes_IMPROVED.sql first.';
   END IF;
 END $$;
 
@@ -65,7 +65,7 @@ BEGIN
 
     RAISE NOTICE 'Hardened cleanup_old_monitoring_data function';
   ELSE
-    RAISE WARNING 'Function cleanup_old_monitoring_data not found - skipping. Apply 20260607_add_monitoring_tables_IMPROVED.sql first.';
+    RAISE EXCEPTION 'Function cleanup_old_monitoring_data not found. Apply 20260607_add_monitoring_tables_IMPROVED.sql first.';
   END IF;
 END $$;
 
@@ -81,6 +81,6 @@ BEGIN
 
     RAISE NOTICE 'Hardened identify_sensitive_settings function';
   ELSE
-    RAISE WARNING 'Function identify_sensitive_settings not found - skipping. Apply 20260607_encrypt_api_keys_IMPROVED.sql first.';
+    RAISE EXCEPTION 'Function identify_sensitive_settings not found. Apply 20260607_encrypt_api_keys_IMPROVED.sql first.';
   END IF;
 END $$;

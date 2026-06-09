@@ -110,3 +110,31 @@ export function withRateLimitAndAuth(handler: AuthenticatedHandler) {
     return withAdminAuth(handler)(req, res);
   };
 }
+
+/**
+ * Stricter rate limit for expensive operations (AI vision, large file uploads, etc.)
+ * Limits to 20 requests per minute to prevent cost abuse and resource exhaustion.
+ *
+ * Usage:
+ *   export default withStrictRateLimitAndAuth(expensiveHandler);
+ */
+export function withStrictRateLimitAndAuth(handler: AuthenticatedHandler) {
+  return async (req: NextApiRequest, res: NextApiResponse) => {
+    // Apply strict rate limiting BEFORE auth check
+    const rateLimitPassed = await rateLimiters.strict.check(req);
+    if (!rateLimitPassed) {
+      const retryAfter = rateLimiters.strict.getRetryAfter(req);
+      res.setHeader('Retry-After', retryAfter.toString());
+      res.setHeader('X-RateLimit-Limit', '20');
+      res.setHeader('X-RateLimit-Remaining', '0');
+      return res.status(429).json({
+        error: 'Too many requests',
+        message: 'Rate limit exceeded for this endpoint. Please wait before making another request',
+        retryAfter
+      });
+    }
+
+    // Rate limit passed, proceed to auth check
+    return withAdminAuth(handler)(req, res);
+  };
+}

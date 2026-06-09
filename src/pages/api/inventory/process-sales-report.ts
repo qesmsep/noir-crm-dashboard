@@ -36,7 +36,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
       location: location_slug,
       verify_only,
       content_size: csv_content?.length || 0,
-      user: req.user?.email
+      user_id: req.user?.id
     });
 
     if (!csv_content || !location_slug) {
@@ -234,7 +234,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
         items_processed: verification.total_items_processed,
         successful: verification.successful_deductions,
         failed: verification.failed_deductions,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(200).json({
         verification,
@@ -283,7 +283,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
       successful: verification.successful_deductions,
       revenue: verification.total_revenue,
       inventory_change: verification.inventory_value_change,
-      user: req.user?.email
+      user_id: req.user?.id
     });
 
     return res.status(200).json({
@@ -298,7 +298,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
     await monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
       context: 'sales_report_processing',
       location: req.body?.location_slug,
-      user: req.user?.email
+      user_id: req.user?.id
     });
     return res.status(500).json({
       error: 'Failed to process sales report',

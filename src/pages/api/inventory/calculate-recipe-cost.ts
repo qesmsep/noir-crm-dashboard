@@ -16,7 +16,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       await monitoring.trackEvent('recipe_cost_calculation_started', {
         recipe_id,
         location: location_slug,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       // Get location
@@ -143,7 +143,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
         total_cost: totalCost,
         profit_percentage: profitPercentage,
         ingredient_count: ingredientCosts.length,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       return res.status(200).json(analysis);
@@ -153,7 +153,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       await monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
         context: 'recipe_cost_calculation',
         recipe_id: req.body?.recipe_id,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Failed to calculate recipe cost' });
     }
@@ -256,7 +256,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
         location: location_slug,
         recipe_count: recipeCosts.length,
         average_margin: summary.average_profit_margin,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       return res.status(200).json({
@@ -270,7 +270,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       await monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
         context: 'recipe_costs_fetch',
         location: req.query?.location_slug,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Failed to fetch recipe costs' });
     }

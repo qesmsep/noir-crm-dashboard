@@ -43,7 +43,7 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'transactions_fetch',
         item_id: req.query?.item_id,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Internal server error' });
     }
@@ -91,7 +91,7 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
         transaction_type: transaction_type,
         quantity_change: quantity_change,
         low_stock: result.low_stock,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       // Return the result with warning information
@@ -107,7 +107,7 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'transaction_create',
         item_id: req.body?.item_id,
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Internal server error' });
     }

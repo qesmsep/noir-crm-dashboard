@@ -129,7 +129,7 @@ async function encryptApiKeys() {
 
       if (statusData.unencrypted_sensitive_count > 0) {
         console.log(`  ⚠️  Unencrypted sensitive settings: ${statusData.unencrypted_sensitive_count}`);
-        console.log(`     Keys: ${statusData.unencrypted_sensitive_keys.join(', ')}`);
+        console.log(`     Run this script to encrypt them`);
       }
     }
 

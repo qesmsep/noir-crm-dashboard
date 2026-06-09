@@ -57,7 +57,7 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
         from_location_id: from_location_id,
         to_location_id: to_location_id,
         quantity: quantity,
-        user: req.user?.email
+        user_id: req.user?.id
       });
 
       // Return the transfer result
@@ -76,7 +76,7 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
       await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_transfer',
         // Only log safe identifiers, not user input
-        user: req.user?.email
+        user_id: req.user?.id
       });
       return res.status(500).json({ error: 'Internal server error' });
     }

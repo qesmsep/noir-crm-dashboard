@@ -56,6 +56,7 @@ COMMENT ON FUNCTION identify_sensitive_settings IS 'Returns list of settings wit
 -- ========================================
 
 -- View for monitoring encryption status (admin-only access)
+-- SECURITY: Exposes only counts, not actual key names, to prevent metadata leakage in logs
 CREATE OR REPLACE VIEW v_encryption_status AS
 SELECT
   COUNT(*) AS total_settings,
@@ -67,20 +68,10 @@ SELECT
            OR key ILIKE '%token%'
            OR key ILIKE '%password%')
     AND is_encrypted = false
-  ) AS unencrypted_sensitive_count,
-  ARRAY_AGG(
-    key
-    ORDER BY key
-  ) FILTER (
-    WHERE (key ILIKE '%api_key%'
-           OR key ILIKE '%secret%'
-           OR key ILIKE '%token%'
-           OR key ILIKE '%password%')
-    AND is_encrypted = false
-  ) AS unencrypted_sensitive_keys
+  ) AS unencrypted_sensitive_count
 FROM system_settings;
 
-COMMENT ON VIEW v_encryption_status IS 'Monitoring view for encryption status of system settings (admin-only access)';
+COMMENT ON VIEW v_encryption_status IS 'Monitoring view for encryption status of system_settings (admin-only access). Exposes only counts to prevent metadata leakage. For detailed key names, use identify_sensitive_settings() function which has stricter access control.';
 
 -- ========================================
 -- STEP 5: RESTRICT ACCESS TO ENCRYPTION METADATA

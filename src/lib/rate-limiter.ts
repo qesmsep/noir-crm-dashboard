@@ -31,11 +31,22 @@ interface RequestRecord {
  * Derive a client identifier from the request. Prefers the forwarded client
  * IP, falling back to the socket address.
  *
- * SECURITY NOTE: x-forwarded-for header can be spoofed by attackers.
- * For authenticated routes, prefer using a custom key (e.g., user.id)
- * by passing it to check() and getRetryAfter() instead of relying on this.
+ * SECURITY NOTE: On Vercel, x-vercel-forwarded-for is automatically populated
+ * by the edge and cannot be spoofed by clients. We prioritize this over
+ * x-forwarded-for which can be spoofed. For authenticated routes, prefer using
+ * a custom key (e.g., user.id) by passing it to check() and getRetryAfter().
  */
 function getClientKey(req: NextApiRequest): string {
+  // Vercel sets x-vercel-forwarded-for which is trusted and can't be spoofed
+  const vercelForwarded = req.headers['x-vercel-forwarded-for'];
+  if (typeof vercelForwarded === 'string' && vercelForwarded.length > 0) {
+    return vercelForwarded.split(',')[0].trim();
+  }
+  if (Array.isArray(vercelForwarded) && vercelForwarded.length > 0) {
+    return vercelForwarded[0];
+  }
+
+  // Fall back to x-forwarded-for (can be spoofed, but better than nothing)
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string' && forwarded.length > 0) {
     return forwarded.split(',')[0].trim();
@@ -43,6 +54,7 @@ function getClientKey(req: NextApiRequest): string {
   if (Array.isArray(forwarded) && forwarded.length > 0) {
     return forwarded[0];
   }
+
   return req.socket?.remoteAddress || 'unknown';
 }
 
