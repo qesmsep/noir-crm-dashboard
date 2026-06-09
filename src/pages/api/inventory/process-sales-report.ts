@@ -32,7 +32,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
   try {
     const { csv_content, location_slug, report_date, verify_only = false } = req.body;
 
-    await monitoring.trackEvent('sales_report_upload_started', {
+    monitoring.trackEvent('sales_report_upload_started', {
       location: location_slug,
       verify_only,
       content_size: csv_content?.length || 0,
@@ -223,7 +223,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
 
     // If verify only, return results
     if (verify_only) {
-      await monitoring.trackEvent('sales_report_verified', {
+      monitoring.trackEvent('sales_report_verified', {
         location: location_slug,
         items_processed: verification.total_items_processed,
         successful: verification.successful_deductions,
@@ -271,7 +271,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
       }
     }
 
-    await monitoring.trackEvent('sales_report_processed', {
+    monitoring.trackEvent('sales_report_processed', {
       location: location_slug,
       items_processed: verification.total_items_processed,
       successful: verification.successful_deductions,
@@ -289,7 +289,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
 
   } catch (error) {
     console.error('Error processing sales report:', error);
-    await monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
+    monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
       context: 'sales_report_processing',
       location: req.body?.location_slug,
       user_id: req.user?.id

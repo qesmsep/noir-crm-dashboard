@@ -1,18 +1,21 @@
 import crypto from 'crypto';
-import { promisify } from 'util';
 
 /**
  * Crypto utility for encrypting/decrypting sensitive data
  * Uses AES-256-GCM for encryption with authentication
  *
  * IMPORTANT: ENCRYPTION_KEY environment variable is required in all environments.
+ * It must be a 32-byte (256-bit) hex string generated via: openssl rand -hex 32
+ *
+ * Since the key is already 256 bits of cryptographically secure randomness,
+ * no key derivation function (PBKDF2) is needed. We use the key directly with
+ * a fresh random IV for each encryption operation.
+ *
  * See SECURITY_SETUP.md for configuration instructions.
  */
 
-const pbkdf2 = promisify(crypto.pbkdf2);
-
 // Get encryption key from environment (required in all environments)
-const getEncryptionKey = (): string => {
+const getEncryptionKey = (): Buffer => {
   const envKey = process.env.ENCRYPTION_KEY;
 
   if (process.env.NODE_ENV === 'production' && !envKey) {
@@ -38,20 +41,21 @@ const getEncryptionKey = (): string => {
     );
   }
 
-  return envKey;
+  // Convert hex string to Buffer for direct use
+  return Buffer.from(envKey, 'hex');
 };
 
 // Lazy-loaded encryption key (only initialized when actually encrypting/decrypting)
-let ENCRYPTION_KEY: string | null = null;
+let ENCRYPTION_KEY: Buffer | null = null;
 
-const IV_LENGTH = 16; // For AES, this is always 16
+const IV_LENGTH = 16; // For AES-256-GCM, this is always 16 bytes
 const TAG_LENGTH = 16; // GCM authentication tag length
-const SALT_LENGTH = 64; // Salt length for key derivation
 
 /**
  * Get or initialize the encryption key (lazy-loaded to prevent module load crashes)
+ * Returns the raw 32-byte key buffer ready for use with AES-256.
  */
-function ensureEncryptionKey(): string {
+function ensureEncryptionKey(): Buffer {
   if (!ENCRYPTION_KEY) {
     ENCRYPTION_KEY = getEncryptionKey();
   }
@@ -59,25 +63,17 @@ function ensureEncryptionKey(): string {
 }
 
 /**
- * Derives a key from the encryption key and salt
- * Uses async pbkdf2 to avoid blocking the event loop
- * Iterations: 210,000 (meets NIST SP 800-132 2023 recommendation)
- */
-async function deriveKey(salt: Buffer): Promise<Buffer> {
-  return pbkdf2(ensureEncryptionKey(), salt, 210000, 32, 'sha256');
-}
-
-/**
  * Encrypts sensitive data (like API keys)
+ * Uses AES-256-GCM with a fresh random IV for each encryption.
+ * No KDF is needed since ENCRYPTION_KEY is already 256 bits of secure randomness.
  */
-export async function encrypt(text: string): Promise<string> {
+export function encrypt(text: string): string {
   try {
-    // Generate random salt and IV
-    const salt = crypto.randomBytes(SALT_LENGTH);
-    const iv = crypto.randomBytes(IV_LENGTH);
+    // Get the raw 32-byte encryption key
+    const key = ensureEncryptionKey();
 
-    // Derive key from salt (async to avoid blocking event loop)
-    const key = await deriveKey(salt);
+    // Generate fresh random IV for this encryption
+    const iv = crypto.randomBytes(IV_LENGTH);
 
     // Create cipher
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -91,8 +87,8 @@ export async function encrypt(text: string): Promise<string> {
     // Get the authentication tag
     const tag = cipher.getAuthTag();
 
-    // Combine salt, iv, tag, and encrypted data
-    const combined = Buffer.concat([salt, iv, tag, encrypted]);
+    // Combine iv, tag, and encrypted data (no salt needed)
+    const combined = Buffer.concat([iv, tag, encrypted]);
 
     // Return as base64 string
     return combined.toString('base64');
@@ -104,20 +100,23 @@ export async function encrypt(text: string): Promise<string> {
 
 /**
  * Decrypts sensitive data (like API keys)
+ *
+ * WARNING: Data encrypted with the old PBKDF2-based format cannot be decrypted
+ * with this function. If you have existing encrypted data, you must decrypt it
+ * with the old code before deploying this change, then re-encrypt it.
  */
-export async function decrypt(encryptedText: string): Promise<string> {
+export function decrypt(encryptedText: string): string {
   try {
+    // Get the raw 32-byte encryption key
+    const key = ensureEncryptionKey();
+
     // Decode from base64
     const combined = Buffer.from(encryptedText, 'base64');
 
-    // Extract components
-    const salt = combined.slice(0, SALT_LENGTH);
-    const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-    const tag = combined.slice(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
-    const encrypted = combined.slice(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
-
-    // Derive key from salt (async to avoid blocking event loop)
-    const key = await deriveKey(salt);
+    // Extract components (no salt in new format)
+    const iv = combined.slice(0, IV_LENGTH);
+    const tag = combined.slice(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+    const encrypted = combined.slice(IV_LENGTH + TAG_LENGTH);
 
     // Create decipher
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);

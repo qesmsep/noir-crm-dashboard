@@ -14,7 +14,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
     try {
       const { recipe_id, ingredients, menu_price, location_slug } = req.body;
 
-      await monitoring.trackEvent('recipe_cost_calculation_started', {
+      monitoring.trackEvent('recipe_cost_calculation_started', {
         recipe_id,
         location: location_slug,
         user_id: req.user?.id
@@ -146,7 +146,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
           .eq('id', recipe_id);
       }
 
-      await monitoring.trackEvent('recipe_cost_calculated', {
+      monitoring.trackEvent('recipe_cost_calculated', {
         recipe_id,
         location: location_slug,
         total_cost: totalCost,
@@ -159,7 +159,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
 
     } catch (error) {
       console.error('Error calculating recipe cost:', error);
-      await monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
+      monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
         context: 'recipe_cost_calculation',
         recipe_id: req.body?.recipe_id,
         user_id: req.user?.id
@@ -275,7 +275,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
         average_profit_margin: recipeCosts.reduce((sum, r) => sum + r.profit_percentage, 0) / recipeCosts.length,
       };
 
-      await monitoring.trackEvent('recipe_costs_fetched', {
+      monitoring.trackEvent('recipe_costs_fetched', {
         location: location_slug,
         recipe_count: recipeCosts.length,
         average_margin: summary.average_profit_margin,
@@ -290,7 +290,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
 
     } catch (error) {
       console.error('Error fetching recipe costs:', error);
-      await monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
+      monitoring.trackError(error instanceof Error ? error : new Error('Unknown error'), {
         context: 'recipe_costs_fetch',
         location: req.query?.location_slug,
         user_id: req.user?.id

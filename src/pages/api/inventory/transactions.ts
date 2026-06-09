@@ -40,7 +40,7 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
       return res.status(200).json({ data: data || [] });
     } catch (err) {
       console.error('Unhandled error fetching transactions:', err);
-      await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'transactions_fetch',
         item_id: req.query?.item_id,
         user_id: req.user?.id
@@ -85,26 +85,29 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
         return res.status(500).json({ error: 'Failed to process transaction' });
       }
 
+      // The function returns an array with a single result row
+      const transactionResult = result?.[0];
+
       // Track successful transaction
-      await monitoring.trackEvent('inventory_transaction_created', {
+      monitoring.trackEvent('inventory_transaction_created', {
         item_id: item_id,
         transaction_type: transaction_type,
         quantity_change: quantity_change,
-        low_stock: result.low_stock,
+        low_stock: transactionResult?.low_stock,
         user_id: req.user?.id
       });
 
       // Return the result with warning information
       return res.status(201).json({
-        data: result,
+        data: transactionResult,
         warnings: {
-          low_stock: result.low_stock,
-          out_of_stock: result.out_of_stock
+          low_stock: transactionResult?.low_stock,
+          out_of_stock: transactionResult?.out_of_stock
         }
       });
     } catch (err) {
       console.error('Unhandled error creating transaction:', err);
-      await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'transaction_create',
         item_id: req.body?.item_id,
         user_id: req.user?.id

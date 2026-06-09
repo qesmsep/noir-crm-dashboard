@@ -52,7 +52,7 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
       }
 
       // Track successful transfer
-      await monitoring.trackEvent('inventory_transfer_completed', {
+      monitoring.trackEvent('inventory_transfer_completed', {
         item_id: item_id,
         from_location_id: from_location_id,
         to_location_id: to_location_id,
@@ -73,7 +73,7 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
       });
     } catch (err) {
       console.error('Unhandled error during transfer:', err);
-      await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_transfer',
         // Only log safe identifiers, not user input
         user_id: req.user?.id

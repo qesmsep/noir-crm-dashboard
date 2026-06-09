@@ -50,7 +50,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       return res.status(200).json({ data: data || [] });
     } catch (err) {
       console.error('Unhandled error fetching inventory:', err);
-      await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_fetch',
         location: req.query?.location_slug,
         user_id: req.user?.id
@@ -120,7 +120,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to create item' });
       }
 
-      await monitoring.trackEvent('inventory_item_created', {
+      monitoring.trackEvent('inventory_item_created', {
         item_id: data.id,
         category: data.category,
         location: req.body?.location_slug,
@@ -130,7 +130,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       return res.status(201).json({ data });
     } catch (err) {
       console.error('Unhandled error creating inventory item:', err);
-      await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_create',
         user_id: req.user?.id
       });
@@ -169,7 +169,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to update item' });
       }
 
-      await monitoring.trackEvent('inventory_item_updated', {
+      monitoring.trackEvent('inventory_item_updated', {
         item_id: id,
         user_id: req.user?.id
       });
@@ -177,7 +177,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       return res.status(200).json({ data });
     } catch (err) {
       console.error('Unhandled error updating inventory item:', err);
-      await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_update',
         item_id: req.body?.id,
         user_id: req.user?.id
@@ -203,7 +203,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to delete item' });
       }
 
-      await monitoring.trackEvent('inventory_item_deleted', {
+      monitoring.trackEvent('inventory_item_deleted', {
         item_id: id,
         user_id: req.user?.id
       });
@@ -211,7 +211,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error('Unhandled error deleting inventory item:', err);
-      await monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
         context: 'inventory_delete',
         item_id: req.body?.id,
         user_id: req.user?.id
