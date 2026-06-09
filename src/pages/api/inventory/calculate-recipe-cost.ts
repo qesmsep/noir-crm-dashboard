@@ -117,7 +117,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       }
 
       // Calculate profit
-      const finalMenuPrice = menu_price || (recipe ? recipe.price : 0) || 0;
+      const finalMenuPrice = menu_price || (recipe ? recipe.menu_price : 0) || 0;
       const profitMargin = finalMenuPrice - totalCost;
       const profitPercentage = finalMenuPrice > 0 ? (profitMargin / finalMenuPrice) * 100 : 0;
 
