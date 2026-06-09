@@ -1,9 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 
 const SETTINGS_KEY = 'inventory_categories';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+/**
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
+ */
+async function settingsHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
 
   if (req.method === 'GET') {
@@ -92,3 +96,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withRateLimitAndAuth(settingsHandler);

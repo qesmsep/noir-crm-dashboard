@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import InventoryList from '../../components/inventory/InventoryList';
-import InventoryItemDrawer from '../../components/inventory/InventoryItemDrawer';
+import InventoryItemModal from '../../components/inventory/InventoryItemModal';
 import InventoryPhotoScanner from '../../components/inventory/InventoryPhotoScanner';
+import InventoryTransferModal from '../../components/inventory/InventoryTransferModal';
 import RecipeBuilder from '../../components/inventory/RecipeBuilder';
 import RecipeDrawer from '../../components/inventory/RecipeDrawer';
-import SalesUpload from '../../components/inventory/SalesUpload';
+import EnhancedSalesUpload from '../../components/inventory/EnhancedSalesUpload';
 import InventorySettings from '../../components/inventory/InventorySettings';
+import { supabase } from '../../lib/supabase';
 import {
   Package,
   ChefHat,
@@ -19,6 +21,8 @@ import {
   Download,
   History,
   Settings,
+  MapPin,
+  ArrowRightLeft,
 } from 'lucide-react';
 import type {
   InventoryItem,
@@ -30,10 +34,25 @@ import type {
   RecipeCategory,
   SalesRecord,
   ScannedItem,
+  LocationSlug,
+  UILocationSlug,
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
+import { getAuthHeaders as getBaseAuthHeaders } from '../../lib/client-auth';
+
+// Helper to get auth headers with Content-Type for API requests
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const baseHeaders = await getBaseAuthHeaders();
+  return {
+    'Content-Type': 'application/json',
+    ...baseHeaders,
+  };
+}
 
 export default function InventoryPage() {
+  // Location state (UILocationSlug includes 'all' for filtering)
+  const [currentLocation, setCurrentLocation] = useState<UILocationSlug>('noirkc');
+
   // Tab state
   const [activeTab, setActiveTab] = useState<InventoryTab>('inventory');
 
@@ -44,6 +63,7 @@ export default function InventoryPage() {
   const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -61,10 +81,46 @@ export default function InventoryPage() {
   // Sales state
   const [salesHistory, setSalesHistory] = useState<SalesRecord[]>([]);
 
+  // Locations data for badges
+  const [locationsData, setLocationsData] = useState<Array<{ id: string; slug: string; name: string }>>([]);
+
+  // Build location tabs: "All Locations" synthetic tab + real locations from API
+  const locationTabs = useMemo<{ slug: UILocationSlug; name: string }[]>(() => {
+    const realLocations = locationsData.map(loc => ({
+      slug: loc.slug as LocationSlug,
+      name: loc.name
+    }));
+    return [
+      { slug: 'all' as UILocationSlug, name: 'All Locations' },
+      ...realLocations
+    ];
+  }, [locationsData]);
+
+  // Fetch locations for badges
+  useEffect(() => {
+    async function fetchLocations() {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch('/api/locations', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setLocationsData(data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch locations:', err);
+      }
+    }
+    fetchLocations();
+  }, []);
+
   // Load data
   const fetchInventory = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory');
+      const url = currentLocation === 'all'
+        ? '/api/inventory' // Fetch all locations
+        : `/api/inventory?location_slug=${currentLocation}`;
+      const headers = await getAuthHeaders();
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
         setInventory(data.data || []);
@@ -72,11 +128,15 @@ export default function InventoryPage() {
     } catch (err) {
       console.error('Failed to fetch inventory:', err);
     }
-  }, []);
+  }, [currentLocation]);
 
   const fetchRecipes = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory/recipes');
+      const url = currentLocation === 'all'
+        ? '/api/inventory/recipes' // Fetch all locations
+        : `/api/inventory/recipes?location_slug=${currentLocation}`;
+      const headers = await getAuthHeaders();
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
         setRecipes(data.data || []);
@@ -84,11 +144,12 @@ export default function InventoryPage() {
     } catch (err) {
       console.error('Failed to fetch recipes:', err);
     }
-  }, []);
+  }, [currentLocation]);
 
   const fetchSalesHistory = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory/sales');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/inventory/sales', { headers });
       if (res.ok) {
         const data = await res.json();
         setSalesHistory(data.data || []);
@@ -116,23 +177,31 @@ export default function InventoryPage() {
   const recipeCount = recipes.length;
 
   // Inventory CRUD
-  const handleSaveItem = async (data: InventoryItemFormData) => {
+  const handleSaveItem = async (data: InventoryItemFormData): Promise<InventoryItem | null> => {
     setSavingItem(true);
     try {
       const method = editingItem ? 'PUT' : 'POST';
-      const body = editingItem ? { ...data, id: editingItem.id } : data;
+      const { location_id, ...dataWithoutLocationId } = data;
+      const body = editingItem
+        ? { ...data, id: editingItem.id }
+        : { ...dataWithoutLocationId, location_slug: currentLocation === 'all' ? 'noirkc' : currentLocation };
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory', {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       });
       if (res.ok) {
+        const result = await res.json();
         await fetchInventory();
         setIsItemDrawerOpen(false);
         setEditingItem(null);
+        return result.data; // Return the newly created/updated item
       }
+      return null;
     } catch (err) {
       console.error('Failed to save item:', err);
+      return null;
     } finally {
       setSavingItem(false);
     }
@@ -141,9 +210,10 @@ export default function InventoryPage() {
   const handleDeleteItem = async (id: string) => {
     if (!confirm('Delete this inventory item?')) return;
     try {
+      const headers = await getAuthHeaders();
       await fetch('/api/inventory', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ id }),
       });
       await fetchInventory();
@@ -164,9 +234,10 @@ export default function InventoryPage() {
 
     try {
       // Log the transaction and update quantity
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory/transactions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           item_id: id,
           transaction_type: transactionType,
@@ -232,48 +303,83 @@ export default function InventoryPage() {
     setIsItemDrawerOpen(true);
   };
 
-  // AI Scan handler
+  // AI Scan handler - supports multi-location assignment
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
-    // For each scanned item, either update existing or create new
+    const failures: string[] = [];
+
     for (const scanned of scannedItems) {
+      const selectedLocations = scanned.selected_locations || [];
+
+      // Skip items with no locations selected
+      if (selectedLocations.length === 0) {
+        continue;
+      }
+
       if (scanned.matched_inventory_id) {
-        // Update existing item quantity
-        const existing = inventory.find(
-          (i) => i.id === scanned.matched_inventory_id
-        );
-        if (existing) {
-          await fetch('/api/inventory', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+        // Update existing item quantity using transaction API to avoid race conditions
+        // (stale React state could cause incorrect absolute quantity if another user/tab updates concurrently)
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch('/api/inventory/transactions', {
+            method: 'POST',
+            headers,
             body: JSON.stringify({
-              id: existing.id,
-              quantity: scanned.estimated_quantity,
+              item_id: scanned.matched_inventory_id,
+              transaction_type: 'add',
+              quantity_change: scanned.estimated_quantity,
+              notes: 'Added from AI scan'
             }),
           });
+
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+            failures.push(`Failed to update ${scanned.name}: ${errorData.error || res.statusText}`);
+          }
+        } catch (err) {
+          failures.push(`Failed to update ${scanned.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
         }
       } else {
-        // Create new inventory item
-        await fetch('/api/inventory', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: scanned.name,
-            brand: scanned.brand,
-            category: scanned.category,
-            quantity: scanned.estimated_quantity,
-            unit: scanned.unit || 'bottle',
-            subcategory: '',
-            volume_ml: 750,
-            cost_per_unit: 0,
-            price_per_serving: 0,
-            par_level: 0,
-            notes: 'Added from AI scan',
-          }),
-        });
+        // Create new inventory item at each selected location
+        const headers = await getAuthHeaders();
+        for (const locationSlug of selectedLocations) {
+          try {
+            const res = await fetch('/api/inventory', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                name: scanned.name,
+                brand: scanned.brand,
+                category: scanned.category,
+                quantity: scanned.estimated_quantity,
+                unit: scanned.unit || 'bottle',
+                subcategory: '',
+                volume_ml: 750,
+                cost_per_unit: 0,
+                price_per_serving: 0,
+                par_level: 0,
+                notes: 'Added from AI scan',
+                location_slug: locationSlug,
+              }),
+            });
+
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+              failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${errorData.error || res.statusText}`);
+            }
+          } catch (err) {
+            failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
+        }
       }
     }
+
     await fetchInventory();
     setIsScannerOpen(false);
+
+    // Show failures to user if any occurred
+    if (failures.length > 0) {
+      alert(`Scan completed with errors:\n\n${failures.join('\n')}`);
+    }
   };
 
   // Recipe CRUD
@@ -282,9 +388,10 @@ export default function InventoryPage() {
     try {
       const method = editingRecipe ? 'PUT' : 'POST';
       const body = editingRecipe ? { ...data, id: editingRecipe.id } : data;
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory/recipes', {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       });
       if (res.ok) {
@@ -302,9 +409,10 @@ export default function InventoryPage() {
   const handleDeleteRecipe = async (id: string) => {
     if (!confirm('Delete this recipe?')) return;
     try {
+      const headers = await getAuthHeaders();
       await fetch('/api/inventory/recipes', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ id }),
       });
       await fetchRecipes();
@@ -328,9 +436,10 @@ export default function InventoryPage() {
   // Sales processing
   const handleProcessSales = async (record: SalesRecord) => {
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory/sales', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(record),
       });
       if (res.ok) {
@@ -369,6 +478,9 @@ export default function InventoryPage() {
             <button className={styles.btnTertiary} onClick={handleExportCSV}>
               <Download size={16} /> Export
             </button>
+            <button className={styles.btnTertiary} onClick={() => setIsTransferModalOpen(true)}>
+              <ArrowRightLeft size={16} /> Transfer
+            </button>
             <button className={styles.btnTertiary} onClick={() => setIsScannerOpen(true)}>
               <Camera size={16} /> Scan
             </button>
@@ -384,6 +496,19 @@ export default function InventoryPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Location Tabs */}
+      <div className={styles.locationTabs}>
+        {locationTabs.map((location) => (
+          <button
+            key={location.slug}
+            className={`${styles.locationTab} ${currentLocation === location.slug ? styles.locationTabActive : ''}`}
+            onClick={() => setCurrentLocation(location.slug)}
+          >
+            {location.name}
+          </button>
+        ))}
       </div>
 
       {/* Stats Bar */}
@@ -472,6 +597,8 @@ export default function InventoryPage() {
           onEdit={handleEditItem}
           onDelete={handleDeleteItem}
           onAdjustStock={handleAdjustStock}
+          showLocationBadges={currentLocation === 'all'}
+          locations={locationsData}
         />
       )}
 
@@ -489,16 +616,17 @@ export default function InventoryPage() {
       )}
 
       {activeTab === 'sales' && (
-        <SalesUpload
-          inventory={inventory}
-          recipes={recipes}
-          salesHistory={salesHistory}
-          onProcessSales={handleProcessSales}
+        <EnhancedSalesUpload
+          currentLocation={currentLocation}
+          onUploadComplete={() => {
+            fetchInventory();
+            fetchRecipes();
+          }}
         />
       )}
 
-      {/* Drawers */}
-      <InventoryItemDrawer
+      {/* Modals */}
+      <InventoryItemModal
         isOpen={isItemDrawerOpen}
         onClose={() => {
           setIsItemDrawerOpen(false);
@@ -508,6 +636,8 @@ export default function InventoryPage() {
         onDelete={handleDeleteItem}
         editItem={editingItem}
         saving={savingItem}
+        currentLocation={currentLocation}
+        locations={locationsData}
       />
 
       <InventoryPhotoScanner
@@ -515,6 +645,23 @@ export default function InventoryPage() {
         onClose={() => setIsScannerOpen(false)}
         onConfirm={handleScanConfirm}
         existingItems={inventory}
+        locations={locationsData.map(loc => ({ slug: loc.slug as LocationSlug, name: loc.name }))}
+      />
+
+      <InventoryTransferModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onTransferComplete={() => {
+          fetchInventory();
+          setIsTransferModalOpen(false);
+        }}
+        items={inventory}
+        locations={locationsData.map(loc => ({
+          id: loc.id,
+          slug: loc.slug as LocationSlug,
+          name: loc.name
+        }))}
+        currentLocation={currentLocation}
       />
 
       <RecipeDrawer
@@ -528,6 +675,13 @@ export default function InventoryPage() {
         editRecipe={editingRecipe}
         inventory={inventory}
         saving={savingRecipe}
+        onSaveNewItem={handleSaveItem}
+        currentLocation={currentLocation}
+        locations={locationsData.map(loc => ({
+          id: loc.id,
+          slug: loc.slug as LocationSlug,
+          name: loc.name
+        }))}
       />
 
       {/* Settings Drawer */}

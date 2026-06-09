@@ -18,6 +18,8 @@ interface InventoryListProps {
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
   onAdjustStock?: (id: string, newQuantity: number) => void;
+  showLocationBadges?: boolean;
+  locations?: Array<{ id: string; slug: string; name: string }>;
 }
 
 const CATEGORY_STYLE_MAP: Record<string, string> = {
@@ -30,7 +32,10 @@ const CATEGORY_STYLE_MAP: Record<string, string> = {
   other: styles.categoryOther,
 };
 
-function formatCurrency(val: number): string {
+function formatCurrency(val: number | undefined | null): string {
+  if (val === undefined || val === null || isNaN(val)) {
+    return '$0.00';
+  }
   return '$' + val.toFixed(2);
 }
 
@@ -57,7 +62,14 @@ export default function InventoryList({
   onEdit,
   onDelete,
   onAdjustStock,
+  showLocationBadges = false,
+  locations = [],
 }: InventoryListProps) {
+  const getLocationName = (locationId: string): string => {
+    const location = locations.find((loc) => loc.id === locationId);
+    return location?.name || 'Unknown';
+  };
+
   const filtered = items.filter((item) => {
     const matchesSearch =
       !searchQuery ||
@@ -137,6 +149,11 @@ export default function InventoryList({
                         {item.brand && (
                           <div className={styles.itemBrand}>{item.brand}</div>
                         )}
+                        {showLocationBadges && item.location_id && (
+                          <span className={styles.locationBadge}>
+                            {getLocationName(item.location_id)}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <span
@@ -213,6 +230,11 @@ export default function InventoryList({
                       <h4 className={styles.cardTitle}>{item.name}</h4>
                       {item.brand && (
                         <p className={styles.cardBrand}>{item.brand}</p>
+                      )}
+                      {showLocationBadges && item.location_id && (
+                        <span className={styles.locationBadge}>
+                          {getLocationName(item.location_id)}
+                        </span>
                       )}
                     </div>
                     <span

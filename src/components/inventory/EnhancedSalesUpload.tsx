@@ -1,40 +1,55 @@
-import React, { useState, useRef, useCallback } from 'react';
-import {
-  Upload,
-  FileText,
-  X,
-  Check,
-  AlertTriangle,
-  TrendingDown,
-  Clock,
-  DollarSign,
-} from 'lucide-react';
-import type {
-  SalesRecord,
-  SalesItem,
-  InventoryItem,
-  Recipe,
-} from '../../types/inventory';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Upload, FileText, X, Check, AlertTriangle, Clock } from 'lucide-react';
+import type { SalesRecord, SalesItem, UILocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
+import { getAuthHeaders } from '../../lib/client-auth';
 
-interface SalesUploadProps {
-  inventory: InventoryItem[];
-  recipes: Recipe[];
-  salesHistory: SalesRecord[];
-  onProcessSales: (record: SalesRecord) => void;
+interface EnhancedSalesUploadProps {
+  /** The currently selected location (or 'all'). */
+  currentLocation: UILocationSlug;
+  /** Called after a sales upload has been confirmed and inventory deducted. */
+  onUploadComplete: () => void;
 }
 
-export default function SalesUpload({
-  inventory,
-  recipes,
-  salesHistory,
-  onProcessSales,
-}: SalesUploadProps) {
+/**
+ * Enhanced sales upload component.
+ *
+ * Handles the full upload flow against /api/inventory/sales:
+ *   1. Upload a PDF/CSV/Excel sales report (AI-parsed)
+ *   2. Review and edit the extracted line items
+ *   3. Confirm to deduct ingredients from inventory
+ *
+ * Self-contained: fetches its own inventory/recipe context for better AI
+ * matching and refreshes its own sales history after each upload.
+ */
+export default function EnhancedSalesUpload({
+  currentLocation,
+  onUploadComplete,
+}: EnhancedSalesUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [pendingRecord, setPendingRecord] = useState<SalesRecord | null>(null);
+  const [salesHistory, setSalesHistory] = useState<SalesRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchSalesHistory = useCallback(async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/inventory/sales', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setSalesHistory(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch sales history:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSalesHistory();
+  }, [fetchSalesHistory]);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
@@ -55,13 +70,45 @@ export default function SalesUpload({
       setProcessing(true);
 
       try {
+        // Fetch context to improve AI matching, scoped to the active location.
+        const headers = await getAuthHeaders();
+        const locationQuery =
+          currentLocation === 'all' ? '' : `?location_slug=${currentLocation}`;
+        const [invRes, recRes] = await Promise.all([
+          fetch(`/api/inventory${locationQuery}`, { headers }),
+          fetch(`/api/inventory/recipes${locationQuery}`, { headers }),
+        ]);
+        const inventory = invRes.ok ? (await invRes.json()).data || [] : [];
+        const recipes = recRes.ok ? (await recRes.json()).data || [] : [];
+
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('recipes', JSON.stringify(recipes.map((r) => ({ id: r.id, name: r.name, ingredients: r.ingredients }))));
-        formData.append('inventory', JSON.stringify(inventory.map((i) => ({ id: i.id, name: i.name, brand: i.brand }))));
+        formData.append(
+          'recipes',
+          JSON.stringify(
+            recipes.map((r: { id: string; name: string; ingredients: unknown }) => ({
+              id: r.id,
+              name: r.name,
+              ingredients: r.ingredients,
+            }))
+          )
+        );
+        formData.append(
+          'inventory',
+          JSON.stringify(
+            inventory.map((i: { id: string; name: string; brand?: string }) => ({
+              id: i.id,
+              name: i.name,
+              brand: i.brand,
+            }))
+          )
+        );
 
+        // Reuse auth headers from above, removing Content-Type for FormData
+        const { 'Content-Type': _, ...headersWithoutContentType } = headers;
         const res = await fetch('/api/inventory/sales', {
           method: 'POST',
+          headers: headersWithoutContentType,
           body: formData,
         });
 
@@ -82,14 +129,14 @@ export default function SalesUpload({
           status: 'reviewing',
           created_at: new Date().toISOString(),
         });
-      } catch (err: any) {
-        setError(err.message || 'Failed to process file.');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to process file.');
       } finally {
         setUploading(false);
         setProcessing(false);
       }
     },
-    [inventory, recipes]
+    [currentLocation]
   );
 
   const handleDrop = useCallback(
@@ -124,16 +171,43 @@ export default function SalesUpload({
     setPendingRecord({ ...pendingRecord, items: updated, total_revenue: newRevenue });
   };
 
-  const handleConfirmProcess = () => {
+  const handleConfirmProcess = async () => {
     if (!pendingRecord) return;
-    onProcessSales({ ...pendingRecord, status: 'processed' });
-    setPendingRecord(null);
+    setConfirming(true);
+    setError(null);
+    try {
+      const baseHeaders = await getAuthHeaders();
+      const headers = { ...baseHeaders, 'Content-Type': 'application/json' };
+      const res = await fetch('/api/inventory/sales', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          id: pendingRecord.id,
+          items: pendingRecord.items,
+          total_revenue: pendingRecord.total_revenue,
+          total_cost: pendingRecord.total_cost,
+          source_filename: pendingRecord.source_filename,
+          period_start: pendingRecord.period_start,
+          period_end: pendingRecord.period_end,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to process sales.');
+      }
+
+      setPendingRecord(null);
+      await fetchSalesHistory();
+      onUploadComplete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process sales.');
+    } finally {
+      setConfirming(false);
+    }
   };
 
-  const formatCurrency = (val: number | undefined | null) => {
-    if (val === undefined || val === null || isNaN(val)) return '$0.00';
-    return '$' + val.toFixed(2);
-  };
+  const formatCurrency = (val: number) => '$' + val.toFixed(2);
 
   return (
     <>
@@ -159,7 +233,7 @@ export default function SalesUpload({
             <Upload size={44} className={styles.uploadIcon} />
             <h3 className={styles.uploadTitle}>Upload Sales Report</h3>
             <p className={styles.uploadSubtext}>
-              Drop your weekend sales file here, or click to browse
+              Drop your sales file here, or click to browse
             </p>
             <div className={styles.uploadFormats}>
               <span className={styles.uploadFormat}>PDF</span>
@@ -200,6 +274,7 @@ export default function SalesUpload({
               className={styles.btnTertiary}
               style={{ padding: '0.375rem' }}
               onClick={() => setPendingRecord(null)}
+              disabled={confirming}
             >
               <X size={16} />
             </button>
@@ -218,11 +293,7 @@ export default function SalesUpload({
                 className={styles.salesItemInput}
                 value={item.quantity_sold}
                 onChange={(e) =>
-                  updateSalesItem(
-                    idx,
-                    'quantity_sold',
-                    parseInt(e.target.value) || 0
-                  )
+                  updateSalesItem(idx, 'quantity_sold', parseInt(e.target.value) || 0)
                 }
                 title="Quantity sold"
               />
@@ -233,6 +304,7 @@ export default function SalesUpload({
                 className={styles.ingredientRemoveBtn}
                 onClick={() => removeSalesItem(idx)}
                 title="Remove item"
+                disabled={confirming}
               >
                 <X size={14} />
               </button>
@@ -251,6 +323,7 @@ export default function SalesUpload({
               className={styles.btnTertiary}
               style={{ flex: 1 }}
               onClick={() => setPendingRecord(null)}
+              disabled={confirming}
             >
               Cancel
             </button>
@@ -258,8 +331,9 @@ export default function SalesUpload({
               className={styles.btnPrimary}
               style={{ flex: 1, justifyContent: 'center' }}
               onClick={handleConfirmProcess}
+              disabled={confirming}
             >
-              <Check size={16} /> Confirm & Deduct
+              <Check size={16} /> {confirming ? 'Processing...' : 'Confirm & Deduct'}
             </button>
           </div>
         </div>
@@ -299,9 +373,7 @@ export default function SalesUpload({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <FileText size={20} style={{ color: '#ABA8A1', flexShrink: 0 }} />
                   <div className={styles.salesHistoryInfo}>
-                    <p className={styles.salesHistoryFilename}>
-                      {record.source_filename}
-                    </p>
+                    <p className={styles.salesHistoryFilename}>{record.source_filename}</p>
                     <p className={styles.salesHistoryMeta}>
                       <Clock size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} />
                       {new Date(record.upload_date).toLocaleDateString()}

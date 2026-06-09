@@ -21,7 +21,10 @@ interface RecipeBuilderProps {
   onAdd: () => void;
 }
 
-function formatCurrency(val: number): string {
+function formatCurrency(val: number | undefined | null): string {
+  if (val === undefined || val === null || isNaN(val)) {
+    return '$0.00';
+  }
   return '$' + val.toFixed(2);
 }
 
@@ -49,7 +52,9 @@ function getAvailability(
 }
 
 function getMarginClass(recipe: Recipe): string {
-  if (recipe.menu_price <= 0 || recipe.estimated_cost <= 0) return styles.marginOk;
+  if (!recipe.menu_price || !recipe.estimated_cost || recipe.menu_price <= 0 || recipe.estimated_cost <= 0) {
+    return styles.marginOk;
+  }
   const margin =
     ((recipe.menu_price - recipe.estimated_cost) / recipe.menu_price) * 100;
   if (margin >= 70) return styles.marginGood;
@@ -58,7 +63,9 @@ function getMarginClass(recipe: Recipe): string {
 }
 
 function getMarginPercent(recipe: Recipe): string {
-  if (recipe.menu_price <= 0 || recipe.estimated_cost <= 0) return '—';
+  if (!recipe.menu_price || !recipe.estimated_cost || recipe.menu_price <= 0 || recipe.estimated_cost <= 0) {
+    return '—';
+  }
   const margin =
     ((recipe.menu_price - recipe.estimated_cost) / recipe.menu_price) * 100;
   return margin.toFixed(0) + '%';

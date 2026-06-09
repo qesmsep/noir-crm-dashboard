@@ -1,22 +1,46 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import { InventoryItemSchema, UpdateInventoryItemSchema, validateRequest, formatZodErrors } from '../../../lib/inventory-validation';
+import { monitoring } from '../../../lib/monitoring';
 
 /**
- * Inventory Items API
- * GET: Fetch all inventory items
+ * Inventory Items API with Multi-Location Support
+ * GET: Fetch inventory items filtered by location
  * POST: Create a new inventory item
  * PUT: Update an existing inventory item
  * DELETE: Delete an inventory item
+ *
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin || supabase;
 
   if (req.method === 'GET') {
     try {
-      const { data, error } = await client
-        .from('inventory_items')
-        .select('*')
-        .order('name', { ascending: true });
+      const { location_slug } = req.query;
+
+      // Build query
+      let query = client.from('inventory_items').select('*');
+
+      // Filter by location if provided
+      if (location_slug) {
+        const { data: locationData, error: locationError } = await client
+          .from('locations')
+          .select('id')
+          .eq('slug', location_slug)
+          .single();
+
+        if (locationError) {
+          return res.status(400).json({ error: 'Invalid location' });
+        }
+
+        query = query.eq('location_id', locationData.id);
+      }
+
+      query = query.order('name', { ascending: true });
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching inventory:', error);
@@ -26,14 +50,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ data: data || [] });
     } catch (err) {
       console.error('Unhandled error fetching inventory:', err);
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+        context: 'inventory_fetch',
+        location: req.query?.location_slug,
+        user_id: req.user?.id
+      });
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   if (req.method === 'POST') {
     try {
-      const body = req.body;
+      // Validate input
+      const validation = validateRequest(InventoryItemSchema, req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Invalid input',
+          details: formatZodErrors(validation.errors)
+        });
+      }
+
+      const body = validation.data;
       const now = new Date().toISOString();
+
+      // Get location ID
+      let locationId = body.location_id;
+      if (!locationId && body.location_slug) {
+        const { data: locationData, error: locationError } = await client
+          .from('locations')
+          .select('id')
+          .eq('slug', body.location_slug)
+          .single();
+
+        if (locationError) {
+          return res.status(400).json({ error: 'Invalid location' });
+        }
+        locationId = locationData?.id;
+      }
+
+      if (!locationId) {
+        return res.status(400).json({ error: 'Location is required' });
+      }
 
       const { data, error } = await client
         .from('inventory_items')
@@ -50,6 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           par_level: body.par_level || 0,
           notes: body.notes || '',
           image_url: body.image_url || '',
+          location_id: locationId,
           last_counted: now,
           created_at: now,
           updated_at: now,
@@ -62,21 +120,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to create item' });
       }
 
+      monitoring.trackEvent('inventory_item_created', {
+        item_id: data.id,
+        category: data.category,
+        location: req.body?.location_slug,
+        user_id: req.user?.id
+      });
+
       return res.status(201).json({ data });
     } catch (err) {
       console.error('Unhandled error creating inventory item:', err);
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+        context: 'inventory_create',
+        user_id: req.user?.id
+      });
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   if (req.method === 'PUT') {
     try {
-      const { id, ...updates } = req.body;
+      // Validate input
+      const validation = validateRequest(UpdateInventoryItemSchema, req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Invalid input',
+          details: formatZodErrors(validation.errors)
+        });
+      }
+
+      const { id, ...updates } = validation.data;
       if (!id) {
         return res.status(400).json({ error: 'Item ID is required' });
       }
 
-      const { data, error } = await client
+      const { data, error} = await client
         .from('inventory_items')
         .update({
           ...updates,
@@ -91,9 +169,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to update item' });
       }
 
+      monitoring.trackEvent('inventory_item_updated', {
+        item_id: id,
+        user_id: req.user?.id
+      });
+
       return res.status(200).json({ data });
     } catch (err) {
       console.error('Unhandled error updating inventory item:', err);
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+        context: 'inventory_update',
+        item_id: req.body?.id,
+        user_id: req.user?.id
+      });
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -115,12 +203,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Failed to delete item' });
       }
 
+      monitoring.trackEvent('inventory_item_deleted', {
+        item_id: id,
+        user_id: req.user?.id
+      });
+
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error('Unhandled error deleting inventory item:', err);
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+        context: 'inventory_delete',
+        item_id: req.body?.id,
+        user_id: req.user?.id
+      });
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+// Export with admin authentication
+export default withRateLimitAndAuth(inventoryHandler);

@@ -1,7 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import { TransactionSchema, validateRequest, formatZodErrors } from '../../../lib/inventory-validation';
+import { monitoring } from '../../../lib/monitoring';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+/**
+ * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
+ */
+async function transactionsHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin;
 
   if (req.method === 'GET') {
@@ -34,71 +40,89 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ data: data || [] });
     } catch (err) {
       console.error('Unhandled error fetching transactions:', err);
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+        context: 'transactions_fetch',
+        item_id: req.query?.item_id,
+        user_id: req.user?.id
+      });
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   if (req.method === 'POST') {
     try {
-      const { item_id, transaction_type, quantity_change, notes } = req.body;
-
-      // Get current quantity
-      const { data: item, error: itemError } = await client
-        .from('inventory_items')
-        .select('quantity')
-        .eq('id', item_id)
-        .single();
-
-      if (itemError) {
-        return res.status(400).json({ error: 'Item not found' });
+      // Validate input
+      const validation = validateRequest(TransactionSchema, req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Invalid input',
+          details: formatZodErrors(validation.errors)
+        });
       }
 
-      const quantityBefore = item.quantity;
-      const quantityAfter = transaction_type === 'remove'
-        ? quantityBefore - Math.abs(quantity_change)
-        : quantityBefore + Math.abs(quantity_change);
+      const { item_id, transaction_type, quantity_change, notes } = validation.data;
 
-      // Create transaction record
-      const { data: transaction, error: transError } = await client
-        .from('inventory_transactions')
-        .insert({
-          item_id,
-          transaction_type,
-          quantity: Math.abs(quantity_change),
-          quantity_before: quantityBefore,
-          quantity_after: quantityAfter,
-          notes: notes || '',
-          created_by: 'Admin',
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (transError) {
-        console.error('Error creating transaction:', transError);
-        return res.status(500).json({ error: 'Failed to create transaction' });
+      // Auth is enforced by withRateLimitAndAuth middleware - req.user is always set
+      if (!req.user?.id) {
+        throw new Error('User not authenticated - middleware failure');
       }
 
-      // Update item quantity
-      const { error: updateError } = await client
-        .from('inventory_items')
-        .update({
-          quantity: quantityAfter,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', item_id);
+      // Use atomic database function to prevent race conditions
+      const { data: result, error } = await client.rpc('adjust_inventory_quantity', {
+        p_item_id: item_id,
+        p_quantity_change: quantity_change,
+        p_transaction_type: transaction_type,
+        p_notes: notes || '',
+        p_created_by: req.user.id
+      });
 
-      if (updateError) {
-        console.error('Error updating item quantity:', updateError);
-        return res.status(500).json({ error: 'Failed to update quantity' });
+      if (error) {
+        console.error('Error adjusting inventory:', error);
+
+        // Check if it's an insufficient stock error
+        if (error.message?.includes('Insufficient inventory')) {
+          return res.status(400).json({
+            error: 'Insufficient stock',
+            message: error.message
+          });
+        }
+
+        return res.status(500).json({ error: 'Failed to process transaction' });
       }
 
-      return res.status(201).json({ data: transaction });
+      // The function returns an array with a single result row
+      const transactionResult = result?.[0];
+
+      // Track successful transaction
+      monitoring.trackEvent('inventory_transaction_created', {
+        item_id: item_id,
+        transaction_type: transaction_type,
+        quantity_change: quantity_change,
+        low_stock: transactionResult?.low_stock,
+        user_id: req.user?.id
+      });
+
+      // Return the result with warning information
+      return res.status(201).json({
+        data: transactionResult,
+        warnings: {
+          low_stock: transactionResult?.low_stock,
+          out_of_stock: transactionResult?.out_of_stock
+        }
+      });
     } catch (err) {
       console.error('Unhandled error creating transaction:', err);
+      monitoring.trackError(err instanceof Error ? err : new Error('Unknown error'), {
+        context: 'transaction_create',
+        item_id: req.body?.item_id,
+        user_id: req.user?.id
+      });
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+// Export with admin authentication
+export default withRateLimitAndAuth(transactionsHandler);

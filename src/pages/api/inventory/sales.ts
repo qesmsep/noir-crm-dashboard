@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import formidable from 'formidable';
 import fs from 'fs';
 import OpenAI from 'openai';
@@ -31,7 +32,7 @@ function parseJsonBody(req: NextApiRequest): Promise<any> {
  * POST: Upload and process a sales file (PDF/CSV) using AI
  * PUT: Confirm processed sales and deduct from inventory (expects JSON body)
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function salesHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin || supabase;
 
   if (req.method === 'GET') {
@@ -298,3 +299,5 @@ Try to match item names to the known recipes if possible. Return ONLY valid JSON
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withRateLimitAndAuth(salesHandler);
