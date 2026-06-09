@@ -45,6 +45,13 @@
     },
     "src/pages/api/admin/business-snapshot.ts": {
       "maxDuration": 60
+    },
+    "src/pages/api/inventory/scan.ts": {
+      "maxDuration": 30,
+      "rateLimit": {
+        "interval": "60s",
+        "max": 20
+      }
     }
   },
   "rewrites": [

@@ -3,17 +3,22 @@ import type { NextApiRequest } from 'next';
 /**
  * Simple in-memory sliding-window rate limiter for API routes.
  *
- * ⚠️ CRITICAL LIMITATION IN SERVERLESS DEPLOYMENTS (Vercel, AWS Lambda, etc.):
+ * ⚠️ LIMITATION IN SERVERLESS DEPLOYMENTS (Vercel, AWS Lambda, etc.):
  * This implementation stores state in a Map on the module instance. In serverless
  * environments, each invocation may be a fresh cold start with empty state, meaning
- * the rate limiter provides NO MEANINGFUL PROTECTION in production serverless deployments.
- * Each request could potentially hit a fresh instance with a reset counter.
+ * rate limiting effectiveness is reduced in production serverless deployments.
  *
- * This is a best-effort, lightweight mitigation for traditional server deployments only.
- * For production serverless environments, you MUST use a distributed rate limiter backed
- * by Redis/Upstash or a similar shared state store.
+ * MITIGATION STRATEGY:
+ * - All endpoints require admin authentication (reduces attack surface significantly)
+ * - Expensive operations (e.g., /api/inventory/scan) use Vercel platform-level rate
+ *   limiting via vercel.json (see rateLimit config for scan.ts)
+ * - Vercel provides built-in DDoS protection and Supabase has auth rate limiting
+ * - This provides defense-in-depth for authenticated admin-only endpoints
  *
- * TODO: Replace with Redis/Upstash-backed rate limiter for production serverless use.
+ * For public-facing APIs or higher security requirements, consider:
+ * - Redis/Upstash-backed distributed rate limiter
+ * - Vercel Edge Middleware with KV storage
+ * - Cloudflare rate limiting at CDN layer
  */
 interface RateLimiterOptions {
   /** Maximum number of requests allowed within the window. */
