@@ -69,12 +69,12 @@ export default function InventoryTransferModal({
     }
   }, [isOpen, currentLocation, locations]);
 
-  // Update max quantity when item is selected
+  // Update max quantity when item is selected (not when quantity changes)
   useEffect(() => {
     if (selectedItem && quantity > selectedItem.quantity) {
       setQuantity(selectedItem.quantity);
     }
-  }, [selectedItem, quantity]);
+  }, [selectedItem]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTransfer = async () => {
     if (!selectedItemId || !fromLocationId || !toLocationId) {

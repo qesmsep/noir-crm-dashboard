@@ -4,11 +4,14 @@ import { promisify } from 'util';
 /**
  * Crypto utility for encrypting/decrypting sensitive data
  * Uses AES-256-GCM for encryption with authentication
+ *
+ * IMPORTANT: ENCRYPTION_KEY environment variable is required in all environments.
+ * See SECURITY_SETUP.md for configuration instructions.
  */
 
 const pbkdf2 = promisify(crypto.pbkdf2);
 
-// Get encryption key from environment or generate one for development
+// Get encryption key from environment (required in all environments)
 const getEncryptionKey = (): string => {
   const envKey = process.env.ENCRYPTION_KEY;
 
