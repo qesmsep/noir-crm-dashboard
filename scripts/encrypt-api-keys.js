@@ -68,14 +68,19 @@ async function encryptApiKeys() {
           continue;
         }
 
+        // Convert JSONB value to string if necessary
+        const rawValue = typeof setting.value === 'string'
+          ? setting.value
+          : JSON.stringify(setting.value);
+
         // Skip empty values
-        if (!setting.value || setting.value.trim() === '') {
+        if (!rawValue || rawValue.trim() === '') {
           console.log(`    ⚠️  Empty value, skipping`);
           continue;
         }
 
         // Encrypt the value
-        const encryptedValue = await encrypt(setting.value);
+        const encryptedValue = await encrypt(rawValue);
 
         // Update the database
         const { error: updateError } = await supabase

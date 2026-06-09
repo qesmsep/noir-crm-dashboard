@@ -40,6 +40,8 @@ DECLARE
   v_dest_transaction_id UUID;
   v_from_location_name TEXT;
   v_to_location_name TEXT;
+  v_source_qty_before NUMERIC;
+  v_dest_qty_before NUMERIC;
 BEGIN
   -- Wrap entire operation in exception handler for rollback safety
   BEGIN
@@ -105,6 +107,9 @@ BEGIN
       hashtext(p_to_location_id::text || v_source_item.name || COALESCE(v_source_item.brand, ''))
     );
 
+    -- Capture source quantity before update
+    v_source_qty_before := v_source_item.quantity;
+
     -- Check if item exists at destination location (same name and brand)
     SELECT * INTO v_dest_item
     FROM inventory_items
@@ -116,6 +121,7 @@ BEGIN
 
     -- If destination item doesn't exist, create it
     IF NOT FOUND THEN
+      v_dest_qty_before := 0;
       INSERT INTO inventory_items (
         name, category, subcategory, brand, quantity, unit, volume_ml,
         cost_per_unit, price_per_serving, par_level, notes, image_url,
@@ -139,6 +145,9 @@ BEGIN
         NOW()
       ) RETURNING * INTO v_dest_item;
     ELSE
+      -- Capture destination quantity before update
+      v_dest_qty_before := v_dest_item.quantity;
+
       -- Update existing destination item quantity
       UPDATE inventory_items
       SET
@@ -160,11 +169,15 @@ BEGIN
 
     -- Create transaction record for source (removal) with clean notes
     INSERT INTO inventory_transactions (
-      item_id, transaction_type, quantity_change, notes, created_by, created_at
+      item_id, location_id, transaction_type, quantity_change,
+      quantity_before, quantity_after, notes, created_by, created_at
     ) VALUES (
       p_item_id,
+      p_from_location_id,
       'transfer_out',
       -p_quantity,
+      v_source_qty_before,
+      v_source_item.quantity,
       CASE
         WHEN p_notes = '' THEN format('Transferred to %s', v_to_location_name)
         ELSE format('Transferred to %s. %s', v_to_location_name, p_notes)
@@ -175,11 +188,15 @@ BEGIN
 
     -- Create transaction record for destination (addition) with clean notes
     INSERT INTO inventory_transactions (
-      item_id, transaction_type, quantity_change, notes, created_by, created_at
+      item_id, location_id, transaction_type, quantity_change,
+      quantity_before, quantity_after, notes, created_by, created_at
     ) VALUES (
       v_dest_item.id,
+      p_to_location_id,
       'transfer_in',
       p_quantity,
+      v_dest_qty_before,
+      v_dest_item.quantity,
       CASE
         WHEN p_notes = '' THEN format('Transferred from %s', v_from_location_name)
         ELSE format('Transferred from %s. %s', v_from_location_name, p_notes)
@@ -198,8 +215,18 @@ BEGIN
       v_dest_item.quantity;
 
   EXCEPTION
+    WHEN SQLSTATE '40P01' THEN
+      -- Deadlock detected - this can happen with concurrent opposing transfers
+      RETURN QUERY SELECT
+        FALSE,
+        'Transfer temporarily unavailable due to concurrent operation. Please retry.'::TEXT,
+        NULL::UUID,
+        NULL::UUID,
+        NULL::NUMERIC,
+        NULL::NUMERIC;
+      RETURN;
     WHEN OTHERS THEN
-      -- Any error will cause automatic rollback of all changes
+      -- Any other error will cause automatic rollback of all changes
       RAISE EXCEPTION 'Transfer failed: %', SQLERRM;
   END;
 END;

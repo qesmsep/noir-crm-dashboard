@@ -109,6 +109,19 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.warn('⚠️  Cannot check database: Supabase configuration missing');
+
+  console.log('\n' + '='.repeat(50));
+  console.log('Verification Complete\n');
+
+  if (encryptionKey || nodeEnv !== 'production') {
+    console.log('✅ Encryption configuration is valid');
+    if (!encryptionKey && nodeEnv !== 'production') {
+      console.log('   (Using development key - set ENCRYPTION_KEY for production)');
+    }
+  } else {
+    console.error('❌ Encryption configuration needs attention');
+    process.exit(1);
+  }
 } else {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -144,6 +157,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
       }
     } catch (err) {
       console.error('❌ Database check failed:', err.message);
+      process.exit(1);
     }
 
     console.log('\n' + '='.repeat(50));
@@ -158,5 +172,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
       console.error('❌ Encryption configuration needs attention');
       process.exit(1);
     }
-  })();
+  })().catch((error) => {
+    console.error('❌ Unexpected error during database check:', error);
+    process.exit(1);
+  });
 }
