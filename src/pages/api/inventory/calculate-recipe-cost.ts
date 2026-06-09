@@ -4,6 +4,28 @@ import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-aut
 import { monitoring } from '../../../lib/monitoring';
 import type { DBRecipe, RecipeIngredient } from '../../../types/inventory';
 
+interface IngredientCost {
+  item_id: string;
+  item_name: string;
+  quantity_needed: number;
+  unit: string;
+  cost_per_unit: number;
+  total_cost: number;
+  in_stock: boolean;
+  stock_quantity: number;
+}
+
+interface RecipeCostAnalysis {
+  recipe_id: string;
+  recipe_name: string;
+  category: string;
+  total_cost: number;
+  menu_price: number;
+  profit_margin: number;
+  profit_percentage: number;
+  ingredients: IngredientCost[];
+}
+
 /**
  * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
  */
@@ -68,16 +90,6 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       const inventoryMap = new Map(inventoryItems?.map(item => [item.id, item]) || []);
 
       // Calculate costs
-      interface IngredientCost {
-        item_id: string;
-        item_name: string;
-        quantity_needed: number;
-        unit: string;
-        cost_per_unit: number;
-        total_cost: number;
-        in_stock: boolean;
-        stock_quantity: number;
-      }
       const ingredientCosts: IngredientCost[] = [];
       let totalCost = 0;
       const missingIngredients: string[] = [];
@@ -192,16 +204,6 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       }
 
       // Calculate costs for all recipes
-      interface RecipeCostAnalysis {
-        recipe_id: string;
-        recipe_name: string;
-        category: string;
-        total_cost: number;
-        menu_price: number;
-        profit_margin: number;
-        profit_percentage: number;
-        ingredients: IngredientCost[];
-      }
       const recipeCosts: RecipeCostAnalysis[] = [];
 
       for (const dbRecipe of recipes || []) {

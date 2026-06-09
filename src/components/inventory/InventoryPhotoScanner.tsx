@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Camera, Upload, X, Check, Loader2 } from 'lucide-react';
 import type { ScannedItem, InventoryItem, LocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
+import { getAuthHeaders } from '../../lib/client-auth';
 
 interface InventoryPhotoScannerProps {
   isOpen: boolean;
@@ -77,8 +78,13 @@ export default function InventoryPhotoScanner({
         )
       );
 
+      // Get auth headers and remove Content-Type (auto-set for FormData)
+      const authHeaders = await getAuthHeaders();
+      const { 'Content-Type': _, ...headers } = authHeaders;
+
       const res = await fetch('/api/inventory/scan', {
         method: 'POST',
+        headers,
         body: formData,
       });
 
