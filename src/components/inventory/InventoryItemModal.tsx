@@ -73,8 +73,10 @@ export default function InventoryItemModal({
       setVolumeOzInput(editItem.volume_ml ? (editItem.volume_ml / OZ_TO_ML).toFixed(1) : '');
     } else {
       // When creating a new item, pre-populate location_id from currentLocation
-      const targetSlug = currentLocation === 'all' ? 'noirkc' : currentLocation;
-      const targetLocation = locations.find(loc => loc.slug === targetSlug);
+      // If viewing 'all' locations, leave empty so user must choose
+      const targetLocation = currentLocation !== 'all'
+        ? locations.find(loc => loc.slug === currentLocation)
+        : undefined;
       setForm({ ...EMPTY_FORM, location_id: targetLocation?.id || '' });
       setVolumeOzInput('');
     }

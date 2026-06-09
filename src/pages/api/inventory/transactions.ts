@@ -62,13 +62,18 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
 
       const { item_id, transaction_type, quantity_change, notes } = validation.data;
 
+      // Auth is enforced by withRateLimitAndAuth middleware - req.user is always set
+      if (!req.user?.id) {
+        throw new Error('User not authenticated - middleware failure');
+      }
+
       // Use atomic database function to prevent race conditions
       const { data: result, error } = await client.rpc('adjust_inventory_quantity', {
         p_item_id: item_id,
         p_quantity_change: quantity_change,
         p_transaction_type: transaction_type,
         p_notes: notes || '',
-        p_created_by: req.user?.id || 'Unknown'
+        p_created_by: req.user.id
       });
 
       if (error) {

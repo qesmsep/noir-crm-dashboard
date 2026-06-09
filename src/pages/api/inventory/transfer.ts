@@ -26,6 +26,11 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
 
       const { item_id, from_location_id, to_location_id, quantity, notes } = validation.data;
 
+      // Auth is enforced by withRateLimitAndAuth middleware - req.user is always set
+      if (!req.user?.id) {
+        throw new Error('User not authenticated - middleware failure');
+      }
+
       // Use atomic database function to prevent race conditions
       const { data: result, error } = await client.rpc('transfer_inventory_between_locations', {
         p_item_id: item_id,
@@ -33,11 +38,20 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
         p_to_location_id: to_location_id,
         p_quantity: quantity,
         p_notes: notes || '',
-        p_created_by: req.user?.id || 'Unknown'
+        p_created_by: req.user.id
       });
 
       if (error) {
         console.error('Error transferring inventory:', error);
+
+        // Check if it's an insufficient stock error (client error, not server error)
+        if (error.message?.includes('Insufficient inventory') || error.message?.includes('insufficient')) {
+          return res.status(400).json({
+            error: 'Insufficient inventory',
+            message: error.message
+          });
+        }
+
         return res.status(500).json({ error: 'Failed to process transfer' });
       }
 
