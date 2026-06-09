@@ -18,16 +18,9 @@ import crypto from 'crypto';
 const getEncryptionKey = (): Buffer => {
   const envKey = process.env.ENCRYPTION_KEY;
 
-  if (process.env.NODE_ENV === 'production' && !envKey) {
-    throw new Error(
-      'ENCRYPTION_KEY environment variable is required in production. ' +
-      'Generate one using: openssl rand -hex 32'
-    );
-  }
-
   if (!envKey) {
     throw new Error(
-      'ENCRYPTION_KEY environment variable is required. ' +
+      'ENCRYPTION_KEY environment variable is required in all environments. ' +
       'Generate one using: openssl rand -hex 32\n' +
       'Add it to your .env.local file for development.'
     );
@@ -48,7 +41,7 @@ const getEncryptionKey = (): Buffer => {
 // Lazy-loaded encryption key (only initialized when actually encrypting/decrypting)
 let ENCRYPTION_KEY: Buffer | null = null;
 
-const IV_LENGTH = 16; // For AES-256-GCM, this is always 16 bytes
+const IV_LENGTH = 12; // NIST SP 800-38D: 96-bit (12-byte) IV is the standard for AES-GCM
 const TAG_LENGTH = 16; // GCM authentication tag length
 
 /**

@@ -45,6 +45,8 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
         console.error('Error transferring inventory:', error);
 
         // Check if it's an insufficient stock error (client error, not server error)
+        // TODO: Use error.code instead of message matching when DB function is updated
+        // with RAISE EXCEPTION ... USING ERRCODE = 'P0001'
         if (error.message?.includes('Insufficient inventory') || error.message?.includes('insufficient')) {
           return res.status(400).json({
             error: 'Insufficient inventory',
