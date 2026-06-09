@@ -102,9 +102,11 @@ BEGIN
     END IF;
 
     -- Acquire advisory lock to prevent concurrent creation of same item at destination
-    -- Lock key is based on destination location, item name, and brand
+    -- Use two-argument form for better hash distribution and lower collision risk
+    -- Lock key: (location hash, item name+brand hash)
     PERFORM pg_advisory_xact_lock(
-      hashtext(p_to_location_id::text || v_source_item.name || COALESCE(v_source_item.brand, ''))
+      hashtext(p_to_location_id::text)::bigint,
+      hashtext(v_source_item.name || COALESCE(v_source_item.brand, ''))::bigint
     );
 
     -- Capture source quantity before update

@@ -37,6 +37,11 @@ DECLARE
   v_par_level NUMERIC;
   v_location_id UUID;
 BEGIN
+  -- Validate transaction_type
+  IF p_transaction_type NOT IN ('add', 'remove', 'adjust', 'count', 'sales', 'waste', 'receive', 'transfer_in', 'transfer_out') THEN
+    RAISE EXCEPTION 'Invalid transaction_type: %. Must be one of: add, remove, adjust, count, sales, waste, receive, transfer_in, transfer_out', p_transaction_type;
+  END IF;
+
   -- Lock the row for update to prevent race conditions
   SELECT quantity, par_level, location_id
   INTO v_current_quantity, v_par_level, v_location_id

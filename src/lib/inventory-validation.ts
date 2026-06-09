@@ -47,7 +47,7 @@ export const TransferSchema = z.object({
   item_id: z.string().uuid(),
   from_location_id: z.string().uuid(),
   to_location_id: z.string().uuid(),
-  quantity: z.number().min(1).finite(),
+  quantity: z.number().positive().finite(), // Supports fractional quantities (e.g., 0.5 bottles)
   notes: z.string().max(500).default('')
 }).refine(
   data => data.from_location_id !== data.to_location_id,

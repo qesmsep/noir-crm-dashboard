@@ -1,13 +1,15 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 
 /**
  * Script to encrypt existing API keys in the database
  * Run this after applying the migration to encrypt sensitive settings
+ *
+ * Usage: npx tsx scripts/encrypt-api-keys.ts
  */
 
-const { createClient } = require('@supabase/supabase-js');
-const { encrypt } = require('../src/lib/crypto');
-require('dotenv').config();
+import { createClient } from '@supabase/supabase-js';
+import { encrypt } from '../src/lib/crypto';
+import 'dotenv/config';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

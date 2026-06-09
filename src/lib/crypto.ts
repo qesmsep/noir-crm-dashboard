@@ -1,9 +1,12 @@
 import crypto from 'crypto';
+import { promisify } from 'util';
 
 /**
  * Crypto utility for encrypting/decrypting sensitive data
  * Uses AES-256-GCM for encryption with authentication
  */
+
+const pbkdf2 = promisify(crypto.pbkdf2);
 
 // Get encryption key from environment or generate one for development
 const getEncryptionKey = (): string => {
@@ -54,9 +57,10 @@ function ensureEncryptionKey(): string {
 
 /**
  * Derives a key from the encryption key and salt
+ * Uses async pbkdf2 to avoid blocking the event loop
  */
-function deriveKey(salt: Buffer): Buffer {
-  return crypto.pbkdf2Sync(ensureEncryptionKey(), salt, 100000, 32, 'sha256');
+async function deriveKey(salt: Buffer): Promise<Buffer> {
+  return pbkdf2(ensureEncryptionKey(), salt, 100000, 32, 'sha256');
 }
 
 /**
@@ -68,8 +72,8 @@ export async function encrypt(text: string): Promise<string> {
     const salt = crypto.randomBytes(SALT_LENGTH);
     const iv = crypto.randomBytes(IV_LENGTH);
 
-    // Derive key from salt
-    const key = deriveKey(salt);
+    // Derive key from salt (async to avoid blocking event loop)
+    const key = await deriveKey(salt);
 
     // Create cipher
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -108,8 +112,8 @@ export async function decrypt(encryptedText: string): Promise<string> {
     const tag = combined.slice(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
     const encrypted = combined.slice(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
 
-    // Derive key from salt
-    const key = deriveKey(salt);
+    // Derive key from salt (async to avoid blocking event loop)
+    const key = await deriveKey(salt);
 
     // Create decipher
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);

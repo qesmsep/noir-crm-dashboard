@@ -3,9 +3,17 @@ import type { NextApiRequest } from 'next';
 /**
  * Simple in-memory sliding-window rate limiter for API routes.
  *
- * Note: state is per-server-instance and resets on cold start. This is a
- * lightweight mitigation against abuse, not a distributed quota system. For
- * stronger guarantees across instances, back this with Redis/Upstash.
+ * ⚠️ CRITICAL LIMITATION IN SERVERLESS DEPLOYMENTS (Vercel, AWS Lambda, etc.):
+ * This implementation stores state in a Map on the module instance. In serverless
+ * environments, each invocation may be a fresh cold start with empty state, meaning
+ * the rate limiter provides NO MEANINGFUL PROTECTION in production serverless deployments.
+ * Each request could potentially hit a fresh instance with a reset counter.
+ *
+ * This is a best-effort, lightweight mitigation for traditional server deployments only.
+ * For production serverless environments, you MUST use a distributed rate limiter backed
+ * by Redis/Upstash or a similar shared state store.
+ *
+ * TODO: Replace with Redis/Upstash-backed rate limiter for production serverless use.
  */
 interface RateLimiterOptions {
   /** Maximum number of requests allowed within the window. */
