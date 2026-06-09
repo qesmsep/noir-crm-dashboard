@@ -5,6 +5,9 @@
  * Checks that encryption is properly set up and working
  */
 
+// Load environment variables FIRST before checking them
+require('dotenv').config();
+
 const crypto = require('crypto');
 
 console.log('🔐 Verifying Encryption Configuration\n');
@@ -102,7 +105,6 @@ console.log('Database Encryption Status Check\n');
 
 // Check database for unencrypted sensitive settings
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

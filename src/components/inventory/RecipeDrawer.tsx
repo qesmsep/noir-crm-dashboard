@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Trash2 } from 'lucide-react';
 import InventoryItemModal from './InventoryItemModal';
-import IngredientSearchDropdown from './IngredientSearchDropdown';
 import type {
   Recipe,
   RecipeFormData,

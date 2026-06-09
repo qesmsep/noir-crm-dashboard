@@ -104,8 +104,7 @@ export default function EnhancedSalesUpload({
           )
         );
 
-        const headers = await getAuthHeaders();
-        // Remove Content-Type header as it will be set automatically for FormData
+        // Reuse auth headers from above, removing Content-Type for FormData
         const { 'Content-Type': _, ...headersWithoutContentType } = headers;
         const res = await fetch('/api/inventory/sales', {
           method: 'POST',
