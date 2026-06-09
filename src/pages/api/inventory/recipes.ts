@@ -88,7 +88,7 @@ async function calculateRecipeCost(
  * DELETE: Delete a recipe
  */
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
-  const client = supabase;
+  const client = supabaseAdmin;
 
   // GET: Fetch recipes
   if (req.method === 'GET') {
