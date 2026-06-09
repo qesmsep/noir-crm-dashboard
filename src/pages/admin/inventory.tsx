@@ -305,6 +305,8 @@ export default function InventoryPage() {
 
   // AI Scan handler - supports multi-location assignment
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
+    const failures: string[] = [];
+
     for (const scanned of scannedItems) {
       const selectedLocations = scanned.selected_locations || [];
 
@@ -316,44 +318,68 @@ export default function InventoryPage() {
       if (scanned.matched_inventory_id) {
         // Update existing item quantity using transaction API to avoid race conditions
         // (stale React state could cause incorrect absolute quantity if another user/tab updates concurrently)
-        const headers = await getAuthHeaders();
-        await fetch('/api/inventory/transactions', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            item_id: scanned.matched_inventory_id,
-            transaction_type: 'add',
-            quantity_change: scanned.estimated_quantity,
-            notes: 'Added from AI scan'
-          }),
-        });
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch('/api/inventory/transactions', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              item_id: scanned.matched_inventory_id,
+              transaction_type: 'add',
+              quantity_change: scanned.estimated_quantity,
+              notes: 'Added from AI scan'
+            }),
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+            failures.push(`Failed to update ${scanned.name}: ${errorData.error || res.statusText}`);
+          }
+        } catch (err) {
+          failures.push(`Failed to update ${scanned.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
       } else {
         // Create new inventory item at each selected location
         const headers = await getAuthHeaders();
         for (const locationSlug of selectedLocations) {
-          await fetch('/api/inventory', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              name: scanned.name,
-              brand: scanned.brand,
-              category: scanned.category,
-              quantity: scanned.estimated_quantity,
-              unit: scanned.unit || 'bottle',
-              subcategory: '',
-              volume_ml: 750,
-              cost_per_unit: 0,
-              price_per_serving: 0,
-              par_level: 0,
-              notes: 'Added from AI scan',
-              location_slug: locationSlug,
-            }),
-          });
+          try {
+            const res = await fetch('/api/inventory', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                name: scanned.name,
+                brand: scanned.brand,
+                category: scanned.category,
+                quantity: scanned.estimated_quantity,
+                unit: scanned.unit || 'bottle',
+                subcategory: '',
+                volume_ml: 750,
+                cost_per_unit: 0,
+                price_per_serving: 0,
+                par_level: 0,
+                notes: 'Added from AI scan',
+                location_slug: locationSlug,
+              }),
+            });
+
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+              failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${errorData.error || res.statusText}`);
+            }
+          } catch (err) {
+            failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
         }
       }
     }
+
     await fetchInventory();
     setIsScannerOpen(false);
+
+    // Show failures to user if any occurred
+    if (failures.length > 0) {
+      alert(`Scan completed with errors:\n\n${failures.join('\n')}`);
+    }
   };
 
   // Recipe CRUD

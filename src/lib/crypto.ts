@@ -58,9 +58,10 @@ function ensureEncryptionKey(): string {
 /**
  * Derives a key from the encryption key and salt
  * Uses async pbkdf2 to avoid blocking the event loop
+ * Iterations: 210,000 (meets NIST SP 800-132 2023 recommendation)
  */
 async function deriveKey(salt: Buffer): Promise<Buffer> {
-  return pbkdf2(ensureEncryptionKey(), salt, 100000, 32, 'sha256');
+  return pbkdf2(ensureEncryptionKey(), salt, 210000, 32, 'sha256');
 }
 
 /**

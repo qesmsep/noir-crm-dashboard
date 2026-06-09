@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '../../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { withRateLimitAndAuth, type AuthenticatedRequest } from '../../../lib/api-auth';
 import { safeJSONParse, calculateIngredientCost, sanitizeInput, validateIngredients } from '../../../lib/inventory-utils';
 import { MAX_RECIPE_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../../../constants/inventory';
@@ -193,6 +193,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (body.descriptors) insertData.descriptors = body.descriptors;
       if (body.glass_type) insertData.glass_type = sanitizeInput(body.glass_type, 100);
       if (body.garnish) insertData.garnish = sanitizeInput(body.garnish, 100);
+      if (body.location_id) insertData.location_id = body.location_id;
       if (body.location_ids) insertData.location_ids = body.location_ids;
       if (body.batch_ingredients) insertData.batch_ingredients = JSON.stringify(body.batch_ingredients);
       if (body.batch_yield) insertData.batch_yield = body.batch_yield;
@@ -277,6 +278,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (body.descriptors !== undefined) updateData.descriptors = body.descriptors;
       if (body.glass_type !== undefined) updateData.glass_type = sanitizeInput(body.glass_type, 100);
       if (body.garnish !== undefined) updateData.garnish = sanitizeInput(body.garnish, 100);
+      if (body.location_id !== undefined) updateData.location_id = body.location_id;
       if (body.location_ids !== undefined) updateData.location_ids = body.location_ids;
       if (body.batch_ingredients !== undefined) updateData.batch_ingredients = JSON.stringify(body.batch_ingredients);
       if (body.batch_yield !== undefined) updateData.batch_yield = body.batch_yield;
