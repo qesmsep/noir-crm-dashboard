@@ -92,7 +92,7 @@ If you have existing unencrypted API keys in the database:
 1. Ensure the ENCRYPTION_KEY is set in your environment
 2. Run the encryption script:
    ```bash
-   node scripts/encrypt-api-keys.js
+   npx tsx scripts/encrypt-api-keys.ts
    ```
 
 This will:

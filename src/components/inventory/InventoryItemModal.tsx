@@ -19,6 +19,7 @@ interface InventoryItemModalProps {
   editItem: InventoryItem | null;
   saving: boolean;
   currentLocation: UILocationSlug;
+  locations?: Array<{ id: string; slug: string; name: string }>;
 }
 
 const EMPTY_FORM: InventoryItemFormData = {
@@ -44,6 +45,7 @@ export default function InventoryItemModal({
   editItem,
   saving,
   currentLocation,
+  locations = [],
 }: InventoryItemModalProps) {
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_FORM);
   const [categories, setCategories] = useState<string[]>(['spirits', 'wine', 'beer', 'mixers', 'garnishes', 'supplies', 'other']);
@@ -70,10 +72,13 @@ export default function InventoryItemModal({
       });
       setVolumeOzInput(editItem.volume_ml ? (editItem.volume_ml / OZ_TO_ML).toFixed(1) : '');
     } else {
-      setForm({ ...EMPTY_FORM, location_id: '' });
+      // When creating a new item, pre-populate location_id from currentLocation
+      const targetSlug = currentLocation === 'all' ? 'noirkc' : currentLocation;
+      const targetLocation = locations.find(loc => loc.slug === targetSlug);
+      setForm({ ...EMPTY_FORM, location_id: targetLocation?.id || '' });
       setVolumeOzInput('');
     }
-  }, [editItem, isOpen, currentLocation]);
+  }, [editItem, isOpen, currentLocation, locations]);
 
   // Load settings with error handling
   useEffect(() => {

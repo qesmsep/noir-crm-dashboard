@@ -637,6 +637,7 @@ export default function InventoryPage() {
         editItem={editingItem}
         saving={savingItem}
         currentLocation={currentLocation}
+        locations={locationsData}
       />
 
       <InventoryPhotoScanner

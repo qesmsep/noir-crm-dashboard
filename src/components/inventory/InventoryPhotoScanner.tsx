@@ -110,16 +110,14 @@ export default function InventoryPhotoScanner({
   const toggleLocation = (itemIndex: number, locationSlug: LocationSlug) => {
     if (!scanResults) return;
     const updated = [...scanResults];
-    const item = updated[itemIndex];
-    const currentLocations = item.selected_locations || [];
+    const currentLocations = updated[itemIndex].selected_locations || [];
 
-    if (currentLocations.includes(locationSlug)) {
-      // Remove location
-      item.selected_locations = currentLocations.filter(loc => loc !== locationSlug);
-    } else {
-      // Add location
-      item.selected_locations = [...currentLocations, locationSlug];
-    }
+    const newLocations = currentLocations.includes(locationSlug)
+      ? currentLocations.filter(loc => loc !== locationSlug)
+      : [...currentLocations, locationSlug];
+
+    // Immutable update: create new object instead of mutating
+    updated[itemIndex] = { ...updated[itemIndex], selected_locations: newLocations };
 
     setScanResults(updated);
   };
