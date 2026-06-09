@@ -68,7 +68,7 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
         p_quantity_change: quantity_change,
         p_transaction_type: transaction_type,
         p_notes: notes || '',
-        p_created_by: req.user?.email || 'Unknown'
+        p_created_by: req.user?.id || 'Unknown'
       });
 
       if (error) {

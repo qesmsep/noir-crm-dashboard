@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, FileText, X, Check, AlertTriangle, Clock } from 'lucide-react';
 import type { SalesRecord, SalesItem, UILocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
+import { getAuthHeaders } from '../../lib/client-auth';
 
 interface EnhancedSalesUploadProps {
   /** The currently selected location (or 'all'). */
@@ -35,7 +36,8 @@ export default function EnhancedSalesUpload({
 
   const fetchSalesHistory = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory/sales');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/inventory/sales', { headers });
       if (res.ok) {
         const data = await res.json();
         setSalesHistory(data.data || []);
@@ -69,11 +71,12 @@ export default function EnhancedSalesUpload({
 
       try {
         // Fetch context to improve AI matching, scoped to the active location.
+        const headers = await getAuthHeaders();
         const locationQuery =
           currentLocation === 'all' ? '' : `?location_slug=${currentLocation}`;
         const [invRes, recRes] = await Promise.all([
-          fetch(`/api/inventory${locationQuery}`),
-          fetch(`/api/inventory/recipes${locationQuery}`),
+          fetch(`/api/inventory${locationQuery}`, { headers }),
+          fetch(`/api/inventory/recipes${locationQuery}`, { headers }),
         ]);
         const inventory = invRes.ok ? (await invRes.json()).data || [] : [];
         const recipes = recRes.ok ? (await recRes.json()).data || [] : [];
@@ -101,8 +104,12 @@ export default function EnhancedSalesUpload({
           )
         );
 
+        const headers = await getAuthHeaders();
+        // Remove Content-Type header as it will be set automatically for FormData
+        const { 'Content-Type': _, ...headersWithoutContentType } = headers;
         const res = await fetch('/api/inventory/sales', {
           method: 'POST',
+          headers: headersWithoutContentType,
           body: formData,
         });
 
@@ -170,9 +177,11 @@ export default function EnhancedSalesUpload({
     setConfirming(true);
     setError(null);
     try {
+      const baseHeaders = await getAuthHeaders();
+      const headers = { ...baseHeaders, 'Content-Type': 'application/json' };
       const res = await fetch('/api/inventory/sales', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           id: pendingRecord.id,
           items: pendingRecord.items,

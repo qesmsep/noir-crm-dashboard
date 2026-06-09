@@ -82,13 +82,7 @@ async function salesReportHandler(req: AuthenticatedRequest, res: NextApiRespons
     // Get inventory and recipes
     const [inventoryResult, recipesResult] = await Promise.all([
       client.from('inventory_items').select('*').eq('location_id', location_id),
-      client.from('inventory_recipes').select(`
-        *,
-        inventory_recipe_ingredients (
-          id, item_id, quantity, unit,
-          inventory_items (name, quantity, unit, cost_per_unit)
-        )
-      `).eq('location_id', location_id).eq('is_active', true),
+      client.from('inventory_recipes').select('*').or(`location_id.eq.${location_id},location_ids.cs.{${location_id}}`),
     ]);
 
     if (inventoryResult.error || recipesResult.error) {

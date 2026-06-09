@@ -113,7 +113,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
 
         if (locationData) {
-          query = query.contains('location_ids', [locationData.id]);
+          // Support both location_id (singular) and location_ids (array) for backward compatibility
+          query = query.or(`location_id.eq.${locationData.id},location_ids.cs.{${locationData.id}}`);
         }
       }
 

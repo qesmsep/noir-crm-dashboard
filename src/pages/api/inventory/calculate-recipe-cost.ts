@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
 import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { monitoring } from '../../../lib/monitoring';
+import type { DBRecipe, RecipeIngredient } from '../../../types/inventory';
 
 /**
  * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
@@ -31,18 +32,13 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       }
 
       // Fetch recipe if ID provided
-      let recipe: any = null;
+      let recipe: DBRecipe | null = null;
       let recipeIngredients = ingredients;
 
       if (recipe_id) {
-        const { data: recipeData, error: recipeError } = await client
+        const { data: recipeData, error: recipeError} = await client
           .from('inventory_recipes')
-          .select(`
-            *,
-            inventory_recipe_ingredients (
-              id, item_id, quantity, unit
-            )
-          `)
+          .select('*')
           .eq('id', recipe_id)
           .single();
 
@@ -51,11 +47,14 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
         }
 
         recipe = recipeData;
-        recipeIngredients = recipeData.inventory_recipe_ingredients;
+        // Parse ingredients from JSON column
+        recipeIngredients = typeof recipeData.ingredients === 'string'
+          ? JSON.parse(recipeData.ingredients)
+          : recipeData.ingredients;
       }
 
       // Get inventory items
-      const itemIds = recipeIngredients.map((i: any) => i.item_id);
+      const itemIds = recipeIngredients.map((i: RecipeIngredient) => i.inventory_item_id);
       const { data: inventoryItems, error: inventoryError } = await client
         .from('inventory_items')
         .select('*')
@@ -69,14 +68,24 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
       const inventoryMap = new Map(inventoryItems?.map(item => [item.id, item]) || []);
 
       // Calculate costs
-      const ingredientCosts: any[] = [];
+      interface IngredientCost {
+        item_id: string;
+        item_name: string;
+        quantity_needed: number;
+        unit: string;
+        cost_per_unit: number;
+        total_cost: number;
+        in_stock: boolean;
+        stock_quantity: number;
+      }
+      const ingredientCosts: IngredientCost[] = [];
       let totalCost = 0;
       const missingIngredients: string[] = [];
 
       for (const ingredient of recipeIngredients) {
-        const inventoryItem = inventoryMap.get(ingredient.item_id);
+        const inventoryItem = inventoryMap.get(ingredient.inventory_item_id);
         if (!inventoryItem) {
-          missingIngredients.push(`Item ${ingredient.item_id} not found`);
+          missingIngredients.push(`Item ${ingredient.inventory_item_id} not found`);
           continue;
         }
 
@@ -175,33 +184,48 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
 
       const { data: recipes, error: recipesError } = await client
         .from('inventory_recipes')
-        .select(`
-          *,
-          inventory_recipe_ingredients (
-            id, item_id, quantity, unit,
-            inventory_items (
-              name, cost_per_unit, unit, volume_ml, quantity
-            )
-          )
-        `)
-        .eq('location_id', locationData.id)
-        .eq('is_active', true);
+        .select('*')
+        .or(`location_id.eq.${locationData.id},location_ids.cs.{${locationData.id}}`);
 
       if (recipesError) {
         return res.status(500).json({ error: 'Failed to fetch recipes' });
       }
 
       // Calculate costs for all recipes
-      const recipeCosts: any[] = [];
+      interface RecipeCostAnalysis {
+        recipe_id: string;
+        recipe_name: string;
+        category: string;
+        total_cost: number;
+        menu_price: number;
+        profit_margin: number;
+        profit_percentage: number;
+        ingredients: IngredientCost[];
+      }
+      const recipeCosts: RecipeCostAnalysis[] = [];
 
-      for (const recipe of recipes || []) {
+      for (const dbRecipe of recipes || []) {
+        // Parse ingredients from JSON
+        const recipeIngredients: RecipeIngredient[] = typeof dbRecipe.ingredients === 'string'
+          ? JSON.parse(dbRecipe.ingredients)
+          : dbRecipe.ingredients || [];
+
+        // Fetch all inventory items for this recipe
+        const ingredientItemIds = recipeIngredients.map(ing => ing.inventory_item_id);
+        const { data: items } = await client
+          .from('inventory_items')
+          .select('*')
+          .eq('location_id', locationData.id)
+          .in('id', ingredientItemIds);
+
+        const itemsMap = new Map(items?.map(item => [item.id, item]) || []);
+
         let totalCost = 0;
-        const ingredientCosts: any[] = [];
+        const ingredientCosts: IngredientCost[] = [];
 
-        for (const ingredient of recipe.inventory_recipe_ingredients || []) {
-          if (!ingredient.inventory_items) continue;
-
-          const item = ingredient.inventory_items;
+        for (const ingredient of recipeIngredients) {
+          const item = itemsMap.get(ingredient.inventory_item_id);
+          if (!item) continue;
           let costPerIngredientUnit = item.cost_per_unit;
 
           if (ingredient.unit === 'oz' && item.unit === 'bottle') {
@@ -217,7 +241,7 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
           totalCost += ingredientTotalCost;
 
           ingredientCosts.push({
-            item_id: ingredient.item_id,
+            item_id: ingredient.inventory_item_id,
             item_name: item.name,
             quantity_needed: ingredient.quantity,
             unit: ingredient.unit,
@@ -228,19 +252,18 @@ async function recipeCostHandler(req: AuthenticatedRequest, res: NextApiResponse
           });
         }
 
-        const profitMargin = recipe.price - totalCost;
-        const profitPercentage = recipe.price > 0 ? (profitMargin / recipe.price) * 100 : 0;
+        const profitMargin = dbRecipe.menu_price - totalCost;
+        const profitPercentage = dbRecipe.menu_price > 0 ? (profitMargin / dbRecipe.menu_price) * 100 : 0;
 
         recipeCosts.push({
-          recipe_id: recipe.id,
-          recipe_name: recipe.name,
-          category: recipe.category,
+          recipe_id: dbRecipe.id,
+          recipe_name: dbRecipe.name,
+          category: dbRecipe.category,
           total_cost: totalCost,
-          menu_price: recipe.price,
+          menu_price: dbRecipe.menu_price,
           profit_margin: profitMargin,
           profit_percentage: profitPercentage,
           ingredients: ingredientCosts,
-          is_active: recipe.is_active,
         });
       }
 

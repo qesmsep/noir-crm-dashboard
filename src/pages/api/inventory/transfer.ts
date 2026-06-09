@@ -33,7 +33,7 @@ async function transferHandler(req: AuthenticatedRequest, res: NextApiResponse) 
         p_to_location_id: to_location_id,
         p_quantity: quantity,
         p_notes: notes || '',
-        p_created_by: req.user?.email || 'Unknown'
+        p_created_by: req.user?.id || 'Unknown'
       });
 
       if (error) {
