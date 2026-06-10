@@ -407,7 +407,7 @@ export default function InventoryPage() {
   };
 
   const handleDeleteRecipe = async (id: string) => {
-    if (!confirm('Delete this recipe?')) return;
+    // No confirm needed - double confirmation is in the drawer
     try {
       const headers = await getAuthHeaders();
       await fetch('/api/inventory/recipes', {
@@ -420,6 +420,27 @@ export default function InventoryPage() {
       setEditingRecipe(null);
     } catch (err) {
       console.error('Failed to delete recipe:', err);
+      alert('Failed to delete recipe. Please try again.');
+    }
+  };
+
+  const handleArchiveRecipe = async (id: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/inventory/recipes', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ id, is_active: false }),
+      });
+      if (res.ok) {
+        await fetchRecipes();
+        setIsRecipeDrawerOpen(false);
+        setEditingRecipe(null);
+        alert('Recipe has been archived successfully.');
+      }
+    } catch (err) {
+      console.error('Failed to archive recipe:', err);
+      alert('Failed to archive recipe. Please try again.');
     }
   };
 
@@ -672,6 +693,7 @@ export default function InventoryPage() {
         }}
         onSave={handleSaveRecipe}
         onDelete={handleDeleteRecipe}
+        onArchive={handleArchiveRecipe}
         editRecipe={editingRecipe}
         inventory={inventory}
         saving={savingRecipe}

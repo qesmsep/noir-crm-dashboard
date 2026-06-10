@@ -98,6 +98,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       let query = client
         .from('inventory_recipes')
         .select('*')
+        .eq('is_active', true) // Only show active recipes by default
         .order('name', { ascending: true });
 
       // Filter by location if specified
@@ -284,6 +285,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (body.batch_ingredients !== undefined) updateData.batch_ingredients = JSON.stringify(body.batch_ingredients);
       if (body.batch_yield !== undefined) updateData.batch_yield = body.batch_yield;
       if (body.batch_instructions !== undefined) updateData.batch_instructions = sanitizeInput(body.batch_instructions, 5000);
+      if (body.is_active !== undefined) updateData.is_active = body.is_active;
 
       const { data, error } = await client
         .from('inventory_recipes')

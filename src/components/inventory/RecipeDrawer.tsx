@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, Trash2, Upload, Image as ImageIcon, Archive } from 'lucide-react';
 import InventoryItemModal from './InventoryItemModal';
 import type {
   Recipe,
@@ -20,6 +20,7 @@ interface RecipeDrawerProps {
   onClose: () => void;
   onSave: (data: RecipeFormData) => void;
   onDelete?: (id: string) => void;
+  onArchive?: (id: string) => void;
   editRecipe: Recipe | null;
   inventory: InventoryItem[];
   saving: boolean;
@@ -58,6 +59,7 @@ export default function RecipeDrawer({
   onClose,
   onSave,
   onDelete,
+  onArchive,
   editRecipe,
   inventory,
   saving,
@@ -74,6 +76,8 @@ export default function RecipeDrawer({
   const [batchIngredients, setBatchIngredients] = useState<RecipeIngredient[]>([]);
   const [batchYield, setBatchYield] = useState<number>(1);
   const [batchInstructions, setBatchInstructions] = useState<string>('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
 
   // Ingredient search values for dropdowns
   const [searchTerms, setSearchTerms] = useState<Record<number, string>>({});
@@ -799,15 +803,95 @@ export default function RecipeDrawer({
         </form>
 
         <div className={styles.modalFooter}>
-          {editRecipe && onDelete && (
-            <button
-              className={styles.btnDanger}
-              onClick={() => onDelete(editRecipe.id)}
-              type="button"
-              style={{ marginRight: 'auto' }}
-            >
-              <Trash2 size={14} /> Delete
-            </button>
+          {editRecipe && (
+            <div style={{ marginRight: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {/* Archive Button */}
+              {onArchive && (
+                <button
+                  className={styles.btnTertiary}
+                  onClick={() => onArchive(editRecipe.id)}
+                  type="button"
+                  title="Archive Recipe"
+                  style={{ padding: '0.5rem 1rem' }}
+                >
+                  <Archive size={14} /> Archive
+                </button>
+              )}
+
+              {/* Delete Button with Double Confirmation */}
+              {onDelete && (
+                <>
+                  {!showDeleteConfirm ? (
+                    <button
+                      className={styles.btnIcon}
+                      onClick={() => setShowDeleteConfirm(true)}
+                      type="button"
+                      title="Delete Recipe"
+                      style={{
+                        padding: '0.5rem',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #DC2626',
+                        color: '#DC2626'
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  ) : deleteConfirmStep === 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#DC2626' }}>Delete permanently?</span>
+                      <button
+                        className={styles.btnDanger}
+                        onClick={() => setDeleteConfirmStep(1)}
+                        type="button"
+                        style={{ padding: '0.375rem 0.75rem', fontSize: '0.875rem' }}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        className={styles.btnTertiary}
+                        onClick={() => {
+                          setShowDeleteConfirm(false);
+                          setDeleteConfirmStep(0);
+                        }}
+                        type="button"
+                        style={{ padding: '0.375rem 0.75rem', fontSize: '0.875rem' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#DC2626', fontWeight: 600 }}>
+                        Are you absolutely sure?
+                      </span>
+                      <button
+                        className={styles.btnDanger}
+                        onClick={() => {
+                          onDelete(editRecipe.id);
+                          setShowDeleteConfirm(false);
+                          setDeleteConfirmStep(0);
+                        }}
+                        type="button"
+                        style={{ padding: '0.375rem 0.75rem', fontSize: '0.875rem' }}
+                      >
+                        Delete Forever
+                      </button>
+                      <button
+                        className={styles.btnTertiary}
+                        onClick={() => {
+                          setShowDeleteConfirm(false);
+                          setDeleteConfirmStep(0);
+                        }}
+                        type="button"
+                        style={{ padding: '0.375rem 0.75rem', fontSize: '0.875rem' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
           <button className={styles.btnTertiary} onClick={onClose} type="button">
             Cancel
