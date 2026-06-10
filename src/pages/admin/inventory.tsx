@@ -678,6 +678,10 @@ export default function InventoryPage() {
         editItem={editingItem}
         saving={savingItem}
         currentLocation={currentLocation}
+        onRefresh={async () => {
+          await fetchInventory();
+          await fetchAllInventory();
+        }}
         locations={locationsData}
       />
 

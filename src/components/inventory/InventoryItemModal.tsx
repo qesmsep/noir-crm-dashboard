@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Trash2, X, MapPin } from 'lucide-react';
 import type {
@@ -15,12 +15,13 @@ import { getAuthHeaders } from '../../lib/client-auth';
 interface InventoryItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: InventoryItemFormData) => void;
+  onSave: (data: InventoryItemFormData) => void | Promise<void>;
   onDelete?: (id: string) => void;
   editItem: InventoryItem | null;
   saving: boolean;
   currentLocation: UILocationSlug;
   locations?: Array<{ id: string; slug: string; name: string }>;
+  onRefresh?: () => Promise<void>;
 }
 
 // Location data interfaces
@@ -60,11 +61,13 @@ export default function InventoryItemModal({
   saving,
   currentLocation,
   locations = [],
+  onRefresh,
 }: InventoryItemModalProps) {
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_FORM);
   const [locationQuantities, setLocationQuantities] = useState<LocationQuantities>({});
   const [locationParLevels, setLocationParLevels] = useState<LocationParLevels>({});
   const [locationAvailability, setLocationAvailability] = useState<LocationAvailability>({});
+  const [manualAvailabilitySet, setManualAvailabilitySet] = useState<{[key: string]: boolean}>({});
   const [selectedLocationTab, setSelectedLocationTab] = useState<string>('');
   const [existingItemsByLocation, setExistingItemsByLocation] = useState<{ [locationId: string]: string }>({});
   const [categories, setCategories] = useState<string[]>(['spirits', 'wine', 'beer', 'mixers', 'garnishes', 'supplies', 'other']);
@@ -72,6 +75,7 @@ export default function InventoryItemModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [volumeOzInput, setVolumeOzInput] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingLocations, setLoadingLocations] = useState(false);
 
   // Initialize location data
   useEffect(() => {
@@ -92,16 +96,10 @@ export default function InventoryItemModal({
     }
   }, [isOpen, locations]);
 
-  // Fetch existing items at all locations when editing
-  useEffect(() => {
-    if (editItem && isOpen) {
-      fetchAllLocationQuantities();
-    }
-  }, [editItem, isOpen]);
-
-  const fetchAllLocationQuantities = async () => {
+  const fetchAllLocationQuantities = useCallback(async () => {
     if (!editItem) return;
 
+    setLoadingLocations(true);
     try {
       const headers = await getAuthHeaders();
 
@@ -144,9 +142,20 @@ export default function InventoryItemModal({
         setExistingItemsByLocation(itemsByLocation);
       }
     } catch (err) {
-      console.error('Failed to fetch location quantities:', err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to fetch location quantities:', err);
+      }
+    } finally {
+      setLoadingLocations(false);
     }
-  };
+  }, [editItem, locations]);
+
+  // Fetch existing items at all locations when editing
+  useEffect(() => {
+    if (editItem && isOpen) {
+      fetchAllLocationQuantities();
+    }
+  }, [editItem, isOpen, fetchAllLocationQuantities]);
 
   useEffect(() => {
     if (editItem) {
@@ -213,18 +222,51 @@ export default function InventoryItemModal({
       ...prev,
       [locationId]: newQuantity
     }));
-    // Update availability based on quantity
+    // Only auto-enable availability if user hasn't manually set it
+    if (newQuantity > 0 && !manualAvailabilitySet[locationId]) {
+      setLocationAvailability(prev => ({
+        ...prev,
+        [locationId]: true
+      }));
+    }
+  };
+
+  const handleLocationAvailabilityChange = (locationId: string, isAvailable: boolean) => {
     setLocationAvailability(prev => ({
       ...prev,
-      [locationId]: newQuantity > 0
+      [locationId]: isAvailable
     }));
+    // Mark that user has manually set availability
+    setManualAvailabilitySet(prev => ({
+      ...prev,
+      [locationId]: true
+    }));
+    // If disabling, reset qty and par to 0
+    if (!isAvailable) {
+      setLocationQuantities(prev => ({
+        ...prev,
+        [locationId]: 0
+      }));
+      setLocationParLevels(prev => ({
+        ...prev,
+        [locationId]: 0
+      }));
+    }
   };
 
   const handleLocationParLevelChange = (locationId: string, parLevel: number) => {
+    const newParLevel = Math.max(0, parLevel);
     setLocationParLevels(prev => ({
       ...prev,
-      [locationId]: Math.max(0, parLevel)
+      [locationId]: newParLevel
     }));
+    // Only auto-enable availability if user hasn't manually set it
+    if (newParLevel > 0 && !manualAvailabilitySet[locationId]) {
+      setLocationAvailability(prev => ({
+        ...prev,
+        [locationId]: true
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -240,45 +282,66 @@ export default function InventoryItemModal({
       return;
     }
 
+    const failures: string[] = [];
+    const successes: string[] = [];
+
     try {
       const headers = await getAuthHeaders();
 
       for (const locationId of locationsToSave) {
+        const locationName = locations.find(l => l.id === locationId)?.name || locationId;
         const existingItemId = existingItemsByLocation[locationId];
         const quantity = locationQuantities[locationId] || 0;
         const parLevel = locationParLevels[locationId] || 0;
 
-        if (existingItemId) {
-          // Update existing item at this location
-          await fetch('/api/inventory', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              ...headers,
-            },
-            body: JSON.stringify({
-              ...form,
-              id: existingItemId,
-              quantity,
-              par_level: parLevel,
-              location_id: locationId,
-            }),
-          });
-        } else {
-          // Create new item at this location
-          await fetch('/api/inventory', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...headers,
-            },
-            body: JSON.stringify({
-              ...form,
-              quantity,
-              par_level: parLevel,
-              location_id: locationId,
-            }),
-          });
+        try {
+          if (existingItemId) {
+            // Update existing item at this location
+            const response = await fetch('/api/inventory', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                ...headers,
+              },
+              body: JSON.stringify({
+                ...form,
+                id: existingItemId,
+                quantity,
+                par_level: parLevel,
+                location_id: locationId,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(errorText || 'Update failed');
+            }
+            successes.push(locationName);
+          } else {
+            // Create new item at this location
+            const response = await fetch('/api/inventory', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...headers,
+              },
+              body: JSON.stringify({
+                ...form,
+                quantity,
+                par_level: parLevel,
+                location_id: locationId,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(errorText || 'Create failed');
+            }
+            successes.push(locationName);
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+          failures.push(`${locationName}: ${errorMsg}`);
         }
       }
 
@@ -288,20 +351,45 @@ export default function InventoryItemModal({
           .filter(([locationId, isAvailable]) => !isAvailable && existingItemsByLocation[locationId]);
 
         for (const [locationId, _] of locationsToDelete) {
+          const locationName = locations.find(l => l.id === locationId)?.name || locationId;
           const itemId = existingItemsByLocation[locationId];
-          await fetch('/api/inventory', {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-              ...headers,
-            },
-            body: JSON.stringify({ id: itemId }),
-          });
+          try {
+            const response = await fetch('/api/inventory', {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                ...headers,
+              },
+              body: JSON.stringify({ id: itemId }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(errorText || 'Delete failed');
+            }
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+            failures.push(`Failed to remove from ${locationName}: ${errorMsg}`);
+          }
         }
       }
 
-      // Call the original onSave to refresh the inventory list
-      onSave(form);
+      // Refresh the inventory list
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        await onSave(form);
+      }
+
+      // Show result to user
+      if (failures.length > 0 && successes.length === 0) {
+        alert(`Failed to save:\n\n${failures.join('\n')}`);
+        return; // Don't close modal if everything failed
+      } else if (failures.length > 0) {
+        alert(`Partially saved:\n\nSucceeded: ${successes.join(', ')}\n\nFailed:\n${failures.join('\n')}`);
+      }
+
+      onClose();
     } catch (err) {
       console.error('Failed to save inventory items:', err);
       alert('Failed to save inventory items. Please try again.');
@@ -326,9 +414,11 @@ export default function InventoryItemModal({
         }
 
         setShowDeleteConfirm(false);
-        onClose();
         // Refresh the inventory list
-        window.location.reload();
+        if (onRefresh) {
+          await onRefresh();
+        }
+        onClose();
       } catch (err) {
         console.error('Failed to delete items:', err);
         alert('Failed to delete items. Please try again.');
@@ -585,28 +675,27 @@ export default function InventoryItemModal({
                           border: 'none',
                           borderBottom: selectedLocationTab === location.id ? '2px solid #92400E' : '2px solid transparent',
                           cursor: 'pointer',
-                          position: 'relative',
                           marginBottom: '-1px'
                         }}
                       >
                         {location.name}
-                        {locationQuantities[location.id] > 0 && (
-                          <span style={{
-                            position: 'absolute',
-                            top: '0.25rem',
-                            right: '0.25rem',
-                            width: '6px',
-                            height: '6px',
-                            backgroundColor: '#10B981',
-                            borderRadius: '50%'
-                          }} />
-                        )}
                       </button>
                     ))}
                   </div>
 
                   {/* Tab Content */}
-                  {selectedLocationTab === 'all' ? (
+                  {loadingLocations ? (
+                    <div style={{
+                      padding: '2rem',
+                      backgroundColor: '#F9FAFB',
+                      borderRadius: '0.375rem',
+                      border: '1px solid #E5E7EB',
+                      textAlign: 'center',
+                      color: '#6B7280'
+                    }}>
+                      <div style={{ fontSize: '0.875rem' }}>Loading location data...</div>
+                    </div>
+                  ) : selectedLocationTab === 'all' ? (
                     /* All Locations Total Summary */
                     <div style={{
                       padding: '0.75rem',
@@ -624,46 +713,102 @@ export default function InventoryItemModal({
                     </div>
                   ) : selectedLocationTab && (
                     <div style={{
-                      display: 'flex',
-                      gap: '1rem',
-                      alignItems: 'center',
                       padding: '0.75rem',
                       backgroundColor: '#F9FAFB',
                       borderRadius: '0.375rem',
                       border: '1px solid #E5E7EB'
                     }}>
-                      <div style={{ flex: 1 }}>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Quantity
-                        </label>
-                        <input
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0"
-                          value={locationQuantities[selectedLocationTab] || 0}
-                          onChange={(e) =>
-                            handleLocationQuantityChange(selectedLocationTab, parseFloat(e.target.value) || 0)
-                          }
-                        />
-                      </div>
+                      <div style={{
+                        display: 'flex',
+                        gap: '1rem',
+                        alignItems: 'flex-end'
+                      }}>
+                        {/* Available Toggle */}
+                        <div style={{ flex: '0 0 auto' }}>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Available
+                          </label>
+                          <label style={{
+                            position: 'relative',
+                            display: 'inline-block',
+                            width: '44px',
+                            height: '24px',
+                            cursor: 'pointer'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={locationAvailability[selectedLocationTab] || false}
+                              onChange={(e) => handleLocationAvailabilityChange(selectedLocationTab, e.target.checked)}
+                              style={{
+                                opacity: 0,
+                                width: 0,
+                                height: 0
+                              }}
+                            />
+                            <span style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              backgroundColor: locationAvailability[selectedLocationTab] ? '#10B981' : '#D1D5DB',
+                              borderRadius: '24px',
+                              transition: 'background-color 0.2s',
+                              cursor: 'pointer'
+                            }}>
+                              <span style={{
+                                position: 'absolute',
+                                content: '',
+                                height: '18px',
+                                width: '18px',
+                                left: locationAvailability[selectedLocationTab] ? '23px' : '3px',
+                                bottom: '3px',
+                                backgroundColor: 'white',
+                                borderRadius: '50%',
+                                transition: 'left 0.2s'
+                              }} />
+                            </span>
+                          </label>
+                        </div>
 
-                      <div style={{ flex: 1 }}>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Minimum Stock Level
-                        </label>
-                        <input
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0"
-                          value={locationParLevels[selectedLocationTab] || 0}
-                          onChange={(e) =>
-                            handleLocationParLevelChange(selectedLocationTab, parseFloat(e.target.value) || 0)
-                          }
-                        />
+                        {/* Quantity and Par Level inputs (only show if available) */}
+                        {locationAvailability[selectedLocationTab] && (
+                          <>
+                            <div style={{ flex: 1 }}>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Quantity
+                              </label>
+                              <input
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                value={locationQuantities[selectedLocationTab] || 0}
+                                onChange={(e) =>
+                                  handleLocationQuantityChange(selectedLocationTab, parseFloat(e.target.value) || 0)
+                                }
+                              />
+                            </div>
+
+                            <div style={{ flex: 1 }}>
+                              <label className="block text-xs text-gray-600 mb-1">
+                                Minimum Stock Level
+                              </label>
+                              <input
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0"
+                                value={locationParLevels[selectedLocationTab] || 0}
+                                onChange={(e) =>
+                                  handleLocationParLevelChange(selectedLocationTab, parseFloat(e.target.value) || 0)
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -726,7 +871,7 @@ export default function InventoryItemModal({
                 </button>
                 <button
                   className={styles.btnPrimary}
-                  disabled={saving || !form.name.trim() || getTotalQuantity() === 0}
+                  disabled={saving || !form.name.trim() || Object.values(locationAvailability).every(v => !v)}
                   type="submit"
                 >
                   {saving
