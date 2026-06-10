@@ -355,7 +355,7 @@ export default function InventoryItemModal({
           />
           <div
             className={styles.modal}
-            style={{ maxWidth: '800px', zIndex: Z_INDEX.NESTED_MODAL }}
+            style={{ maxWidth: '550px', zIndex: Z_INDEX.NESTED_MODAL }}
           >
             {/* Loading Overlay */}
             {saving && (
