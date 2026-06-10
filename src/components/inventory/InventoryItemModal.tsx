@@ -407,7 +407,7 @@ export default function InventoryItemModal({
 
             <form onSubmit={handleSubmit} className={styles.modalBody}>
               <div className="grid grid-cols-1 gap-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1rem' }}>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Name *
@@ -436,7 +436,7 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: '400px' }}>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Category
@@ -607,48 +607,19 @@ export default function InventoryItemModal({
 
                   {/* Tab Content */}
                   {selectedLocationTab === 'all' ? (
-                    /* All Locations Summary */
+                    /* All Locations Total Summary */
                     <div style={{
                       padding: '0.75rem',
                       backgroundColor: '#F9FAFB',
                       borderRadius: '0.375rem',
-                      border: '1px solid #E5E7EB'
+                      border: '1px solid #E5E7EB',
+                      textAlign: 'center'
                     }}>
-                      <div style={{ fontSize: '0.875rem' }}>
-                        {locations.map((location) => (
-                          <div key={location.id} style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '0.5rem 0',
-                            borderBottom: '1px solid #E5E7EB'
-                          }}>
-                            <span style={{ fontWeight: '500', color: '#374151' }}>
-                              {location.name}
-                            </span>
-                            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                              <span style={{ color: '#6B7280', fontSize: '0.813rem' }}>
-                                Qty: <strong>{locationQuantities[location.id] || 0}</strong>
-                              </span>
-                              <span style={{ color: '#6B7280', fontSize: '0.813rem' }}>
-                                Min: <strong>{locationParLevels[location.id] || 0}</strong>
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                        <div style={{
-                          marginTop: '0.5rem',
-                          paddingTop: '0.5rem',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontWeight: '600'
-                        }}>
-                          <span style={{ color: '#374151' }}>Total</span>
-                          <span style={{ color: '#111827' }}>
-                            {getTotalQuantity()} {form.unit || 'units'}
-                          </span>
-                        </div>
+                      <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>
+                        Total Quantity
+                      </div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', marginTop: '0.25rem' }}>
+                        {getTotalQuantity()} {form.unit || 'units'}
                       </div>
                     </div>
                   ) : selectedLocationTab && (
