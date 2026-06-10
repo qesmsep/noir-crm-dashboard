@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 
+const ALLOWED_LOCATIONS = ['noirkc', 'rooftopkc'];
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -10,8 +12,17 @@ export default async function handler(req, res) {
   try {
     const location = req.query.location || 'noirkc';
 
+    // Validate location
+    if (!ALLOWED_LOCATIONS.includes(location)) {
+      return res.status(400).json({ error: 'Invalid location' });
+    }
+
     // In production, use Supabase Storage
     if (process.env.NODE_ENV === 'production') {
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return res.status(500).json({ error: 'Server configuration error' });
+      }
+
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -40,7 +51,37 @@ export default async function handler(req, res) {
         };
       });
 
-      return res.status(200).json(filesWithUrls);
+      // Check if there's a saved order in system_settings
+      const settingKey = `menu_order_${location}`;
+      const { data: orderSetting } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', settingKey)
+        .single();
+
+      let orderedFiles = filesWithUrls;
+
+      if (orderSetting?.value?.order) {
+        const { order } = orderSetting.value;
+
+        // Validate that order is an array
+        if (Array.isArray(order)) {
+          // Sort files according to saved order
+          const fileMap = new Map(filesWithUrls.map(f => [f.name, f]));
+          orderedFiles = order
+            .map(name => fileMap.get(name))
+            .filter(Boolean); // Remove any files that no longer exist
+
+          // Append any new files that aren't in the saved order
+          const orderedNames = new Set(order);
+          const newFiles = filesWithUrls.filter(f => !orderedNames.has(f.name));
+          orderedFiles = [...orderedFiles, ...newFiles];
+        } else {
+          console.error('Order setting is not an array:', order);
+        }
+      }
+
+      return res.status(200).json(orderedFiles);
     }
 
     // In development, use filesystem

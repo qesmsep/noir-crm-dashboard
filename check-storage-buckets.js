@@ -2,6 +2,12 @@
 /**
  * Check Supabase Storage Buckets
  * This script lists all storage buckets and their contents
+ *
+ * Purpose: Debug utility to verify that menu files exist in Supabase Storage
+ * Created during investigation of "no menu pages available" issue (June 2026)
+ * Kept for future debugging of storage bucket issues
+ *
+ * Usage: node check-storage-buckets.js
  */
 
 require('dotenv').config({ path: '.env.local' });
