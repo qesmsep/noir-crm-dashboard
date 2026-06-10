@@ -65,6 +65,7 @@ export default function InventoryItemModal({
   const [locationQuantities, setLocationQuantities] = useState<LocationQuantities>({});
   const [locationParLevels, setLocationParLevels] = useState<LocationParLevels>({});
   const [locationAvailability, setLocationAvailability] = useState<LocationAvailability>({});
+  const [selectedLocationTab, setSelectedLocationTab] = useState<string>('');
   const [existingItemsByLocation, setExistingItemsByLocation] = useState<{ [locationId: string]: string }>({});
   const [categories, setCategories] = useState<string[]>(['spirits', 'wine', 'beer', 'mixers', 'garnishes', 'supplies', 'other']);
   const [subcategoryOptions, setSubcategoryOptions] = useState<Record<string, string[]>>(DEFAULTS);
@@ -86,6 +87,10 @@ export default function InventoryItemModal({
       setLocationQuantities(initialQuantities);
       setLocationParLevels(initialParLevels);
       setLocationAvailability(initialAvailability);
+      // Set first location as selected tab
+      if (locations.length > 0) {
+        setSelectedLocationTab(locations[0].id);
+      }
     }
   }, [isOpen, locations]);
 
@@ -205,9 +210,15 @@ export default function InventoryItemModal({
   };
 
   const handleLocationQuantityChange = (locationId: string, quantity: number) => {
+    const newQuantity = Math.max(0, quantity);
     setLocationQuantities(prev => ({
       ...prev,
-      [locationId]: Math.max(0, quantity)
+      [locationId]: newQuantity
+    }));
+    // Update availability based on quantity
+    setLocationAvailability(prev => ({
+      ...prev,
+      [locationId]: newQuantity > 0
     }));
   };
 
@@ -216,25 +227,6 @@ export default function InventoryItemModal({
       ...prev,
       [locationId]: Math.max(0, parLevel)
     }));
-  };
-
-  const handleLocationAvailabilityToggle = (locationId: string) => {
-    setLocationAvailability(prev => ({
-      ...prev,
-      [locationId]: !prev[locationId]
-    }));
-
-    // Reset quantity and par level when unchecked
-    if (locationAvailability[locationId]) {
-      setLocationQuantities(prev => ({
-        ...prev,
-        [locationId]: 0
-      }));
-      setLocationParLevels(prev => ({
-        ...prev,
-        [locationId]: 0
-      }));
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -527,119 +519,118 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                {/* Location Availability & Quantities Section - Compact */}
+                {/* Location Inventory - Tabbed Interface */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     <MapPin size={14} className="inline mr-1" />
-                    Location Availability
+                    Location Inventory
                   </label>
+
+                  {/* Tab Headers */}
                   <div style={{
-                    backgroundColor: '#F9FAFB',
-                    borderRadius: '0.375rem',
-                    padding: '0.5rem',
-                    border: '1px solid #E5E7EB',
-                    fontSize: '0.875rem'
+                    display: 'flex',
+                    borderBottom: '1px solid #E5E7EB',
+                    marginBottom: '0.75rem'
                   }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      {locations.map((location) => (
-                        <div key={location.id} style={{
-                          padding: '0.375rem',
-                          backgroundColor: locationAvailability[location.id] ? '#F3F4F6' : 'transparent',
-                          borderRadius: '0.25rem'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input
-                              type="checkbox"
-                              id={`location-${location.id}`}
-                              checked={locationAvailability[location.id] || false}
-                              onChange={() => handleLocationAvailabilityToggle(location.id)}
-                              className="h-3.5 w-3.5 text-cork-600 focus:ring-cork-500 border-gray-300 rounded"
-                            />
-                            <label
-                              htmlFor={`location-${location.id}`}
-                              style={{
-                                fontSize: '0.875rem',
-                                fontWeight: locationAvailability[location.id] ? '500' : '400',
-                                color: '#374151',
-                                cursor: 'pointer',
-                                minWidth: '100px'
-                              }}
-                            >
-                              {location.name}
-                            </label>
-
-                            {locationAvailability[location.id] && (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.75rem',
-                                marginLeft: 'auto'
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Qty:</span>
-                                  <input
-                                    style={{
-                                      width: '3rem',
-                                      padding: '0.125rem 0.25rem',
-                                      fontSize: '0.813rem',
-                                      border: '1px solid #D1D5DB',
-                                      borderRadius: '0.25rem',
-                                      textAlign: 'center'
-                                    }}
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    value={locationQuantities[location.id] || 0}
-                                    onChange={(e) =>
-                                      handleLocationQuantityChange(location.id, parseInt(e.target.value) || 0)
-                                    }
-                                  />
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Min:</span>
-                                  <input
-                                    style={{
-                                      width: '3rem',
-                                      padding: '0.125rem 0.25rem',
-                                      fontSize: '0.813rem',
-                                      border: '1px solid #D1D5DB',
-                                      borderRadius: '0.25rem',
-                                      textAlign: 'center'
-                                    }}
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    value={locationParLevels[location.id] || 0}
-                                    onChange={(e) =>
-                                      handleLocationParLevelChange(location.id, parseInt(e.target.value) || 0)
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {getTotalQuantity() > 0 && (
-                      <div style={{
-                        marginTop: '0.5rem',
-                        paddingTop: '0.5rem',
-                        borderTop: '1px solid #E5E7EB',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        fontSize: '0.813rem'
-                      }}>
-                        <span style={{ fontWeight: '600', color: '#374151' }}>Total</span>
-                        <span style={{ fontWeight: '600', color: '#111827' }}>
-                          {getTotalQuantity()} {form.unit || 'units'}
-                        </span>
-                      </div>
-                    )}
+                    {locations.map((location) => (
+                      <button
+                        key={location.id}
+                        type="button"
+                        onClick={() => setSelectedLocationTab(location.id)}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.875rem',
+                          fontWeight: selectedLocationTab === location.id ? '600' : '400',
+                          color: selectedLocationTab === location.id ? '#92400E' : '#6B7280',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          borderBottom: selectedLocationTab === location.id ? '2px solid #92400E' : '2px solid transparent',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          marginBottom: '-1px'
+                        }}
+                      >
+                        {location.name}
+                        {locationQuantities[location.id] > 0 && (
+                          <span style={{
+                            position: 'absolute',
+                            top: '0.25rem',
+                            right: '0.25rem',
+                            width: '6px',
+                            height: '6px',
+                            backgroundColor: '#10B981',
+                            borderRadius: '50%'
+                          }} />
+                        )}
+                      </button>
+                    ))}
                   </div>
+
+                  {/* Tab Content */}
+                  {selectedLocationTab && (
+                    <div style={{
+                      display: 'flex',
+                      gap: '1rem',
+                      alignItems: 'center',
+                      padding: '0.75rem',
+                      backgroundColor: '#F9FAFB',
+                      borderRadius: '0.375rem',
+                      border: '1px solid #E5E7EB'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Quantity
+                        </label>
+                        <input
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="0"
+                          value={locationQuantities[selectedLocationTab] || 0}
+                          onChange={(e) =>
+                            handleLocationQuantityChange(selectedLocationTab, parseInt(e.target.value) || 0)
+                          }
+                        />
+                      </div>
+
+                      <div style={{ flex: 1 }}>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Minimum Stock Level
+                        </label>
+                        <input
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="0"
+                          value={locationParLevels[selectedLocationTab] || 0}
+                          onChange={(e) =>
+                            handleLocationParLevelChange(selectedLocationTab, parseInt(e.target.value) || 0)
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Total Summary */}
+                  {getTotalQuantity() > 0 && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '0.5rem',
+                      backgroundColor: '#F3F4F6',
+                      borderRadius: '0.25rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.813rem'
+                    }}>
+                      <span style={{ color: '#6B7280' }}>Total across all locations:</span>
+                      <span style={{ fontWeight: '600', color: '#111827' }}>
+                        {getTotalQuantity()} {form.unit || 'units'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
