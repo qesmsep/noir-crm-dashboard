@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/useToast';
 import { Trash2, GripVertical } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import {
   DndContext,
   closestCenter,
@@ -162,6 +163,11 @@ export default function HomePageAdmin() {
 
     setUploading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
       const formData = new FormData();
       Array.from(files).forEach((file) => {
         formData.append('menuFiles', file);
@@ -169,6 +175,9 @@ export default function HomePageAdmin() {
 
       const response = await fetch(`/api/admin/upload-menu?location=${selectedLocation}`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: formData,
       });
 
@@ -197,9 +206,17 @@ export default function HomePageAdmin() {
     if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(`/api/admin/delete-menu-file?location=${selectedLocation}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ fileName }),
       });
 
@@ -234,9 +251,17 @@ export default function HomePageAdmin() {
       // Save the new order to the server
       setReordering(true);
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Not authenticated');
+        }
+
         const response = await fetch(`/api/admin/reorder-menu-files?location=${selectedLocation}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
           body: JSON.stringify({
             order: newOrder.map((file) => file.name),
           }),
