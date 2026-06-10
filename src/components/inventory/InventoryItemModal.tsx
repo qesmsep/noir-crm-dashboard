@@ -543,7 +543,7 @@ export default function InventoryItemModal({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     <MapPin size={14} className="inline mr-1" />
-                    Location Inventory
+                    Location Inventory On-Hand
                   </label>
 
                   {/* Tab Headers */}
@@ -640,11 +640,11 @@ export default function InventoryItemModal({
                           className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
                           type="number"
                           min="0"
-                          step="1"
+                          step="0.01"
                           placeholder="0"
                           value={locationQuantities[selectedLocationTab] || 0}
                           onChange={(e) =>
-                            handleLocationQuantityChange(selectedLocationTab, parseInt(e.target.value) || 0)
+                            handleLocationQuantityChange(selectedLocationTab, parseFloat(e.target.value) || 0)
                           }
                         />
                       </div>
@@ -657,11 +657,11 @@ export default function InventoryItemModal({
                           className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
                           type="number"
                           min="0"
-                          step="1"
+                          step="0.01"
                           placeholder="0"
                           value={locationParLevels[selectedLocationTab] || 0}
                           onChange={(e) =>
-                            handleLocationParLevelChange(selectedLocationTab, parseInt(e.target.value) || 0)
+                            handleLocationParLevelChange(selectedLocationTab, parseFloat(e.target.value) || 0)
                           }
                         />
                       </div>
