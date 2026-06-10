@@ -23,9 +23,17 @@ interface InventoryItemModalProps {
   locations?: Array<{ id: string; slug: string; name: string }>;
 }
 
-// Location quantities interface
+// Location data interfaces
 interface LocationQuantities {
   [locationId: string]: number;
+}
+
+interface LocationParLevels {
+  [locationId: string]: number;
+}
+
+interface LocationAvailability {
+  [locationId: string]: boolean;
 }
 
 const EMPTY_FORM: InventoryItemFormData = {
@@ -55,6 +63,8 @@ export default function InventoryItemModal({
 }: InventoryItemModalProps) {
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_FORM);
   const [locationQuantities, setLocationQuantities] = useState<LocationQuantities>({});
+  const [locationParLevels, setLocationParLevels] = useState<LocationParLevels>({});
+  const [locationAvailability, setLocationAvailability] = useState<LocationAvailability>({});
   const [existingItemsByLocation, setExistingItemsByLocation] = useState<{ [locationId: string]: string }>({});
   const [categories, setCategories] = useState<string[]>(['spirits', 'wine', 'beer', 'mixers', 'garnishes', 'supplies', 'other']);
   const [subcategoryOptions, setSubcategoryOptions] = useState<Record<string, string[]>>(DEFAULTS);
@@ -62,14 +72,20 @@ export default function InventoryItemModal({
   const [volumeOzInput, setVolumeOzInput] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Initialize location quantities
+  // Initialize location data
   useEffect(() => {
     if (isOpen) {
       const initialQuantities: LocationQuantities = {};
+      const initialParLevels: LocationParLevels = {};
+      const initialAvailability: LocationAvailability = {};
       locations.forEach(loc => {
         initialQuantities[loc.id] = 0;
+        initialParLevels[loc.id] = 0;
+        initialAvailability[loc.id] = false;
       });
       setLocationQuantities(initialQuantities);
+      setLocationParLevels(initialParLevels);
+      setLocationAvailability(initialAvailability);
     }
   }, [isOpen, locations]);
 
@@ -98,22 +114,30 @@ export default function InventoryItemModal({
         );
 
         const quantities: LocationQuantities = {};
+        const parLevels: LocationParLevels = {};
+        const availability: LocationAvailability = {};
         const itemsByLocation: { [locationId: string]: string } = {};
 
-        // Initialize all locations with 0
+        // Initialize all locations with defaults
         locations.forEach(loc => {
           quantities[loc.id] = 0;
+          parLevels[loc.id] = 0;
+          availability[loc.id] = false;
         });
 
-        // Set quantities for locations where this item exists
+        // Set data for locations where this item exists
         relatedItems.forEach(item => {
           if (item.location_id) {
             quantities[item.location_id] = item.quantity;
+            parLevels[item.location_id] = item.par_level || 0;
+            availability[item.location_id] = true;
             itemsByLocation[item.location_id] = item.id;
           }
         });
 
         setLocationQuantities(quantities);
+        setLocationParLevels(parLevels);
+        setLocationAvailability(availability);
         setExistingItemsByLocation(itemsByLocation);
       }
     } catch (err) {
@@ -187,23 +211,52 @@ export default function InventoryItemModal({
     }));
   };
 
+  const handleLocationParLevelChange = (locationId: string, parLevel: number) => {
+    setLocationParLevels(prev => ({
+      ...prev,
+      [locationId]: Math.max(0, parLevel)
+    }));
+  };
+
+  const handleLocationAvailabilityToggle = (locationId: string) => {
+    setLocationAvailability(prev => ({
+      ...prev,
+      [locationId]: !prev[locationId]
+    }));
+
+    // Reset quantity and par level when unchecked
+    if (locationAvailability[locationId]) {
+      setLocationQuantities(prev => ({
+        ...prev,
+        [locationId]: 0
+      }));
+      setLocationParLevels(prev => ({
+        ...prev,
+        [locationId]: 0
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Save items to each location with quantity > 0
-    const locationsToSave = Object.entries(locationQuantities)
-      .filter(([_, quantity]) => quantity > 0);
+    // Save items only to locations where availability is checked
+    const locationsToSave = Object.entries(locationAvailability)
+      .filter(([_, isAvailable]) => isAvailable)
+      .map(([locationId]) => locationId);
 
     if (locationsToSave.length === 0) {
-      alert('Please enter a quantity for at least one location');
+      alert('Please select at least one location where this item is available');
       return;
     }
 
     try {
       const headers = await getAuthHeaders();
 
-      for (const [locationId, quantity] of locationsToSave) {
+      for (const locationId of locationsToSave) {
         const existingItemId = existingItemsByLocation[locationId];
+        const quantity = locationQuantities[locationId] || 0;
+        const parLevel = locationParLevels[locationId] || 0;
 
         if (existingItemId) {
           // Update existing item at this location
@@ -217,6 +270,7 @@ export default function InventoryItemModal({
               ...form,
               id: existingItemId,
               quantity,
+              par_level: parLevel,
               location_id: locationId,
             }),
           });
@@ -231,16 +285,17 @@ export default function InventoryItemModal({
             body: JSON.stringify({
               ...form,
               quantity,
+              par_level: parLevel,
               location_id: locationId,
             }),
           });
         }
       }
 
-      // Handle items that need to be deleted (quantity set to 0)
+      // Handle items that need to be deleted (unchecked locations)
       if (editItem) {
-        const locationsToDelete = Object.entries(locationQuantities)
-          .filter(([locationId, quantity]) => quantity === 0 && existingItemsByLocation[locationId]);
+        const locationsToDelete = Object.entries(locationAvailability)
+          .filter(([locationId, isAvailable]) => !isAvailable && existingItemsByLocation[locationId]);
 
         for (const [locationId, _] of locationsToDelete) {
           const itemId = existingItemsByLocation[locationId];
@@ -292,7 +347,9 @@ export default function InventoryItemModal({
   };
 
   const getTotalQuantity = () => {
-    return Object.values(locationQuantities).reduce((sum, qty) => sum + qty, 0);
+    return Object.entries(locationQuantities)
+      .filter(([locationId]) => locationAvailability[locationId])
+      .reduce((sum, [_, qty]) => sum + qty, 0);
   };
 
   if (!isOpen) return null;
@@ -470,11 +527,11 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                {/* Location Quantities Section */}
+                {/* Location Availability & Quantities Section */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <MapPin size={16} className="inline mr-1" />
-                    Quantities by Location *
+                    Location Availability
                   </label>
                   <div style={{
                     backgroundColor: '#F9FAFB',
@@ -482,43 +539,84 @@ export default function InventoryItemModal({
                     padding: '1rem',
                     border: '1px solid #E5E7EB'
                   }}>
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-3">
                       {locations.map((location) => (
-                        <div key={location.id} className="flex items-center justify-between">
-                          <label className="text-sm font-medium text-gray-700" style={{ minWidth: '120px' }}>
-                            {location.name}
-                          </label>
-                          <div className="flex items-center gap-2">
+                        <div key={location.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                          <div className="flex items-center">
                             <input
-                              className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500 text-center"
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={locationQuantities[location.id] || 0}
-                              onChange={(e) =>
-                                handleLocationQuantityChange(location.id, parseInt(e.target.value) || 0)
-                              }
+                              type="checkbox"
+                              id={`location-${location.id}`}
+                              checked={locationAvailability[location.id] || false}
+                              onChange={() => handleLocationAvailabilityToggle(location.id)}
+                              className="h-4 w-4 text-cork-600 focus:ring-cork-500 border-gray-300 rounded"
                             />
-                            <span className="text-sm text-gray-500">
-                              {form.unit || 'units'}
-                            </span>
+                            <label
+                              htmlFor={`location-${location.id}`}
+                              className="ml-2 text-sm font-medium text-gray-900 cursor-pointer"
+                            >
+                              {location.name}
+                            </label>
                           </div>
+
+                          {locationAvailability[location.id] && (
+                            <div className="mt-3 ml-6 grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  Quantity
+                                </label>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={locationQuantities[location.id] || 0}
+                                    onChange={(e) =>
+                                      handleLocationQuantityChange(location.id, parseInt(e.target.value) || 0)
+                                    }
+                                  />
+                                  <span className="text-xs text-gray-500">
+                                    {form.unit || 'units'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  Min Stock
+                                </label>
+                                <input
+                                  className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={locationParLevels[location.id] || 0}
+                                  onChange={(e) =>
+                                    handleLocationParLevelChange(location.id, parseInt(e.target.value) || 0)
+                                  }
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
-                    <div style={{
-                      marginTop: '0.75rem',
-                      paddingTop: '0.75rem',
-                      borderTop: '1px solid #E5E7EB',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span className="text-sm font-semibold text-gray-700">Total</span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {getTotalQuantity()} {form.unit || 'units'}
-                      </span>
-                    </div>
+
+                    {getTotalQuantity() > 0 && (
+                      <div style={{
+                        marginTop: '0.75rem',
+                        paddingTop: '0.75rem',
+                        borderTop: '1px solid #E5E7EB',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <span className="text-sm font-semibold text-gray-700">Total Quantity</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {getTotalQuantity()} {form.unit || 'units'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -562,23 +660,6 @@ export default function InventoryItemModal({
                       }
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Par Level
-                  </label>
-                  <input
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="Minimum stock level"
-                    value={form.par_level || ''}
-                    onChange={(e) =>
-                      handleChange('par_level', parseFloat(e.target.value) || 0)
-                    }
-                  />
                 </div>
 
                 <div>
