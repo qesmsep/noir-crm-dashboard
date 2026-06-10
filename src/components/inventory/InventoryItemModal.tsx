@@ -407,8 +407,8 @@ export default function InventoryItemModal({
 
             <form onSubmit={handleSubmit} className={styles.modalBody}>
               <div className="grid grid-cols-1 gap-4">
-                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1rem' }}>
-                  <div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ width: '250px' }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Name *
                     </label>
@@ -422,7 +422,7 @@ export default function InventoryItemModal({
                     />
                   </div>
 
-                  <div>
+                  <div style={{ width: '200px' }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Brand
                     </label>
@@ -476,8 +476,8 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ width: '120px' }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Unit
                     </label>
@@ -498,7 +498,7 @@ export default function InventoryItemModal({
                     </select>
                   </div>
 
-                  <div>
+                  <div style={{ width: '100px' }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Volume (oz)
                     </label>
@@ -518,9 +518,9 @@ export default function InventoryItemModal({
                     />
                   </div>
 
-                  <div>
+                  <div style={{ width: '100px' }}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cost per Unit ($)
+                      Cost ($)
                     </label>
                     <input
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
