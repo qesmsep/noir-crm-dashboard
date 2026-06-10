@@ -87,10 +87,8 @@ export default function InventoryItemModal({
       setLocationQuantities(initialQuantities);
       setLocationParLevels(initialParLevels);
       setLocationAvailability(initialAvailability);
-      // Set first location as selected tab
-      if (locations.length > 0) {
-        setSelectedLocationTab(locations[0].id);
-      }
+      // Set All Locations as default selected tab
+      setSelectedLocationTab('all');
     }
   }, [isOpen, locations]);
 
@@ -409,31 +407,33 @@ export default function InventoryItemModal({
 
             <form onSubmit={handleSubmit} className={styles.modalBody}>
               <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
-                    type="text"
-                    placeholder="e.g., Grey Goose Vodka"
-                    value={form.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
-                    required
-                  />
-                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Name *
+                    </label>
+                    <input
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
+                      type="text"
+                      placeholder="e.g., Grey Goose Vodka"
+                      value={form.name}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Brand
-                  </label>
-                  <input
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
-                    type="text"
-                    placeholder="e.g., Grey Goose"
-                    value={form.brand}
-                    onChange={(e) => handleChange('brand', e.target.value)}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Brand
+                    </label>
+                    <input
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
+                      type="text"
+                      placeholder="e.g., Grey Goose"
+                      value={form.brand}
+                      onChange={(e) => handleChange('brand', e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -476,7 +476,7 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Unit
@@ -517,6 +517,26 @@ export default function InventoryItemModal({
                       }}
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cost per Unit ($)
+                    </label>
+                    <input
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={form.cost_per_unit || ''}
+                      onChange={(e) =>
+                        handleChange(
+                          'cost_per_unit',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                    />
+                  </div>
                 </div>
 
                 {/* Location Inventory - Tabbed Interface */}
@@ -532,6 +552,25 @@ export default function InventoryItemModal({
                     borderBottom: '1px solid #E5E7EB',
                     marginBottom: '0.75rem'
                   }}>
+                    {/* All Locations Tab */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLocationTab('all')}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.875rem',
+                        fontWeight: selectedLocationTab === 'all' ? '600' : '400',
+                        color: selectedLocationTab === 'all' ? '#92400E' : '#6B7280',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        borderBottom: selectedLocationTab === 'all' ? '2px solid #92400E' : '2px solid transparent',
+                        cursor: 'pointer',
+                        marginBottom: '-1px'
+                      }}
+                    >
+                      All Locations
+                    </button>
+
                     {locations.map((location) => (
                       <button
                         key={location.id}
@@ -567,7 +606,52 @@ export default function InventoryItemModal({
                   </div>
 
                   {/* Tab Content */}
-                  {selectedLocationTab && (
+                  {selectedLocationTab === 'all' ? (
+                    /* All Locations Summary */
+                    <div style={{
+                      padding: '0.75rem',
+                      backgroundColor: '#F9FAFB',
+                      borderRadius: '0.375rem',
+                      border: '1px solid #E5E7EB'
+                    }}>
+                      <div style={{ fontSize: '0.875rem' }}>
+                        {locations.map((location) => (
+                          <div key={location.id} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '0.5rem 0',
+                            borderBottom: '1px solid #E5E7EB'
+                          }}>
+                            <span style={{ fontWeight: '500', color: '#374151' }}>
+                              {location.name}
+                            </span>
+                            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                              <span style={{ color: '#6B7280', fontSize: '0.813rem' }}>
+                                Qty: <strong>{locationQuantities[location.id] || 0}</strong>
+                              </span>
+                              <span style={{ color: '#6B7280', fontSize: '0.813rem' }}>
+                                Min: <strong>{locationParLevels[location.id] || 0}</strong>
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        <div style={{
+                          marginTop: '0.5rem',
+                          paddingTop: '0.5rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontWeight: '600'
+                        }}>
+                          <span style={{ color: '#374151' }}>Total</span>
+                          <span style={{ color: '#111827' }}>
+                            {getTotalQuantity()} {form.unit || 'units'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : selectedLocationTab && (
                     <div style={{
                       display: 'flex',
                       gap: '1rem',
@@ -612,67 +696,6 @@ export default function InventoryItemModal({
                       </div>
                     </div>
                   )}
-
-                  {/* Total Summary */}
-                  {getTotalQuantity() > 0 && (
-                    <div style={{
-                      marginTop: '0.5rem',
-                      padding: '0.5rem',
-                      backgroundColor: '#F3F4F6',
-                      borderRadius: '0.25rem',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '0.813rem'
-                    }}>
-                      <span style={{ color: '#6B7280' }}>Total across all locations:</span>
-                      <span style={{ fontWeight: '600', color: '#111827' }}>
-                        {getTotalQuantity()} {form.unit || 'units'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cost per Unit ($)
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={form.cost_per_unit || ''}
-                      onChange={(e) =>
-                        handleChange(
-                          'cost_per_unit',
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price per Serving ($)
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cork-500"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={form.price_per_serving || ''}
-                      onChange={(e) =>
-                        handleChange(
-                          'price_per_serving',
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                    />
-                  </div>
                 </div>
 
                 <div>
