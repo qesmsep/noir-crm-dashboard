@@ -58,6 +58,7 @@ export default function InventoryPage() {
 
   // Inventory state
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [allInventory, setAllInventory] = useState<InventoryItem[]>([]); // All items for recipe creation
   const [inventorySearch, setInventorySearch] = useState('');
   const [inventoryCategory, setInventoryCategory] = useState<InventoryCategory | 'all'>('all');
   const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
@@ -130,6 +131,20 @@ export default function InventoryPage() {
     }
   }, [currentLocation]);
 
+  // Fetch all inventory items for recipe creation (location agnostic)
+  const fetchAllInventory = useCallback(async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/inventory', { headers }); // Always fetch all
+      if (res.ok) {
+        const data = await res.json();
+        setAllInventory(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch all inventory:', err);
+    }
+  }, []);
+
   const fetchRecipes = useCallback(async () => {
     try {
       const url = currentLocation === 'all'
@@ -160,10 +175,10 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => {
-    Promise.all([fetchInventory(), fetchRecipes(), fetchSalesHistory()]).finally(
+    Promise.all([fetchInventory(), fetchAllInventory(), fetchRecipes(), fetchSalesHistory()]).finally(
       () => setLoading(false)
     );
-  }, [fetchInventory, fetchRecipes, fetchSalesHistory]);
+  }, [fetchInventory, fetchAllInventory, fetchRecipes, fetchSalesHistory]);
 
   // Computed stats
   const totalItems = inventory.length;
@@ -194,6 +209,7 @@ export default function InventoryPage() {
       if (res.ok) {
         const result = await res.json();
         await fetchInventory();
+        await fetchAllInventory();
         setIsItemDrawerOpen(false);
         setEditingItem(null);
         return result.data; // Return the newly created/updated item
@@ -217,6 +233,7 @@ export default function InventoryPage() {
         body: JSON.stringify({ id }),
       });
       await fetchInventory();
+      await fetchAllInventory();
     } catch (err) {
       console.error('Failed to delete item:', err);
     }
@@ -248,6 +265,7 @@ export default function InventoryPage() {
 
       if (res.ok) {
         await fetchInventory();
+        await fetchAllInventory();
       }
     } catch (err) {
       console.error('Failed to adjust stock:', err);
@@ -374,6 +392,7 @@ export default function InventoryPage() {
     }
 
     await fetchInventory();
+    await fetchAllInventory();
     setIsScannerOpen(false);
 
     // Show failures to user if any occurred
@@ -626,7 +645,7 @@ export default function InventoryPage() {
       {activeTab === 'recipes' && (
         <RecipeBuilder
           recipes={recipes}
-          inventory={inventory}
+          inventory={allInventory}  // Use all inventory for recipe creation
           searchQuery={recipeSearch}
           onSearchChange={setRecipeSearch}
           categoryFilter={recipeCategory}
@@ -641,6 +660,7 @@ export default function InventoryPage() {
           currentLocation={currentLocation}
           onUploadComplete={() => {
             fetchInventory();
+            fetchAllInventory();
             fetchRecipes();
           }}
         />
@@ -674,6 +694,7 @@ export default function InventoryPage() {
         onClose={() => setIsTransferModalOpen(false)}
         onTransferComplete={() => {
           fetchInventory();
+          fetchAllInventory();
           setIsTransferModalOpen(false);
         }}
         items={inventory}
@@ -695,7 +716,7 @@ export default function InventoryPage() {
         onDelete={handleDeleteRecipe}
         onArchive={handleArchiveRecipe}
         editRecipe={editingRecipe}
-        inventory={inventory}
+        inventory={allInventory}  // Use all inventory for recipe creation
         saving={savingRecipe}
         onSaveNewItem={handleSaveItem}
         currentLocation={currentLocation}
