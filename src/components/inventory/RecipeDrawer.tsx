@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-react';
 import InventoryItemModal from './InventoryItemModal';
 import type {
   Recipe,
@@ -485,10 +485,7 @@ export default function RecipeDrawer({
               >
                 <option value="cocktail">Cocktail</option>
                 <option value="mocktail">Mocktail</option>
-                <option value="shot">Shot</option>
-                <option value="beer">Beer</option>
-                <option value="wine">Wine</option>
-                <option value="other">Other</option>
+                <option value="syrup">Syrup</option>
               </select>
             </div>
             <div className={styles.formGroup}>
@@ -503,37 +500,6 @@ export default function RecipeDrawer({
                 onChange={(e) =>
                   handleChange('menu_price', parseFloat(e.target.value) || 0)
                 }
-              />
-            </div>
-          </div>
-
-          {/* Descriptor Words */}
-          <div className={styles.formGroup}>
-            <label className={styles.formLabel}>Descriptor Words</label>
-            <div className={styles.descriptorInputs}>
-              <input
-                className={styles.descriptorInput}
-                type="text"
-                placeholder="e.g., Sweet"
-                maxLength={20}
-                value={(form.descriptors || ['', '', ''])[0]}
-                onChange={(e) => updateDescriptor(0, e.target.value)}
-              />
-              <input
-                className={styles.descriptorInput}
-                type="text"
-                placeholder="e.g., Citrus"
-                maxLength={20}
-                value={(form.descriptors || ['', '', ''])[1]}
-                onChange={(e) => updateDescriptor(1, e.target.value)}
-              />
-              <input
-                className={styles.descriptorInput}
-                type="text"
-                placeholder="e.g., Refreshing"
-                maxLength={20}
-                value={(form.descriptors || ['', '', ''])[2]}
-                onChange={(e) => updateDescriptor(2, e.target.value)}
               />
             </div>
           </div>

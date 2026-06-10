@@ -51,7 +51,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 
 export default function InventoryPage() {
   // Location state (UILocationSlug includes 'all' for filtering)
-  const [currentLocation, setCurrentLocation] = useState<UILocationSlug>('noirkc');
+  const [currentLocation, setCurrentLocation] = useState<UILocationSlug>('all');
 
   // Tab state
   const [activeTab, setActiveTab] = useState<InventoryTab>('inventory');

@@ -80,7 +80,9 @@ export default function InventoryItemModal({
       setForm({ ...EMPTY_FORM, location_id: targetLocation?.id || '' });
       setVolumeOzInput('');
     }
-  }, [editItem, isOpen, currentLocation, locations]);
+    // Note: locations is intentionally omitted from deps to avoid infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editItem, isOpen, currentLocation]);
 
   // Load settings with error handling
   useEffect(() => {
