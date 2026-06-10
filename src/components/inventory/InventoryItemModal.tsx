@@ -527,46 +527,65 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                {/* Location Availability & Quantities Section */}
+                {/* Location Availability & Quantities Section - Compact */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <MapPin size={16} className="inline mr-1" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <MapPin size={14} className="inline mr-1" />
                     Location Availability
                   </label>
                   <div style={{
                     backgroundColor: '#F9FAFB',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
-                    border: '1px solid #E5E7EB'
+                    borderRadius: '0.375rem',
+                    padding: '0.5rem',
+                    border: '1px solid #E5E7EB',
+                    fontSize: '0.875rem'
                   }}>
-                    <div className="space-y-3">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {locations.map((location) => (
-                        <div key={location.id} className="border border-gray-200 rounded-lg p-3 bg-white">
-                          <div className="flex items-center">
+                        <div key={location.id} style={{
+                          padding: '0.375rem',
+                          backgroundColor: locationAvailability[location.id] ? '#F3F4F6' : 'transparent',
+                          borderRadius: '0.25rem'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <input
                               type="checkbox"
                               id={`location-${location.id}`}
                               checked={locationAvailability[location.id] || false}
                               onChange={() => handleLocationAvailabilityToggle(location.id)}
-                              className="h-4 w-4 text-cork-600 focus:ring-cork-500 border-gray-300 rounded"
+                              className="h-3.5 w-3.5 text-cork-600 focus:ring-cork-500 border-gray-300 rounded"
                             />
                             <label
                               htmlFor={`location-${location.id}`}
-                              className="ml-2 text-sm font-medium text-gray-900 cursor-pointer"
+                              style={{
+                                fontSize: '0.875rem',
+                                fontWeight: locationAvailability[location.id] ? '500' : '400',
+                                color: '#374151',
+                                cursor: 'pointer',
+                                minWidth: '100px'
+                              }}
                             >
                               {location.name}
                             </label>
-                          </div>
 
-                          {locationAvailability[location.id] && (
-                            <div className="mt-3 ml-6 grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">
-                                  Quantity
-                                </label>
-                                <div className="flex items-center gap-1">
+                            {locationAvailability[location.id] && (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                                marginLeft: 'auto'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Qty:</span>
                                   <input
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
+                                    style={{
+                                      width: '3rem',
+                                      padding: '0.125rem 0.25rem',
+                                      fontSize: '0.813rem',
+                                      border: '1px solid #D1D5DB',
+                                      borderRadius: '0.25rem',
+                                      textAlign: 'center'
+                                    }}
                                     type="number"
                                     min="0"
                                     step="1"
@@ -575,44 +594,47 @@ export default function InventoryItemModal({
                                       handleLocationQuantityChange(location.id, parseInt(e.target.value) || 0)
                                     }
                                   />
-                                  <span className="text-xs text-gray-500">
-                                    {form.unit || 'units'}
-                                  </span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Min:</span>
+                                  <input
+                                    style={{
+                                      width: '3rem',
+                                      padding: '0.125rem 0.25rem',
+                                      fontSize: '0.813rem',
+                                      border: '1px solid #D1D5DB',
+                                      borderRadius: '0.25rem',
+                                      textAlign: 'center'
+                                    }}
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={locationParLevels[location.id] || 0}
+                                    onChange={(e) =>
+                                      handleLocationParLevelChange(location.id, parseInt(e.target.value) || 0)
+                                    }
+                                  />
                                 </div>
                               </div>
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-1">
-                                  Min Stock
-                                </label>
-                                <input
-                                  className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cork-500 text-sm"
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  value={locationParLevels[location.id] || 0}
-                                  onChange={(e) =>
-                                    handleLocationParLevelChange(location.id, parseInt(e.target.value) || 0)
-                                  }
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
 
                     {getTotalQuantity() > 0 && (
                       <div style={{
-                        marginTop: '0.75rem',
-                        paddingTop: '0.75rem',
+                        marginTop: '0.5rem',
+                        paddingTop: '0.5rem',
                         borderTop: '1px solid #E5E7EB',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        fontSize: '0.813rem'
                       }}>
-                        <span className="text-sm font-semibold text-gray-700">Total Quantity</span>
-                        <span className="text-sm font-semibold text-gray-900">
+                        <span style={{ fontWeight: '600', color: '#374151' }}>Total</span>
+                        <span style={{ fontWeight: '600', color: '#111827' }}>
                           {getTotalQuantity()} {form.unit || 'units'}
                         </span>
                       </div>
