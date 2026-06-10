@@ -407,8 +407,8 @@ export default function InventoryItemModal({
 
             <form onSubmit={handleSubmit} className={styles.modalBody}>
               <div className="grid grid-cols-1 gap-4">
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ width: '250px' }}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Name *
                     </label>
@@ -422,7 +422,7 @@ export default function InventoryItemModal({
                     />
                   </div>
 
-                  <div style={{ width: '200px' }}>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Brand
                     </label>
@@ -436,7 +436,7 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: '400px' }}>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Category
@@ -476,8 +476,8 @@ export default function InventoryItemModal({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ width: '120px' }}>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Unit
                     </label>
@@ -498,7 +498,7 @@ export default function InventoryItemModal({
                     </select>
                   </div>
 
-                  <div style={{ width: '100px' }}>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Volume (oz)
                     </label>
@@ -518,7 +518,7 @@ export default function InventoryItemModal({
                     />
                   </div>
 
-                  <div style={{ width: '100px' }}>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Cost ($)
                     </label>
