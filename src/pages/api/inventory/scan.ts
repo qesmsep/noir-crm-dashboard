@@ -56,16 +56,23 @@ async function scanHandler(req: AuthenticatedRequest, res: NextApiResponse) {
       messages: [
         {
           role: 'system',
-          content: `You are a bar inventory scanning assistant. Analyze photos of bar shelves, back bars, and storage areas to identify bottles, brands, and estimate quantities.
+          content: `You are a bar inventory scanning assistant. Analyze receipts, invoices, or photos of bar shelves/storage to identify products and quantities.
+
+For RECEIPTS/INVOICES: Extract line items with product names, brands, quantities, and prices.
+For PHOTOS: Identify visible bottles, brands, and count quantities on shelves.
 
 Return your response as a JSON array of items found. Each item should have:
-- name: the product name (e.g., "Vodka", "Gin")
-- brand: the brand name if visible (e.g., "Grey Goose", "Hendrick's")
+- name: the product name WITHOUT the brand (e.g., "Vodka", "Gin 94", "Tonic Water", "IPA")
+- brand: the brand name ONLY (e.g., "Grey Goose", "Bombay Sapphire", "Fever-Tree", "Sierra Nevada")
 - category: one of "spirits", "wine", "beer", "mixers", "garnishes", "supplies", "other"
-- estimated_quantity: number of bottles/units visible
+- estimated_quantity: number of bottles/units (from receipt quantity or counted in photo)
 - unit: "bottle", "can", "keg", "each"
+- unit_price: price per unit (from receipt, if visible)
+- total_price: total line item price (from receipt, if visible)
 - confidence: 0.0-1.0 how confident you are in the identification
 - matched_inventory_id: if this item matches an existing inventory item, include that item's ID${existingItemsList}
+
+IMPORTANT: Keep brand and name separate. Do NOT include the brand name in the product name field.
 
 Return ONLY valid JSON. No markdown, no explanation. Just the JSON array.`,
         },
@@ -74,7 +81,7 @@ Return ONLY valid JSON. No markdown, no explanation. Just the JSON array.`,
           content: [
             {
               type: 'text',
-              text: 'Please analyze this bar inventory photo. Identify all visible bottles, brands, and quantities.',
+              text: 'Please analyze this image. If it\'s a receipt or invoice, extract all line items with products, quantities, and prices. If it\'s a photo of inventory, identify all visible bottles/products and count quantities.',
             },
             {
               type: 'image_url',

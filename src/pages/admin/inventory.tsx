@@ -321,21 +321,31 @@ export default function InventoryPage() {
     setIsItemDrawerOpen(true);
   };
 
-  // AI Scan handler - supports multi-location assignment
+  // AI Scan handler - supports multi-location assignment with per-location quantities
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
     const failures: string[] = [];
 
     for (const scanned of scannedItems) {
-      const selectedLocations = scanned.selected_locations || [];
+      const locationQuantities = scanned.location_quantities || {};
+      const allocatedLocations = Object.entries(locationQuantities).filter(([_, qty]) => qty > 0);
 
-      // Skip items with no locations selected
-      if (selectedLocations.length === 0) {
+      // Skip items with no locations allocated
+      if (allocatedLocations.length === 0) {
         continue;
       }
 
-      if (scanned.matched_inventory_id) {
-        // Update existing item quantity using transaction API to avoid race conditions
-        // (stale React state could cause incorrect absolute quantity if another user/tab updates concurrently)
+      // Calculate cost per unit from receipt data
+      let costPerUnit = 0;
+      if (scanned.unit_price) {
+        costPerUnit = scanned.unit_price;
+      } else if (scanned.total_price && scanned.estimated_quantity > 0) {
+        costPerUnit = scanned.total_price / scanned.estimated_quantity;
+      }
+
+      if (!scanned.create_new && scanned.matched_inventory_id) {
+        // Match to existing: add quantity to the existing item
+        const totalQuantity = allocatedLocations.reduce((sum, [_, qty]) => sum + qty, 0);
+
         try {
           const headers = await getAuthHeaders();
           const res = await fetch('/api/inventory/transactions', {
@@ -344,8 +354,8 @@ export default function InventoryPage() {
             body: JSON.stringify({
               item_id: scanned.matched_inventory_id,
               transaction_type: 'add',
-              quantity_change: scanned.estimated_quantity,
-              notes: 'Added from AI scan'
+              quantity_change: totalQuantity,
+              notes: 'Added from receipt scan'
             }),
           });
 
@@ -357,9 +367,9 @@ export default function InventoryPage() {
           failures.push(`Failed to update ${scanned.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
         }
       } else {
-        // Create new inventory item at each selected location
+        // Create new: create inventory item at each allocated location with specific quantity
         const headers = await getAuthHeaders();
-        for (const locationSlug of selectedLocations) {
+        for (const [locationSlug, quantity] of allocatedLocations) {
           try {
             const res = await fetch('/api/inventory', {
               method: 'POST',
@@ -368,21 +378,25 @@ export default function InventoryPage() {
                 name: scanned.name,
                 brand: scanned.brand,
                 category: scanned.category,
-                quantity: scanned.estimated_quantity,
+                quantity: quantity,
                 unit: scanned.unit || 'bottle',
                 subcategory: '',
                 volume_ml: 750,
-                cost_per_unit: 0,
+                cost_per_unit: costPerUnit,
                 price_per_serving: 0,
                 par_level: 0,
-                notes: 'Added from AI scan',
+                notes: 'Added from receipt scan',
                 location_slug: locationSlug,
               }),
             });
 
             if (!res.ok) {
               const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-              failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${errorData.error || res.statusText}`);
+              const errorMsg = errorData.details
+                ? `${errorData.error} - ${JSON.stringify(errorData.details)}`
+                : (errorData.error || res.statusText);
+              failures.push(`Failed to create ${scanned.name} (${quantity} units) at ${locationSlug}: ${errorMsg}`);
+              console.error('Inventory creation error:', errorData);
             }
           } catch (err) {
             failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${err instanceof Error ? err.message : 'Unknown error'}`);

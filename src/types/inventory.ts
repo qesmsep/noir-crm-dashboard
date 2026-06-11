@@ -207,9 +207,14 @@ export interface ScannedItem {
   category: InventoryCategory;
   estimated_quantity: number;
   unit: InventoryUnit;
+  unit_price?: number;
+  total_price?: number;
   confidence: number;
   matched_inventory_id?: string;
-  selected_locations?: LocationSlug[];
+  matched_inventory_name?: string;
+  matched_inventory_stock?: number;
+  location_quantities?: Record<LocationSlug, number>; // qty per location
+  create_new?: boolean; // true = create new, false = match to existing
 }
 
 // ========================================
