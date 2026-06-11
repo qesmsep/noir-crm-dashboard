@@ -8,13 +8,15 @@ interface PhotoCropUploadProps {
   currentPhoto?: string;
   buttonClassName?: string;
   showEditButton?: boolean; // Show edit button for existing photo
+  autoOpen?: boolean; // Auto-open crop modal on mount
 }
 
 export default function PhotoCropUpload({
   onPhotoSelected,
   currentPhoto,
   buttonClassName,
-  showEditButton = false
+  showEditButton = false,
+  autoOpen = false
 }: PhotoCropUploadProps) {
   const { toast } = useToast();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -209,6 +211,13 @@ export default function PhotoCropUpload({
   const handleUploadNewPhoto = () => {
     fileInputRef.current?.click();
   };
+
+  // Auto-open crop modal when autoOpen is true
+  useEffect(() => {
+    if (autoOpen && currentPhoto) {
+      handleEditCurrentPhoto();
+    }
+  }, [autoOpen]);
 
   // Add touch event listener with { passive: false } to allow preventDefault
   useEffect(() => {

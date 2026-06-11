@@ -191,6 +191,9 @@ export default function MemberDetailAdmin() {
   const [allAccountIds, setAllAccountIds] = useState<string[]>([]);
   const [currentAccountIndex, setCurrentAccountIndex] = useState<number>(-1);
 
+  // Photo editing state
+  const [editingPhotoMemberId, setEditingPhotoMemberId] = useState<string | null>(null);
+
   const toggleMemberExpansion = async (memberId: string) => {
     const isExpanding = !expandedMemberIds.has(memberId);
 
@@ -211,16 +214,16 @@ export default function MemberDetailAdmin() {
         const { data: referred } = await supabase
           .from('members')
           .select('member_id, first_name, last_name')
-          .eq('referred_by', members.find(m => m.member_id === memberId)?.referral_code || '');
+          .eq('referred_by_member_id', memberId);
 
         // Get who referred this person
         const member = members.find(m => m.member_id === memberId);
         let referredBy: { member_id: any; first_name: any; last_name: any; } | null = null;
-        if (member?.referred_by) {
+        if (member?.referred_by_member_id) {
           const { data: referrer } = await supabase
             .from('members')
             .select('member_id, first_name, last_name')
-            .ilike('referral_code', member.referred_by)
+            .eq('member_id', member.referred_by_member_id)
             .single();
           referredBy = referrer || null;
         }
@@ -267,6 +270,7 @@ export default function MemberDetailAdmin() {
 
     fetchAllAccountIds();
   }, [accountId]);
+
 
   // Navigation functions
   const goToNextMember = () => {
@@ -1773,7 +1777,15 @@ export default function MemberDetailAdmin() {
                     <div className={styles.memberHeader} style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }} onClick={() => toggleMemberExpansion(member.member_id)}>
                       <div style={{ position: 'relative' }}>
                         {member.photo ? (
-                          <div className={styles.memberPhoto}>
+                          <div
+                            className={styles.memberPhoto}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingPhotoMemberId(member.member_id);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to view/edit photo"
+                          >
                             <Image
                               src={member.photo}
                               alt={`${member.first_name} ${member.last_name}`}
@@ -1784,11 +1796,19 @@ export default function MemberDetailAdmin() {
                             />
                           </div>
                         ) : (
-                          <div className={styles.photoPlaceholder}>
+                          <div
+                            className={styles.photoPlaceholder}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingPhotoMemberId(member.member_id);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                            title="Click to add photo"
+                          >
                             {member.first_name?.[0]}{member.last_name?.[0]}
                           </div>
                         )}
-                        {editingMemberId === member.member_id && (
+                        {(editingMemberId === member.member_id || editingPhotoMemberId === member.member_id) && (
                           <div
                             style={{
                               position: 'absolute',
@@ -1799,10 +1819,15 @@ export default function MemberDetailAdmin() {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <PhotoCropUpload
+                              key={`photo-${member.member_id}-${editingPhotoMemberId}`}
                               currentPhoto={member.photo}
-                              onPhotoSelected={(photoDataUrl) => handlePhotoUpdate(member.member_id, photoDataUrl)}
+                              onPhotoSelected={(photoDataUrl) => {
+                                handlePhotoUpdate(member.member_id, photoDataUrl);
+                                setEditingPhotoMemberId(null);
+                              }}
                               buttonClassName={styles.photoEditButton}
                               showEditButton={true}
+                              autoOpen={editingPhotoMemberId === member.member_id && editingMemberId !== member.member_id}
                             />
                           </div>
                         )}
