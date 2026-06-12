@@ -212,7 +212,10 @@ export interface ScannedItem {
   confidence: number;
   matched_inventory_id?: string;
   matched_inventory_name?: string;
+  matched_inventory_brand?: string;
   matched_inventory_stock?: number;
+  ai_extracted_name?: string; // Original AI extraction
+  ai_extracted_brand?: string; // Original AI extraction
   location_quantities?: Record<LocationSlug, number>; // qty per location
   create_new?: boolean; // true = create new, false = match to existing
 }

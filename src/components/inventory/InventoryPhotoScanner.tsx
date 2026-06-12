@@ -24,6 +24,9 @@ export default function InventoryPhotoScanner({
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScannedItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [matchingItemIndex, setMatchingItemIndex] = useState<number | null>(null);
+  const [matchSearchQuery, setMatchSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -95,21 +98,42 @@ export default function InventoryPhotoScanner({
       const data = await res.json();
       // Initialize items with location_quantities and match info
       const itemsWithDefaults = (data.items || []).map((item: ScannedItem) => {
+        // Store AI-extracted values
+        const aiExtractedName = item.name;
+        const aiExtractedBrand = item.brand;
+
         // Find matched item details from existingItems
-        let matchedName, matchedStock;
+        let matchedName, matchedBrand, matchedStock, displayName, displayBrand;
         if (item.matched_inventory_id) {
           const matched = existingItems.find(i => i.id === item.matched_inventory_id);
           if (matched) {
-            matchedName = `${matched.brand ? matched.brand + ' ' : ''}${matched.name}`;
+            matchedName = matched.name;
+            matchedBrand = matched.brand || '';
             matchedStock = matched.quantity;
+            // Use matched item's name/brand for display when there's a match
+            displayName = matchedName;
+            displayBrand = matchedBrand;
+          } else {
+            // No matched item found, use AI extraction
+            displayName = aiExtractedName;
+            displayBrand = aiExtractedBrand;
           }
+        } else {
+          // No match, use AI extraction
+          displayName = aiExtractedName;
+          displayBrand = aiExtractedBrand;
         }
 
         return {
           ...item,
+          name: displayName,
+          brand: displayBrand,
+          ai_extracted_name: aiExtractedName,
+          ai_extracted_brand: aiExtractedBrand,
           location_quantities: {},
-          create_new: !item.matched_inventory_id, // Default to create new if no match
+          create_new: !item.matched_inventory_id, // Default to match if matched, create new if not
           matched_inventory_name: matchedName,
+          matched_inventory_brand: matchedBrand,
           matched_inventory_stock: matchedStock,
         };
       });
@@ -152,7 +176,36 @@ export default function InventoryPhotoScanner({
   const toggleMatchMode = (index: number, createNew: boolean) => {
     if (!scanResults) return;
     const updated = [...scanResults];
-    updated[index] = { ...updated[index], create_new: createNew };
+    const item = updated[index];
+
+    if (createNew) {
+      // Switching to "Create new" - use AI-extracted values (or keep current edits)
+      // Only reset if currently showing matched values
+      if (!item.create_new && item.matched_inventory_id) {
+        updated[index] = {
+          ...item,
+          create_new: true,
+          name: item.ai_extracted_name || item.name,
+          brand: item.ai_extracted_brand || item.brand,
+        };
+      } else {
+        updated[index] = { ...item, create_new: true };
+      }
+    } else {
+      // Switching to "Match to existing" - use matched item values
+      if (item.matched_inventory_id) {
+        updated[index] = {
+          ...item,
+          create_new: false,
+          name: item.matched_inventory_name || item.name,
+          brand: item.matched_inventory_brand || item.brand,
+        };
+      } else {
+        // No match available, can't switch to match mode
+        return;
+      }
+    }
+
     setScanResults(updated);
   };
 
@@ -195,6 +248,33 @@ export default function InventoryPhotoScanner({
     if (confirm(`Remove ${itemName} from the scan?`)) {
       setScanResults(scanResults.filter((_, i) => i !== index));
     }
+  };
+
+  const openMatchModal = (index: number) => {
+    setMatchingItemIndex(index);
+    setMatchSearchQuery('');
+    setShowMatchModal(true);
+  };
+
+  const selectMatchedItem = (inventoryItem: InventoryItem) => {
+    if (matchingItemIndex === null || !scanResults) return;
+
+    const updated = [...scanResults];
+    updated[matchingItemIndex] = {
+      ...updated[matchingItemIndex],
+      matched_inventory_id: inventoryItem.id,
+      matched_inventory_name: inventoryItem.name,
+      matched_inventory_brand: inventoryItem.brand || '',
+      matched_inventory_stock: inventoryItem.quantity,
+      name: inventoryItem.name,
+      brand: inventoryItem.brand || '',
+      create_new: false, // Switch to match mode
+    };
+
+    setScanResults(updated);
+    setShowMatchModal(false);
+    setMatchingItemIndex(null);
+    setMatchSearchQuery('');
   };
 
   const handleConfirm = () => {
@@ -369,40 +449,65 @@ export default function InventoryPhotoScanner({
                           gap: '0.75rem'
                         }}>
                           <div>
-                            <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>Product Name</div>
+                            <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span>
+                                Product Name {!item.create_new && <span style={{ fontSize: '0.625rem', color: '#9CA3AF' }}>(locked)</span>}
+                              </span>
+                              {item.matched_inventory_id && !item.create_new && (
+                                <span style={{
+                                  fontSize: '0.625rem',
+                                  fontWeight: 600,
+                                  color: '#059669',
+                                  background: '#D1FAE5',
+                                  padding: '0.125rem 0.375rem',
+                                  borderRadius: '3px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}>
+                                  ✓ Matched
+                                </span>
+                              )}
+                            </div>
                             <input
                               type="text"
                               value={item.name}
                               onChange={(e) => updateItemName(idx, e.target.value)}
                               placeholder="Product Name"
+                              disabled={!item.create_new}
                               style={{
                                 width: '100%',
                                 fontSize: '0.9375rem',
                                 fontWeight: 500,
-                                color: '#111827',
+                                color: !item.create_new ? '#6B7280' : '#111827',
                                 border: '1px solid #D1D5DB',
                                 borderRadius: '4px',
                                 padding: '0.5rem',
-                                background: '#fff'
+                                background: !item.create_new ? '#F9FAFB' : '#fff',
+                                cursor: !item.create_new ? 'not-allowed' : 'text'
                               }}
                             />
                           </div>
                           <div>
-                            <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>Brand</div>
+                            <div style={{ fontSize: '0.75rem', color: '#6B7280', marginBottom: '0.25rem' }}>
+                              Brand {!item.create_new && <span style={{ fontSize: '0.625rem', color: '#9CA3AF' }}>(locked)</span>}
+                            </div>
                             <input
                               type="text"
                               value={item.brand || ''}
                               onChange={(e) => updateItemBrand(idx, e.target.value)}
                               placeholder="Brand"
+                              disabled={!item.create_new}
                               style={{
                                 width: '100%',
                                 fontSize: '0.9375rem',
                                 fontWeight: 500,
-                                color: '#111827',
+                                color: !item.create_new ? '#6B7280' : '#111827',
                                 border: '1px solid #D1D5DB',
                                 borderRadius: '4px',
                                 padding: '0.5rem',
-                                background: '#fff'
+                                background: !item.create_new ? '#F9FAFB' : '#fff',
+                                cursor: !item.create_new ? 'not-allowed' : 'text'
                               }}
                             />
                           </div>
@@ -475,27 +580,6 @@ export default function InventoryPhotoScanner({
 
                         {/* Inventory Match - No title */}
                         <div style={{ marginBottom: '1.5rem' }}>
-                          {/* Current Match Display (if exists) */}
-                          {item.matched_inventory_id && (
-                            <div style={{
-                              padding: '0.5rem 1rem',
-                              border: '1px solid #D1D5DB',
-                              borderRadius: '6px',
-                              background: '#F0FDF4',
-                              fontSize: '0.875rem',
-                              color: '#374151',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              marginBottom: '0.75rem'
-                            }}>
-                              <span>
-                                {item.matched_inventory_name} — current stock: {item.matched_inventory_stock}
-                              </span>
-                              <span style={{ color: '#9CA3AF' }}>▼</span>
-                            </div>
-                          )}
-
                           {/* Create New / Match to Existing Buttons - 50% height */}
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <button
@@ -518,17 +602,16 @@ export default function InventoryPhotoScanner({
                               <span style={{ fontSize: '1rem' }}>+</span> Create new
                             </button>
                             <button
-                              onClick={() => toggleMatchMode(idx, false)}
-                              disabled={!item.matched_inventory_id}
+                              onClick={() => openMatchModal(idx)}
                               style={{
                                 padding: '0.375rem 0.75rem',
                                 border: !item.create_new ? '2px solid #2563EB' : '1px solid #D1D5DB',
                                 borderRadius: '6px',
-                                background: item.matched_inventory_id ? '#fff' : '#F9FAFB',
-                                cursor: item.matched_inventory_id ? 'pointer' : 'not-allowed',
+                                background: '#fff',
+                                cursor: 'pointer',
                                 fontSize: '0.875rem',
                                 fontWeight: 500,
-                                color: !item.create_new ? '#2563EB' : item.matched_inventory_id ? '#374151' : '#9CA3AF',
+                                color: !item.create_new ? '#2563EB' : '#374151',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -707,6 +790,125 @@ export default function InventoryPhotoScanner({
           })()}
         </div>
       </div>
+
+      {/* Match to Existing Item Modal */}
+      {showMatchModal && (
+        <>
+          <div
+            className={styles.modalOverlay}
+            onClick={() => {
+              setShowMatchModal(false);
+              setMatchingItemIndex(null);
+              setMatchSearchQuery('');
+            }}
+            style={{ zIndex: 1001 }}
+          />
+          <div
+            className={styles.modal}
+            style={{
+              zIndex: 1002,
+              maxHeight: '80vh',
+              width: '600px',
+              maxWidth: '90vw'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Match to Existing Inventory</h2>
+              <button
+                className={styles.modalClose}
+                onClick={() => {
+                  setShowMatchModal(false);
+                  setMatchingItemIndex(null);
+                  setMatchSearchQuery('');
+                }}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className={styles.modalBody} style={{ padding: '1.5rem' }}>
+              {/* Search Input */}
+              <input
+                type="text"
+                placeholder="Search by product name or brand..."
+                value={matchSearchQuery}
+                onChange={(e) => setMatchSearchQuery(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '0.9375rem',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  marginBottom: '1rem'
+                }}
+              />
+
+              {/* Inventory List */}
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {existingItems
+                  .filter((item) => {
+                    if (!matchSearchQuery) return true;
+                    const query = matchSearchQuery.toLowerCase();
+                    const name = (item.name || '').toLowerCase();
+                    const brand = (item.brand || '').toLowerCase();
+                    return name.includes(query) || brand.includes(query);
+                  })
+                  .sort((a, b) => {
+                    // Sort by brand then name
+                    const brandA = (a.brand || '').toLowerCase();
+                    const brandB = (b.brand || '').toLowerCase();
+                    if (brandA !== brandB) return brandA.localeCompare(brandB);
+                    return (a.name || '').localeCompare(b.name || '');
+                  })
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => selectMatchedItem(item)}
+                      style={{
+                        padding: '0.875rem',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '6px',
+                        marginBottom: '0.5rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        background: '#fff'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#F9FAFB';
+                        e.currentTarget.style.borderColor = '#2563EB';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#fff';
+                        e.currentTarget.style.borderColor = '#E5E7EB';
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
+                        {item.brand ? `${item.brand} ` : ''}{item.name}
+                      </div>
+                      <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
+                        Stock: {item.quantity} {item.unit} · {item.category}
+                      </div>
+                    </div>
+                  ))}
+                {existingItems.filter((item) => {
+                  if (!matchSearchQuery) return true;
+                  const query = matchSearchQuery.toLowerCase();
+                  const name = (item.name || '').toLowerCase();
+                  const brand = (item.brand || '').toLowerCase();
+                  return name.includes(query) || brand.includes(query);
+                }).length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>
+                    No matching inventory items found
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
