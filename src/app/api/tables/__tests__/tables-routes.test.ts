@@ -161,6 +161,31 @@ describe('PUT /api/tables/[id]', () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/active or inactive/i);
   });
+
+  it('returns 409 when another table already uses the number at the location', async () => {
+    authOk();
+    mockFrom = makeFrom({
+      tables: [
+        { data: { location_id: 'loc1' }, error: null }, // current table lookup
+        { data: { id: 'other' }, error: null }, // a different table has this number
+      ],
+    });
+    const res = await PUT(postReq({ table_number: 7, seats: 2, status: 'active' }), params);
+    expect(res.status).toBe(409);
+  });
+
+  it('updates a table (200) when input is valid and unique', async () => {
+    authOk();
+    mockFrom = makeFrom({
+      tables: [
+        { data: { location_id: 'loc1' }, error: null }, // current table lookup
+        { data: null, error: null }, // no conflicting number
+        { data: { id: 'abc', table_number: 7, seats: 2, status: 'active', location_id: 'loc1' }, error: null }, // update
+      ],
+    });
+    const res = await PUT(postReq({ table_number: 7, seats: 2, status: 'active' }), params);
+    expect(res.status).toBe(200);
+  });
 });
 
 // --- DELETE ----------------------------------------------------------------
@@ -181,6 +206,27 @@ describe('DELETE /api/tables/[id]', () => {
     });
     const res = await DELETE(postReq({}), params);
     expect(res.status).toBe(409);
+  });
+
+  it('returns 409 on a foreign-key violation from historical rows', async () => {
+    authOk();
+    mockFrom = makeFrom({
+      reservations: [{ data: [], error: null }], // no active/future reservations
+      tables: [{ data: null, error: { code: '23503' } }], // delete blocked by FK
+    });
+    const res = await DELETE(postReq({}), params);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/reservations or events/i);
+  });
+
+  it('deletes a table (200) when nothing references it', async () => {
+    authOk();
+    mockFrom = makeFrom({
+      reservations: [{ data: [], error: null }],
+      tables: [{ data: null, error: null }],
+    });
+    const res = await DELETE(postReq({}), params);
+    expect(res.status).toBe(200);
   });
 });
 

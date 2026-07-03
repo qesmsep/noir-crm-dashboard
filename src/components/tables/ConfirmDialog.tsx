@@ -24,8 +24,10 @@ interface ConfirmDialogProps {
 /**
  * Confirmation dialog built on the shared Radix AlertDialog primitives, so
  * focus trapping, Escape handling, and scroll-lock come from the design system
- * rather than a hand-rolled portal. Escape/overlay dismissals route through
- * `onOpenChange` to `onCancel` (which callers keep idempotent).
+ * rather than a hand-rolled portal. Dismissals (Escape or the Cancel button)
+ * route through `onOpenChange` to `onCancel` (which callers keep idempotent).
+ * Note: AlertDialog intentionally does NOT close on overlay/outside click,
+ * which is the desired guard for a destructive action.
  */
 export default function ConfirmDialog({
   isOpen,
