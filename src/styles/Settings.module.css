@@ -870,3 +870,73 @@
   text-align: center;
   padding: 2rem;
 }
+
+/* Compact Table Styles */
+.compactTableWrapper {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.compactTable {
+  width: 100%;
+  max-width: 500px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.compactTable th {
+  padding: 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: #6e6e73;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.compactTable td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.compactTable tr:hover {
+  background-color: #f9fafb;
+}
+
+.editButton {
+  padding: 0.375rem;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6e6e73;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editButton:hover {
+  background: #f3f4f6;
+  color: #a59480;
+  border-color: #a59480;
+}
+
+/* Mobile Cards - Hide desktop table and show cards on mobile */
+.mobileCards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .compactTableWrapper {
+    display: none;
+  }
+
+  .mobileCards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}

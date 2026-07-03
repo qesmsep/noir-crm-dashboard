@@ -1,6 +1,7 @@
 import React from 'react';
 import CalendarAvailabilityControl from './CalendarAvailabilityControl';
 import BypassCodeManager from './BypassCodeManager';
+import TablesSettingSection from './tables/TablesSettingSection';
 import styles from '../styles/Settings.module.css';
 
 // Constants
@@ -356,6 +357,12 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
           />
         </div>
       </div>
+
+      {/* Tables Management */}
+      <TablesSettingSection
+        locationSlug={locationSlug}
+        locationName={locationName}
+      />
 
       {/* Priority Order Reference */}
       <div className={styles.card}>
