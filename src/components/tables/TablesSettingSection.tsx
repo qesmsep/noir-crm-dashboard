@@ -25,6 +25,20 @@ interface TablesSettingSectionProps {
   locationName: string;
 }
 
+// Normalize a raw table row (as returned by POST/PUT) into the shape the list
+// expects. The mutation responses return the DB row without the joined
+// location slug, so we fill it in from the current location context.
+function normalizeTableRow(row: any, locationSlug: string): TableData {
+  return {
+    id: row.id,
+    table_number: Number(row.table_number) || 0,
+    seats: Number(row.seats) || 0,
+    status: row.status || 'active',
+    location_id: row.location_id,
+    location_slug: locationSlug,
+  };
+}
+
 export default function TablesSettingSection({
   locationSlug,
   locationName,
@@ -150,6 +164,9 @@ export default function TablesSettingSection({
           throw new Error(result.error || 'Failed to update table');
         }
 
+        // Update local state from the returned row (no full refetch needed)
+        const updatedRow = normalizeTableRow(result.data, locationSlug);
+        setTables((prev) => prev.map((t) => (t.id === editingTable.id ? updatedRow : t)));
         setSuccess(`Table ${tableNumber} updated successfully`);
       } else {
         // Create new table
@@ -171,11 +188,11 @@ export default function TablesSettingSection({
           throw new Error(result.error || 'Failed to create table');
         }
 
+        // Append the newly created row to local state (no full refetch needed)
+        const createdRow = normalizeTableRow(result.data, locationSlug);
+        setTables((prev) => [...prev, createdRow]);
         setSuccess(`Table ${tableNumber} created successfully`);
       }
-
-      // Refetch data to ensure consistency
-      await fetchTables();
 
       setModalOpen(false);
       setEditingTable(null);
@@ -221,10 +238,9 @@ export default function TablesSettingSection({
         throw new Error(result.error || 'Failed to delete table');
       }
 
+      // Remove the deleted row from local state (no full refetch needed)
+      setTables((prev) => prev.filter((t) => t.id !== id));
       setSuccess(`Table ${tableNumber} deleted successfully`);
-
-      // Refetch data to ensure consistency
-      await fetchTables();
 
       setModalOpen(false);
       setEditingTable(null);

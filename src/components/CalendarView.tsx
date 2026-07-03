@@ -37,10 +37,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent
       const tablesRes = await fetch('/api/tables');
       const tablesJson = await tablesRes.json();
       const tableResources = (tablesJson.data || [])
-        .sort((a: any, b: any) => a.table_number.localeCompare(b.table_number))
+        // table_number is a number from the API, so sort numerically
+        .sort((a: any, b: any) => a.table_number - b.table_number)
         .map((t: any) => ({
           resourceId: t.id,
-          resourceTitle: `Table ${t.table_number}`
+          resourceTitle: `Table ${String(t.table_number).padStart(2, '0')}`
         }));
       setTables(tableResources);
       const [privateEventsRes, resRes] = await Promise.all([

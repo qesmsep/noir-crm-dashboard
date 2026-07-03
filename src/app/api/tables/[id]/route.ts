@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAdminAccess } from '@/lib/admin-middleware';
+
+// Postgres unique_violation error code
+const PG_UNIQUE_VIOLATION = '23505';
 
 export async function PUT(
   request: Request,
@@ -13,10 +16,7 @@ export async function PUT(
       return authCheck.response;
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = supabaseAdmin;
 
     const { id } = await params;
     const body = await request.json();
@@ -26,6 +26,14 @@ export async function PUT(
     if (table_number === undefined || seats === undefined || !status) {
       return NextResponse.json(
         { error: 'Missing required fields: table_number, seats, status' },
+        { status: 400 }
+      );
+    }
+
+    // Validate table_number is a positive integer (guards direct API calls)
+    if (!Number.isInteger(table_number) || table_number < 1) {
+      return NextResponse.json(
+        { error: 'Table number must be a positive integer' },
         { status: 400 }
       );
     }
@@ -87,6 +95,13 @@ export async function PUT(
       .single();
 
     if (error) {
+      // Unique constraint violation from a concurrent update to the same number
+      if (error.code === PG_UNIQUE_VIOLATION) {
+        return NextResponse.json(
+          { error: `Table ${table_number} already exists at this location` },
+          { status: 409 }
+        );
+      }
       console.error('Error updating table:', error);
       return NextResponse.json(
         { error: error.message || 'Failed to update table' },
@@ -115,10 +130,7 @@ export async function DELETE(
       return authCheck.response;
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = supabaseAdmin;
 
     const { id } = await params;
 

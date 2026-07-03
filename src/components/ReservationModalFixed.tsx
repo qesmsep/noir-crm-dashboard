@@ -180,7 +180,10 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
 
   const fetchTables = async () => {
     try {
-      const url = locationSlug ? `/api/tables?location=${locationSlug}` : '/api/tables';
+      // Only active tables can be booked
+      const url = locationSlug
+        ? `/api/tables?location=${locationSlug}&status=active`
+        : '/api/tables?status=active';
       const response = await fetch(url);
       if (response.ok) {
         const result = await response.json();

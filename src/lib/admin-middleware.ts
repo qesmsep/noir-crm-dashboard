@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { resolveAdmin } from './admin-auth';
 
 /**
  * Verify that the request comes from an authenticated admin user.
  * Checks for valid Bearer token and active admin status in database.
+ *
+ * Delegates the token + `admins` table lookup to the shared `resolveAdmin`
+ * helper so there is a single source of truth for admin auth.
  *
  * @param request - The incoming request object
  * @returns Object with authorized status and either user data or error response
@@ -17,33 +20,13 @@ export async function verifyAdminAccess(request: Request) {
     };
   }
 
-  const token = authHeader.split(' ')[1];
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) {
-    return {
-      authorized: false,
-      response: NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    };
-  }
-
-  const { data: adminData } = await supabase
-    .from('admins')
-    .select('access_level, status')
-    .eq('auth_user_id', user.id)
-    .eq('status', 'active')
-    .single();
-
-  if (!adminData) {
+  const admin = await resolveAdmin(authHeader.split(' ')[1]);
+  if (!admin) {
     return {
       authorized: false,
       response: NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     };
   }
 
-  return { authorized: true, user, adminData };
+  return { authorized: true, user: admin.user, adminData: admin.adminData };
 }

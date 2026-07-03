@@ -133,7 +133,8 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
 
   const fetchTables = async () => {
     try {
-      const response = await fetch('/api/tables');
+      // Only active tables can be booked
+      const response = await fetch('/api/tables?status=active');
       if (response.ok) {
         const result = await response.json();
         setTables(result.data || []);

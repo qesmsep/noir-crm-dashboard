@@ -348,7 +348,10 @@ export default function SimpleReservationRequestModal({
   useEffect(() => {
     const fetchTablesAndCoverCharge = async () => {
       try {
-        const url = selectedLocation ? `/api/tables?location=${selectedLocation}` : '/api/tables';
+        // Only active tables can be booked
+        const url = selectedLocation
+          ? `/api/tables?location=${selectedLocation}&status=active`
+          : '/api/tables?status=active';
         const response = await fetch(url);
         const result = await response.json();
         if (response.ok && result.data) {
