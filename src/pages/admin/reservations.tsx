@@ -6,6 +6,7 @@ import ReservationEditModal from '../../components/ReservationEditModal';
 import ReservationModalFixed from '../../components/ReservationModalFixed';
 import SimpleReservationRequestModal from '../../components/member/SimpleReservationRequestModal';
 import PrivateEventRSVPModal from '../../components/PrivateEventRSVPModal';
+import MemberSelectionModal from '../../components/MemberSelectionModal';
 import { useSettings } from '../../context/SettingsContext';
 import { useToast } from '@/hooks/useToast';
 import { debugLog } from '../../utils/debugLogger';
@@ -58,6 +59,21 @@ export default function Reservations() {
   // Private Event RSVP modal state
   const [isPrivateEventRSVPModalOpen, setIsPrivateEventRSVPModalOpen] = useState(false);
   const [hasPrivateEventsOnDate, setHasPrivateEventsOnDate] = useState(false);
+  // Any active private event on the date (RSVP-enabled or not) - drives the
+  // Assign Table override button so admins can still book on blocked days.
+  const [hasAnyPrivateEventOnDate, setHasAnyPrivateEventOnDate] = useState(false);
+
+  // Track if we're creating a reservation during a private event
+  const [isPrivateEventReservation, setIsPrivateEventReservation] = useState(false);
+
+  // Member selection modal state
+  const [isMemberSelectionModalOpen, setIsMemberSelectionModalOpen] = useState(false);
+  const [prefilledMemberData, setPrefilledMemberData] = useState<{
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    email?: string;
+  } | null>(null);
 
   // Debug: Log component mount and router state
   useEffect(() => {
@@ -142,11 +158,42 @@ export default function Reservations() {
   const handleModalClose = () => {
     setIsModalOpen(false);
     setSelectedSlot(null);
+    setIsPrivateEventReservation(false);
+    setPrefilledMemberData(null); // Clear prefilled data
   };
 
   const handleReservationCreated = () => {
     // Modal is already closed, just trigger reload
     setReloadKey(prev => prev + 1);
+    setIsPrivateEventReservation(false);
+  };
+
+  const handleAssignTableClick = () => {
+    // Open member selection modal first
+    setIsPrivateEventReservation(true);
+    setIsMemberSelectionModalOpen(true);
+  };
+
+  const handleMemberSelected = (member: any | null) => {
+    // Set the selected slot and member data
+    setSelectedSlot({ date: currentDate, resourceId: '' });
+
+    if (member) {
+      // Member was selected - prefill their data
+      setPrefilledMemberData({
+        first_name: member.first_name,
+        last_name: member.last_name,
+        phone: member.phone,
+        email: member.email,
+      });
+    } else {
+      // Non-member selected - no prefilled data
+      setPrefilledMemberData(null);
+    }
+
+    // Close member selection and open reservation modal
+    setIsMemberSelectionModalOpen(false);
+    setIsModalOpen(true);
   };
 
   const handleDateChange = (date: Date) => {
@@ -296,6 +343,18 @@ export default function Reservations() {
         locationSlug={activeLocation}
       />
 
+      {/* Member Selection Modal */}
+      <MemberSelectionModal
+        isOpen={isMemberSelectionModalOpen}
+        onClose={() => {
+          setIsMemberSelectionModalOpen(false);
+          // Reset the private-event flag so cancelling the member-selection flow
+          // doesn't leak the override into the next normal reservation modal.
+          setIsPrivateEventReservation(false);
+        }}
+        onSelectMember={handleMemberSelected}
+      />
+
       {/* Modal for creating new reservations - Custom portal to document.body */}
       <ReservationModalFixed
         isOpen={isModalOpen}
@@ -304,6 +363,8 @@ export default function Reservations() {
         initialTableId={selectedSlot?.resourceId}
         onReservationCreated={handleReservationCreated}
         locationSlug={activeLocation}
+        isPrivateEventOverride={isPrivateEventReservation}
+        prefilledData={prefilledMemberData}
       />
 
       {/* Private Event RSVP Modal */}
@@ -342,7 +403,11 @@ export default function Reservations() {
               onSlotClick={handleSlotClick}
               onMakeReservationClick={() => setIsLookupModalOpen(true)}
               onPrivateEventRSVPClick={hasPrivateEventsOnDate ? () => setIsPrivateEventRSVPModalOpen(true) : undefined}
-              onPrivateEventsCheck={(hasEvents) => setHasPrivateEventsOnDate(hasEvents)}
+              onAssignTableClick={hasAnyPrivateEventOnDate ? handleAssignTableClick : undefined}
+              onPrivateEventsCheck={(hasRsvpEvents, hasAnyPrivateEvent) => {
+                setHasPrivateEventsOnDate(hasRsvpEvents);
+                setHasAnyPrivateEventOnDate(hasAnyPrivateEvent);
+              }}
               locationSlug={activeLocation}
             />
           </div>

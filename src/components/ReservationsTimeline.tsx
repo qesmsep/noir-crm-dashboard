@@ -3,7 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
-import { fromUTC, toUTC, formatDateTime, formatTime, isSameDay, getSundayOfWeek } from '../utils/dateUtils';
+import { fromUTC, toUTC, formatDateTime, formatTime, getSundayOfWeek } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { useAsyncEffect } from '../hooks/useAsyncEffect';
@@ -25,7 +25,7 @@ interface ReservationsTimelineProps {
   onMakeReservationClick?: () => void;
   onPrivateEventRSVPClick?: () => void;
   onAssignTableClick?: () => void;
-  onPrivateEventsCheck?: (hasEvents: boolean) => void;
+  onPrivateEventsCheck?: (hasRsvpEvents: boolean, hasAnyPrivateEvent: boolean) => void;
   locationSlug?: string;
 }
 
@@ -64,6 +64,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   locationSlug,
 }) => {
   const calendarRef = useRef<FullCalendar | null>(null);
+  const [tableResources, setTableResources] = useState<Resource[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [localReloadKey, setLocalReloadKey] = useState(0);
@@ -76,6 +77,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const [scrollTime, setScrollTime] = useState<string>('18:00:00');
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const [exceptionalClosures, setExceptionalClosures] = useState<any[]>([]);
+  const [blockedTimeRanges, setBlockedTimeRanges] = useState<{start: string, end: string}[]>([]);
+  const [hasPrivateEventToday, setHasPrivateEventToday] = useState(false);
   const { settings } = useSettings();
   const toast = useToast();
   
@@ -124,14 +127,14 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
       if (!isActive()) return;
 
-      const tableResources = tables
+      const tableResourcesList = tables
         .sort((a, b) => Number(a.table_number) - Number(b.table_number))
         .map(t => ({
           id: t.id,
           title: `${t.table_number} (${t.seats})`,
         }));
 
-      setResources(tableResources);
+      setTableResources(tableResourcesList);
       setTableIds(tables.map(t => t.id));
     } catch (err) {
       if (isActive()) {
@@ -145,6 +148,29 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       }
     }
   }, [reloadKey, locationSlug, toast]);
+
+  // Combine table resources with private event row when there's a private event
+  useEffect(() => {
+    if (hasPrivateEventToday && tableResources.length > 0) {
+      // Add private event row at the beginning
+      const privateEventResource = {
+        id: '00-private-event',
+        title: '\u00A0',  // Non-breaking space to render as blank
+        orderIndex: -1  // Use negative order to ensure it appears first
+      };
+      // Add order to table resources as well
+      const orderedTableResources = tableResources.map((resource, index) => ({
+        ...resource,
+        orderIndex: index  // Tables start from order 0
+      }));
+      setResources([privateEventResource, ...orderedTableResources]);
+    } else {
+      // Just use table resources without private event row. Set unconditionally
+      // (even when empty) so switching to a location with no tables clears the
+      // previous location's rows instead of leaving them stale.
+      setResources(tableResources);
+    }
+  }, [hasPrivateEventToday, tableResources]);
 
   // Fetch and set operating hours based on weekly_hours + base_hours
   useAsyncEffect(async (isActive) => {
@@ -298,26 +324,157 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     fetchPrivateEvents();
   }, [reloadKey, localReloadKey, locationSlug]);
 
-  // Check for private events on current date
+  // Check for private events on current date and update blocked ranges
   useEffect(() => {
-    if (!onPrivateEventsCheck || !locationSlug) return;
+    // Build blocked time ranges for header styling
+    const blockedRanges: {start: string, end: string}[] = [];
+    const currentDateStr = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone).toFormat('yyyy-MM-dd');
 
-    const checkPrivateEventsOnDate = () => {
+    // Get all private events for the current date (not just RSVP-enabled ones)
+    const currentDayPrivateEvents = privateEvents.filter((pe: any) => {
+      if (pe.status && pe.status !== 'active') return false;
+      const eventStartTime = fromUTC(pe.start_time, settings.timezone);
+      const eventEndTime = fromUTC(pe.end_time, settings.timezone);
+      const calendarDateLocal = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone);
+
+      // Check if event overlaps with current calendar date at all
+      const eventStartDate = eventStartTime.toFormat('yyyy-MM-dd');
+      const eventEndDate = eventEndTime.toFormat('yyyy-MM-dd');
+      const currentDate = calendarDateLocal.toFormat('yyyy-MM-dd');
+
+      // Include event if it starts on current date, ends on current date, or spans across current date
+      return eventStartDate === currentDate || eventEndDate === currentDate ||
+             (eventStartDate < currentDate && eventEndDate > currentDate);
+    });
+
+    // Track if we have private events
+    setHasPrivateEventToday(currentDayPrivateEvents.length > 0);
+
+    // Add private event time ranges to blocked list
+    const addedRanges = new Set<string>(); // Track unique ranges
+    currentDayPrivateEvents.forEach((privateEvent: any) => {
+      const startTime = fromUTC(privateEvent.start_time, settings.timezone);
+      const endTime = fromUTC(privateEvent.end_time, settings.timezone);
+
+      // Check if the event spans into the next day
+      const eventStartDate = startTime.toFormat('yyyy-MM-dd');
+      const eventEndDate = endTime.toFormat('yyyy-MM-dd');
+
+      // Handle events that span to next day (e.g., 19:00 to 00:00 next day)
+      let rangeToAdd: { start: string; end: string } | null = null;
+      if (eventStartDate === currentDateStr) {
+        // Event starts on current date
+        if (eventEndDate > currentDateStr) {
+          // Event spans to next day - handle the 26-hour time format
+          const endHour = endTime.hour;
+          const endMinute = endTime.minute;
+
+          // If event ends at midnight or later on next day, convert to 26-hour format
+          if (endHour === 0 && endMinute === 0) {
+            rangeToAdd = {
+              start: startTime.toFormat('HH:mm:ss'),
+              end: '24:00:00' // Use 24:00 for midnight exactly
+            };
+          } else if (endHour === 0 || endHour < 3) {
+            // For times like 1am, 2am on next day, use 25:00, 26:00 format
+            const adjustedHour = 24 + endHour;
+            rangeToAdd = {
+              start: startTime.toFormat('HH:mm:ss'),
+              end: `${adjustedHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`
+            };
+          } else {
+            // Normal case - event ends before 3am, just go to end of day
+            rangeToAdd = {
+              start: startTime.toFormat('HH:mm:ss'),
+              end: '23:59:59'
+            };
+          }
+        } else {
+          // Event ends on same day
+          rangeToAdd = {
+            start: startTime.toFormat('HH:mm:ss'),
+            end: endTime.toFormat('HH:mm:ss')
+          };
+        }
+      } else if (eventEndDate === currentDateStr) {
+        // Event ends on current date (started previous day)
+        rangeToAdd = {
+          start: '00:00:00',
+          end: endTime.toFormat('HH:mm:ss')
+        };
+      } else if (eventStartDate < currentDateStr && eventEndDate > currentDateStr) {
+        // Event spans entire day
+        rangeToAdd = {
+          start: '00:00:00',
+          end: '23:59:59'
+        };
+      }
+
+      // Only add unique ranges
+      if (rangeToAdd) {
+        const rangeKey = `${rangeToAdd.start}-${rangeToAdd.end}`;
+        if (!addedRanges.has(rangeKey)) {
+          addedRanges.add(rangeKey);
+          blockedRanges.push(rangeToAdd);
+        }
+      }
+    });
+
+    // Add exceptional closure time ranges to blocked list
+    const currentDayClosures = exceptionalClosures.filter((closure: any) => closure.date === currentDateStr);
+    let hasFullDayClosure = false;
+    currentDayClosures.forEach((closure: any) => {
+      if (closure.full_day) {
+        hasFullDayClosure = true;
+        // For full day closures, block all 26 hours (to handle times past midnight)
+        blockedRanges.push({
+          start: '00:00:00',
+          end: '26:00:00' // Use 26:00 to cover any past-midnight times
+        });
+      } else if (closure.time_ranges && closure.time_ranges.length > 0) {
+        closure.time_ranges.forEach((range: any) => {
+          blockedRanges.push({
+            start: range.start + ':00',
+            end: range.end + ':00'
+          });
+        });
+      }
+    });
+
+    // Days with no operating hours are handled by the slotMinTime/slotMaxTime
+    // logic, so nothing extra is needed here.
+
+    setBlockedTimeRanges(blockedRanges);
+
+    // Check for RSVP-enabled private events specifically for the button visibility
+    if (onPrivateEventsCheck && locationSlug) {
       const startOfDay = DateTime.fromJSDate(currentCalendarDate)
         .setZone('America/Chicago')
         .startOf('day');
       const endOfDay = startOfDay.endOf('day');
 
-      const eventsOnDate = privateEvents.filter((event: any) => {
+      const rsvpEventsOnDate = privateEvents.filter((event: any) => {
         const eventStart = DateTime.fromISO(event.start_time, { zone: 'utc' }).setZone('America/Chicago');
         return eventStart >= startOfDay && eventStart <= endOfDay && event.rsvp_enabled;
       });
 
-      onPrivateEventsCheck(eventsOnDate.length > 0);
-    };
+      // The RSVP button only applies to RSVP-enabled events, but the table
+      // override (Assign Table) must be reachable for ANY active private event
+      // that blocks the day - otherwise admins are stuck on non-RSVP buyouts.
+      // Match the "occurs on this date" logic used for blocking (start on, end
+      // on, or span across the date) so it also covers midnight-spanning events.
+      // Reuses currentDateStr computed at the top of this effect.
+      const hasAnyPrivateEvent = privateEvents.some((event: any) => {
+        if (event.status && event.status !== 'active') return false;
+        const eventStartDate = fromUTC(event.start_time, settings.timezone).toFormat('yyyy-MM-dd');
+        const eventEndDate = fromUTC(event.end_time, settings.timezone).toFormat('yyyy-MM-dd');
+        return eventStartDate === currentDateStr || eventEndDate === currentDateStr ||
+               (eventStartDate < currentDateStr && eventEndDate > currentDateStr);
+      });
 
-    checkPrivateEventsOnDate();
-  }, [privateEvents, currentCalendarDate, locationSlug, onPrivateEventsCheck]);
+      onPrivateEventsCheck(rsvpEventsOnDate.length > 0, hasAnyPrivateEvent);
+    }
+  }, [privateEvents, currentCalendarDate, locationSlug, onPrivateEventsCheck, exceptionalClosures, settings.timezone]);
 
   // Load exceptional closures (custom closed days)
   useEffect(() => {
@@ -542,13 +699,12 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         });
       }
 
-      // Map reservations to events
+      // Map reservations to events. Exclude untabled private-event RSVPs: they
+      // are represented by the summary bar on the private-event row, and drawing
+      // them as normal reservations would stack them onto whichever table sorts
+      // first and mislead staff about what is actually booked there.
       const mapped = rawReservations
-        .filter((r: Record<string, any>) => {
-          // Skip private event RSVPs - they'll be shown as blocking events only
-          const shouldSkip = (r.table_id === null && r.private_event_id);
-          return !shouldSkip;
-        })
+        .filter((r: Record<string, any>) => !(!r.table_id && r.private_event_id))
         .map((r: Record<string, any>) => {
         const heart = r.membership_type === 'member' ? '🖤 ' : '';
         let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
@@ -565,8 +721,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           const tableResource = resources.find(res => res.id === String(r.table_id));
           resourceId = String(r.table_id);
         } else {
-          // If no table_id, assign to first available table or a default
-          resourceId = resources.length > 0 ? resources[0].id : 'unassigned';
+          // If no table_id, find the first actual table resource (skip private event row)
+          const firstTableResource = resources.find(res => res.id !== '00-private-event');
+          resourceId = firstTableResource ? firstTableResource.id : 'unassigned';
         }
         startTime = fromUTC(r.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
         endTime = fromUTC(r.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
@@ -592,105 +749,34 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         return event;
       });
       
-      // Add blocking events for private events
-      const blockingEvents: any[] = [];
-      const currentDayPrivateEvents = getCurrentDayPrivateEvents();
+      // Add private event visualization to the private event row
+      let privateEventBlocks: any[] = [];
+      if (hasPrivateEventToday) {
+        const currentDayPrivateEvents = getCurrentDayPrivateEvents();
+        privateEventBlocks = currentDayPrivateEvents.map((pe: any) => {
+          const startTime = fromUTC(pe.start_time, settings.timezone);
+          const endTime = fromUTC(pe.end_time, settings.timezone);
 
-      currentDayPrivateEvents.forEach((privateEvent: any) => {
-        resources.forEach((resource: Resource) => {
-          const startTime = fromUTC(privateEvent.start_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-          const endTime = fromUTC(privateEvent.end_time, settings.timezone).toFormat("yyyy-MM-dd'T'HH:mm:ss");
-
-          const blockingEvent = {
-            id: `blocking-${privateEvent.id}-${resource.id}`,
-            title: `🔒 ${privateEvent.title}`,
+          return {
+            id: `private-event-${pe.id}`,
+            title: pe.title || 'Private Event',
+            start: startTime.toFormat("yyyy-MM-dd'T'HH:mm:ss"),
+            end: endTime.toFormat("yyyy-MM-dd'T'HH:mm:ss"),
+            resourceId: '00-private-event',
+            backgroundColor: '#353535',
+            borderColor: '#353535',
+            textColor: '#ecede8',
+            display: 'block',
             extendedProps: {
-              private_event_id: privateEvent.id,
-              is_blocking: true,
-              event_type: 'private_event',
-              ...privateEvent
-            },
-            start: startTime,
-            end: endTime,
-            resourceId: resource.id,
-            type: 'blocking',
-            backgroundColor: '#6b7280',
-            borderColor: '#6b7280',
-            textColor: '#ffffff',
-            classNames: ['private-event-blocking']
+              is_private_event: true,
+              type: 'private_event'
+            }
           };
-
-          blockingEvents.push(blockingEvent);
         });
-      });
+      }
 
-      // Add blocking events for exceptional closures (custom closed days)
-      const currentDateStr = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone).toFormat('yyyy-MM-dd');
-      const currentDayClosures = exceptionalClosures.filter((closure: any) => closure.date === currentDateStr);
-
-      currentDayClosures.forEach((closure: any) => {
-        resources.forEach((resource: Resource) => {
-          let startTime, endTime;
-
-          if (closure.full_day) {
-            // Full day closure - block entire day
-            startTime = `${currentDateStr}T00:00:00`;
-            endTime = `${currentDateStr}T23:59:59`;
-          } else if (closure.time_ranges && closure.time_ranges.length > 0) {
-            // Partial day closure - create blocking events for each time range
-            closure.time_ranges.forEach((range: any, idx: number) => {
-              const closureEvent = {
-                id: `closure-${closure.id}-${resource.id}-${idx}`,
-                title: `🔒 ${closure.reason || 'Closed'}`,
-                extendedProps: {
-                  closure_id: closure.id,
-                  is_blocking: true,
-                  event_type: 'exceptional_closure',
-                  reason: closure.reason,
-                  ...closure
-                },
-                start: `${currentDateStr}T${range.start}:00`,
-                end: `${currentDateStr}T${range.end}:00`,
-                resourceId: resource.id,
-                type: 'blocking',
-                backgroundColor: '#6b7280',
-                borderColor: '#6b7280',
-                textColor: '#ffffff',
-                classNames: ['exceptional-closure-blocking']
-              };
-              blockingEvents.push(closureEvent);
-            });
-            return; // Skip the default blocking event creation below
-          } else {
-            return; // No time ranges and not full day, skip
-          }
-
-          // Full day blocking event
-          const closureEvent = {
-            id: `closure-${closure.id}-${resource.id}`,
-            title: `🔒 ${closure.reason || 'Closed'}`,
-            extendedProps: {
-              closure_id: closure.id,
-              is_blocking: true,
-              event_type: 'exceptional_closure',
-              reason: closure.reason,
-              ...closure
-            },
-            start: startTime,
-            end: endTime,
-            resourceId: resource.id,
-            type: 'blocking',
-            backgroundColor: '#6b7280',
-            borderColor: '#6b7280',
-            textColor: '#ffffff',
-            classNames: ['exceptional-closure-blocking']
-          };
-
-          blockingEvents.push(closureEvent);
-        });
-      });
-
-      const allEvents = [...mapped, ...blockingEvents];
+      // Combine regular events with private event blocks
+      const allEvents = [...mapped, ...privateEventBlocks];
       setEvents(allEvents);
     };
     
@@ -713,24 +799,71 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         console.debug('scrollToTime not available:', e);
       }
     }
-  }, [resources, eventData, currentCalendarDate, privateEvents, exceptionalClosures, settings.timezone, isMobile]);
+  }, [resources, eventData, currentCalendarDate, privateEvents, exceptionalClosures, settings.timezone, isMobile, hasPrivateEventToday]);
 
   // Get private events for the current calendar date
   const getCurrentDayPrivateEvents = () => {
+    const calendarDateLocal = fromUTC(currentCalendarDate.toISOString(), settings.timezone);
+    const currentDate = calendarDateLocal.toFormat('yyyy-MM-dd');
     return privateEvents.filter((pe: any) => {
       // Minaka events don't have a status field, so only check status for local events
       if (pe.status && pe.status !== 'active') return false;
-      const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
-      const calendarDateUTC = currentCalendarDate.toISOString();
-      const calendarDateLocal = fromUTC(calendarDateUTC, settings.timezone);
-      return isSameDay(eventDateLocal, calendarDateLocal, settings.timezone);
+      const eventStartDate = fromUTC(pe.start_time, settings.timezone).toFormat('yyyy-MM-dd');
+      const eventEndDate = fromUTC(pe.end_time, settings.timezone).toFormat('yyyy-MM-dd');
+      // Include events that start on, end on, or span across the current date so
+      // that private events crossing midnight still render and block the next day.
+      return eventStartDate === currentDate || eventEndDate === currentDate ||
+             (eventStartDate < currentDate && eventEndDate > currentDate);
     });
+  };
+
+  // Shared helpers for slot background styling (used by slotLabelDidMount and
+  // slotLaneDidMount) so the two callbacks stay consistent.
+  const getSlotTimeStr = (slotTime: Date): string => {
+    const tz = settings.timezone || 'America/Chicago';
+    const slotDateTime = DateTime.fromJSDate(slotTime).setZone(tz);
+    const slotHour = slotDateTime.hour;
+    // Compare full dates (not just day-of-month) so month boundaries work.
+    const currentDateStr = DateTime.fromJSDate(currentCalendarDate).setZone(tz).toFormat('yyyy-MM-dd');
+    const slotDateStr = slotDateTime.toFormat('yyyy-MM-dd');
+    if (slotHour < 3 && slotDateStr > currentDateStr) {
+      // This is a time after midnight, use 24+ hour format
+      const adjustedHour = 24 + slotHour;
+      return `${adjustedHour.toString().padStart(2, '0')}:${slotDateTime.minute.toString().padStart(2, '0')}:${slotDateTime.second.toString().padStart(2, '0')}`;
+    }
+    return slotDateTime.toFormat('HH:mm:ss');
+  };
+
+  const isSlotBlocked = (slotTimeStr: string): boolean => {
+    for (const range of blockedTimeRanges) {
+      const rangeEndStr = range.end;
+      // For ranges that end at or after midnight (24:00:00 or later)
+      if (rangeEndStr >= '24:00:00') {
+        if ((slotTimeStr >= range.start && slotTimeStr <= '23:59:59') ||
+            (slotTimeStr >= '24:00:00' && slotTimeStr < rangeEndStr)) {
+          return true;
+        }
+      } else {
+        // Exclusive end so a slot on the boundary renders open (consistent
+        // between the slot label and the slot lane).
+        if (slotTimeStr >= range.start && slotTimeStr < range.end) {
+          return true;
+        }
+      }
+    }
+    return false;
   };
 
   // Handle drag and drop
   async function handleEventDrop(info: any) {
     try {
-      if (info.event.extendedProps.is_blocking) {
+      if (info.event.extendedProps.is_blocking || info.event.extendedProps.is_private_event) {
+        if (info.revert) info.revert();
+        return;
+      }
+
+      // Don't allow dropping onto the private event row
+      if (info.newResource?.id === '00-private-event') {
         if (info.revert) info.revert();
         return;
       }
@@ -810,7 +943,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
   // Handle event resize
   async function handleEventResize(info: any) {
-    if (info.event.extendedProps.is_blocking) {
+    if (info.event.extendedProps.is_blocking || info.event.extendedProps.is_private_event) {
       if (info.revert) info.revert();
       return;
     }
@@ -863,10 +996,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
   // Handle event click
   function handleEventClick(info: any) {
-    if (info.event.extendedProps.is_blocking) {
+    // Don't handle clicks for blocking events or private events
+    if (info.event.extendedProps.is_blocking || info.event.extendedProps.is_private_event) {
       return;
     }
-    
+
     if (onReservationClick) {
       onReservationClick(info.event.id);
     }
@@ -876,15 +1010,20 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const handleSlotClick = (info: any) => {
     let clickedDate = info.date;
     const resourceId = info.resource?.id;
-    
+
+    // Don't allow creating reservations in the private event row
+    if (resourceId === '00-private-event') {
+      return;
+    }
+
     if (!clickedDate) {
       clickedDate = info.start || info.startStr ? new Date(info.start || info.startStr) : null;
     }
-    
+
     if (!clickedDate) {
       clickedDate = currentCalendarDate;
     }
-    
+
     // Check if blocked by private event
     if (clickedDate && resourceId) {
       const currentDayPrivateEvents = getCurrentDayPrivateEvents();
@@ -892,8 +1031,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         const eventStart = fromUTC(privateEvent.start_time, settings.timezone);
         const eventEnd = fromUTC(privateEvent.end_time, settings.timezone);
         const clickedTime = DateTime.fromJSDate(clickedDate, { zone: settings.timezone });
-        const clickedTimeOnly = clickedTime.set({ year: eventStart.year, month: eventStart.month, day: eventStart.day });
-        return clickedTimeOnly >= eventStart && clickedTimeOnly < eventEnd;
+        // Compare the actual clicked instant against the event window. Re-dating
+        // the click onto the event's start day would misjudge slots after
+        // midnight (viewed on the following day) for events that span midnight.
+        return clickedTime >= eventStart && clickedTime < eventEnd;
       });
       
       if (isBlocked) {
@@ -1014,10 +1155,6 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       const calendarApi = calendarRef.current.getApi();
       const chicagoNow = DateTime.now().setZone('America/Chicago');
       const todayString = chicagoNow.toFormat('yyyy-MM-dd');
-      console.log('=== TODAY BUTTON CLICKED ===');
-      console.log('Current time Chicago:', chicagoNow.toISO());
-      console.log('Going to date:', todayString);
-      console.log('========================');
       calendarApi.gotoDate(todayString);
       setCurrentCalendarDate(new Date());
       if (onDateChange) {
@@ -1073,9 +1210,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             <button
               className={styles.mobileNavNewRez}
               onClick={onPrivateEventRSVPClick}
-              aria-label="Private Event RSVPs"
+              aria-label="Event RSVPs"
             >
-              PE RSVPs
+              Event RSVPs
             </button>
           )}
           {onAssignTableClick && (
@@ -1091,9 +1228,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             <button
               className={styles.mobileNavNewRez}
               onClick={onMakeReservationClick}
-              aria-label="Make Reservation"
+              aria-label="+Reservation"
             >
-              Make Rez
+              +Reservation
             </button>
           )}
         </div>
@@ -1113,7 +1250,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           
           customButtons={{
             makeReservation: {
-              text: 'Make Reservation',
+              text: '+Reservation',
               click: () => {
                 if (onMakeReservationClick) {
                   onMakeReservationClick();
@@ -1121,7 +1258,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
               },
             },
             privateEventRSVPs: {
-              text: 'Private Event RSVPs',
+              text: 'Event RSVPs',
               click: () => {
                 if (onPrivateEventRSVPClick) {
                   onPrivateEventRSVPClick();
@@ -1149,8 +1286,17 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
               return buttons.join(',');
             })(),
           }}
-          titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
+          titleFormat={(date) => {
+            // Use the current calendar date for the title, not the timeline start
+            // The timeline starts in the evening of the previous day, but we want to show
+            // the main date being viewed
+            const chicagoDate = DateTime.fromJSDate(currentCalendarDate)
+              .setZone(settings.timezone || 'America/Chicago');
+
+            return chicagoDate.toFormat('EEEE, MMMM d');
+          }}
           resources={resources}
+          resourceOrder="orderIndex"  // Order resources by orderIndex property
           events={events}
           editable={true}
           droppable={true}
@@ -1186,15 +1332,58 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           resourceAreaHeaderContent=""
           aspectRatio={isMobile ? undefined : 1.5}
           
-          eventContent={(arg) => {
-            if (arg.event.extendedProps.is_blocking) {
-              return (
-                <div className={styles.blockingEvent}>
-                  {arg.event.title}
-                </div>
-              );
-            }
+          slotLabelDidMount={(arg) => {
+            // Check if this time slot falls within a blocked range
+            const slotTime = arg.date;
+            if (!slotTime) return;
 
+            const slotTimeStr = getSlotTimeStr(slotTime);
+            const isBlocked = isSlotBlocked(slotTimeStr);
+
+            // Apply dark background to blocked time slots, light background to open times
+            const applyStyle = () => {
+              if (isBlocked) {
+                arg.el.style.setProperty('background-color', '#353535', 'important');
+                arg.el.style.setProperty('color', '#ecede8', 'important');
+                arg.el.style.setProperty('font-weight', '500', 'important');
+                // Also style parent element to ensure full coverage
+                if (arg.el.parentElement) {
+                  arg.el.parentElement.style.setProperty('background-color', '#353535', 'important');
+                }
+              } else {
+                // Ensure open times have standard light background
+                arg.el.style.setProperty('background-color', '#ecede8', 'important');
+                arg.el.style.setProperty('color', '#353535', 'important');
+              }
+            };
+
+            // Apply immediately and after a short delay to ensure it sticks
+            applyStyle();
+            setTimeout(applyStyle, 100);
+          }}
+          slotLaneDidMount={(arg) => {
+            // Check if this time slot falls within a blocked range
+            const slotTime = arg.date;
+            if (!slotTime) return;
+
+            const slotTimeStr = getSlotTimeStr(slotTime);
+            const isBlocked = isSlotBlocked(slotTimeStr);
+
+            // Apply subtle dark tint to blocked lanes, keep light for open lanes
+            const applyLaneStyle = () => {
+              if (isBlocked) {
+                arg.el.style.setProperty('background-color', 'rgba(53, 53, 53, 0.08)', 'important');
+              } else {
+                // Keep standard light background for open lanes
+                arg.el.style.setProperty('background-color', 'rgba(236, 237, 232, 0.3)', 'important');
+              }
+            };
+
+            // Apply immediately and after a short delay to ensure it sticks
+            applyLaneStyle();
+            setTimeout(applyLaneStyle, 100);
+          }}
+          eventContent={(arg) => {
             const isCheckedIn = arg.event.extendedProps.checked_in;
             const backgroundColor = isCheckedIn ? '#a59480' : '#353535';
             const textColor = isCheckedIn ? '#353535' : '#ecede8';

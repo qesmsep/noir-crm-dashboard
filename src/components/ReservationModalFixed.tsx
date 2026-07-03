@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { localInputToUTC, dateToLocalInput } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
+import { supabase } from '../lib/supabase';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -15,6 +16,13 @@ interface ReservationModalProps {
   initialTableId?: string;
   onReservationCreated: () => void;
   locationSlug?: string;
+  isPrivateEventOverride?: boolean;
+  prefilledData?: {
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    email?: string;
+  } | null;
 }
 
 const eventTypes = [
@@ -43,6 +51,8 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
   initialTableId,
   onReservationCreated,
   locationSlug,
+  isPrivateEventOverride = false,
+  prefilledData,
 }) => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -130,10 +140,10 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
       const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
 
       setFormData({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
+        first_name: prefilledData?.first_name || '',
+        last_name: prefilledData?.last_name || '',
+        email: prefilledData?.email || '',
+        phone: prefilledData?.phone || '',
         party_size: 2,
         event_type: '',
         notes: '',
@@ -146,7 +156,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         send_confirmation: false,
       });
     }
-  }, [isOpen, initialDate, initialTableId, timezone]);
+  }, [isOpen, initialDate, initialTableId, timezone, prefilledData]);
 
   useEffect(() => {
     if (isOpen && initialTableId) {
@@ -225,7 +235,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
       const cleanedPhone = formData.phone.replace(/\D/g, '');
       const tableId = formData.table_id === '' ? null : formData.table_id;
 
-      const reservationData = {
+      const reservationData: any = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email,
@@ -244,9 +254,24 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         source: 'manual'
       };
 
+      // If this is a private event override, add the admin_override flag
+      // This allows creating reservations even when there's a private event blocking the date
+      if (isPrivateEventOverride) {
+        reservationData.admin_override = true;
+      }
+
+      // Get the session for authentication if we need admin override
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (isPrivateEventOverride) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(reservationData),
       });
 
@@ -333,8 +358,13 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         {/* Header */}
         <div className="border-b p-4 pb-2 pt-3 flex-shrink-0" style={{ fontFamily: 'IvyJournal, sans-serif' }}>
           <h2 className="text-xl font-bold" style={{ color: '#353535' }}>
-            New Reservation
+            {isPrivateEventOverride ? 'New Reservation (Private Event)' : 'New Reservation'}
           </h2>
+          {isPrivateEventOverride && (
+            <p className="text-sm text-gray-600 mt-1">
+              Creating reservation during private event - bypassing public booking restrictions
+            </p>
+          )}
           <Button
             variant="ghost"
             size="sm"

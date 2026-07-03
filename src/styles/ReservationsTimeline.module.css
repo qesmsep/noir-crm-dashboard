@@ -47,17 +47,42 @@
   font-weight: 400 !important;
 }
 
-/* Custom button styling for new reservation button */
-.calendarContainer :global(.fc-newRez-button) {
-  background-color: var(--timeline-button-green) !important;
-  border-color: var(--timeline-button-green) !important;
+/* Custom button styling for all timeline buttons */
+.calendarContainer :global(.fc-button) {
+  background-color: #353535 !important;
+  border-color: #353535 !important;
   color: #ffffff !important;
-  margin-right: 0.5em !important;
+  margin-left: 0.5em !important;
+  padding: 0.4em 0.8em !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  transition: background-color 0.2s ease !important;
 }
 
-.calendarContainer :global(.fc-newRez-button:hover) {
-  background-color: var(--timeline-button-green-hover) !important;
-  border-color: var(--timeline-button-green-hover) !important;
+.calendarContainer :global(.fc-button:hover) {
+  background-color: #4a4a4a !important;
+  border-color: #4a4a4a !important;
+}
+
+.calendarContainer :global(.fc-button:focus) {
+  box-shadow: none !important;
+}
+
+.calendarContainer :global(.fc-button:active) {
+  background-color: #2a2a2a !important;
+  border-color: #2a2a2a !important;
+}
+
+/* Today button can have a slightly different style */
+.calendarContainer :global(.fc-today-button) {
+  background-color: #353535 !important;
+  border-color: #353535 !important;
+}
+
+.calendarContainer :global(.fc-today-button:disabled) {
+  background-color: #6b6b6b !important;
+  border-color: #6b6b6b !important;
+  opacity: 0.5 !important;
 }
 
 .calendarContainer :global(.fc-resource-area) {
@@ -78,6 +103,37 @@
   font-size: 12px;
   padding: 8px 2px;
   text-align: center;
+}
+
+/* Private Event resource row styling */
+.calendarContainer :global(.fc-resource[data-resource-id="00-private-event"]) {
+  background-color: #353535 !important;
+}
+
+.calendarContainer :global(.fc-resource[data-resource-id="00-private-event"] .fc-datagrid-cell) {
+  background-color: #353535 !important;
+}
+
+/* Hide all text content in the private event resource cell */
+.calendarContainer :global(.fc-resource[data-resource-id="00-private-event"] .fc-datagrid-cell-cushion::after) {
+  content: '' !important;
+}
+
+.calendarContainer :global(.fc-resource[data-resource-id="00-private-event"] .fc-datagrid-cell-cushion) {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: #353535 !important;
+}
+
+.calendarContainer :global(.fc-resource[data-resource-id="00-private-event"] .fc-datagrid-cell-main) {
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+/* Make private event blocks non-clickable */
+.calendarContainer :global(.fc-event[id^="private-event-"]) {
+  pointer-events: none !important;
+  cursor: default !important;
 }
 
 .calendarContainer :global(.fc-timeline-header),
@@ -137,9 +193,20 @@
 
 /* Exceptional closure blocking events (custom closed days) */
 .calendarContainer :global(.exceptional-closure-blocking) {
-  background-color: #6b7280 !important;
-  border-color: #6b7280 !important;
-  opacity: 0.8 !important;
+  background-color: #9ca3af !important;
+  border-color: #9ca3af !important;
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+/* Private event blocking events */
+.calendarContainer :global(.private-event-blocking) {
+  background-color: #9ca3af !important;
+  border-color: #9ca3af !important;
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
 }
 
 /* Fix for private event blocking - remove ALL ::before pseudo-elements from timeline events */
@@ -153,11 +220,12 @@
   content: none !important;
 }
 
-/* Force correct height for private event blocking events */
+/* Force correct height for private event blocking events - make them full height of row */
 .calendarContainer :global(.fc-event.private-event-blocking),
 .calendarContainer :global(.fc-event.exceptional-closure-blocking) {
-  height: auto !important;
-  max-height: 30px !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 20px !important;
 }
 
 /* Ensure the event main content doesn't have extra height */
@@ -166,6 +234,11 @@
   height: 100% !important;
   display: flex !important;
   align-items: center !important;
+}
+
+/* Ensure regular events appear on top of blocking events */
+.calendarContainer :global(.fc-event:not(.private-event-blocking):not(.exceptional-closure-blocking)) {
+  z-index: 2 !important;
 }
 
 /* Mobile Navigation Bar */
