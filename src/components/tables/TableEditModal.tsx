@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ConfirmDialog from './ConfirmDialog';
+import { formatTableNumber } from '@/lib/utils';
 
 interface TableData {
   id: string;
@@ -176,7 +177,7 @@ export default function TableEditModal({
         {/* Header */}
         <div className="border-b p-4 pb-2 pt-3 flex-shrink-0" style={{ fontFamily: 'IvyJournal, sans-serif' }}>
           <h2 className="text-xl font-bold" style={{ color: '#353535' }}>
-            {editTable ? `Edit Table ${String(editTable.table_number).padStart(2, '0')}` : 'Add Table'}
+            {editTable ? `Edit Table ${formatTableNumber(editTable.table_number)}` : 'Add Table'}
             {locationName && <span className="text-sm font-normal ml-2">({locationName})</span>}
           </h2>
           <Button
@@ -352,7 +353,7 @@ export default function TableEditModal({
       <ConfirmDialog
         isOpen={showConfirmDelete}
         title="Delete Table"
-        message={`Are you sure you want to delete Table ${editTable?.table_number ? String(editTable.table_number).padStart(2, '0') : ''}? This action cannot be undone.`}
+        message={`Are you sure you want to delete Table ${editTable ? formatTableNumber(editTable.table_number) : ''}? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"

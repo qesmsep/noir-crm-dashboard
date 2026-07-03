@@ -9,6 +9,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { supabase } from '@/lib/supabase';
 import { getSundayOfWeek } from '@/utils/dateUtils';
 import type { LocationHours, WeeklyHours } from '@/types/hours';
+import { formatTableNumber } from '@/lib/utils';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -1388,7 +1389,7 @@ export default function SimpleReservationRequestModal({
                 <option value="">Table (Optional)</option>
                 {tables.map((table) => (
                   <option key={table.id} value={table.id}>
-                    Table {String(table.table_number).padStart(2, '0')}
+                    Table {formatTableNumber(table.table_number)}
                   </option>
                 ))}
               </select>

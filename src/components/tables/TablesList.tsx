@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Search, Edit2, Table as TableIcon } from 'lucide-react';
 import styles from '../../styles/Settings.module.css';
 import StatusBadge from './StatusBadge';
+import { formatTableNumber } from '@/lib/utils';
 
 interface TableData {
   id: string;
@@ -35,7 +36,7 @@ export default function TablesList({
         !searchQuery ||
         table.table_number.toString().includes(searchQuery) ||
         // Also match the zero-padded label shown in the UI (e.g. "05")
-        String(table.table_number).padStart(2, '0').includes(searchQuery) ||
+        formatTableNumber(table.table_number).includes(searchQuery) ||
         table.seats.toString().includes(searchQuery);
 
       const matchesStatus =
@@ -118,7 +119,7 @@ export default function TablesList({
               <tbody>
                 {filtered.map((table) => (
                   <tr key={table.id}>
-                    <td style={{ fontWeight: 500 }}>Table {String(table.table_number).padStart(2, '0')}</td>
+                    <td style={{ fontWeight: 500 }}>Table {formatTableNumber(table.table_number)}</td>
                     <td>{table.seats}</td>
                     <td>
                       <StatusBadge status={table.status} />
@@ -128,7 +129,7 @@ export default function TablesList({
                         onClick={() => onEdit(table)}
                         className={styles.editButton}
                         title="Edit table"
-                        aria-label={`Edit table ${String(table.table_number).padStart(2, '0')}`}
+                        aria-label={`Edit table ${formatTableNumber(table.table_number)}`}
                       >
                         <Edit2 size={14} />
                       </button>
@@ -145,7 +146,7 @@ export default function TablesList({
               <div key={table.id} className={styles.card} style={{ padding: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Table {String(table.table_number).padStart(2, '0')}</h4>
+                    <h4 style={{ margin: 0, fontSize: '1rem' }}>Table {formatTableNumber(table.table_number)}</h4>
                     <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#6e6e73' }}>
                       {table.seats} seats
                     </p>
@@ -156,7 +157,7 @@ export default function TablesList({
                       onClick={() => onEdit(table)}
                       className={styles.editButton}
                       title="Edit table"
-                      aria-label={`Edit table ${String(table.table_number).padStart(2, '0')}`}
+                      aria-label={`Edit table ${formatTableNumber(table.table_number)}`}
                     >
                       <Edit2 size={14} />
                     </button>

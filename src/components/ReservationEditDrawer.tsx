@@ -30,6 +30,7 @@ import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
 import { formatDateTime, utcToLocalInput, localInputToUTC } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
+import { formatTableNumber } from '@/lib/utils';
 
 // Helper: Format a local datetime string with timezone offset
 function toOffsetISOString(dateString: string) {
@@ -634,7 +635,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                         {tables && tables.length > 0 ? (
                           tables.map(table => (
                             <option key={table.id} value={table.id}>
-                              Table {String(table.table_number).padStart(2, '0')} ({table.seats} seats)
+                              Table {formatTableNumber(table.table_number)} ({table.seats} seats)
                             </option>
                           ))
                         ) : (

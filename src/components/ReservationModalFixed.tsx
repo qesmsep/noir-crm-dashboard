@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { localInputToUTC, dateToLocalInput } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
+import { formatTableNumber } from '@/lib/utils';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -478,7 +479,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
               >
                 <option value="">Select table</option>
                 {tables.map(table => (
-                  <option key={table.id} value={table.id}>Table {String(table.table_number).padStart(2, '0')}</option>
+                  <option key={table.id} value={table.id}>Table {formatTableNumber(table.table_number)}</option>
                 ))}
               </select>
             </div>

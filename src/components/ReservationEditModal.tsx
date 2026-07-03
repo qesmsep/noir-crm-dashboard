@@ -5,6 +5,7 @@ import { formatDateTime, utcToLocalInput, localInputToUTC } from '../utils/dateU
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { Trash2, X } from 'lucide-react';
+import { formatTableNumber } from '@/lib/utils';
 
 const eventTypes = [
   { value: 'birthday', label: '🎂 Birthday' },
@@ -738,7 +739,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   <option value="">Table (Optional)</option>
                   {tables.map(table => (
                     <option key={table.id} value={table.id}>
-                      Table {String(table.table_number).padStart(2, '0')} ({table.seats} seats)
+                      Table {formatTableNumber(table.table_number)} ({table.seats} seats)
                     </option>
                   ))}
                 </select>

@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
+import { formatTableNumber } from '@/lib/utils';
 import { localInputToUTC } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
 
@@ -414,7 +415,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
               >
                 <option value="">Select table</option>
                 {tables.map(table => (
-                  <option key={table.id} value={table.id}>Table {String(table.table_number).padStart(2, '0')}</option>
+                  <option key={table.id} value={table.id}>Table {formatTableNumber(table.table_number)}</option>
                 ))}
               </Select>
             </div>

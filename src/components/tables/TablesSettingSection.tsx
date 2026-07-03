@@ -4,6 +4,7 @@ import TablesList from './TablesList';
 import TableEditModal from './TableEditModal';
 import styles from '../../styles/Settings.module.css';
 import { supabase } from '@/lib/supabase';
+import { formatTableNumber } from '@/lib/utils';
 
 interface TableData {
   id: string;
@@ -139,7 +140,7 @@ export default function TablesSettingSection({
 
     try {
       const isUpdate = !!editingTable;
-      const tableNumber = String(formData.table_number).padStart(2, '0');
+      const tableNumber = formatTableNumber(formData.table_number);
 
       // Get auth token
       const { data: { session } } = await supabase.auth.getSession();
@@ -217,7 +218,7 @@ export default function TablesSettingSection({
 
     try {
       const tableToDelete = tables.find((t) => t.id === id);
-      const tableNumber = tableToDelete ? String(tableToDelete.table_number).padStart(2, '0') : '';
+      const tableNumber = tableToDelete ? formatTableNumber(tableToDelete.table_number) : '';
 
       // Get auth token
       const { data: { session } } = await supabase.auth.getSession();

@@ -112,8 +112,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid location parameter' }, { status: 400 });
     }
 
-    // Validate input
-    if (table_number === undefined || !seats || !location_slug) {
+    // Validate presence. Use `seats === undefined` (not `!seats`) so that a
+    // seats value of 0 falls through to the specific range message below
+    // instead of the generic "missing fields" one.
+    if (table_number === undefined || seats === undefined || !location_slug) {
       return NextResponse.json(
         { error: 'Missing required fields: table_number, seats, location_slug' },
         { status: 400 }

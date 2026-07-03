@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { resolveAdmin } from './admin-auth';
 
+// Discriminated union so callers narrowing on `authorized` get `response`
+// (on failure) or `user`/`adminData` (on success) without a `| undefined`.
+type AdminAuthResult =
+  | { authorized: true; user: any; adminData: any }
+  | { authorized: false; response: NextResponse };
+
 /**
  * Verify that the request comes from an authenticated admin user.
  * Checks for valid Bearer token and active admin status in database.
@@ -11,7 +17,7 @@ import { resolveAdmin } from './admin-auth';
  * @param request - The incoming request object
  * @returns Object with authorized status and either user data or error response
  */
-export async function verifyAdminAccess(request: Request) {
+export async function verifyAdminAccess(request: Request): Promise<AdminAuthResult> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {

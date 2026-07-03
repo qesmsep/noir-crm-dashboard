@@ -4,6 +4,7 @@ import { Calendar, momentLocalizer, Event as RBCEvent, SlotInfo } from 'react-bi
 import moment from 'moment';
 import { fromUTC } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
+import { formatTableNumber } from '@/lib/utils';
 
 const localizer = momentLocalizer(moment);
 
@@ -42,7 +43,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent
         .sort((a: any, b: any) => a.table_number - b.table_number)
         .map((t: any) => ({
           resourceId: t.id,
-          resourceTitle: `Table ${String(t.table_number).padStart(2, '0')}`
+          resourceTitle: `Table ${formatTableNumber(t.table_number)}`
         }));
       setTables(tableResources);
       const [privateEventsRes, resRes] = await Promise.all([
