@@ -343,7 +343,12 @@ export default function Reservations() {
       {/* Member Selection Modal */}
       <MemberSelectionModal
         isOpen={isMemberSelectionModalOpen}
-        onClose={() => setIsMemberSelectionModalOpen(false)}
+        onClose={() => {
+          setIsMemberSelectionModalOpen(false);
+          // Reset the private-event flag so cancelling the member-selection flow
+          // doesn't leak the override into the next normal reservation modal.
+          setIsPrivateEventReservation(false);
+        }}
         onSelectMember={handleMemberSelected}
       />
 

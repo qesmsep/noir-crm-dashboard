@@ -123,8 +123,8 @@ export default function MemberSelectionModal({
       });
       // Sort by relevance (names starting with query first)
       filtered.sort((a, b) => {
-        const aStarts = a.first_name.toLowerCase().startsWith(query) || a.last_name.toLowerCase().startsWith(query);
-        const bStarts = b.first_name.toLowerCase().startsWith(query) || b.last_name.toLowerCase().startsWith(query);
+        const aStarts = (a.first_name || '').toLowerCase().startsWith(query) || (a.last_name || '').toLowerCase().startsWith(query);
+        const bStarts = (b.first_name || '').toLowerCase().startsWith(query) || (b.last_name || '').toLowerCase().startsWith(query);
         if (aStarts && !bStarts) return -1;
         if (!aStarts && bStarts) return 1;
         return 0;

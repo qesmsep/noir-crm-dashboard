@@ -3,7 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline';
 import interactionPlugin from '@fullcalendar/interaction';
 import '@fullcalendar/common/main.css';
-import { fromUTC, toUTC, formatDateTime, formatTime, isSameDay, getSundayOfWeek } from '../utils/dateUtils';
+import { fromUTC, toUTC, formatDateTime, formatTime, getSundayOfWeek } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { useAsyncEffect } from '../hooks/useAsyncEffect';
@@ -164,8 +164,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         orderIndex: index  // Tables start from order 0
       }));
       setResources([privateEventResource, ...orderedTableResources]);
-    } else if (tableResources.length > 0) {
-      // Just use table resources without private event row
+    } else {
+      // Just use table resources without private event row. Set unconditionally
+      // (even when empty) so switching to a location with no tables clears the
+      // previous location's rows instead of leaving them stale.
       setResources(tableResources);
     }
   }, [hasPrivateEventToday, tableResources]);
@@ -689,8 +691,12 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         });
       }
 
-      // Map reservations to events
+      // Map reservations to events. Exclude untabled private-event RSVPs: they
+      // are represented by the summary bar on the private-event row, and drawing
+      // them as normal reservations would stack them onto whichever table sorts
+      // first and mislead staff about what is actually booked there.
       const mapped = rawReservations
+        .filter((r: Record<string, any>) => !(!r.table_id && r.private_event_id))
         .map((r: Record<string, any>) => {
         const heart = r.membership_type === 'member' ? '🖤 ' : '';
         let emoji = r.event_type ? eventTypeEmojis[r.event_type.toLowerCase()] || '' : '';
@@ -789,14 +795,55 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
   // Get private events for the current calendar date
   const getCurrentDayPrivateEvents = () => {
+    const calendarDateLocal = fromUTC(currentCalendarDate.toISOString(), settings.timezone);
+    const currentDate = calendarDateLocal.toFormat('yyyy-MM-dd');
     return privateEvents.filter((pe: any) => {
       // Minaka events don't have a status field, so only check status for local events
       if (pe.status && pe.status !== 'active') return false;
-      const eventDateLocal = fromUTC(pe.start_time, settings.timezone);
-      const calendarDateUTC = currentCalendarDate.toISOString();
-      const calendarDateLocal = fromUTC(calendarDateUTC, settings.timezone);
-      return isSameDay(eventDateLocal, calendarDateLocal, settings.timezone);
+      const eventStartDate = fromUTC(pe.start_time, settings.timezone).toFormat('yyyy-MM-dd');
+      const eventEndDate = fromUTC(pe.end_time, settings.timezone).toFormat('yyyy-MM-dd');
+      // Include events that start on, end on, or span across the current date so
+      // that private events crossing midnight still render and block the next day.
+      return eventStartDate === currentDate || eventEndDate === currentDate ||
+             (eventStartDate < currentDate && eventEndDate > currentDate);
     });
+  };
+
+  // Shared helpers for slot background styling (used by slotLabelDidMount and
+  // slotLaneDidMount) so the two callbacks stay consistent.
+  const getSlotTimeStr = (slotTime: Date): string => {
+    const tz = settings.timezone || 'America/Chicago';
+    const slotDateTime = DateTime.fromJSDate(slotTime).setZone(tz);
+    const slotHour = slotDateTime.hour;
+    // Compare full dates (not just day-of-month) so month boundaries work.
+    const currentDateStr = DateTime.fromJSDate(currentCalendarDate).setZone(tz).toFormat('yyyy-MM-dd');
+    const slotDateStr = slotDateTime.toFormat('yyyy-MM-dd');
+    if (slotHour < 3 && slotDateStr > currentDateStr) {
+      // This is a time after midnight, use 24+ hour format
+      const adjustedHour = 24 + slotHour;
+      return `${adjustedHour.toString().padStart(2, '0')}:${slotDateTime.minute.toString().padStart(2, '0')}:${slotDateTime.second.toString().padStart(2, '0')}`;
+    }
+    return slotDateTime.toFormat('HH:mm:ss');
+  };
+
+  const isSlotBlocked = (slotTimeStr: string): boolean => {
+    for (const range of blockedTimeRanges) {
+      const rangeEndStr = range.end;
+      // For ranges that end at or after midnight (24:00:00 or later)
+      if (rangeEndStr >= '24:00:00') {
+        if ((slotTimeStr >= range.start && slotTimeStr <= '23:59:59') ||
+            (slotTimeStr >= '24:00:00' && slotTimeStr < rangeEndStr)) {
+          return true;
+        }
+      } else {
+        // Exclusive end so a slot on the boundary renders open (consistent
+        // between the slot label and the slot lane).
+        if (slotTimeStr >= range.start && slotTimeStr < range.end) {
+          return true;
+        }
+      }
+    }
+    return false;
   };
 
   // Handle drag and drop
@@ -1280,45 +1327,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             const slotTime = arg.date;
             if (!slotTime) return;
 
-            // Convert the slot time to Chicago timezone for proper comparison
-            const slotDateTime = DateTime.fromJSDate(slotTime).setZone(settings.timezone || 'America/Chicago');
-            const slotHour = slotDateTime.hour;
-            const slotMinute = slotDateTime.minute;
-            const slotSecond = slotDateTime.second;
-
-            // Create a time string that handles past-midnight times
-            let slotTimeStr: string;
-            // Check if this is a "next day" time (after midnight but shown in same timeline)
-            const currentDateDay = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone || 'America/Chicago').day;
-            if (slotHour < 3 && slotDateTime.day > currentDateDay) {
-              // This is a time after midnight, use 24+ hour format
-              const adjustedHour = 24 + slotHour;
-              slotTimeStr = `${adjustedHour.toString().padStart(2, '0')}:${slotMinute.toString().padStart(2, '0')}:${slotSecond.toString().padStart(2, '0')}`;
-            } else {
-              slotTimeStr = slotDateTime.toFormat('HH:mm:ss');
-            }
-
-            let isBlocked = false;
-            for (const range of blockedTimeRanges) {
-              // Handle comparison for times that might be in 24+ hour format
-              const rangeEndStr = range.end;
-
-              // For ranges that end at or after midnight (24:00:00 or later)
-              if (rangeEndStr >= '24:00:00') {
-                // Check if slot is between start and midnight, or after midnight up to end
-                if ((slotTimeStr >= range.start && slotTimeStr <= '23:59:59') ||
-                    (slotTimeStr >= '24:00:00' && slotTimeStr <= rangeEndStr)) {
-                  isBlocked = true;
-                  break;
-                }
-              } else {
-                // Normal comparison for same-day ranges
-                if (slotTimeStr >= range.start && slotTimeStr <= range.end) {
-                  isBlocked = true;
-                  break;
-                }
-              }
-            }
+            const slotTimeStr = getSlotTimeStr(slotTime);
+            const isBlocked = isSlotBlocked(slotTimeStr);
 
             // Apply dark background to blocked time slots, light background to open times
             const applyStyle = () => {
@@ -1346,45 +1356,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             const slotTime = arg.date;
             if (!slotTime) return;
 
-            // Convert the slot time to Chicago timezone for proper comparison
-            const slotDateTime = DateTime.fromJSDate(slotTime).setZone(settings.timezone || 'America/Chicago');
-            const slotHour = slotDateTime.hour;
-            const slotMinute = slotDateTime.minute;
-            const slotSecond = slotDateTime.second;
-
-            // Create a time string that handles past-midnight times
-            let slotTimeStr: string;
-            // Check if this is a "next day" time (after midnight but shown in same timeline)
-            const currentDateDay = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone || 'America/Chicago').day;
-            if (slotHour < 3 && slotDateTime.day > currentDateDay) {
-              // This is a time after midnight, use 24+ hour format
-              const adjustedHour = 24 + slotHour;
-              slotTimeStr = `${adjustedHour.toString().padStart(2, '0')}:${slotMinute.toString().padStart(2, '0')}:${slotSecond.toString().padStart(2, '0')}`;
-            } else {
-              slotTimeStr = slotDateTime.toFormat('HH:mm:ss');
-            }
-
-            let isBlocked = false;
-            for (const range of blockedTimeRanges) {
-              // Handle comparison for times that might be in 24+ hour format
-              const rangeEndStr = range.end;
-
-              // For ranges that end at or after midnight (24:00:00 or later)
-              if (rangeEndStr >= '24:00:00') {
-                // Check if slot is between start and midnight, or after midnight up to end
-                if ((slotTimeStr >= range.start && slotTimeStr <= '23:59:59') ||
-                    (slotTimeStr >= '24:00:00' && slotTimeStr <= rangeEndStr)) {
-                  isBlocked = true;
-                  break;
-                }
-              } else {
-                // Normal comparison for same-day ranges
-                if (slotTimeStr >= range.start && slotTimeStr < range.end) {
-                  isBlocked = true;
-                  break;
-                }
-              }
-            }
+            const slotTimeStr = getSlotTimeStr(slotTime);
+            const isBlocked = isSlotBlocked(slotTimeStr);
 
             // Apply subtle dark tint to blocked lanes, keep light for open lanes
             const applyLaneStyle = () => {
