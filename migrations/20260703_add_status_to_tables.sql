@@ -1,6 +1,6 @@
 -- ========================================
 -- Migration: Add Status Column to Tables
--- Created: 2025-07-03
+-- Created: 2026-07-03
 -- Description: Adds status column to tables table for tracking whether
 --              a table is active (available for reservations) or
 --              inactive (maintenance/unavailable)
