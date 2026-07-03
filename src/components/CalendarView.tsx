@@ -4,6 +4,7 @@ import { Calendar, momentLocalizer, Event as RBCEvent, SlotInfo } from 'react-bi
 import moment from 'moment';
 import { fromUTC } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
+import { formatTableNumber } from '@/lib/utils';
 
 const localizer = momentLocalizer(moment);
 
@@ -34,13 +35,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent
 
   useEffect(() => {
     async function fetchData() {
-      const tablesRes = await fetch('/api/tables');
+      // Only active tables are bookable, so keep them off the calendar grid too
+      const tablesRes = await fetch('/api/tables?status=active');
       const tablesJson = await tablesRes.json();
       const tableResources = (tablesJson.data || [])
-        .sort((a: any, b: any) => a.table_number.localeCompare(b.table_number))
+        // table_number is a number from the API, so sort numerically
+        .sort((a: any, b: any) => a.table_number - b.table_number)
         .map((t: any) => ({
           resourceId: t.id,
-          resourceTitle: `Table ${t.table_number}`
+          resourceTitle: `Table ${formatTableNumber(t.table_number)}`
         }));
       setTables(tableResources);
       const [privateEventsRes, resRes] = await Promise.all([

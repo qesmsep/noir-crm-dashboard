@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { localInputToUTC, dateToLocalInput } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
+import { formatTableNumber } from '@/lib/utils';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -180,7 +181,10 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
 
   const fetchTables = async () => {
     try {
-      const url = locationSlug ? `/api/tables?location=${locationSlug}` : '/api/tables';
+      // Only active tables can be booked
+      const url = locationSlug
+        ? `/api/tables?location=${locationSlug}&status=active`
+        : '/api/tables?status=active';
       const response = await fetch(url);
       if (response.ok) {
         const result = await response.json();
@@ -475,7 +479,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
               >
                 <option value="">Select table</option>
                 {tables.map(table => (
-                  <option key={table.id} value={table.id}>Table {table.table_number}</option>
+                  <option key={table.id} value={table.id}>Table {formatTableNumber(table.table_number)}</option>
                 ))}
               </select>
             </div>

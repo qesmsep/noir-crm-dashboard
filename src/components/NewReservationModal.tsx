@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatTableNumber } from '@/lib/utils';
 import {
   Modal,
   ModalOverlay,
@@ -133,7 +134,8 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
 
   const fetchTables = async () => {
     try {
-      const response = await fetch('/api/tables');
+      // Only active tables can be booked
+      const response = await fetch('/api/tables?status=active');
       if (response.ok) {
         const result = await response.json();
         setTables(result.data || []);
@@ -436,7 +438,7 @@ const NewReservationModal: React.FC<NewReservationModalProps> = ({
               >
                 <option value="">Select table</option>
                 {tables.map(table => (
-                  <option key={table.id} value={table.id}>Table {table.table_number}</option>
+                  <option key={table.id} value={table.id}>Table {formatTableNumber(table.table_number)}</option>
                 ))}
               </Select>
             </FormControl>

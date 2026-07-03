@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
+import { formatTableNumber } from '@/lib/utils';
 import { localInputToUTC } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
 
@@ -138,7 +139,8 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
 
   const fetchTables = async () => {
     try {
-      const response = await fetch('/api/tables');
+      // Only active tables can be booked
+      const response = await fetch('/api/tables?status=active');
       if (response.ok) {
         const result = await response.json();
         setTables(result.data || []);
@@ -413,7 +415,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
               >
                 <option value="">Select table</option>
                 {tables.map(table => (
-                  <option key={table.id} value={table.id}>Table {table.table_number}</option>
+                  <option key={table.id} value={table.id}>Table {formatTableNumber(table.table_number)}</option>
                 ))}
               </Select>
             </div>
