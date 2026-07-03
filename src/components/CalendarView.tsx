@@ -34,7 +34,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onSelectSlot, onSelectEvent
 
   useEffect(() => {
     async function fetchData() {
-      const tablesRes = await fetch('/api/tables');
+      // Only active tables are bookable, so keep them off the calendar grid too
+      const tablesRes = await fetch('/api/tables?status=active');
       const tablesJson = await tablesRes.json();
       const tableResources = (tablesJson.data || [])
         // table_number is a number from the API, so sort numerically
