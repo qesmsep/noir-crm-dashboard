@@ -60,7 +60,7 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
         });
       }
 
-      const { item_id, transaction_type, quantity_change, notes } = validation.data;
+      const { item_id, transaction_type, quantity_change, cost_per_unit, notes } = validation.data;
 
       // Auth is enforced by withRateLimitAndAuth middleware - req.user is always set
       if (!req.user?.id) {
@@ -73,7 +73,8 @@ async function transactionsHandler(req: AuthenticatedRequest, res: NextApiRespon
         p_quantity_change: quantity_change,
         p_transaction_type: transaction_type,
         p_notes: notes || '',
-        p_created_by: req.user.id
+        p_created_by: req.user.id,
+        p_cost_per_unit: cost_per_unit || null  // Pass price for history tracking
       });
 
       if (error) {

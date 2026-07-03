@@ -40,6 +40,7 @@ export const TransactionSchema = z.object({
   item_id: z.string().uuid(),
   transaction_type: TransactionTypeSchema,
   quantity_change: z.number().refine(val => val !== 0, 'Quantity change cannot be zero'),
+  cost_per_unit: z.number().min(0).finite().optional(), // Track price at time of transaction
   notes: z.string().max(500).default('')
 });
 

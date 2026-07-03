@@ -343,7 +343,7 @@ export default function InventoryPage() {
       }
 
       if (!scanned.create_new && scanned.matched_inventory_id) {
-        // Match to existing: add quantity to the existing item
+        // Match to existing: add quantity and update price to the existing item
         const totalQuantity = allocatedLocations.reduce((sum, [_, qty]) => sum + qty, 0);
 
         try {
@@ -355,7 +355,10 @@ export default function InventoryPage() {
               item_id: scanned.matched_inventory_id,
               transaction_type: 'add',
               quantity_change: totalQuantity,
-              notes: 'Added from receipt scan'
+              cost_per_unit: costPerUnit > 0 ? costPerUnit : undefined, // Track price in transaction history
+              notes: costPerUnit > 0
+                ? `Added from receipt scan ($${costPerUnit.toFixed(2)}/unit)`
+                : 'Added from receipt scan'
             }),
           });
 
@@ -431,6 +434,10 @@ export default function InventoryPage() {
         await fetchRecipes();
         setIsRecipeDrawerOpen(false);
         setEditingRecipe(null);
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Recipe save failed:', errorData);
+        alert(`Failed to save recipe: ${errorData.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Failed to save recipe:', err);
