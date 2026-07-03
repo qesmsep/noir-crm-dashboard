@@ -3909,6 +3909,18 @@ This section maintains a running log of all significant commits and changes to t
 
 ---
 
+### 2026-07-03 - Tables Management System
+
+**Changes**: Added a full CRUD Tables Management feature for venues (admin UI + `/api/tables` and `/api/tables/[id]` routes, shared admin-auth middleware, active/inactive status). Booking flows request active tables only; admin edit flows still see all tables.
+
+**Migrations**:
+- `migrations/20260703_add_status_to_tables.sql` — adds the `status` column to `tables` (rollback: `..._ROLLBACK.sql`). Applied to production.
+- `migrations/20260703_add_unique_table_number_per_location.sql` — adds a unique index on `(location_id, table_number)` to close the create/update duplicate-number race. Applied to production.
+
+**Documentation**: See [Changelog & Commit Log](#changelog--commit-log)
+
+**Git Commit**: `feat: Add comprehensive tables management system for venues` (+ review-fix follow-ups)
+
 ### 2026-03-10 - Annual Membership Billing & Display Fixes
 
 **Commits**:
