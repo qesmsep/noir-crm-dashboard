@@ -128,9 +128,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (seats < 1 || seats > 20) {
+    // Integer guard matches table_number: a non-numeric seats value makes the
+    // range comparison NaN-based (silently false) and would only fail at the DB
+    if (!Number.isInteger(seats) || seats < 1 || seats > 20) {
       return NextResponse.json(
-        { error: 'Seats must be between 1 and 20' },
+        { error: 'Seats must be an integer between 1 and 20' },
         { status: 400 }
       );
     }
