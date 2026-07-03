@@ -49,6 +49,7 @@ export default async function handler(req, res) {
 
     const results = [];
     const timestamp = new Date().toISOString();
+    const sentBy = req.headers['x-user-email'] || null;
     let successCount = 0;
     let failCount = 0;
 
@@ -116,7 +117,8 @@ export default async function handler(req, res) {
             direction: 'outbound',
             status: 'sent',
             phone_number: formattedPhone,
-            created_at: timestamp
+            timestamp: timestamp,
+            sent_by: sentBy
           });
 
         if (insertError) {
@@ -145,7 +147,8 @@ export default async function handler(req, res) {
             status: 'failed',
             phone_number: member.phone,
             error_message: error.message,
-            created_at: timestamp
+            timestamp: timestamp,
+            sent_by: sentBy
           });
 
         if (insertError) {

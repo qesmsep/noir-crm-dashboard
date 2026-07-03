@@ -491,10 +491,15 @@ export default function MembersAdmin() {
           .map(account => account.account_id)
       );
 
+      // Capture the sending admin's email so the message is attributed in the log
+      const { data: { session } } = await supabase.auth.getSession();
+      const userEmail = session?.user?.email || '';
+
       const response = await fetch('/api/send-bulk-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-user-email': userEmail,
         },
         body: JSON.stringify({
           content: bulkMessageContent.trim(),
