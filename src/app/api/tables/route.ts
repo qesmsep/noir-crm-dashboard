@@ -66,8 +66,9 @@ export async function GET(request: Request) {
     const { data, error } = await query;
 
     if (error) {
+      // Don't leak raw DB error details to this public, unauthenticated route
       console.error('Error fetching tables from Supabase:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch tables' }, { status: 500 });
     }
 
     const mapped = (data || []).map(t => {

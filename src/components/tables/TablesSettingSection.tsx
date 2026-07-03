@@ -320,6 +320,7 @@ export default function TablesSettingSection({
         editTable={editingTable}
         saving={saving}
         locationName={locationName}
+        error={error}
       />
     </div>
   );

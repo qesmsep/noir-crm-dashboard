@@ -18,6 +18,15 @@ interface TableFormData {
   status: 'active' | 'inactive';
 }
 
+// While editing, the numeric fields may be transiently empty (user cleared the
+// input to retype). We keep '' in local state so the field doesn't snap back to
+// a default, and coerce to numbers on submit.
+interface TableFormState {
+  table_number: number | '';
+  seats: number | '';
+  status: 'active' | 'inactive';
+}
+
 interface TableEditModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,9 +35,10 @@ interface TableEditModalProps {
   editTable: TableData | null;
   saving: boolean;
   locationName?: string;
+  error?: string | null;
 }
 
-const EMPTY_FORM: TableFormData = {
+const EMPTY_FORM: TableFormState = {
   table_number: 1,
   seats: 2,
   status: 'active',
@@ -42,8 +52,9 @@ export default function TableEditModal({
   editTable,
   saving,
   locationName = '',
+  error = null,
 }: TableEditModalProps) {
-  const [form, setForm] = useState<TableFormData>(EMPTY_FORM);
+  const [form, setForm] = useState<TableFormState>(EMPTY_FORM);
   const [mounted, setMounted] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
@@ -94,7 +105,7 @@ export default function TableEditModal({
   }, [isOpen, onClose, showConfirmDelete]);
 
   const handleChange = (
-    field: keyof TableFormData,
+    field: keyof TableFormState,
     value: string | number
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -102,7 +113,16 @@ export default function TableEditModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(form);
+    // Guard against submitting while a numeric field is transiently empty
+    // (the `required`/`min` attributes normally block this at the browser).
+    if (form.table_number === '' || form.seats === '') {
+      return;
+    }
+    onSave({
+      table_number: Number(form.table_number),
+      seats: Number(form.seats),
+      status: form.status,
+    });
   };
 
   const handleDeleteClick = () => {
@@ -173,6 +193,16 @@ export default function TableEditModal({
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-3 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-3">
+            {/* Error (rendered inline so it isn't hidden behind the overlay) */}
+            {error && (
+              <div
+                role="alert"
+                className="text-sm rounded px-3 py-2"
+                style={{ backgroundColor: '#f8d7da', color: '#842029', border: '1px solid #f5c2c7' }}
+              >
+                {error}
+              </div>
+            )}
             {/* Table Number */}
             <div>
               <label className="text-sm md:text-xs font-semibold mb-1 block">
@@ -186,9 +216,14 @@ export default function TableEditModal({
                 style={{ fontFamily: 'Montserrat, sans-serif' }}
                 value={form.table_number}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  if (value >= 1 || e.target.value === '') {
-                    handleChange('table_number', value || 1);
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    handleChange('table_number', '');
+                    return;
+                  }
+                  const value = parseInt(raw, 10);
+                  if (value >= 1) {
+                    handleChange('table_number', value);
                   }
                 }}
                 required
@@ -212,9 +247,14 @@ export default function TableEditModal({
                 style={{ fontFamily: 'Montserrat, sans-serif' }}
                 value={form.seats}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  if ((value >= 1 && value <= 20) || e.target.value === '') {
-                    handleChange('seats', value || 2);
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    handleChange('seats', '');
+                    return;
+                  }
+                  const value = parseInt(raw, 10);
+                  if (value >= 1 && value <= 20) {
+                    handleChange('seats', value);
                   }
                 }}
                 required

@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAdminAccess } from '@/lib/admin-middleware';
 
-// Postgres unique_violation error code
+// Postgres error codes
 const PG_UNIQUE_VIOLATION = '23505';
+const PG_FOREIGN_KEY_VIOLATION = '23503';
 
 export async function PUT(
   request: Request,
@@ -172,9 +173,19 @@ export async function DELETE(
       .eq('id', id);
 
     if (error) {
+      // The future-reservation guard above doesn't catch past/cancelled
+      // reservations (or events) that still hold an FK to this table. Those
+      // trip a foreign-key violation, which we surface as a clean 409 instead
+      // of a raw 500.
+      if (error.code === PG_FOREIGN_KEY_VIOLATION) {
+        return NextResponse.json(
+          { error: 'Cannot delete this table because existing reservations or events reference it.' },
+          { status: 409 }
+        );
+      }
       console.error('Error deleting table:', error);
       return NextResponse.json(
-        { error: error.message || 'Failed to delete table' },
+        { error: 'Failed to delete table' },
         { status: 500 }
       );
     }

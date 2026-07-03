@@ -34,6 +34,8 @@ export default function TablesList({
       const matchesSearch =
         !searchQuery ||
         table.table_number.toString().includes(searchQuery) ||
+        // Also match the zero-padded label shown in the UI (e.g. "05")
+        String(table.table_number).padStart(2, '0').includes(searchQuery) ||
         table.seats.toString().includes(searchQuery);
 
       const matchesStatus =
