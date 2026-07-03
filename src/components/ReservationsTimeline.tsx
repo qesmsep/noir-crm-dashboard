@@ -441,14 +441,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       }
     });
 
-    // Check if there are no operating hours for this day (venue is closed)
-    // This would be handled by the operating hours logic, but we should ensure
-    // the UI reflects this as well
-    if (blockedRanges.length === 0 && !hasFullDayClosure) {
-      // Check if the venue has no hours for this day
-      const dayOfWeek = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone).weekday;
-      // This will be handled by slotMinTime/slotMaxTime being empty or invalid
-    }
+    // Days with no operating hours are handled by the slotMinTime/slotMaxTime
+    // logic, so nothing extra is needed here.
 
     setBlockedTimeRanges(blockedRanges);
 
@@ -469,7 +463,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       // that blocks the day - otherwise admins are stuck on non-RSVP buyouts.
       // Match the "occurs on this date" logic used for blocking (start on, end
       // on, or span across the date) so it also covers midnight-spanning events.
-      const currentDateStr = fromUTC(currentCalendarDate.toISOString(), settings.timezone).toFormat('yyyy-MM-dd');
+      // Reuses currentDateStr computed at the top of this effect.
       const hasAnyPrivateEvent = privateEvents.some((event: any) => {
         if (event.status && event.status !== 'active') return false;
         const eventStartDate = fromUTC(event.start_time, settings.timezone).toFormat('yyyy-MM-dd');
