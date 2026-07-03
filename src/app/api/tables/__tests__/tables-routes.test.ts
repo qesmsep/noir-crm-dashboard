@@ -186,6 +186,15 @@ describe('PUT /api/tables/[id]', () => {
     const res = await PUT(postReq({ table_number: 7, seats: 2, status: 'active' }), params);
     expect(res.status).toBe(200);
   });
+
+  it('returns 404 when the table does not exist', async () => {
+    authOk();
+    mockFrom = makeFrom({
+      tables: [{ data: null, error: { message: 'not found' } }], // current table lookup misses
+    });
+    const res = await PUT(postReq({ table_number: 7, seats: 2, status: 'active' }), params);
+    expect(res.status).toBe(404);
+  });
 });
 
 // --- DELETE ----------------------------------------------------------------
@@ -253,6 +262,11 @@ describe('GET /api/tables', () => {
 
   it('rejects an invalid status filter with 400', async () => {
     const res = await GET(getReq('http://localhost/api/tables?status=bogus'));
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a malformed location parameter with 400', async () => {
+    const res = await GET(getReq('http://localhost/api/tables?location=bad!slug'));
     expect(res.status).toBe(400);
   });
 });

@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAdminAccess } from '@/lib/admin-middleware';
-
-// Postgres error codes
-const PG_UNIQUE_VIOLATION = '23505';
-const PG_FOREIGN_KEY_VIOLATION = '23503';
+import { PG_UNIQUE_VIOLATION, PG_FOREIGN_KEY_VIOLATION } from '@/lib/pg-error-codes';
 
 export async function PUT(
   request: Request,

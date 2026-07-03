@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { verifyAdminAccess } from '@/lib/admin-middleware';
+import { PG_UNIQUE_VIOLATION } from '@/lib/pg-error-codes';
 
 // Slugs are alphanumeric plus hyphens (e.g. "noirkc", "rooftopkc")
 const LOCATION_SLUG_REGEX = /^[a-z0-9-]+$/i;
-
-// Postgres unique_violation error code
-const PG_UNIQUE_VIOLATION = '23505';
 
 export async function GET(request: Request) {
   try {
