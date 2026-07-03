@@ -634,7 +634,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                         {tables && tables.length > 0 ? (
                           tables.map(table => (
                             <option key={table.id} value={table.id}>
-                              Table {table.table_number} ({table.seats} seats)
+                              Table {String(table.table_number).padStart(2, '0')} ({table.seats} seats)
                             </option>
                           ))
                         ) : (

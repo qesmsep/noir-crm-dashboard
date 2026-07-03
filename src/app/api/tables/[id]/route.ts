@@ -75,7 +75,7 @@ export async function PUT(
       .eq('location_id', currentTable.location_id)
       .eq('table_number', table_number)
       .neq('id', id)
-      .single();
+      .maybeSingle();
 
     if (existingTable) {
       return NextResponse.json(

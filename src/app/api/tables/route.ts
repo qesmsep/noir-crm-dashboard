@@ -169,7 +169,7 @@ export async function POST(request: Request) {
       .select('id')
       .eq('location_id', locationId)
       .eq('table_number', table_number)
-      .single();
+      .maybeSingle();
 
     if (existingTable) {
       return NextResponse.json(
