@@ -357,6 +357,7 @@ export default function TableEditModal({
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"
+        disabled={saving}
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowConfirmDelete(false)}
       />
