@@ -2,4 +2,5 @@
 
 ALTER TABLE public.messages
   DROP COLUMN IF EXISTS direction,
-  DROP COLUMN IF EXISTS phone_number;
+  DROP COLUMN IF EXISTS phone_number,
+  DROP COLUMN IF EXISTS sent_by;
