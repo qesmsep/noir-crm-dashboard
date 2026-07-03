@@ -359,7 +359,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       const eventEndDate = endTime.toFormat('yyyy-MM-dd');
 
       // Handle events that span to next day (e.g., 19:00 to 00:00 next day)
-      let rangeToAdd = null;
+      let rangeToAdd: { start: string; end: string } | null = null;
       if (eventStartDate === currentDateStr) {
         // Event starts on current date
         if (eventEndDate > currentDateStr) {
