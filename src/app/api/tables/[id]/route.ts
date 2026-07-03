@@ -134,13 +134,18 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Check for future reservations
+    // Check for reservations that would be orphaned by deleting this table:
+    // any non-cancelled reservation that has not yet ended (upcoming OR
+    // currently in progress). Using end_time > now catches occupied tables
+    // that gte('start_time', now) would miss, and excluding cancelled ones
+    // mirrors the assign-table conflict check.
     const now = new Date().toISOString();
     const { data: futureReservations, error: reservationError } = await supabase
       .from('reservations')
       .select('id')
       .eq('table_id', id)
-      .gte('start_time', now)
+      .neq('status', 'cancelled')
+      .gt('end_time', now)
       .limit(1);
 
     if (reservationError) {

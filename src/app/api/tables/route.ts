@@ -135,6 +135,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate status against the enum (matches PUT); guards direct API calls
+    // so an invalid value returns 400 instead of failing the DB CHECK as a 500
+    if (status !== undefined && !['active', 'inactive'].includes(status)) {
+      return NextResponse.json(
+        { error: 'Status must be either active or inactive' },
+        { status: 400 }
+      );
+    }
+
     // Get location ID
     const { data: locationData, error: locationError } = await supabase
       .from('locations')

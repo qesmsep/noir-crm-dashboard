@@ -1388,7 +1388,7 @@ export default function SimpleReservationRequestModal({
                 <option value="">Table (Optional)</option>
                 {tables.map((table) => (
                   <option key={table.id} value={table.id}>
-                    Table {table.table_number}
+                    Table {String(table.table_number).padStart(2, '0')}
                   </option>
                 ))}
               </select>

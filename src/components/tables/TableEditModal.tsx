@@ -77,7 +77,10 @@ export default function TableEditModal({
     document.body.style.overflow = 'hidden';
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      // When the delete-confirmation dialog is open, let it handle Escape
+      // (dismissing only itself) rather than also closing the whole modal
+      // and discarding in-progress edits.
+      if (e.key === 'Escape' && !showConfirmDelete) {
         onClose();
       }
     };
@@ -88,7 +91,7 @@ export default function TableEditModal({
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, showConfirmDelete]);
 
   const handleChange = (
     field: keyof TableFormData,

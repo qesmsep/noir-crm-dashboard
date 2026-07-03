@@ -414,7 +414,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
               >
                 <option value="">Select table</option>
                 {tables.map(table => (
-                  <option key={table.id} value={table.id}>Table {table.table_number}</option>
+                  <option key={table.id} value={table.id}>Table {String(table.table_number).padStart(2, '0')}</option>
                 ))}
               </Select>
             </div>
