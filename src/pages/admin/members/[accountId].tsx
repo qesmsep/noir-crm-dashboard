@@ -28,6 +28,7 @@ interface Member {
   dob?: string;
   company?: string;
   referred_by?: string;
+  referred_by_member_id?: string;
   next_renewal?: string;
   ledger_notifications_enabled?: boolean;
   address?: string;

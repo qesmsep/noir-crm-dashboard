@@ -212,7 +212,7 @@ export default function InventoryPhotoScanner({
   const toggleLocationForItem = (itemIndex: number, locationSlug: LocationSlug) => {
     if (!scanResults) return;
     const updated = [...scanResults];
-    const currentQuantities = updated[itemIndex].location_quantities || {};
+    const currentQuantities: Partial<Record<LocationSlug, number>> = updated[itemIndex].location_quantities || {};
 
     if (currentQuantities[locationSlug] !== undefined) {
       // Location is selected, remove it

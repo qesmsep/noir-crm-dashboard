@@ -24,6 +24,7 @@ interface ReservationsTimelineProps {
   onSlotClick?: (slotInfo: { date: Date; resourceId: string }) => void;
   onMakeReservationClick?: () => void;
   onPrivateEventRSVPClick?: () => void;
+  onAssignTableClick?: () => void;
   onPrivateEventsCheck?: (hasEvents: boolean) => void;
   locationSlug?: string;
 }
@@ -58,6 +59,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   onSlotClick,
   onMakeReservationClick,
   onPrivateEventRSVPClick,
+  onAssignTableClick,
   onPrivateEventsCheck,
   locationSlug,
 }) => {
@@ -1076,6 +1078,15 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
               PE RSVPs
             </button>
           )}
+          {onAssignTableClick && (
+            <button
+              className={styles.mobileNavNewRez}
+              onClick={onAssignTableClick}
+              aria-label="Assign Table"
+            >
+              Assign Table
+            </button>
+          )}
           {onMakeReservationClick && (
             <button
               className={styles.mobileNavNewRez}
@@ -1117,12 +1128,26 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
                 }
               },
             },
+            assignTable: {
+              text: 'Assign Table',
+              click: () => {
+                if (onAssignTableClick) {
+                  onAssignTableClick();
+                }
+              },
+            },
           }}
 
           headerToolbar={isMobile ? false : {
             left: 'prev,next',
             center: 'title',
-            right: onPrivateEventRSVPClick ? 'privateEventRSVPs,makeReservation,today' : 'makeReservation,today',
+            right: (() => {
+              let buttons: string[] = [];
+              if (onPrivateEventRSVPClick) buttons.push('privateEventRSVPs');
+              if (onAssignTableClick) buttons.push('assignTable');
+              buttons.push('makeReservation', 'today');
+              return buttons.join(',');
+            })(),
           }}
           titleFormat={{ weekday: 'long', month: 'long', day: 'numeric' }}
           resources={resources}

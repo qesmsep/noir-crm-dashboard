@@ -15,7 +15,7 @@ import { getAuthHeaders } from '../../lib/client-auth';
 interface InventoryItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: InventoryItemFormData) => void | Promise<void>;
+  onSave: (data: InventoryItemFormData) => void | Promise<void> | Promise<InventoryItem | null>;
   onDelete?: (id: string) => void;
   editItem: InventoryItem | null;
   saving: boolean;

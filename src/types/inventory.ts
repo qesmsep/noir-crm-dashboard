@@ -216,7 +216,7 @@ export interface ScannedItem {
   matched_inventory_stock?: number;
   ai_extracted_name?: string; // Original AI extraction
   ai_extracted_brand?: string; // Original AI extraction
-  location_quantities?: Record<LocationSlug, number>; // qty per location
+  location_quantities?: Partial<Record<LocationSlug, number>>; // qty per location
   create_new?: boolean; // true = create new, false = match to existing
 }
 
