@@ -25,7 +25,7 @@ interface ReservationsTimelineProps {
   onMakeReservationClick?: () => void;
   onPrivateEventRSVPClick?: () => void;
   onAssignTableClick?: () => void;
-  onPrivateEventsCheck?: (hasEvents: boolean) => void;
+  onPrivateEventsCheck?: (hasRsvpEvents: boolean, hasAnyPrivateEvent: boolean) => void;
   locationSlug?: string;
 }
 
@@ -464,7 +464,21 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         return eventStart >= startOfDay && eventStart <= endOfDay && event.rsvp_enabled;
       });
 
-      onPrivateEventsCheck(rsvpEventsOnDate.length > 0);
+      // The RSVP button only applies to RSVP-enabled events, but the table
+      // override (Assign Table) must be reachable for ANY active private event
+      // that blocks the day - otherwise admins are stuck on non-RSVP buyouts.
+      // Match the "occurs on this date" logic used for blocking (start on, end
+      // on, or span across the date) so it also covers midnight-spanning events.
+      const currentDateStr = fromUTC(currentCalendarDate.toISOString(), settings.timezone).toFormat('yyyy-MM-dd');
+      const hasAnyPrivateEvent = privateEvents.some((event: any) => {
+        if (event.status && event.status !== 'active') return false;
+        const eventStartDate = fromUTC(event.start_time, settings.timezone).toFormat('yyyy-MM-dd');
+        const eventEndDate = fromUTC(event.end_time, settings.timezone).toFormat('yyyy-MM-dd');
+        return eventStartDate === currentDateStr || eventEndDate === currentDateStr ||
+               (eventStartDate < currentDateStr && eventEndDate > currentDateStr);
+      });
+
+      onPrivateEventsCheck(rsvpEventsOnDate.length > 0, hasAnyPrivateEvent);
     }
   }, [privateEvents, currentCalendarDate, locationSlug, onPrivateEventsCheck, exceptionalClosures, settings.timezone]);
 
@@ -1023,8 +1037,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         const eventStart = fromUTC(privateEvent.start_time, settings.timezone);
         const eventEnd = fromUTC(privateEvent.end_time, settings.timezone);
         const clickedTime = DateTime.fromJSDate(clickedDate, { zone: settings.timezone });
-        const clickedTimeOnly = clickedTime.set({ year: eventStart.year, month: eventStart.month, day: eventStart.day });
-        return clickedTimeOnly >= eventStart && clickedTimeOnly < eventEnd;
+        // Compare the actual clicked instant against the event window. Re-dating
+        // the click onto the event's start day would misjudge slots after
+        // midnight (viewed on the following day) for events that span midnight.
+        return clickedTime >= eventStart && clickedTime < eventEnd;
       });
       
       if (isBlocked) {

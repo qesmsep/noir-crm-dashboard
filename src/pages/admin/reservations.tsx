@@ -59,6 +59,9 @@ export default function Reservations() {
   // Private Event RSVP modal state
   const [isPrivateEventRSVPModalOpen, setIsPrivateEventRSVPModalOpen] = useState(false);
   const [hasPrivateEventsOnDate, setHasPrivateEventsOnDate] = useState(false);
+  // Any active private event on the date (RSVP-enabled or not) - drives the
+  // Assign Table override button so admins can still book on blocked days.
+  const [hasAnyPrivateEventOnDate, setHasAnyPrivateEventOnDate] = useState(false);
 
   // Track if we're creating a reservation during a private event
   const [isPrivateEventReservation, setIsPrivateEventReservation] = useState(false);
@@ -400,8 +403,11 @@ export default function Reservations() {
               onSlotClick={handleSlotClick}
               onMakeReservationClick={() => setIsLookupModalOpen(true)}
               onPrivateEventRSVPClick={hasPrivateEventsOnDate ? () => setIsPrivateEventRSVPModalOpen(true) : undefined}
-              onAssignTableClick={hasPrivateEventsOnDate ? handleAssignTableClick : undefined}
-              onPrivateEventsCheck={(hasEvents) => setHasPrivateEventsOnDate(hasEvents)}
+              onAssignTableClick={hasAnyPrivateEventOnDate ? handleAssignTableClick : undefined}
+              onPrivateEventsCheck={(hasRsvpEvents, hasAnyPrivateEvent) => {
+                setHasPrivateEventsOnDate(hasRsvpEvents);
+                setHasAnyPrivateEventOnDate(hasAnyPrivateEvent);
+              }}
               locationSlug={activeLocation}
             />
           </div>
