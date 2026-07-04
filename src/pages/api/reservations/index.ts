@@ -418,9 +418,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // SECURITY: Verify admin authentication if override is requested
       if (adminOverride) {
+        console.log('[ADMIN OVERRIDE] Verifying admin credentials...');
         const isAdmin = await verifyAdmin(req);
         if (!isAdmin) {
-          console.warn('[SECURITY] Non-admin attempted to use admin_override flag');
+          console.warn('[SECURITY] Non-admin attempted to use admin_override flag or verification failed');
+          console.warn('[SECURITY] Headers:', {
+            hasAuth: !!req.headers.authorization,
+            authPrefix: req.headers.authorization?.substring(0, 20)
+          });
           return res.status(403).json({
             error: 'Unauthorized: admin_override requires admin privileges'
           });

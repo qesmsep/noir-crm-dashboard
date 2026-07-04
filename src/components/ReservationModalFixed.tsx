@@ -135,6 +135,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      console.log('[RESERVATION MODAL] Opening with isPrivateEventOverride:', isPrivateEventOverride);
       fetchTables();
       const startTime = initialDate ? new Date(initialDate) : new Date();
       const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
@@ -156,7 +157,7 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         send_confirmation: false,
       });
     }
-  }, [isOpen, initialDate, initialTableId, timezone, prefilledData]);
+  }, [isOpen, initialDate, initialTableId, timezone, prefilledData, isPrivateEventOverride]);
 
   useEffect(() => {
     if (isOpen && initialTableId) {
@@ -261,15 +262,25 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
       // This allows creating reservations even when there's a private event blocking the date
       if (isPrivateEventOverride) {
         reservationData.admin_override = true;
+        console.log('[ADMIN OVERRIDE] Creating reservation during private event');
       }
 
       // Get the session for authentication if we need admin override
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (isPrivateEventOverride) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+          console.error('[ADMIN OVERRIDE] Failed to get session:', sessionError);
+          toast({
+            title: 'Authentication Error',
+            description: 'Unable to verify admin credentials. Please refresh and try again.',
+            status: 'error',
+            duration: 5000,
+          });
+          return;
         }
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+        console.log('[ADMIN OVERRIDE] Authorization header added');
       }
 
       const response = await fetch('/api/reservations', {
