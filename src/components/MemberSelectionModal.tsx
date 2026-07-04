@@ -33,6 +33,7 @@ export default function MemberSelectionModal({
   const [error, setError] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Format phone number to (xxx)xxx-xxxx
   const formatPhoneNumber = (phone: string) => {
@@ -65,9 +66,20 @@ export default function MemberSelectionModal({
 
   useEffect(() => {
     setMounted(true);
+
+    // Check if mobile on mount
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+
+    // Listen for window resize
+    window.addEventListener('resize', checkMobile);
+
     return () => {
       setMounted(false);
       debouncedSetSearch.cancel(); // Cancel any pending debounced calls
+      window.removeEventListener('resize', checkMobile);
     };
   }, [debouncedSetSearch]);
 
@@ -238,7 +250,7 @@ export default function MemberSelectionModal({
         </div>
 
         {/* Body */}
-        <div className="p-3 overflow-y-auto flex-1">
+        <div className="p-3 overflow-y-auto flex-1" style={{ minHeight: 0 }}>
           {/* Search Input */}
           <div className="mb-3 relative">
             <Search
@@ -279,6 +291,7 @@ export default function MemberSelectionModal({
               color: '#353535',
               cursor: 'pointer',
               transition: 'background-color 0.2s',
+              minHeight: '44px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#f5f5f5';
@@ -325,7 +338,7 @@ export default function MemberSelectionModal({
                 filteredMembers.length > 0 && (
                   <div
                     style={{
-                      maxHeight: '300px',
+                      maxHeight: isMobile ? '200px' : '300px',
                       overflowY: 'auto',
                       border: '1px solid #353535',
                       borderRadius: '6px',
@@ -378,17 +391,18 @@ export default function MemberSelectionModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t p-3 flex-shrink-0" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <div className="border-t p-3 flex-shrink-0" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <Button
             onClick={handleClose}
             style={{
               backgroundColor: 'transparent',
               border: '1px solid #353535',
               color: '#353535',
-              padding: '8px 16px',
+              padding: '10px 16px',
               fontFamily: 'Montserrat, sans-serif',
               fontSize: '14px',
               fontWeight: '600',
+              minHeight: '44px',
             }}
           >
             Cancel
@@ -400,14 +414,16 @@ export default function MemberSelectionModal({
               backgroundColor: selectedMember ? '#353535' : '#999',
               color: '#ffffff',
               border: 'none',
-              padding: '8px 16px',
+              padding: '10px 16px',
               fontFamily: 'Montserrat, sans-serif',
               fontSize: '14px',
               fontWeight: '600',
               cursor: selectedMember ? 'pointer' : 'not-allowed',
+              minHeight: '44px',
+              flex: isMobile ? '1 1 100%' : 'initial',
             }}
           >
-            Continue with Selected Member
+            {isMobile ? 'Continue' : 'Continue with Selected Member'}
           </Button>
         </div>
       </div>
