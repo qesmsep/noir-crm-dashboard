@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from 'next/router';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import ReservationsTimeline from '../../components/ReservationsTimeline';
@@ -64,6 +64,8 @@ export default function Reservations() {
   const [hasAnyPrivateEventOnDate, setHasAnyPrivateEventOnDate] = useState(false);
 
   // Track if we're creating a reservation during a private event
+  // Use a ref to avoid React state timing issues
+  const isPrivateEventReservationRef = useRef(false);
   const [isPrivateEventReservation, setIsPrivateEventReservation] = useState(false);
 
   // Member selection modal state
@@ -159,6 +161,7 @@ export default function Reservations() {
     setIsModalOpen(false);
     setSelectedSlot(null);
     setIsPrivateEventReservation(false);
+    isPrivateEventReservationRef.current = false;
     setPrefilledMemberData(null); // Clear prefilled data
   };
 
@@ -166,15 +169,25 @@ export default function Reservations() {
     // Modal is already closed, just trigger reload
     setReloadKey(prev => prev + 1);
     setIsPrivateEventReservation(false);
+    isPrivateEventReservationRef.current = false;
   };
 
   const handleAssignTableClick = () => {
+    console.log('[ASSIGN TABLE] Button clicked - enabling private event override');
     // Open member selection modal first
+    // Set BOTH ref and state to ensure consistency
+    isPrivateEventReservationRef.current = true;
     setIsPrivateEventReservation(true);
     setIsMemberSelectionModalOpen(true);
   };
 
   const handleMemberSelected = (member: any | null) => {
+    console.log('[ASSIGN TABLE] Member selected, opening modal with override:', {
+      isMember: !!member,
+      refValue: isPrivateEventReservationRef.current,
+      stateValue: isPrivateEventReservation
+    });
+
     // Set the selected slot and member data
     setSelectedSlot({ date: currentDate, resourceId: '' });
 
@@ -363,7 +376,7 @@ export default function Reservations() {
         initialTableId={selectedSlot?.resourceId}
         onReservationCreated={handleReservationCreated}
         locationSlug={activeLocation}
-        isPrivateEventOverride={isPrivateEventReservation}
+        isPrivateEventOverride={isPrivateEventReservationRef.current}
         prefilledData={prefilledMemberData}
       />
 
@@ -405,6 +418,7 @@ export default function Reservations() {
               onPrivateEventRSVPClick={hasPrivateEventsOnDate ? () => setIsPrivateEventRSVPModalOpen(true) : undefined}
               onAssignTableClick={hasAnyPrivateEventOnDate ? handleAssignTableClick : undefined}
               onPrivateEventsCheck={(hasRsvpEvents, hasAnyPrivateEvent) => {
+                console.log('[PRIVATE EVENTS CHECK]', { hasRsvpEvents, hasAnyPrivateEvent, date: currentDate });
                 setHasPrivateEventsOnDate(hasRsvpEvents);
                 setHasAnyPrivateEventOnDate(hasAnyPrivateEvent);
               }}

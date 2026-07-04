@@ -1039,10 +1039,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       
       if (isBlocked) {
         toast({
-          title: 'Private Event',
-          description: 'This time slot is blocked due to a private event.',
+          title: 'Private Event - Use Override Button',
+          description: 'This time slot is blocked. To create a reservation anyway, use the "⚠️ Assign Table (Override)" button in the top toolbar.',
           status: 'warning',
-          duration: 3000,
+          duration: 6000,
         });
         return;
       }
@@ -1219,9 +1219,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
             <button
               className={styles.mobileNavNewRez}
               onClick={onAssignTableClick}
-              aria-label="Assign Table"
+              aria-label="Assign Table (Override Private Event)"
+              style={{ backgroundColor: '#d97706', fontWeight: 'bold' }}
             >
-              Assign Table
+              ⚠️ Override
             </button>
           )}
           {onMakeReservationClick && (
@@ -1266,7 +1267,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
               },
             },
             assignTable: {
-              text: 'Assign Table',
+              text: '⚠️ Assign Table (Override)',
               click: () => {
                 if (onAssignTableClick) {
                   onAssignTableClick();
