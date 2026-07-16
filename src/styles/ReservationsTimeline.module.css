@@ -241,6 +241,22 @@
   z-index: 2 !important;
 }
 
+/* Let FullCalendar handle its own scrolling - GLOBAL (all screen sizes) */
+.calendarContainer :global(.fc-scroller) {
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Ensure horizontal scrolling works - GLOBAL (all screen sizes) */
+.calendarContainer :global(.fc-scroller-liquid) {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.calendarContainer :global(.fc-timeline-body .fc-scroller) {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
 /* Mobile Navigation Bar */
 .mobileNavBar {
   display: none;
@@ -380,22 +396,6 @@
     flex: 1;
     min-height: 0;
     width: 100%;
-  }
-
-  /* Let FullCalendar handle its own scrolling */
-  .calendarContainer :global(.fc-scroller) {
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-  }
-
-  /* Ensure horizontal scrolling works */
-  .calendarContainer :global(.fc-scroller-liquid) {
-    overflow-x: auto !important;
-    overflow-y: auto !important;
-  }
-
-  .calendarContainer :global(.fc-timeline-body .fc-scroller) {
-    overflow-x: auto !important;
-    overflow-y: auto !important;
   }
 
   .reservationEvent {

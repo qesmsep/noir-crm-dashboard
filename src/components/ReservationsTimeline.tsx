@@ -779,26 +779,16 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       const allEvents = [...mapped, ...privateEventBlocks];
       setEvents(allEvents);
     };
-    
+
     fetchMemberNamesAndMap();
 
     const isThursday = currentCalendarDate.getDay() === 4;
     setSlotMinTime(isThursday ? '16:00:00' : '18:00:00');
     setSlotMaxTime(isThursday ? '24:00:00' : '26:00:00');
-    // Scroll to 4pm on Thursdays, otherwise use default scroll time
+    // Set scroll time but don't auto-scroll here - preserve user's scroll position
+    // Auto-scroll only happens on date changes (in propCurrentDate effect and handleDatesSet)
     const newScrollTime = isThursday ? '16:00:00' : '18:00:00';
     setScrollTime(newScrollTime);
-
-    // Only programmatically scroll on desktop - let mobile users control their own scroll
-    if (calendarRef.current && !isMobile) {
-      try {
-        const calendarApi = calendarRef.current.getApi();
-        calendarApi.scrollToTime(newScrollTime);
-      } catch (e) {
-        // scrollToTime might not be available, that's okay
-        console.debug('scrollToTime not available:', e);
-      }
-    }
   }, [resources, eventData, currentCalendarDate, privateEvents, exceptionalClosures, settings.timezone, isMobile, hasPrivateEventToday]);
 
   // Get private events for the current calendar date
@@ -1069,32 +1059,39 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     if (isUpdatingFromProps.current) {
       return;
     }
-    
-    const newDate = new Date(info.startStr);
-    setCurrentCalendarDate(newDate);
-    
-    // Scroll to correct time based on day of week
-    const isThursday = newDate.getDay() === 4;
-    const scrollToTime = isThursday ? '16:00:00' : '18:00:00';
-    setScrollTime(scrollToTime);
 
-    // Only programmatically scroll on desktop - let mobile users control their own scroll
-    if (calendarRef.current && !isMobile) {
-      setTimeout(() => {
-        try {
-          const calendarApi = calendarRef.current?.getApi();
-          if (calendarApi && typeof calendarApi.scrollToTime === 'function') {
-            calendarApi.scrollToTime(scrollToTime);
+    const newDate = new Date(info.startStr);
+
+    // Only auto-scroll if the date actually changed (not just a re-render)
+    // Compare date strings to avoid time-of-day differences
+    const dateChanged = currentCalendarDate.toDateString() !== newDate.toDateString();
+
+    if (dateChanged) {
+      setCurrentCalendarDate(newDate);
+
+      // Scroll to correct time based on day of week
+      const isThursday = newDate.getDay() === 4;
+      const scrollToTime = isThursday ? '16:00:00' : '18:00:00';
+      setScrollTime(scrollToTime);
+
+      // Only programmatically scroll on desktop when date changes
+      if (calendarRef.current && !isMobile) {
+        setTimeout(() => {
+          try {
+            const calendarApi = calendarRef.current?.getApi();
+            if (calendarApi && typeof calendarApi.scrollToTime === 'function') {
+              calendarApi.scrollToTime(scrollToTime);
+            }
+            // If scrollToTime is not available, the scrollTime prop will handle it
+          } catch (e) {
+            console.debug('Error scrolling to time:', e);
           }
-          // If scrollToTime is not available, the scrollTime prop will handle it
-        } catch (e) {
-          console.debug('Error scrolling to time:', e);
-        }
-      }, 100);
-    }
-    
-    if (onDateChange) {
-      onDateChange(newDate);
+        }, 100);
+      }
+
+      if (onDateChange) {
+        onDateChange(newDate);
+      }
     }
   };
 
