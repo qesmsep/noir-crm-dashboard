@@ -9,10 +9,12 @@ export default function ViewportHeightProvider() {
       document.documentElement.style.setProperty('--vh', `${vh}px`);
     }
 
+    const handleOrientationChange = () => setTimeout(setVH, 100);
+
     setVH();
 
     window.addEventListener('resize', setVH);
-    window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
+    window.addEventListener('orientationchange', handleOrientationChange);
     if ('visualViewport' in window) {
       // @ts-ignore
       window.visualViewport.addEventListener('resize', setVH);
@@ -20,7 +22,7 @@ export default function ViewportHeightProvider() {
 
     return () => {
       window.removeEventListener('resize', setVH);
-      window.removeEventListener('orientationchange', () => setTimeout(setVH, 100));
+      window.removeEventListener('orientationchange', handleOrientationChange);
       if ('visualViewport' in window) {
         // @ts-ignore
         window.visualViewport.removeEventListener('resize', setVH);
