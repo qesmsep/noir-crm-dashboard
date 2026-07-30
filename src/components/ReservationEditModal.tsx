@@ -498,8 +498,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
           maxWidth: isMobile ? '100%' : '600px',
           width: isMobile ? '100vw' : '100%',
-          maxHeight: isMobile ? '100vh' : '90vh',
-          height: isMobile ? '100vh' : 'auto',
+          maxHeight: isMobile ? 'calc(100 * var(--vh, 1vh))' : '90vh',
+          height: isMobile ? 'calc(100 * var(--vh, 1vh))' : 'auto',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
@@ -604,7 +604,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         </div>
 
         {/* Body */}
-        <div style={{ padding: isMobile ? '1rem' : '1.5rem', overflowY: 'auto', flex: 1, maxHeight: isMobile ? 'calc(100vh - 140px)' : 'auto' }}>
+        <div style={{ padding: isMobile ? '1rem' : '1.5rem', overflowY: 'auto', flex: 1, maxHeight: isMobile ? 'calc(100 * var(--vh, 1vh) - 140px)' : 'auto' }}>
           {isLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
               <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>Loading...</div>
@@ -941,7 +941,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div style={{ borderTop: '1px solid #D1D5DB', padding: isMobile ? '1rem' : '1rem 1.5rem', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '0.5rem' : '0' }}>
+        <div style={{ borderTop: '1px solid #D1D5DB', padding: isMobile ? '1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1rem' : '1rem 1.5rem', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '0.5rem' : '0', flexShrink: 0 }}>
           {isConfirmingDelete ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
               <p style={{ fontWeight: '600', fontSize: '0.875rem', color: '#1F1F1F', margin: 0 }}>Are you sure?</p>
