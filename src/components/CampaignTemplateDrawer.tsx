@@ -1,50 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import {
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  Button,
-  VStack,
-  HStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Textarea,
-  Text,
-  Box,
-  Divider,
-  useToast,
-  Spinner,
-  Badge,
-  IconButton,
-  Switch,
-  Alert,
-  AlertIcon,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
-  Radio,
-  RadioGroup,
-  Stack,
-  Checkbox,
-  CheckboxGroup,
   AlertDialog,
-  AlertDialogBody,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogContent,
-  AlertDialogOverlay,
-  useDisclosure,
-} from '@chakra-ui/react';
-import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
+import { Spinner } from '@/components/ui/spinner';
+import { Info } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
-import { InfoIcon } from '@chakra-ui/icons';
+import { useToast } from '@/hooks/useToast';
 import { CampaignTriggerType } from '../types';
 
 interface CampaignTemplate {
@@ -96,6 +71,8 @@ interface CampaignTemplateDrawerProps {
   campaignTriggerType?: CampaignTriggerType;
 }
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   isOpen,
   onClose,
@@ -106,7 +83,6 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   isCampaignMode = false,
   campaignTriggerType,
 }) => {
-  const cancelRef = React.useRef<HTMLButtonElement>(null);
   const [template, setTemplate] = useState<CampaignTemplate | null>(null);
   const [formData, setFormData] = useState({
     campaign_id: '',
@@ -147,7 +123,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const [isLoadingPrivateEvents, setIsLoadingPrivateEvents] = useState(false);
   const [campaignData, setCampaignData] = useState<any>(null);
   const [noirMemberEvents, setNoirMemberEvents] = useState<any[]>([]);
-  const toast = useToast();
+  const { toast } = useToast();
   const { settings } = useSettings();
 
   useEffect(() => {
@@ -180,10 +156,10 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           // New fields for reservation range campaigns
           reservation_range_include_past: true,
           reservation_range_minute_precision: false,
-                  // New fields for private event campaigns
-        private_event_date_range: undefined,
-        private_event_include_old: false,
-        selected_private_event_id: undefined,
+          // New fields for private event campaigns
+          private_event_date_range: undefined,
+          private_event_include_old: false,
+          selected_private_event_id: undefined,
         });
         setTemplate(null);
         setShowPreview(false);
@@ -210,7 +186,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
   const fetchTemplate = async () => {
     if (!templateId) return;
-    
+
     setIsLoading(true);
     try {
       const response = await fetch(`/api/campaign-messages/${templateId}`);
@@ -266,7 +242,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch template',
-        variant: 'destructive',
+        status: 'error',
       });
     } finally {
       setIsLoading(false);
@@ -283,23 +259,23 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         const sortedEvents = (data.data || []).sort((a: any, b: any) => {
           const dateA = new Date(a.start_time);
           const dateB = new Date(b.start_time);
-          
+
           // First sort by date
           if (dateA.getTime() !== dateB.getTime()) {
             return dateA.getTime() - dateB.getTime();
           }
-          
+
           // If dates are the same, sort by name
           return a.title.localeCompare(b.title);
         });
-        
+
         setPrivateEvents(sortedEvents);
       } else {
         console.error('Failed to fetch private events');
         toast({
           title: 'Error',
           description: 'Failed to fetch private events',
-          variant: 'destructive',
+          status: 'error',
         });
       }
     } catch (error) {
@@ -307,7 +283,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch private events',
-        variant: 'destructive',
+        status: 'error',
       });
     } finally {
       setIsLoadingPrivateEvents(false);
@@ -316,14 +292,14 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
   const fetchCampaignData = async () => {
     if (!campaignId) return;
-    
+
     try {
       // Fetch campaign data
       const campaignResponse = await fetch(`/api/campaigns/${campaignId}`);
       if (campaignResponse.ok) {
         const campaignData = await campaignResponse.json();
         setCampaignData(campaignData);
-        
+
         // If campaign has event list enabled, fetch noir member events
         if (campaignData.include_event_list && campaignData.event_list_date_range) {
           await fetchNoirMemberEvents(campaignData.event_list_date_range);
@@ -350,19 +326,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = async () => {
-    console.log('=== SAVING MESSAGE TEMPLATE ===');
-    console.log('Form data:', formData);
-    console.log('Campaign ID:', campaignId);
-    console.log('Is create mode:', isCreateMode);
-    console.log('Template ID:', templateId);
+  const toggleWeekday = (day: number) => {
+    const current = formData.recurring_weekdays || [];
+    const next = current.includes(day) ? current.filter(d => d !== day) : [...current, day];
+    handleInputChange('recurring_weekdays', next);
+  };
 
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.content.trim()) {
-      console.log('Validation failed: Missing required fields');
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
-        variant: 'destructive',
+        status: 'error',
       });
       return;
     }
@@ -373,25 +348,25 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: `Recipient type "${formData.recipient_type}" is not valid for ${campaignTriggerType} campaigns. Please select a valid recipient type.`,
-        variant: 'destructive',
+        status: 'error',
       });
       return;
     }
 
     setIsSaving(true);
     try {
-      const url = isCreateMode 
-        ? '/api/campaign-messages' 
+      const url = isCreateMode
+        ? '/api/campaign-messages'
         : `/api/campaign-messages/${templateId}`;
-      
+
       const method = isCreateMode ? 'POST' : 'PUT';
-      
+
       // Clean up the data to only send relevant fields based on timing type
       let cleanedData: any = { ...formData };
-      
+
       // Remove trigger_type as it's not in the database schema
       delete cleanedData.trigger_type;
-      
+
       // Send all relevant fields including the new timing fields
       const basicFields = [
         'campaign_id', 'name', 'description', 'content', 'recipient_type',
@@ -401,23 +376,19 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         'relative_time', 'relative_quantity', 'relative_unit', 'relative_proximity',
         'include_ledger_pdf', 'is_active', 'selected_private_event_id'
       ];
-      
+
       // Remove all fields except the basic ones
       Object.keys(cleanedData).forEach(key => {
         if (!basicFields.includes(key)) {
           delete cleanedData[key];
         }
       });
-      
+
       // If creating a template within a campaign, set the campaign_id
-      const dataToSend = isCreateMode && campaignId 
+      const dataToSend = isCreateMode && campaignId
         ? { ...cleanedData, campaign_id: campaignId }
         : cleanedData;
-      
-      console.log('Sending request to:', url);
-      console.log('Request method:', method);
-      console.log('Request data:', dataToSend);
-      
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -426,22 +397,14 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         body: JSON.stringify(dataToSend),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Response error:', errorText);
         throw new Error(`Failed to save template: ${response.status} ${response.statusText}`);
       }
 
-      const responseData = await response.json();
-      console.log('Response data:', responseData);
+      await response.json();
 
-      console.log('=== MESSAGE TEMPLATE SAVED SUCCESSFULLY ===');
-      console.log('Template will be processed by cron job every 10 minutes');
-      console.log('Next processing time:', new Date(Date.now() + 10 * 60 * 1000).toLocaleString());
-      
       // If this is an all_members campaign and campaign data has been modified, save the campaign
       if (campaignTriggerType === 'all_members' && campaignId && campaignData) {
         try {
@@ -458,19 +421,15 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
           if (!campaignResponse.ok) {
             console.error('Failed to update campaign event list settings');
-            // Show warning to user but don't fail the entire save
             toast({
               title: 'Warning',
               description: 'Message saved but campaign settings update failed. Please try updating campaign settings separately.',
               status: 'warning',
               duration: 5000,
             });
-          } else {
-            console.log('Campaign event list settings updated successfully');
           }
         } catch (error) {
           console.error('Error updating campaign event list settings:', error);
-          // Show warning to user but don't fail the entire save
           toast({
             title: 'Warning',
             description: 'Message saved but campaign settings update encountered an error. Please try updating campaign settings separately.',
@@ -479,7 +438,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           });
         }
       }
-      
+
       toast({
         title: 'Success',
         description: `Message ${isCreateMode ? 'created' : 'updated'} successfully`,
@@ -494,7 +453,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to save template',
-        variant: 'destructive',
+        status: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -529,7 +488,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to delete template',
-        variant: 'destructive',
+        status: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -543,31 +502,31 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{member_name\}\}/g, 'John Doe')
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
-    
+
     // Add reservation-specific placeholders if this is a reservation campaign
     if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
         .replace(/\{\{party_size\}\}/g, '4');
     }
-    
+
     // Add event list if this is an all_members campaign with event list enabled
     if (campaignTriggerType === 'all_members' && campaignData?.include_event_list && noirMemberEvents.length > 0) {
       const eventList = noirMemberEvents.map(event => {
         let eventLine = `• ${event.date} at ${event.time} - ${event.title}`;
-        
+
         // Add RSVP URL if available
         if (event.rsvpEnabled && event.rsvpUrl) {
           const rsvpUrl = `${window.location.origin}/rsvp/${event.rsvpUrl}`;
           eventLine += `\n  RSVP: ${rsvpUrl}`;
         }
-        
+
         return eventLine;
       }).join('\n\n');
-      
+
       previewContent += '\n\n📅 Upcoming Noir Member Events:\n' + eventList;
     }
-    
+
     return previewContent;
   };
 
@@ -604,21 +563,21 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const formatPhoneNumber = (phone: string) => {
     // Remove all non-digits
     const digits = phone.replace(/\D/g, '');
-    
+
     // Format as (XXX) XXX-XXXX
     if (digits.length === 10) {
       return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
     } else if (digits.length === 11 && digits.startsWith('1')) {
       return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
     }
-    
+
     return phone;
   };
 
   const handlePhoneChange = (phone: string) => {
     // Remove all non-digits
     const digits = phone.replace(/\D/g, '');
-    
+
     // Convert to international format for storage
     let formattedPhone = phone;
     if (digits.length === 10) {
@@ -628,7 +587,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     } else {
       formattedPhone = '+' + digits;
     }
-    
+
     setFormData(prev => ({ ...prev, specific_phone: formattedPhone }));
   };
 
@@ -694,29 +653,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     }
   };
 
-  const getTimingOptions = () => {
-    if (!campaignTriggerType) return ['specific_time', 'recurring', 'relative'];
-    
-    switch (campaignTriggerType) {
-      case 'recurring':
-        return ['specific_time', 'recurring', 'relative'];
-      
-      case 'all_members':
-        return ['specific_time', 'recurring', 'relative'];
-      
-      case 'reservation_range':
-      case 'private_event':
-        return ['specific_time', 'recurring', 'relative'];
-      
-      default:
-        // member_signup, member_birthday, member_renewal, reservation_time, reservation_created
-        return ['specific_time', 'recurring', 'relative'];
-    }
-  };
-
   const shouldShowRelativeOption = () => {
     if (!campaignTriggerType) return false;
-    
+
     // Only show relative option for triggers that have specific dates/times
     return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'private_event'].includes(campaignTriggerType);
   };
@@ -734,228 +673,160 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },
     ];
-    
+
     return placeholders;
   };
 
   const shouldShowLedgerPdfOption = () => {
     if (!campaignTriggerType) return false;
-    
+
     // Only show ledger PDF for member-related triggers
     return ['member_signup', 'member_birthday', 'member_renewal'].includes(campaignTriggerType);
   };
 
   return (
-    <Drawer 
-      isOpen={isOpen} 
-      placement="right" 
-      onClose={onClose} 
-      size="sm"
-      closeOnOverlayClick={true}
-      closeOnEsc={true}
-    >
-      <Box zIndex="2000" position="relative">
-        <DrawerOverlay bg="blackAlpha.600" onClick={onClose} />
-        <DrawerContent 
-          border="2px solid #353535" 
-          borderRadius="10px"  
-          fontFamily="Montserrat, sans-serif" 
-          maxW="500px" 
-          w="50vw" 
-          boxShadow="xl" 
-          mt="80px" 
-          mb="25px" 
-          paddingRight="40px" 
-          paddingLeft="40px" 
-          backgroundColor="#ecede8"
-          position="fixed"
-          top="0"
-          right="0"
-          style={{
-            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-            transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            willChange: 'transform',
-            transformStyle: 'preserve-3d',
-            backfaceVisibility: 'hidden'
-          }}
-        >
-          <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
-            <HStack justify="space-between" align="center">
-              <Text>
-                {isCreateMode ? 'Create/Edit Message' : 'Edit Message'}
-              </Text>
-              <IconButton
-                aria-label="Close drawer"
-                icon={<CloseIcon />}
-                size="sm"
-                variant="ghost"
-                bg="#353535"
-                onClick={onClose}
-                color="#ECEDE8"
-                _hover={{ bg: '#2a2a2a' }}
-              />
-            </HStack>
-          </DrawerHeader>
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-lg flex flex-col p-0 border-l-2 border-l-[#353535] font-montserrat"
+      >
+        <SheetHeader className="shrink-0 border-b px-6 py-4 text-left">
+          <SheetTitle className="font-ivyjournal text-2xl font-bold text-[#353535]">
+            {isCreateMode ? 'Create/Edit Message' : 'Edit Message'}
+          </SheetTitle>
+        </SheetHeader>
 
-          <DrawerBody className="drawer-body-content" overflowY="auto" maxH="calc(100vh - 200px)">
-            {isLoading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" height="200px">
-                <Spinner size="xl" color="#a59480" />
-              </Box>
-            ) : (
-              <VStack spacing={6} align="stretch">
-                {/* Basic Information */}
-                <Box>
-                  <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                    Basic Information
-                  </Text>
-                  <VStack spacing={4}>
-                    <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Template Name</FormLabel>
-                      <Input
-                        value={formData.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                        bg="#ecede8"
-                        color="#353535"
-                        borderColor="#a59480"
-                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                      />
-                    </FormControl>
+        <div className="flex-1 overflow-y-auto min-h-0 px-4 py-6 md:px-6">
+          {isLoading ? (
+            <div className="flex h-[200px] items-center justify-center">
+              <Spinner size="lg" className="text-[#a59480]" />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {/* Basic Information */}
+              <div>
+                <h3 className="mb-4 text-lg font-bold text-[#a59480]">Basic Information</h3>
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <Label className="text-[#a59480]">Template Name</Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
 
-                    <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Description</FormLabel>
-                      <Input
-                        value={formData.description}
-                        onChange={(e) => handleInputChange('description', e.target.value)}
-                        bg="#ecede8"
-                        color="#353535"
-                        borderColor="#a59480"
-                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                      />
-                    </FormControl>
-                  </VStack>
-                </Box>
+                  <div>
+                    <Label className="text-[#a59480]">Description</Label>
+                    <Input
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
 
-                <Divider borderColor="#a59480" />
+              <Separator className="bg-[#a59480]" />
 
-                {/* Recipient Configuration */}
-                <Box>
-                  <VStack spacing={4}>
-                    <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Recipient Type</FormLabel>
+              {/* Recipient Configuration */}
+              <div className="flex flex-col gap-4">
+                <div>
+                  <Label className="text-[#a59480]">Recipient Type</Label>
+                  <Select
+                    value={formData.recipient_type}
+                    onChange={(e) => handleInputChange('recipient_type', e.target.value)}
+                    className="mt-1"
+                  >
+                    {getRecipientOptions().map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                {formData.recipient_type === 'specific_phone' && (
+                  <div>
+                    <Label className="text-[#a59480]">Phone Number</Label>
+                    <Input
+                      value={formatPhoneNumber(formData.specific_phone || '')}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      placeholder="(555) 123-4567"
+                      className="mt-1"
+                    />
+                    <p className="mt-1 text-xs text-[#a59480]">Format: (XXX) XXX-XXXX</p>
+                  </div>
+                )}
+
+                {formData.recipient_type === 'private_event_rsvps' && (
+                  <div>
+                    <Label className="text-[#a59480]">Select Private Event</Label>
+                    {isLoadingPrivateEvents ? (
+                      <div className="flex h-[100px] items-center justify-center">
+                        <Spinner size="md" className="text-[#a59480]" />
+                      </div>
+                    ) : (
                       <Select
-                        value={formData.recipient_type}
-                        onChange={(e) => handleInputChange('recipient_type', e.target.value)}
-                        bg="#ecede8"
-                        color="#353535"
-                        borderColor="#a59480"
-                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        value={formData.selected_private_event_id || ''}
+                        onChange={(e) => handleInputChange('selected_private_event_id', e.target.value)}
+                        className="mt-1"
                       >
-                        {getRecipientOptions().map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
+                        <option value="">Select a private event</option>
+                        {privateEvents.map((event) => (
+                          <option key={event.id} value={event.id}>
+                            {new Date(event.start_time).toLocaleDateString()} {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {event.title}
                           </option>
                         ))}
                       </Select>
-                    </FormControl>
-
-                    {formData.recipient_type === 'specific_phone' && (
-                      <FormControl>
-                        <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Phone Number</FormLabel>
-                        <Input
-                          value={formatPhoneNumber(formData.specific_phone || '')}
-                          onChange={(e) => handlePhoneChange(e.target.value)}
-                          bg="#ecede8"
-                          color="#353535"
-                          borderColor="#a59480"
-                          _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                          placeholder="(555) 123-4567"
-                        />
-                        <Text fontSize="xs" color="#a59480" mt={1}>
-                          Format: (XXX) XXX-XXXX
-                        </Text>
-                      </FormControl>
                     )}
-
-                    {formData.recipient_type === 'private_event_rsvps' && (
-                      <FormControl>
-                        <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Select Private Event</FormLabel>
-                        {isLoadingPrivateEvents ? (
-                          <Box display="flex" justifyContent="center" alignItems="center" height="100px">
-                            <Spinner size="md" color="#a59480" />
-                          </Box>
-                        ) : (
-                          <Select
-                            value={formData.selected_private_event_id || ''}
-                            onChange={(e) => handleInputChange('selected_private_event_id', e.target.value)}
-                            bg="#ecede8"
-                            color="#353535"
-                            borderColor="#a59480"
-                            _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            placeholder="Select a private event"
-                          >
-                            <option value="">Select a private event</option>
-                            {privateEvents.map((event) => (
-                              <option key={event.id} value={event.id}>
-                                {new Date(event.start_time).toLocaleDateString()} {new Date(event.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {event.title}
-                              </option>
-                            ))}
-                          </Select>
-                        )}
-                        {privateEvents.length === 0 && !isLoadingPrivateEvents && (
-                          <Text fontSize="xs" color="#a59480" mt={1}>
-                            No private events found. Create some private events first.
-                          </Text>
-                        )}
-                      </FormControl>
+                    {privateEvents.length === 0 && !isLoadingPrivateEvents && (
+                      <p className="mt-1 text-xs text-[#a59480]">
+                        No private events found. Create some private events first.
+                      </p>
                     )}
-                  </VStack>
-                </Box>
+                  </div>
+                )}
+              </div>
 
-                <Divider borderColor="#a59480" />
+              <Separator className="bg-[#a59480]" />
 
-                {/* Event List Configuration - Only for all_members campaigns */}
-                {campaignTriggerType === 'all_members' && (
-                  <Box>
-                    <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      Event List Configuration
-                    </Text>
-                    <VStack spacing={4}>
-                      <FormControl display="flex" alignItems="center">
-                        <FormLabel htmlFor="include-event-list" mb="0" fontFamily="'Montserrat', sans-serif" color="#a59480">
-                          Include Event List
-                        </FormLabel>
+              {/* Event List Configuration - Only for all_members campaigns */}
+              {campaignTriggerType === 'all_members' && (
+                <>
+                  <div>
+                    <h3 className="mb-4 text-lg font-bold text-[#a59480]">Event List Configuration</h3>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="include-event-list" className="text-[#a59480]">Include Event List</Label>
                         <Switch
                           id="include-event-list"
-                          isChecked={campaignData?.include_event_list || false}
-                          onChange={(e) => {
-                            // Update campaign data locally for preview
+                          checked={campaignData?.include_event_list || false}
+                          onCheckedChange={(checked) => {
                             setCampaignData(prev => ({
                               ...prev,
-                              include_event_list: e.target.checked,
-                              event_list_date_range: e.target.checked ? (prev?.event_list_date_range || { type: 'this_month' }) : null
+                              include_event_list: checked,
+                              event_list_date_range: checked ? (prev?.event_list_date_range || { type: 'this_month' }) : null
                             }));
-                            // If enabling, fetch events immediately
-                            if (e.target.checked) {
+                            if (checked) {
                               fetchNoirMemberEvents(campaignData?.event_list_date_range || { type: 'this_month' });
                             } else {
                               setNoirMemberEvents([]);
                             }
                           }}
-                          colorScheme="green"
                         />
-                      </FormControl>
-                      
+                      </div>
+
                       {campaignData?.include_event_list && (
-                        <VStack spacing={4} align="stretch">
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Event Date Range</FormLabel>
+                        <div className="flex flex-col gap-4">
+                          <div>
+                            <Label className="text-[#a59480]">Event Date Range</Label>
                             <Select
                               value={campaignData?.event_list_date_range?.type || 'this_month'}
                               onChange={(e) => {
-                                const newDateRange = { 
-                                  ...campaignData?.event_list_date_range, 
-                                  type: e.target.value 
+                                const newDateRange = {
+                                  ...campaignData?.event_list_date_range,
+                                  type: e.target.value
                                 };
                                 setCampaignData(prev => ({
                                   ...prev,
@@ -963,28 +834,25 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                                 }));
                                 fetchNoirMemberEvents(newDateRange);
                               }}
-                              bg="#ecede8"
-                              color="#353535"
-                              borderColor="#a59480"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                              className="mt-1"
                             >
                               <option value="this_month">This Month</option>
                               <option value="next_month">Next Month</option>
                               <option value="specific_range">Specific Date Range</option>
                             </Select>
-                          </FormControl>
+                          </div>
 
                           {campaignData?.event_list_date_range?.type === 'specific_range' && (
-                            <HStack spacing={4}>
-                              <FormControl>
-                                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Start Date</FormLabel>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-[#a59480]">Start Date</Label>
                                 <Input
                                   type="date"
                                   value={campaignData?.event_list_date_range?.start_date || ''}
                                   onChange={(e) => {
-                                    const newDateRange = { 
-                                      ...campaignData?.event_list_date_range, 
-                                      start_date: e.target.value 
+                                    const newDateRange = {
+                                      ...campaignData?.event_list_date_range,
+                                      start_date: e.target.value
                                     };
                                     setCampaignData(prev => ({
                                       ...prev,
@@ -994,21 +862,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                                       fetchNoirMemberEvents(newDateRange);
                                     }
                                   }}
-                                  bg="#ecede8"
-                                  color="#353535"
-                                  borderColor="#a59480"
-                                  _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                                  className="mt-1"
                                 />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">End Date</FormLabel>
+                              </div>
+                              <div>
+                                <Label className="text-[#a59480]">End Date</Label>
                                 <Input
                                   type="date"
                                   value={campaignData?.event_list_date_range?.end_date || ''}
                                   onChange={(e) => {
-                                    const newDateRange = { 
-                                      ...campaignData?.event_list_date_range, 
-                                      end_date: e.target.value 
+                                    const newDateRange = {
+                                      ...campaignData?.event_list_date_range,
+                                      end_date: e.target.value
                                     };
                                     setCampaignData(prev => ({
                                       ...prev,
@@ -1018,554 +883,438 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                                       fetchNoirMemberEvents(newDateRange);
                                     }
                                   }}
-                                  bg="#ecede8"
-                                  color="#353535"
-                                  borderColor="#a59480"
-                                  _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                                  className="mt-1"
                                 />
-                              </FormControl>
-                            </HStack>
+                              </div>
+                            </div>
                           )}
 
-                          <Text fontSize="sm" color="#a59480">
+                          <p className="text-sm text-[#a59480]">
                             Will include all "Noir Member Event" events within the selected date range.
-                          </Text>
-                        </VStack>
+                          </p>
+                        </div>
                       )}
-                    </VStack>
-                  </Box>
-                )}
+                    </div>
+                  </div>
+                  <Separator className="bg-[#a59480]" />
+                </>
+              )}
 
-                <Divider borderColor="#a59480" />
-
-                {/* Timing Configuration */}
-                <Box>
-                  <VStack spacing={4}>
-                    <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Timing Type</FormLabel>
-                      <RadioGroup value={formData.timing_type} onChange={(value) => handleInputChange('timing_type', value)}>
-                        <Stack direction="column">
-                          <Radio 
-                            value="specific_time" 
-                            colorScheme="green"
-                            bg={formData.timing_type === 'specific_time' ? '#ecede8' : 'transparent'}
-                            p={2}
-                            borderRadius="md"
-                            border={formData.timing_type === 'specific_time' ? '2px solid #a59480' : '1px solid transparent'}
-                          >
-                            Send at specific time
-                          </Radio>
-                          <Radio 
-                            value="recurring" 
-                            colorScheme="green"
-                            bg={formData.timing_type === 'recurring' ? '#ecede8' : 'transparent'}
-                            p={2}
-                            borderRadius="md"
-                            border={formData.timing_type === 'recurring' ? '2px solid #a59480' : '1px solid transparent'}
-                          >
-                            Send on recurring schedule
-                          </Radio>
-                          {shouldShowRelativeOption() && (
-                            <Radio 
-                              value="relative" 
-                              colorScheme="green"
-                              bg={formData.timing_type === 'relative' ? '#ecede8' : 'transparent'}
-                              p={2}
-                              borderRadius="md"
-                              border={formData.timing_type === 'relative' ? '2px solid #a59480' : '1px solid transparent'}
-                            >
-                              Send relative to trigger date
-                            </Radio>
-                          )}
-                        </Stack>
-                      </RadioGroup>
-                    </FormControl>
-
-                    {formData.timing_type === 'specific_time' && (
-                      <VStack spacing={4} width="100%">
-                        <HStack spacing={4} width="100%">
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time</FormLabel>
-                            <Input
-                              type="time"
-                              value={formData.specific_time}
-                              onChange={(e) => handleInputChange('specific_time', e.target.value)}
-                              bg="#ecede8"
-                              color="#353535"
-                              borderColor="#a59480"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            />
-                          </FormControl>
-
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Date</FormLabel>
-                            <Input
-                              type="date"
-                              value={formData.specific_date}
-                              onChange={(e) => handleInputChange('specific_date', e.target.value)}
-                              bg="#ecede8"
-                              color="#353535"
-                              borderColor="#a59480"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            />
-                          </FormControl>
-                        </HStack>
-                      </VStack>
-                    )}
-
-                    {formData.timing_type === 'recurring' && (
-                      <VStack spacing={4} width="100%">
-                        <FormControl>
-                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Recurring Type</FormLabel>
-                          <RadioGroup value={formData.recurring_type} onChange={(value) => handleInputChange('recurring_type', value)}>
-                            <Stack direction="column">
-                              <Radio value="daily" colorScheme="green">Daily</Radio>
-                              <Radio value="weekly" colorScheme="green">Weekly</Radio>
-                              <Radio value="monthly" colorScheme="green">Monthly</Radio>
-                              <Radio value="yearly" colorScheme="green">Yearly</Radio>
-                            </Stack>
-                          </RadioGroup>
-                        </FormControl>
-
-                        <FormControl>
-                          <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time</FormLabel>
-                          <Input
-                            type="time"
-                            value={formData.recurring_time || '10:00'}
-                            onChange={(e) => handleInputChange('recurring_time', e.target.value)}
-                            bg="#ecede8"
-                            color="#353535"
-                            borderColor="#a59480"
-                            _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                          />
-                        </FormControl>
-
-                        {formData.recurring_type === 'weekly' && (
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Select Weekdays</FormLabel>
-                            <CheckboxGroup value={formData.recurring_weekdays || []} onChange={(value) => handleInputChange('recurring_weekdays', value)}>
-                              <Stack direction="column">
-                                <Checkbox value="0">Sunday</Checkbox>
-                                <Checkbox value="1">Monday</Checkbox>
-                                <Checkbox value="2">Tuesday</Checkbox>
-                                <Checkbox value="3">Wednesday</Checkbox>
-                                <Checkbox value="4">Thursday</Checkbox>
-                                <Checkbox value="5">Friday</Checkbox>
-                                <Checkbox value="6">Saturday</Checkbox>
-                              </Stack>
-                            </CheckboxGroup>
-                          </FormControl>
-                        )}
-
-                        {formData.recurring_type === 'monthly' && (
-                          <>
-                            <FormControl>
-                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Monthly Type</FormLabel>
-                              <RadioGroup value={formData.recurring_monthly_type} onChange={(value) => handleInputChange('recurring_monthly_type', value)}>
-                                <Stack direction="column">
-                                  <Radio value="first" colorScheme="green">First</Radio>
-                                  <Radio value="second" colorScheme="green">Second</Radio>
-                                  <Radio value="third" colorScheme="green">Third</Radio>
-                                  <Radio value="fourth" colorScheme="green">Fourth</Radio>
-                                  <Radio value="last" colorScheme="green">Last</Radio>
-                                </Stack>
-                              </RadioGroup>
-                            </FormControl>
-
-                            <FormControl>
-                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Day/Weekday</FormLabel>
-                              <RadioGroup value={formData.recurring_monthly_day} onChange={(value) => handleInputChange('recurring_monthly_day', value)}>
-                                <Stack direction="column">
-                                  <Radio value="day" colorScheme="green">Day</Radio>
-                                  <Radio value="weekday" colorScheme="green">Weekday</Radio>
-                                </Stack>
-                              </RadioGroup>
-                            </FormControl>
-
-                            <FormControl>
-                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Value</FormLabel>
-                              <NumberInput
-                                value={formData.recurring_monthly_value || 1}
-                                onChange={(value) => handleInputChange('recurring_monthly_value', parseInt(value))}
-                                min={0}
-                                max={31}
-                                bg="#ecede8"
-                                color="#353535"
-                                borderColor="#a59480"
-                                _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                              >
-                                <NumberInputField 
-                                  placeholder="1-31"
-                                  _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                                />
-                                <NumberInputStepper>
-                                  <NumberIncrementStepper />
-                                  <NumberDecrementStepper />
-                                </NumberInputStepper>
-                              </NumberInput>
-                            </FormControl>
-                          </>
-                        )}
-
-                        {formData.recurring_type === 'yearly' && (
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Yearly Date</FormLabel>
-                            <Input
-                              type="date"
-                              value={formData.recurring_yearly_date || ''}
-                              onChange={(e) => handleInputChange('recurring_yearly_date', e.target.value)}
-                              bg="#ecede8"
-                              color="#353535"
-                              borderColor="#a59480"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            />
-                          </FormControl>
-                        )}
-                      </VStack>
-                    )}
-
-                    {formData.timing_type === 'relative' && (
-                      <VStack spacing={4} width="100%">
-                        <HStack spacing={4} width="100%">
-                          {formData.relative_unit !== 'minute' && (
-                            <FormControl>
-                              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time</FormLabel>
-                              <Input
-                                type="time"
-                                value={formData.relative_time || '10:00'}
-                                onChange={(e) => handleInputChange('relative_time', e.target.value)}
-                                bg="#ecede8"
-                                color="#353535"
-                                borderColor="#a59480"
-                                _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                              />
-                            </FormControl>
-                          )}
-
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Quantity</FormLabel>
-                            <NumberInput
-                              value={formData.relative_quantity ?? 1}
-                              onChange={(value) => handleInputChange('relative_quantity', parseInt(value))}
-                              min={0}
-                              max={formData.relative_unit === 'minute' ? 1440 : 365}
-                              bg="#ecede8"
-                              color="#353535"
-                              borderColor="#a59480"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            >
-                              <NumberInputField 
-                                placeholder={formData.relative_unit === 'minute' ? "1-1440" : "1-365"}
-                                _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                              />
-                              <NumberInputStepper>
-                                <NumberIncrementStepper />
-                                <NumberDecrementStepper />
-                              </NumberInputStepper>
-                            </NumberInput>
-                          </FormControl>
-
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Time Unit</FormLabel>
-                            <Select
-                              value={formData.relative_unit || 'day'}
-                              onChange={(e) => handleInputChange('relative_unit', e.target.value)}
-                              bg="#ecede8"
-                              color="#353535"
-                              borderColor="#a59480"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            >
-                              <option value="minute">Minutes</option>
-                              <option value="hour">Hours</option>
-                              <option value="day">Days</option>
-                              <option value="week">Weeks</option>
-                              <option value="month">Months</option>
-                              <option value="year">Years</option>
-                            </Select>
-                          </FormControl>
-
-                          <FormControl>
-                            <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Proximity</FormLabel>
-                            <Select
-                              value={formData.relative_proximity || 'after'}
-                              onChange={(e) => handleInputChange('relative_proximity', e.target.value)}
-                              bg="#ecede8"
-                              color="#353535"
-                              borderColor="#a59480"
-                              _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                            >
-                              <option value="before">Before</option>
-                              <option value="after">After</option>
-                            </Select>
-                          </FormControl>
-                        </HStack>
-                      </VStack>
-                    )}
-
-                    <Box p={4} bg="#ecede8" borderRadius="md" border="1px solid #a59480">
-                      <Text fontFamily="'Montserrat', sans-serif" color="#353535" fontWeight="bold">
-                        {formatTimingDisplay()}
-                      </Text>
-                    </Box>
-                  </VStack>
-                </Box>
-
-                <Divider borderColor="#a59480" />
-
-                {/* Message Template */}
-                <Box>
-                  <VStack spacing={4}>
-                    <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                        Message Content
-                        <IconButton
-                          aria-label="View available placeholders"
-                          icon={<InfoIcon />}
-                          size="sm"
-                          variant="ghost"
-                          color="#a59480"
-                          ml={2}
-                          onClick={() => {
-                            const placeholders = getAvailablePlaceholders();
-                            const placeholderText = placeholders.map(p => `${p.name}: ${p.description}`).join('\n');
-                            alert(`Available Placeholders:\n\n${placeholderText}`);
-                          }}
+              {/* Timing Configuration */}
+              <div className="flex flex-col gap-4">
+                <div>
+                  <Label className="text-[#a59480]">Timing Type</Label>
+                  <div className="mt-2 flex flex-col gap-2">
+                    <label className={`flex items-center gap-2 rounded-md border p-2 text-sm text-[#353535] ${formData.timing_type === 'specific_time' ? 'border-2 border-[#a59480] bg-[#ecede8]' : 'border-transparent'}`}>
+                      <input
+                        type="radio"
+                        name="timing_type"
+                        className="h-4 w-4 accent-green-600"
+                        checked={formData.timing_type === 'specific_time'}
+                        onChange={() => handleInputChange('timing_type', 'specific_time')}
+                      />
+                      Send at specific time
+                    </label>
+                    <label className={`flex items-center gap-2 rounded-md border p-2 text-sm text-[#353535] ${formData.timing_type === 'recurring' ? 'border-2 border-[#a59480] bg-[#ecede8]' : 'border-transparent'}`}>
+                      <input
+                        type="radio"
+                        name="timing_type"
+                        className="h-4 w-4 accent-green-600"
+                        checked={formData.timing_type === 'recurring'}
+                        onChange={() => handleInputChange('timing_type', 'recurring')}
+                      />
+                      Send on recurring schedule
+                    </label>
+                    {shouldShowRelativeOption() && (
+                      <label className={`flex items-center gap-2 rounded-md border p-2 text-sm text-[#353535] ${formData.timing_type === 'relative' ? 'border-2 border-[#a59480] bg-[#ecede8]' : 'border-transparent'}`}>
+                        <input
+                          type="radio"
+                          name="timing_type"
+                          className="h-4 w-4 accent-green-600"
+                          checked={formData.timing_type === 'relative'}
+                          onChange={() => handleInputChange('timing_type', 'relative')}
                         />
-                      </FormLabel>
-                      <Textarea
-                        value={formData.content}
-                        onChange={(e) => handleInputChange('content', e.target.value)}
-                        rows={8}
-                        minH="200px"
-                        resize="vertical"
-                        bg="#ecede8"
-                        color="#353535"
-                        borderColor="#a59480"
-                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
-                        placeholder="Enter your message template here. Use placeholders like {{first_name}}, {{last_name}}, etc."
-                        fontFamily="'Montserrat', sans-serif"
-                        fontSize="14px"
-                        lineHeight="1.5"
-                        w="90%"
-                      />
-                    </FormControl>
-
-                    {/* Preview Toggle */}
-                    <FormControl display="flex" alignItems="center">
-                      <FormLabel htmlFor="show-preview" mb="0" fontFamily="'Montserrat', sans-serif" color="#a59480">
-                        Show Preview
-                      </FormLabel>
-                      <Switch
-                        id="show-preview"
-                        isChecked={showPreview}
-                        onChange={(e) => setShowPreview(e.target.checked)}
-                        colorScheme="green"
-                      />
-                    </FormControl>
-
-                    {/* Preview Section */}
-                    {showPreview && formData.content && (
-                      <Box>
-                        <Text fontSize="sm" fontWeight="bold" mb={2} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                          Preview:
-                        </Text>
-                        <Box 
-                          p={4} 
-                          bg="#ecede8" 
-                          borderRadius="md" 
-                          border="1px solid #a59480"
-                          minH="120px"
-                          maxH="200px"
-                          overflowY="auto"
-                          w="90%"
-                        >
-                          <Text 
-                            fontFamily="'Montserrat', sans-serif" 
-                            color="#353535" 
-                            whiteSpace="pre-wrap"
-                            fontSize="14px"
-                            lineHeight="1.5"
-                          >
-                            {getPreviewMessage()}
-                          </Text>
-                        </Box>
-                      </Box>
+                        Send relative to trigger date
+                      </label>
                     )}
+                  </div>
+                </div>
 
-                    {/* Event List Preview - Only for all_members campaigns with event list enabled */}
-                    {campaignTriggerType === 'all_members' && campaignData?.include_event_list && (
-                      <Box>
-                        <Text fontSize="sm" fontWeight="bold" mb={2} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                          Event List Preview:
-                        </Text>
-                        <Box 
-                          p={4} 
-                          bg="#f0f8ff" 
-                          borderRadius="md" 
-                          border="1px solid #a59480"
-                          minH="100px"
-                          maxH="200px"
-                          overflowY="auto"
-                          w="90%"
-                        >
-                          {noirMemberEvents.length > 0 ? (
-                            <VStack spacing={2} align="stretch">
-                              {noirMemberEvents.map((event, index) => (
-                                <Box key={index} p={2} bg="white" borderRadius="sm" border="1px solid #e0e0e0">
-                                  <Text fontWeight="bold" fontSize="sm" color="#353535">
-                                    {event.title}
-                                  </Text>
-                                  <Text fontSize="xs" color="#666">
-                                    {event.date} at {event.time}
-                                  </Text>
-                                  {event.description && (
-                                    <Text fontSize="xs" color="#666" mt={1}>
-                                      {event.description}
-                                    </Text>
-                                  )}
-                                </Box>
-                              ))}
-                            </VStack>
-                          ) : (
-                            <Text fontSize="sm" color="#666" fontStyle="italic">
-                              No Noir Member Events found for the selected date range.
-                            </Text>
-                          )}
-                        </Box>
-                      </Box>
-                    )}
-                  </VStack>
-                </Box>
-
-                <Divider borderColor="#a59480" />
-
-                {/* Ledger PDF Option - Only for member-related triggers */}
-                {shouldShowLedgerPdfOption() && (
-                  <>
-                    <Button
-                      size="sm"
-                      colorScheme={formData.include_ledger_pdf ? 'green' : 'gray'}
-                      variant="outline"
-                      onClick={() => handleInputChange('include_ledger_pdf', !formData.include_ledger_pdf)}
-                      fontFamily="'Montserrat', sans-serif"
-                      fontWeight="bold"
-                      _hover={{
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      }}
-                    >
-                      {formData.include_ledger_pdf ? '✓ Include Ledger PDF' : 'Include Ledger PDF'}
-                    </Button>
-                    <Divider borderColor="#a59480" />
-                  </>
+                {formData.timing_type === 'specific_time' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-[#a59480]">Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.specific_time}
+                        onChange={(e) => handleInputChange('specific_time', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[#a59480]">Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.specific_date}
+                        onChange={(e) => handleInputChange('specific_date', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
                 )}
 
-                {/* Status */}
-                <Box>
-                  <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
-                    Status
-                  </Text>
-                  <HStack spacing={4} align="center">
-                    <Button
-                      size="sm"
-                      colorScheme={formData.is_active ? 'green' : 'red'}
-                      variant="outline"
-                      onClick={() => handleInputChange('is_active', !formData.is_active)}
-                      fontFamily="'Montserrat', sans-serif"
-                      fontWeight="bold"
-                      _hover={{
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      }}
-                    >
-                      {formData.is_active ? 'Active' : 'Inactive'}
-                    </Button>
-                  </HStack>
-                </Box>
+                {formData.timing_type === 'recurring' && (
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <Label className="text-[#a59480]">Recurring Type</Label>
+                      <div className="mt-2 flex flex-col gap-2">
+                        {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(type => (
+                          <label key={type} className="flex items-center gap-2 text-sm capitalize text-[#353535]">
+                            <input
+                              type="radio"
+                              name="recurring_type"
+                              className="h-4 w-4 accent-green-600"
+                              checked={formData.recurring_type === type}
+                              onChange={() => handleInputChange('recurring_type', type)}
+                            />
+                            {type}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Delete Section */}
-                {!isCreateMode && templateId && (
-                  <>
-                    <Divider borderColor="#a59480" />
-                    <Box>
-                      <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#ef4444">
-                        Danger Zone
-                      </Text>
-                      <Button
-                        colorScheme="red"
-                        variant="outline"
-                        onClick={() => setIsConfirmingDelete(true)}
-                        fontFamily="'Montserrat', sans-serif"
+                    <div>
+                      <Label className="text-[#a59480]">Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.recurring_time || '10:00'}
+                        onChange={(e) => handleInputChange('recurring_time', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+
+                    {formData.recurring_type === 'weekly' && (
+                      <div>
+                        <Label className="text-[#a59480]">Select Weekdays</Label>
+                        <div className="mt-2 flex flex-col gap-2">
+                          {WEEKDAYS.map((day, index) => (
+                            <label key={day} className="flex items-center gap-2 text-sm text-[#353535]">
+                              <Checkbox
+                                checked={(formData.recurring_weekdays || []).includes(index)}
+                                onCheckedChange={() => toggleWeekday(index)}
+                              />
+                              {day}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.recurring_type === 'monthly' && (
+                      <>
+                        <div>
+                          <Label className="text-[#a59480]">Monthly Type</Label>
+                          <div className="mt-2 flex flex-col gap-2">
+                            {(['first', 'second', 'third', 'fourth', 'last'] as const).map(type => (
+                              <label key={type} className="flex items-center gap-2 text-sm capitalize text-[#353535]">
+                                <input
+                                  type="radio"
+                                  name="recurring_monthly_type"
+                                  className="h-4 w-4 accent-green-600"
+                                  checked={formData.recurring_monthly_type === type}
+                                  onChange={() => handleInputChange('recurring_monthly_type', type)}
+                                />
+                                {type}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-[#a59480]">Day/Weekday</Label>
+                          <div className="mt-2 flex flex-col gap-2">
+                            {(['day', 'weekday'] as const).map(type => (
+                              <label key={type} className="flex items-center gap-2 text-sm capitalize text-[#353535]">
+                                <input
+                                  type="radio"
+                                  name="recurring_monthly_day"
+                                  className="h-4 w-4 accent-green-600"
+                                  checked={formData.recurring_monthly_day === type}
+                                  onChange={() => handleInputChange('recurring_monthly_day', type)}
+                                />
+                                {type}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-[#a59480]">Value</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={31}
+                            placeholder="1-31"
+                            value={formData.recurring_monthly_value ?? 1}
+                            onChange={(e) => handleInputChange('recurring_monthly_value', parseInt(e.target.value, 10))}
+                            className="mt-1"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {formData.recurring_type === 'yearly' && (
+                      <div>
+                        <Label className="text-[#a59480]">Yearly Date</Label>
+                        <Input
+                          type="date"
+                          value={formData.recurring_yearly_date || ''}
+                          onChange={(e) => handleInputChange('recurring_yearly_date', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {formData.timing_type === 'relative' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {formData.relative_unit !== 'minute' && (
+                      <div>
+                        <Label className="text-[#a59480]">Time</Label>
+                        <Input
+                          type="time"
+                          value={formData.relative_time || '10:00'}
+                          onChange={(e) => handleInputChange('relative_time', e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <Label className="text-[#a59480]">Quantity</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={formData.relative_unit === 'minute' ? 1440 : 365}
+                        placeholder={formData.relative_unit === 'minute' ? '1-1440' : '1-365'}
+                        value={formData.relative_quantity ?? 1}
+                        onChange={(e) => handleInputChange('relative_quantity', parseInt(e.target.value, 10))}
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-[#a59480]">Time Unit</Label>
+                      <Select
+                        value={formData.relative_unit || 'day'}
+                        onChange={(e) => handleInputChange('relative_unit', e.target.value)}
+                        className="mt-1"
                       >
-                        Delete Template
-                      </Button>
-                    </Box>
-                  </>
-                )}
-              </VStack>
-            )}
-          </DrawerBody>
+                        <option value="minute">Minutes</option>
+                        <option value="hour">Hours</option>
+                        <option value="day">Days</option>
+                        <option value="week">Weeks</option>
+                        <option value="month">Months</option>
+                        <option value="year">Years</option>
+                      </Select>
+                    </div>
 
-          <DrawerFooter className="drawer-footer-content">
-            <HStack spacing={4} w="full">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                flex={1}
-                fontFamily="'Montserrat', sans-serif"
-                borderColor="#353535"
-                color="#353535"
-                _hover={{ bg: '#f0f0f0' }}
-              >
-                Cancel
-              </Button>
-              <Button
-                colorScheme="blue"
-                onClick={handleSave}
-                isLoading={isSaving}
-                loadingText="Saving..."
-                flex={1}
-                fontFamily="'Montserrat', sans-serif"
-                bg="#a59480"
-                color="#ECEDE8"
-                _hover={{ bg: '#8a7a6a' }}
-              >
-                {isCreateMode ? 'Create Template' : 'Update Template'}
-              </Button>
-            </HStack>
-          </DrawerFooter>
-        </DrawerContent>
-      </Box>
+                    <div>
+                      <Label className="text-[#a59480]">Proximity</Label>
+                      <Select
+                        value={formData.relative_proximity || 'after'}
+                        onChange={(e) => handleInputChange('relative_proximity', e.target.value)}
+                        className="mt-1"
+                      >
+                        <option value="before">Before</option>
+                        <option value="after">After</option>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-md border border-[#a59480] bg-[#ecede8] p-4">
+                  <p className="font-bold text-[#353535]">{formatTimingDisplay()}</p>
+                </div>
+              </div>
+
+              <Separator className="bg-[#a59480]" />
+
+              {/* Message Template */}
+              <div className="flex flex-col gap-4">
+                <div>
+                  <Label className="flex items-center text-[#a59480]">
+                    Message Content
+                    <button
+                      type="button"
+                      aria-label="View available placeholders"
+                      className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded text-[#a59480] hover:bg-[#ecede8]"
+                      onClick={() => {
+                        const placeholders = getAvailablePlaceholders();
+                        const placeholderText = placeholders.map(p => `${p.name}: ${p.description}`).join('\n');
+                        alert(`Available Placeholders:\n\n${placeholderText}`);
+                      }}
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </Label>
+                  <Textarea
+                    value={formData.content}
+                    onChange={(e) => handleInputChange('content', e.target.value)}
+                    rows={8}
+                    placeholder="Enter your message template here. Use placeholders like {{first_name}}, {{last_name}}, etc."
+                    className="mt-1 min-h-[200px] w-full resize-y text-sm leading-relaxed"
+                  />
+                </div>
+
+                {/* Preview Toggle */}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="show-preview" className="text-[#a59480]">Show Preview</Label>
+                  <Switch
+                    id="show-preview"
+                    checked={showPreview}
+                    onCheckedChange={(checked) => setShowPreview(checked)}
+                  />
+                </div>
+
+                {/* Preview Section */}
+                {showPreview && formData.content && (
+                  <div>
+                    <p className="mb-2 text-sm font-bold text-[#a59480]">Preview:</p>
+                    <div className="max-h-[200px] min-h-[120px] w-full overflow-y-auto rounded-md border border-[#a59480] bg-[#ecede8] p-4">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#353535]">
+                        {getPreviewMessage()}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Event List Preview - Only for all_members campaigns with event list enabled */}
+                {campaignTriggerType === 'all_members' && campaignData?.include_event_list && (
+                  <div>
+                    <p className="mb-2 text-sm font-bold text-[#a59480]">Event List Preview:</p>
+                    <div className="max-h-[200px] min-h-[100px] w-full overflow-y-auto rounded-md border border-[#a59480] bg-[#f0f8ff] p-4">
+                      {noirMemberEvents.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {noirMemberEvents.map((event, index) => (
+                            <div key={index} className="rounded-sm border border-[#e0e0e0] bg-white p-2">
+                              <p className="text-sm font-bold text-[#353535]">{event.title}</p>
+                              <p className="text-xs text-[#666]">{event.date} at {event.time}</p>
+                              {event.description && (
+                                <p className="mt-1 text-xs text-[#666]">{event.description}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm italic text-[#666]">
+                          No Noir Member Events found for the selected date range.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator className="bg-[#a59480]" />
+
+              {/* Ledger PDF Option - Only for member-related triggers */}
+              {shouldShowLedgerPdfOption() && (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleInputChange('include_ledger_pdf', !formData.include_ledger_pdf)}
+                    className={formData.include_ledger_pdf
+                      ? 'w-fit border-green-600 text-green-700 hover:bg-green-600 hover:text-white'
+                      : 'w-fit border-gray-400 text-gray-600 hover:bg-gray-400 hover:text-white'}
+                  >
+                    {formData.include_ledger_pdf ? '✓ Include Ledger PDF' : 'Include Ledger PDF'}
+                  </Button>
+                  <Separator className="bg-[#a59480]" />
+                </>
+              )}
+
+              {/* Status */}
+              <div>
+                <h3 className="mb-4 text-lg font-bold text-[#a59480]">Status</h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleInputChange('is_active', !formData.is_active)}
+                  className={formData.is_active
+                    ? 'border-green-600 text-green-700 hover:bg-green-600 hover:text-white'
+                    : 'border-red-600 text-red-700 hover:bg-red-600 hover:text-white'}
+                >
+                  {formData.is_active ? 'Active' : 'Inactive'}
+                </Button>
+              </div>
+
+              {/* Delete Section */}
+              {!isCreateMode && templateId && (
+                <>
+                  <Separator className="bg-[#a59480]" />
+                  <div>
+                    <h3 className="mb-4 text-lg font-bold text-red-500">Danger Zone</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsConfirmingDelete(true)}
+                      className="min-h-[44px] border-red-600 text-red-700 hover:bg-red-600 hover:text-white"
+                    >
+                      Delete Template
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        <SheetFooter className="shrink-0 flex-row gap-3 border-t bg-white px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:px-6 sm:justify-end sm:space-x-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="min-h-[44px] flex-1 border-[#353535] text-[#353535] hover:bg-[#f0f0f0]"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="min-h-[44px] flex-1 bg-[#a59480] text-[#ECEDE8] hover:bg-[#8a7a6a]"
+          >
+            {isSaving ? 'Saving...' : (isCreateMode ? 'Create Template' : 'Update Template')}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        isOpen={isConfirmingDelete}
-        onClose={() => setIsConfirmingDelete(false)}
-        leastDestructiveRef={cancelRef}
-      >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Delete Template
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
+      <AlertDialog open={isConfirmingDelete} onOpenChange={setIsConfirmingDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+            <AlertDialogDescription>
               Are you sure you want to delete this template? This action cannot be undone.
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <Button onClick={() => setIsConfirmingDelete(false)}>
-                Cancel
-              </Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3}>
-                Delete
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsConfirmingDelete(false)} className="min-h-[44px]">
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleDelete} className="min-h-[44px] bg-red-600 text-white hover:bg-red-700">
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
-    </Drawer>
+    </Sheet>
   );
 };
 
-export default CampaignTemplateDrawer; 
+export default CampaignTemplateDrawer;
