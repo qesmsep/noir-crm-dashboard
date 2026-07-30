@@ -1015,105 +1015,12 @@ export async function handler(req, res) {
   // MEMBER / MEMBERSHIP triggers are now handled by the DB-driven intake campaign
   // system above. The Membership Nurture Flow campaign was created in migration
   // 20260403_membership_nurture_flow.sql with both MEMBERSHIP and MEMBER triggers.
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LEGACY HARDCODED TRIGGER: INVITATION
-  // ─────────────────────────────────────────────────────────────────────────
-  // WARNING: This block has CUSTOM BUSINESS LOGIC beyond simple SMS responses.
-  // It generates signup tokens, creates/updates waitlist entries, and builds
-  // personalized /onboard/<token> URLs with 24-hour expiration.
   //
-  // DO NOT replace with a simple Intake Campaign unless the campaign's
-  // message template can replicate the token generation and waitlist logic.
-  // To migrate this, you would need to either:
-  //   1. Move the token/waitlist logic into the intake-enroll API, OR
-  //   2. Keep this block and only use Intake Campaigns for simple SMS triggers.
-  //
-  // SAFE TO REMOVE only after the token generation logic is handled elsewhere.
-  // No other code depends on this block's return value.
-  // ═══════════════════════════════════════════════════════════════════════════
-  // --- LEGACY INVITATION BLOCK START ---
-  // COMMENTED OUT 2026-04-06: Testing new intake campaign system
-  // TODO: Delete this block after confirming intake campaigns work
-  /*
-  if (text.toLowerCase().trim() === 'invitation') {
-    console.log('Processing INVITATION message for membership signup');
-
-    try {
-      // Check if waitlist entry already exists for this phone
-      const { data: existingEntry } = await supabase
-        .from('waitlist')
-        .select('id, agreement_token, application_expires_at')
-        .eq('phone', from)
-        .eq('status', 'approved')
-        .single();
-
-      let signupToken;
-      if (existingEntry && existingEntry.agreement_token && new Date(existingEntry.application_expires_at) > new Date()) {
-        // Use existing valid token
-        signupToken = existingEntry.agreement_token;
-        console.log('Using existing invitation token for phone:', from);
-      } else {
-        // Generate new application token (24-hour expiration)
-        signupToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24);
-
-        if (existingEntry) {
-          // Update existing entry with new token
-          await supabase
-            .from('waitlist')
-            .update({
-              agreement_token: signupToken,
-              agreement_token_created_at: new Date().toISOString(),
-              application_expires_at: expiresAt.toISOString(),
-              application_link_sent_at: new Date().toISOString()
-            })
-            .eq('id', existingEntry.id);
-        } else {
-          // Create new waitlist entry with status='approved'
-          // Use space character to satisfy NOT NULL constraint while keeping fields functionally empty
-          await supabase
-            .from('waitlist')
-            .insert({
-              phone: from,
-              first_name: ' ',
-              last_name: ' ',
-              email: ' ',
-              status: 'approved',
-              agreement_token: signupToken,
-              agreement_token_created_at: new Date().toISOString(),
-              application_expires_at: expiresAt.toISOString(),
-              application_link_sent_at: new Date().toISOString(),
-              submitted_at: new Date().toISOString()
-            });
-        }
-        console.log('Created/updated invitation with token for phone:', from);
-      }
-
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://noirkc.com';
-      const signupUrl = `${baseUrl}/onboard/${signupToken}`;
-
-      const invitationMessage = `Thank you for requesting an invitation to join Noir and we are excited to formally invite you to become a member of Noir.
-
-To officially join, please complete the following:
-
-${signupUrl}
-
-The link expires in 24 hours, so please respond to this text with any questions.
-
-Thank you.`;
-
-      await sendSMS(from, invitationMessage);
-      return res.status(200).json({ message: 'Sent invitation signup link' });
-    } catch (error) {
-      console.error('Error processing INVITATION request:', error);
-      await sendSMS(from, 'We encountered an error processing your invitation request. Please try again later or contact us directly.');
-      return res.status(500).json({ error: 'Failed to process invitation request' });
-    }
-  }
-  */
-  // --- LEGACY INVITATION BLOCK END ---
+  // The INVITATION trigger is likewise handled by the DB-driven intake campaign
+  // system above (see sms_intake_campaigns, trigger_word='INVITATION', action
+  // create_onboarding_link in intake-enroll.ts) rather than by hardcoded logic
+  // here. The campaign's status controls whether it responds; configure it via
+  // the Intake Campaigns admin UI.
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LEGACY HARDCODED TRIGGER: SKYLINE
