@@ -1,39 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Drawer,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  Button,
-  VStack,
-  HStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Textarea,
-  Select,
-  Switch,
-  Text,
-  useToast,
-  Box,
-  Checkbox,
-  CheckboxGroup,
-  Stack,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
-  Radio,
-  RadioGroup,
-  Divider,
-  Badge,
-  IconButton,
-} from '@chakra-ui/react';
-import { CloseIcon, CalendarIcon } from '@chakra-ui/icons';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/useToast';
 
 interface Campaign {
   id?: string;
@@ -65,6 +40,18 @@ interface CampaignDrawerProps {
   onCampaignUpdated: () => void;
 }
 
+const RECURRING_SCHEDULE_OPTIONS = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+  { value: 'weekdays', label: 'Specific Weekdays' },
+  { value: 'first_of_month', label: '1st of Month' },
+  { value: 'last_of_month', label: 'Last Day of Month' },
+];
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
   isOpen,
   onClose,
@@ -85,7 +72,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [appliesToAllLocations, setAppliesToAllLocations] = useState(false);
-  const toast = useToast();
+  const { toast } = useToast();
 
   // Initialization effect: runs when drawer opens or mode/campaign changes
   useEffect(() => {
@@ -122,7 +109,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
 
   const fetchCampaign = async () => {
     if (!campaignId) return;
-    
+
     setIsLoading(true);
     try {
       const response = await fetch(`/api/campaigns/${campaignId}`);
@@ -218,211 +205,193 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
     { value: 'reservation_time', label: 'Reservation Time' },
   ];
 
+  const toggleWeekday = (value: string) => {
+    const current: string[] = formData.recurring_schedule?.weekdays || [];
+    const next = current.includes(value)
+      ? current.filter(v => v !== value)
+      : [...current, value];
+    handleInputChange('recurring_schedule', { ...formData.recurring_schedule, weekdays: next });
+  };
+
+  const toggleLocation = (locationId: string) => {
+    setSelectedLocationIds(prev =>
+      prev.includes(locationId) ? prev.filter(id => id !== locationId) : [...prev, locationId]
+    );
+  };
+
   const renderTriggerTypeSpecificFields = () => {
     switch (formData.trigger_type) {
       case 'recurring':
         return (
-          <VStack spacing={4} align="stretch">
-            <FormControl>
-              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                Recurring Schedule
-              </FormLabel>
-              <RadioGroup value={formData.recurring_schedule?.type || 'weekly'} onChange={(value) => handleInputChange('recurring_schedule', { ...formData.recurring_schedule, type: value })}>
-                <Stack direction="column">
-                  <Radio value="daily" colorScheme="green">Daily</Radio>
-                  <Radio value="weekly" colorScheme="green">Weekly</Radio>
-                  <Radio value="monthly" colorScheme="green">Monthly</Radio>
-                  <Radio value="yearly" colorScheme="green">Yearly</Radio>
-                  <Radio value="weekdays" colorScheme="green">Specific Weekdays</Radio>
-                  <Radio value="first_of_month" colorScheme="green">1st of Month</Radio>
-                  <Radio value="last_of_month" colorScheme="green">Last Day of Month</Radio>
-                </Stack>
-              </RadioGroup>
-            </FormControl>
+          <div className="flex flex-col gap-4">
+            <div>
+              <Label className="text-[#a59480]">Recurring Schedule</Label>
+              <div className="mt-2 flex flex-col gap-2">
+                {RECURRING_SCHEDULE_OPTIONS.map(option => (
+                  <label key={option.value} className="flex items-center gap-2 text-sm text-[#353535]">
+                    <input
+                      type="radio"
+                      name="recurring_schedule_type"
+                      className="h-4 w-4 accent-green-600"
+                      checked={(formData.recurring_schedule?.type || 'weekly') === option.value}
+                      onChange={() => handleInputChange('recurring_schedule', { ...formData.recurring_schedule, type: option.value })}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
 
-            {(formData.recurring_schedule?.type === 'weekdays') && (
-              <FormControl>
-                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                  Select Weekdays
-                </FormLabel>
-                <CheckboxGroup value={formData.recurring_schedule?.weekdays || []} onChange={(value) => handleInputChange('recurring_schedule', { ...formData.recurring_schedule, weekdays: value })}>
-                  <Stack direction="column">
-                    <Checkbox value="0">Sunday</Checkbox>
-                    <Checkbox value="1">Monday</Checkbox>
-                    <Checkbox value="2">Tuesday</Checkbox>
-                    <Checkbox value="3">Wednesday</Checkbox>
-                    <Checkbox value="4">Thursday</Checkbox>
-                    <Checkbox value="5">Friday</Checkbox>
-                    <Checkbox value="6">Saturday</Checkbox>
-                  </Stack>
-                </CheckboxGroup>
-              </FormControl>
+            {formData.recurring_schedule?.type === 'weekdays' && (
+              <div>
+                <Label className="text-[#a59480]">Select Weekdays</Label>
+                <div className="mt-2 flex flex-col gap-2">
+                  {WEEKDAYS.map((day, index) => (
+                    <label key={day} className="flex items-center gap-2 text-sm text-[#353535]">
+                      <Checkbox
+                        checked={(formData.recurring_schedule?.weekdays || []).includes(String(index))}
+                        onCheckedChange={() => toggleWeekday(String(index))}
+                      />
+                      {day}
+                    </label>
+                  ))}
+                </div>
+              </div>
             )}
 
-            <HStack spacing={4}>
-              <FormControl>
-                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                  Start Date
-                </FormLabel>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-[#a59480]">Start Date</Label>
                 <Input
                   type="date"
                   value={formData.recurring_start_date || ''}
                   onChange={(e) => handleInputChange('recurring_start_date', e.target.value)}
-                  borderColor="#a59480"
-                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
+                  className="mt-1"
                 />
-              </FormControl>
+              </div>
 
-              <FormControl>
-                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                  End Date (Optional)
-                </FormLabel>
+              <div>
+                <Label className="text-[#a59480]">End Date (Optional)</Label>
                 <Input
                   type="date"
                   value={formData.recurring_end_date || ''}
                   onChange={(e) => handleInputChange('recurring_end_date', e.target.value)}
-                  borderColor="#a59480"
-                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
+                  className="mt-1"
                 />
-              </FormControl>
-            </HStack>
-          </VStack>
+              </div>
+            </div>
+          </div>
         );
 
       case 'reservation_range':
         return (
-          <VStack spacing={4} align="stretch">
-            <HStack spacing={4}>
-              <FormControl>
-                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                  Start Date & Time
-                </FormLabel>
-                <Input
-                  type="datetime-local"
-                  value={formData.reservation_range_start || ''}
-                  onChange={(e) => handleInputChange('reservation_range_start', e.target.value)}
-                  borderColor="#a59480"
-                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                />
-              </FormControl>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-[#a59480]">Start Date &amp; Time</Label>
+              <Input
+                type="datetime-local"
+                value={formData.reservation_range_start || ''}
+                onChange={(e) => handleInputChange('reservation_range_start', e.target.value)}
+                className="mt-1"
+              />
+            </div>
 
-              <FormControl>
-                <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                  End Date & Time
-                </FormLabel>
-                <Input
-                  type="datetime-local"
-                  value={formData.reservation_range_end || ''}
-                  onChange={(e) => handleInputChange('reservation_range_end', e.target.value)}
-                  borderColor="#a59480"
-                  _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                />
-              </FormControl>
-            </HStack>
-          </VStack>
+            <div>
+              <Label className="text-[#a59480]">End Date &amp; Time</Label>
+              <Input
+                type="datetime-local"
+                value={formData.reservation_range_end || ''}
+                onChange={(e) => handleInputChange('reservation_range_end', e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
         );
 
       case 'private_event':
         return (
-          <VStack spacing={4} align="stretch">
-            <FormControl>
-              <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                Select Private Event
-              </FormLabel>
-              <Select
-                value={formData.selected_private_event_id || ''}
-                onChange={(e) => handleInputChange('selected_private_event_id', e.target.value)}
-                borderColor="#a59480"
-                _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                placeholder="Select a private event"
-              >
-                {privateEvents.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.title} - {new Date(event.start_time).toLocaleDateString()}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
-          </VStack>
+          <div>
+            <Label className="text-[#a59480]">Select Private Event</Label>
+            <Select
+              value={formData.selected_private_event_id || ''}
+              onChange={(e) => handleInputChange('selected_private_event_id', e.target.value)}
+              className="mt-1"
+            >
+              <option value="" disabled>Select a private event</option>
+              {privateEvents.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.title} - {new Date(event.start_time).toLocaleDateString()}
+                </option>
+              ))}
+            </Select>
+          </div>
         );
 
       case 'all_members':
         return (
-          <VStack spacing={4} align="stretch">
-            <FormControl display="flex" alignItems="center">
-              <FormLabel htmlFor="include-event-list" mb="0" fontFamily="'Montserrat', sans-serif" color="#a59480">
-                Include Event List
-              </FormLabel>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="include-event-list" className="text-[#a59480]">Include Event List</Label>
               <Switch
                 id="include-event-list"
-                isChecked={formData.include_event_list || false}
-                onChange={(e) => handleInputChange('include_event_list', e.target.checked)}
-                colorScheme="green"
+                checked={formData.include_event_list || false}
+                onCheckedChange={(checked) => handleInputChange('include_event_list', checked)}
               />
-            </FormControl>
-            
+            </div>
+
             {formData.include_event_list && (
-              <VStack spacing={4} align="stretch">
-                <FormControl>
-                  <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Event Date Range</FormLabel>
+              <div className="flex flex-col gap-4">
+                <div>
+                  <Label className="text-[#a59480]">Event Date Range</Label>
                   <Select
                     value={formData.event_list_date_range?.type || 'this_month'}
-                    onChange={(e) => handleInputChange('event_list_date_range', { 
-                      ...formData.event_list_date_range, 
-                      type: e.target.value 
+                    onChange={(e) => handleInputChange('event_list_date_range', {
+                      ...formData.event_list_date_range,
+                      type: e.target.value
                     })}
-                    bg="#ecede8"
-                    color="#353535"
-                    borderColor="#a59480"
-                    _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                    className="mt-1"
                   >
                     <option value="this_month">This Month</option>
                     <option value="next_month">Next Month</option>
                     <option value="specific_range">Specific Date Range</option>
                   </Select>
-                </FormControl>
+                </div>
 
                 {formData.event_list_date_range?.type === 'specific_range' && (
-                  <HStack spacing={4}>
-                    <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Start Date</FormLabel>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-[#a59480]">Start Date</Label>
                       <Input
                         type="date"
                         value={formData.event_list_date_range?.start_date || ''}
-                        onChange={(e) => handleInputChange('event_list_date_range', { 
-                          ...formData.event_list_date_range, 
-                          start_date: e.target.value 
+                        onChange={(e) => handleInputChange('event_list_date_range', {
+                          ...formData.event_list_date_range,
+                          start_date: e.target.value
                         })}
-                        bg="#ecede8"
-                        color="#353535"
-                        borderColor="#a59480"
-                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        className="mt-1"
                       />
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">End Date</FormLabel>
+                    </div>
+                    <div>
+                      <Label className="text-[#a59480]">End Date</Label>
                       <Input
                         type="date"
                         value={formData.event_list_date_range?.end_date || ''}
-                        onChange={(e) => handleInputChange('event_list_date_range', { 
-                          ...formData.event_list_date_range, 
-                          end_date: e.target.value 
+                        onChange={(e) => handleInputChange('event_list_date_range', {
+                          ...formData.event_list_date_range,
+                          end_date: e.target.value
                         })}
-                        bg="#ecede8"
-                        color="#353535"
-                        borderColor="#a59480"
-                        _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
+                        className="mt-1"
                       />
-                    </FormControl>
-                  </HStack>
+                    </div>
+                  </div>
                 )}
 
-                <Text fontSize="sm" color="#a59480">
+                <p className="text-sm text-[#a59480]">
                   Will include all "Noir Member Event" events within the selected date range.
-                </Text>
-              </VStack>
+                </p>
+              </div>
             )}
-          </VStack>
+          </div>
         );
 
       default:
@@ -505,100 +474,54 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
   };
 
   return (
-    <Drawer
-      isOpen={isOpen}
-      placement="right"
-      onClose={onClose}
-      size="lg"
-    >
-      <DrawerOverlay />
-      <DrawerContent
-        borderLeft="2px solid #a59480"
-        borderRadius="0 0 0 20px"
-        fontFamily="'Montserrat', sans-serif"
-        maxW="600px"
-        w="100%"
-        boxShadow="0 0 50px rgba(0,0,0,0.3)"
-        mt="60px"
-        mb="20px"
-        padding="0"
-        backgroundColor="#f8f9fa"
-        position="relative"
-        transform="translateX(0)"
-        transition="all 0.3s ease"
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-lg flex flex-col p-0 border-l-2 border-l-[#a59480] font-montserrat"
       >
-        <DrawerHeader
-          borderBottom="2px solid #ecede8"
-          backgroundColor="#ecede8"
-          color="#353535"
-          fontFamily="'IvyJournal', serif"
-          fontSize="2xl"
-          fontWeight="bold"
-          py={6}
-        >
-          <HStack justify="space-between">
-            <Text>{isCreateMode ? 'Create New Campaign' : 'Edit Campaign'}</Text>
-            <DrawerCloseButton
-              color="#a59480"
-              _hover={{ color: '#8a7a66' }}
-              size="lg"
-            />
-          </HStack>
-        </DrawerHeader>
+        <SheetHeader className="shrink-0 border-b-2 border-[#ecede8] bg-[#ecede8] px-6 py-4 text-left">
+          <SheetTitle className="font-ivyjournal text-2xl font-bold text-[#353535]">
+            {isCreateMode ? 'Create New Campaign' : 'Edit Campaign'}
+          </SheetTitle>
+        </SheetHeader>
 
-        <DrawerBody py={8} overflowY="auto" maxH="calc(100vh - 200px)">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-8">
           {isLoading ? (
-            <Box textAlign="center" py={12}>
-              <Text>Loading campaign...</Text>
-            </Box>
+            <div className="py-12 text-center text-[#353535]">Loading campaign...</div>
           ) : (
-            <VStack spacing={6} align="stretch">
+            <div className="flex flex-col gap-6">
               {/* Basic Information */}
-              <Box>
-                <Text fontSize="lg" fontWeight="bold" color="#353535" mb={4}>
-                  Campaign Information
-                </Text>
-                
-                <VStack spacing={4} align="stretch">
-                  <FormControl>
-                    <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      Campaign Name *
-                    </FormLabel>
+              <div>
+                <h3 className="mb-4 text-lg font-bold text-[#353535]">Campaign Information</h3>
+
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <Label className="text-[#a59480]">Campaign Name *</Label>
                     <Input
                       value={formData.name}
                       onChange={(e) => handleInputChange('name', e.target.value)}
                       placeholder="Enter campaign name"
-                      borderColor="#a59480"
-                      _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                      fontFamily="'Montserrat', sans-serif"
+                      className="mt-1"
                     />
-                  </FormControl>
+                  </div>
 
-                  <FormControl>
-                    <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      Description
-                    </FormLabel>
+                  <div>
+                    <Label className="text-[#a59480]">Description</Label>
                     <Textarea
                       value={formData.description}
                       onChange={(e) => handleInputChange('description', e.target.value)}
                       placeholder="Enter campaign description"
-                      borderColor="#a59480"
-                      _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                      fontFamily="'Montserrat', sans-serif"
                       rows={3}
+                      className="mt-1"
                     />
-                  </FormControl>
+                  </div>
 
-                  <FormControl>
-                    <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      Trigger Type *
-                    </FormLabel>
+                  <div>
+                    <Label className="text-[#a59480]">Trigger Type *</Label>
                     <Select
                       value={formData.trigger_type}
                       onChange={(e) => handleInputChange('trigger_type', e.target.value)}
-                      borderColor="#a59480"
-                      _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                      fontFamily="'Montserrat', sans-serif"
+                      className="mt-1"
                     >
                       {getTriggerTypeOptions().map((option) => (
                         <option key={option.value} value={option.value}>
@@ -606,125 +529,97 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
                         </option>
                       ))}
                     </Select>
-                  </FormControl>
-                </VStack>
-              </Box>
+                  </div>
+                </div>
+              </div>
 
               {/* Trigger Type Specific Fields */}
               {formData.trigger_type && (
                 <>
-                  <Divider borderColor="#a59480" />
-                  <Box>
-                    <Text fontSize="lg" fontWeight="bold" color="#353535" mb={4}>
+                  <Separator className="bg-[#a59480]" />
+                  <div>
+                    <h3 className="mb-4 text-lg font-bold text-[#353535]">
                       {formData.trigger_type === 'recurring' && 'Recurring Schedule'}
                       {formData.trigger_type === 'reservation_range' && 'Reservation Range'}
                       {formData.trigger_type === 'private_event' && 'Private Event Selection'}
                       {formData.trigger_type === 'all_members' && 'All Members Options'}
-                    </Text>
+                    </h3>
                     {renderTriggerTypeSpecificFields()}
-                  </Box>
+                  </div>
                 </>
               )}
 
               {/* Location Assignment */}
-              <Divider borderColor="#a59480" />
-              <Box>
-                <Text fontSize="lg" fontWeight="bold" color="#353535" mb={4}>
-                  Locations
-                </Text>
-                <VStack align="stretch" spacing={4}>
-                  <FormControl display="flex" alignItems="center">
-                    <FormLabel htmlFor="all-locations" mb="0" fontFamily="'Montserrat', sans-serif" color="#a59480">
-                      Apply to all locations
-                    </FormLabel>
+              <Separator className="bg-[#a59480]" />
+              <div>
+                <h3 className="mb-4 text-lg font-bold text-[#353535]">Locations</h3>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="all-locations" className="text-[#a59480]">Apply to all locations</Label>
                     <Switch
                       id="all-locations"
-                      isChecked={appliesToAllLocations}
-                      onChange={(e) => setAppliesToAllLocations(e.target.checked)}
-                      colorScheme="green"
+                      checked={appliesToAllLocations}
+                      onCheckedChange={(checked) => setAppliesToAllLocations(checked)}
                     />
-                  </FormControl>
+                  </div>
 
                   {!appliesToAllLocations && (
-                    <CheckboxGroup
-                      value={selectedLocationIds}
-                      onChange={(values) => setSelectedLocationIds(values as string[])}
-                    >
-                      <Stack spacing={2}>
-                        {locations.map((location) => (
+                    <div className="flex flex-col gap-2">
+                      {locations.map((location) => (
+                        <label key={location.id} className="flex items-center gap-2 text-[#353535]">
                           <Checkbox
-                            key={location.id}
-                            value={location.id}
-                            fontFamily="'Montserrat', sans-serif"
-                            color="#353535"
-                          >
-                            {location.name}
-                          </Checkbox>
-                        ))}
-                      </Stack>
-                    </CheckboxGroup>
+                            checked={selectedLocationIds.includes(location.id)}
+                            onCheckedChange={() => toggleLocation(location.id)}
+                          />
+                          {location.name}
+                        </label>
+                      ))}
+                    </div>
                   )}
-                </VStack>
-              </Box>
+                </div>
+              </div>
 
               {/* Status */}
-              <Divider borderColor="#a59480" />
-              <Box>
-                <Text fontSize="lg" fontWeight="bold" color="#353535" mb={4}>
-                  Status
-                </Text>
-                <HStack spacing={4} align="center">
-                  <Button
-                    size="sm"
-                    colorScheme={formData.is_active ? 'green' : 'red'}
-                    variant="outline"
-                    onClick={() => handleInputChange('is_active', !formData.is_active)}
-                    fontFamily="'Montserrat', sans-serif"
-                    fontWeight="bold"
-                    _hover={{
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    }}
-                  >
-                    {formData.is_active ? 'Active' : 'Inactive'}
-                  </Button>
-                </HStack>
-              </Box>
-            </VStack>
+              <Separator className="bg-[#a59480]" />
+              <div>
+                <h3 className="mb-4 text-lg font-bold text-[#353535]">Status</h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleInputChange('is_active', !formData.is_active)}
+                  className={formData.is_active
+                    ? 'border-green-600 text-green-700 hover:bg-green-600 hover:text-white'
+                    : 'border-red-600 text-red-700 hover:bg-red-600 hover:text-white'}
+                >
+                  {formData.is_active ? 'Active' : 'Inactive'}
+                </Button>
+              </div>
+            </div>
           )}
-        </DrawerBody>
+        </div>
 
-        <DrawerFooter>
-          <HStack spacing={4} w="full">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              flex={1}
-              fontFamily="'Montserrat', sans-serif"
-              borderColor="#353535"
-              color="#353535"
-              _hover={{ bg: '#f0f0f0' }}
-            >
-              Cancel
-            </Button>
-            <Button
-              colorScheme="blue"
-              onClick={handleSave}
-              isLoading={isSaving}
-              loadingText="Saving..."
-              flex={1}
-              fontFamily="'Montserrat', sans-serif"
-              bg="#a59480"
-              color="#ECEDE8"
-              _hover={{ bg: '#8a7a6a' }}
-            >
-              {isCreateMode ? 'Create Campaign' : 'Update Campaign'}
-            </Button>
-          </HStack>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+        <SheetFooter className="shrink-0 flex-row gap-3 border-t border-[#ecede8] bg-white px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:justify-end sm:space-x-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="min-h-[44px] flex-1 border-[#353535] text-[#353535] hover:bg-[#f0f0f0]"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="min-h-[44px] flex-1 bg-[#a59480] text-[#ECEDE8] hover:bg-[#8a7a6a]"
+          >
+            {isSaving ? 'Saving...' : (isCreateMode ? 'Create Campaign' : 'Update Campaign')}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 };
 
-export default CampaignDrawer; 
+export default CampaignDrawer;
