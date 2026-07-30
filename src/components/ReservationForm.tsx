@@ -986,14 +986,16 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       // ALWAYS verify membership status by checking phone number
       console.log('Checking membership status for phone:', form.phone);
 
-      const { data: members, error: memberError } = await supabase
-        .from('members')
-        .select('member_id, first_name, last_name, phone')
-        .eq('phone', form.phone)
-        .limit(1);
-
-      const member = members && members.length > 0 ? members[0] : null;
-      console.log('Member verification response:', { member, memberError });
+      const membershipResponse = await fetch('/api/membership/check-by-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: form.phone }),
+      });
+      const membershipResult = await membershipResponse.json();
+      const member = membershipResponse.ok && membershipResult.isMember
+        ? { first_name: membershipResult.first_name, last_name: membershipResult.last_name }
+        : null;
+      console.log('Member verification response:', membershipResult);
 
       // If not a member, show "Members only" message
       if (!member) {
@@ -1033,9 +1035,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
 
       // Send reservation data to backend for members
       try {
+        // member_id is intentionally omitted here: the membership check
+        // endpoint no longer exposes it to the client. /api/reservations
+        // resolves the member server-side from the phone number.
         const requestBody = {
           ...reservationData,
-          member_id: member.member_id // Add member_id to the reservation data
         };
 
         console.log('Sending reservation request to API...');
