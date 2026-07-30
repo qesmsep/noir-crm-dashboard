@@ -62,6 +62,20 @@
   }
 }
 
+/* Caps full-screen Sheet panels to the real visible viewport height so they
+   never overflow below the fold on iOS Safari when the address bar is
+   showing (same class of bug fixed for drawers in #45/#47). Falls back to
+   the JS-computed --vh unit on browsers without dvh support. */
+.sheet-dvh-max-height {
+  max-height: calc(100 * var(--vh));
+}
+
+@supports (height: 100dvh) {
+  .sheet-dvh-max-height {
+    max-height: 100dvh;
+  }
+}
+
 /* Mobile-specific CSS reset to override browser defaults */
 * {
   box-sizing: border-box;

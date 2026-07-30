@@ -477,10 +477,15 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-lg flex flex-col p-0 border-l-2 border-l-[#a59480] font-montserrat"
+        overlayClassName="bg-black/70"
+        className="sheet-dvh-max-height flex w-full flex-col overflow-hidden rounded-[10px] border-2 border-[#353535] bg-[#ecede8] p-0 sm:max-w-lg"
+        style={{ fontFamily: 'Montserrat, sans-serif' }}
       >
-        <SheetHeader className="shrink-0 border-b-2 border-[#ecede8] bg-[#ecede8] px-6 py-4 text-left">
-          <SheetTitle className="font-ivyjournal text-2xl font-bold text-[#353535]">
+        <SheetHeader className="shrink-0 border-b p-4 pb-2 pt-3 text-left">
+          <SheetTitle
+            className="text-xl font-bold text-[#353535]"
+            style={{ fontFamily: 'IvyJournal, sans-serif' }}
+          >
             {isCreateMode ? 'Create New Campaign' : 'Edit Campaign'}
           </SheetTitle>
         </SheetHeader>
@@ -599,7 +604,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
           )}
         </div>
 
-        <SheetFooter className="shrink-0 flex-row gap-3 border-t border-[#ecede8] bg-white px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:justify-end sm:space-x-0">
+        <SheetFooter className="shrink-0 flex-row gap-3 border-t px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:justify-end sm:space-x-0">
           <Button
             type="button"
             variant="outline"
