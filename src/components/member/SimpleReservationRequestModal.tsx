@@ -305,7 +305,8 @@ export default function SimpleReservationRequestModal({
 
           const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
           const overrideParam = adminOverride ? '&adminOverride=true' : '';
-          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}`);
+          const partySizeParam = partySize ? `&partySize=${partySize}` : '';
+          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}${partySizeParam}`);
 
           if (response.ok) {
             const result = await response.json();
@@ -442,7 +443,8 @@ export default function SimpleReservationRequestModal({
       const dateStr = DateTime.fromJSDate(newDate, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
       const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
       const overrideParam = adminOverride ? '&adminOverride=true' : '';
-      const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}`, {
+      const partySizeParam = `&partySize=${partySize}`;
+      const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}${partySizeParam}`, {
         signal: abortController.signal,
       });
       const result = await response.json();
@@ -567,9 +569,12 @@ export default function SimpleReservationRequestModal({
           return;
         }
 
-        if (paymentIntent && paymentIntent.status === 'succeeded') {
-          // Payment successful, now create reservation
+        if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture')) {
+          // Payment authorized (not captured yet), now create reservation
           await createReservationAfterPayment(paymentIntent.id);
+        } else {
+          setPaymentError(`Unexpected payment status: ${paymentIntent?.status}`);
+          setPaymentProcessing(false);
         }
       } catch (error: any) {
         setPaymentError(error.message);
@@ -622,15 +627,17 @@ export default function SimpleReservationRequestModal({
             boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
           }}
         >
-          {paymentProcessing ? 'Processing...' : `Pay $${parseInt(partySize) * coverPrice}`}
+          {paymentProcessing ? 'Authorizing...' : `Authorize $${parseInt(partySize) * coverPrice}`}
         </button>
       </form>
     );
   }
 
-  // Create reservation after successful payment
+  // Create reservation after successful payment authorization (not captured yet)
   const createReservationAfterPayment = async (paymentId: string) => {
     setIsCreatingReservation(true);
+    let reservationCreated = false;
+    let reservationId: string | null = null;
 
     try {
       const [timeStr, period] = time.split(' ');
@@ -682,30 +689,108 @@ export default function SimpleReservationRequestModal({
         throw new Error(result.error || 'Failed to create reservation');
       }
 
-      toast({
-        title: 'Reservation Confirmed!',
-        description: 'Payment successful. Your table has been reserved.',
-        variant: 'success',
-      });
+      // Reservation created successfully, store the ID
+      reservationCreated = true;
+      reservationId = result.data?.id || null;
 
-      if (onReservationCreated) {
-        onReservationCreated();
+      // Now capture the payment since reservation succeeded
+      try {
+        const captureResponse = await fetch('/api/capture-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentIntentId: paymentId,
+            reservationId: reservationId,
+          }),
+        });
+
+        const captureResult = await captureResponse.json();
+
+        if (!captureResponse.ok) {
+          throw new Error(captureResult.error || 'Failed to capture payment');
+        }
+
+        // Success! Both reservation and payment capture succeeded
+        toast({
+          title: 'Reservation Confirmed!',
+          description: 'Payment successful. Your table has been reserved.',
+          variant: 'success',
+        });
+
+        if (onReservationCreated) {
+          onReservationCreated();
+        }
+
+        // Reset and close
+        setDate(null);
+        setTime('');
+        setPartySize('2');
+        setNotes('');
+        setShowPayment(false);
+        setClientSecret(null);
+        onClose();
+
+      } catch (captureError: any) {
+        // Critical: Reservation was created but payment capture failed
+        // Need to delete the reservation to maintain consistency
+        console.error('Payment capture failed after reservation created:', captureError);
+
+        if (reservationId) {
+          try {
+            // Delete the reservation
+            await fetch(`/api/reservations/${reservationId}`, {
+              method: 'DELETE',
+            });
+            console.log('Deleted reservation due to payment capture failure');
+          } catch (deleteError) {
+            console.error('Failed to delete reservation after payment capture failure:', deleteError);
+          }
+        }
+
+        toast({
+          title: 'Payment Error',
+          description: 'Payment capture failed. Your reservation has been cancelled. Please try again.',
+          variant: 'error',
+        });
       }
 
-      // Reset and close
-      setDate(null);
-      setTime('');
-      setPartySize('2');
-      setNotes('');
-      setShowPayment(false);
-      setClientSecret(null);
-      onClose();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Payment succeeded but reservation failed. Please contact us.',
-        variant: 'error',
-      });
+      // Reservation creation failed - cancel the payment authorization
+      try {
+        const cancelResponse = await fetch('/api/cancel-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentIntentId: paymentId,
+            reason: 'reservation_failed',
+          }),
+        });
+
+        const cancelResult = await cancelResponse.json();
+
+        if (cancelResponse.ok) {
+          console.log('Payment authorization cancelled successfully');
+          toast({
+            title: 'Reservation Failed',
+            description: `${error.message || 'Failed to create reservation'}. Your payment authorization has been cancelled.`,
+            variant: 'error',
+          });
+        } else {
+          console.error('Failed to cancel payment authorization:', cancelResult);
+          toast({
+            title: 'Reservation Failed',
+            description: `${error.message || 'Failed to create reservation'}. Please contact us to cancel the payment hold.`,
+            variant: 'error',
+          });
+        }
+      } catch (cancelError) {
+        console.error('Error cancelling payment:', cancelError);
+        toast({
+          title: 'Reservation Failed',
+          description: 'Failed to create reservation and cancel payment. Please contact support immediately.',
+          variant: 'error',
+        });
+      }
     } finally {
       setIsCreatingReservation(false);
     }
