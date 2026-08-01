@@ -60,14 +60,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Cancel the payment intent
-    const canceledPayment = await stripe.paymentIntents.cancel(paymentIntentId, {
-      cancellation_reason: 'requested_by_customer',
-    });
-
-    console.log(`[PAYMENT CANCEL] Successfully canceled payment: ${paymentIntentId}`);
-
-    // Update metadata to track cancellation
+    // Update metadata to track cancellation before canceling - PaymentIntents can only be
+    // updated while still in a cancelable state, not after they've been canceled.
     await stripe.paymentIntents.update(paymentIntentId, {
       metadata: {
         ...paymentIntent.metadata,
@@ -75,6 +69,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cancellation_reason: reason || 'reservation_failed',
       },
     });
+
+    // Map our internal reason to a Stripe-native cancellation_reason value
+    const stripeCancellationReason = reason === 'reservation_failed' ? 'abandoned' : 'requested_by_customer';
+
+    // Cancel the payment intent
+    const canceledPayment = await stripe.paymentIntents.cancel(paymentIntentId, {
+      cancellation_reason: stripeCancellationReason,
+    });
+
+    console.log(`[PAYMENT CANCEL] Successfully canceled payment: ${paymentIntentId}`);
 
     return res.status(200).json({
       success: true,

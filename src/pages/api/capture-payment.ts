@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { supabase, supabaseAdmin } from '../../lib/supabase';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -38,6 +39,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         error: `Payment cannot be captured. Current status: ${paymentIntent.status}`,
         status: paymentIntent.status,
       });
+    }
+
+    // If a reservationId was provided, verify it actually belongs to this payment intent
+    // before capturing funds, to guard against stale/mismatched IDs from client retries.
+    if (reservationId) {
+      const client = supabaseAdmin || supabase;
+      const { data: reservation, error: reservationError } = await client
+        .from('reservations')
+        .select('id, payment_intent_id')
+        .eq('id', reservationId)
+        .maybeSingle();
+
+      if (reservationError) {
+        console.error('[PAYMENT CAPTURE] Error verifying reservation ownership:', reservationError);
+        return res.status(500).json({ error: 'Failed to verify reservation for capture' });
+      }
+
+      if (!reservation || reservation.payment_intent_id !== paymentIntentId) {
+        console.error(`[PAYMENT CAPTURE] Reservation ${reservationId} does not match payment intent ${paymentIntentId}`);
+        return res.status(400).json({ error: 'Reservation does not match the provided payment intent' });
+      }
     }
 
     // Capture the payment

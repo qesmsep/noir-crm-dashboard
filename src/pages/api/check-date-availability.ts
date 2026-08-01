@@ -149,6 +149,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const partySizeNum = parseInt(partySize);
 
       if (!isNaN(partySizeNum) && partySizeNum > 0) {
+        // Determine the actual reservation duration for this location so we check for a
+        // contiguous free window, not just the isolated 30-minute display slot. Otherwise a
+        // slot can show as "available" while no table is actually free for the full stay.
+        let reservationDurationHours = 2.0;
+        if (locationId) {
+          const { data: locationDurationData } = await supabase
+            .from('locations')
+            .select('default_reservation_duration_hours')
+            .eq('id', locationId)
+            .single();
+
+          if (locationDurationData?.default_reservation_duration_hours) {
+            reservationDurationHours = locationDurationData.default_reservation_duration_hours;
+          }
+        }
+
         // Get tables that can accommodate the party size
         let tablesQuery = supabase
           .from('tables')
@@ -239,12 +255,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     }, { zone: 'America/Chicago' });
 
                     const slotEnd = slotStart.plus({ minutes: 30 });
+                    // The full window a reservation starting in this slot would actually occupy
+                    const conflictWindowEnd = slotStart.plus({ hours: reservationDurationHours });
 
                     // Check if ANY table is available for this time slot
                     let tableAvailable = false;
 
                     for (const table of availableTables) {
-                      // Check if this table has any conflicting reservations
+                      // Check if this table has any conflicting reservations over the full
+                      // reservation duration (not just the 30-minute display slot)
                       const hasConflict = activeReservations.some((res: any) => {
                         if (res.table_id !== table.id) return false;
 
@@ -252,7 +271,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         const resEnd = DateTime.fromISO(res.end_time);
 
                         // Check for overlap
-                        return (slotStart < resEnd) && (slotEnd > resStart);
+                        return (slotStart < resEnd) && (conflictWindowEnd > resStart);
                       });
 
                       if (!hasConflict) {
