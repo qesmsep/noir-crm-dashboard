@@ -636,7 +636,6 @@ export default function SimpleReservationRequestModal({
   // Create reservation after successful payment authorization (not captured yet)
   const createReservationAfterPayment = async (paymentId: string) => {
     setIsCreatingReservation(true);
-    let reservationCreated = false;
     let reservationId: string | null = null;
 
     try {
@@ -690,7 +689,6 @@ export default function SimpleReservationRequestModal({
       }
 
       // Reservation created successfully, store the ID
-      reservationCreated = true;
       reservationId = result.data?.id || null;
 
       // Now capture the payment since reservation succeeded
