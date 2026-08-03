@@ -3,6 +3,7 @@ import { AppContextProvider } from '../context/AppContext';
 import { SettingsProvider } from '../context/SettingsContext';
 import { AuthProvider } from '../lib/auth-context';
 import MainNav from '../components/MainNav';
+import ViewportHeightProvider from '../components/ViewportHeightProvider';
 import { Toaster } from '@/components/ui/toaster';
 import { Analytics } from '@vercel/analytics/react';
 import type { AppProps } from 'next/app';
@@ -16,6 +17,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     <AuthProvider>
       <SettingsProvider>
         <AppContextProvider>
+          <ViewportHeightProvider />
           {!hideNav && <MainNav />}
           <Component {...pageProps} />
           <Toaster />
@@ -24,4 +26,4 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       </SettingsProvider>
     </AuthProvider>
   );
-} 
+}

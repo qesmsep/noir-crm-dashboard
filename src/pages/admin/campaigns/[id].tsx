@@ -1,34 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Button,
-  Input,
-  Textarea,
-  Select,
-  Switch,
-  Badge,
-  useToast,
-  IconButton,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Divider,
-  Flex,
-  Grid,
-  GridItem,
-} from '@chakra-ui/react';
-import { ArrowBackIcon, EditIcon, DeleteIcon, AddIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/router';
+import { ArrowLeft, Pencil, Trash2, Plus } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import AdminLayout from '../../../components/layouts/AdminLayout';
 import CampaignTemplateDrawer from '../../../components/CampaignTemplateDrawer';
 import { sortCampaignTemplates } from '../../../utils/campaignSorting';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/useToast';
 
 interface Campaign {
   id: string;
@@ -79,7 +61,7 @@ export default function CampaignEditPage() {
   const [isTemplateCreateMode, setIsTemplateCreateMode] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const toast = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (id) {
@@ -95,23 +77,19 @@ export default function CampaignEditPage() {
 
   const fetchCampaign = async () => {
     try {
-      console.log('Fetching campaign with ID:', id);
       const response = await fetch(`/api/campaigns/${id}`);
-      console.log('Response status:', response.status);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Response error data:', errorData);
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      console.log('Campaign data received:', data);
 
       if (!data) {
         throw new Error('Campaign not found');
       }
-      
+
       setCampaign(data);
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -120,7 +98,6 @@ export default function CampaignEditPage() {
         description: 'Failed to fetch campaign',
         status: 'error',
         duration: 5000,
-        isClosable: true,
       });
     } finally {
       setLoading(false);
@@ -129,17 +106,15 @@ export default function CampaignEditPage() {
 
   const fetchTemplates = async () => {
     try {
-      console.log('Fetching templates for campaign_id:', campaign?.id);
       const response = await fetch(`/api/campaign-messages?campaign_id=${campaign?.id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch templates');
       }
       const data = await response.json();
-      console.log('All templates fetched:', data);
-      
+
       // Sort templates by proximity to trigger event
       const sortedTemplates = sortCampaignTemplates(data);
-      
+
       setTemplates(sortedTemplates);
     } catch (error) {
       console.error('Error fetching templates:', error);
@@ -148,7 +123,6 @@ export default function CampaignEditPage() {
         description: 'Failed to fetch templates',
         status: 'error',
         duration: 5000,
-        isClosable: true,
       });
     }
   };
@@ -179,7 +153,6 @@ export default function CampaignEditPage() {
         description: 'Campaign updated successfully',
         status: 'success',
         duration: 2000,
-        isClosable: true,
       });
     } catch (error) {
       console.error('Error updating campaign:', error);
@@ -188,7 +161,6 @@ export default function CampaignEditPage() {
         description: 'Failed to update campaign',
         status: 'error',
         duration: 5000,
-        isClosable: true,
       });
     } finally {
       setSaving(false);
@@ -243,7 +215,6 @@ export default function CampaignEditPage() {
         description: 'Template deleted successfully',
         status: 'success',
         duration: 2000,
-        isClosable: true,
       });
     } catch (error) {
       console.error('Error deleting template:', error);
@@ -252,7 +223,6 @@ export default function CampaignEditPage() {
         description: 'Failed to delete template',
         status: 'error',
         duration: 5000,
-        isClosable: true,
       });
     }
   };
@@ -271,7 +241,7 @@ export default function CampaignEditPage() {
         throw new Error('Failed to update template');
       }
 
-      setTemplates(templates.map(t => 
+      setTemplates(templates.map(t =>
         t.id === template.id ? { ...t, is_active: !t.is_active } : t
       ));
 
@@ -280,7 +250,6 @@ export default function CampaignEditPage() {
         description: `Template ${!template.is_active ? 'activated' : 'deactivated'} successfully`,
         status: 'success',
         duration: 2000,
-        isClosable: true,
       });
     } catch (error) {
       console.error('Error updating template:', error);
@@ -289,7 +258,6 @@ export default function CampaignEditPage() {
         description: 'Failed to update template',
         status: 'error',
         duration: 5000,
-        isClosable: true,
       });
     }
   };
@@ -307,7 +275,7 @@ export default function CampaignEditPage() {
       const period = hours >= 12 ? 'PM' : 'AM';
       const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
       const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
-      
+
       if (template.specific_date) {
         return `${displayTime} on ${template.specific_date}`;
       } else {
@@ -319,7 +287,7 @@ export default function CampaignEditPage() {
       const period = hours >= 12 ? 'PM' : 'AM';
       const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
       const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
-      
+
       if (template.recurring_type === 'daily') {
         return `Daily at ${displayTime}`;
       } else if (template.recurring_type === 'weekly') {
@@ -340,11 +308,11 @@ export default function CampaignEditPage() {
       const period = hours >= 12 ? 'PM' : 'AM';
       const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
       const displayTime = `${displayHours}:${minutes.toString().padStart(2, '0')}${period}`;
-      
+
       const quantity = template.relative_quantity || 0;
       const unit = template.relative_unit || 'day';
       const proximity = template.relative_proximity || 'after';
-      
+
       if (quantity === 0) {
         return `${displayTime} on trigger date`;
       } else {
@@ -371,14 +339,9 @@ export default function CampaignEditPage() {
   if (loading) {
     return (
       <AdminLayout>
-        <Box
-          px={10}
-          py={12}
-          style={{ backgroundImage: 'linear-gradient(to bottom right, #ECEDE8, #FFFFFF)', backgroundAttachment: 'fixed' }}
-          minH="100vh"
-        >
-          <Text>Loading campaign...</Text>
-        </Box>
+        <div className="min-h-screen bg-gradient-to-br from-[#ECEDE8] to-white bg-fixed px-4 py-8 md:px-10 md:py-12">
+          <p>Loading campaign...</p>
+        </div>
       </AdminLayout>
     );
   }
@@ -386,231 +349,148 @@ export default function CampaignEditPage() {
   if (!campaign) {
     return (
       <AdminLayout>
-        <Box
-          px={10}
-          py={12}
-          style={{ backgroundImage: 'linear-gradient(to bottom right, #ECEDE8, #FFFFFF)', backgroundAttachment: 'fixed' }}
-          minH="100vh"
-        >
-          <Text>Campaign not found</Text>
-        </Box>
+        <div className="min-h-screen bg-gradient-to-br from-[#ECEDE8] to-white bg-fixed px-4 py-8 md:px-10 md:py-12">
+          <p>Campaign not found</p>
+        </div>
       </AdminLayout>
     );
   }
 
   return (
     <AdminLayout>
-      <Box
-        px={10}
-        py={12}
-        bg="white"
-        minH="100vh"
-      >
-        <VStack spacing={8} align="stretch">
+      <div className="min-h-screen bg-white px-4 py-8 md:px-10 md:py-12">
+        <div className="flex flex-col gap-8">
           {/* Header */}
-          <HStack justify="space-between" align="center">
-            <HStack spacing={4}>
-              <IconButton
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <button
                 onClick={() => router.push('/admin/communication')}
-                icon={<ArrowBackIcon />}
-                variant="ghost"
-                color="#a59480"
-                _hover={{ bg: '#ecede8' }}
                 aria-label="Back to campaigns"
-              />
-              <Text
-                fontSize="3xl"
-                fontWeight="bold"
-                color="#353535"
-                fontFamily="'IvyJournal', serif"
-                letterSpacing="tight"
-                mb={4}
+                className="flex h-11 w-11 items-center justify-center rounded-md text-[#a59480] hover:bg-[#ecede8]"
               >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <h1 className="font-ivyjournal text-2xl font-bold tracking-tight text-[#353535] md:text-3xl">
                 Edit Campaign
-              </Text>
-            </HStack>
+              </h1>
+            </div>
             <Button
               onClick={handleCreateMessage}
-              leftIcon={<AddIcon />}
-              colorScheme="green"
-              size="lg"
-              px={8}
-              py={6}
-              fontSize="lg"
-              fontWeight="bold"
-              fontFamily="'Montserrat', sans-serif"
-              bg="#a59480"
-              color="white"
-              _hover={{
-                bg: '#8a7a66',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 8px 25px rgba(165, 148, 128, 0.3)',
-              }}
-              _active={{
-                bg: '#7a6a56',
-                transform: 'translateY(0)',
-              }}
-              borderRadius="xl"
-              boxShadow="0 4px 15px rgba(165, 148, 128, 0.2)"
+              className="min-h-[44px] w-full rounded-xl bg-[#a59480] font-montserrat text-white shadow-[0_4px_15px_rgba(165,148,128,0.2)] hover:bg-[#8a7a66] md:w-auto"
             >
+              <Plus className="mr-2 h-4 w-4" />
               Create New Message
             </Button>
-          </HStack>
+          </div>
 
           {/* Condensed Campaign Details */}
-          <Box
-            borderRadius="xl"
-            overflow="hidden"
-            boxShadow="0 10px 30px rgba(0,0,0,0.15)"
-            w="100%"
-            transition="all 0.3s ease"
-            _hover={{
-              transform: 'translateY(-4px)',
-              boxShadow: '0 15px 40px rgba(0,0,0,0.2)',
-            }}
-          >
-            <Box bg="#a59480" px={6} py={4}>
-              <Text fontSize="2xl" letterSpacing="wide" fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="white">
-                Campaign Details
-              </Text>
-            </Box>
-            <Box bg="white" px={6} py={6}>
-              <VStack spacing={4} align="stretch">
-                <HStack justify="space-between" align="center">
-                  <HStack spacing={2}>
-                    {saving && (
-                      <Badge colorScheme="blue" fontFamily="'Montserrat', sans-serif">
-                        Saving...
-                      </Badge>
-                    )}
-                  </HStack>
-                </HStack>
-                <Grid templateColumns="repeat(2, 1fr)" gap={6}>
+          <div className="w-full overflow-hidden rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.15)]">
+            <div className="bg-[#a59480] px-6 py-4">
+              <p className="font-montserrat text-2xl font-bold tracking-wide text-white">Campaign Details</p>
+            </div>
+            <div className="bg-white px-6 py-6">
+              <div className="flex flex-col gap-4">
+                {saving && (
+                  <div>
+                    <Badge className="bg-blue-100 text-blue-800">Saving...</Badge>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Campaign ID */}
-                  <GridItem>
-                    <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif" mb={1}>
-                      Campaign ID
-                    </Text>
-                    <Text fontSize="md" fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="#353535">
-                      {campaign.id}
-                    </Text>
-                  </GridItem>
+                  <div>
+                    <p className="mb-1 font-montserrat text-sm text-[#666]">Campaign ID</p>
+                    <p className="break-all font-montserrat font-bold text-[#353535]">{campaign.id}</p>
+                  </div>
                   {/* Status */}
-                  <GridItem >
-                    <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif" mb={1}>
-                      Status
-                    </Text>
+                  <div>
+                    <p className="mb-1 font-montserrat text-sm text-[#666]">Status</p>
                     <Button
                       size="sm"
-                      colorScheme={campaign.is_active ? 'green' : 'red'}
                       variant="outline"
                       onClick={() => handleCampaignUpdate('is_active', !campaign.is_active)}
-                      isDisabled={saving}
-                      fontFamily="'Montserrat', sans-serif"
-                      fontWeight="bold"
-                      _hover={{
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      }}
+                      disabled={saving}
+                      className={campaign.is_active
+                        ? 'border-green-600 text-green-700 hover:bg-green-600 hover:text-white'
+                        : 'border-red-600 text-red-700 hover:bg-red-600 hover:text-white'}
                     >
                       {campaign.is_active ? 'Active' : 'Inactive'}
                     </Button>
-                  </GridItem>
+                  </div>
                   {/* Campaign Name */}
-                  <GridItem colSpan={2}>
-                    <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif" mb={1}>
-                      Campaign Name *
-                    </Text>
+                  <div className="md:col-span-2">
+                    <p className="mb-1 font-montserrat text-sm text-[#666]">Campaign Name *</p>
                     {editingField === 'name' ? (
-                      <HStack>
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center">
                         <Input
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
-                          bg="white"
-                          borderColor="#a59480"
-                          _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                          fontFamily="'Montserrat', sans-serif"
                           placeholder="Enter campaign name"
-                          _placeholder={{ color: '#999' }}
+                          className="flex-1"
                         />
-                        <Button size="sm" colorScheme="green" onClick={saveEdit}>
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={cancelEdit}>
-                          Cancel
-                        </Button>
-                      </HStack>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={saveEdit} className="min-h-[44px] flex-1 bg-green-600 text-white hover:bg-green-700 md:flex-none">
+                            Save
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEdit} className="min-h-[44px] flex-1 md:flex-none">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
-                      <HStack justify="space-between" >
-                        <Text fontSize="lg" fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="#353535">
-                          {campaign.name}
-                        </Text>
-                        <IconButton
-                          size="sm"
-                          icon={<EditIcon />}
-                          variant="ghost"
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-montserrat text-lg font-bold text-[#353535]">{campaign.name}</p>
+                        <button
                           onClick={() => startEditing('name', campaign.name)}
                           aria-label="Edit campaign name"
-                        />
-                      </HStack>
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[#a59480] hover:bg-[#ecede8]"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
-                  </GridItem>
+                  </div>
                   {/* Description */}
-                  <GridItem colSpan={2}>
-                    <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif" mb={1}>
-                      Description
-                    </Text>
+                  <div className="md:col-span-2">
+                    <p className="mb-1 font-montserrat text-sm text-[#666]">Description</p>
                     {editingField === 'description' ? (
-                      <VStack align="stretch">
+                      <div className="flex flex-col gap-2">
                         <Textarea
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
-                          bg="white"
-                          borderColor="#a59480"
-                          _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                          fontFamily="'Montserrat', sans-serif"
                           rows={3}
                           placeholder="Enter campaign description"
-                          _placeholder={{ color: '#999' }}
                         />
-                        <HStack>
-                          <Button size="sm" colorScheme="green" onClick={saveEdit}>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={saveEdit} className="min-h-[44px] flex-1 bg-green-600 text-white hover:bg-green-700 md:flex-none">
                             Save
                           </Button>
-                          <Button size="sm" variant="outline" onClick={cancelEdit}>
+                          <Button size="sm" variant="outline" onClick={cancelEdit} className="min-h-[44px] flex-1 md:flex-none">
                             Cancel
                           </Button>
-                        </HStack>
-                      </VStack>
+                        </div>
+                      </div>
                     ) : (
-                      <HStack justify="space-between">
-                        <Text fontSize="md" fontFamily="'Montserrat', sans-serif" color="#353535">
-                          {campaign.description || 'No description'}
-                        </Text>
-                        <IconButton
-                          size="sm"
-                          icon={<EditIcon />}
-                          variant="ghost"
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-montserrat text-[#353535]">{campaign.description || 'No description'}</p>
+                        <button
                           onClick={() => startEditing('description', campaign.description || '')}
                           aria-label="Edit description"
-                        />
-                      </HStack>
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[#a59480] hover:bg-[#ecede8]"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
-                  </GridItem>
+                  </div>
                   {/* Trigger Type */}
-                  <GridItem colSpan={2}>
-                    <Text fontSize="sm" color="#666" fontFamily="'Montserrat', sans-serif" mb={1}>
-                      Trigger Type *
-                    </Text>
+                  <div className="md:col-span-2">
+                    <p className="mb-1 font-montserrat text-sm text-[#666]">Trigger Type *</p>
                     {editingField === 'trigger_type' ? (
-                      <HStack>
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center">
                         <Select
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
-                          bg="white"
-                          borderColor="#a59480"
-                          _focus={{ borderColor: '#8a7a66', boxShadow: '0 0 0 1px #8a7a66' }}
-                          fontFamily="'Montserrat', sans-serif"
+                          className="flex-1"
                         >
                           <option value="all_members">All Members</option>
                           <option value="member_birthday">Member Birthday</option>
@@ -623,124 +503,162 @@ export default function CampaignEditPage() {
                           <option value="reservation_range">Reservation Range</option>
                           <option value="reservation_time">Reservation Time</option>
                         </Select>
-                        <Button size="sm" colorScheme="green" onClick={saveEdit}>
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={cancelEdit}>
-                          Cancel
-                        </Button>
-                      </HStack>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={saveEdit} className="min-h-[44px] flex-1 bg-green-600 text-white hover:bg-green-700 md:flex-none">
+                            Save
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEdit} className="min-h-[44px] flex-1 md:flex-none">
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
-                      <HStack justify="space-between">
-                        <Text fontSize="md" fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="#353535">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-montserrat font-bold text-[#353535]">
                           {campaign.trigger_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </Text>
-                        <IconButton
-                          size="sm"
-                          icon={<EditIcon />}
-                          variant="ghost"
+                        </p>
+                        <button
                           onClick={() => startEditing('trigger_type', campaign.trigger_type)}
                           aria-label="Edit trigger type"
-                        />
-                      </HStack>
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[#a59480] hover:bg-[#ecede8]"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
-                  </GridItem>
-                </Grid>
-              </VStack>
-            </Box>
-          </Box>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Message Templates */}
-          <Box
-            borderRadius="xl"
-            overflow="hidden"
-            boxShadow="0 10px 30px rgba(0,0,0,0.15)"
-            w="100%"
-          >
-            <Box bg="#a59480" px={6} py={4}>
-              <Text fontSize="2xl" letterSpacing="wide" fontFamily="'Montserrat', sans-serif" fontWeight="bold" color="white">
+          <div className="w-full overflow-hidden rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.15)]">
+            <div className="bg-[#a59480] px-6 py-4">
+              <p className="font-montserrat text-2xl font-bold tracking-wide text-white">
                 Message Templates ({templates.length})
-              </Text>
-            </Box>
-            <Box bg="white" px={6} py={6} overflowX="auto">
+              </p>
+            </div>
+            <div className="bg-white px-4 py-6 md:px-6">
               {templates.length === 0 ? (
-                <Box textAlign="center" py={12}>
-                  <Text fontSize="xl" color="#666" fontFamily="'Montserrat', sans-serif" mb={4}>
-                    No message templates yet
-                  </Text>
-                  <Text fontSize="md" color="#888" fontFamily="'Montserrat', sans-serif">
+                <div className="py-12 text-center">
+                  <p className="mb-4 font-montserrat text-xl text-[#666]">No message templates yet</p>
+                  <p className="font-montserrat text-[#888]">
                     Create your first message template to start sending messages
-                  </Text>
-                </Box>
+                  </p>
+                </div>
               ) : (
-                <Table variant="striped" colorScheme="gray" size="lg">
-                  <Thead>
-                    <Tr >
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="15%">Template Name</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="25%">Description</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="25%">Timing</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="15%">Recipient</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="10%">Status</Th>
-                      <Th fontFamily="'Montserrat', sans-serif" fontWeight="bold" padding={20} fontSize="lg" py={14} width="10%">Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-[#f7f7f5]">
+                          <th className="p-3 text-left font-montserrat font-bold text-[#353535]">Template Name</th>
+                          <th className="p-3 text-left font-montserrat font-bold text-[#353535]">Description</th>
+                          <th className="p-3 text-left font-montserrat font-bold text-[#353535]">Timing</th>
+                          <th className="p-3 text-left font-montserrat font-bold text-[#353535]">Recipient</th>
+                          <th className="p-3 text-left font-montserrat font-bold text-[#353535]">Status</th>
+                          <th className="p-3 text-left font-montserrat font-bold text-[#353535]">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {templates.map((template) => (
+                          <tr key={template.id} className="border-b border-[#ececec] hover:bg-[#f0f0f0]">
+                            <td className="p-3 align-top font-montserrat font-bold text-[#353535]">{template.name}</td>
+                            <td className="max-w-[300px] p-3 align-top font-montserrat text-[#353535]">
+                              <p className="line-clamp-3 break-words">{template.description || '-'}</p>
+                            </td>
+                            <td className="max-w-[300px] p-3 align-top font-montserrat text-[#353535]">
+                              <p className="line-clamp-2 break-words">{formatTiming(template)}</p>
+                            </td>
+                            <td className="p-3 align-top font-montserrat text-[#353535]">{formatRecipient(template)}</td>
+                            <td className="p-3 align-top">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleToggleTemplateActive(template)}
+                                className={template.is_active
+                                  ? 'border-green-600 text-green-700 hover:bg-green-600 hover:text-white'
+                                  : 'border-red-600 text-red-700 hover:bg-red-600 hover:text-white'}
+                              >
+                                {template.is_active ? 'Active' : 'Inactive'}
+                              </Button>
+                            </td>
+                            <td className="p-3 align-top">
+                              <div className="flex gap-2">
+                                <button
+                                  aria-label="Edit template"
+                                  onClick={() => handleEditTemplate(template)}
+                                  className="flex h-11 w-11 items-center justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                  aria-label="Delete template"
+                                  onClick={() => handleDeleteTemplate(template.id)}
+                                  className="flex h-11 w-11 items-center justify-center rounded-md bg-red-600 text-white hover:bg-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="flex flex-col gap-3 md:hidden">
                     {templates.map((template) => (
-                        <Tr key={template.id} _hover={{ bg: '#f0f0f0' }}>
-                          <Td fontFamily="'Montserrat', sans-serif" fontWeight="bold" fontSize="md" py={6} px={4}>
-                            {template.name}
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={4} maxW="300px">
-                            <Text noOfLines={3} wordBreak="break-word">
-                              {template.description || '-'}
-                            </Text>
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={4} maxW="300px">
-                            <Text noOfLines={2} wordBreak="break-word">
-                              {formatTiming(template)}
-                            </Text>
-                          </Td>
-                          <Td fontFamily="'Montserrat', sans-serif" fontSize="md" py={6} px={4}>
-                            {formatRecipient(template)}
-                          </Td>
-                          <Td py={6} px={4}>
-                            <Button
-                              size="sm"
-                              colorScheme={template.is_active ? 'green' : 'red'}
-                              variant="outline"
-                              onClick={() => handleToggleTemplateActive(template)}
-                              fontFamily="'Montserrat', sans-serif"
-                              fontWeight="bold"
+                      <div key={template.id} className="rounded-2xl border border-[#ececec] bg-white p-4 shadow-sm">
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                          <p className="font-montserrat font-bold text-[#353535]">{template.name}</p>
+                          <div className="flex gap-1">
+                            <button
+                              aria-label="Edit template"
+                              onClick={() => handleEditTemplate(template)}
+                              className="flex h-11 w-11 items-center justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
                             >
-                              {template.is_active ? 'Active' : 'Inactive'}
-                            </Button>
-                          </Td>
-                          <Td py={6} px={4}>
-                            <HStack spacing={2}>
-                              <IconButton 
-                                aria-label="Edit template" 
-                                icon={<EditIcon />} 
-                                size="md" 
-                                colorScheme="blue" 
-                                onClick={() => handleEditTemplate(template)}
-                              />
-                              <IconButton 
-                                aria-label="Delete template" 
-                                icon={<DeleteIcon />} 
-                                size="md" 
-                                colorScheme="red" 
-                                onClick={() => handleDeleteTemplate(template.id)}
-                              />
-                            </HStack>
-                          </Td>
-                        </Tr>
-                      ))}
-                  </Tbody>
-                </Table>
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              aria-label="Delete template"
+                              onClick={() => handleDeleteTemplate(template.id)}
+                              className="flex h-11 w-11 items-center justify-center rounded-md bg-red-600 text-white hover:bg-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        {template.description && (
+                          <p className="mb-2 font-montserrat text-sm text-[#666]">{template.description}</p>
+                        )}
+                        <div className="flex flex-col gap-1 font-montserrat text-sm text-[#353535]">
+                          <p><span className="text-[#888]">Timing:</span> {formatTiming(template)}</p>
+                          <p><span className="text-[#888]">Recipient:</span> {formatRecipient(template)}</p>
+                        </div>
+                        <div className="mt-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleToggleTemplateActive(template)}
+                            className={template.is_active
+                              ? 'min-h-[44px] border-green-600 text-green-700 hover:bg-green-600 hover:text-white'
+                              : 'min-h-[44px] border-red-600 text-red-700 hover:bg-red-600 hover:text-white'}
+                          >
+                            {template.is_active ? 'Active' : 'Inactive'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
-            </Box>
-          </Box>
-        </VStack>
+            </div>
+          </div>
+        </div>
 
         {/* Template Drawer */}
         <CampaignTemplateDrawer
@@ -752,7 +670,7 @@ export default function CampaignEditPage() {
           campaignId={campaign.id}
           campaignTriggerType={campaign?.trigger_type}
         />
-      </Box>
+      </div>
     </AdminLayout>
   );
-} 
+}
