@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { date, location, adminOverride } = req.query;
+    const { date, location, adminOverride, partySize } = req.query;
 
     if (!date || typeof date !== 'string') {
       return res.status(400).json({ error: 'Date is required' });
@@ -142,6 +142,168 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     } else {
       console.log('[ADMIN OVERRIDE] Skipping private event blocking for date:', date);
+    }
+
+    // Check table availability if partySize is provided
+    if (partySize && typeof partySize === 'string') {
+      const partySizeNum = parseInt(partySize);
+
+      if (!isNaN(partySizeNum) && partySizeNum > 0) {
+        // Determine the actual reservation duration for this location so we check for a
+        // contiguous free window, not just the isolated 30-minute display slot. Otherwise a
+        // slot can show as "available" while no table is actually free for the full stay.
+        let reservationDurationHours = 2.0;
+        if (locationId) {
+          const { data: locationDurationData } = await supabase
+            .from('locations')
+            .select('default_reservation_duration_hours')
+            .eq('id', locationId)
+            .single();
+
+          if (locationDurationData?.default_reservation_duration_hours) {
+            reservationDurationHours = locationDurationData.default_reservation_duration_hours;
+          }
+        }
+
+        // Get tables that can accommodate the party size
+        let tablesQuery = supabase
+          .from('tables')
+          .select('id, table_number, seats')
+          .gte('seats', partySizeNum)
+          .eq('status', 'active')
+          .order('seats', { ascending: true });
+
+        // Filter by location if provided
+        if (locationId) {
+          tablesQuery = tablesQuery.eq('location_id', locationId);
+        }
+
+        const { data: tables, error: tablesError } = await tablesQuery;
+
+        if (tablesError) {
+          console.error('Error fetching tables:', tablesError);
+        } else if (tables && tables.length > 0) {
+          // Filter out tables 4, 8, and 12 (not available for reservations)
+          const excludedTableNumbers = [4, 8, 12];
+          const availableTables = tables.filter((t: any) =>
+            !excludedTableNumbers.includes(parseInt(t.table_number, 10))
+          );
+
+          if (availableTables.length > 0) {
+            // Get all reservations for this date
+            const startOfDay = requestDate.startOf('day').toUTC().toISO();
+            const endOfDay = requestDate.endOf('day').toUTC().toISO();
+
+            const tableIds = availableTables.map(t => t.id);
+
+            // Get existing reservations for these tables on this date
+            const { data: reservations, error: resError } = await supabase
+              .from('reservations')
+              .select('id, table_id, start_time, end_time, status')
+              .in('table_id', tableIds)
+              .gte('start_time', startOfDay)
+              .lte('start_time', endOfDay);
+
+            if (resError) {
+              console.error('Error fetching reservations:', resError);
+            } else {
+              // Filter out cancelled reservations
+              const activeReservations = (reservations || []).filter(
+                (r: any) => !r.status || r.status !== 'cancelled'
+              );
+
+              // Get venue hours for this date and location
+              let venueHoursQuery = supabase
+                .from('venue_hours')
+                .select('*')
+                .eq('type', 'base')
+                .eq('day_of_week', requestDate.weekday % 7); // Convert to 0-6 Sunday-Saturday
+
+              if (locationId) {
+                venueHoursQuery = venueHoursQuery.eq('location_id', locationId);
+              }
+
+              const { data: venueHours } = await venueHoursQuery;
+
+              // Default operating hours if not found in database
+              const defaultHours = [
+                { start: '18:00', end: '23:00' } // 6 PM to 11 PM
+              ];
+
+              const operatingHours = venueHours && venueHours.length > 0 && venueHours[0].time_ranges
+                ? venueHours[0].time_ranges
+                : defaultHours;
+
+              // Check availability for each 30-minute slot within operating hours
+              operatingHours.forEach((hours: any) => {
+                const [startHour, startMin] = hours.start.split(':').map(Number);
+                const [endHour, endMin] = hours.end.split(':').map(Number);
+
+                // Generate 30-minute time slots
+                for (let hour = startHour; hour < endHour || (hour === endHour && 0 < endMin); hour++) {
+                  for (let minute = 0; minute < 60; minute += 30) {
+                    // Skip if past end time
+                    if (hour === endHour && minute >= endMin) break;
+                    if (hour > endHour) break;
+
+                    const slotStart = DateTime.fromObject({
+                      year: requestDate.year,
+                      month: requestDate.month,
+                      day: requestDate.day,
+                      hour,
+                      minute
+                    }, { zone: 'America/Chicago' });
+
+                    const slotEnd = slotStart.plus({ minutes: 30 });
+                    // The full window a reservation starting in this slot would actually occupy
+                    const conflictWindowEnd = slotStart.plus({ hours: reservationDurationHours });
+
+                    // Check if ANY table is available for this time slot
+                    let tableAvailable = false;
+
+                    for (const table of availableTables) {
+                      // Check if this table has any conflicting reservations over the full
+                      // reservation duration (not just the 30-minute display slot)
+                      const hasConflict = activeReservations.some((res: any) => {
+                        if (res.table_id !== table.id) return false;
+
+                        const resStart = DateTime.fromISO(res.start_time);
+                        const resEnd = DateTime.fromISO(res.end_time);
+
+                        // Check for overlap
+                        return (slotStart < resEnd) && (conflictWindowEnd > resStart);
+                      });
+
+                      if (!hasConflict) {
+                        tableAvailable = true;
+                        break; // At least one table is available
+                      }
+                    }
+
+                    // If no tables available for this slot, add it to blocked times
+                    if (!tableAvailable) {
+                      blockedTimeRanges.push({
+                        id: `no-tables-${hour}-${minute}`,
+                        title: 'No tables available',
+                        startTime: slotStart.toFormat('h:mm a'),
+                        endTime: slotEnd.toFormat('h:mm a'),
+                        startHour: hour,
+                        startMinute: minute,
+                        endHour: slotEnd.hour,
+                        endMinute: slotEnd.minute,
+                        reason: 'all_tables_booked'
+                      });
+                    }
+                  }
+                }
+              });
+            }
+          } else {
+            // No tables at all that can fit this party size
+            console.log(`No tables can accommodate party size ${partySizeNum}`);
+          }
+        }
+      }
     }
 
     return res.status(200).json({

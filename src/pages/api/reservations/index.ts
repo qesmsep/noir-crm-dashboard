@@ -373,8 +373,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // If no table was found, reject the reservation
             if (!tableId) {
               console.warn(`No available tables found for party size ${body.party_size} at ${body.start_time} to ${body.end_time}`);
-              return res.status(400).json({ 
-                error: 'No tables available for the requested time slot. Please select a different time.' 
+              return res.status(400).json({
+                error: 'No tables available for the requested time slot. Please select a different time.'
               });
             }
           } else {
@@ -393,8 +393,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // If table_id was required but not found/assigned, reject
       if (!body.table_id && !tableId && !body.private_event_id) {
-        return res.status(400).json({ 
-          error: 'No table available for the requested time slot. Please select a different time.' 
+        return res.status(400).json({
+          error: 'No table available for the requested time slot. Please select a different time.'
         });
       }
 
@@ -704,8 +704,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         
         if (!foundTable) {
-          return res.status(400).json({ 
-            error: 'No tables available for the requested time slot. Please select a different time.' 
+          return res.status(400).json({
+            error: 'No tables available for the requested time slot. Please select a different time.'
           });
         }
       }

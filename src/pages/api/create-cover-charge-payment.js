@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
       currency: 'usd',
-      capture_method: 'automatic', // Charge immediately
+      capture_method: 'manual', // Hold funds only, capture after reservation confirmed
       metadata: {
         type: 'cover_charge',
         party_size: partySize?.toString() || 'unknown',
