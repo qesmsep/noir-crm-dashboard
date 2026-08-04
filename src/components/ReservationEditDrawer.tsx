@@ -573,7 +573,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
               
                 <VStack spacing={1} as="section" align="stretch">
                   <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
-                  <Grid templateColumns="repeat(2, 1fr)" gap={2}>
+                  <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={2}>
                     <GridItem>
                       <FormControl>
                         <FormLabel fontSize="sm" mb={1}>First Name</FormLabel>
@@ -601,7 +601,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                   </Grid>
                 </VStack>
               
-                <Grid as="section" templateColumns="repeat(2, 1fr)" gap={2} alignItems="center">
+                <Grid as="section" templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={2} alignItems="center">
                   <GridItem colSpan={2}>
                     <Text marginBottom="0px" alignSelf="start" fontSize="md" fontWeight="bold"></Text>
                   </GridItem>

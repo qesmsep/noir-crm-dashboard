@@ -1488,6 +1488,44 @@ body.stripe-ach-active [class*="StripeFinancialConnections"] {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
+  /* Collapse paired form fields to a single column.
+     
+     These are plain CSS rather than Chakra responsive props (`{{ base, sm }}`)
+     for a reason worth recording: those props are SILENTLY DROPPED on every
+     Pages Router page, because there is no ChakraProvider in pages/_app.tsx and
+     so no `theme.breakpoints` to resolve them against. Verified directly — a
+     `<Box display={{ base: 'none', sm: 'block' }}>` computes to `block` at
+     390px instead of `none`. Any responsive style prop under /admin is inert.
+     
+     The components pair these classes with static `repeat(2, minmax(0, 1fr))`
+     / `direction="row"`, so desktop keeps two columns and the rules below take
+     over on phones. `minmax(0, 1fr)` also matters on its own: a bare `1fr`
+     carries an implicit `auto` minimum, so a track can never shrink below its
+     content's min-content width — which is how two 257px fields ended up
+     overflowing a 354px drawer body by 164px. */
+  .chakra-modal__body .form-grid-2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .chakra-modal__body .form-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Chakra renders Checkbox, Radio and Switch as a visually-hidden native
+     input plus a styled span that is what the user actually sees and taps. The
+     blanket `button, a, input, select, textarea { min-height: 44px; min-width:
+     44px }` rule earlier in this file inflates that hidden input to 48x48 and,
+     because it is absolutely positioned, pushes it outside its container —
+     measured overflowing the drawer body on the event form. The visible control
+     already carries its own sizing, so exempt the hidden input. */
+  input.chakra-checkbox__input,
+  input.chakra-radio__input,
+  input.chakra-switch__input {
+    min-height: 0 !important;
+    min-width: 0 !important;
+  }
+
   /* Let a Stack of footer buttons take the full footer width. ModalFooter is
      `display: flex; justify-content: flex-end`, so a Stack inside it sits at
      its shrink-to-fit width — measured at 169px of an available 358px, which

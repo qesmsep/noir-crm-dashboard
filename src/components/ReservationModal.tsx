@@ -299,7 +299,7 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
         <ModalCloseButton />
         <ModalBody p={3} overflowY="auto">
           <VStack spacing={2} align="stretch">
-            <Grid templateColumns="repeat(2, 1fr)" gap={2}>
+            <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={2}>
               <GridItem>
                 <FormControl isRequired>
                   <FormLabel fontSize="xs" mb={0.5} fontWeight="600">First Name</FormLabel>
@@ -352,7 +352,7 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
               </GridItem>
             </Grid>
 
-            <Grid templateColumns="repeat(2, 1fr)" gap={2}>
+            <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={2}>
               <GridItem>
                 <FormControl isRequired>
                   <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Party Size</FormLabel>
@@ -388,7 +388,7 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
               </GridItem>
             </Grid>
 
-            <Grid templateColumns="repeat(2, 1fr)" gap={2}>
+            <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={2}>
               <GridItem>
                 <FormControl isRequired>
                   <FormLabel fontSize="xs" mb={0.5} fontWeight="600">Start Time</FormLabel>
@@ -445,7 +445,7 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
               />
             </FormControl>
 
-            <Grid templateColumns="repeat(2, 1fr)" gap={1}>
+            <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={1}>
               <GridItem>
                 <Checkbox 
                   fontFamily="Montserrat, sans-serif"
