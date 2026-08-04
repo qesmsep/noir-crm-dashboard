@@ -259,13 +259,16 @@ export function NumberField({
           // value alone until the user types a number.
           const parsed = parseInt(raw, 10)
           if (Number.isNaN(parsed)) return
-          // Only the lower bound is enforced per keystroke. Applying `max` here
-          // made the field fight the user: in a max=31 field, typing "40" showed
-          // "4" and then snapped to "31" the moment the second digit landed. The
-          // upper bound is applied on blur instead, which always runs before a
-          // Save click (blur precedes click) so an over-max value cannot be
+          // NEITHER bound is applied per keystroke. Clamping mid-type makes the
+          // field fight the user, and the lower bound is just as guilty as the
+          // upper: with min=10, typing "12" clamps the first keystroke's "1" to
+          // 10, the re-sync effect sees text "1" against value 10 and rewrites
+          // the field to "10" before the second digit ever lands.
+          //
+          // Both bounds are applied on blur instead, which always runs before a
+          // Save click (blur precedes click), so an out-of-range value cannot be
           // submitted.
-          onChange(Math.max(min, parsed))
+          onChange(parsed)
         }}
         onBlur={() => {
           // Settle the field: apply the upper bound and normalise the display.

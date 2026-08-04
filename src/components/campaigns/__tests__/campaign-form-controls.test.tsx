@@ -110,11 +110,37 @@ describe('NumberField', () => {
     expect(onChange).toHaveBeenCalledWith(31);
   });
 
-  it('enforces the lower bound while typing', () => {
+  it('does not clamp to min while typing, and does not rewrite the field', () => {
+    // The previous version of this test only asserted the onChange argument and
+    // never re-rendered with the committed value, so it could not observe the
+    // snap-back it was supposed to guard. With min=10, typing "12" used to
+    // clamp the first keystroke's "1" to 10, and the re-sync effect then
+    // rewrote the field to "10" before the second digit landed.
+    const onChange = jest.fn();
+    const { rerender } = render(
+      <NumberField value={12} onChange={onChange} min={10} max={31} />
+    );
+    const input = screen.getByRole('spinbutton');
+
+    fireEvent.change(input, { target: { value: '1' } });
+    expect(onChange).toHaveBeenCalledWith(1);
+
+    // Feed the committed value back in, as a controlled parent would.
+    rerender(<NumberField value={1} onChange={onChange} min={10} max={31} />);
+    expect(input).toHaveValue(1);
+
+    fireEvent.change(input, { target: { value: '12' } });
+    expect(onChange).toHaveBeenLastCalledWith(12);
+  });
+
+  it('clamps to min on blur', () => {
     const onChange = jest.fn();
     render(<NumberField value={5} onChange={onChange} min={2} max={31} />);
+    const input = screen.getByRole('spinbutton');
 
-    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '1' } });
+    fireEvent.change(input, { target: { value: '1' } });
+    onChange.mockClear();
+    fireEvent.blur(input);
 
     expect(onChange).toHaveBeenCalledWith(2);
   });
