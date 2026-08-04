@@ -3,19 +3,10 @@ import { Info } from 'lucide-react';
 
 import { useToast } from '@/hooks/useToast';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { useSettings } from '../context/SettingsContext';
 import { CampaignTriggerType } from '../types';
 import CampaignBuilderDialog from './campaigns/CampaignBuilderDialog';
+import CampaignConfirmDialog from './campaigns/CampaignConfirmDialog';
 import {
   CheckboxRow,
   DialogActions,
@@ -28,6 +19,7 @@ import {
   TextAreaField,
   TextField,
   ToggleChipGroup,
+  WEEKDAY_OPTIONS,
 } from './campaigns/campaign-form-controls';
 
 interface CampaignTemplate {
@@ -78,16 +70,6 @@ interface CampaignTemplateDrawerProps {
   isCampaignMode?: boolean;
   campaignTriggerType?: CampaignTriggerType;
 }
-
-const WEEKDAY_OPTIONS = [
-  { value: '0', label: 'Sun' },
-  { value: '1', label: 'Mon' },
-  { value: '2', label: 'Tue' },
-  { value: '3', label: 'Wed' },
-  { value: '4', label: 'Thu' },
-  { value: '5', label: 'Fri' },
-  { value: '6', label: 'Sat' },
-];
 
 const RECURRING_TYPE_OPTIONS = [
   { value: 'daily', label: 'Daily' },
@@ -233,7 +215,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           toast({
             title: 'Setup Required',
             description: 'Please run the database migration first to create the campaign messages table.',
-            variant: 'warning',
+            status: 'warning',
           });
           onClose();
           return;
@@ -278,7 +260,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch template',
-        variant: 'error',
+        status: 'error',
       });
     } finally {
       setIsLoading(false);
@@ -311,7 +293,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         toast({
           title: 'Error',
           description: 'Failed to fetch private events',
-          variant: 'error',
+          status: 'error',
         });
       }
     } catch (error) {
@@ -319,7 +301,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch private events',
-        variant: 'error',
+        status: 'error',
       });
     } finally {
       setIsLoadingPrivateEvents(false);
@@ -367,7 +349,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
-        variant: 'error',
+        status: 'error',
       });
       return;
     }
@@ -378,7 +360,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: `Recipient type "${formData.recipient_type}" is not valid for ${campaignTriggerType} campaigns. Please select a valid recipient type.`,
-        variant: 'error',
+        status: 'error',
       });
       return;
     }
@@ -455,7 +437,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
             toast({
               title: 'Warning',
               description: 'Message saved but campaign settings update failed. Please try updating campaign settings separately.',
-              variant: 'warning',
+              status: 'warning',
             });
           }
         } catch (error) {
@@ -464,7 +446,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           toast({
             title: 'Warning',
             description: 'Message saved but campaign settings update encountered an error. Please try updating campaign settings separately.',
-            variant: 'warning',
+            status: 'warning',
           });
         }
       }
@@ -472,7 +454,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Success',
         description: `Message ${isCreateMode ? 'created' : 'updated'} successfully`,
-        variant: 'success',
+        status: 'success',
       });
 
       onTemplateUpdated();
@@ -482,7 +464,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to save template',
-        variant: 'error',
+        status: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -506,7 +488,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Success',
         description: 'Template deleted successfully',
-        variant: 'success',
+        status: 'success',
       });
 
       onTemplateUpdated();
@@ -516,7 +498,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to delete template',
-        variant: 'error',
+        status: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -1272,27 +1254,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         )}
       </CampaignBuilderDialog>
 
-      {/* Delete Confirmation Dialog. Rendered as a sibling of the builder
-          popup, not a child, so it is not clipped by the popup's overflow. */}
-      <AlertDialog open={isConfirmingDelete} onOpenChange={setIsConfirmingDelete}>
-        <AlertDialogContent className="z-[1100]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Template</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this template? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-[#ef4444] text-white hover:bg-[#dc2626]"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete confirmation. A sibling of the builder popup rather than a
+          child, so the popup's overflow cannot clip it, and stacked above the
+          builder's z-[1000]/z-[1001] layers so it is actually visible. */}
+      <CampaignConfirmDialog
+        open={isConfirmingDelete}
+        onOpenChange={setIsConfirmingDelete}
+        title="Delete Template"
+        description="Are you sure you want to delete this template? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+        destructive
+      />
     </>
   );
 };

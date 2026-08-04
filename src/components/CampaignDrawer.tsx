@@ -14,6 +14,7 @@ import {
   TextAreaField,
   TextField,
   ToggleChipGroup,
+  WEEKDAY_OPTIONS,
 } from './campaigns/campaign-form-controls';
 
 interface Campaign {
@@ -45,16 +46,6 @@ interface CampaignDrawerProps {
   isCreateMode?: boolean;
   onCampaignUpdated: () => void;
 }
-
-const WEEKDAY_OPTIONS = [
-  { value: '0', label: 'Sun' },
-  { value: '1', label: 'Mon' },
-  { value: '2', label: 'Tue' },
-  { value: '3', label: 'Wed' },
-  { value: '4', label: 'Thu' },
-  { value: '5', label: 'Fri' },
-  { value: '6', label: 'Sat' },
-];
 
 const RECURRING_SCHEDULE_OPTIONS = [
   { value: 'daily', label: 'Daily' },
@@ -133,7 +124,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
           toast({
             title: 'Setup Required',
             description: 'Please run the database migration first to create the campaigns table.',
-            variant: 'warning',
+            status: 'warning',
           });
           onClose();
           return;
@@ -169,7 +160,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to fetch campaign',
-        variant: 'error',
+        status: 'error',
       });
     } finally {
       setIsLoading(false);
@@ -387,7 +378,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
-        variant: 'error',
+        status: 'error',
       });
       return;
     }
@@ -397,7 +388,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       toast({
         title: 'Validation Error',
         description: 'Please select at least one location or enable "Apply to all locations"',
-        variant: 'error',
+        status: 'error',
       });
       return;
     }
@@ -433,7 +424,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       toast({
         title: 'Success',
         description: `Campaign ${isCreateMode ? 'created' : 'updated'} successfully`,
-        variant: 'success',
+        status: 'success',
       });
 
       onCampaignUpdated();
@@ -443,7 +434,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to save campaign',
-        variant: 'error',
+        status: 'error',
       });
     } finally {
       setIsSaving(false);

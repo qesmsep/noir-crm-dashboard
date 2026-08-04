@@ -19,6 +19,20 @@ import { Label } from "@/components/ui/label"
  * Native inputs also give us free keyboard and screen-reader behaviour.
  */
 
+/**
+ * Weekday values match the `INTEGER[]` columns in the database (0 = Sunday).
+ * Shared so the two campaign forms cannot drift apart if one is edited alone.
+ */
+export const WEEKDAY_OPTIONS = [
+  { value: "0", label: "Sun" },
+  { value: "1", label: "Mon" },
+  { value: "2", label: "Tue" },
+  { value: "3", label: "Wed" },
+  { value: "4", label: "Thu" },
+  { value: "5", label: "Fri" },
+  { value: "6", label: "Sat" },
+]
+
 const controlBase =
   "w-full min-h-[44px] rounded-md border border-[#a59480] bg-white px-3 py-2 text-base text-[#353535] " +
   "placeholder:text-[#9a9385] focus:outline-none focus:ring-2 focus:ring-[#a59480] focus:border-[#a59480] " +
@@ -169,6 +183,21 @@ export function NumberField({
 
   const clamp = (next: number) => Math.min(max, Math.max(min, next))
 
+  // The visible text is tracked separately from the committed number so the
+  // field can sit empty mid-edit. Deriving it straight from `value` meant a
+  // select-all + delete produced NaN, which we could only ignore — and because
+  // the input is controlled, React immediately painted the old digits back, so
+  // clearing the field was impossible.
+  const [text, setText] = React.useState(() =>
+    value != null ? String(value) : ""
+  )
+
+  React.useEffect(() => {
+    // Re-sync when the parent changes the value from outside this input:
+    // the -/+ buttons, a form reset, or loading an existing template.
+    setText(value != null ? String(value) : "")
+  }, [value])
+
   return (
     <div className={cn("flex items-stretch gap-2", className)}>
       <button
@@ -184,16 +213,25 @@ export function NumberField({
         id={id}
         type="number"
         inputMode="numeric"
-        value={value ?? ""}
+        value={text}
         placeholder={placeholder}
         min={min}
         max={max}
         step={step}
         onChange={(e) => {
-          const parsed = parseInt(e.target.value, 10)
-          // Let the field go empty while typing rather than snapping to min.
+          const raw = e.target.value
+          setText(raw)
+          // An empty field is a valid intermediate state; leave the committed
+          // value alone until the user types a number.
+          const parsed = parseInt(raw, 10)
           if (Number.isNaN(parsed)) return
           onChange(clamp(parsed))
+        }}
+        onBlur={() => {
+          // Leaving the field empty falls back to the last committed value.
+          if (text.trim() === "") {
+            setText(value != null ? String(value) : "")
+          }
         }}
         className={cn(controlBase, "text-center")}
       />
