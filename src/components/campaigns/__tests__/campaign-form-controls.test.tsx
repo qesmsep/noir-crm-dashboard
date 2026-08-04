@@ -36,10 +36,12 @@ describe('ToggleChipGroup', () => {
     expect(screen.getByRole('button', { name: 'Tue' })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('does not select anything when numbers are passed unconverted', () => {
+  it('does not select anything when numbers are passed unconverted, and warns', () => {
     // The original bug: strict `includes` comparing 1 against "1". Pinned so a
     // future refactor that drops the conversion fails loudly here instead of
     // silently showing an empty selection to the user.
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
     render(
       <ToggleChipGroup
         value={[1, 3] as unknown as string[]}
@@ -49,6 +51,11 @@ describe('ToggleChipGroup', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Mon' })).toHaveAttribute('aria-pressed', 'false');
+    // The type alone cannot catch this: the data is `any` by the time it
+    // reaches most call sites, so the contract is also enforced at runtime.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ToggleChipGroup'));
+
+    warn.mockRestore();
   });
 
   it('reports the full selection when a chip is toggled on', () => {

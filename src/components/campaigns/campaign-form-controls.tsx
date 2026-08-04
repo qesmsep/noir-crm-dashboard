@@ -384,6 +384,24 @@ export function ToggleChipGroup({
   options: { value: string; label: string }[]
   className?: string
 }) {
+  // The string/number boundary here has broken twice: values arrive from an
+  // INTEGER[] column and a JSONB field, and `includes` is strict, so numbers
+  // passed through unconverted select nothing at all — silently, with the form
+  // simply looking empty. Callers are expected to `.map(String)` on the way in.
+  // A build-time type is not enough on its own, since the data is `any` by the
+  // time it reaches most call sites.
+  if (process.env.NODE_ENV !== "production") {
+    const offender = value.find((v) => typeof v !== "string")
+    if (offender !== undefined) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `ToggleChipGroup: received a non-string value (${typeof offender}). ` +
+          "Nothing will appear selected. Convert with .map(String) on load and " +
+          ".map(Number) on save."
+      )
+    }
+  }
+
   const toggle = (next: string) => {
     onChange(
       value.includes(next)
