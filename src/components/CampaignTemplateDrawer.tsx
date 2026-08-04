@@ -216,6 +216,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
             title: 'Setup Required',
             description: 'Please run the database migration first to create the campaign messages table.',
             status: 'warning',
+            duration: 5000,
           });
           onClose();
           return;
@@ -438,6 +439,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
               title: 'Warning',
               description: 'Message saved but campaign settings update failed. Please try updating campaign settings separately.',
               status: 'warning',
+            duration: 5000,
             });
           }
         } catch (error) {
@@ -447,6 +449,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
             title: 'Warning',
             description: 'Message saved but campaign settings update encountered an error. Please try updating campaign settings separately.',
             status: 'warning',
+            duration: 5000,
           });
         }
       }
@@ -455,6 +458,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         title: 'Success',
         description: `Message ${isCreateMode ? 'created' : 'updated'} successfully`,
         status: 'success',
+        duration: 3000,
       });
 
       onTemplateUpdated();
@@ -489,6 +493,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         title: 'Success',
         description: 'Template deleted successfully',
         status: 'success',
+        duration: 3000,
       });
 
       onTemplateUpdated();

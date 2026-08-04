@@ -125,6 +125,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
             title: 'Setup Required',
             description: 'Please run the database migration first to create the campaigns table.',
             status: 'warning',
+            duration: 5000,
           });
           onClose();
           return;
@@ -161,6 +162,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
         title: 'Error',
         description: 'Failed to fetch campaign',
         status: 'error',
+        duration: 3000,
       });
     } finally {
       setIsLoading(false);
@@ -227,9 +229,19 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
             {formData.recurring_schedule?.type === 'weekdays' && (
               <Field label="Select Weekdays">
                 <ToggleChipGroup
-                  value={formData.recurring_schedule?.weekdays || []}
+                  // Same INTEGER-vs-string boundary as recurring_weekdays in
+                  // CampaignTemplateDrawer. `RecurringSchedule.weekdays` is
+                  // typed number[] and validated as such by the zod schema in
+                  // lib/validations.ts, but this lives in a JSONB column, so
+                  // unlike a real INTEGER[] column nothing coerces strings back
+                  // — writing ["1","3"] would persist verbatim and silently
+                  // corrupt the stored schedule.
+                  value={(formData.recurring_schedule?.weekdays || []).map(String)}
                   onChange={(value) =>
-                    handleInputChange('recurring_schedule', { ...formData.recurring_schedule, weekdays: value })
+                    handleInputChange('recurring_schedule', {
+                      ...formData.recurring_schedule,
+                      weekdays: value.map(Number).sort((a, b) => a - b),
+                    })
                   }
                   options={WEEKDAY_OPTIONS}
                 />
@@ -379,6 +391,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
         title: 'Validation Error',
         description: 'Please fill in all required fields',
         status: 'error',
+        duration: 3000,
       });
       return;
     }
@@ -389,6 +402,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
         title: 'Validation Error',
         description: 'Please select at least one location or enable "Apply to all locations"',
         status: 'error',
+        duration: 3000,
       });
       return;
     }
@@ -425,6 +439,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
         title: 'Success',
         description: `Campaign ${isCreateMode ? 'created' : 'updated'} successfully`,
         status: 'success',
+        duration: 3000,
       });
 
       onCampaignUpdated();
@@ -435,6 +450,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
         title: 'Error',
         description: 'Failed to save campaign',
         status: 'error',
+        duration: 3000,
       });
     } finally {
       setIsSaving(false);
