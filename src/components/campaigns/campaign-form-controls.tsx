@@ -65,6 +65,7 @@ export function Field({
   hint,
   error,
   required,
+  labelAction,
   children,
   className,
 }: {
@@ -73,19 +74,29 @@ export function Field({
   hint?: React.ReactNode
   error?: string | null
   required?: boolean
+  /**
+   * Control rendered beside the label — e.g. a help toggle. Kept as a sibling
+   * of the <label> rather than inside it: `ui/label.tsx` is a plain <label>,
+   * and a nested <button> is invalid per the HTML content model, with
+   * inconsistent screen-reader and label-click behaviour across browsers.
+   */
+  labelAction?: React.ReactNode
   children: React.ReactNode
   className?: string
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
       {label ? (
-        <Label
-          htmlFor={htmlFor}
-          className="block text-sm font-medium text-[#a59480]"
-        >
-          {label}
-          {required ? <span className="ml-0.5 text-[#C84B31]">*</span> : null}
-        </Label>
+        <div className="flex items-center gap-2">
+          <Label
+            htmlFor={htmlFor}
+            className="block text-sm font-medium text-[#a59480]"
+          >
+            {label}
+            {required ? <span className="ml-0.5 text-[#C84B31]">*</span> : null}
+          </Label>
+          {labelAction}
+        </div>
       ) : null}
       {children}
       {error ? (
@@ -228,10 +239,12 @@ export function NumberField({
           onChange(clamp(parsed))
         }}
         onBlur={() => {
-          // Leaving the field empty falls back to the last committed value.
-          if (text.trim() === "") {
-            setText(value != null ? String(value) : "")
-          }
+          // Normalise the display to the committed value on the way out. This
+          // covers an empty field, and also input that parses to the number
+          // already committed ("5" -> "05", or a value above max that was
+          // clamped) — in both cases `value` never changes, so the re-sync
+          // effect does not fire and the stale text would otherwise persist.
+          setText(value != null ? String(value) : "")
         }}
         className={cn(controlBase, "text-center")}
       />

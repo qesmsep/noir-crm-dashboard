@@ -439,7 +439,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
               title: 'Warning',
               description: 'Message saved but campaign settings update failed. Please try updating campaign settings separately.',
               status: 'warning',
-            duration: 5000,
+              duration: 5000,
             });
           }
         } catch (error) {
@@ -1117,22 +1117,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
             {/* Message Template */}
             <FormSection title="Message">
               <Field
-                label={
-                  <span className="inline-flex items-center gap-2">
-                    <span>
-                      Message Content
-                      <span className="ml-0.5 text-[#C84B31]">*</span>
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="View available placeholders"
-                      aria-expanded={showPlaceholders}
-                      onClick={() => setShowPlaceholders((v) => !v)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[#a59480] hover:bg-[#a59480]/15"
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
-                  </span>
+                label="Message Content"
+                required
+                labelAction={
+                  <button
+                    type="button"
+                    aria-label="View available placeholders"
+                    aria-expanded={showPlaceholders}
+                    onClick={() => setShowPlaceholders((v) => !v)}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[#a59480] hover:bg-[#a59480]/15"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
                 }
                 htmlFor="message-content"
               >

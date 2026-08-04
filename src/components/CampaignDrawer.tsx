@@ -430,7 +430,9 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save campaign');
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`Failed to save campaign: ${response.status} ${response.statusText}`);
       }
 
       await response.json();
