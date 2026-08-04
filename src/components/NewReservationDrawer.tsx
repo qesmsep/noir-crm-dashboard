@@ -273,7 +273,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
     <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <SheetContent
         side="right"
-        className="w-[350px] max-w-[50vw] bg-[#ecede8] border-2 border-[#353535] rounded-[10px] shadow-xl mt-20 mb-6 px-10 py-0 font-montserrat z-[2000]"
+        className="flex flex-col w-full max-w-full h-[100dvh] rounded-none px-4 mt-0 mb-0 sm:w-[350px] sm:max-w-[50vw] sm:h-auto sm:rounded-[10px] sm:px-10 sm:mt-20 sm:mb-6 bg-[#ecede8] border-2 border-[#353535] shadow-xl py-0 font-montserrat z-[2000]"
       >
         <SheetHeader className="border-b border-[#ECEAE5] pb-0 pt-0 mb-4">
           <SheetTitle className="text-left pt-4">
