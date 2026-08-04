@@ -161,7 +161,7 @@ function useToast() {
   // Chakra-compatible toast function
   const toast = React.useCallback(
     (props: Toast & { status?: "success" | "error" | "warning" | "info" }) => {
-      const { status, title, description, ...rest } = props
+      const { status, variant: variantProp, title, description, ...rest } = props
       const id = genId()
 
       const update = (props: ToasterToast) =>
@@ -171,8 +171,18 @@ function useToast() {
         })
       const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
-      // Map Chakra's status prop to our variant prop
-      const variant = status || "default"
+      // Map Chakra's status prop to our variant prop.
+      //
+      // `variant` is destructured out above and considered here rather than
+      // being left to ride along in `...rest`. Previously it stayed in `rest`,
+      // which is spread *before* this computed key in the dispatch below — so a
+      // caller passing `variant: 'error'` had it silently overwritten with
+      // "default" and got an unstyled grey toast. Around fifteen files across
+      // the app pass `variant:` and were all affected.
+      //
+      // `status` still wins when both are given, keeping the documented
+      // Chakra-compatible API authoritative.
+      const variant = status || variantProp || "default"
 
       dispatch({
         type: "ADD_TOAST",

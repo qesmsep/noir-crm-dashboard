@@ -58,6 +58,18 @@ export function FormSection({
   )
 }
 
+/**
+ * Id of the current Field's label, for controls that cannot be associated with
+ * one via `htmlFor`.
+ *
+ * `<label htmlFor>` only binds to a single labelable form control — it does
+ * nothing for a `role="radiogroup"` or `role="group"` container. Without this,
+ * every recurring-schedule, timing-type and monthly-type group in the campaign
+ * forms is announced with no name at all. Groups read it and set
+ * `aria-labelledby` themselves, so callers get the association for free.
+ */
+const FieldLabelContext = React.createContext<string | undefined>(undefined)
+
 /** Label + control + optional hint/error, stacked. */
 export function Field({
   label,
@@ -84,27 +96,32 @@ export function Field({
   children: React.ReactNode
   className?: string
 }) {
+  const labelId = `${React.useId()}-label`
+
   return (
-    <div className={cn("space-y-1.5", className)}>
-      {label ? (
-        <div className="flex items-center gap-2">
-          <Label
-            htmlFor={htmlFor}
-            className="block text-sm font-medium text-[#a59480]"
-          >
-            {label}
-            {required ? <span className="ml-0.5 text-[#C84B31]">*</span> : null}
-          </Label>
-          {labelAction}
-        </div>
-      ) : null}
-      {children}
-      {error ? (
-        <p className="text-sm text-[#C84B31]">{error}</p>
-      ) : hint ? (
-        <p className="text-xs text-[#6b6b5f]">{hint}</p>
-      ) : null}
-    </div>
+    <FieldLabelContext.Provider value={label ? labelId : undefined}>
+      <div className={cn("space-y-1.5", className)}>
+        {label ? (
+          <div className="flex items-center gap-2">
+            <Label
+              id={labelId}
+              htmlFor={htmlFor}
+              className="block text-sm font-medium text-[#a59480]"
+            >
+              {label}
+              {required ? <span className="ml-0.5 text-[#C84B31]">*</span> : null}
+            </Label>
+            {labelAction}
+          </div>
+        ) : null}
+        {children}
+        {error ? (
+          <p className="text-sm text-[#C84B31]">{error}</p>
+        ) : hint ? (
+          <p className="text-xs text-[#6b6b5f]">{hint}</p>
+        ) : null}
+      </div>
+    </FieldLabelContext.Provider>
   )
 }
 
@@ -203,9 +220,15 @@ export function NumberField({
     value != null ? String(value) : ""
   )
 
+  const textRef = React.useRef(text)
+  textRef.current = text
+
   React.useEffect(() => {
-    // Re-sync when the parent changes the value from outside this input:
-    // the -/+ buttons, a form reset, or loading an existing template.
+    // Re-sync when the value changes from outside this input: the -/+ buttons,
+    // a form reset, or loading an existing template. Skipped when the text on
+    // screen already represents the incoming value, so typing is never
+    // interrupted to rewrite what the user is in the middle of.
+    if (value != null && parseInt(textRef.current, 10) === value) return
     setText(value != null ? String(value) : "")
   }, [value])
 
@@ -236,15 +259,27 @@ export function NumberField({
           // value alone until the user types a number.
           const parsed = parseInt(raw, 10)
           if (Number.isNaN(parsed)) return
-          onChange(clamp(parsed))
+          // Only the lower bound is enforced per keystroke. Applying `max` here
+          // made the field fight the user: in a max=31 field, typing "40" showed
+          // "4" and then snapped to "31" the moment the second digit landed. The
+          // upper bound is applied on blur instead, which always runs before a
+          // Save click (blur precedes click) so an over-max value cannot be
+          // submitted.
+          onChange(Math.max(min, parsed))
         }}
         onBlur={() => {
-          // Normalise the display to the committed value on the way out. This
-          // covers an empty field, and also input that parses to the number
-          // already committed ("5" -> "05", or a value above max that was
-          // clamped) — in both cases `value` never changes, so the re-sync
-          // effect does not fire and the stale text would otherwise persist.
-          setText(value != null ? String(value) : "")
+          // Settle the field: apply the upper bound and normalise the display.
+          // This also covers an empty field and input that parses to the value
+          // already committed ("5" -> "05"), where `value` never changes and the
+          // re-sync effect would not fire on its own.
+          const parsed = parseInt(text, 10)
+          if (Number.isNaN(parsed)) {
+            setText(value != null ? String(value) : "")
+            return
+          }
+          const settled = clamp(parsed)
+          if (settled !== value) onChange(settled)
+          setText(String(settled))
         }}
         className={cn(controlBase, "text-center")}
       />
@@ -283,8 +318,14 @@ export function RadioCardGroup({
   options: RadioCardOption[]
   className?: string
 }) {
+  const labelledBy = React.useContext(FieldLabelContext)
+
   return (
-    <div role="radiogroup" className={cn("space-y-2", className)}>
+    <div
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      className={cn("space-y-2", className)}
+    >
       {options.map((option) => {
         const checked = value === option.value
         return (
@@ -348,8 +389,14 @@ export function ToggleChipGroup({
     )
   }
 
+  const labelledBy = React.useContext(FieldLabelContext)
+
   return (
-    <div className={cn("flex flex-wrap gap-2", className)}>
+    <div
+      role="group"
+      aria-labelledby={labelledBy}
+      className={cn("flex flex-wrap gap-2", className)}
+    >
       {options.map((option) => {
         const selected = value.includes(option.value)
         return (
