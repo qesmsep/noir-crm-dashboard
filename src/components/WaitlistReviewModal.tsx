@@ -147,7 +147,7 @@ const WaitlistReviewModal: React.FC<WaitlistReviewModalProps> = ({
               <Heading size="md" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
                 Applicant Information
               </Heading>
-              <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={4}>
+              <Grid templateColumns="repeat(2, 1fr)" gap={4}>
                 <GridItem>
                   <Text fontWeight="bold" color="#a59480">Name</Text>
                   <Text>{entry.first_name} {entry.last_name}</Text>
@@ -183,7 +183,7 @@ const WaitlistReviewModal: React.FC<WaitlistReviewModalProps> = ({
               <Heading size="md" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
                 Professional Information
               </Heading>
-              <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={4}>
+              <Grid templateColumns="repeat(2, 1fr)" gap={4}>
                 {entry.company && (
                   <GridItem>
                     <Text fontWeight="bold" color="#a59480">Company</Text>

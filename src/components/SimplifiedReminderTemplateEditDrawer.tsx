@@ -8,7 +8,7 @@ import {
   DrawerContent,
   Button,
   VStack,
-  Stack,
+  HStack,
   FormControl,
   FormLabel,
   Input,
@@ -294,7 +294,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
           }}
         >
           <DrawerHeader borderBottomWidth="1px" margin="0" fontWeight="bold" paddingTop="0px" fontSize="24px" fontFamily="IvyJournal, sans-serif" color="#353535">
-            <Stack direction="row" justify="space-between" align="center">
+            <HStack justify="space-between" align="center">
               <Text>
                 {isCreateMode ? 'Create Reminder Template' : 'Edit Reminder Template'}
               </Text>
@@ -308,7 +308,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
                 color="#ECEDE8"
                 _hover={{ bg: '#2a2a2a' }}
               />
-            </Stack>
+            </HStack>
           </DrawerHeader>
 
           <DrawerBody className="drawer-body-content">
@@ -324,7 +324,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
                     Basic Information
                   </Text>
                                   <VStack spacing={4}>
-                  <Stack direction="row" className="form-row" spacing={4} width="100%">
+                  <HStack spacing={4} width="100%">
                     <FormControl flex="1">
                       <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Template Name</FormLabel>
                       <Input
@@ -348,7 +348,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
                         _focus={{ borderColor: '#a59480', boxShadow: '0 0 0 1px #a59480' }}
                       />
                     </FormControl>
-                  </Stack>
+                  </HStack>
                 </VStack>
                 </Box>
 
@@ -360,7 +360,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
                     When to Send
                   </Text>
                   <VStack spacing={4}>
-                    <Stack direction="row" className="form-row" spacing={4} width="100%">
+                    <HStack spacing={4} width="100%">
                       <FormControl>
                         <FormLabel fontFamily="'Montserrat', sans-serif" color="#a59480">Quantity</FormLabel>
                         <NumberInput
@@ -423,7 +423,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
                           Relative to reservation time
                         </Text>
                       </FormControl>
-                    </Stack>
+                    </HStack>
 
                                       <Box p={4} bg="#ecede8" borderRadius="md" border="1px solid #a59480">
                     <Text fontFamily="'Montserrat', sans-serif" color="#353535" fontWeight="bold">
@@ -514,7 +514,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
                   <Text fontSize="lg" fontWeight="bold" mb={4} fontFamily="'Montserrat', sans-serif" color="#a59480">
                     Status
                   </Text>
-                  <Stack direction="row" spacing={4} align="center">
+                  <HStack spacing={4} align="center">
                     <Switch
                       isChecked={formData.is_active}
                       onChange={(e) => handleInputChange('is_active', e.target.checked)}
@@ -523,7 +523,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
                     <Text fontFamily="'Montserrat', sans-serif" color="#a59480">
                       {formData.is_active ? 'Active' : 'Inactive'}
                     </Text>
-                  </Stack>
+                  </HStack>
                 </Box>
 
                 {/* Delete Section */}
@@ -550,7 +550,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
           </DrawerBody>
 
           <DrawerFooter className="drawer-footer-content" borderTopWidth="1px" borderColor="#a59480">
-            <Stack direction="row" spacing={4}>
+            <HStack spacing={4}>
               <Button variant="outline" onClick={onClose} fontFamily="'Montserrat', sans-serif" color="#a59480">
                 Cancel
               </Button>
@@ -562,7 +562,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
               >
                 {isCreateMode ? 'Create Template' : 'Save Changes'}
               </Button>
-            </Stack>
+            </HStack>
           </DrawerFooter>
         </DrawerContent>
       </Box>
@@ -588,7 +588,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
             <Text mb={6} fontFamily="'Montserrat', sans-serif" color="#ECEDE8">
               Are you sure you want to delete this template? This action cannot be undone.
             </Text>
-            <Stack direction="row" spacing={4}>
+            <HStack spacing={4}>
               <Button
                 variant="outline"
                 onClick={() => setIsConfirmingDelete(false)}
@@ -605,7 +605,7 @@ const SimplifiedReminderTemplateEditDrawer: React.FC<ReminderTemplateEditDrawerP
               >
                 Delete
               </Button>
-            </Stack>
+            </HStack>
           </Box>
         </Box>
       )}

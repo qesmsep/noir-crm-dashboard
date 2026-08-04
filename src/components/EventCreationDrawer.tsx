@@ -360,7 +360,7 @@ const EventCreationDrawer: React.FC<EventCreationDrawerProps> = ({
                 </FormControl>
 
                 {/* Date and Time */}
-                <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={4}>
+                <Grid templateColumns="repeat(2, 1fr)" gap={4}>
                   <FormControl isRequired>
                     <FormLabel fontWeight="600" color="#353535">Start Date & Time</FormLabel>
                     <Input
@@ -397,7 +397,7 @@ const EventCreationDrawer: React.FC<EventCreationDrawerProps> = ({
                 </FormControl>
 
                 {/* Guest Limits */}
-                <Grid templateColumns="repeat(2, minmax(0, 1fr))" className="form-grid-2" gap={4}>
+                <Grid templateColumns="repeat(2, 1fr)" gap={4}>
                   <FormControl isRequired>
                     <FormLabel fontWeight="600" color="#353535">Max Guests per Reservation</FormLabel>
                     <NumberInput
@@ -495,7 +495,6 @@ const EventCreationDrawer: React.FC<EventCreationDrawerProps> = ({
                   <Input
                     type="file"
                     accept="image/*"
-                    maxW="100%"
                     onChange={handleImageChange}
                     borderColor="#a59480"
                     _focus={{ borderColor: '#353535', boxShadow: '0 0 0 1px #353535' }}
