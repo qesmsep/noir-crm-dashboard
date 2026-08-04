@@ -5,8 +5,17 @@ import { useToast } from '@/hooks/useToast';
 import { Spinner } from '@/components/ui/spinner';
 import { useSettings } from '../context/SettingsContext';
 import { CampaignTriggerType } from '../types';
-import CampaignBuilderDialog from './campaigns/CampaignBuilderDialog';
-import CampaignConfirmDialog from './campaigns/CampaignConfirmDialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   CheckboxRow,
   DialogActions,
@@ -729,7 +738,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
   return (
     <>
-      <CampaignBuilderDialog
+      <ResponsiveDialog
         open={isOpen}
         onOpenChange={(open) => !open && onClose()}
         title={isCreateMode ? 'Create/Edit Message' : 'Edit Message'}
@@ -1253,20 +1262,39 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
             )}
           </div>
         )}
-      </CampaignBuilderDialog>
+      </ResponsiveDialog>
 
       {/* Delete confirmation. A sibling of the builder popup rather than a
           child, so the popup's overflow cannot clip it, and stacked above the
           builder's z-[1000]/z-[1001] layers so it is actually visible. */}
-      <CampaignConfirmDialog
-        open={isConfirmingDelete}
-        onOpenChange={setIsConfirmingDelete}
-        title="Delete Template"
-        description="Are you sure you want to delete this template? This action cannot be undone."
-        confirmLabel="Delete"
-        onConfirm={handleDelete}
-        destructive
-      />
+      <AlertDialog open={isConfirmingDelete} onOpenChange={setIsConfirmingDelete}>
+        <AlertDialogContent
+          // Raised above the builder's z-[1000]/z-[1001] layers. These two
+          // props exist because `className` alone lands on the innermost
+          // Content, inside a `position: fixed` wrapper that opens its own
+          // stacking context — so the confirmation rendered behind the still
+          // opaque builder panel and "Delete Template" looked like it did
+          // nothing.
+          overlayClassName="z-[1100]"
+          containerClassName="z-[1101]"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this template? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="min-h-[44px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="min-h-[44px] bg-[#ef4444] text-white hover:bg-[#dc2626]"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

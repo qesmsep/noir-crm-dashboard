@@ -7,51 +7,48 @@ import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
- * Popup shell for the campaign builder.
+ * A dialog that fills the screen on phones and centres as a popup from `sm` up,
+ * for forms too long to fit in a viewport.
  *
- * Replaces the Chakra right-side Drawer that CampaignDrawer and
- * CampaignTemplateDrawer used to render, which was unusable on phones:
- *  - it asked for `w="50vw"` while global CSS forced `width: auto !important`
- *  - it sat under an `mt="80px"` offset while global CSS forced a
- *    full-viewport height pinned to `top: 0`, so the footer holding the Save
- *    button rendered below the fold with no way to scroll to it
- *  - `--vh` (which those global rules depend on) is never set on /admin pages,
- *    because ViewportHeightProvider is only mounted in the App Router layout
+ * `ui/dialog.tsx` cannot do this: it hardcodes a centred `max-w-lg` container
+ * with `p-4`, so its content can never go edge to edge, and it bounds nothing
+ * vertically — a tall form simply grows past the viewport with no scroll. That
+ * is the bug this exists to fix. Measured on the campaign builder before the
+ * change: 1398px of content inside an 844px fixed container, the body
+ * reporting `scrollHeight === clientHeight`, everything past the fold
+ * unreachable because a `position: fixed` container never extends the page's
+ * own scroll range.
  *
- * This is built directly on the Radix dialog primitive rather than on
- * components/ui/dialog.tsx, because that wrapper hardcodes a centered
- * `max-w-lg` container with `p-4`, which cannot become a full-screen mobile
- * sheet. Building on the primitive keeps this change scoped to the campaign
- * builder with no risk to the ~20 other screens using the shared Dialog.
- *
- * Layout contract — this is the whole fix:
+ * The layout contract is the whole fix:
  *   - the panel is a flex column that is never taller than the viewport
  *   - the header and footer are fixed-size and always visible
  *   - the body is the single scroll surface
  *
- * Sizing uses `dvh`, not `vh`, so mobile browser chrome (the URL bar) is
- * excluded and nothing is clipped.
+ * Sized in `dvh` rather than `vh`, so mobile browser chrome is excluded.
  *
- * If this works well, it is the intended pattern for the other drawers in the
- * app (reservations, events, reminders, questionnaires), which share the same
- * defects.
+ * This wraps the Radix primitive directly, which `.claude/preferences.md`
+ * reserves for `ui/` wrappers — the same thing `ui/dialog.tsx` and
+ * `ui/sheet.tsx` already do. Feature code should import this, never the
+ * primitive.
  */
-export interface CampaignBuilderDialogProps {
+export interface ResponsiveDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
   description?: string
   children: React.ReactNode
-  /** Rendered in the pinned footer. Usually the Cancel / Save button pair. */
+  /** Rendered in the pinned footer. Usually a Cancel / Save pair. */
   footer?: React.ReactNode
   /**
-   * Set while a nested confirmation dialog is open, so a click or Escape lands
-   * on that dialog instead of tearing down the whole form behind it.
+   * Set false while a nested dialog is open, so a click or Escape lands on that
+   * dialog instead of tearing down the form behind it.
    */
   dismissable?: boolean
+  /** Applied to the panel, for per-feature colours and borders. */
+  className?: string
 }
 
-export function CampaignBuilderDialog({
+export function ResponsiveDialog({
   open,
   onOpenChange,
   title,
@@ -59,7 +56,8 @@ export function CampaignBuilderDialog({
   children,
   footer,
   dismissable = true,
-}: CampaignBuilderDialogProps) {
+  className,
+}: ResponsiveDialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -90,7 +88,8 @@ export function CampaignBuilderDialog({
               "sm:h-auto sm:max-h-[88dvh] sm:max-w-[720px] sm:rounded-xl sm:border-2 sm:border-[#353535]",
               "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
               "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "focus:outline-none"
+              "focus:outline-none",
+              className
             )}
           >
             {/* Header — fixed size, never scrolls away. */}
@@ -104,8 +103,9 @@ export function CampaignBuilderDialog({
                     {description}
                   </DialogPrimitive.Description>
                 ) : (
-                  // Radix warns when Content has no Description; this satisfies
-                  // it without rendering anything visible.
+                  // Radix warns when Content has no Description. This
+                  // deliberately repeats the title rather than inventing prose;
+                  // pass `description` to give screen readers something better.
                   <DialogPrimitive.Description className="sr-only">
                     {title}
                   </DialogPrimitive.Description>
@@ -123,12 +123,14 @@ export function CampaignBuilderDialog({
             {/* Body — the ONLY scroll surface. `min-h-0` is what allows a flex
                 child to shrink below its content size and actually scroll.
                 `overscroll-contain` stops a scroll at the end of the form from
-                chaining out to the page behind the dialog. */}
+                chaining out to the page behind. */}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6 [-webkit-overflow-scrolling:touch]">
               {children}
             </div>
 
-            {/* Footer — pinned, and padded clear of the iOS home indicator. */}
+            {/* Footer — pinned, and padded clear of the iOS home indicator.
+                That padding depends on the `viewport-fit=cover` viewport meta
+                in pages/_app.tsx; without it env() resolves to 0. */}
             {footer ? (
               <div
                 className="flex-shrink-0 border-t border-[#a59480] bg-[#ecede8] px-4 pt-4 sm:px-6"
@@ -146,4 +148,4 @@ export function CampaignBuilderDialog({
   )
 }
 
-export default CampaignBuilderDialog
+export default ResponsiveDialog

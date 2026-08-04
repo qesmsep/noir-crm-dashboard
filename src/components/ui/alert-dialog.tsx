@@ -27,13 +27,35 @@ const AlertDialogOverlay = React.forwardRef<
 ))
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 
+interface AlertDialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> {
+  /**
+   * Applied to the overlay and the positioning wrapper, which are otherwise
+   * fixed at `z-50` internally.
+   *
+   * Needed to stack this dialog above another portalled layer. `className`
+   * lands on the innermost Content, which sits inside a `position: fixed`
+   * wrapper and therefore opens its own stacking context — a z-index there can
+   * never escape it. Raising the layer requires reaching these two elements,
+   * so a caller confirming a destructive action from inside another dialog
+   * would otherwise render invisibly behind it.
+   */
+  overlayClassName?: string
+  containerClassName?: string
+}
+
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+  AlertDialogContentProps
+>(({ className, overlayClassName, containerClassName, ...props }, ref) => (
   <AlertDialogPortal>
-    <AlertDialogOverlay />
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <AlertDialogOverlay className={overlayClassName} />
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center p-4",
+        containerClassName
+      )}
+    >
       <AlertDialogPrimitive.Content
         ref={ref}
         className={cn(

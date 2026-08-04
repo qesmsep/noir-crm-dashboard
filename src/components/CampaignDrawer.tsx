@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import { useToast } from '@/hooks/useToast';
 import { Spinner } from '@/components/ui/spinner';
-import CampaignBuilderDialog from './campaigns/CampaignBuilderDialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import {
   CheckboxRow,
   DialogActions,
@@ -471,7 +471,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
       : undefined;
 
   return (
-    <CampaignBuilderDialog
+    <ResponsiveDialog
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
       title={isCreateMode ? 'Create New Campaign' : 'Edit Campaign'}
@@ -582,7 +582,7 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
           </FormSection>
         </div>
       )}
-    </CampaignBuilderDialog>
+    </ResponsiveDialog>
   );
 };
 
