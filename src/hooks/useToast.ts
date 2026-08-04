@@ -134,6 +134,22 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
+/** The variants `toastVariants` in components/ui/toast.tsx actually defines. */
+type ToastVariant = "default" | "success" | "error" | "warning" | "info"
+
+const KNOWN_VARIANTS = new Set<string>([
+  "default",
+  "success",
+  "error",
+  "warning",
+  "info",
+])
+
+/** Spellings used by callers that don't match a defined variant. */
+const VARIANT_ALIASES: Record<string, ToastVariant> = {
+  destructive: "error",
+}
+
 /**
  * useToast - Toast hook compatible with Chakra UI's useToast API
  *
@@ -182,7 +198,20 @@ function useToast() {
       //
       // `status` still wins when both are given, keeping the documented
       // Chakra-compatible API authoritative.
-      const variant = status || variantProp || "default"
+      //
+      // The value is then normalised against what `toastVariants` actually
+      // defines. This matters because honoring `variant` at all is what makes
+      // an unrecognised value reachable: cva contributes NO classes for a value
+      // outside its map (defaultVariants only apply when the prop is
+      // undefined), so passing one through renders a completely unstyled toast
+      // — worse than the grey it used to get clobbered into. `destructive` is
+      // the shadcn spelling of `error` and is aliased rather than dropped;
+      // anything else unrecognised degrades to "default".
+      const requested = status || variantProp
+      const variant: ToastVariant = requested
+        ? VARIANT_ALIASES[requested] ??
+          (KNOWN_VARIANTS.has(requested) ? (requested as ToastVariant) : "default")
+        : "default"
 
       dispatch({
         type: "ADD_TOAST",
