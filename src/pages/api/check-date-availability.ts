@@ -305,8 +305,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               });
             }
           } else {
-            // No tables at all that can fit this party size
+            // No tables at all that can fit this party size - block all operating hours
             console.log(`No tables can accommodate party size ${partySizeNum}`);
+
+            // Get venue hours to block all time slots
+            let venueHoursQuery = supabase
+              .from('venue_hours')
+              .select('*')
+              .eq('type', 'base')
+              .eq('day_of_week', requestDate.weekday % 7);
+
+            if (locationId) {
+              venueHoursQuery = venueHoursQuery.eq('location_id', locationId);
+            }
+
+            const { data: venueHours } = await venueHoursQuery;
+
+            const defaultHours = [
+              { start: '18:00', end: '23:00' }
+            ];
+
+            const operatingHours = venueHours && venueHours.length > 0 && venueHours[0].time_ranges
+              ? venueHours[0].time_ranges
+              : defaultHours;
+
+            // Block all time slots since no table can fit this party size
+            operatingHours.forEach((hours: any) => {
+              const [startHour, startMin] = hours.start.split(':').map(Number);
+              const [endHour, endMin] = hours.end.split(':').map(Number);
+
+              // Generate 30-minute time slots
+              for (let hour = startHour; hour < endHour || (hour === endHour && 0 < endMin); hour++) {
+                for (let minute = 0; minute < 60; minute += 30) {
+                  if (hour === endHour && minute >= endMin) break;
+                  if (hour > endHour) break;
+
+                  const slotStart = DateTime.fromObject({
+                    year: requestDate.year,
+                    month: requestDate.month,
+                    day: requestDate.day,
+                    hour,
+                    minute
+                  }, { zone: timezone });
+
+                  const slotEnd = slotStart.plus({ minutes: 30 });
+
+                  blockedTimeRanges.push({
+                    id: `no-tables-${hour}-${minute}`,
+                    title: 'No tables available',
+                    startTime: slotStart.toFormat('h:mm a'),
+                    endTime: slotEnd.toFormat('h:mm a'),
+                    startHour: hour,
+                    startMinute: minute,
+                    endHour: slotEnd.hour,
+                    endMinute: slotEnd.minute,
+                    reason: 'party_size_too_large'
+                  });
+                }
+              }
+            });
           }
         }
       }

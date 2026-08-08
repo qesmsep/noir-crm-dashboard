@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { DateTime } from 'luxon';
@@ -182,6 +182,9 @@ export default function SimpleReservationRequestModal({
   const [locationTimezone, setLocationTimezone] = useState<string>('America/Chicago');
   const [allWeeklyHours, setAllWeeklyHours] = useState<Record<string, any>>({});
 
+  // AbortController ref to cancel in-flight requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Initialize fields when memberName changes
   useEffect(() => {
     if (memberName) {
@@ -288,6 +291,8 @@ export default function SimpleReservationRequestModal({
   }, [isOpen, selectedLocation]);
 
   // Fetch blocked dates for the next 30 days
+  // Note: This checks for closures and private events only, not party size availability
+  // Party size availability is checked when user selects a date (in fetchBlockedTimes)
   useEffect(() => {
     const fetchBlockedDates = async () => {
       if (!isOpen) return;
@@ -298,15 +303,16 @@ export default function SimpleReservationRequestModal({
         const blockedDatesSet = new Set<string>();
         const today = DateTime.now().setZone(locationTimezone);
 
-        // Check next 30 days
+        // Check next 30 days for closures and private events (not party size)
         for (let i = 0; i <= 30; i++) {
           const checkDate = today.plus({ days: i });
           const dateStr = checkDate.toFormat('yyyy-MM-dd');
 
           const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
           const overrideParam = adminOverride ? '&adminOverride=true' : '';
-          const partySizeParam = partySize ? `&partySize=${partySize}` : '';
-          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}${partySizeParam}`);
+          // Don't pass partySize here - we only want to block dates for closures/events
+          // Party size availability is checked when selecting a specific date
+          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}`);
 
           if (response.ok) {
             const result = await response.json();
@@ -343,7 +349,7 @@ export default function SimpleReservationRequestModal({
     };
 
     fetchBlockedDates();
-  }, [isOpen, selectedLocation, adminOverride, locationTimezone, partySize]);
+  }, [isOpen, selectedLocation, adminOverride, locationTimezone]);
 
   // Fetch tables and cover charge info based on selected location
   useEffect(() => {
@@ -421,9 +427,16 @@ export default function SimpleReservationRequestModal({
 
   // Fetch blocked times for a given date and party size
   const fetchBlockedTimes = async (targetDate: Date, targetPartySize: string) => {
-    setLoadingTimes(true);
+    // Cancel previous request if still in flight
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
+    // Create new abort controller for this request
     const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    setLoadingTimes(true);
 
     try {
       // Fetch blocked times for this date
@@ -436,22 +449,25 @@ export default function SimpleReservationRequestModal({
       });
       const result = await response.json();
 
-      if (response.ok) {
+      // Only update state if this request wasn't cancelled
+      if (response.ok && abortControllerRef.current === abortController) {
         setBlockedTimes(result.blockedTimeRanges || []);
-      } else {
+      } else if (!response.ok) {
         console.error('Error fetching availability:', result.error);
         setBlockedTimes([]);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Error fetching availability:', error);
+        if (abortControllerRef.current === abortController) {
+          setBlockedTimes([]);
+        }
       }
-      setBlockedTimes([]);
     } finally {
-      setLoadingTimes(false);
+      if (abortControllerRef.current === abortController) {
+        setLoadingTimes(false);
+      }
     }
-
-    return () => abortController.abort();
   };
 
   // Reset time when date changes if current time is not in new slots
