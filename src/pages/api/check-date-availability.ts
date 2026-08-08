@@ -264,7 +264,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (tablesError) {
           console.error('Error fetching tables:', tablesError);
-        } else if (tables && tables.length > 0) {
+        } else if (!tables || tables.length === 0) {
+          // No tables at all can fit this party size (query returned 0 rows)
+          // Block all operating hours since party size exceeds all table capacities
+          const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
+          blockAllSlotsInHours(operatingHours, requestDate, timezone, 'party_size_too_large', blockedTimeRanges);
+        } else {
           // Filter out tables 4, 8, and 12 (not available for reservations)
           const excludedTableNumbers = [4, 8, 12];
           const availableTables = tables.filter((t: any) =>

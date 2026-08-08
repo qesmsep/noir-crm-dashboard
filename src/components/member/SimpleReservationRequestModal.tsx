@@ -417,6 +417,19 @@ export default function SimpleReservationRequestModal({
 
   // Fetch blocked times for a given date and party size
   const fetchBlockedTimes = async (targetDate: Date, targetPartySize: string) => {
+    // Block object used when availability check fails (fail closed)
+    const BLOCK_ALL_ON_ERROR = {
+      id: 'error-block-all',
+      title: 'Unable to verify availability',
+      startTime: '12:00 am',
+      endTime: '11:59 pm',
+      startHour: 0,
+      startMinute: 0,
+      endHour: 23,
+      endMinute: 59,
+      reason: 'fetch_error'
+    };
+
     // Cancel previous request if still in flight
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -445,35 +458,13 @@ export default function SimpleReservationRequestModal({
       } else if (!response.ok && abortControllerRef.current === abortController) {
         console.error('Error fetching availability:', result.error);
         // On error, block ALL times (fail closed) by blocking entire day
-        // This prevents showing availability when the check failed
-        setBlockedTimes([{
-          id: 'error-block-all',
-          title: 'Unable to verify availability',
-          startTime: '12:00 am',
-          endTime: '11:59 pm',
-          startHour: 0,
-          startMinute: 0,
-          endHour: 23,
-          endMinute: 59,
-          reason: 'fetch_error'
-        }]);
+        setBlockedTimes([BLOCK_ALL_ON_ERROR]);
       }
     } catch (error: any) {
       if (error.name !== 'AbortError' && abortControllerRef.current === abortController) {
         console.error('Error fetching availability:', error);
         // On error, block ALL times (fail closed) by blocking entire day
-        // This prevents showing availability when the check failed
-        setBlockedTimes([{
-          id: 'error-block-all',
-          title: 'Unable to verify availability',
-          startTime: '12:00 am',
-          endTime: '11:59 pm',
-          startHour: 0,
-          startMinute: 0,
-          endHour: 23,
-          endMinute: 59,
-          reason: 'fetch_error'
-        }]);
+        setBlockedTimes([BLOCK_ALL_ON_ERROR]);
       }
     } finally {
       if (abortControllerRef.current === abortController) {
