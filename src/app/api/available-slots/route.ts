@@ -238,7 +238,8 @@ export async function POST(request: Request) {
     const { data: tables, error: tablesError } = await supabase
       .from('tables')
       .select('id, table_number, seats')
-      .gte('seats', party_size);
+      .gte('seats', party_size)
+      .eq('status', 'active'); // Only include active tables
     if (tablesError) {
       console.error('Error fetching tables:', tablesError);
       return NextResponse.json({ 
@@ -246,15 +247,12 @@ export async function POST(request: Request) {
         details: tablesError 
       }, { status: 500 });
     }
-    
-    // Filter out tables 4, 8, and 12 (not available for reservations)
-    const excludedTableNumbers = [4, 8, 12];
-    const availableTables = (tables || []).filter((t: any) => 
-      !excludedTableNumbers.includes(parseInt(t.table_number, 10))
-    );
-    
+
+    // Use only active tables (inactive tables are filtered by database query)
+    const availableTables = tables || [];
+
     if (!availableTables || availableTables.length === 0) {
-      console.warn(`⚠️ No tables found that can accommodate ${party_size} guests (after excluding tables 4, 8, 12)`);
+      console.warn(`⚠️ No tables found that can accommodate ${party_size} guests`);
       // Get all tables to show what's available
       const { data: allTables } = await supabase
         .from('tables')

@@ -10,6 +10,111 @@ import { verifyAdmin } from '../../../lib/admin-auth';
  * Uses service role when available to bypass RLS in production.
  */
 
+// ===== TABLE SCORING CONSTANTS (Phase 1) =====
+// Scoring weights for intelligent table assignment algorithm
+const SCORE_PERFECT_FIT = 100;           // Exact party size match
+const SCORE_ONE_EXTRA_SEAT = 80;         // 1 extra seat (very good)
+const SCORE_TWO_EXTRA_SEATS = 60;        // 2 extra seats (acceptable)
+const PENALTY_PER_WASTED_SEAT = 10;      // Penalty for each seat beyond 2 extra
+const PENALTY_SMALL_PARTY_LARGE_TABLE = 50;   // Don't give 1-3 person parties a 6+ top
+const PENALTY_INEFFICIENT_MEGA_TABLE = 100;   // Preserve 10-tops for large parties
+const LARGE_TABLE_THRESHOLD = 6;         // Tables with 6+ seats are "large"
+const MEGA_TABLE_THRESHOLD = 10;         // Tables with 10+ seats are "mega"
+const SMALL_PARTY_THRESHOLD = 3;         // Parties of 1-3 are "small"
+const MEDIUM_PARTY_THRESHOLD = 6;        // Parties of 1-6 shouldn't get mega tables
+
+// Debug logging flag - set to false in production to reduce log noise
+const DEBUG_TABLE_SCORING = true;
+
+/**
+ * Intelligent table scoring algorithm (Phase 1)
+ * Prevents small parties from taking large "prime" tables
+ *
+ * @param table - Table object with seats property
+ * @param partySize - Number of guests
+ * @returns Score (higher is better)
+ */
+function scoreTableForParty(table: { seats: number }, partySize: number): number {
+  const seatDiff = table.seats - partySize;
+  let score = 0;
+
+  // Prefer exact match or close to party size
+  if (seatDiff === 0) {
+    score += SCORE_PERFECT_FIT;
+  } else if (seatDiff === 1) {
+    score += SCORE_ONE_EXTRA_SEAT;
+  } else if (seatDiff === 2) {
+    score += SCORE_TWO_EXTRA_SEATS;
+  } else {
+    score -= seatDiff * PENALTY_PER_WASTED_SEAT;
+  }
+
+  // Heavy penalty for small party at large table
+  // This preserves 6-tops and 10-tops for larger groups
+  if (table.seats >= LARGE_TABLE_THRESHOLD && partySize <= SMALL_PARTY_THRESHOLD) {
+    score -= PENALTY_SMALL_PARTY_LARGE_TABLE;
+  }
+
+  // Additional penalty for using the largest tables inefficiently
+  if (table.seats >= MEGA_TABLE_THRESHOLD && partySize <= MEDIUM_PARTY_THRESHOLD) {
+    score -= PENALTY_INEFFICIENT_MEGA_TABLE;
+  }
+
+  return score;
+}
+
+/**
+ * Fetches available tables and applies intelligent scoring
+ * Consolidates table query + scoring logic used in both primary and fallback paths
+ *
+ * @param client - Supabase client instance
+ * @param partySize - Number of guests
+ * @param locationId - Optional location filter
+ * @param pathLabel - Label for debug logging (e.g., "Primary" or "Fallback")
+ * @returns Array of scored and sorted tables (highest score first)
+ */
+async function getScoredAvailableTables(
+  client: any,
+  partySize: number,
+  locationId: string | null,
+  pathLabel: string = ''
+): Promise<any[]> {
+  // Build query for tables that can accommodate party size
+  let tablesQuery = client
+    .from('tables')
+    .select('id, table_number, seats')
+    .gte('seats', partySize)
+    .eq('status', 'active'); // Only include active tables
+
+  // Filter by location if available
+  if (locationId) {
+    tablesQuery = tablesQuery.eq('location_id', locationId);
+    if (DEBUG_TABLE_SCORING) {
+      console.log(`${pathLabel ? `[${pathLabel}] ` : ''}Filtering tables by location_id:`, locationId);
+    }
+  }
+
+  const { data: tables } = await tablesQuery;
+  let availableTables = tables || [];
+
+  // Apply intelligent scoring if multiple tables available
+  if (availableTables.length > 1) {
+    availableTables = availableTables.map((table: any) => ({
+      ...table,
+      assignmentScore: scoreTableForParty(table, partySize)
+    })).sort((a: any, b: any) => b.assignmentScore - a.assignmentScore);
+
+    // Debug logging
+    if (DEBUG_TABLE_SCORING) {
+      console.log(`${pathLabel ? `[${pathLabel}] ` : ''}Table scoring for party of ${partySize}: ${availableTables.map((t: any) =>
+        `Table ${t.table_number} (${t.seats} seats): ${t.assignmentScore} points`
+      ).join(', ')}`);
+    }
+  }
+
+  return availableTables;
+}
+
 /**
  * Type definition for reservation creation request body
  */
@@ -266,25 +371,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!tableId && body.start_time && body.end_time && body.party_size) {
         console.log('Finding available table for reservation...');
         try {
-          // Get tables that fit party size, filtered by location if provided
-          let tablesQuery = client
-            .from('tables')
-            .select('id, table_number, seats')
-            .gte('seats', body.party_size)
-            .order('seats', { ascending: true }); // Prefer smaller tables that fit
-
-          // Filter by location if location_id is available
-          if (locationId) {
-            tablesQuery = tablesQuery.eq('location_id', locationId);
-            console.log('Filtering available tables by location_id:', locationId);
-          }
-
-          const { data: tables } = await tablesQuery;
-          
-          // Filter out tables 4, 8, and 12 (not available for reservations)
-          const excludedTableNumbers = [4, 8, 12];
-          const availableTables = (tables || []).filter((t: any) => 
-            !excludedTableNumbers.includes(parseInt(t.table_number, 10))
+          // ===== PHASE 1: INTELLIGENT TABLE SCORING =====
+          // Get available tables, scored and sorted by intelligent assignment algorithm
+          const availableTables = await getScoredAvailableTables(
+            client,
+            body.party_size,
+            locationId,
+            'Primary'
           );
           
           if (availableTables && availableTables.length > 0) {
@@ -615,17 +708,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // This handles the case where table_id wasn't provided initially
         const startTime = new Date(body.start_time);
         const endTime = new Date(body.end_time);
-        
-        const { data: allTables } = await client
-          .from('tables')
-          .select('id, table_number, seats')
-          .gte('seats', body.party_size)
-          .order('seats', { ascending: true });
-        
-        // Filter out tables 4, 8, and 12 (not available for reservations)
-        const excludedTableNumbers = [4, 8, 12];
-        const availableTables = (allTables || []).filter((t: any) => 
-          !excludedTableNumbers.includes(parseInt(t.table_number, 10))
+
+        // ===== PHASE 1: INTELLIGENT TABLE SCORING (FALLBACK PATH) =====
+        // Get available tables, scored and sorted by intelligent assignment algorithm
+        const availableTables = await getScoredAvailableTables(
+          client,
+          body.party_size,
+          locationId,
+          'Fallback'
         );
         
         if (!availableTables || availableTables.length === 0) {

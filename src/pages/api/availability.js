@@ -17,14 +17,12 @@ export default async function handler(req, res) {
   const { data: tables, error: tblErr } = await supabase
     .from('tables')
     .select('table_id, table_number, capacity')
-    .gte('capacity', Number(party_size));
+    .gte('capacity', Number(party_size))
+    .eq('status', 'active'); // Only include active tables
   if (tblErr) return res.status(500).json({ error: tblErr.message });
 
-  // Filter out tables 4, 8, and 12 (not available for reservations)
-  const excludedTableNumbers = [4, 8, 12];
-  const availableTables = (tables || []).filter((t) => 
-    !excludedTableNumbers.includes(parseInt(t.table_number, 10))
-  );
+  // Use only active tables (inactive tables are filtered by database query)
+  const availableTables = tables || [];
 
   // Map to id, number, capacity for frontend
   const mappedTables = (availableTables || []).map(t => ({
