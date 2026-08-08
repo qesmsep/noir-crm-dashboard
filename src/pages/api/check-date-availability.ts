@@ -19,22 +19,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Date is required' });
     }
 
-    // Parse the date (format: YYYY-MM-DD)
-    const requestDate = DateTime.fromISO(date);
-
-    // Get location_id if location slug is provided
+    // Get location_id and timezone if location slug is provided
     let locationId: string | null = null;
+    let timezone = 'America/Chicago'; // Default timezone
+
     if (location && typeof location === 'string') {
       const { data: locationData, error: locationError } = await supabase
         .from('locations')
-        .select('id')
+        .select('id, timezone')
         .eq('slug', location)
         .single();
 
       if (!locationError && locationData) {
         locationId = locationData.id;
+        timezone = locationData.timezone || 'America/Chicago';
       }
     }
+
+    // Parse the date in the location's timezone (format: YYYY-MM-DD)
+    // This ensures we check the correct day in the location's local time
+    const requestDate = DateTime.fromISO(date, { zone: timezone });
 
     // Check for exceptional closures first
     let closuresQuery = supabase
@@ -80,8 +84,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const [startHour, startMinute] = range.start.split(':').map(Number);
             const [endHour, endMinute] = range.end.split(':').map(Number);
 
-            const start = DateTime.fromObject({ hour: startHour, minute: startMinute }, { zone: 'America/Chicago' });
-            const end = DateTime.fromObject({ hour: endHour, minute: endMinute }, { zone: 'America/Chicago' });
+            const start = DateTime.fromObject({ hour: startHour, minute: startMinute }, { zone: timezone });
+            const end = DateTime.fromObject({ hour: endHour, minute: endMinute }, { zone: timezone });
 
             blockedTimeRanges.push({
               id: `closure-${closure.id}-${idx}`,
@@ -126,8 +130,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Add private event time ranges
       (events || []).forEach((event) => {
-        const start = DateTime.fromISO(event.start_time).setZone('America/Chicago');
-        const end = DateTime.fromISO(event.end_time).setZone('America/Chicago');
+        const start = DateTime.fromISO(event.start_time).setZone(timezone);
+        const end = DateTime.fromISO(event.end_time).setZone(timezone);
 
         blockedTimeRanges.push({
           id: event.id,
@@ -190,19 +194,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           );
 
           if (availableTables.length > 0) {
-            // Get all reservations for this date
+            // Get all reservations that overlap with this date
+            // Parse in location timezone, then convert to UTC for database query
             const startOfDay = requestDate.startOf('day').toUTC().toISO();
             const endOfDay = requestDate.endOf('day').toUTC().toISO();
 
             const tableIds = availableTables.map(t => t.id);
 
-            // Get existing reservations for these tables on this date
+            // Get existing reservations for these tables that overlap with this date
+            // A reservation overlaps if: start_time < end_of_day AND end_time > start_of_day
             const { data: reservations, error: resError } = await supabase
               .from('reservations')
               .select('id, table_id, start_time, end_time, status')
               .in('table_id', tableIds)
-              .gte('start_time', startOfDay)
-              .lte('start_time', endOfDay);
+              .lt('start_time', endOfDay)
+              .gt('end_time', startOfDay);
 
             if (resError) {
               console.error('Error fetching reservations:', resError);
@@ -252,7 +258,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                       day: requestDate.day,
                       hour,
                       minute
-                    }, { zone: 'America/Chicago' });
+                    }, { zone: timezone });
 
                     const slotEnd = slotStart.plus({ minutes: 30 });
                     // The full window a reservation starting in this slot would actually occupy
