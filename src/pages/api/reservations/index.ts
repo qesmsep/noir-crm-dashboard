@@ -267,11 +267,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log('Finding available table for reservation...');
         try {
           // Get tables that fit party size, filtered by location if provided
+          // Note: We fetch all matching tables and sort by scoring algorithm (not just by seats)
           let tablesQuery = client
             .from('tables')
             .select('id, table_number, seats')
             .gte('seats', body.party_size)
-            .order('seats', { ascending: true }); // Prefer smaller tables that fit
+            .eq('status', 'active'); // Only include active tables
 
           // Filter by location if location_id is available
           if (locationId) {
@@ -280,12 +281,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
 
           const { data: tables } = await tablesQuery;
-          
-          // Filter out tables 4, 8, and 12 (not available for reservations)
-          const excludedTableNumbers = [4, 8, 12];
-          const availableTables = (tables || []).filter((t: any) => 
-            !excludedTableNumbers.includes(parseInt(t.table_number, 10))
-          );
+
+          // Use only active tables (inactive tables are filtered by database query)
+          let availableTables = tables || [];
+
+          // ===== PHASE 1: INTELLIGENT TABLE SCORING =====
+          // Score and sort tables to optimize assignment
+          // Prevents small parties from taking large "prime" tables
+          if (availableTables.length > 1) {
+            availableTables = availableTables.map((table: any) => {
+              const seatDiff = table.seats - body.party_size;
+              let score = 0;
+
+              // Prefer exact match or close to party size
+              if (seatDiff === 0) {
+                score += 100; // Perfect fit
+              } else if (seatDiff === 1) {
+                score += 80;  // 1 extra seat (very good)
+              } else if (seatDiff === 2) {
+                score += 60;  // 2 extra seats (acceptable)
+              } else {
+                score -= seatDiff * 10; // Penalty for wasting seats
+              }
+
+              // Heavy penalty for small party at large table
+              // This preserves 6-tops and 10-tops for larger groups
+              if (table.seats >= 6 && body.party_size <= 3) {
+                score -= 50; // Don't give 1-3 person parties a 6+ top
+              }
+
+              // Additional penalty for using the largest tables inefficiently
+              if (table.seats >= 10 && body.party_size <= 6) {
+                score -= 100; // Preserve 10-tops for large parties
+              }
+
+              return { ...table, assignmentScore: score };
+            }).sort((a: any, b: any) => b.assignmentScore - a.assignmentScore);
+
+            console.log(`Table scoring for party of ${body.party_size}: ${availableTables.map((t: any) =>
+              `Table ${t.table_number} (${t.seats} seats): ${t.assignmentScore} points`
+            ).join(', ')}`);
+          }
           
           if (availableTables && availableTables.length > 0) {
             // Get existing reservations that could overlap with the requested time slot
@@ -620,13 +656,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .from('tables')
           .select('id, table_number, seats')
           .gte('seats', body.party_size)
+          .eq('status', 'active') // Only include active tables
           .order('seats', { ascending: true });
-        
-        // Filter out tables 4, 8, and 12 (not available for reservations)
-        const excludedTableNumbers = [4, 8, 12];
-        const availableTables = (allTables || []).filter((t: any) => 
-          !excludedTableNumbers.includes(parseInt(t.table_number, 10))
-        );
+
+        // Use only active tables (inactive tables are filtered by database query)
+        const availableTables = allTables || [];
         
         if (!availableTables || availableTables.length === 0) {
           return res.status(400).json({ 

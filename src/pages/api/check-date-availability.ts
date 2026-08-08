@@ -274,11 +274,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
           blockAllSlotsInHours(operatingHours, requestDate, timezone, 'party_size_too_large', blockedTimeRanges);
         } else {
-          // Filter out tables 4, 8, and 12 (not available for reservations)
-          const excludedTableNumbers = [4, 8, 12];
-          const availableTables = tables.filter((t: any) =>
-            !excludedTableNumbers.includes(parseInt(t.table_number, 10))
-          );
+          // Use only active tables (inactive tables are filtered by database query)
+          const availableTables = tables;
 
           if (availableTables.length > 0) {
             // Get all reservations that overlap with this date
