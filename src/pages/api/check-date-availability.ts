@@ -35,6 +35,52 @@ async function getOperatingHoursForDate(
     : defaultHours;
 }
 
+/**
+ * Helper: Generate 30-minute time slots for operating hours and add to blockedTimeRanges
+ */
+function blockAllSlotsInHours(
+  operatingHours: Array<{ start: string; end: string }>,
+  requestDate: DateTime,
+  timezone: string,
+  reason: string,
+  blockedTimeRanges: any[]
+): void {
+  operatingHours.forEach((hours: any) => {
+    const [startHour, startMin] = hours.start.split(':').map(Number);
+    const [endHour, endMin] = hours.end.split(':').map(Number);
+
+    // Generate 30-minute time slots
+    for (let hour = startHour; hour < endHour || (hour === endHour && 0 < endMin); hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        if (hour === endHour && minute >= endMin) break;
+        if (hour > endHour) break;
+
+        const slotStart = DateTime.fromObject({
+          year: requestDate.year,
+          month: requestDate.month,
+          day: requestDate.day,
+          hour,
+          minute
+        }, { zone: timezone });
+
+        const slotEnd = slotStart.plus({ minutes: 30 });
+
+        blockedTimeRanges.push({
+          id: `no-tables-${hour}-${minute}`,
+          title: 'No tables available',
+          startTime: slotStart.toFormat('h:mm a'),
+          endTime: slotEnd.toFormat('h:mm a'),
+          startHour: hour,
+          startMinute: minute,
+          endHour: slotEnd.hour,
+          endMinute: slotEnd.minute,
+          reason
+        });
+      }
+    }
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -67,6 +113,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Parse the date in the location's timezone (format: YYYY-MM-DD)
     // This ensures we check the correct day in the location's local time
     const requestDate = DateTime.fromISO(date, { zone: timezone });
+
+    // Validate that the DateTime object is valid (timezone could be invalid)
+    if (!requestDate.isValid) {
+      return res.status(400).json({
+        error: 'Invalid date or timezone',
+        details: requestDate.invalidReason
+      });
+    }
 
     // Check for exceptional closures first
     let closuresQuery = supabase
@@ -128,8 +182,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }
       });
-    } else if (skipExceptionalClosures && closures && closures.length > 0) {
-      console.log('[ADMIN OVERRIDE] Skipping exceptional closures for date:', date);
     }
 
     // Fetch private events for this date
@@ -172,8 +224,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           endMinute: end.minute,
         });
       });
-    } else {
-      console.log('[ADMIN OVERRIDE] Skipping private event blocking for date:', date);
     }
 
     // Check table availability if partySize is provided
@@ -315,46 +365,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
           } else {
             // No tables at all that can fit this party size - block all operating hours
-            console.log(`No tables can accommodate party size ${partySizeNum}`);
-
-            // Get venue hours to block all time slots
             const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
-
-            // Block all time slots since no table can fit this party size
-            operatingHours.forEach((hours: any) => {
-              const [startHour, startMin] = hours.start.split(':').map(Number);
-              const [endHour, endMin] = hours.end.split(':').map(Number);
-
-              // Generate 30-minute time slots
-              for (let hour = startHour; hour < endHour || (hour === endHour && 0 < endMin); hour++) {
-                for (let minute = 0; minute < 60; minute += 30) {
-                  if (hour === endHour && minute >= endMin) break;
-                  if (hour > endHour) break;
-
-                  const slotStart = DateTime.fromObject({
-                    year: requestDate.year,
-                    month: requestDate.month,
-                    day: requestDate.day,
-                    hour,
-                    minute
-                  }, { zone: timezone });
-
-                  const slotEnd = slotStart.plus({ minutes: 30 });
-
-                  blockedTimeRanges.push({
-                    id: `no-tables-${hour}-${minute}`,
-                    title: 'No tables available',
-                    startTime: slotStart.toFormat('h:mm a'),
-                    endTime: slotEnd.toFormat('h:mm a'),
-                    startHour: hour,
-                    startMinute: minute,
-                    endHour: slotEnd.hour,
-                    endMinute: slotEnd.minute,
-                    reason: 'party_size_too_large'
-                  });
-                }
-              }
-            });
+            blockAllSlotsInHours(operatingHours, requestDate, timezone, 'party_size_too_large', blockedTimeRanges);
           }
         }
       }

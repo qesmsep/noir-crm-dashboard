@@ -444,15 +444,36 @@ export default function SimpleReservationRequestModal({
         setBlockedTimes(result.blockedTimeRanges || []);
       } else if (!response.ok && abortControllerRef.current === abortController) {
         console.error('Error fetching availability:', result.error);
-        // On error, keep previous blockedTimes rather than clearing to []
-        // This fails "closed" (conservative) rather than "open" (unsafe)
-        // User will see previous availability or no times available
+        // On error, block ALL times (fail closed) by blocking entire day
+        // This prevents showing availability when the check failed
+        setBlockedTimes([{
+          id: 'error-block-all',
+          title: 'Unable to verify availability',
+          startTime: '12:00 am',
+          endTime: '11:59 pm',
+          startHour: 0,
+          startMinute: 0,
+          endHour: 23,
+          endMinute: 59,
+          reason: 'fetch_error'
+        }]);
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && abortControllerRef.current === abortController) {
         console.error('Error fetching availability:', error);
-        // On error, keep previous blockedTimes rather than clearing to []
-        // This fails "closed" (conservative) rather than "open" (unsafe)
+        // On error, block ALL times (fail closed) by blocking entire day
+        // This prevents showing availability when the check failed
+        setBlockedTimes([{
+          id: 'error-block-all',
+          title: 'Unable to verify availability',
+          startTime: '12:00 am',
+          endTime: '11:59 pm',
+          startHour: 0,
+          startMinute: 0,
+          endHour: 23,
+          endMinute: 59,
+          reason: 'fetch_error'
+        }]);
       }
     } finally {
       if (abortControllerRef.current === abortController) {
