@@ -343,7 +343,7 @@ export default function SimpleReservationRequestModal({
     };
 
     fetchBlockedDates();
-  }, [isOpen, selectedLocation, adminOverride, locationTimezone]);
+  }, [isOpen, selectedLocation, adminOverride, locationTimezone, partySize]);
 
   // Fetch tables and cover charge info based on selected location
   useEffect(() => {
@@ -419,31 +419,18 @@ export default function SimpleReservationRequestModal({
     fetchTablesAndCoverCharge();
   }, [selectedLocation]);
 
-  // Reset time when date changes if current time is not in new slots
-  const handleDateChange = async (newDate: Date) => {
-    setDate(newDate);
-    setTime('');
+  // Fetch blocked times for a given date and party size
+  const fetchBlockedTimes = async (targetDate: Date, targetPartySize: string) => {
     setLoadingTimes(true);
-
-    // Update weekly hours for the selected date's week
-    const selectedWeekSunday = getSundayOfWeek(newDate, locationTimezone);
-    const weeklyHoursForSelectedWeek = allWeeklyHours[selectedWeekSunday] || null;
-
-    // Update locationHours with the selected week's hours
-    setLocationHours(prevHours => ({
-      ...prevHours,
-      weeklyHours: weeklyHoursForSelectedWeek,
-      weeklyHoursWeekStart: weeklyHoursForSelectedWeek ? selectedWeekSunday : null,
-    }));
 
     const abortController = new AbortController();
 
     try {
       // Fetch blocked times for this date
-      const dateStr = DateTime.fromJSDate(newDate, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
+      const dateStr = DateTime.fromJSDate(targetDate, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
       const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
       const overrideParam = adminOverride ? '&adminOverride=true' : '';
-      const partySizeParam = `&partySize=${partySize}`;
+      const partySizeParam = `&partySize=${targetPartySize}`;
       const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}${partySizeParam}`, {
         signal: abortController.signal,
       });
@@ -465,6 +452,37 @@ export default function SimpleReservationRequestModal({
     }
 
     return () => abortController.abort();
+  };
+
+  // Reset time when date changes if current time is not in new slots
+  const handleDateChange = async (newDate: Date) => {
+    setDate(newDate);
+    setTime('');
+
+    // Update weekly hours for the selected date's week
+    const selectedWeekSunday = getSundayOfWeek(newDate, locationTimezone);
+    const weeklyHoursForSelectedWeek = allWeeklyHours[selectedWeekSunday] || null;
+
+    // Update locationHours with the selected week's hours
+    setLocationHours(prevHours => ({
+      ...prevHours,
+      weeklyHours: weeklyHoursForSelectedWeek,
+      weeklyHoursWeekStart: weeklyHoursForSelectedWeek ? selectedWeekSunday : null,
+    }));
+
+    // Fetch blocked times for the new date
+    await fetchBlockedTimes(newDate, partySize);
+  };
+
+  // Handle party size change - re-fetch availability if date is selected
+  const handlePartySizeChange = async (newPartySize: string) => {
+    setPartySize(newPartySize);
+
+    // If a date is already selected, re-fetch blocked times with new party size
+    if (date) {
+      setTime(''); // Clear selected time since availability may have changed
+      await fetchBlockedTimes(date, newPartySize);
+    }
   };
 
   // Get all time slots for the selected date
@@ -1348,6 +1366,31 @@ export default function SimpleReservationRequestModal({
             </div>
           )}
 
+          {/* Party Size - Moved up so date/time availability is based on guest count */}
+          <div>
+            <select
+              value={partySize}
+              onChange={(e) => handlePartySizeChange(e.target.value)}
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
+                <option key={num} value={num}>
+                  {num} {num === 1 ? 'guest' : 'guests'}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Availability Notice */}
           <div style={{
             fontSize: '0.8125rem',
@@ -1428,31 +1471,9 @@ export default function SimpleReservationRequestModal({
             </div>
           </div>
 
-          {/* Party Size and Table */}
-          <div style={{ display: 'grid', gridTemplateColumns: hideTableSelection ? '1fr' : '1fr 1fr', gap: '1rem' }}>
-            <select
-              value={partySize}
-              onChange={(e) => setPartySize(e.target.value)}
-              style={{
-                width: '100%',
-                height: '44px',
-                padding: '0 1rem',
-                border: '1px solid #D1D5DB',
-                borderRadius: '10px',
-                fontSize: '0.875rem',
-                backgroundColor: 'white',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
-                <option key={num} value={num}>
-                  {num} {num === 1 ? 'guest' : 'guests'}
-                </option>
-              ))}
-            </select>
-
-            {!hideTableSelection && (
+          {/* Table Selection - Only show for admin users */}
+          {!hideTableSelection && (
+            <div>
               <select
                 value={tableId}
                 onChange={(e) => setTableId(e.target.value)}
@@ -1475,8 +1496,8 @@ export default function SimpleReservationRequestModal({
                   </option>
                 ))}
               </select>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Food Notice */}
           <div style={{
