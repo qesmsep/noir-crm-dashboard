@@ -264,6 +264,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (tablesError) {
           console.error('Error fetching tables:', tablesError);
+          // On database error, block all slots (fail closed)
+          // Don't return partial/incorrect availability data
+          const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
+          blockAllSlotsInHours(operatingHours, requestDate, timezone, 'availability_check_failed', blockedTimeRanges);
         } else if (!tables || tables.length === 0) {
           // No tables at all can fit this party size (query returned 0 rows)
           // Block all operating hours since party size exceeds all table capacities
@@ -295,6 +299,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             if (resError) {
               console.error('Error fetching reservations:', resError);
+              // On database error, block all slots (fail closed)
+              // Don't return partial/incorrect availability data
+              const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
+              blockAllSlotsInHours(operatingHours, requestDate, timezone, 'availability_check_failed', blockedTimeRanges);
             } else {
               // Filter out cancelled reservations
               const activeReservations = (reservations || []).filter(
