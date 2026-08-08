@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { DateTime } from 'luxon';
@@ -182,6 +182,9 @@ export default function SimpleReservationRequestModal({
   const [locationTimezone, setLocationTimezone] = useState<string>('America/Chicago');
   const [allWeeklyHours, setAllWeeklyHours] = useState<Record<string, any>>({});
 
+  // AbortController ref to cancel in-flight requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   // Initialize fields when memberName changes
   useEffect(() => {
     if (memberName) {
@@ -288,6 +291,8 @@ export default function SimpleReservationRequestModal({
   }, [isOpen, selectedLocation]);
 
   // Fetch blocked dates for the next 30 days
+  // Note: This checks for closures and private events only, not party size availability
+  // Party size availability is checked when user selects a date (in fetchBlockedTimes)
   useEffect(() => {
     const fetchBlockedDates = async () => {
       if (!isOpen) return;
@@ -298,24 +303,19 @@ export default function SimpleReservationRequestModal({
         const blockedDatesSet = new Set<string>();
         const today = DateTime.now().setZone(locationTimezone);
 
-        // Check next 30 days
+        // Check next 30 days for closures and private events (not party size)
         for (let i = 0; i <= 30; i++) {
           const checkDate = today.plus({ days: i });
           const dateStr = checkDate.toFormat('yyyy-MM-dd');
 
           const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
           const overrideParam = adminOverride ? '&adminOverride=true' : '';
-          const partySizeParam = partySize ? `&partySize=${partySize}` : '';
-          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}${partySizeParam}`);
+          // Don't pass partySize here - we only want to block dates for closures/events
+          // Party size availability is checked when selecting a specific date
+          const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}`);
 
           if (response.ok) {
             const result = await response.json();
-
-            // Debug logging for April 24
-            if (dateStr === '2026-04-24') {
-              console.log('[April 24 Check] blockedTimeRanges:', result.blockedTimeRanges);
-              console.log('[April 24 Check] adminOverride:', adminOverride);
-            }
 
             // If there are blocked time ranges that cover the full day, mark as blocked
             if (result.blockedTimeRanges && result.blockedTimeRanges.length > 0) {
@@ -324,10 +324,6 @@ export default function SimpleReservationRequestModal({
                 return (range.startHour === 0 && range.endHour === 23) ||
                        (range.startHour <= 16 && range.endHour >= 23);
               });
-
-              if (dateStr === '2026-04-24') {
-                console.log('[April 24 Check] hasFullDayBlock:', hasFullDayBlock);
-              }
 
               if (hasFullDayBlock) {
                 blockedDatesSet.add(dateStr);
@@ -419,11 +415,68 @@ export default function SimpleReservationRequestModal({
     fetchTablesAndCoverCharge();
   }, [selectedLocation]);
 
+  // Fetch blocked times for a given date and party size
+  const fetchBlockedTimes = async (targetDate: Date, targetPartySize: string) => {
+    // Block object used when availability check fails (fail closed)
+    const BLOCK_ALL_ON_ERROR = {
+      id: 'error-block-all',
+      title: 'Unable to verify availability',
+      startTime: '12:00 am',
+      endTime: '11:59 pm',
+      startHour: 0,
+      startMinute: 0,
+      endHour: 23,
+      endMinute: 59,
+      reason: 'fetch_error'
+    };
+
+    // Cancel previous request if still in flight
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    setLoadingTimes(true);
+
+    try {
+      // Fetch blocked times for this date
+      const dateStr = DateTime.fromJSDate(targetDate, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
+      const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
+      const overrideParam = adminOverride ? '&adminOverride=true' : '';
+      const partySizeParam = `&partySize=${targetPartySize}`;
+      const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}${partySizeParam}`, {
+        signal: abortController.signal,
+      });
+      const result = await response.json();
+
+      // Only update state if this request wasn't cancelled
+      if (response.ok && abortControllerRef.current === abortController) {
+        setBlockedTimes(result.blockedTimeRanges || []);
+      } else if (!response.ok && abortControllerRef.current === abortController) {
+        console.error('Error fetching availability:', result.error);
+        // On error, block ALL times (fail closed) by blocking entire day
+        setBlockedTimes([BLOCK_ALL_ON_ERROR]);
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError' && abortControllerRef.current === abortController) {
+        console.error('Error fetching availability:', error);
+        // On error, block ALL times (fail closed) by blocking entire day
+        setBlockedTimes([BLOCK_ALL_ON_ERROR]);
+      }
+    } finally {
+      if (abortControllerRef.current === abortController) {
+        setLoadingTimes(false);
+      }
+    }
+  };
+
   // Reset time when date changes if current time is not in new slots
   const handleDateChange = async (newDate: Date) => {
     setDate(newDate);
     setTime('');
-    setLoadingTimes(true);
 
     // Update weekly hours for the selected date's week
     const selectedWeekSunday = getSundayOfWeek(newDate, locationTimezone);
@@ -436,35 +489,19 @@ export default function SimpleReservationRequestModal({
       weeklyHoursWeekStart: weeklyHoursForSelectedWeek ? selectedWeekSunday : null,
     }));
 
-    const abortController = new AbortController();
+    // Fetch blocked times for the new date
+    await fetchBlockedTimes(newDate, partySize);
+  };
 
-    try {
-      // Fetch blocked times for this date
-      const dateStr = DateTime.fromJSDate(newDate, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
-      const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
-      const overrideParam = adminOverride ? '&adminOverride=true' : '';
-      const partySizeParam = `&partySize=${partySize}`;
-      const response = await fetch(`/api/check-date-availability?date=${dateStr}${locationParam}${overrideParam}${partySizeParam}`, {
-        signal: abortController.signal,
-      });
-      const result = await response.json();
+  // Handle party size change - re-fetch availability if date is selected
+  const handlePartySizeChange = async (newPartySize: string) => {
+    setPartySize(newPartySize);
 
-      if (response.ok) {
-        setBlockedTimes(result.blockedTimeRanges || []);
-      } else {
-        console.error('Error fetching availability:', result.error);
-        setBlockedTimes([]);
-      }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error('Error fetching availability:', error);
-      }
-      setBlockedTimes([]);
-    } finally {
-      setLoadingTimes(false);
+    // If a date is already selected, re-fetch blocked times with new party size
+    if (date) {
+      setTime(''); // Clear selected time since availability may have changed
+      await fetchBlockedTimes(date, newPartySize);
     }
-
-    return () => abortController.abort();
   };
 
   // Get all time slots for the selected date
@@ -1348,6 +1385,31 @@ export default function SimpleReservationRequestModal({
             </div>
           )}
 
+          {/* Party Size - Moved up so date/time availability is based on guest count */}
+          <div>
+            <select
+              value={partySize}
+              onChange={(e) => handlePartySizeChange(e.target.value)}
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 1rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '10px',
+                fontSize: '0.875rem',
+                backgroundColor: 'white',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
+                <option key={num} value={num}>
+                  {num} {num === 1 ? 'guest' : 'guests'}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Availability Notice */}
           <div style={{
             fontSize: '0.8125rem',
@@ -1428,31 +1490,9 @@ export default function SimpleReservationRequestModal({
             </div>
           </div>
 
-          {/* Party Size and Table */}
-          <div style={{ display: 'grid', gridTemplateColumns: hideTableSelection ? '1fr' : '1fr 1fr', gap: '1rem' }}>
-            <select
-              value={partySize}
-              onChange={(e) => setPartySize(e.target.value)}
-              style={{
-                width: '100%',
-                height: '44px',
-                padding: '0 1rem',
-                border: '1px solid #D1D5DB',
-                borderRadius: '10px',
-                fontSize: '0.875rem',
-                backgroundColor: 'white',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
-                <option key={num} value={num}>
-                  {num} {num === 1 ? 'guest' : 'guests'}
-                </option>
-              ))}
-            </select>
-
-            {!hideTableSelection && (
+          {/* Table Selection - Only show for admin users */}
+          {!hideTableSelection && (
+            <div>
               <select
                 value={tableId}
                 onChange={(e) => setTableId(e.target.value)}
@@ -1475,8 +1515,8 @@ export default function SimpleReservationRequestModal({
                   </option>
                 ))}
               </select>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Food Notice */}
           <div style={{

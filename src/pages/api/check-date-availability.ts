@@ -7,6 +7,80 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+/**
+ * Helper: Get operating hours for a specific date and location
+ */
+async function getOperatingHoursForDate(
+  requestDate: DateTime,
+  locationId: string | null
+): Promise<Array<{ start: string; end: string }>> {
+  let venueHoursQuery = supabase
+    .from('venue_hours')
+    .select('*')
+    .eq('type', 'base')
+    .eq('day_of_week', requestDate.weekday % 7);
+
+  if (locationId) {
+    venueHoursQuery = venueHoursQuery.eq('location_id', locationId);
+  }
+
+  const { data: venueHours } = await venueHoursQuery;
+
+  const defaultHours = [
+    { start: '18:00', end: '23:00' }
+  ];
+
+  return venueHours && venueHours.length > 0 && venueHours[0].time_ranges
+    ? venueHours[0].time_ranges
+    : defaultHours;
+}
+
+/**
+ * Helper: Generate 30-minute time slots for operating hours and add to blockedTimeRanges
+ */
+function blockAllSlotsInHours(
+  operatingHours: Array<{ start: string; end: string }>,
+  requestDate: DateTime,
+  timezone: string,
+  reason: string,
+  blockedTimeRanges: any[]
+): void {
+  operatingHours.forEach((hours: any) => {
+    const [startHour, startMin] = hours.start.split(':').map(Number);
+    const [endHour, endMin] = hours.end.split(':').map(Number);
+
+    // Generate 30-minute time slots
+    for (let hour = startHour; hour < endHour || (hour === endHour && 0 < endMin); hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        if (hour === endHour && minute >= endMin) break;
+        if (hour > endHour) break;
+
+        const slotStart = DateTime.fromObject({
+          year: requestDate.year,
+          month: requestDate.month,
+          day: requestDate.day,
+          hour,
+          minute
+        }, { zone: timezone });
+
+        const slotEnd = slotStart.plus({ minutes: 30 });
+
+        blockedTimeRanges.push({
+          id: `no-tables-${hour}-${minute}`,
+          title: 'No tables available',
+          startTime: slotStart.toFormat('h:mm a'),
+          endTime: slotEnd.toFormat('h:mm a'),
+          startHour: hour,
+          startMinute: minute,
+          endHour: slotEnd.hour,
+          endMinute: slotEnd.minute,
+          reason
+        });
+      }
+    }
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -19,21 +93,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Date is required' });
     }
 
-    // Parse the date (format: YYYY-MM-DD)
-    const requestDate = DateTime.fromISO(date);
-
-    // Get location_id if location slug is provided
+    // Get location_id and timezone if location slug is provided
     let locationId: string | null = null;
+    let timezone = 'America/Chicago'; // Default timezone
+
     if (location && typeof location === 'string') {
       const { data: locationData, error: locationError } = await supabase
         .from('locations')
-        .select('id')
+        .select('id, timezone')
         .eq('slug', location)
         .single();
 
       if (!locationError && locationData) {
         locationId = locationData.id;
+        timezone = locationData.timezone || 'America/Chicago';
       }
+    }
+
+    // Parse the date in the location's timezone (format: YYYY-MM-DD)
+    // This ensures we check the correct day in the location's local time
+    const requestDate = DateTime.fromISO(date, { zone: timezone });
+
+    // Validate that the DateTime object is valid (timezone could be invalid)
+    if (!requestDate.isValid) {
+      return res.status(400).json({
+        error: 'Invalid date or timezone',
+        details: requestDate.invalidReason
+      });
     }
 
     // Check for exceptional closures first
@@ -80,8 +166,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const [startHour, startMinute] = range.start.split(':').map(Number);
             const [endHour, endMinute] = range.end.split(':').map(Number);
 
-            const start = DateTime.fromObject({ hour: startHour, minute: startMinute }, { zone: 'America/Chicago' });
-            const end = DateTime.fromObject({ hour: endHour, minute: endMinute }, { zone: 'America/Chicago' });
+            const start = DateTime.fromObject({ hour: startHour, minute: startMinute }, { zone: timezone });
+            const end = DateTime.fromObject({ hour: endHour, minute: endMinute }, { zone: timezone });
 
             blockedTimeRanges.push({
               id: `closure-${closure.id}-${idx}`,
@@ -96,8 +182,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
         }
       });
-    } else if (skipExceptionalClosures && closures && closures.length > 0) {
-      console.log('[ADMIN OVERRIDE] Skipping exceptional closures for date:', date);
     }
 
     // Fetch private events for this date
@@ -126,8 +210,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Add private event time ranges
       (events || []).forEach((event) => {
-        const start = DateTime.fromISO(event.start_time).setZone('America/Chicago');
-        const end = DateTime.fromISO(event.end_time).setZone('America/Chicago');
+        const start = DateTime.fromISO(event.start_time).setZone(timezone);
+        const end = DateTime.fromISO(event.end_time).setZone(timezone);
 
         blockedTimeRanges.push({
           id: event.id,
@@ -140,8 +224,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           endMinute: end.minute,
         });
       });
-    } else {
-      console.log('[ADMIN OVERRIDE] Skipping private event blocking for date:', date);
     }
 
     // Check table availability if partySize is provided
@@ -182,7 +264,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (tablesError) {
           console.error('Error fetching tables:', tablesError);
-        } else if (tables && tables.length > 0) {
+          // On database error, block all slots (fail closed)
+          // Don't return partial/incorrect availability data
+          const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
+          blockAllSlotsInHours(operatingHours, requestDate, timezone, 'availability_check_failed', blockedTimeRanges);
+        } else if (!tables || tables.length === 0) {
+          // No tables at all can fit this party size (query returned 0 rows)
+          // Block all operating hours since party size exceeds all table capacities
+          const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
+          blockAllSlotsInHours(operatingHours, requestDate, timezone, 'party_size_too_large', blockedTimeRanges);
+        } else {
           // Filter out tables 4, 8, and 12 (not available for reservations)
           const excludedTableNumbers = [4, 8, 12];
           const availableTables = tables.filter((t: any) =>
@@ -190,22 +281,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           );
 
           if (availableTables.length > 0) {
-            // Get all reservations for this date
+            // Get all reservations that overlap with this date
+            // Parse in location timezone, then convert to UTC for database query
             const startOfDay = requestDate.startOf('day').toUTC().toISO();
             const endOfDay = requestDate.endOf('day').toUTC().toISO();
 
             const tableIds = availableTables.map(t => t.id);
 
-            // Get existing reservations for these tables on this date
+            // Get existing reservations for these tables that overlap with this date
+            // A reservation overlaps if: start_time < end_of_day AND end_time > start_of_day
             const { data: reservations, error: resError } = await supabase
               .from('reservations')
               .select('id, table_id, start_time, end_time, status')
               .in('table_id', tableIds)
-              .gte('start_time', startOfDay)
-              .lte('start_time', endOfDay);
+              .lt('start_time', endOfDay)
+              .gt('end_time', startOfDay);
 
             if (resError) {
               console.error('Error fetching reservations:', resError);
+              // On database error, block all slots (fail closed)
+              // Don't return partial/incorrect availability data
+              const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
+              blockAllSlotsInHours(operatingHours, requestDate, timezone, 'availability_check_failed', blockedTimeRanges);
             } else {
               // Filter out cancelled reservations
               const activeReservations = (reservations || []).filter(
@@ -213,26 +310,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               );
 
               // Get venue hours for this date and location
-              let venueHoursQuery = supabase
-                .from('venue_hours')
-                .select('*')
-                .eq('type', 'base')
-                .eq('day_of_week', requestDate.weekday % 7); // Convert to 0-6 Sunday-Saturday
-
-              if (locationId) {
-                venueHoursQuery = venueHoursQuery.eq('location_id', locationId);
-              }
-
-              const { data: venueHours } = await venueHoursQuery;
-
-              // Default operating hours if not found in database
-              const defaultHours = [
-                { start: '18:00', end: '23:00' } // 6 PM to 11 PM
-              ];
-
-              const operatingHours = venueHours && venueHours.length > 0 && venueHours[0].time_ranges
-                ? venueHours[0].time_ranges
-                : defaultHours;
+              const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
 
               // Check availability for each 30-minute slot within operating hours
               operatingHours.forEach((hours: any) => {
@@ -252,7 +330,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                       day: requestDate.day,
                       hour,
                       minute
-                    }, { zone: 'America/Chicago' });
+                    }, { zone: timezone });
 
                     const slotEnd = slotStart.plus({ minutes: 30 });
                     // The full window a reservation starting in this slot would actually occupy
@@ -299,8 +377,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               });
             }
           } else {
-            // No tables at all that can fit this party size
-            console.log(`No tables can accommodate party size ${partySizeNum}`);
+            // No tables at all that can fit this party size - block all operating hours
+            const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
+            blockAllSlotsInHours(operatingHours, requestDate, timezone, 'party_size_too_large', blockedTimeRanges);
           }
         }
       }
