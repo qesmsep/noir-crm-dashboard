@@ -18,7 +18,7 @@ import { verifyAdmin } from '../../../lib/admin-auth';
  * @param partySize - Number of guests
  * @returns Score (higher is better)
  */
-function scoreTableForParty(table: { seats: number; table_number: number | string }, partySize: number): number {
+function scoreTableForParty(table: { seats: number }, partySize: number): number {
   const seatDiff = table.seats - partySize;
   let score = 0;
 
@@ -665,11 +665,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const startTime = new Date(body.start_time);
         const endTime = new Date(body.end_time);
         
-        const { data: allTables } = await client
+        let tablesQuery = client
           .from('tables')
           .select('id, table_number, seats')
           .gte('seats', body.party_size)
           .eq('status', 'active'); // Only include active tables
+
+        // Filter by location if location_id is available
+        if (locationId) {
+          tablesQuery = tablesQuery.eq('location_id', locationId);
+          console.log('[Fallback] Filtering tables by location_id:', locationId);
+        }
+
+        const { data: allTables } = await tablesQuery;
 
         // Use only active tables and apply intelligent scoring
         let availableTables = allTables || [];

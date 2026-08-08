@@ -12,6 +12,7 @@
 DO $$
 DECLARE
   noirkc_location_id UUID;
+  updated_count INTEGER;
 BEGIN
   -- Get NoirKC location ID
   SELECT id INTO noirkc_location_id
@@ -27,8 +28,8 @@ BEGIN
   SET status = 'active', updated_at = NOW()
   WHERE status IS NULL;
 
-  RAISE NOTICE 'Set NULL status values to active for % tables',
-    (SELECT COUNT(*) FROM public.tables WHERE updated_at >= NOW() - interval '1 second');
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+  RAISE NOTICE 'Set NULL status values to active for % tables', updated_count;
 
   -- STEP 2: Mark NoirKC tables 4, 8, 12 as inactive
   -- These tables are not desirable for reservations at NoirKC specifically
