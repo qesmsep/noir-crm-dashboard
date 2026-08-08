@@ -11,6 +11,43 @@ import { verifyAdmin } from '../../../lib/admin-auth';
  */
 
 /**
+ * Intelligent table scoring algorithm (Phase 1)
+ * Prevents small parties from taking large "prime" tables
+ *
+ * @param table - Table object with seats property
+ * @param partySize - Number of guests
+ * @returns Score (higher is better)
+ */
+function scoreTableForParty(table: { seats: number; table_number: number | string }, partySize: number): number {
+  const seatDiff = table.seats - partySize;
+  let score = 0;
+
+  // Prefer exact match or close to party size
+  if (seatDiff === 0) {
+    score += 100; // Perfect fit
+  } else if (seatDiff === 1) {
+    score += 80;  // 1 extra seat (very good)
+  } else if (seatDiff === 2) {
+    score += 60;  // 2 extra seats (acceptable)
+  } else {
+    score -= seatDiff * 10; // Penalty for wasting seats
+  }
+
+  // Heavy penalty for small party at large table
+  // This preserves 6-tops and 10-tops for larger groups
+  if (table.seats >= 6 && partySize <= 3) {
+    score -= 50; // Don't give 1-3 person parties a 6+ top
+  }
+
+  // Additional penalty for using the largest tables inefficiently
+  if (table.seats >= 10 && partySize <= 6) {
+    score -= 100; // Preserve 10-tops for large parties
+  }
+
+  return score;
+}
+
+/**
  * Type definition for reservation creation request body
  */
 interface ReservationCreateBody {
@@ -289,34 +326,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Score and sort tables to optimize assignment
           // Prevents small parties from taking large "prime" tables
           if (availableTables.length > 1) {
-            availableTables = availableTables.map((table: any) => {
-              const seatDiff = table.seats - body.party_size;
-              let score = 0;
-
-              // Prefer exact match or close to party size
-              if (seatDiff === 0) {
-                score += 100; // Perfect fit
-              } else if (seatDiff === 1) {
-                score += 80;  // 1 extra seat (very good)
-              } else if (seatDiff === 2) {
-                score += 60;  // 2 extra seats (acceptable)
-              } else {
-                score -= seatDiff * 10; // Penalty for wasting seats
-              }
-
-              // Heavy penalty for small party at large table
-              // This preserves 6-tops and 10-tops for larger groups
-              if (table.seats >= 6 && body.party_size <= 3) {
-                score -= 50; // Don't give 1-3 person parties a 6+ top
-              }
-
-              // Additional penalty for using the largest tables inefficiently
-              if (table.seats >= 10 && body.party_size <= 6) {
-                score -= 100; // Preserve 10-tops for large parties
-              }
-
-              return { ...table, assignmentScore: score };
-            }).sort((a: any, b: any) => b.assignmentScore - a.assignmentScore);
+            availableTables = availableTables.map((table: any) => ({
+              ...table,
+              assignmentScore: scoreTableForParty(table, body.party_size)
+            })).sort((a: any, b: any) => b.assignmentScore - a.assignmentScore);
 
             console.log(`Table scoring for party of ${body.party_size}: ${availableTables.map((t: any) =>
               `Table ${t.table_number} (${t.seats} seats): ${t.assignmentScore} points`
@@ -656,11 +669,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .from('tables')
           .select('id, table_number, seats')
           .gte('seats', body.party_size)
-          .eq('status', 'active') // Only include active tables
-          .order('seats', { ascending: true });
+          .eq('status', 'active'); // Only include active tables
 
-        // Use only active tables (inactive tables are filtered by database query)
-        const availableTables = allTables || [];
+        // Use only active tables and apply intelligent scoring
+        let availableTables = allTables || [];
+
+        // ===== PHASE 1: INTELLIGENT TABLE SCORING (FALLBACK PATH) =====
+        if (availableTables.length > 1) {
+          availableTables = availableTables.map((table: any) => ({
+            ...table,
+            assignmentScore: scoreTableForParty(table, body.party_size)
+          })).sort((a: any, b: any) => b.assignmentScore - a.assignmentScore);
+
+          console.log(`[Fallback] Table scoring for party of ${body.party_size}: ${availableTables.map((t: any) =>
+            `Table ${t.table_number} (${t.seats} seats): ${t.assignmentScore} points`
+          ).join(', ')}`);
+        }
         
         if (!availableTables || availableTables.length === 0) {
           return res.status(400).json({ 
