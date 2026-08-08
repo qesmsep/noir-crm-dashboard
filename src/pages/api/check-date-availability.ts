@@ -7,6 +7,34 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+/**
+ * Helper: Get operating hours for a specific date and location
+ */
+async function getOperatingHoursForDate(
+  requestDate: DateTime,
+  locationId: string | null
+): Promise<Array<{ start: string; end: string }>> {
+  let venueHoursQuery = supabase
+    .from('venue_hours')
+    .select('*')
+    .eq('type', 'base')
+    .eq('day_of_week', requestDate.weekday % 7);
+
+  if (locationId) {
+    venueHoursQuery = venueHoursQuery.eq('location_id', locationId);
+  }
+
+  const { data: venueHours } = await venueHoursQuery;
+
+  const defaultHours = [
+    { start: '18:00', end: '23:00' }
+  ];
+
+  return venueHours && venueHours.length > 0 && venueHours[0].time_ranges
+    ? venueHours[0].time_ranges
+    : defaultHours;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -219,26 +247,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               );
 
               // Get venue hours for this date and location
-              let venueHoursQuery = supabase
-                .from('venue_hours')
-                .select('*')
-                .eq('type', 'base')
-                .eq('day_of_week', requestDate.weekday % 7); // Convert to 0-6 Sunday-Saturday
-
-              if (locationId) {
-                venueHoursQuery = venueHoursQuery.eq('location_id', locationId);
-              }
-
-              const { data: venueHours } = await venueHoursQuery;
-
-              // Default operating hours if not found in database
-              const defaultHours = [
-                { start: '18:00', end: '23:00' } // 6 PM to 11 PM
-              ];
-
-              const operatingHours = venueHours && venueHours.length > 0 && venueHours[0].time_ranges
-                ? venueHours[0].time_ranges
-                : defaultHours;
+              const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
 
               // Check availability for each 30-minute slot within operating hours
               operatingHours.forEach((hours: any) => {
@@ -309,25 +318,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`No tables can accommodate party size ${partySizeNum}`);
 
             // Get venue hours to block all time slots
-            let venueHoursQuery = supabase
-              .from('venue_hours')
-              .select('*')
-              .eq('type', 'base')
-              .eq('day_of_week', requestDate.weekday % 7);
-
-            if (locationId) {
-              venueHoursQuery = venueHoursQuery.eq('location_id', locationId);
-            }
-
-            const { data: venueHours } = await venueHoursQuery;
-
-            const defaultHours = [
-              { start: '18:00', end: '23:00' }
-            ];
-
-            const operatingHours = venueHours && venueHours.length > 0 && venueHours[0].time_ranges
-              ? venueHours[0].time_ranges
-              : defaultHours;
+            const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
 
             // Block all time slots since no table can fit this party size
             operatingHours.forEach((hours: any) => {

@@ -317,12 +317,6 @@ export default function SimpleReservationRequestModal({
           if (response.ok) {
             const result = await response.json();
 
-            // Debug logging for April 24
-            if (dateStr === '2026-04-24') {
-              console.log('[April 24 Check] blockedTimeRanges:', result.blockedTimeRanges);
-              console.log('[April 24 Check] adminOverride:', adminOverride);
-            }
-
             // If there are blocked time ranges that cover the full day, mark as blocked
             if (result.blockedTimeRanges && result.blockedTimeRanges.length > 0) {
               // Check if any blocking is for the full day (starts at midnight or early, ends late)
@@ -330,10 +324,6 @@ export default function SimpleReservationRequestModal({
                 return (range.startHour === 0 && range.endHour === 23) ||
                        (range.startHour <= 16 && range.endHour >= 23);
               });
-
-              if (dateStr === '2026-04-24') {
-                console.log('[April 24 Check] hasFullDayBlock:', hasFullDayBlock);
-              }
 
               if (hasFullDayBlock) {
                 blockedDatesSet.add(dateStr);
@@ -452,16 +442,17 @@ export default function SimpleReservationRequestModal({
       // Only update state if this request wasn't cancelled
       if (response.ok && abortControllerRef.current === abortController) {
         setBlockedTimes(result.blockedTimeRanges || []);
-      } else if (!response.ok) {
+      } else if (!response.ok && abortControllerRef.current === abortController) {
         console.error('Error fetching availability:', result.error);
-        setBlockedTimes([]);
+        // On error, keep previous blockedTimes rather than clearing to []
+        // This fails "closed" (conservative) rather than "open" (unsafe)
+        // User will see previous availability or no times available
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Error fetching availability:', error);
-        if (abortControllerRef.current === abortController) {
-          setBlockedTimes([]);
-        }
+        // On error, keep previous blockedTimes rather than clearing to []
+        // This fails "closed" (conservative) rather than "open" (unsafe)
       }
     } finally {
       if (abortControllerRef.current === abortController) {
