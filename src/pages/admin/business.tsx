@@ -165,10 +165,9 @@ function WeeklyGainLossChart({ data, currentWeekStart }: { data: WeeklyPoint[]; 
   return (
     <div className={styles.chartContainer}>
       <svg
-        width="100%"
+        width={chartWidth}
         height={halfHeight * 2 + 48}
         viewBox={`0 0 ${chartWidth} ${halfHeight * 2 + 48}`}
-        preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Membership accounts gained and lost per week"
       >
@@ -249,11 +248,12 @@ function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; curren
 
   return (
     <div className={styles.chartContainer}>
+      {/* Fixed pixel width inside the scrollable container: on phones the
+          chart scrolls horizontally instead of shrinking labels illegibly */}
       <svg
-        width="100%"
+        width={chartWidth}
         height={height + 34}
         viewBox={`0 0 ${chartWidth} ${height + 34}`}
-        preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Member spend by location, last 6 months"
       >
@@ -532,7 +532,8 @@ export default function BusinessDashboard() {
               <div className={styles.chartCard}>
                 <div className={styles.chartTitle}>Member Spend by Location (Last 6 Months)</div>
                 <LocationTrendChart data={m.locations.trend} currentMonth={m.month} />
-                <table className={styles.dataTable} style={{ marginTop: '0.75rem' }}>
+                <div className={styles.chartContainer} style={{ marginTop: '0.75rem' }}>
+                <table className={styles.dataTable}>
                   <thead>
                     <tr>
                       <th>Month</th>
@@ -554,6 +555,7 @@ export default function BusinessDashboard() {
                     ))}
                   </tbody>
                 </table>
+                </div>
                 <div className={styles.modalHint}>
                   Location is derived from ledger purchase notes (Noir Attendance/Visit, RooftopKC) until purchases carry a
                   location id. RooftopKC totals include the $20 cover (first cocktail included) — Toast imports will let us
@@ -603,6 +605,7 @@ export default function BusinessDashboard() {
                   {m.engagement.atRisk.length === 0 ? (
                     <div className={styles.emptyState}>Everyone has visited recently 🎉</div>
                   ) : (
+                    <div className={styles.chartContainer}>
                     <table className={styles.dataTable}>
                       <thead>
                         <tr>
@@ -629,6 +632,7 @@ export default function BusinessDashboard() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   )}
                   {m.engagement.atRiskCount > m.engagement.atRisk.length && (
                     <div className={styles.modalHint}>
