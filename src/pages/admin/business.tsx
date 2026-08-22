@@ -31,6 +31,13 @@ interface AtRiskRow {
   monthlyDues: number;
 }
 
+interface WeeklyPoint {
+  weekStart: string; // YYYY-MM-DD (Monday)
+  gained: number;
+  lost: number;
+  net: number;
+}
+
 interface Metrics {
   generatedAt: string;
   today: string;
@@ -41,6 +48,7 @@ interface Metrics {
     totalMembers: number;
     newAccountsThisMonth: number;
     canceledLast30: number;
+    weekly: WeeklyPoint[];
   };
   mrr: {
     total: number;
@@ -122,6 +130,91 @@ const SERIES = [
   { key: 'rooftop' as const, label: 'RooftopKC', color: '#0a6fce' },
   { key: 'other' as const, label: 'Events & Other', color: '#b0508c' },
 ];
+
+// Gain/loss polarity colors (status semantics: gained = good, lost = bad)
+const GAINED_COLOR = '#1e7e45';
+const LOST_COLOR = '#c93a34';
+
+function fmtWeek(weekStart: string): string {
+  const d = new Date(weekStart + 'T12:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+// ---------------------------------------------------------------------------
+// Members gained vs lost — diverging weekly bars (gained up, lost down)
+// ---------------------------------------------------------------------------
+
+function WeeklyGainLossChart({ data, currentWeekStart }: { data: WeeklyPoint[]; currentWeekStart: string }) {
+  if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
+
+  const halfHeight = 80;
+  const yAxisWidth = 30;
+  const barWidth = 30;
+  const gap = 18;
+  const chartWidth = yAxisWidth + data.length * (barWidth + gap) + gap;
+  const maxVal = Math.max(...data.map(d => Math.max(d.gained, d.lost)), 1);
+  const midY = halfHeight + 14;
+  const hFor = (v: number) => (v / maxVal) * halfHeight;
+
+  return (
+    <div className={styles.chartContainer}>
+      <svg
+        width="100%"
+        height={halfHeight * 2 + 48}
+        viewBox={`0 0 ${chartWidth} ${halfHeight * 2 + 48}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Membership accounts gained and lost per week"
+      >
+        <line x1={yAxisWidth} y1={midY} x2={chartWidth} y2={midY} stroke="rgba(0,0,0,0.15)" strokeWidth={1} />
+        {data.map((d, i) => {
+          const x = yAxisWidth + gap + i * (barWidth + gap);
+          const gainedH = hFor(d.gained);
+          const lostH = hFor(d.lost);
+          const isCurrent = d.weekStart === currentWeekStart;
+          return (
+            <g key={d.weekStart} opacity={isCurrent ? 0.6 : 1}>
+              {d.gained > 0 && (
+                <rect x={x} y={midY - gainedH} width={barWidth} height={gainedH} rx={2} fill={GAINED_COLOR} opacity={0.9}>
+                  <title>{`Week of ${fmtWeek(d.weekStart)}: +${d.gained} gained`}</title>
+                </rect>
+              )}
+              {d.lost > 0 && (
+                <rect x={x} y={midY + 1} width={barWidth} height={lostH} rx={2} fill={LOST_COLOR} opacity={0.9}>
+                  <title>{`Week of ${fmtWeek(d.weekStart)}: −${d.lost} lost`}</title>
+                </rect>
+              )}
+              {d.gained > 0 && (
+                <text x={x + barWidth / 2} y={midY - gainedH - 4} textAnchor="middle" fontSize="9" fontWeight="600" fill="#1d1d1f">
+                  +{d.gained}
+                </text>
+              )}
+              {d.lost > 0 && (
+                <text x={x + barWidth / 2} y={midY + lostH + 11} textAnchor="middle" fontSize="9" fontWeight="600" fill="#1d1d1f">
+                  −{d.lost}
+                </text>
+              )}
+              <text x={x + barWidth / 2} y={halfHeight * 2 + 42} textAnchor="middle" fontSize="9" fill="#86868b">
+                {fmtWeek(d.weekStart)}{isCurrent ? '*' : ''}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.6875rem', color: '#6e6e73' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: GAINED_COLOR, display: 'inline-block' }} />
+          Accounts gained
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.6875rem', color: '#6e6e73' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: LOST_COLOR, display: 'inline-block' }} />
+          Accounts lost
+        </div>
+        <span style={{ fontSize: '0.6875rem', color: '#86868b' }}>* current week in progress</span>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Location revenue trend — stacked bars, one per month
@@ -303,6 +396,38 @@ export default function BusinessDashboard() {
                 <div className={styles.kpiValue}>{m.membership.canceledLast30}</div>
                 <div className={styles.kpiLabel}>Cancellations (30d)</div>
                 <div className={styles.kpiHint}>Accounts whose subscription was canceled in the last 30 days.</div>
+              </div>
+              {m.membership.weekly.length >= 2 && (() => {
+                const thisWk = m.membership.weekly[m.membership.weekly.length - 1];
+                const lastWk = m.membership.weekly[m.membership.weekly.length - 2];
+                return (
+                  <div className={styles.kpiTile}>
+                    <div className={styles.kpiValue}>
+                      <span style={{ color: GAINED_COLOR }}>+{thisWk.gained}</span>
+                      {' / '}
+                      <span style={{ color: LOST_COLOR }}>−{thisWk.lost}</span>
+                    </div>
+                    <div className={styles.kpiLabel}>Gained / Lost This Week</div>
+                    <div className={styles.kpiHint}>
+                      Net {thisWk.net >= 0 ? '+' : ''}{thisWk.net} accounts so far this week (Mon–Sun).
+                      Last week: +{lastWk.gained} / −{lastWk.lost} (net {lastWk.net >= 0 ? '+' : ''}{lastWk.net}).
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className={styles.chartsGrid}>
+              <div className={styles.chartCard}>
+                <div className={styles.chartTitle}>Members Gained vs Lost — Week over Week (Last 12 Weeks)</div>
+                <WeeklyGainLossChart
+                  data={m.membership.weekly}
+                  currentWeekStart={m.membership.weekly[m.membership.weekly.length - 1]?.weekStart || ''}
+                />
+                <div className={styles.modalHint}>
+                  Gained = accounts whose first member joined that week (counted even if they later canceled).
+                  Lost = accounts whose subscription was canceled that week. Weeks run Monday–Sunday.
+                </div>
               </div>
             </div>
 

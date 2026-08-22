@@ -97,6 +97,14 @@ function shiftMonth(monthStr: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Monday of the week containing dateStr (ISO week start). */
+function weekStartOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const dow = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
 // ---------------------------------------------------------------------------
 // Row types
 // ---------------------------------------------------------------------------
@@ -220,6 +228,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       a.subscription_cancel_at.slice(0, 10) >= cancel30Cutoff
     ).length;
 
+    // Members gained vs lost, week over week (last 12 ISO weeks, Monday start).
+    // Gained = account's first member joined that week (counted even if the
+    // account later canceled); lost = subscription canceled that week.
+    const thisWeekStart = weekStartOf(today);
+    const weekStarts: string[] = [];
+    for (let i = 11; i >= 0; i--) weekStarts.push(addDays(thisWeekStart, -7 * i));
+    const gainedByWeek = new Map<string, number>();
+    const lostByWeek = new Map<string, number>();
+    for (const jd of accountEarliestJoin.values()) {
+      const wk = weekStartOf(jd);
+      if (wk >= weekStarts[0]) gainedByWeek.set(wk, (gainedByWeek.get(wk) || 0) + 1);
+    }
+    for (const a of accounts) {
+      if (a.subscription_status !== 'canceled' || !a.subscription_cancel_at) continue;
+      const wk = weekStartOf(a.subscription_cancel_at.slice(0, 10));
+      if (wk >= weekStarts[0]) lostByWeek.set(wk, (lostByWeek.get(wk) || 0) + 1);
+    }
+    const weekly = weekStarts.map(wk => {
+      const gained = gainedByWeek.get(wk) || 0;
+      const lost = lostByWeek.get(wk) || 0;
+      return { weekStart: wk, gained, lost, net: gained - lost };
+    });
+
     const membership = {
       accounts: {
         total: activeAccounts.length,
@@ -230,6 +261,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalMembers: activeMembers.length,
       newAccountsThisMonth,
       canceledLast30,
+      weekly,
     };
 
     // ------------------------------------------------------------------
