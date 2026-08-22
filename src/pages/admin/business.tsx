@@ -103,6 +103,7 @@ interface Metrics {
   dataQuality?: {
     unknownPlanAccounts: number;
     purchasesWithEmptyNote: number;
+    futureCancelDates: number;
   };
 }
 

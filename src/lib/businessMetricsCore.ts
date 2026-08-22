@@ -96,6 +96,92 @@ export function round2(n: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// MRR and cash-flow (pure)
+// ---------------------------------------------------------------------------
+
+export interface PayingAccountInput {
+  /** accounts.monthly_dues: monthly amount for monthly plans, FULL annual amount for annual plans */
+  dues: number;
+  annual: boolean;
+  nextBillingDate: string | null; // YYYY-MM-DD
+}
+
+export interface MrrSummary {
+  total: number;
+  monthlyPlans: number;
+  annualNormalized: number;
+  payingAccounts: number;
+  annualAccounts: number;
+  avgDuesPerAccount: number;
+}
+
+/** MRR counted once per paying account; annual plans normalized to /12. */
+export function computeMrr(accounts: PayingAccountInput[]): MrrSummary {
+  let monthly = 0;
+  let annualNormalized = 0;
+  let annualCount = 0;
+  for (const a of accounts) {
+    if (a.annual) {
+      annualNormalized += a.dues / 12;
+      annualCount++;
+    } else {
+      monthly += a.dues;
+    }
+  }
+  const total = monthly + annualNormalized;
+  return {
+    total: round2(total),
+    monthlyPlans: round2(monthly),
+    annualNormalized: round2(annualNormalized),
+    payingAccounts: accounts.length,
+    annualAccounts: annualCount,
+    avgDuesPerAccount: accounts.length ? round2(total / accounts.length) : 0,
+  };
+}
+
+export interface CashflowSummary {
+  asOf: string;
+  windows: { days: number; amount: number; accounts: number }[];
+  overdueBilling: { accounts: number; amount: number };
+}
+
+/**
+ * Expected dues billing in the next N-day windows (inclusive of today and
+ * the window end). Each account bills its full `dues` when its
+ * next_billing_date falls in the window — annual accounts at full annual
+ * value. Billing dates in the past are surfaced as overdue, not projected.
+ */
+export function computeCashflowWindows(
+  accounts: PayingAccountInput[],
+  today: string,
+  windowDays: number[] = [7, 14, 21, 30]
+): CashflowSummary {
+  const windows = windowDays.map(days => {
+    const end = addDays(today, days);
+    let amount = 0;
+    let count = 0;
+    for (const a of accounts) {
+      if (a.nextBillingDate && a.nextBillingDate >= today && a.nextBillingDate <= end) {
+        amount += a.dues;
+        count++;
+      }
+    }
+    return { days, amount: round2(amount), accounts: count };
+  });
+
+  let overdueAmount = 0;
+  let overdueCount = 0;
+  for (const a of accounts) {
+    if (a.nextBillingDate && a.nextBillingDate < today) {
+      overdueAmount += a.dues;
+      overdueCount++;
+    }
+  }
+
+  return { asOf: today, windows, overdueBilling: { accounts: overdueCount, amount: round2(overdueAmount) } };
+}
+
+// ---------------------------------------------------------------------------
 // Single-pass ledger aggregation
 // ---------------------------------------------------------------------------
 

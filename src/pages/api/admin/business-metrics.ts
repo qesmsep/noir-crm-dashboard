@@ -5,6 +5,8 @@ import {
   classifyPlan,
   aggregateLedger,
   emptyLocationAgg,
+  computeMrr,
+  computeCashflowWindows,
   LOCATION_LABELS,
   LocationKey,
   LocationAgg,
@@ -201,7 +203,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // INVARIANT (verified against production data): subscription_cancel_at is
     // only populated with the actual cancellation date on accounts whose
     // subscription_status is already 'canceled' — never a future scheduled
-    // cancel date. The status filter below guards the metric if that changes.
+    // cancel date. The status filter below guards the metric if that changes,
+    // and the defensive count here makes a violation visible.
+    let futureCancelDates = 0;
+    for (const a of accounts) {
+      if (a.subscription_status === 'canceled' && a.subscription_cancel_at && a.subscription_cancel_at.slice(0, 10) > today) {
+        futureCancelDates++;
+        console.warn(`[business-metrics] Canceled account ${a.account_id} has a FUTURE subscription_cancel_at (${a.subscription_cancel_at}) — cancellation metrics may count it early`);
+      }
+    }
     const cancel30Cutoff = addDays(today, -30);
     const canceledLast30 = accounts.filter(a =>
       a.subscription_status === 'canceled' &&
@@ -246,27 +256,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     };
 
     // ------------------------------------------------------------------
-    // C — MRR (account level; annual normalized to /12)
+    // C — MRR (account level; annual normalized to /12) — pure math in core
     // ------------------------------------------------------------------
-    let mrrMonthly = 0;
-    let mrrAnnualNormalized = 0;
-    let annualAccountCount = 0;
-    for (const a of payingAccounts) {
-      if (isAnnual(a)) {
-        mrrAnnualNormalized += a.monthly_dues / 12;
-        annualAccountCount++;
-      } else {
-        mrrMonthly += a.monthly_dues;
-      }
-    }
-    const mrr = {
-      total: round2(mrrMonthly + mrrAnnualNormalized),
-      monthlyPlans: round2(mrrMonthly),
-      annualNormalized: round2(mrrAnnualNormalized),
-      payingAccounts: payingAccounts.length,
-      annualAccounts: annualAccountCount,
-      avgDuesPerAccount: payingAccounts.length ? round2((mrrMonthly + mrrAnnualNormalized) / payingAccounts.length) : 0,
-    };
+    const payingInputs = payingAccounts.map(a => ({
+      dues: a.monthly_dues,
+      annual: isAnnual(a),
+      nextBillingDate: a.next_billing_date?.slice(0, 10) || null,
+    }));
+    const mrr = computeMrr(payingInputs);
 
     // ------------------------------------------------------------------
     // Revenue
@@ -326,34 +323,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // ------------------------------------------------------------------
     // 4 — Cash-flow projection (dues billing in the next 7/14/21/30 days)
+    // — pure math in core
     // ------------------------------------------------------------------
-    const windows = [7, 14, 21, 30].map(days => {
-      const end = addDays(today, days);
-      let amount = 0;
-      let count = 0;
-      for (const a of payingAccounts) {
-        const nbd = a.next_billing_date?.slice(0, 10);
-        if (nbd && nbd >= today && nbd <= end) {
-          amount += a.monthly_dues; // full amount billed (annual accounts bill their full annual dues)
-          count++;
-        }
-      }
-      return { days, amount: round2(amount), accounts: count };
-    });
-    let overdueAmount = 0;
-    let overdueCount = 0;
-    for (const a of payingAccounts) {
-      const nbd = a.next_billing_date?.slice(0, 10);
-      if (nbd && nbd < today) {
-        overdueAmount += a.monthly_dues;
-        overdueCount++;
-      }
-    }
-    const cashflow = {
-      asOf: today,
-      windows,
-      overdueBilling: { accounts: overdueCount, amount: round2(overdueAmount) },
-    };
+    const cashflow = computeCashflowWindows(payingInputs, today);
 
     // ------------------------------------------------------------------
     // Balances — money owed to us, and the house-credit liability
@@ -420,6 +392,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       dataQuality: {
         unknownPlanAccounts: unknownPlanAccounts.size,
         purchasesWithEmptyNote,
+        futureCancelDates,
       },
     };
 

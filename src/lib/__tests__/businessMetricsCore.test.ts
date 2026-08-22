@@ -5,6 +5,8 @@ import {
   isDuesCash,
   aggregateLedger,
   CoreLedgerRow,
+  computeMrr,
+  computeCashflowWindows,
   addDays,
   monthStartOf,
   shiftMonth,
@@ -107,6 +109,55 @@ describe('date helpers', () => {
   it('round2', () => {
     expect(round2(26675 / 12)).toBe(2222.92);
     expect(round2(0.005)).toBe(0.01);
+  });
+});
+
+describe('computeMrr', () => {
+  it('normalizes annual dues to /12 and counts each account once', () => {
+    const mrr = computeMrr([
+      { dues: 150, annual: false, nextBillingDate: null },
+      { dues: 125, annual: false, nextBillingDate: null },
+      { dues: 1800, annual: true, nextBillingDate: null }, // $150/mo normalized
+    ]);
+    expect(mrr.total).toBe(425);
+    expect(mrr.monthlyPlans).toBe(275);
+    expect(mrr.annualNormalized).toBe(150);
+    expect(mrr.payingAccounts).toBe(3);
+    expect(mrr.annualAccounts).toBe(1);
+    expect(mrr.avgDuesPerAccount).toBe(round2(425 / 3));
+  });
+
+  it('handles zero paying accounts without dividing by zero', () => {
+    const mrr = computeMrr([]);
+    expect(mrr.total).toBe(0);
+    expect(mrr.avgDuesPerAccount).toBe(0);
+  });
+});
+
+describe('computeCashflowWindows', () => {
+  const accounts = [
+    { dues: 100, annual: false, nextBillingDate: '2026-08-22' }, // today: in every window
+    { dues: 200, annual: false, nextBillingDate: '2026-08-29' }, // day 7 boundary: inclusive
+    { dues: 300, annual: false, nextBillingDate: '2026-08-30' }, // day 8: 14+ only
+    { dues: 1800, annual: true, nextBillingDate: '2026-09-15' }, // annual, full value, 30-day window only
+    { dues: 150, annual: false, nextBillingDate: '2026-08-20' }, // past date: overdue, never projected
+    { dues: 50, annual: false, nextBillingDate: null }, // no date: ignored
+  ];
+
+  it('buckets billing into inclusive windows with annual at full value', () => {
+    const cf = computeCashflowWindows(accounts, '2026-08-22');
+    const byDays = Object.fromEntries(cf.windows.map(w => [w.days, w]));
+    expect(byDays[7].amount).toBe(300); // 100 + 200
+    expect(byDays[7].accounts).toBe(2);
+    expect(byDays[14].amount).toBe(600); // + 300
+    expect(byDays[21].amount).toBe(600);
+    expect(byDays[30].amount).toBe(2400); // + 1800 annual
+  });
+
+  it('reports past billing dates as overdue instead of projecting them', () => {
+    const cf = computeCashflowWindows(accounts, '2026-08-22');
+    expect(cf.overdueBilling.accounts).toBe(1);
+    expect(cf.overdueBilling.amount).toBe(150);
   });
 });
 
