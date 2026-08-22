@@ -3,6 +3,13 @@ const nextConfig = {
   // Temporarily disable React Strict Mode to avoid double-mounting in dev
   // Re-enable this for production builds to catch potential issues
   reactStrictMode: process.env.NODE_ENV === 'production',
+  async redirects() {
+    return [
+      // Old dashboards merged into the Business page
+      { source: '/admin/dashboard', destination: '/admin/business', permanent: false },
+      { source: '/admin/dashboard-v2', destination: '/admin/business', permanent: false },
+    ];
+  },
   images: {
     remotePatterns: [
       {

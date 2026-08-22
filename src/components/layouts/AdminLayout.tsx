@@ -6,7 +6,6 @@ import { useAuth } from '../../lib/auth-context';
 import { debugLog } from '../../utils/debugLogger';
 import styles from '../../styles/AdminLayout.module.css';
 import {
-  BarChart3,
   CalendarDays,
   Users,
   Clock,
@@ -144,7 +143,6 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
   }
 
   const navItems = [
-    { href: '/admin/dashboard-v2', label: 'Dashboard', icon: BarChart3 },
     { href: '/admin/business', label: 'Business', icon: TrendingUp },
     { href: '/admin/reservations', label: 'Reservations', icon: CalendarDays },
     { href: '/admin/members', label: 'Members', icon: Users },
