@@ -100,6 +100,10 @@ interface Metrics {
     atRiskCount: number;
     atRisk: AtRiskRow[];
   };
+  dataQuality?: {
+    unknownPlanAccounts: number;
+    purchasesWithEmptyNote: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -372,6 +376,13 @@ export default function BusinessDashboard() {
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
+
+        {m && (m.dataQuality?.unknownPlanAccounts ?? 0) > 0 && (
+          <div className={styles.error}>
+            ⚠ {m.dataQuality!.unknownPlanAccounts} account{m.dataQuality!.unknownPlanAccounts > 1 ? 's reference' : ' references'} a
+            membership plan that no longer exists — their dues are being counted as monthly in MRR. Fix the plan assignment on those accounts.
+          </div>
+        )}
 
         {m && (
           <>

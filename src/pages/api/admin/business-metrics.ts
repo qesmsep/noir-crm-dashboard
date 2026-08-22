@@ -3,12 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import {
   classifyPlan,
-  classifyPurchaseLocation,
-  isVisit,
-  isDuesCash,
+  aggregateLedger,
+  emptyLocationAgg,
   LOCATION_LABELS,
   LocationKey,
+  LocationAgg,
   PlanType,
+  CoreLedgerRow,
   todayChicago,
   addDays,
   monthStartOf,
@@ -46,14 +47,7 @@ const supabaseAdmin = createClient(
 // Row types
 // ---------------------------------------------------------------------------
 
-interface LedgerRow {
-  account_id: string;
-  type: string;
-  amount: number;
-  note: string | null;
-  source: string | null;
-  date: string;
-}
+type LedgerRow = CoreLedgerRow;
 
 interface AccountRow {
   account_id: string;
@@ -132,12 +126,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       planMap.set(p.id, { plan_name: p.plan_name || '', interval: p.interval || 'month' });
     }
 
+    const unknownPlanAccounts = new Set<string>();
     const planOf = (a: AccountRow) => {
       if (!a.membership_plan_id) return undefined;
       const plan = planMap.get(a.membership_plan_id);
-      if (!plan) {
+      if (!plan && !unknownPlanAccounts.has(a.account_id)) {
         // A stale plan id silently degrades MRR math (annual would be counted
         // as monthly), so make bad data visible instead of failing quietly.
+        unknownPlanAccounts.add(a.account_id);
         console.warn(
           `[business-metrics] Account ${a.account_id} has membership_plan_id ${a.membership_plan_id} not found in subscription_plans — treating as monthly/other`
         );
@@ -169,60 +165,24 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // ------------------------------------------------------------------
     // Single pass over the ledger for everything it feeds
+    // (pure reducer in businessMetricsCore.ts — unit tested there)
     // ------------------------------------------------------------------
-    interface LocAgg { revenue: number; visits: number; accounts: Set<string> }
-    const emptyLocAgg = (): Record<LocationKey, LocAgg> => ({
-      noir: { revenue: 0, visits: 0, accounts: new Set() },
-      rooftop: { revenue: 0, visits: 0, accounts: new Set() },
-      other: { revenue: 0, visits: 0, accounts: new Set() },
-    });
-
     const trendMonths: string[] = [];
     for (let i = 5; i >= 0; i--) trendMonths.push(shiftMonth(monthStart, -i));
-    const locByMonth = new Map<string, Record<LocationKey, LocAgg>>();
-    for (const m of trendMonths) locByMonth.set(m, emptyLocAgg());
 
-    let duesCashMTD = 0;
-    let duesCashLastMonth = 0;
-    const spendLastMonthByAccount = new Map<string, number>(); // visit spend, last full month
-    const balanceByAccount = new Map<string, number>();
-    const lastVisitByAccount = new Map<string, string>();
-    const visitedMTD = new Set<string>();
+    const {
+      locByMonth,
+      duesCashMTD,
+      duesCashLastMonth,
+      spendLastMonthByAccount,
+      balanceByAccount,
+      lastVisitByAccount,
+      visitedMTD,
+      purchasesWithEmptyNote,
+    } = aggregateLedger(ledger, monthStart, nextMonthStart, lastMonthStart, trendMonths);
 
-    for (const r of ledger) {
-      balanceByAccount.set(r.account_id, (balanceByAccount.get(r.account_id) || 0) + r.amount);
-
-      if (r.amount > 0 && isDuesCash(r.type, r.note, r.source)) {
-        if (r.date >= monthStart && r.date < nextMonthStart) duesCashMTD += r.amount;
-        else if (r.date >= lastMonthStart && r.date < monthStart) duesCashLastMonth += r.amount;
-      }
-
-      if (r.type !== 'purchase') continue;
-
-      const loc = classifyPurchaseLocation(r.note);
-      const monthKey = monthStartOf(r.date);
-      const agg = locByMonth.get(monthKey);
-      if (agg) {
-        agg[loc].revenue += Math.abs(r.amount);
-        agg[loc].visits++;
-        if (r.account_id) agg[loc].accounts.add(r.account_id);
-      }
-
-      if (loc === 'noir' || loc === 'rooftop') {
-        const prev = lastVisitByAccount.get(r.account_id);
-        if (!prev || r.date > prev) lastVisitByAccount.set(r.account_id, r.date);
-        if (r.date >= monthStart && r.date < nextMonthStart) visitedMTD.add(r.account_id);
-        if (r.date >= lastMonthStart && r.date < monthStart) {
-          spendLastMonthByAccount.set(
-            r.account_id,
-            (spendLastMonthByAccount.get(r.account_id) || 0) + Math.abs(r.amount)
-          );
-        }
-      }
-    }
-
-    const mtdLoc = locByMonth.get(monthStart) || emptyLocAgg();
-    const lastLoc = locByMonth.get(lastMonthStart) || emptyLocAgg();
+    const mtdLoc = locByMonth.get(monthStart) || emptyLocationAgg();
+    const lastLoc = locByMonth.get(lastMonthStart) || emptyLocationAgg();
 
     // ------------------------------------------------------------------
     // A + B — Membership
@@ -238,6 +198,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (activeAccountIds.has(accountId) && jd >= monthStart && jd < nextMonthStart) newAccountsThisMonth++;
     }
 
+    // INVARIANT (verified against production data): subscription_cancel_at is
+    // only populated with the actual cancellation date on accounts whose
+    // subscription_status is already 'canceled' — never a future scheduled
+    // cancel date. The status filter below guards the metric if that changes.
     const cancel30Cutoff = addDays(today, -30);
     const canceledLast30 = accounts.filter(a =>
       a.subscription_status === 'canceled' &&
@@ -307,7 +271,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // ------------------------------------------------------------------
     // Revenue
     // ------------------------------------------------------------------
-    const locationSummary = (agg: Record<LocationKey, LocAgg>) =>
+    const locationSummary = (agg: Record<LocationKey, LocationAgg>) =>
       (Object.keys(LOCATION_LABELS) as LocationKey[]).map(key => ({
         key,
         label: LOCATION_LABELS[key],
@@ -318,7 +282,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }));
 
     const locationTrend = trendMonths.map(m => {
-      const agg = locByMonth.get(m) || emptyLocAgg();
+      const agg = locByMonth.get(m) || emptyLocationAgg();
       return {
         month: m.slice(0, 7),
         noir: round2(agg.noir.revenue),
@@ -450,6 +414,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       },
       balances,
       engagement,
+      // Data-quality signals: nonzero values mean a figure above is degraded
+      // (stale plan id => annual dues counted as monthly; empty purchase
+      // notes => spend silently bucketed under "Events & Other").
+      dataQuality: {
+        unknownPlanAccounts: unknownPlanAccounts.size,
+        purchasesWithEmptyNote,
+      },
     };
 
     cached = { at: Date.now(), payload };

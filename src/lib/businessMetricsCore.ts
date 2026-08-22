@@ -94,3 +94,113 @@ export function weekStartOf(dateStr: string): string {
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+// ---------------------------------------------------------------------------
+// Single-pass ledger aggregation
+// ---------------------------------------------------------------------------
+
+export interface CoreLedgerRow {
+  account_id: string;
+  type: string;
+  amount: number;
+  note: string | null;
+  source: string | null;
+  date: string; // YYYY-MM-DD
+}
+
+export interface LocationAgg {
+  revenue: number;
+  visits: number;
+  accounts: Set<string>;
+}
+
+export interface LedgerAggregates {
+  /** Per trend month (YYYY-MM-01 keys): purchase revenue/visits by location */
+  locByMonth: Map<string, Record<LocationKey, LocationAgg>>;
+  duesCashMTD: number;
+  duesCashLastMonth: number;
+  /** Visit (Noir/Rooftop) purchase spend per account, last full month */
+  spendLastMonthByAccount: Map<string, number>;
+  /** All-time running balance per account */
+  balanceByAccount: Map<string, number>;
+  /** Most recent visit date per account (all time) */
+  lastVisitByAccount: Map<string, string>;
+  /** Accounts with at least one visit this month */
+  visitedMTD: Set<string>;
+  /** Purchase rows whose note is null/empty — these silently land in
+   *  "Events & Other", so surface the count as a data-quality signal. */
+  purchasesWithEmptyNote: number;
+}
+
+export function emptyLocationAgg(): Record<LocationKey, LocationAgg> {
+  return {
+    noir: { revenue: 0, visits: 0, accounts: new Set() },
+    rooftop: { revenue: 0, visits: 0, accounts: new Set() },
+    other: { revenue: 0, visits: 0, accounts: new Set() },
+  };
+}
+
+/**
+ * One pass over the full ledger computing everything the dashboard needs
+ * from it. Pure: takes rows + month boundaries, returns aggregates.
+ *
+ * monthStart/nextMonthStart/lastMonthStart are YYYY-MM-01 boundaries for
+ * the current month; trendMonths lists the months (YYYY-MM-01) to bucket
+ * location revenue for.
+ */
+export function aggregateLedger(
+  ledger: CoreLedgerRow[],
+  monthStart: string,
+  nextMonthStart: string,
+  lastMonthStart: string,
+  trendMonths: string[]
+): LedgerAggregates {
+  const locByMonth = new Map<string, Record<LocationKey, LocationAgg>>();
+  for (const m of trendMonths) locByMonth.set(m, emptyLocationAgg());
+
+  const agg: LedgerAggregates = {
+    locByMonth,
+    duesCashMTD: 0,
+    duesCashLastMonth: 0,
+    spendLastMonthByAccount: new Map(),
+    balanceByAccount: new Map(),
+    lastVisitByAccount: new Map(),
+    visitedMTD: new Set(),
+    purchasesWithEmptyNote: 0,
+  };
+
+  for (const r of ledger) {
+    agg.balanceByAccount.set(r.account_id, (agg.balanceByAccount.get(r.account_id) || 0) + r.amount);
+
+    if (r.amount > 0 && isDuesCash(r.type, r.note, r.source)) {
+      if (r.date >= monthStart && r.date < nextMonthStart) agg.duesCashMTD += r.amount;
+      else if (r.date >= lastMonthStart && r.date < monthStart) agg.duesCashLastMonth += r.amount;
+    }
+
+    if (r.type !== 'purchase') continue;
+
+    if (!r.note || !r.note.trim()) agg.purchasesWithEmptyNote++;
+
+    const loc = classifyPurchaseLocation(r.note);
+    const monthAgg = locByMonth.get(monthStartOf(r.date));
+    if (monthAgg) {
+      monthAgg[loc].revenue += Math.abs(r.amount);
+      monthAgg[loc].visits++;
+      if (r.account_id) monthAgg[loc].accounts.add(r.account_id);
+    }
+
+    if (loc === 'noir' || loc === 'rooftop') {
+      const prev = agg.lastVisitByAccount.get(r.account_id);
+      if (!prev || r.date > prev) agg.lastVisitByAccount.set(r.account_id, r.date);
+      if (r.date >= monthStart && r.date < nextMonthStart) agg.visitedMTD.add(r.account_id);
+      if (r.date >= lastMonthStart && r.date < monthStart) {
+        agg.spendLastMonthByAccount.set(
+          r.account_id,
+          (agg.spendLastMonthByAccount.get(r.account_id) || 0) + Math.abs(r.amount)
+        );
+      }
+    }
+  }
+
+  return agg;
+}
