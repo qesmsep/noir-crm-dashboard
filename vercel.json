@@ -24,10 +24,6 @@
     {
       "path": "/api/cron/retry-failed-payments",
       "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/admin/business-snapshot",
-      "schedule": "0 6 1 * *"
     }
   ],
   "functions": {
@@ -41,9 +37,6 @@
       "maxDuration": 60
     },
     "src/pages/api/cron/retry-failed-payments.ts": {
-      "maxDuration": 60
-    },
-    "src/pages/api/admin/business-snapshot.ts": {
       "maxDuration": 60
     },
     "src/pages/api/inventory/scan.ts": {

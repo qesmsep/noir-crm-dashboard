@@ -1,108 +1,110 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
 import { supabase } from '../../lib/supabase';
-import type { MembershipCashBreakdown, BusinessSummary as BusinessSummaryBase } from '../../lib/businessMetrics';
 
 // ---------------------------------------------------------------------------
-// Types (mirror server types for client-side display)
+// Types (mirror /api/admin/business-metrics response)
 // ---------------------------------------------------------------------------
 
-interface MrrBridge {
-  startingMrr: number;
-  endingMrr: number;
-  newMrr: number;
-  expansionMrr: number;
-  contractionMrr: number;
-  churnedMrr: number;
-  pausedMrr: number;
-  netNewMrr: number;
-}
-
-interface MemberCounts {
-  activeMembers: number;
-  newMembers: number;
-  churnedMembers: number;
-  pausedMembers: number;
-}
-
-interface RetentionRates {
-  nrr: number;
-  grr: number;
-  logoChurnRate: number;
-  revenueChurnRate: number;
-}
-
-interface AttachMetrics {
-  attachRevenue: number;
-  attachRate: number;
-  allInArpm: number;
-  membersWithAttach: number;
-}
-
-interface AlertStatus {
-  alert_key: string;
+interface LocationSummary {
+  key: string;
   label: string;
-  description: string | null;
-  threshold_value: number;
-  threshold_type: string;
-  is_triggered: boolean;
-  last_evaluated_at: string | null;
-  current_value: number | null;
+  revenue: number;
+  visits: number;
+  uniqueAccounts: number;
+  avgCheck: number;
 }
 
-// Extends the canonical BusinessSummary from the lib with client-only fields
-// added by the API layer (alerts are evaluated separately in business-summary.ts).
-interface BusinessSummary extends BusinessSummaryBase {
-  alerts: AlertStatus[];
+interface TrendPoint {
+  month: string; // YYYY-MM
+  noir: number;
+  rooftop: number;
+  other: number;
 }
 
-interface SeriesPoint {
+interface AtRiskRow {
+  account_id: string;
+  member_id: string | null;
+  name: string;
+  lastVisit: string | null;
+  monthlyDues: number;
+}
+
+interface WeeklyPoint {
+  weekStart: string; // YYYY-MM-DD (Monday)
+  gained: number;
+  lost: number;
+  net: number;
+}
+
+interface Metrics {
+  generatedAt: string;
+  today: string;
   month: string;
-  mrr: number;
-  activeMembers: number;
-  attachRevenue: number;
-  newMrr: number;
-  expansionMrr: number;
-  contractionMrr: number;
-  churnedMrr: number;
-  pausedMrr: number;
-  netNewMrr: number;
-}
-
-interface CohortRow {
-  cohortMonth: string;
-  cohortSize: number;
-  retentionByMonth: { month: string; retained: number; rate: number }[];
-}
-
-interface DrillChurn {
-  member_id: string;
-  first_name: string;
-  last_name: string;
-  tenure_months: number;
-  plan_name: string | null;
-  prior_mrr: number;
-  churn_type: string;
-}
-
-interface DrillExpansion {
-  member_id: string;
-  first_name: string;
-  last_name: string;
-  prior_mrr: number;
-  current_mrr: number;
-  delta: number;
-  type: 'expansion' | 'contraction';
-}
-
-interface DrillAttach {
-  member_id: string;
-  first_name: string;
-  last_name: string;
-  attach_revenue: number;
-  transaction_count: number;
+  lastMonth: string;
+  membership: {
+    accounts: { total: number; noir: number; skyline: number; other: number };
+    totalMembers: number;
+    newAccountsThisMonth: number;
+    canceledLast30: number;
+    weekly: WeeklyPoint[];
+  };
+  mrr: {
+    total: number;
+    monthlyPlans: number;
+    annualNormalized: number;
+    payingAccounts: number;
+    annualAccounts: number;
+    avgDuesPerAccount: number;
+  };
+  revenue: {
+    duesCashMTD: number;
+    duesCashLastMonth: number;
+    beverageMTD: number;
+    beverageLastMonth: number;
+    eventsOtherMTD: number;
+    eventsOtherLastMonth: number;
+    totalMemberSpendMTD: number;
+  };
+  memberSpend: {
+    month: string;
+    avgSpendPerAccount: number;
+    avgDuesPerAccount: number;
+    accountsOverDues: number;
+    payingAccounts: number;
+    pctOverDues: number;
+    totalBeverage: number;
+  };
+  cashflow: {
+    asOf: string;
+    windows: { days: number; amount: number; accounts: number }[];
+    overdueBilling: { accounts: number; amount: number };
+  };
+  locations: {
+    current: LocationSummary[];
+    lastMonth: LocationSummary[];
+    trend: TrendPoint[];
+  };
+  balances: {
+    outstandingOwed: number;
+    accountsOwing: number;
+    houseCreditLiability: number;
+    accountsInCredit: number;
+  };
+  engagement: {
+    visitingAccountsMTD: number;
+    payingAccounts: number;
+    visitRateMTD: number;
+    atRiskCount: number;
+    atRisk: AtRiskRow[];
+  };
+  dataQuality?: {
+    unknownPlanAccounts: number;
+    purchasesWithEmptyNote: number;
+    futureCancelDates: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -117,477 +119,229 @@ function fmtCurrencyDec(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fmtPct(n: number): string {
-  return (n * 100).toFixed(1) + '%';
+function fmtMonth(monthStr: string): string {
+  const d = new Date(monthStr + '-01T12:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
-function fmtMonthLabel(monthStr: string): string {
-  const d = new Date(monthStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+function fmtMonthShort(monthStr: string): string {
+  const d = new Date(monthStr + '-01T12:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
 }
 
-function deltaStr(current: number, prior: number, format: 'currency' | 'pct' | 'number' = 'currency'): { text: string; cls: string } {
-  if (prior === 0 && current === 0) return { text: '--', cls: styles.deltaNeutral };
-  const diff = current - prior;
-  const sign = diff >= 0 ? '+' : '';
-  let text = '';
-  if (format === 'currency') text = sign + fmtCurrency(diff);
-  else if (format === 'pct') text = sign + (diff * 100).toFixed(1) + 'pp';
-  else text = sign + diff.toLocaleString();
-  return { text, cls: diff > 0 ? styles.deltaPositive : diff < 0 ? styles.deltaNegative : styles.deltaNeutral };
-}
+// Validated categorical palette (fixed order: Noir, RooftopKC, Events & Other).
+// Passes CVD-separation, chroma and contrast checks on a light surface.
+const SERIES = [
+  { key: 'noir' as const, label: 'Noir', color: '#b06a1f' },
+  { key: 'rooftop' as const, label: 'RooftopKC', color: '#0a6fce' },
+  { key: 'other' as const, label: 'Events & Other', color: '#b0508c' },
+];
 
-/** Inverse delta: for churn-like metrics where lower = better */
-function inverseDeltaStr(current: number, prior: number, format: 'pct' | 'number' = 'pct'): { text: string; cls: string } {
-  const d = deltaStr(current, prior, format);
-  // Flip colors: increase in churn is negative
-  if (d.cls === styles.deltaPositive) d.cls = styles.deltaNegative;
-  else if (d.cls === styles.deltaNegative) d.cls = styles.deltaPositive;
-  return d;
-}
+// Gain/loss polarity colors (status semantics: gained = good, lost = bad)
+const GAINED_COLOR = '#1e7e45';
+const LOST_COLOR = '#c93a34';
 
-/** Format month as "Month Year" or "MTD" for current month */
-function fmtMonthRange(monthStr: string): string {
-  const date = new Date(monthStr + 'T00:00:00');
-  const now = new Date();
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const monthName = date.toLocaleString('en-US', { month: 'long' });
-
-  // Check if this is the current month
-  if (year === now.getFullYear() && month === now.getMonth()) {
-    return `${monthName} ${year} (MTD)`;
-  }
-
-  return `${monthName} ${year}`;
-}
-
-function generateMonthOptions(): string[] {
-  const options: string[] = [];
-  const now = new Date();
-  const stopDate = new Date(2025, 9, 1); // October 2025 (month is 0-indexed)
-
-  // Start with current month
-  let currentDate = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  // Generate months from now back to October 2025
-  while (currentDate >= stopDate) {
-    const y = currentDate.getFullYear();
-    const m = String(currentDate.getMonth() + 1).padStart(2, '0');
-    options.push(`${y}-${m}-01`);
-
-    // Move to previous month
-    currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-  }
-
-  return options;
+function fmtWeek(weekStart: string): string {
+  const d = new Date(weekStart + 'T12:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 // ---------------------------------------------------------------------------
-// Simple SVG Chart Components
+// Members gained vs lost — diverging weekly bars (gained up, lost down)
 // ---------------------------------------------------------------------------
 
-function BarChart({ data, dataKey, color, height = 160 }: {
-  data: SeriesPoint[];
-  dataKey: keyof SeriesPoint;
-  color: string;
-  height?: number;
-}) {
+function WeeklyGainLossChart({ data, currentWeekStart }: { data: WeeklyPoint[]; currentWeekStart: string }) {
   if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
 
-  const values = data.map(d => Number(d[dataKey]) || 0);
-  const maxDataVal = Math.max(...values, 1);
-  const barWidth = Math.min(40, Math.floor(600 / data.length) - 8);
-  const yAxisWidth = 60; // Space for y-axis labels
-  const chartWidth = data.length * (barWidth + 8) + yAxisWidth;
-
-  // Generate y-axis tick values in $3k increments
-  const tickIncrement = 3000;
-  const maxVal = Math.ceil(maxDataVal / tickIncrement) * tickIncrement; // Round up to nearest $3k
-  const numTicks = Math.floor(maxVal / tickIncrement) + 1;
-  const yTicks = Array.from({ length: numTicks }, (_, i) => i * tickIncrement);
+  const halfHeight = 80;
+  const yAxisWidth = 30;
+  const barWidth = 30;
+  const gap = 18;
+  const chartWidth = yAxisWidth + data.length * (barWidth + gap) + gap;
+  const maxVal = Math.max(...data.map(d => Math.max(d.gained, d.lost)), 1);
+  const midY = halfHeight + 14;
+  const hFor = (v: number) => (v / maxVal) * halfHeight;
 
   return (
     <div className={styles.chartContainer}>
-      <svg width={chartWidth} height={height + 30} viewBox={`0 0 ${chartWidth} ${height + 30}`}>
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tickValue, i) => {
-          const y = height - (tickValue / maxVal) * height;
-          return (
-            <g key={i}>
-              <line
-                x1={yAxisWidth}
-                y1={y}
-                x2={chartWidth}
-                y2={y}
-                stroke="rgba(0,0,0,0.06)"
-                strokeWidth={1}
-                strokeDasharray="2,2"
-              />
-              <text
-                x={yAxisWidth - 8}
-                y={y + 3}
-                textAnchor="end"
-                fontSize="10"
-                fill="#86868b"
-                fontWeight="500"
-              >
-                {fmtCurrency(tickValue)}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Bars */}
+      <svg
+        width="100%"
+        height={halfHeight * 2 + 48}
+        viewBox={`0 0 ${chartWidth} ${halfHeight * 2 + 48}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Membership accounts gained and lost per week"
+      >
+        <line x1={yAxisWidth} y1={midY} x2={chartWidth} y2={midY} stroke="rgba(0,0,0,0.15)" strokeWidth={1} />
         {data.map((d, i) => {
-          const val = Number(d[dataKey]) || 0;
-          const barH = (val / maxVal) * height;
-          const x = yAxisWidth + i * (barWidth + 8) + 4;
-          const y = height - barH;
+          const x = yAxisWidth + gap + i * (barWidth + gap);
+          const gainedH = hFor(d.gained);
+          const lostH = hFor(d.lost);
+          const isCurrent = d.weekStart === currentWeekStart;
           return (
-            <g key={d.month}>
-              <rect x={x} y={y} width={barWidth} height={barH} rx={4} fill={color} opacity={0.85} />
-              <text x={x + barWidth / 2} y={height + 14} textAnchor="middle" fontSize="9" fill="#86868b">
-                {fmtMonthLabel(d.month)}
-              </text>
-              <title>{fmtMonthLabel(d.month)}: {fmtCurrency(val)}</title>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function LineChart({ data, dataKey, color, height = 160 }: {
-  data: SeriesPoint[];
-  dataKey: keyof SeriesPoint;
-  color: string;
-  height?: number;
-}) {
-  if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
-
-  const values = data.map(d => Number(d[dataKey]) || 0);
-  const maxDataVal = Math.max(...values, 1);
-  const minDataVal = Math.min(...values, 0);
-  const yAxisWidth = 60;
-  const chartWidth = 600; // Fixed width to fit 6 months comfortably
-  const padding = 20;
-
-  // Generate y-axis tick values
-  const tickIncrement = 3000;
-  const maxVal = Math.ceil(maxDataVal / tickIncrement) * tickIncrement;
-  const minVal = Math.floor(minDataVal / tickIncrement) * tickIncrement;
-  const range = maxVal - minVal;
-  const numTicks = Math.floor(range / tickIncrement) + 1;
-  const yTicks = Array.from({ length: numTicks }, (_, i) => minVal + i * tickIncrement);
-
-  // Calculate line points
-  const pointSpacing = (chartWidth - yAxisWidth - padding * 2) / (data.length - 1 || 1);
-  const points = data.map((d, i) => {
-    const val = Number(d[dataKey]) || 0;
-    const x = yAxisWidth + padding + i * pointSpacing;
-    const y = height - ((val - minVal) / range) * height;
-    return { x, y, val, month: d.month };
-  });
-
-  const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
-
-  return (
-    <div className={styles.chartContainer}>
-      <svg width="100%" height={height + 40} viewBox={`0 0 ${chartWidth} ${height + 40}`} preserveAspectRatio="xMidYMid meet" style={{ maxWidth: '100%' }}>
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tickValue, i) => {
-          const y = height - ((tickValue - minVal) / range) * height;
-          return (
-            <g key={i}>
-              <line
-                x1={yAxisWidth}
-                y1={y}
-                x2={chartWidth}
-                y2={y}
-                stroke="rgba(0,0,0,0.06)"
-                strokeWidth={1}
-                strokeDasharray="2,2"
-              />
-              <text
-                x={yAxisWidth - 8}
-                y={y + 3}
-                textAnchor="end"
-                fontSize="14"
-                fill="#86868b"
-                fontWeight="500"
-              >
-                {fmtCurrency(tickValue)}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Line */}
-        <path
-          d={pathData}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Points and labels */}
-        {points.map((p, i) => (
-          <g key={i}>
-            <circle cx={p.x} cy={p.y} r={4} fill={color} opacity={0.9} />
-            <text
-              x={p.x}
-              y={height + 20}
-              textAnchor="middle"
-              fontSize="9"
-              fill="#86868b"
-            >
-              {fmtMonthLabel(p.month)}
-            </text>
-            <title>{fmtMonthLabel(p.month)}: {fmtCurrency(p.val)}</title>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-function StackedBarChart({ data, keys, colors, height = 160 }: {
-  data: SeriesPoint[];
-  keys: (keyof SeriesPoint)[];
-  colors: string[];
-  height?: number;
-}) {
-  if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
-
-  const totals = data.map(d => keys.reduce((sum, k) => sum + (Number(d[k]) || 0), 0));
-  const maxVal = Math.max(...totals, 1);
-  const barWidth = Math.min(40, Math.floor(600 / data.length) - 8);
-  const chartWidth = data.length * (barWidth + 8);
-
-  return (
-    <div className={styles.chartContainer}>
-      <svg width={chartWidth} height={height + 30} viewBox={`0 0 ${chartWidth} ${height + 30}`}>
-        {data.map((d, i) => {
-          const x = i * (barWidth + 8) + 4;
-          let cumY = height;
-          return (
-            <g key={d.month}>
-              {keys.map((k, ki) => {
-                const val = Number(d[k]) || 0;
-                const barH = (val / maxVal) * height;
-                cumY -= barH;
-                return (
-                  <rect key={String(k)} x={x} y={cumY} width={barWidth} height={barH} rx={2} fill={colors[ki]} opacity={0.85}>
-                    <title>{String(k)}: {fmtCurrency(val)}</title>
-                  </rect>
-                );
-              })}
-              <text x={x + barWidth / 2} y={height + 14} textAnchor="middle" fontSize="9" fill="#86868b">
-                {fmtMonthLabel(d.month)}
+            <g key={d.weekStart} opacity={isCurrent ? 0.6 : 1}>
+              {d.gained > 0 && (
+                <rect x={x} y={midY - gainedH} width={barWidth} height={gainedH} rx={2} fill={GAINED_COLOR} opacity={0.9}>
+                  <title>{`Week of ${fmtWeek(d.weekStart)}: +${d.gained} gained`}</title>
+                </rect>
+              )}
+              {d.lost > 0 && (
+                <rect x={x} y={midY + 1} width={barWidth} height={lostH} rx={2} fill={LOST_COLOR} opacity={0.9}>
+                  <title>{`Week of ${fmtWeek(d.weekStart)}: −${d.lost} lost`}</title>
+                </rect>
+              )}
+              {d.gained > 0 && (
+                <text x={x + barWidth / 2} y={midY - gainedH - 4} textAnchor="middle" fontSize="9" fontWeight="600" fill="#1d1d1f">
+                  +{d.gained}
+                </text>
+              )}
+              {d.lost > 0 && (
+                <text x={x + barWidth / 2} y={midY + lostH + 11} textAnchor="middle" fontSize="9" fontWeight="600" fill="#1d1d1f">
+                  −{d.lost}
+                </text>
+              )}
+              <text x={x + barWidth / 2} y={halfHeight * 2 + 42} textAnchor="middle" fontSize="9" fill="#86868b">
+                {fmtWeek(d.weekStart)}{isCurrent ? '*' : ''}
               </text>
             </g>
           );
         })}
       </svg>
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-        {keys.map((k, i) => (
-          <div key={String(k)} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.6875rem', color: '#6e6e73' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: colors[i], display: 'inline-block' }} />
-            {String(k).replace(/([A-Z])/g, ' $1').replace('mrr', 'MRR').trim()}
-          </div>
-        ))}
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.6875rem', color: '#6e6e73' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: GAINED_COLOR, display: 'inline-block' }} />
+          Accounts gained
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.6875rem', color: '#6e6e73' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: LOST_COLOR, display: 'inline-block' }} />
+          Accounts lost
+        </div>
+        <span style={{ fontSize: '0.6875rem', color: '#86868b' }}>* current week in progress</span>
       </div>
     </div>
   );
 }
 
-function BridgeChart({ bridge, height = 180 }: { bridge: MrrBridge; height?: number }) {
-  const items = [
-    { label: 'Starting', value: bridge.startingMrr, color: '#86868b' },
-    { label: 'New', value: bridge.newMrr, color: '#34c759' },
-    { label: 'Expansion', value: bridge.expansionMrr, color: '#30d158' },
-    { label: 'Contraction', value: -bridge.contractionMrr, color: '#ff9500' },
-    { label: 'Churned', value: -bridge.churnedMrr, color: '#ff3b30' },
-    { label: 'Paused', value: -bridge.pausedMrr, color: '#af52de' },
-    { label: 'Ending', value: bridge.endingMrr, color: '#bca892' },
-  ];
+// ---------------------------------------------------------------------------
+// Location revenue trend — stacked bars, one per month
+// ---------------------------------------------------------------------------
 
-  const maxAbs = Math.max(...items.map(i => Math.abs(i.value)), 1);
-  const barWidth = 60;
-  const gap = 16;
-  const chartWidth = items.length * (barWidth + gap);
-  const midY = height / 2;
+function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; currentMonth: string }) {
+  if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
+
+  const height = 200;
+  const yAxisWidth = 52;
+  const barWidth = 44;
+  const gap = 28;
+  const chartWidth = yAxisWidth + data.length * (barWidth + gap) + gap;
+
+  const totals = data.map(d => d.noir + d.rooftop + d.other);
+  const maxTotal = Math.max(...totals, 1);
+  // Nice tick increment: 1/2/5 × 10^k so ~4 gridlines
+  const rawStep = maxTotal / 4;
+  const pow = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const step = [1, 2, 5, 10].map(m => m * pow).find(s => s >= rawStep) || rawStep;
+  const maxVal = Math.ceil(maxTotal / step) * step;
+  const ticks: number[] = [];
+  for (let t = 0; t <= maxVal; t += step) ticks.push(t);
+
+  const yFor = (v: number) => height - (v / maxVal) * height;
 
   return (
     <div className={styles.chartContainer}>
-      <svg width={chartWidth} height={height + 40} viewBox={`0 0 ${chartWidth} ${height + 40}`}>
-        {/* Zero line */}
-        <line x1={0} y1={midY} x2={chartWidth} y2={midY} stroke="rgba(0,0,0,0.08)" strokeWidth={1} />
-        {items.map((item, i) => {
-          const x = i * (barWidth + gap) + gap / 2;
-          const normalizedH = (Math.abs(item.value) / maxAbs) * (height / 2 - 10);
-          const y = item.value >= 0 ? midY - normalizedH : midY;
+      <svg
+        width="100%"
+        height={height + 34}
+        viewBox={`0 0 ${chartWidth} ${height + 34}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Member spend by location, last 6 months"
+      >
+        {ticks.map(t => (
+          <g key={t}>
+            <line x1={yAxisWidth} y1={yFor(t)} x2={chartWidth} y2={yFor(t)} stroke="rgba(0,0,0,0.06)" strokeWidth={1} />
+            <text x={yAxisWidth - 6} y={yFor(t) + 3} textAnchor="end" fontSize="10" fill="#86868b">
+              {t >= 1000 ? `$${t / 1000}k` : `$${t}`}
+            </text>
+          </g>
+        ))}
+        {data.map((d, i) => {
+          const x = yAxisWidth + gap + i * (barWidth + gap);
+          let cumY = height;
+          const isMTD = d.month === currentMonth;
           return (
-            <g key={item.label}>
-              <rect x={x} y={y} width={barWidth} height={normalizedH} rx={4} fill={item.color} opacity={0.85}>
-                <title>{item.label}: {fmtCurrency(item.value)}</title>
-              </rect>
-              <text x={x + barWidth / 2} y={height + 10} textAnchor="middle" fontSize="9" fontWeight="600" fill="#6e6e73">
-                {item.label}
+            <g key={d.month}>
+              {SERIES.map(s => {
+                const val = d[s.key];
+                const barH = (val / maxVal) * height;
+                cumY -= barH;
+                const y = cumY;
+                return barH > 0 ? (
+                  <rect
+                    key={s.key}
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={Math.max(barH - 2, 1)}
+                    rx={2}
+                    fill={s.color}
+                    opacity={isMTD ? 0.55 : 0.9}
+                  >
+                    <title>{`${fmtMonthShort(d.month)} · ${s.label}: ${fmtCurrency(val)}`}</title>
+                  </rect>
+                ) : null;
+              })}
+              <text
+                x={x + barWidth / 2}
+                y={cumY - 5}
+                textAnchor="middle"
+                fontSize="9"
+                fontWeight="600"
+                fill="#6e6e73"
+              >
+                {fmtCurrency(d.noir + d.rooftop + d.other)}
               </text>
-              <text x={x + barWidth / 2} y={item.value >= 0 ? y - 4 : y + normalizedH + 12} textAnchor="middle" fontSize="9" fill="#1d1d1f">
-                {fmtCurrency(item.value)}
+              <text x={x + barWidth / 2} y={height + 14} textAnchor="middle" fontSize="10" fill="#86868b">
+                {fmtMonthShort(d.month)}{isMTD ? '*' : ''}
               </text>
             </g>
           );
         })}
       </svg>
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        {SERIES.map(s => (
+          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.6875rem', color: '#6e6e73' }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: s.color, display: 'inline-block' }} />
+            {s.label}
+          </div>
+        ))}
+        <span style={{ fontSize: '0.6875rem', color: '#86868b' }}>* current month is month-to-date</span>
+      </div>
     </div>
   );
 }
 
-// Cohort heatmap color
-function cohortColor(rate: number): string {
-  if (rate >= 0.9) return 'rgba(52, 199, 89, 0.25)';
-  if (rate >= 0.7) return 'rgba(52, 199, 89, 0.15)';
-  if (rate >= 0.5) return 'rgba(255, 149, 0, 0.15)';
-  if (rate >= 0.3) return 'rgba(255, 59, 48, 0.1)';
-  return 'rgba(255, 59, 48, 0.2)';
-}
-
 // ---------------------------------------------------------------------------
-// Main Component
+// Main
 // ---------------------------------------------------------------------------
 
 export default function BusinessDashboard() {
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    return `${y}-${m}-01`;
-  });
-  const [summary, setSummary] = useState<BusinessSummary | null>(null);
-  const [series, setSeries] = useState<SeriesPoint[]>([]);
-  const [cohorts, setCohorts] = useState<CohortRow[]>([]);
-  const [drillChurn, setDrillChurn] = useState<DrillChurn[]>([]);
-  const [drillExpansion, setDrillExpansion] = useState<DrillExpansion[]>([]);
-  const [drillAttach, setDrillAttach] = useState<DrillAttach[]>([]);
+  const [m, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const [activeAccountCount, setActiveAccountCount] = useState<number | null>(null);
-  const [activeMemberCount, setActiveMemberCount] = useState<number | null>(null);
-  const [avgMonthlyRevenue, setAvgMonthlyRevenue] = useState<number | null>(null);
-  const [currentMonthRevenue, setCurrentMonthRevenue] = useState<number | null>(null);
-  const [lastMonthRevenue, setLastMonthRevenue] = useState<number | null>(null);
-  const [monthlyRevenueBreakdown, setMonthlyRevenueBreakdown] = useState<{ month: string; revenue: number }[]>([]);
-  const [showRevenueModal, setShowRevenueModal] = useState(false);
-  const [portalAccessStats, setPortalAccessStats] = useState<{
-    monthlyAccessCount: number;
-    totalSessions: number;
-    accessLog: any[];
-  }>({ monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
-  const [showPortalAccessModal, setShowPortalAccessModal] = useState(false);
-  const [showMrrModal, setShowMrrModal] = useState(false);
-  const [showNetNewMrrModal, setShowNetNewMrrModal] = useState(false);
-  const [showMembershipCashModal, setShowMembershipCashModal] = useState(false);
-  const [drillNew, setDrillNew] = useState<any[]>([]);
-  const [drillPaused, setDrillPaused] = useState<any[]>([]);
-  const [partySizeMetrics, setPartySizeMetrics] = useState<{
-    avgPartySize: number | null;
-    pctWithGuests: number | null;
-    soloVisits: number | null;
-    totalReservations: number;
-  }>({ avgPartySize: null, pctWithGuests: null, soloVisits: null, totalReservations: 0 });
+  const [showAtRisk, setShowAtRisk] = useState(false);
 
-  const monthOptions = useMemo(() => generateMonthOptions(), []);
-
-  const fetchAll = useCallback(async (month: string) => {
+  const fetchMetrics = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const safeFetch = async (url: string) => {
-        const res = await fetch(url);
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`${url}: ${res.status} ${text}`);
-        }
-        return res.json();
-      };
-
-      const [summaryRes, seriesRes, cohortsRes, churnRes, expRes, attachRes, newRes, pausedRes, financialRes, portalAccessRes] = await Promise.all([
-        safeFetch(`/api/admin/business-summary?month=${month}`),
-        safeFetch(`/api/admin/business-series?month=${month}&months=12`),
-        safeFetch(`/api/admin/business-cohorts?month=${month}&months=12`),
-        safeFetch(`/api/admin/business-drilldown?type=churned&month=${month}`),
-        safeFetch(`/api/admin/business-drilldown?type=expansion&month=${month}`),
-        safeFetch(`/api/admin/business-drilldown?type=attach&month=${month}`),
-        safeFetch(`/api/admin/business-drilldown?type=new&month=${month}`),
-        safeFetch(`/api/admin/business-drilldown?type=paused&month=${month}`),
-        safeFetch(`/api/financial-metrics`),
-        safeFetch(`/api/admin/portal-access-stats`),
-      ]);
-
-      setSummary(summaryRes.data);
-      setSeries(seriesRes.data || []);
-      console.log('Series data:', seriesRes.data);
-      console.log('Summary data:', summaryRes.data);
-      console.log('MRR Bridge:', summaryRes.data?.mrrBridge);
-      setCohorts(cohortsRes.data || []);
-      setDrillChurn(churnRes.data || []);
-      setDrillExpansion(expRes.data || []);
-      setDrillAttach(attachRes.data || []);
-      setDrillNew(newRes.data || []);
-      setDrillPaused(pausedRes.data || []);
-      setAvgMonthlyRevenue(financialRes.averageMonthlyRevenue?.total ?? null);
-      setCurrentMonthRevenue(financialRes.julyRevenue?.total ?? null);
-      setPortalAccessStats(portalAccessRes || { monthlyAccessCount: 0, totalSessions: 0, accessLog: [] });
-
-      const breakdown = financialRes.averageMonthlyRevenue?.monthlyBreakdown ?? [];
-      setMonthlyRevenueBreakdown(breakdown);
-
-      // Last month is the most recent complete month (last item in breakdown)
-      if (breakdown.length > 0) {
-        setLastMonthRevenue(breakdown[breakdown.length - 1].revenue);
-      }
-
-      // Fetch total active members count (individual people) - using status field, excluding pending
-      const { count: memberCount } = await supabase
-        .from('members')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
-      setActiveMemberCount(memberCount ?? null);
-
-      // Fetch active accounts count (accounts with subscription_status = 'active')
-      const { count: accountCount } = await supabase
-        .from('accounts')
-        .select('*', { count: 'exact', head: true })
-        .eq('subscription_status', 'active');
-      setActiveAccountCount(accountCount ?? null);
-
-      // Fetch party size metrics from completed/confirmed reservations
-      const { data: reservationData } = await supabase
-        .from('reservations')
-        .select('party_size')
-        .in('status', ['confirmed', 'completed']);
-
-      if (reservationData && reservationData.length > 0) {
-        const total = reservationData.length;
-        const sum = reservationData.reduce((acc, r) => acc + (r.party_size || 1), 0);
-        const avg = sum / total;
-        const withGuests = reservationData.filter(r => (r.party_size || 1) >= 2).length;
-        const solo = reservationData.filter(r => (r.party_size || 1) === 1).length;
-        setPartySizeMetrics({
-          avgPartySize: Math.round(avg * 10) / 10,
-          pctWithGuests: Math.round((withGuests / total) * 1000) / 10,
-          soloVisits: solo,
-          totalReservations: total,
-        });
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const res = await fetch('/api/admin/business-metrics', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error(`business-metrics: ${res.status} ${await res.text()}`);
+      setMetrics(await res.json());
     } catch (err: any) {
       console.error('Business dashboard fetch error:', err);
       setError(err.message || 'Failed to load dashboard data');
@@ -597,24 +351,8 @@ export default function BusinessDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchAll(selectedMonth);
-  }, [selectedMonth, fetchAll]);
-
-  const handleGenerateSnapshot = async () => {
-    setSnapshotLoading(true);
-    try {
-      const res = await fetch(`/api/admin/business-snapshot?month=${selectedMonth}`, {
-        method: 'POST',
-      });
-      if (!res.ok) throw new Error('Snapshot generation failed');
-      // Refresh data after snapshot
-      await fetchAll(selectedMonth);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSnapshotLoading(false);
-    }
-  };
+    fetchMetrics();
+  }, [fetchMetrics]);
 
   if (loading) {
     return (
@@ -626,730 +364,289 @@ export default function BusinessDashboard() {
     );
   }
 
-  const s = summary;
-
-  // Transform monthlyRevenueBreakdown to match SeriesPoint format for BarChart
-  const revenueChartData = monthlyRevenueBreakdown.map(item => ({
-    month: item.month + '-01', // Add -01 to match expected format
-    mrr: item.revenue, // Use mrr as the dataKey (will display as revenue)
-    activeMembers: 0,
-    attachRevenue: 0,
-    newMrr: 0,
-    expansionMrr: 0,
-    contractionMrr: 0,
-    churnedMrr: 0,
-    pausedMrr: 0,
-    netNewMrr: 0,
-  }));
-
   return (
     <AdminLayout>
       <div className={styles.root}>
-        {/* Header */}
         <div className={styles.header}>
           <h1 className={styles.title}>Business Dashboard</h1>
-          <div className={styles.monthSelector}>
-            <select
-              value={selectedMonth}
-              onChange={e => setSelectedMonth(e.target.value)}
-            >
-              {monthOptions.map(m => (
-                <option key={m} value={m}>{fmtMonthRange(m)}</option>
-              ))}
-            </select>
-            <button
-              className={styles.snapshotBtn}
-              onClick={handleGenerateSnapshot}
-              disabled={snapshotLoading}
-            >
-              {snapshotLoading ? 'Regenerating...' : 'Regenerate Snapshot'}
-            </button>
-          </div>
+          {m && (
+            <div style={{ fontSize: '0.8125rem', color: '#86868b' }}>
+              {fmtMonth(m.month)} · data through {m.today}
+            </div>
+          )}
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
 
-        {s && (
+        {m && (m.dataQuality?.unknownPlanAccounts ?? 0) > 0 && (
+          <div className={styles.error}>
+            ⚠ {m.dataQuality!.unknownPlanAccounts} account{m.dataQuality!.unknownPlanAccounts > 1 ? 's reference' : ' references'} a
+            membership plan that no longer exists — their dues are being counted as monthly in MRR. Fix the plan assignment on those accounts.
+          </div>
+        )}
+
+        {m && (
           <>
-            {/* KPI Tiles */}
-            <h2 className={styles.sectionTitle}>Revenue Health</h2>
-            <div className={styles.kpiGrid}>
-              <div className={styles.kpiTile} onClick={() => setShowMrrModal(true)} style={{ cursor: 'pointer' }}>
-                <div className={styles.kpiValue}>{fmtCurrency(s.mrr)}</div>
-                <div className={styles.kpiLabel}>MRR</div>
-                <div className={`${styles.kpiDelta} ${deltaStr(s.mrr, s.priorMrr).cls}`}>
-                  {deltaStr(s.mrr, s.priorMrr).text}
-                </div>
-                <div className={styles.kpiHint}>Monthly Recurring Revenue — sum of monthly subscription members' dues for {fmtMonthRange(s.month)}. Excludes annual memberships (see ARR). Click to view trend.</div>
-              </div>
-              <div className={styles.kpiTile} onClick={() => setShowNetNewMrrModal(true)} style={{ cursor: 'pointer' }}>
-                <div className={styles.kpiValue}>{fmtCurrency(s.mrrBridge.netNewMrr)}</div>
-                <div className={styles.kpiLabel}>Net New MRR</div>
-                <div className={styles.kpiHint}>New MRR + Expansion − Contraction − Churned − Paused ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}). Positive = you grew revenue this month. Click for details.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtCurrency(s.arr)}</div>
-                <div className={styles.kpiLabel}>ARR</div>
-                <div className={styles.kpiHint}>Annual Recurring Revenue ({fmtMonthRange(s.month)}) — includes all recurring revenue (monthly and annual memberships) annualized. A forward-looking projection of yearly revenue if nothing changes.</div>
-              </div>
-              <div className={styles.kpiTileClickable} onClick={() => setShowMembershipCashModal(true)}>
-                <div className={styles.kpiValue}>{fmtCurrency(s.membershipCash?.total ?? 0)}</div>
-                <div className={styles.kpiLabel}>Membership Cash This Month</div>
-                <div className={styles.kpiHint}>Expected subscription cash for {fmtMonthRange(s.month)}: monthly renewals due + new sign-ups + annual prorated − cancellations before renewal. Click for breakdown.</div>
-              </div>
-              <div
-                className={styles.kpiTile}
-                onClick={() => setShowRevenueModal(true)}
-                style={{ cursor: 'pointer' }}
-                title="Click to view 12-month trend"
-              >
-                <div className={styles.kpiValue}>{currentMonthRevenue !== null ? fmtCurrency(currentMonthRevenue) : '--'}</div>
-                <div className={styles.kpiLabel}>Current Month Total Revenue</div>
-                <div className={styles.kpiHint}>Total revenue from all member payments (dues + purchases) in the current month. Includes membership fees and all other member spending. Click to view trend.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{lastMonthRevenue !== null ? fmtCurrency(lastMonthRevenue) : '--'}</div>
-                <div className={styles.kpiLabel}>Last Month Total Revenue</div>
-                <div className={styles.kpiHint}>Total revenue from all member payments (dues + purchases) in the previous month. Complete month data.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{activeMemberCount ?? '--'}</div>
-                <div className={styles.kpiLabel}>Active Members</div>
-                <div className={styles.kpiHint}>Total number of individual members (people) across all accounts who are active, paying, and not archived/paused/deactivated (as of today).</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{activeAccountCount ?? '--'}</div>
-                <div className={styles.kpiLabel}>Active Accounts</div>
-                <div className={styles.kpiHint}>Total number of accounts with active subscription status (as of today).</div>
-              </div>
-              <div className={styles.kpiTile} onClick={() => setShowPortalAccessModal(true)} style={{ cursor: 'pointer' }}>
-                <div className={styles.kpiValue}>{portalAccessStats.monthlyAccessCount}</div>
-                <div className={styles.kpiLabel}>Monthly Portal Access</div>
-                <div className={styles.kpiHint}>Unique members who accessed the member portal in the last 30 days. Total sessions: {portalAccessStats.totalSessions}. Click for details.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtPct(s.rates.nrr)}</div>
-                <div className={styles.kpiLabel}>NRR</div>
-                <div className={styles.kpiHint}>Net Revenue Retention ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}) — (Starting MRR + Expansion − Contraction − Churned) ÷ Starting MRR. &gt;100% means existing members are growing revenue even after losses.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtPct(s.rates.grr)}</div>
-                <div className={styles.kpiLabel}>GRR</div>
-                <div className={styles.kpiHint}>Gross Revenue Retention ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}) — (Starting MRR − Contraction − Churned) ÷ Starting MRR. Like NRR but ignores upsells. Shows pure retention health. 100% = no one left.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtPct(s.rates.revenueChurnRate)}</div>
-                <div className={styles.kpiLabel}>Rev Churn %</div>
-                <div className={styles.kpiHint}>Revenue Churn ({fmtMonthRange(s.priorMonth)} → {fmtMonthRange(s.month)}) — Churned MRR ÷ Starting MRR. What % of last month's revenue was lost to cancellations this month.</div>
-              </div>
-            </div>
-
-            <h2 className={styles.sectionTitle}>Member Health</h2>
+            {/* ------------------------------------------------------- */}
+            <h2 className={styles.sectionTitle}>Membership</h2>
             <div className={styles.kpiGrid}>
               <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{s.memberCounts.activeMembers}</div>
-                <div className={styles.kpiLabel}>Active Members</div>
-                <div className={`${styles.kpiDelta} ${deltaStr(s.memberCounts.activeMembers, s.priorMemberCounts.activeMembers, 'number').cls}`}>
-                  {deltaStr(s.memberCounts.activeMembers, s.priorMemberCounts.activeMembers, 'number').text}
-                </div>
+                <div className={styles.kpiValue}>{m.membership.accounts.total}</div>
+                <div className={styles.kpiLabel}>Active Membership Accounts</div>
                 <div className={styles.kpiHint}>
-                  Count of individual people (member rows) with active status and monthly dues &gt; $0 in {fmtMonthRange(s.month)}'s snapshot (compared to {fmtMonthRange(s.priorMonth)}).
-                  {activeAccountCount !== null && (
-                    <> Across <strong>{activeAccountCount}</strong> accounts — accounts can have multiple members (e.g. Duo/Skyline plans).</>
-                  )}
+                  Accounts with an active subscription: <strong>{m.membership.accounts.noir}</strong> Noir ·{' '}
+                  <strong>{m.membership.accounts.skyline}</strong> Skyline ·{' '}
+                  <strong>{m.membership.accounts.other}</strong> Other (host, legacy, TCC).
                 </div>
               </div>
               <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{s.memberCounts.newMembers}</div>
-                <div className={styles.kpiLabel}>New Members</div>
-                <div className={styles.kpiHint}>Individual members whose join date falls within {fmtMonthRange(s.month)}. Does not include reactivations.</div>
+                <div className={styles.kpiValue}>{m.membership.totalMembers}</div>
+                <div className={styles.kpiLabel}>Total Members</div>
+                <div className={styles.kpiHint}>All people with active access to Noir, including partner members on shared accounts.</div>
               </div>
               <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtPct(s.rates.logoChurnRate)}</div>
-                <div className={styles.kpiLabel}>Logo Churn %</div>
-                <div className={styles.kpiHint}>"Logo" = one member (borrowed from SaaS: a logo = one customer). Churned members in {fmtMonthRange(s.month)} ÷ {fmtMonthRange(s.priorMonth)}'s active members. What % of your people cancelled this month.</div>
+                <div className={styles.kpiValue}>{m.membership.newAccountsThisMonth}</div>
+                <div className={styles.kpiLabel}>New Accounts This Month</div>
+                <div className={styles.kpiHint}>Accounts whose first member joined in {fmtMonth(m.month)}.</div>
               </div>
               <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{s.memberCounts.pausedMembers}</div>
-                <div className={styles.kpiLabel}>Paused</div>
-                <div className={styles.kpiHint}>Members with inactive status in {fmtMonthRange(s.month)} but not fully cancelled — they have $0 MRR this month but are expected to return. Not counted in churn.</div>
+                <div className={styles.kpiValue}>{m.membership.canceledLast30}</div>
+                <div className={styles.kpiLabel}>Cancellations (30d)</div>
+                <div className={styles.kpiHint}>Accounts whose subscription was canceled in the last 30 days.</div>
               </div>
+              {m.membership.weekly.length >= 2 && (() => {
+                const thisWk = m.membership.weekly[m.membership.weekly.length - 1];
+                const lastWk = m.membership.weekly[m.membership.weekly.length - 2];
+                return (
+                  <div className={styles.kpiTile}>
+                    <div className={styles.kpiValue}>
+                      <span style={{ color: GAINED_COLOR }}>+{thisWk.gained}</span>
+                      {' / '}
+                      <span style={{ color: LOST_COLOR }}>−{thisWk.lost}</span>
+                    </div>
+                    <div className={styles.kpiLabel}>Gained / Lost This Week</div>
+                    <div className={styles.kpiHint}>
+                      Net {thisWk.net >= 0 ? '+' : ''}{thisWk.net} accounts so far this week (Mon–Sun).
+                      Last week: +{lastWk.gained} / −{lastWk.lost} (net {lastWk.net >= 0 ? '+' : ''}{lastWk.net}).
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
-            <h2 className={styles.sectionTitle}>Unit Economics &amp; Attach</h2>
-            <div className={styles.kpiGrid}>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtCurrency(s.attach.attachRevenue)}</div>
-                <div className={styles.kpiLabel}>Attach Revenue</div>
-                <div className={`${styles.kpiDelta} ${deltaStr(s.attach.attachRevenue, s.priorAttach.attachRevenue).cls}`}>
-                  {deltaStr(s.attach.attachRevenue, s.priorAttach.attachRevenue).text}
-                </div>
-                <div className={styles.kpiHint}>Revenue from Toast (food &amp; beverage) transactions linked to a member in {fmtMonthRange(s.month)} (compared to {fmtMonthRange(s.priorMonth)}). This is spend beyond their membership dues.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtPct(s.attach.attachRate)}</div>
-                <div className={styles.kpiLabel}>Attach Rate</div>
-                <div className={styles.kpiHint}>% of active members who had at least one Toast transaction in {fmtMonthRange(s.month)}. Higher = more members actually spending at the venue.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{fmtCurrencyDec(s.attach.allInArpm)}</div>
-                <div className={styles.kpiLabel}>All-in ARPM</div>
-                <div className={`${styles.kpiDelta} ${deltaStr(s.attach.allInArpm, s.priorAttach.allInArpm).cls}`}>
-                  {deltaStr(s.attach.allInArpm, s.priorAttach.allInArpm).text}
-                </div>
-                <div className={styles.kpiHint}>Average Revenue Per Member ({fmtMonthRange(s.month)}, compared to {fmtMonthRange(s.priorMonth)}) — (MRR + Attach Revenue) ÷ active members. Your true revenue per person including what they spend at the bar.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{s.failedPayments30d}</div>
-                <div className={styles.kpiLabel}>Failed Payments (30d)</div>
-                <div className={styles.kpiHint}>Number of Stripe payment failures in the last 30 days. These are members whose dues didn't process — follow up to prevent involuntary churn.</div>
-              </div>
-            </div>
-
-            {/* Party Size Analytics */}
-            <h2 className={styles.sectionTitle}>Reservation Insights</h2>
-            <div className={styles.kpiGrid}>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{partySizeMetrics.avgPartySize ?? '--'}</div>
-                <div className={styles.kpiLabel}>Avg Party Size</div>
-                <div className={styles.kpiHint}>Average party size per reservation — true parking liability per visit.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{partySizeMetrics.pctWithGuests !== null ? `${partySizeMetrics.pctWithGuests}%` : '--'}</div>
-                <div className={styles.kpiLabel}>Reservations with 2+ Guests</div>
-                <div className={styles.kpiHint}>% of reservations with 2 or more in party — how often guests are present.</div>
-              </div>
-              <div className={styles.kpiTile}>
-                <div className={styles.kpiValue}>{partySizeMetrics.soloVisits ?? '--'}</div>
-                <div className={styles.kpiLabel}>Solo Visits</div>
-                <div className={styles.kpiHint}>Visits where member is solo — your true 1-car baseline. Out of {partySizeMetrics.totalReservations} total reservations.</div>
-              </div>
-            </div>
-
-            {/* Charts */}
-            <h2 className={styles.sectionTitle}>Trends</h2>
             <div className={styles.chartsGrid}>
               <div className={styles.chartCard}>
-                <div className={styles.chartTitle}>MRR Trend (Last 12 Months)</div>
-                <BarChart data={series} dataKey="mrr" color="#bca892" />
-              </div>
-              <div className={styles.chartCard}>
-                <div className={styles.chartTitle}>MRR Bridge — {fmtMonthLabel(selectedMonth)}</div>
-                <BridgeChart bridge={s.mrrBridge} />
-              </div>
-              <div className={styles.chartCard}>
-                <div className={styles.chartTitle}>Revenue Mix: MRR vs Attach (Last 12 Months)</div>
-                <StackedBarChart
-                  data={series}
-                  keys={['mrr', 'attachRevenue']}
-                  colors={['#bca892', '#007aff']}
+                <div className={styles.chartTitle}>Members Gained vs Lost — Week over Week (Last 12 Weeks)</div>
+                <WeeklyGainLossChart
+                  data={m.membership.weekly}
+                  currentWeekStart={m.membership.weekly[m.membership.weekly.length - 1]?.weekStart || ''}
                 />
-              </div>
-              <div className={styles.chartCard}>
-                <div className={styles.chartTitle}>Active Members Trend (Last 12 Months)</div>
-                <BarChart data={series} dataKey="activeMembers" color="#007aff" />
-              </div>
-            </div>
-
-            {/* Cohort Retention */}
-            <h2 className={styles.sectionTitle}>Cohort Retention</h2>
-            <div className={styles.cohortContainer}>
-              <div className={styles.cohortCard}>
-                {cohorts.length === 0 ? (
-                  <div className={styles.emptyState}>No cohort data available. Generate snapshots for multiple months to see retention.</div>
-                ) : (
-                  <table className={styles.cohortTable}>
-                    <thead>
-                      <tr>
-                        <th>Cohort</th>
-                        <th>Size</th>
-                        {cohorts[0]?.retentionByMonth.map(r => (
-                          <th key={r.month}>{fmtMonthLabel(r.month)}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cohorts.map(c => (
-                        <tr key={c.cohortMonth}>
-                          <td>{fmtMonthLabel(c.cohortMonth)}</td>
-                          <td>{c.cohortSize}</td>
-                          {c.retentionByMonth.map(r => (
-                            <td key={r.month}>
-                              <div
-                                className={styles.cohortCell}
-                                style={{ background: cohortColor(r.rate) }}
-                              >
-                                {fmtPct(r.rate)}
-                              </div>
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            {/* Drill-down Tables */}
-            <h2 className={styles.sectionTitle}>Drilldowns — {fmtMonthLabel(selectedMonth)}</h2>
-            <div className={styles.tablesGrid}>
-              {/* Churned Members */}
-              <div className={styles.tableCard}>
-                <div className={styles.tableTitle}>Churned Members</div>
-                {drillChurn.length === 0 ? (
-                  <div className={styles.emptyState}>No churned members this month</div>
-                ) : (
-                  <table className={styles.dataTable}>
-                    <thead>
-                      <tr>
-                        <th>Member</th>
-                        <th>Tenure</th>
-                        <th>Prior MRR</th>
-                        <th>Type</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {drillChurn.map(r => (
-                        <tr key={r.member_id}>
-                          <td>{r.first_name} {r.last_name}</td>
-                          <td>{r.tenure_months}mo</td>
-                          <td>{fmtCurrencyDec(r.prior_mrr)}</td>
-                          <td>{r.churn_type}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {/* Expansion / Contraction */}
-              <div className={styles.tableCard}>
-                <div className={styles.tableTitle}>Expansion &amp; Contraction</div>
-                {drillExpansion.length === 0 ? (
-                  <div className={styles.emptyState}>No changes this month</div>
-                ) : (
-                  <table className={styles.dataTable}>
-                    <thead>
-                      <tr>
-                        <th>Member</th>
-                        <th>Prior</th>
-                        <th>Current</th>
-                        <th>Delta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {drillExpansion.map(r => (
-                        <tr key={r.member_id}>
-                          <td>{r.first_name} {r.last_name}</td>
-                          <td>{fmtCurrencyDec(r.prior_mrr)}</td>
-                          <td>{fmtCurrencyDec(r.current_mrr)}</td>
-                          <td style={{ color: r.delta > 0 ? '#34c759' : '#ff3b30' }}>
-                            {r.delta > 0 ? '+' : ''}{fmtCurrencyDec(r.delta)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {/* Top Attach Members */}
-              <div className={styles.tableCard}>
-                <div className={styles.tableTitle}>Top Attach Members</div>
-                {drillAttach.length === 0 ? (
-                  <div className={styles.emptyState}>No attach revenue this month</div>
-                ) : (
-                  <table className={styles.dataTable}>
-                    <thead>
-                      <tr>
-                        <th>Member</th>
-                        <th>Revenue</th>
-                        <th>Checks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {drillAttach.map(r => (
-                        <tr key={r.member_id}>
-                          <td>{r.first_name} {r.last_name}</td>
-                          <td>{fmtCurrencyDec(r.attach_revenue)}</td>
-                          <td>{r.transaction_count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            {/* Alerts Panel */}
-            <h2 className={styles.sectionTitle}>Alerts</h2>
-            <div className={styles.alertsContainer}>
-              <div className={styles.alertsCard}>
-                {(!s.alerts || s.alerts.length === 0) ? (
-                  <div className={styles.emptyState}>No alerts configured</div>
-                ) : (
-                  s.alerts.map(a => (
-                    <div key={a.alert_key} className={styles.alertItem}>
-                      <div className={`${styles.alertDot} ${a.is_triggered ? styles.alertTriggered : styles.alertOk}`} />
-                      <div className={styles.alertInfo}>
-                        <div className={styles.alertLabel}>{a.label}</div>
-                        <div className={styles.alertMeta}>
-                          {a.current_value !== null && (
-                            <>Current: {a.threshold_type === 'below' || a.alert_key.includes('churn') || a.alert_key.includes('nrr')
-                              ? fmtPct(a.current_value)
-                              : a.current_value.toFixed(1)
-                            }{' | '}</>
-                          )}
-                          Threshold: {a.threshold_type === 'below' || a.alert_key.includes('churn') || a.alert_key.includes('nrr') || a.alert_key.includes('drop')
-                            ? fmtPct(a.threshold_value)
-                            : a.threshold_value.toFixed(0)
-                          }
-                          {a.last_evaluated_at && (
-                            <> | Checked: {new Date(a.last_evaluated_at).toLocaleDateString()}</>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Revenue Trend Modal */}
-        {showRevenueModal && (
-          <div className={styles.modalOverlay} onClick={() => setShowRevenueModal(false)}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>Monthly Total Revenue (Last 12 Months)</h2>
-                <button className={styles.modalClose} onClick={() => setShowRevenueModal(false)}>×</button>
-              </div>
-              <div className={styles.modalBody}>
-                <div className={styles.chartCard} style={{ marginTop: '2rem' }}>
-                  <BarChart data={revenueChartData} dataKey="mrr" color="#bca892" height={320} />
-                </div>
                 <div className={styles.modalHint}>
-                  Total revenue from all member payments (dues + purchases) for each month.
+                  Gained = accounts whose first member joined that week (counted even if they later canceled).
+                  Lost = accounts whose subscription was canceled that week. Weeks run Monday–Sunday.
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* MRR Trend Modal */}
-        {showMrrModal && (
-          <div className={styles.modalOverlay} onClick={() => setShowMrrModal(false)}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>MRR Trend (Last 6 Months)</h2>
-                <button className={styles.modalClose} onClick={() => setShowMrrModal(false)}>×</button>
+            {/* ------------------------------------------------------- */}
+            <h2 className={styles.sectionTitle}>Revenue</h2>
+            <div className={styles.kpiGrid}>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{fmtCurrency(m.mrr.total)}</div>
+                <div className={styles.kpiLabel}>MRR</div>
+                <div className={styles.kpiHint}>
+                  Recurring membership dues, counted once per account: {fmtCurrency(m.mrr.monthlyPlans)} from monthly plans
+                  + {fmtCurrency(m.mrr.annualNormalized)} from {m.mrr.annualAccounts} annual accounts (÷12).
+                  Avg {fmtCurrencyDec(m.mrr.avgDuesPerAccount)} across {m.mrr.payingAccounts} paying accounts.
+                </div>
               </div>
-              <div className={styles.modalBody}>
-                {series.length === 0 ? (
-                  <div className={styles.emptyState}>No snapshot data available. Generate snapshots for previous months to see the MRR trend.</div>
-                ) : (
-                  <>
-                    <div className={styles.chartCard} style={{ marginTop: '1rem' }}>
-                      <LineChart data={series.slice(-6)} dataKey="mrr" color="#bca892" height={200} />
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{fmtCurrency(m.revenue.duesCashMTD)}</div>
+                <div className={styles.kpiLabel}>Dues Collected (MTD)</div>
+                <div className={styles.kpiHint}>
+                  Membership cash actually collected in {fmtMonth(m.month)} (Stripe + ACH dues, signups).
+                  Last month total: {fmtCurrency(m.revenue.duesCashLastMonth)}.
+                </div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{fmtCurrency(m.revenue.beverageMTD)}</div>
+                <div className={styles.kpiLabel}>Member Beverage Revenue (MTD)</div>
+                <div className={styles.kpiHint}>
+                  Member spend at Noir + RooftopKC this month. Last month total: {fmtCurrency(m.revenue.beverageLastMonth)}.
+                  Events &amp; other member spend adds {fmtCurrency(m.revenue.eventsOtherMTD)} MTD.
+                </div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>
+                  {fmtCurrencyDec(m.memberSpend.avgSpendPerAccount)}
+                  <span style={{ fontSize: '0.9rem', color: '#86868b', fontWeight: 500 }}>
+                    {' '}vs {fmtCurrencyDec(m.memberSpend.avgDuesPerAccount)} dues
+                  </span>
+                </div>
+                <div className={styles.kpiLabel}>Avg Member Spend ({fmtMonth(m.memberSpend.month)})</div>
+                <div className={styles.kpiHint}>
+                  Average beverage spend per paying account in the last full month vs average dues.{' '}
+                  <strong>{m.memberSpend.accountsOverDues} of {m.memberSpend.payingAccounts}</strong> accounts
+                  ({m.memberSpend.pctOverDues}%) spent more than their dues.
+                </div>
+              </div>
+            </div>
+
+            {/* ------------------------------------------------------- */}
+            <h2 className={styles.sectionTitle}>Cash-Flow Projection</h2>
+            <div className={styles.kpiGrid}>
+              {m.cashflow.windows.map(w => (
+                <div key={w.days} className={styles.kpiTile}>
+                  <div className={styles.kpiValue}>{fmtCurrency(w.amount)}</div>
+                  <div className={styles.kpiLabel}>Next {w.days} Days</div>
+                  <div className={styles.kpiHint}>{w.accounts} accounts scheduled to bill by {addDaysLabel(m.cashflow.asOf, w.days)}. Annual renewals count at full value.</div>
+                </div>
+              ))}
+            </div>
+            {m.cashflow.overdueBilling.accounts > 0 && (
+              <div className={styles.error} style={{ marginTop: '0.5rem' }}>
+                ⚠ {m.cashflow.overdueBilling.accounts} active account{m.cashflow.overdueBilling.accounts > 1 ? 's have' : ' has'} a billing
+                date in the past ({fmtCurrency(m.cashflow.overdueBilling.amount)} of dues) — billing may be stalled. Check these in Stripe.
+              </div>
+            )}
+
+            {/* ------------------------------------------------------- */}
+            <h2 className={styles.sectionTitle}>Location Performance</h2>
+            <div className={styles.kpiGrid}>
+              {m.locations.current.map(loc => {
+                const prev = m.locations.lastMonth.find(l => l.key === loc.key);
+                return (
+                  <div key={loc.key} className={styles.kpiTile}>
+                    <div className={styles.kpiValue}>{fmtCurrency(loc.revenue)}</div>
+                    <div className={styles.kpiLabel}>{loc.label} (MTD)</div>
+                    <div className={styles.kpiHint}>
+                      {loc.visits} visits · {loc.uniqueAccounts} accounts · avg check {fmtCurrencyDec(loc.avgCheck)}.
+                      Last month: {fmtCurrency(prev?.revenue ?? 0)} across {prev?.visits ?? 0} visits
+                      (avg check {fmtCurrencyDec(prev?.avgCheck ?? 0)}).
                     </div>
-                    <div className={styles.modalHint}>
-                      Monthly Recurring Revenue over time showing the sum of all active members' monthly dues for the last 6 months.
-                      {series.filter(s => s.mrr === 0).length > 0 && ' Note: Months with $0 MRR may not have snapshots generated yet.'}
-                    </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        )}
-
-        {/* Portal Access Modal */}
-        {showPortalAccessModal && (
-          <div className={styles.modalOverlay} onClick={() => setShowPortalAccessModal(false)}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>Member Portal Access Log (Last 30 Days)</h2>
-                <button className={styles.modalClose} onClick={() => setShowPortalAccessModal(false)}>×</button>
-              </div>
-              <div className={styles.modalBody}>
-                <div style={{ marginBottom: '20px' }}>
-                  <strong>Total Unique Members:</strong> {portalAccessStats.monthlyAccessCount} |
-                  <strong style={{ marginLeft: '20px' }}>Total Sessions:</strong> {portalAccessStats.totalSessions}
-                </div>
-                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #ddd', textAlign: 'left' }}>
-                        <th style={{ padding: '12px' }}>Member</th>
-                        <th style={{ padding: '12px' }}>Email</th>
-                        <th style={{ padding: '12px' }}>First Access</th>
-                        <th style={{ padding: '12px' }}>Last Activity</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {portalAccessStats.accessLog.map((log, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: '12px' }}>
-                            <a href={`/admin/members/${log.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
-                              {log.member_name}
-                            </a>
-                          </td>
-                          <td style={{ padding: '12px', color: '#666' }}>{log.email}</td>
-                          <td style={{ padding: '12px', color: '#666' }}>
-                            {new Date(log.first_access).toLocaleString()}
-                          </td>
-                          <td style={{ padding: '12px', color: '#666' }}>
-                            {new Date(log.last_activity).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Net New MRR Breakdown Modal */}
-        {showNetNewMrrModal && s && (
-          <div className={styles.modalOverlay} onClick={() => setShowNetNewMrrModal(false)}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>Net New MRR Breakdown — {fmtMonthLabel(selectedMonth)}</h2>
-                <button className={styles.modalClose} onClick={() => setShowNetNewMrrModal(false)}>×</button>
-              </div>
-              <div className={styles.modalBody}>
-                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f5f5f7', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1d1d1f', marginBottom: '0.5rem' }}>
-                    {fmtCurrency(s.mrrBridge.netNewMrr)}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#6e6e73' }}>
-                    = New ({fmtCurrency(s.mrrBridge.newMrr)}) + Expansion ({fmtCurrency(s.mrrBridge.expansionMrr)}) − Contraction ({fmtCurrency(s.mrrBridge.contractionMrr)}) − Churned ({fmtCurrency(s.mrrBridge.churnedMrr)}) − Paused ({fmtCurrency(s.mrrBridge.pausedMrr)})
-                  </div>
-                </div>
-
-                {/* New Members */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    New Members ({drillNew.length}) — +{fmtCurrency(s.mrrBridge.newMrr)}
-                  </h3>
-                  {drillNew.length === 0 ? (
-                    <div className={styles.emptyState}>No new members this month</div>
-                  ) : (
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>Member</th>
-                          <th>MRR</th>
-                          <th>Plan</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {drillNew.map((r: any) => (
-                          <tr key={r.member_id}>
-                            <td>{r.first_name} {r.last_name}</td>
-                            <td style={{ color: '#34c759' }}>{fmtCurrencyDec(r.mrr)}</td>
-                            <td>{r.plan_name || '--'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-
-                {/* Expansion */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    Expansion ({drillExpansion.filter((r: any) => r.type === 'expansion').length}) — +{fmtCurrency(s.mrrBridge.expansionMrr)}
-                  </h3>
-                  {drillExpansion.filter((r: any) => r.type === 'expansion').length === 0 ? (
-                    <div className={styles.emptyState}>No expansions this month</div>
-                  ) : (
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>Member</th>
-                          <th>Prior</th>
-                          <th>Current</th>
-                          <th>Delta</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {drillExpansion.filter((r: any) => r.type === 'expansion').map((r: any) => (
-                          <tr key={r.member_id}>
-                            <td>{r.first_name} {r.last_name}</td>
-                            <td>{fmtCurrencyDec(r.prior_mrr)}</td>
-                            <td>{fmtCurrencyDec(r.current_mrr)}</td>
-                            <td style={{ color: '#34c759' }}>+{fmtCurrencyDec(r.delta)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-
-                {/* Contraction */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    Contraction ({drillExpansion.filter((r: any) => r.type === 'contraction').length}) — −{fmtCurrency(s.mrrBridge.contractionMrr)}
-                  </h3>
-                  {drillExpansion.filter((r: any) => r.type === 'contraction').length === 0 ? (
-                    <div className={styles.emptyState}>No contractions this month</div>
-                  ) : (
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>Member</th>
-                          <th>Prior</th>
-                          <th>Current</th>
-                          <th>Delta</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {drillExpansion.filter((r: any) => r.type === 'contraction').map((r: any) => (
-                          <tr key={r.member_id}>
-                            <td>{r.first_name} {r.last_name}</td>
-                            <td>{fmtCurrencyDec(r.prior_mrr)}</td>
-                            <td>{fmtCurrencyDec(r.current_mrr)}</td>
-                            <td style={{ color: '#ff9500' }}>{fmtCurrencyDec(r.delta)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-
-                {/* Churned */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    Churned ({drillChurn.length}) — −{fmtCurrency(s.mrrBridge.churnedMrr)}
-                  </h3>
-                  {drillChurn.length === 0 ? (
-                    <div className={styles.emptyState}>No churned members this month</div>
-                  ) : (
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>Member</th>
-                          <th>Prior MRR</th>
-                          <th>Tenure</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {drillChurn.map((r: any) => (
-                          <tr key={r.member_id}>
-                            <td>{r.first_name} {r.last_name}</td>
-                            <td style={{ color: '#ff3b30' }}>{fmtCurrencyDec(r.prior_mrr)}</td>
-                            <td>{r.tenure_months}mo</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-
-                {/* Paused */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    Paused ({drillPaused.length}) — −{fmtCurrency(s.mrrBridge.pausedMrr)}
-                  </h3>
-                  {drillPaused.length === 0 ? (
-                    <div className={styles.emptyState}>No paused members this month</div>
-                  ) : (
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>Member</th>
-                          <th>Prior MRR</th>
-                          <th>Plan</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {drillPaused.map((r: any) => (
-                          <tr key={r.member_id}>
-                            <td>{r.first_name} {r.last_name}</td>
-                            <td style={{ color: '#af52de' }}>{fmtCurrencyDec(r.prior_mrr)}</td>
-                            <td>{r.plan_name || '--'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Membership Cash Breakdown Modal */}
-        {showMembershipCashModal && s?.membershipCash && (
-          <div className={styles.modalOverlay} onClick={() => setShowMembershipCashModal(false)}>
-            <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>Membership Cash — {fmtMonthRange(s.month)}</h2>
-                <button className={styles.modalClose} onClick={() => setShowMembershipCashModal(false)}>×</button>
-              </div>
-              <div className={styles.modalBody}>
-                <div className={styles.modalSummaryBlock}>
-                  <div className={styles.modalSummaryValue}>
-                    {fmtCurrency(s.membershipCash.total)}
-                  </div>
-                  <div className={styles.modalSummaryCaption}>
-                    Expected subscription cash for {fmtMonthRange(s.month)}
-                  </div>
-                </div>
-
-                <table className={styles.dataTable}>
+            <div className={styles.chartsGrid}>
+              <div className={styles.chartCard}>
+                <div className={styles.chartTitle}>Member Spend by Location (Last 6 Months)</div>
+                <LocationTrendChart data={m.locations.trend} currentMonth={m.month} />
+                <table className={styles.dataTable} style={{ marginTop: '0.75rem' }}>
                   <thead>
                     <tr>
-                      <th>Component</th>
-                      <th className={styles.textRight}>Members</th>
-                      <th className={styles.textRight}>Amount</th>
+                      <th>Month</th>
+                      <th className={styles.textRight}>Noir</th>
+                      <th className={styles.textRight}>RooftopKC</th>
+                      <th className={styles.textRight}>Events &amp; Other</th>
+                      <th className={styles.textRight}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>Monthly Renewals Due</td>
-                      <td className={styles.textRight}>{s.membershipCash.monthlyRenewalsCount}</td>
-                      <td className={styles.textRight}>{fmtCurrencyDec(s.membershipCash.monthlyRenewals)}</td>
-                    </tr>
-                    <tr>
-                      <td>New Member Sign-ups</td>
-                      <td className={styles.textRight}>{s.membershipCash.newMembersCount}</td>
-                      <td className={`${styles.textRight} ${styles.deltaPositive}`}>+{fmtCurrencyDec(s.membershipCash.newMemberCash)}</td>
-                    </tr>
-                    <tr>
-                      <td>Annual Members (Prorated)</td>
-                      <td className={styles.textRight}>{s.membershipCash.annualMembersCount}</td>
-                      <td className={`${styles.textRight} ${styles.deltaPositive}`}>+{fmtCurrencyDec(s.membershipCash.annualProrated)}</td>
-                    </tr>
-                    <tr>
-                      <td>Canceled Before Renewal</td>
-                      <td className={styles.textRight}>{s.membershipCash.canceledBeforeRenewalCount}</td>
-                      <td className={`${styles.textRight} ${styles.deltaNegative}`}>−{fmtCurrencyDec(s.membershipCash.canceledBeforeRenewal)}</td>
-                    </tr>
-                    <tr className={styles.totalRow}>
-                      <td>Total</td>
-                      <td></td>
-                      <td className={styles.textRight}>{fmtCurrencyDec(s.membershipCash.total)}</td>
-                    </tr>
+                    {m.locations.trend.map(t => (
+                      <tr key={t.month}>
+                        <td>{fmtMonthShort(t.month)}{t.month === m.month ? ' (MTD)' : ''}</td>
+                        <td className={styles.textRight}>{fmtCurrency(t.noir)}</td>
+                        <td className={styles.textRight}>{fmtCurrency(t.rooftop)}</td>
+                        <td className={styles.textRight}>{fmtCurrency(t.other)}</td>
+                        <td className={styles.textRight}>{fmtCurrency(t.noir + t.rooftop + t.other)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
-
                 <div className={styles.modalHint}>
-                  Monthly renewals = active monthly members whose next billing date falls in {fmtMonthRange(s.month)}.
-                  New sign-ups = members who joined this month. Annual prorated = annual subscription ÷ 12.
-                  Canceled = members who canceled before their renewal date this month.
-                  This metric fluctuates as new members sign up and cancellations occur.
+                  Location is derived from ledger purchase notes (Noir Attendance/Visit, RooftopKC) until purchases carry a
+                  location id. RooftopKC totals include the $20 cover (first cocktail included) — Toast imports will let us
+                  split cover vs. drink sales.
                 </div>
               </div>
             </div>
-          </div>
+
+            {/* ------------------------------------------------------- */}
+            <h2 className={styles.sectionTitle}>Engagement &amp; Collections</h2>
+            <div className={styles.kpiGrid}>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{m.engagement.visitRateMTD}%</div>
+                <div className={styles.kpiLabel}>Visit Rate (MTD)</div>
+                <div className={styles.kpiHint}>
+                  {m.engagement.visitingAccountsMTD} of {m.engagement.payingAccounts} paying accounts have visited so far in {fmtMonth(m.month)}.
+                </div>
+              </div>
+              <div
+                className={styles.kpiTile}
+                onClick={() => setShowAtRisk(v => !v)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className={styles.kpiValue}>{m.engagement.atRiskCount}</div>
+                <div className={styles.kpiLabel}>At-Risk Accounts</div>
+                <div className={styles.kpiHint}>Paying accounts with no visit in 60+ days — the top churn predictor. Click to see who.</div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{fmtCurrency(m.balances.outstandingOwed)}</div>
+                <div className={styles.kpiLabel}>Owed to Us</div>
+                <div className={styles.kpiHint}>{m.balances.accountsOwing} accounts carry a negative house balance.</div>
+              </div>
+              <div className={styles.kpiTile}>
+                <div className={styles.kpiValue}>{fmtCurrency(m.balances.houseCreditLiability)}</div>
+                <div className={styles.kpiLabel}>House Credit Outstanding</div>
+                <div className={styles.kpiHint}>
+                  Unspent member credit across {m.balances.accountsInCredit} accounts — value already collected as dues that
+                  members can still draw down at the bar.
+                </div>
+              </div>
+            </div>
+
+            {showAtRisk && (
+              <div className={styles.tablesGrid}>
+                <div className={styles.tableCard}>
+                  <div className={styles.tableTitle}>At-Risk Accounts (no visit in 60+ days)</div>
+                  {m.engagement.atRisk.length === 0 ? (
+                    <div className={styles.emptyState}>Everyone has visited recently 🎉</div>
+                  ) : (
+                    <table className={styles.dataTable}>
+                      <thead>
+                        <tr>
+                          <th>Account</th>
+                          <th>Last Visit</th>
+                          <th className={styles.textRight}>Monthly Dues</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {m.engagement.atRisk.map(r => (
+                          <tr key={r.account_id}>
+                            <td>
+                              {r.member_id ? (
+                                <a href={`/admin/members/${r.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
+                                  {r.name}
+                                </a>
+                              ) : (
+                                r.name
+                              )}
+                            </td>
+                            <td>{r.lastVisit || 'Never'}</td>
+                            <td className={styles.textRight}>{fmtCurrencyDec(r.monthlyDues)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {m.engagement.atRiskCount > m.engagement.atRisk.length && (
+                    <div className={styles.modalHint}>
+                      Showing {m.engagement.atRisk.length} of {m.engagement.atRiskCount} — longest-absent first.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </AdminLayout>
   );
+}
+
+function addDaysLabel(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
