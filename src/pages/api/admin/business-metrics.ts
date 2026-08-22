@@ -1,5 +1,21 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
+import {
+  classifyPlan,
+  classifyPurchaseLocation,
+  isVisit,
+  isDuesCash,
+  LOCATION_LABELS,
+  LocationKey,
+  PlanType,
+  todayChicago,
+  addDays,
+  monthStartOf,
+  shiftMonth,
+  weekStartOf,
+  round2,
+} from '../../../lib/businessMetricsCore';
 
 /**
  * Zero-based metrics engine for /admin/business.
@@ -13,8 +29,8 @@ import { createClient } from '@supabase/supabase-js';
  * - accounts.monthly_dues stores the FULL amount per billing interval
  *   (monthly plans: monthly amount; annual plans: full annual amount).
  * - Dues collected by the billing cron land in the ledger as type 'credit'
- *   with note "Monthly dues - <Month Year>"; ACH dues and initial signup
- *   payments land as type 'payment' with dues/membership in the note.
+ *   with source 'billing_cron'; ACH dues and initial signup payments land
+ *   as type 'payment' with dues/membership in the note (see isDuesCash).
  *   "Balance charged via Stripe" payments settle house balances (already
  *   counted as purchases) and are NOT dues cash.
  * - Member spend lands as type 'purchase' (negative amounts). Location is
@@ -26,85 +42,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY as string
 );
 
-const CHICAGO_TZ = 'America/Chicago';
-
-// ---------------------------------------------------------------------------
-// Classification — the business rules live here, in one place.
-// ---------------------------------------------------------------------------
-
-export type PlanType = 'noir' | 'skyline' | 'other';
-
-/** Noir = Noir Membership / Annual / Solo (legacy Noir pricing); Skyline = Skyline plans; everything else (Host, TCC, unknown) = other. */
-export function classifyPlan(planName: string | null | undefined): PlanType {
-  const n = (planName || '').toLowerCase();
-  if (n.includes('skyline')) return 'skyline';
-  if (n.includes('noir') || n.includes('annual') || n === 'solo') return 'noir';
-  return 'other';
-}
-
-export type LocationKey = 'noir' | 'rooftop' | 'other';
-
-export const LOCATION_LABELS: Record<LocationKey, string> = {
-  noir: 'Noir',
-  rooftop: 'RooftopKC',
-  other: 'Events & Other',
-};
-
-/** Derive location from a purchase note prefix (until ledger has location_id). */
-export function classifyPurchaseLocation(note: string | null | undefined): LocationKey {
-  const n = (note || '').toLowerCase().trim();
-  if (n.startsWith('noir attendance') || n.startsWith('noir visit') || n.startsWith('attendance')) return 'noir';
-  if (n.startsWith('rooftopkc') || n.startsWith('rooftop')) return 'rooftop';
-  return 'other';
-}
-
-/** A visit is an attendance/visit purchase at a physical location. */
-function isVisit(note: string | null | undefined): boolean {
-  const loc = classifyPurchaseLocation(note);
-  return loc === 'noir' || loc === 'rooftop';
-}
-
-/** Membership dues cash: credit rows written by the billing cron plus payment rows for ACH dues / signups / subscription updates. */
-export function isDuesCash(type: string, note: string | null | undefined): boolean {
-  if (type !== 'credit' && type !== 'payment') return false;
-  return /dues|membership|subscription/i.test(note || '');
-}
-
-// ---------------------------------------------------------------------------
-// Date helpers (America/Chicago)
-// ---------------------------------------------------------------------------
-
-/** Today's date in Chicago as YYYY-MM-DD. */
-function todayChicago(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: CHICAGO_TZ });
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T12:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** First day of the month containing dateStr. */
-function monthStartOf(dateStr: string): string {
-  return dateStr.slice(0, 7) + '-01';
-}
-
-/** First day of the month n months before monthStr (YYYY-MM-01). */
-function shiftMonth(monthStr: string, n: number): string {
-  const [y, m] = monthStr.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + n, 1));
-  return d.toISOString().slice(0, 10);
-}
-
-/** Monday of the week containing dateStr (ISO week start). */
-function weekStartOf(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00Z');
-  const dow = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
-  d.setUTCDate(d.getUTCDate() - dow);
-  return d.toISOString().slice(0, 10);
-}
-
 // ---------------------------------------------------------------------------
 // Row types
 // ---------------------------------------------------------------------------
@@ -114,6 +51,7 @@ interface LedgerRow {
   type: string;
   amount: number;
   note: string | null;
+  source: string | null;
   date: string;
 }
 
@@ -133,7 +71,7 @@ async function fetchAllLedger(): Promise<LedgerRow[]> {
   for (;;) {
     const { data, error } = await supabaseAdmin
       .from('ledger')
-      .select('account_id, type, amount, note, date')
+      .select('account_id, type, amount, note, source, date')
       .range(from, from + pageSize - 1);
     if (error) throw new Error(`ledger fetch: ${error.message}`);
     if (!data || data.length === 0) break;
@@ -144,16 +82,26 @@ async function fetchAllLedger(): Promise<LedgerRow[]> {
   return rows;
 }
 
+// The payload is identical for every admin, and computing it scans the full
+// ledger — cache it briefly so bursts of page loads don't redo the work.
+const CACHE_TTL_MS = 60_000;
+let cached: { at: number; payload: unknown } | null = null;
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      return res.status(200).json(cached.payload);
+    }
+
     const today = todayChicago();
     const monthStart = monthStartOf(today);
     const nextMonthStart = shiftMonth(monthStart, 1);
@@ -184,7 +132,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       planMap.set(p.id, { plan_name: p.plan_name || '', interval: p.interval || 'month' });
     }
 
-    const planOf = (a: AccountRow) => (a.membership_plan_id ? planMap.get(a.membership_plan_id) : undefined);
+    const planOf = (a: AccountRow) => {
+      if (!a.membership_plan_id) return undefined;
+      const plan = planMap.get(a.membership_plan_id);
+      if (!plan) {
+        // A stale plan id silently degrades MRR math (annual would be counted
+        // as monthly), so make bad data visible instead of failing quietly.
+        console.warn(
+          `[business-metrics] Account ${a.account_id} has membership_plan_id ${a.membership_plan_id} not found in subscription_plans — treating as monthly/other`
+        );
+      }
+      return plan;
+    };
     const isAnnual = (a: AccountRow) => planOf(a)?.interval === 'year';
     /** Dues normalized to a monthly run-rate. */
     const normalizedDues = (a: AccountRow) => (isAnnual(a) ? a.monthly_dues / 12 : a.monthly_dues);
@@ -193,7 +152,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const payingAccounts = activeAccounts.filter(a => a.monthly_dues > 0);
     const activeMembers = members.filter((m: any) => m.status === 'active');
 
-    // Primary display name per account (earliest-joined active member)
+    // Primary display name per account (earliest-joined member)
     const accountName = new Map<string, string>();
     const accountPrimaryMemberId = new Map<string, string>();
     const accountEarliestJoin = new Map<string, string>();
@@ -209,6 +168,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // ------------------------------------------------------------------
+    // Single pass over the ledger for everything it feeds
+    // ------------------------------------------------------------------
+    interface LocAgg { revenue: number; visits: number; accounts: Set<string> }
+    const emptyLocAgg = (): Record<LocationKey, LocAgg> => ({
+      noir: { revenue: 0, visits: 0, accounts: new Set() },
+      rooftop: { revenue: 0, visits: 0, accounts: new Set() },
+      other: { revenue: 0, visits: 0, accounts: new Set() },
+    });
+
+    const trendMonths: string[] = [];
+    for (let i = 5; i >= 0; i--) trendMonths.push(shiftMonth(monthStart, -i));
+    const locByMonth = new Map<string, Record<LocationKey, LocAgg>>();
+    for (const m of trendMonths) locByMonth.set(m, emptyLocAgg());
+
+    let duesCashMTD = 0;
+    let duesCashLastMonth = 0;
+    const spendLastMonthByAccount = new Map<string, number>(); // visit spend, last full month
+    const balanceByAccount = new Map<string, number>();
+    const lastVisitByAccount = new Map<string, string>();
+    const visitedMTD = new Set<string>();
+
+    for (const r of ledger) {
+      balanceByAccount.set(r.account_id, (balanceByAccount.get(r.account_id) || 0) + r.amount);
+
+      if (r.amount > 0 && isDuesCash(r.type, r.note, r.source)) {
+        if (r.date >= monthStart && r.date < nextMonthStart) duesCashMTD += r.amount;
+        else if (r.date >= lastMonthStart && r.date < monthStart) duesCashLastMonth += r.amount;
+      }
+
+      if (r.type !== 'purchase') continue;
+
+      const loc = classifyPurchaseLocation(r.note);
+      const monthKey = monthStartOf(r.date);
+      const agg = locByMonth.get(monthKey);
+      if (agg) {
+        agg[loc].revenue += Math.abs(r.amount);
+        agg[loc].visits++;
+        if (r.account_id) agg[loc].accounts.add(r.account_id);
+      }
+
+      if (loc === 'noir' || loc === 'rooftop') {
+        const prev = lastVisitByAccount.get(r.account_id);
+        if (!prev || r.date > prev) lastVisitByAccount.set(r.account_id, r.date);
+        if (r.date >= monthStart && r.date < nextMonthStart) visitedMTD.add(r.account_id);
+        if (r.date >= lastMonthStart && r.date < monthStart) {
+          spendLastMonthByAccount.set(
+            r.account_id,
+            (spendLastMonthByAccount.get(r.account_id) || 0) + Math.abs(r.amount)
+          );
+        }
+      }
+    }
+
+    const mtdLoc = locByMonth.get(monthStart) || emptyLocAgg();
+    const lastLoc = locByMonth.get(lastMonthStart) || emptyLocAgg();
+
+    // ------------------------------------------------------------------
     // A + B — Membership
     // ------------------------------------------------------------------
     const byType: Record<PlanType, number> = { noir: 0, skyline: 0, other: 0 };
@@ -216,10 +232,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       byType[classifyPlan(planOf(a)?.plan_name)]++;
     }
 
-    const newAccountsThisMonth = Array.from(accountEarliestJoin.entries()).filter(([accountId, jd]) => {
-      const acct = accounts.find(a => a.account_id === accountId);
-      return acct?.subscription_status === 'active' && jd >= monthStart && jd < nextMonthStart;
-    }).length;
+    const activeAccountIds = new Set(activeAccounts.map(a => a.account_id));
+    let newAccountsThisMonth = 0;
+    for (const [accountId, jd] of accountEarliestJoin.entries()) {
+      if (activeAccountIds.has(accountId) && jd >= monthStart && jd < nextMonthStart) newAccountsThisMonth++;
+    }
 
     const cancel30Cutoff = addDays(today, -30);
     const canceledLast30 = accounts.filter(a =>
@@ -288,35 +305,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     // ------------------------------------------------------------------
-    // Ledger-derived aggregates
+    // Revenue
     // ------------------------------------------------------------------
-    const inRange = (d: string, start: string, end: string) => d >= start && d < end;
-
-    const duesCash = (start: string, end: string) =>
-      round2(ledger
-        .filter(r => isDuesCash(r.type, r.note) && inRange(r.date, start, end) && r.amount > 0)
-        .reduce((s, r) => s + r.amount, 0));
-
-    interface LocAgg { revenue: number; visits: number; accounts: Set<string> }
-    const locationAgg = (start: string, end: string): Record<LocationKey, LocAgg> => {
-      const agg: Record<LocationKey, LocAgg> = {
-        noir: { revenue: 0, visits: 0, accounts: new Set() },
-        rooftop: { revenue: 0, visits: 0, accounts: new Set() },
-        other: { revenue: 0, visits: 0, accounts: new Set() },
-      };
-      for (const r of ledger) {
-        if (r.type !== 'purchase' || !inRange(r.date, start, end)) continue;
-        const loc = classifyPurchaseLocation(r.note);
-        agg[loc].revenue += Math.abs(r.amount);
-        agg[loc].visits++;
-        if (r.account_id) agg[loc].accounts.add(r.account_id);
-      }
-      return agg;
-    };
-
-    const mtdLoc = locationAgg(monthStart, nextMonthStart);
-    const lastLoc = locationAgg(lastMonthStart, monthStart);
-
     const locationSummary = (agg: Record<LocationKey, LocAgg>) =>
       (Object.keys(LOCATION_LABELS) as LocationKey[]).map(key => ({
         key,
@@ -327,11 +317,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         avgCheck: agg[key].visits ? round2(agg[key].revenue / agg[key].visits) : 0,
       }));
 
-    // 6-month location trend (oldest → newest, current month is MTD)
-    const trendMonths: string[] = [];
-    for (let i = 5; i >= 0; i--) trendMonths.push(shiftMonth(monthStart, -i));
     const locationTrend = trendMonths.map(m => {
-      const agg = locationAgg(m, shiftMonth(m, 1));
+      const agg = locByMonth.get(m) || emptyLocAgg();
       return {
         month: m.slice(0, 7),
         noir: round2(agg.noir.revenue),
@@ -344,8 +331,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const bevLastMonth = lastLoc.noir.revenue + lastLoc.rooftop.revenue;
 
     const revenue = {
-      duesCashMTD: duesCash(monthStart, nextMonthStart),
-      duesCashLastMonth: duesCash(lastMonthStart, monthStart),
+      duesCashMTD: round2(duesCashMTD),
+      duesCashLastMonth: round2(duesCashLastMonth),
       beverageMTD: round2(bevMTD),
       beverageLastMonth: round2(bevLastMonth),
       eventsOtherMTD: round2(mtdLoc.other.revenue),
@@ -356,15 +343,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ------------------------------------------------------------------
     // E — Member spend vs dues (last full month)
     // ------------------------------------------------------------------
-    const spendByAccount = new Map<string, number>();
-    for (const r of ledger) {
-      if (r.type !== 'purchase' || !isVisit(r.note) || !inRange(r.date, lastMonthStart, monthStart)) continue;
-      spendByAccount.set(r.account_id, (spendByAccount.get(r.account_id) || 0) + Math.abs(r.amount));
-    }
     let spendTotal = 0;
     let overDues = 0;
     for (const a of payingAccounts) {
-      const spent = spendByAccount.get(a.account_id) || 0;
+      const spent = spendLastMonthByAccount.get(a.account_id) || 0;
       spendTotal += spent;
       if (spent > normalizedDues(a)) overDues++;
     }
@@ -412,10 +394,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ------------------------------------------------------------------
     // Balances — money owed to us, and the house-credit liability
     // ------------------------------------------------------------------
-    const balanceByAccount = new Map<string, number>();
-    for (const r of ledger) {
-      balanceByAccount.set(r.account_id, (balanceByAccount.get(r.account_id) || 0) + r.amount);
-    }
     let owedTotal = 0, owedCount = 0, creditTotal = 0, creditCount = 0;
     for (const b of balanceByAccount.values()) {
       const bal = Math.round(b * 100) / 100;
@@ -432,18 +410,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ------------------------------------------------------------------
     // Engagement — visit rate and at-risk members
     // ------------------------------------------------------------------
-    const lastVisitByAccount = new Map<string, string>();
-    for (const r of ledger) {
-      if (r.type !== 'purchase' || !isVisit(r.note)) continue;
-      const prev = lastVisitByAccount.get(r.account_id);
-      if (!prev || r.date > prev) lastVisitByAccount.set(r.account_id, r.date);
-    }
-    const visitedMTD = new Set<string>();
-    for (const r of ledger) {
-      if (r.type === 'purchase' && isVisit(r.note) && inRange(r.date, monthStart, nextMonthStart)) {
-        visitedMTD.add(r.account_id);
-      }
-    }
     const atRiskCutoff = addDays(today, -60);
     const atRisk = payingAccounts
       .filter(a => {
@@ -457,7 +423,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastVisit: lastVisitByAccount.get(a.account_id) || null,
         monthlyDues: round2(normalizedDues(a)),
       }))
-      .sort((a, b) => (a.lastVisit || '0000') < (b.lastVisit || '0000') ? -1 : 1);
+      .sort((a, b) => (a.lastVisit || '').localeCompare(b.lastVisit || ''));
 
     const engagement = {
       visitingAccountsMTD: visitedMTD.size,
@@ -467,7 +433,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       atRisk: atRisk.slice(0, 20),
     };
 
-    return res.status(200).json({
+    const payload = {
       generatedAt: new Date().toISOString(),
       today,
       month: monthStart.slice(0, 7),
@@ -484,13 +450,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       balances,
       engagement,
-    });
+    };
+
+    cached = { at: Date.now(), payload };
+    return res.status(200).json(payload);
   } catch (error: any) {
     console.error('business-metrics error:', error);
     return res.status(500).json({ error: error.message || 'Internal error' });
   }
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+export default withRateLimitAndAuth(handler);

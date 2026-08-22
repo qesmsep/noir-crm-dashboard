@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
+import { supabase } from '../../lib/supabase';
 
 // ---------------------------------------------------------------------------
 // Types (mirror /api/admin/business-metrics response)
@@ -329,7 +330,11 @@ export default function BusinessDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/business-metrics');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const res = await fetch('/api/admin/business-metrics', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       if (!res.ok) throw new Error(`business-metrics: ${res.status} ${await res.text()}`);
       setMetrics(await res.json());
     } catch (err: any) {
