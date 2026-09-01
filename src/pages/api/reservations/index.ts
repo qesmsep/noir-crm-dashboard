@@ -7,6 +7,7 @@ import {
   isCapacityError,
   CAPACITY_ERROR_MESSAGE,
 } from '../../../lib/capacity';
+import { HOLD_EXPIRED_MESSAGE } from '../../../lib/holds';
 
 /**
  * Reservations API (Pages Router)
@@ -65,6 +66,9 @@ interface ReservationCreateBody {
 
   // Private event
   private_event_id?: string;
+
+  // Checkout hold being converted into this reservation
+  hold_token?: string;
 
   // Admin override - bypasses private event validation
   // SECURITY: Server-side verification required
@@ -186,6 +190,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .single();
         locationId = eventData?.location_id || null;
         console.log('[RSVP Location] Inherited location_id:', locationId);
+      }
+
+      // Redeem the checkout hold, if the guest has one. The held table wins over
+      // any table the client suggested, and hold_id is carried onto the insert so
+      // the capacity trigger does not count this hold against its own booking.
+      let holdId: string | null = null;
+      if (body.hold_token) {
+        const { data: hold, error: holdError } = await client
+          .from('reservation_holds')
+          .select('id, table_id, location_id, expires_at')
+          .eq('hold_token', body.hold_token)
+          .maybeSingle();
+
+        if (holdError) {
+          console.error('Error loading hold during reservation creation:', holdError);
+        } else if (!hold || new Date(hold.expires_at) <= new Date()) {
+          console.warn('Reservation attempted with an expired or unknown hold');
+          return res.status(410).json({
+            error: HOLD_EXPIRED_MESSAGE,
+            code: 'HOLD_EXPIRED',
+          });
+        } else {
+          holdId = hold.id;
+          tableId = hold.table_id;
+          locationId = locationId || hold.location_id;
+          console.log(`Redeeming hold ${hold.id} for table ${hold.table_id}`);
+        }
       }
 
       // If table_id is provided, validate it first
@@ -808,6 +839,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(body.cover_charge_waived !== undefined && { cover_charge_waived: body.cover_charge_waived }),
         // Verified admins bypass the location capacity limit (DB trigger honors this flag)
         ...(adminOverride && { capacity_override: true }),
+        // Links back to the hold this booking came from, so the capacity trigger
+        // does not count that hold against it
+        ...(holdId && { hold_id: holdId }),
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));
@@ -1015,6 +1049,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }
             }
             
+            await releaseRedeemedHold(client, holdId);
             return res.status(201).json({ data: retryResult.data });
           }
         }
@@ -1256,6 +1291,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // This case should not occur once all clients are updated.
       }
 
+      await releaseRedeemedHold(client, holdId);
+
       return res.status(201).json({ data });
     } catch (err) {
       console.error('Unhandled error creating reservation:', err);
@@ -1266,3 +1303,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+/**
+ * Drop the hold once its reservation exists. The row would lapse on its own,
+ * but until it does its seats keep counting against the location's cap.
+ */
+async function releaseRedeemedHold(client: any, holdId: string | null) {
+  if (!holdId) return;
+  try {
+    const { error } = await client.from('reservation_holds').delete().eq('id', holdId);
+    if (error) console.error('Failed to release redeemed hold (non-critical):', error);
+  } catch (err) {
+    console.error('Failed to release redeemed hold (non-critical):', err);
+  }
+}

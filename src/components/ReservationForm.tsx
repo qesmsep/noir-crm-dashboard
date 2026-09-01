@@ -4,6 +4,8 @@ import 'react-datepicker/dist/react-datepicker.css';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createDateTimeFromTimeString, toUTC } from '../utils/dateUtils';
 import { DateTime } from 'luxon';
+import { useReservationHold } from '../hooks/useReservationHold';
+import HoldCountdown from './HoldCountdown';
 import { supabase } from '../lib/supabase';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -254,6 +256,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   const [time, setTime] = useState('');
   const { isOpen, onOpen, onClose: disclosureOnClose } = useDisclosure();
   const [showCreditCardModal, setShowCreditCardModal] = useState(false);
+  // Set when the guest starts entering card details - the payment step, which
+  // buys them the extension so they are not cut off mid-payment
+  const [reachedPaymentStep, setReachedPaymentStep] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationData, setConfirmationData] = useState<any>(null);
   const [pendingReservation, setPendingReservation] = useState<any>(null);
@@ -318,8 +323,13 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         style: { base: { fontSize: '16px' } }
       });
       cardElement.mount(cardElementRef.current);
-      
+
+      // Touching the card field means checkout has reached payment
+      const handleCardFocus = () => setReachedPaymentStep(true);
+      cardElement.on('focus', handleCardFocus);
+
       return () => {
+        cardElement.off('focus', handleCardFocus);
         cardElement.unmount();
       };
     }
@@ -965,7 +975,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       first_name: form.first_name,
       last_name: form.last_name,
       is_member: isMember,
-      source: 'website' // Track that this reservation came from the website
+      source: 'website', // Track that this reservation came from the website
+      // Claims the table this guest has been holding through checkout
+      ...(holdToken && { hold_token: holdToken })
     };
 
     console.log('=== RESERVATION DATA DEBUG ===');
@@ -1057,6 +1069,20 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
         console.log('API Response data:', data);
 
         if (!response.ok) {
+          // The hold lapsed between the last tick and submitting
+          if (response.status === 410 || data.code === 'HOLD_EXPIRED') {
+            setTime('');
+            setReachedPaymentStep(false);
+            toast({
+              title: 'Your hold expired',
+              description: data.error || 'That table was released. Please choose a time again.',
+              status: 'warning',
+              duration: 6000,
+              isClosable: true,
+            });
+            setIsSubmitting(false);
+            return;
+          }
           // Check if this is a 409 status with alternative times
           if (response.status === 409 && data.alternative_times) {
             setAlternativeTimes(data.alternative_times);
@@ -1133,6 +1159,61 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
       {date ? formatDateMDY(date.toJSDate()) : 'Select Date'}
     </Button>
   ));
+
+  // Once a date, time and party size are chosen, hold that table while the
+  // guest finishes booking. The window matches what will actually be booked.
+  const holdWindow = React.useMemo(() => {
+    if (!time || !date?.isValid || !form.party_size) return null;
+    try {
+      const start = createDateTimeFromTimeString(
+        time,
+        settings?.timezone || 'America/Chicago',
+        date.toJSDate()
+      );
+      if (!start?.isValid) return null;
+      const durationMinutes = form.party_size <= 2 ? 90 : 120;
+      const end = start.plus({ minutes: durationMinutes });
+      if (!end?.isValid) return null;
+      return {
+        start: start.toISO({ suppressMilliseconds: true }),
+        end: end.toISO({ suppressMilliseconds: true }),
+      };
+    } catch {
+      return null;
+    }
+  }, [time, date, form.party_size, settings?.timezone]);
+
+  const {
+    holdToken,
+    secondsLeft: holdSecondsLeft,
+    isCreating: isPlacingHold,
+    error: holdError,
+    extendForPayment,
+  } = useReservationHold({
+    enabled: !!holdWindow && !showConfirmationModal,
+    startTime: holdWindow?.start ?? null,
+    endTime: holdWindow?.end ?? null,
+    partySize: form.party_size || null,
+    locationSlug: tableLocationSlug,
+    onExpired: () => {
+      // The table went back in the pool - send them back to pick a time
+      setTime('');
+      setReachedPaymentStep(false);
+      toast({
+        title: 'Your hold expired',
+        description: 'That table was released. Please choose a time again.',
+        status: 'warning',
+        duration: 6000,
+        isClosable: true,
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (reachedPaymentStep && holdToken) {
+      extendForPayment();
+    }
+  }, [reachedPaymentStep, holdToken, extendForPayment]);
 
   const handleClose = () => {
     if (onClose) {
@@ -1481,6 +1562,15 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                 ))}
               </Select>
             </FormControl>
+
+            {/* Checkout hold countdown */}
+            {holdWindow && (
+              <HoldCountdown
+                secondsLeft={holdSecondsLeft}
+                isCreating={isPlacingHold}
+                error={holdError}
+              />
+            )}
 
             {/* Notes */}
             <FormControl>

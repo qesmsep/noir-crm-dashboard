@@ -79,6 +79,8 @@ interface LocationSettingsState {
   duration: number;
   adminPhone: string;
   maxGuests: number | null;
+  holdMinutes: number;
+  holdPaymentExtensionMinutes: number;
 }
 
 type LocationMessage = { type: 'success' | 'error'; text: string } | null;
@@ -90,6 +92,8 @@ const DEFAULT_LOCATION_SETTINGS: LocationSettingsState = {
   duration: 2.0,
   adminPhone: '',
   maxGuests: null,
+  holdMinutes: 5,
+  holdPaymentExtensionMinutes: 5,
 };
 
 export default function Settings() {
@@ -119,7 +123,7 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('id, name, slug, cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone, max_concurrent_guests')
+          .select('id, name, slug, cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone, max_concurrent_guests, hold_duration_minutes, hold_payment_extension_minutes')
           .eq('status', 'active')
           .order('name', { ascending: true });
 
@@ -139,6 +143,8 @@ export default function Settings() {
             duration: l.default_reservation_duration_hours || 2.0,
             adminPhone: l.admin_notification_phone || '',
             maxGuests: l.max_concurrent_guests ?? null,
+            holdMinutes: l.hold_duration_minutes ?? 5,
+            holdPaymentExtensionMinutes: l.hold_payment_extension_minutes ?? 5,
           };
         });
         setLocationSettings(settingsBySlug);
@@ -179,6 +185,8 @@ export default function Settings() {
           default_reservation_duration_hours: current.duration,
           admin_notification_phone: current.adminPhone,
           max_concurrent_guests: current.maxGuests,
+          hold_duration_minutes: current.holdMinutes,
+          hold_payment_extension_minutes: current.holdPaymentExtensionMinutes,
         })
         .eq('slug', slug);
 
@@ -378,6 +386,12 @@ export default function Settings() {
               setAdminPhone={(adminPhone) => updateLocationSetting(location.slug, { adminPhone })}
               maxGuests={current.maxGuests}
               setMaxGuests={(maxGuests) => updateLocationSetting(location.slug, { maxGuests })}
+              holdMinutes={current.holdMinutes}
+              setHoldMinutes={(holdMinutes) => updateLocationSetting(location.slug, { holdMinutes })}
+              holdPaymentExtensionMinutes={current.holdPaymentExtensionMinutes}
+              setHoldPaymentExtensionMinutes={(holdPaymentExtensionMinutes) =>
+                updateLocationSetting(location.slug, { holdPaymentExtensionMinutes })
+              }
               saving={!!locationSaving[location.slug]}
               message={locationMessage[location.slug] || null}
               onSave={() => handleLocationSave(location.slug)}

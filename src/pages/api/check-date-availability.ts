@@ -6,6 +6,7 @@ import {
   fetchOccupancyReservations,
   getLocationCapacity,
 } from '../../lib/capacity';
+import { fetchActiveHolds } from '../../lib/holds';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -322,15 +323,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const skipCapacityCheck = adminOverride === 'true';
               let capacityCap: number | null = null;
               let occupancyReservations: Awaited<ReturnType<typeof fetchOccupancyReservations>> = [];
-              if (locationId && !skipCapacityCheck) {
-                capacityCap = await getLocationCapacity(supabase, locationId);
-                if (capacityCap !== null) {
-                  occupancyReservations = await fetchOccupancyReservations(
-                    supabase,
-                    locationId,
-                    requestDate.startOf('day').toUTC().toJSDate(),
-                    requestDate.endOf('day').plus({ hours: 6 }).toUTC().toJSDate()
-                  );
+              // Tables another guest is holding mid-checkout are unavailable,
+              // and their seats count toward the cap like booked ones
+              let activeHolds: Awaited<ReturnType<typeof fetchActiveHolds>> = [];
+              if (locationId) {
+                const dayStart = requestDate.startOf('day').toUTC().toJSDate();
+                const dayEnd = requestDate.endOf('day').plus({ hours: 6 }).toUTC().toJSDate();
+
+                activeHolds = await fetchActiveHolds(supabase, locationId, dayStart, dayEnd);
+
+                if (!skipCapacityCheck) {
+                  capacityCap = await getLocationCapacity(supabase, locationId);
+                  if (capacityCap !== null) {
+                    occupancyReservations = await fetchOccupancyReservations(
+                      supabase,
+                      locationId,
+                      dayStart,
+                      dayEnd
+                    );
+                  }
                 }
               }
 
@@ -367,6 +378,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     let assignedTable: any = null;
 
                     for (const table of availableTables) {
+                      // Someone else is holding this table for an overlapping window
+                      const heldForSlot = activeHolds.some((h) =>
+                        String(h.table_id) === String(table.id) &&
+                        slotStart.toUTC().toJSDate() < new Date(h.end_time) &&
+                        conflictWindowEnd.toUTC().toJSDate() > new Date(h.start_time)
+                      );
+                      if (heldForSlot) continue;
+
                       // Check if this table has any conflicting reservations over the full
                       // reservation duration (not just the 30-minute display slot)
                       const hasConflict = activeReservations.some((res: any) => {
@@ -402,9 +421,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                       // A table is free, but taking it out of service may push
                       // the location past its concurrent seat limit
                       const seatsClaimed = Number(assignedTable.seats) || partySizeNum;
+                      const occupancy = [
+                        ...occupancyReservations,
+                        ...activeHolds.map((h) => ({
+                          start_time: h.start_time,
+                          end_time: h.end_time,
+                          occupancy: Number(h.seats) || 0,
+                        })),
+                      ];
                       const projectedPeak =
                         calcPeakConcurrentGuests(
-                          occupancyReservations,
+                          occupancy,
                           slotStart.toUTC().toJSDate(),
                           conflictWindowEnd.toUTC().toJSDate()
                         ) + seatsClaimed;
