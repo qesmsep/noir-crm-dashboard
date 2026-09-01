@@ -14,7 +14,7 @@ const COVER_PRICE_MAX = 100;
 const TIMEZONE = 'America/Chicago';
 
 interface LocationSettingsTabProps {
-  locationSlug: 'noirkc' | 'rooftopkc';
+  locationSlug: string;
   locationName: string;
   coverEnabled: boolean;
   setCoverEnabled: (enabled: boolean) => void;
