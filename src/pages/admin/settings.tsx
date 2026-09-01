@@ -82,6 +82,7 @@ export default function Settings() {
   const [noirKCMinakaUrl, setNoirKCMinakaUrl] = useState('');
   const [noirKCDuration, setNoirKCDuration] = useState(2.0);
   const [noirKCAdminPhone, setNoirKCAdminPhone] = useState('');
+  const [noirKCMaxGuests, setNoirKCMaxGuests] = useState<number | null>(null);
   const [noirKCSaving, setNoirKCSaving] = useState(false);
   const [noirKCMessage, setNoirKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -91,6 +92,7 @@ export default function Settings() {
   const [rooftopKCMinakaUrl, setRooftopKCMinakaUrl] = useState('');
   const [rooftopKCDuration, setRooftopKCDuration] = useState(2.0);
   const [rooftopKCAdminPhone, setRooftopKCAdminPhone] = useState('');
+  const [rooftopKCMaxGuests, setRooftopKCMaxGuests] = useState<number | null>(null);
   const [rooftopKCSaving, setRooftopKCSaving] = useState(false);
   const [rooftopKCMessage, setRooftopKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -104,7 +106,7 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone')
+          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone, max_concurrent_guests')
           .eq('slug', 'noirkc')
           .single();
 
@@ -114,6 +116,7 @@ export default function Settings() {
           setNoirKCMinakaUrl(data.minaka_ical_url || '');
           setNoirKCDuration(data.default_reservation_duration_hours || 2.0);
           setNoirKCAdminPhone(data.admin_notification_phone || '');
+          setNoirKCMaxGuests(data.max_concurrent_guests ?? null);
         }
       } catch (error) {
         console.error('Error fetching Noir KC settings:', error);
@@ -128,7 +131,7 @@ export default function Settings() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone')
+          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone, max_concurrent_guests')
           .eq('slug', 'rooftopkc')
           .single();
 
@@ -138,6 +141,7 @@ export default function Settings() {
           setRooftopKCMinakaUrl(data.minaka_ical_url || '');
           setRooftopKCDuration(data.default_reservation_duration_hours || 2.0);
           setRooftopKCAdminPhone(data.admin_notification_phone || '');
+          setRooftopKCMaxGuests(data.max_concurrent_guests ?? null);
         }
       } catch (error) {
         console.error('Error fetching RooftopKC settings:', error);
@@ -159,6 +163,7 @@ export default function Settings() {
           minaka_ical_url: noirKCMinakaUrl,
           default_reservation_duration_hours: noirKCDuration,
           admin_notification_phone: noirKCAdminPhone,
+          max_concurrent_guests: noirKCMaxGuests,
         })
         .eq('slug', 'noirkc');
 
@@ -186,6 +191,7 @@ export default function Settings() {
           minaka_ical_url: rooftopKCMinakaUrl,
           default_reservation_duration_hours: rooftopKCDuration,
           admin_notification_phone: rooftopKCAdminPhone,
+          max_concurrent_guests: rooftopKCMaxGuests,
         })
         .eq('slug', 'rooftopkc');
 
@@ -376,6 +382,8 @@ export default function Settings() {
             setDuration={setNoirKCDuration}
             adminPhone={noirKCAdminPhone}
             setAdminPhone={setNoirKCAdminPhone}
+            maxGuests={noirKCMaxGuests}
+            setMaxGuests={setNoirKCMaxGuests}
             saving={noirKCSaving}
             message={noirKCMessage}
             onSave={handleNoirKCSave}
@@ -397,6 +405,8 @@ export default function Settings() {
             setDuration={setRooftopKCDuration}
             adminPhone={rooftopKCAdminPhone}
             setAdminPhone={setRooftopKCAdminPhone}
+            maxGuests={rooftopKCMaxGuests}
+            setMaxGuests={setRooftopKCMaxGuests}
             saving={rooftopKCSaving}
             message={rooftopKCMessage}
             onSave={handleRooftopKCSave}

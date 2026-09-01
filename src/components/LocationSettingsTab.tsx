@@ -26,6 +26,8 @@ interface LocationSettingsTabProps {
   setDuration: (duration: number) => void;
   adminPhone: string;
   setAdminPhone: (phone: string) => void;
+  maxGuests: number | null;
+  setMaxGuests: (maxGuests: number | null) => void;
   saving: boolean;
   message: { type: 'success' | 'error'; text: string } | null;
   onSave: () => void;
@@ -44,6 +46,8 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
   setDuration,
   adminPhone,
   setAdminPhone,
+  maxGuests,
+  setMaxGuests,
   saving,
   message,
   onSave,
@@ -281,6 +285,37 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
                 </p>
               </div>
             )}
+
+            {/* Max Concurrent Guests */}
+            <div className={styles.formGroup}>
+              <label className={styles.label} htmlFor={`max-guests-${locationSlug}`}>
+                Max Guests At One Time
+              </label>
+              <input
+                id={`max-guests-${locationSlug}`}
+                type="number"
+                className={styles.input}
+                value={maxGuests ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setMaxGuests(null);
+                  } else {
+                    const value = parseInt(raw, 10);
+                    setMaxGuests(isNaN(value) || value < 1 ? null : value);
+                  }
+                }}
+                min={1}
+                step={1}
+                placeholder="No limit"
+                inputMode="numeric"
+              />
+              <p className={styles.inputHint}>
+                Total booked guests allowed on-site at any one moment across all tables.
+                New reservations that would exceed this are blocked (admins can override).
+                Leave blank for no limit.
+              </p>
+            </div>
 
             {/* Admin Notification Phone */}
             <div className={styles.formGroup}>

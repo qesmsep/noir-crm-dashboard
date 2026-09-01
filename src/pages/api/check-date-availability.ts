@@ -1,6 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import {
+  calcPeakConcurrentGuests,
+  fetchOccupancyReservations,
+  getLocationCapacity,
+} from '../../lib/capacity';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -309,6 +314,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 (r: any) => !r.status || r.status !== 'cancelled'
               );
 
+              // Location capacity limit: fetch the cap and ALL active
+              // reservations at this location for the day (any table/party
+              // size), so slots that would push total concurrent guests past
+              // the cap can be blocked. Admin override skips this, matching
+              // the booking API where verified admins may exceed the cap.
+              const skipCapacityCheck = adminOverride === 'true';
+              let capacityCap: number | null = null;
+              let occupancyReservations: Awaited<ReturnType<typeof fetchOccupancyReservations>> = [];
+              if (locationId && !skipCapacityCheck) {
+                capacityCap = await getLocationCapacity(supabase, locationId);
+                if (capacityCap !== null) {
+                  occupancyReservations = await fetchOccupancyReservations(
+                    supabase,
+                    locationId,
+                    requestDate.startOf('day').toUTC().toJSDate(),
+                    requestDate.endOf('day').plus({ hours: 6 }).toUTC().toJSDate()
+                  );
+                }
+              }
+
               // Get venue hours for this date and location
               const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
 
@@ -371,6 +396,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         endMinute: slotEnd.minute,
                         reason: 'all_tables_booked'
                       });
+                    } else if (capacityCap !== null) {
+                      // A table is free, but would this party push the
+                      // location past its total concurrent guest limit?
+                      const projectedPeak =
+                        calcPeakConcurrentGuests(
+                          occupancyReservations,
+                          slotStart.toUTC().toJSDate(),
+                          conflictWindowEnd.toUTC().toJSDate()
+                        ) + partySizeNum;
+
+                      if (projectedPeak > capacityCap) {
+                        blockedTimeRanges.push({
+                          id: `capacity-${hour}-${minute}`,
+                          title: 'At capacity',
+                          startTime: slotStart.toFormat('h:mm a'),
+                          endTime: slotEnd.toFormat('h:mm a'),
+                          startHour: hour,
+                          startMinute: minute,
+                          endHour: slotEnd.hour,
+                          endMinute: slotEnd.minute,
+                          reason: 'capacity_reached'
+                        });
+                      }
                     }
                   }
                 }

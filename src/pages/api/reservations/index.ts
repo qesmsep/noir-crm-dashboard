@@ -2,6 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
 import { verifyAdmin } from '../../../lib/admin-auth';
+import {
+  checkReservationCapacity,
+  isCapacityError,
+  CAPACITY_ERROR_MESSAGE,
+} from '../../../lib/capacity';
 
 /**
  * Reservations API (Pages Router)
@@ -710,6 +715,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      // CAPACITY CHECK: Enforce the location's max concurrent guest limit.
+      // Friendly pre-check only — the check_reservation_capacity database
+      // trigger is the authoritative enforcement (it also covers paths that
+      // bypass this API). Verified admins may override.
+      if (!adminOverride && !body.private_event_id) {
+        try {
+          let capacityLocationId = locationId;
+          const capacityTableId = tableId || body.table_id;
+          if (!capacityLocationId && capacityTableId) {
+            const { data: tableLocation } = await client
+              .from('tables')
+              .select('location_id')
+              .eq('id', capacityTableId)
+              .single();
+            capacityLocationId = tableLocation?.location_id || null;
+          }
+
+          if (capacityLocationId) {
+            const capacityCheck = await checkReservationCapacity(client, {
+              locationId: capacityLocationId,
+              startTime: new Date(body.start_time),
+              endTime: new Date(body.end_time),
+              partySize: body.party_size,
+            });
+
+            if (!capacityCheck.allowed) {
+              console.warn(
+                `Reservation blocked by capacity limit: projected peak ${capacityCheck.projectedPeak} guests exceeds cap ${capacityCheck.cap} for location ${capacityLocationId}`
+              );
+              return res.status(400).json({
+                error: CAPACITY_ERROR_MESSAGE,
+                code: 'CAPACITY_EXCEEDED',
+              });
+            }
+          }
+        } catch (capacityCheckError) {
+          console.error('Error checking location capacity:', capacityCheckError);
+          // Fall through — the database trigger is the authoritative check
+        }
+      }
+
       // Extract only the fields that exist in the reservations table
       // The trigger function validates these columns exist, so they must be in the schema
       // Note: Some columns may not be in PostgREST schema cache - retry logic handles this
@@ -753,6 +799,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(body.bypass_code_used && { bypass_code_used: body.bypass_code_used }),
         ...(body.bypass_code_id && { bypass_code_id: body.bypass_code_id }),
         ...(body.cover_charge_waived !== undefined && { cover_charge_waived: body.cover_charge_waived }),
+        // Verified admins bypass the location capacity limit (DB trigger honors this flag)
+        ...(adminOverride && { capacity_override: true }),
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));
@@ -966,10 +1014,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (error) {
+        // The capacity trigger raced ahead of our pre-check (or the pre-check
+        // was skipped) — surface it as a friendly 400, not a server error
+        if (isCapacityError(error)) {
+          console.warn('Reservation rejected by capacity trigger:', error.message);
+          return res.status(400).json({
+            error: CAPACITY_ERROR_MESSAGE,
+            code: 'CAPACITY_EXCEEDED',
+          });
+        }
         console.error('Error creating reservation:', error);
         console.error('Error details:', JSON.stringify(error, null, 2));
         console.error('Reservation data attempted:', JSON.stringify(reservationData, null, 2));
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to create reservation',
           details: error.message || error.toString(),
           code: error.code,

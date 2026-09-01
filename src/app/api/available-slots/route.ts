@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
+import {
+  calcPeakConcurrentGuests,
+  fetchOccupancyReservations,
+  getLocationCapacity,
+} from '../../../lib/capacity';
 
 // Enable debug by default to help diagnose issues
 const DEBUG = process.env.DEBUG_AVAILABLE_SLOTS === '1' || process.env.NEXT_PUBLIC_DEBUG_AVAILABLE_SLOTS === '1' || true;
@@ -370,6 +375,25 @@ export async function POST(request: Request) {
       }
     }
     
+    // 2b. Location capacity limit: fetch the cap and all active reservations
+    // at this location for the day (any table/party size) so slots that would
+    // push total concurrent guests past the cap are hidden.
+    let capacityCap: number | null = null;
+    let occupancyReservations: Awaited<ReturnType<typeof fetchOccupancyReservations>> = [];
+    if (locationId) {
+      capacityCap = await getLocationCapacity(supabase, locationId);
+      if (capacityCap !== null) {
+        // Extend the window past midnight so late slots' full duration is covered
+        occupancyReservations = await fetchOccupancyReservations(
+          supabase,
+          locationId,
+          new Date(startOfDayUtc!),
+          new Date(endOfDayLocal.plus({ hours: 6 }).toUTC().toISO()!)
+        );
+        if (DEBUG) console.log(`Capacity limit for location ${locationId}: ${capacityCap} guests, ${occupancyReservations.length} reservations counted for occupancy`);
+      }
+    }
+
     // 3. Generate time slots based on venue hours
     let timeRanges = [{ start: '18:00', end: '23:00' }]; // default
     
@@ -601,6 +625,21 @@ export async function POST(request: Request) {
       if (DEBUG_SLOTS && !availableTable) {
         console.log(`❌ NO TABLE AVAILABLE for slot ${slot} - all tables are booked`);
       }
+
+      // A table may be free, but the location's total concurrent guest limit
+      // can still rule the slot out
+      if (availableTable && capacityCap !== null) {
+        const projectedPeak =
+          calcPeakConcurrentGuests(occupancyReservations, slotStart, slotEnd) +
+          Number(party_size);
+        if (projectedPeak > capacityCap) {
+          if (DEBUG || DEBUG_SLOTS) {
+            console.log(`🚫 SLOT ${slot} BLOCKED BY CAPACITY LIMIT: projected peak ${projectedPeak} > cap ${capacityCap}`);
+          }
+          continue; // Skip this slot
+        }
+      }
+
       if (availableTable) {
         availableSlots.push(slot);
         if (DEBUG || DEBUG_SLOTS) {

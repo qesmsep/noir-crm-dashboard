@@ -2,6 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import Stripe from 'stripe';
+import { resolveAdmin } from '../../../../lib/admin-auth';
+import { isCapacityError, CAPACITY_ERROR_MESSAGE } from '../../../../lib/capacity';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
@@ -204,6 +206,21 @@ export async function PATCH(request: Request, { params }: any) {
 
     updateFields.updated_at = new Date().toISOString();
 
+    // Verified admins may bypass the location capacity limit on edits
+    // (e.g. increasing a party size past the cap). The DB capacity trigger
+    // honors the capacity_override flag.
+    if (body.admin_override === true) {
+      const token = request.headers.get('authorization')?.split(' ')[1];
+      const admin = await resolveAdmin(token);
+      if (!admin) {
+        return NextResponse.json(
+          { error: 'Unauthorized: admin_override requires admin privileges' },
+          { status: 403 }
+        );
+      }
+      updateFields.capacity_override = true;
+    }
+
     const { data, error } = await supabase
       .from('reservations')
       .update(updateFields)
@@ -212,6 +229,13 @@ export async function PATCH(request: Request, { params }: any) {
       .single();
 
     if (error) {
+      if (isCapacityError(error)) {
+        console.warn('Reservation update rejected by capacity trigger:', error.message);
+        return NextResponse.json(
+          { error: CAPACITY_ERROR_MESSAGE, code: 'CAPACITY_EXCEEDED' },
+          { status: 400 }
+        );
+      }
       console.error('Supabase update error:', error);
       throw error;
     }
