@@ -92,11 +92,6 @@ const DEFAULT_LOCATION_SETTINGS: LocationSettingsState = {
   maxGuests: null,
 };
 
-function isMissingCapacityColumn(error: any): boolean {
-  const message = `${error?.message || ''} ${error?.details || ''}`;
-  return error?.code === '42703' || error?.code === 'PGRST204' || message.includes('max_concurrent_guests');
-}
-
 export default function Settings() {
   const { settings: contextSettings, refreshSettings, refreshHoldFeeSettings } = useSettings();
   const [settings, setSettings] = useState<Settings>(contextSettings);
@@ -113,8 +108,6 @@ export default function Settings() {
   const [locationSettings, setLocationSettings] = useState<Record<string, LocationSettingsState>>({});
   const [locationSaving, setLocationSaving] = useState<Record<string, boolean>>({});
   const [locationMessage, setLocationMessage] = useState<Record<string, LocationMessage>>({});
-  // True when the capacity-limits migration has not been applied to this database yet
-  const [capacityColumnMissing, setCapacityColumnMissing] = useState(false);
 
   useEffect(() => {
     setSettings(contextSettings);
@@ -123,33 +116,12 @@ export default function Settings() {
   // Load active locations and their settings
   useEffect(() => {
     async function fetchLocations() {
-      const BASE_COLUMNS =
-        'id, name, slug, cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone';
-
       try {
-        // max_concurrent_guests is added by the capacity-limits migration. If
-        // the code is deployed before that migration runs, fall back to the
-        // base columns so the location tabs still render.
-        const withCapacity = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('locations')
-          .select(`${BASE_COLUMNS}, max_concurrent_guests`)
+          .select('id, name, slug, cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone, max_concurrent_guests')
           .eq('status', 'active')
           .order('name', { ascending: true });
-
-        let data: any[] | null = withCapacity.data;
-        let error: any = withCapacity.error;
-
-        if (error && isMissingCapacityColumn(error)) {
-          console.warn('max_concurrent_guests column not found - capacity limits migration has not been applied yet');
-          setCapacityColumnMissing(true);
-          const withoutCapacity = await supabaseAdmin
-            .from('locations')
-            .select(BASE_COLUMNS)
-            .eq('status', 'active')
-            .order('name', { ascending: true });
-          data = withoutCapacity.data;
-          error = withoutCapacity.error;
-        }
 
         if (error || !data) {
           console.error('Error fetching locations:', error);
@@ -206,7 +178,7 @@ export default function Settings() {
           minaka_ical_url: current.minakaUrl,
           default_reservation_duration_hours: current.duration,
           admin_notification_phone: current.adminPhone,
-          ...(capacityColumnMissing ? {} : { max_concurrent_guests: current.maxGuests }),
+          max_concurrent_guests: current.maxGuests,
         })
         .eq('slug', slug);
 
@@ -214,12 +186,7 @@ export default function Settings() {
 
       setLocationMessage((prev) => ({
         ...prev,
-        [slug]: {
-          type: 'success',
-          text: capacityColumnMissing
-            ? `${locationName} settings saved. Note: the guest limit was not saved because the capacity-limits migration has not been applied yet.`
-            : `${locationName} settings saved successfully`,
-        },
+        [slug]: { type: 'success', text: `${locationName} settings saved successfully` },
       }));
     } catch (error: any) {
       console.error(`Error saving ${locationName} settings:`, error);
