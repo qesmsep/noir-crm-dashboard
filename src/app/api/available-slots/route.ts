@@ -285,11 +285,14 @@ export async function POST(request: Request) {
     if (DEBUG) console.log('Tables found (after filtering):', availableTables);
     
     // Map to id, number, seats for frontend
-    const mappedTables = (availableTables || []).map(t => ({
-      id: t.id,
-      number: t.table_number,
-      seats: parseInt(t.seats, 10)
-    }));
+    // Smallest suitable table first, matching how the booking API assigns tables
+    const mappedTables = (availableTables || [])
+      .map(t => ({
+        id: t.id,
+        number: t.table_number,
+        seats: parseInt(t.seats, 10)
+      }))
+      .sort((a, b) => a.seats - b.seats);
     // 2. Get all reservations that overlap with this date (exclude cancelled reservations and private events)
     // We need reservations that: start_time < endOfDay AND end_time > startOfDay
     // Reuse the startOfDayLocal, endOfDayLocal, startOfDayUtc, and endOfDayUtc variables 
@@ -629,9 +632,11 @@ export async function POST(request: Request) {
       // A table may be free, but the location's total concurrent guest limit
       // can still rule the slot out
       if (availableTable && capacityCap !== null) {
+        // Booking this table takes all of its seats out of service
+        const seatsClaimed = Number(availableTable.seats) || Number(party_size);
         const projectedPeak =
           calcPeakConcurrentGuests(occupancyReservations, slotStart, slotEnd) +
-          Number(party_size);
+          seatsClaimed;
         if (projectedPeak > capacityCap) {
           if (DEBUG || DEBUG_SLOTS) {
             console.log(`🚫 SLOT ${slot} BLOCKED BY CAPACITY LIMIT: projected peak ${projectedPeak} > cap ${capacityCap}`);

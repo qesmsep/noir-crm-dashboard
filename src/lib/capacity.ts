@@ -1,14 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Per-location concurrent guest capacity.
+ * Per-location concurrent seat capacity.
  *
- * A location may define `locations.max_concurrent_guests` — the maximum total
- * booked guests allowed on-site at any single moment, regardless of table
- * availability. The hard guarantee lives in the `check_reservation_capacity`
- * database trigger; the helpers here exist so API routes can (a) hide time
- * slots that would exceed the cap and (b) return a friendly error before the
- * insert ever reaches the trigger.
+ * A location may define `locations.max_concurrent_guests` — the maximum number
+ * of seats that may be occupied at any single moment, regardless of how many
+ * tables are still free. Occupancy is measured by the seating capacity of the
+ * tables booked rather than the party size, since a party of 2 on a 4-top
+ * takes the whole 4-top out of service. The hard guarantee lives in the
+ * `check_reservation_capacity` database trigger; the helpers here exist so API
+ * routes can (a) hide time slots that would exceed the cap and (b) return a
+ * friendly error before the insert ever reaches the trigger.
  *
  * Excluded from occupancy, mirroring the trigger:
  * - cancelled reservations
@@ -18,7 +20,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export interface OccupancyReservation {
   start_time: string;
   end_time: string;
-  party_size: number | null;
+  /** Seats taken out of service — the booked table's capacity, or party size when unassigned. */
+  occupancy: number;
 }
 
 /** Matches the message raised by the check_reservation_capacity trigger. */
@@ -30,11 +33,11 @@ export function isCapacityError(error: any): boolean {
 }
 
 export const CAPACITY_ERROR_MESSAGE =
-  'We are at capacity for that time. Please choose a different time or reduce your party size.';
+  'We are at capacity for that time. Please choose a different time.';
 
 /**
- * Peak number of concurrent guests within [windowStart, windowEnd), given the
- * reservations that overlap that window. Occupancy only changes when a
+ * Peak number of concurrent occupied seats within [windowStart, windowEnd),
+ * given the reservations that overlap that window. Occupancy only changes when a
  * reservation starts, so evaluating the window start plus each overlapping
  * reservation's start time is sufficient to find the peak.
  */
@@ -67,7 +70,7 @@ export function calcPeakConcurrentGuests(
       const start = new Date(r.start_time).getTime();
       const end = new Date(r.end_time).getTime();
       if (start <= t && end > t) {
-        occupancy += r.party_size || 0;
+        occupancy += r.occupancy || 0;
       }
     }
     if (occupancy > peak) peak = occupancy;
@@ -107,7 +110,7 @@ export async function fetchOccupancyReservations(
 ): Promise<OccupancyReservation[]> {
   const { data: locationTables, error: tablesError } = await client
     .from('tables')
-    .select('id')
+    .select('id, seats')
     .eq('location_id', locationId);
 
   if (tablesError) {
@@ -115,6 +118,9 @@ export async function fetchOccupancyReservations(
   }
 
   const tableIds = (locationTables || []).map((t: any) => t.id);
+  const seatsByTableId = new Map<string, number>(
+    (locationTables || []).map((t: any) => [String(t.id), Number(t.seats) || 0])
+  );
   const locationFilter =
     tableIds.length > 0
       ? `location_id.eq.${locationId},table_id.in.(${tableIds.join(',')})`
@@ -122,7 +128,7 @@ export async function fetchOccupancyReservations(
 
   const { data, error } = await client
     .from('reservations')
-    .select('start_time, end_time, party_size, status, private_event_id')
+    .select('start_time, end_time, party_size, table_id, status, private_event_id')
     .or(locationFilter)
     .lt('start_time', windowEnd.toISOString())
     .gt('end_time', windowStart.toISOString());
@@ -132,10 +138,16 @@ export async function fetchOccupancyReservations(
     return [];
   }
 
-  return (data || []).filter(
-    (r: any) =>
-      (!r.status || r.status !== 'cancelled') && !r.private_event_id
-  );
+  return (data || [])
+    .filter((r: any) => (!r.status || r.status !== 'cancelled') && !r.private_event_id)
+    .map((r: any) => ({
+      start_time: r.start_time,
+      end_time: r.end_time,
+      // A booked table is out of service in full, whatever the party size
+      occupancy: r.table_id
+        ? seatsByTableId.get(String(r.table_id)) ?? r.party_size ?? 0
+        : r.party_size ?? 0,
+    }));
 }
 
 export interface CapacityCheckResult {
@@ -145,8 +157,8 @@ export interface CapacityCheckResult {
 }
 
 /**
- * Would a reservation of `partySize` guests over [startTime, endTime) push the
- * location past its cap? Best-effort UX check — the database trigger is the
+ * Would a booking claiming `seats` over [startTime, endTime) push the location
+ * past its cap? Best-effort UX check — the database trigger is the
  * authoritative enforcement.
  */
 export async function checkReservationCapacity(
@@ -155,14 +167,15 @@ export async function checkReservationCapacity(
     locationId: string;
     startTime: Date;
     endTime: Date;
-    partySize: number;
+    /** Seats this booking takes out of service (its table's capacity). */
+    seats: number;
   }
 ): Promise<CapacityCheckResult> {
-  const { locationId, startTime, endTime, partySize } = params;
+  const { locationId, startTime, endTime, seats } = params;
 
   const cap = await getLocationCapacity(client, locationId);
   if (cap === null) {
-    return { allowed: true, cap: null, projectedPeak: partySize };
+    return { allowed: true, cap: null, projectedPeak: seats };
   }
 
   const reservations = await fetchOccupancyReservations(
@@ -172,7 +185,7 @@ export async function checkReservationCapacity(
     endTime
   );
   const peak = calcPeakConcurrentGuests(reservations, startTime, endTime);
-  const projectedPeak = peak + partySize;
+  const projectedPeak = peak + seats;
 
   return { allowed: projectedPeak <= cap, cap, projectedPeak };
 }

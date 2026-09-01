@@ -18,6 +18,7 @@ export default function Calendar() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [activeLocation, setActiveLocation] = useState<string>('noirkc');
+  const [locations, setLocations] = useState<Array<{ id: string; slug: string; name: string }>>([]);
   const [bookingStartDate, setBookingStartDate] = useState<Date>(new Date());
   const [bookingEndDate, setBookingEndDate] = useState<Date>(() => {
     const d = new Date();
@@ -29,6 +30,27 @@ export default function Calendar() {
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [isNewReservationModalOpen, setIsNewReservationModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ date: Date; resourceId: string } | null>(null);
+
+  // Load locations so each venue gets its own tab automatically
+  useEffect(() => {
+    async function fetchLocations() {
+      try {
+        const res = await fetch('/api/locations');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocations(data);
+          // Keep the current tab if it still exists, otherwise fall back to the first
+          setActiveLocation((prev) =>
+            data.some((l: any) => l.slug === prev) ? prev : data[0].slug
+          );
+        }
+      } catch (err) {
+        console.error('Failed to fetch locations:', err);
+      }
+    }
+    fetchLocations();
+  }, []);
 
   useEffect(() => {
     if (router.isReady && router.query.date) {
@@ -149,18 +171,15 @@ export default function Calendar() {
         <header className={styles.header}>
           <nav className={styles.nav}>
             <div className={styles.locationTabs}>
-              <button
-                className={`${styles.locationTab} ${activeLocation === 'noirkc' ? styles.active : ''}`}
-                onClick={() => setActiveLocation('noirkc')}
-              >
-                Noir KC
-              </button>
-              <button
-                className={`${styles.locationTab} ${activeLocation === 'rooftopkc' ? styles.active : ''}`}
-                onClick={() => setActiveLocation('rooftopkc')}
-              >
-                RooftopKC
-              </button>
+              {locations.map((location) => (
+                <button
+                  key={location.slug}
+                  className={`${styles.locationTab} ${activeLocation === location.slug ? styles.active : ''}`}
+                  onClick={() => setActiveLocation(location.slug)}
+                >
+                  {location.name}
+                </button>
+              ))}
             </div>
 
             <div className={styles.viewButtons}>

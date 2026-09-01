@@ -722,14 +722,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!adminOverride && !body.private_event_id) {
         try {
           let capacityLocationId = locationId;
+          // The booking takes its whole table out of service, so the table's
+          // seat count is what consumes capacity - not the party size.
+          let capacitySeats = body.party_size;
           const capacityTableId = tableId || body.table_id;
-          if (!capacityLocationId && capacityTableId) {
-            const { data: tableLocation } = await client
+
+          if (capacityTableId) {
+            const { data: capacityTable } = await client
               .from('tables')
-              .select('location_id')
+              .select('location_id, seats')
               .eq('id', capacityTableId)
               .single();
-            capacityLocationId = tableLocation?.location_id || null;
+            if (capacityTable) {
+              capacityLocationId = capacityLocationId || capacityTable.location_id || null;
+              capacitySeats = Number(capacityTable.seats) || body.party_size;
+            }
           }
 
           if (capacityLocationId) {
@@ -737,12 +744,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               locationId: capacityLocationId,
               startTime: new Date(body.start_time),
               endTime: new Date(body.end_time),
-              partySize: body.party_size,
+              seats: capacitySeats,
             });
 
             if (!capacityCheck.allowed) {
               console.warn(
-                `Reservation blocked by capacity limit: projected peak ${capacityCheck.projectedPeak} guests exceeds cap ${capacityCheck.cap} for location ${capacityLocationId}`
+                `Reservation blocked by capacity limit: projected peak ${capacityCheck.projectedPeak} seats exceeds cap ${capacityCheck.cap} for location ${capacityLocationId}`
               );
               return res.status(400).json({
                 error: CAPACITY_ERROR_MESSAGE,

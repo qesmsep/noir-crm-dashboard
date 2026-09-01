@@ -361,8 +361,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     // The full window a reservation starting in this slot would actually occupy
                     const conflictWindowEnd = slotStart.plus({ hours: reservationDurationHours });
 
-                    // Check if ANY table is available for this time slot
-                    let tableAvailable = false;
+                    // Find the table that would actually be assigned. Tables are
+                    // ordered smallest-first, matching the booking API, so the
+                    // first free one is the table this booking would take.
+                    let assignedTable: any = null;
 
                     for (const table of availableTables) {
                       // Check if this table has any conflicting reservations over the full
@@ -378,13 +380,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                       });
 
                       if (!hasConflict) {
-                        tableAvailable = true;
+                        assignedTable = table;
                         break; // At least one table is available
                       }
                     }
 
                     // If no tables available for this slot, add it to blocked times
-                    if (!tableAvailable) {
+                    if (!assignedTable) {
                       blockedTimeRanges.push({
                         id: `no-tables-${hour}-${minute}`,
                         title: 'No tables available',
@@ -397,14 +399,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         reason: 'all_tables_booked'
                       });
                     } else if (capacityCap !== null) {
-                      // A table is free, but would this party push the
-                      // location past its total concurrent guest limit?
+                      // A table is free, but taking it out of service may push
+                      // the location past its concurrent seat limit
+                      const seatsClaimed = Number(assignedTable.seats) || partySizeNum;
                       const projectedPeak =
                         calcPeakConcurrentGuests(
                           occupancyReservations,
                           slotStart.toUTC().toJSDate(),
                           conflictWindowEnd.toUTC().toJSDate()
-                        ) + partySizeNum;
+                        ) + seatsClaimed;
 
                       if (projectedPeak > capacityCap) {
                         blockedTimeRanges.push({

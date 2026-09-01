@@ -1,13 +1,17 @@
 -- ========================================
--- Migration: Add per-location concurrent guest capacity limits
+-- Migration: Add per-location concurrent seat capacity limits
 -- Created: 2026-08-31
--- Description: Caps the total number of guests that can be booked at a
---              location at any one moment, regardless of table availability.
+-- Description: Caps how many seats can be occupied at a location at any one
+--              moment, regardless of how many tables are still free.
 --              Enforced at the database level via a BEFORE INSERT/UPDATE
 --              trigger so every booking path (website, admin, member portal,
 --              SMS webhook) is covered.
 --
---              Seeds: Noir KC = 85 guests, RooftopKC = 100 guests.
+--              Occupancy is measured by the seating capacity of the tables
+--              booked, not the party size: a party of 2 on a 4-top takes the
+--              whole 4-top out of service, so it counts as 4.
+--
+--              Seeds: Noir KC = 85 seats, RooftopKC = 100 seats.
 --
 -- Tables Affected: locations, reservations
 -- Dependencies: 20260413000000_create_locations_table.sql,
@@ -25,7 +29,7 @@ ALTER TABLE public.locations
   CHECK (max_concurrent_guests IS NULL OR max_concurrent_guests > 0);
 
 COMMENT ON COLUMN public.locations.max_concurrent_guests IS
-  'Maximum total booked guests allowed on-site at any single moment. NULL = no limit.';
+  'Maximum seats (summed table capacity) that may be occupied at any single moment. NULL = no limit.';
 
 -- ========================================
 -- STEP 2: ADD ADMIN OVERRIDE FLAG TO RESERVATIONS
@@ -60,6 +64,7 @@ DECLARE
   v_location_id UUID;
   v_cap INTEGER;
   v_peak INTEGER;
+  v_new_seats INTEGER;
 BEGIN
   -- Cancelling a reservation frees capacity; never block it
   IF NEW.status IS NOT NULL AND NEW.status::text = 'cancelled' THEN
@@ -103,6 +108,13 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- This reservation occupies its whole table. Fall back to party size when no
+  -- table is assigned (a party still takes up room even if seated ad hoc).
+  IF NEW.table_id IS NOT NULL THEN
+    SELECT t.seats INTO v_new_seats FROM public.tables t WHERE t.id = NEW.table_id;
+  END IF;
+  v_new_seats := COALESCE(v_new_seats, NEW.party_size);
+
   -- Serialize concurrent bookings per location so two simultaneous requests
   -- cannot both squeeze under the cap
   PERFORM pg_advisory_xact_lock(hashtext(v_location_id::text));
@@ -111,7 +123,8 @@ BEGIN
   -- only changes when a reservation starts, so it is enough to evaluate the
   -- window start plus each overlapping reservation's start time.
   WITH others AS (
-    SELECT r.start_time, r.end_time, r.party_size
+    SELECT r.start_time, r.end_time,
+           COALESCE(t.seats, r.party_size) AS occupancy
     FROM public.reservations r
     LEFT JOIN public.tables t ON t.id = r.table_id
     WHERE COALESCE(r.location_id, t.location_id) = v_location_id
@@ -130,14 +143,14 @@ BEGIN
   SELECT COALESCE(MAX(occ), 0) INTO v_peak
   FROM points p
   CROSS JOIN LATERAL (
-    SELECT COALESCE(SUM(o.party_size), 0) AS occ
+    SELECT COALESCE(SUM(o.occupancy), 0) AS occ
     FROM others o
     WHERE o.start_time <= p.t AND o.end_time > p.t
   ) s;
 
-  IF v_peak + NEW.party_size > v_cap THEN
-    RAISE EXCEPTION 'CAPACITY_EXCEEDED: this reservation would put % guests on site at once (limit is %)',
-      v_peak + NEW.party_size, v_cap
+  IF v_peak + v_new_seats > v_cap THEN
+    RAISE EXCEPTION 'CAPACITY_EXCEEDED: this reservation would put % seats in use at once (limit is %)',
+      v_peak + v_new_seats, v_cap
       USING ERRCODE = 'P0001',
             HINT = 'Choose a different time, reduce the party size, or use an admin capacity override.';
   END IF;
