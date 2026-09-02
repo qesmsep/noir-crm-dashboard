@@ -83,11 +83,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const { paymentExtensionMinutes } = await getHoldSettings(client, hold.location_id);
-      // Extend from now so reaching payment late still gives the full window
+      // Reaching payment guarantees at least the extension from now, but never
+      // takes away time the guest already had - a long hold is not truncated
+      // just because the extension is shorter than what remains.
+      const currentExpiry = new Date(hold.expires_at);
+      const fromNow = new Date(Date.now() + paymentExtensionMinutes * 60 * 1000);
       const extendedExpiry =
-        paymentExtensionMinutes > 0
-          ? new Date(Date.now() + paymentExtensionMinutes * 60 * 1000)
-          : new Date(hold.expires_at);
+        paymentExtensionMinutes > 0 && fromNow > currentExpiry ? fromNow : currentExpiry;
 
       const { data: updated, error: updateError } = await client
         .from('reservation_holds')
@@ -110,7 +112,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         stage: updated.stage,
         expires_at: updated.expires_at,
         seconds_remaining: secondsRemaining(updated.expires_at),
-        extended: paymentExtensionMinutes > 0,
+        extended: extendedExpiry > currentExpiry,
         extension_minutes: paymentExtensionMinutes,
       });
     }

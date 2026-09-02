@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
 import {
   calcPeakConcurrentGuests,
@@ -393,7 +393,9 @@ export async function POST(request: Request) {
       const dayEnd = new Date(endOfDayLocal.plus({ hours: 6 }).toUTC().toISO()!);
 
       capacityCap = await getLocationCapacity(supabase, locationId);
-      activeHolds = await fetchActiveHolds(supabase, locationId, dayStart, dayEnd);
+      // reservation_holds has RLS on with no policy, so it is readable only by
+      // the service role - the anon client would silently return nothing
+      activeHolds = await fetchActiveHolds(supabaseAdmin || supabase, locationId, dayStart, dayEnd);
 
       if (capacityCap !== null) {
         occupancyReservations = await fetchOccupancyReservations(

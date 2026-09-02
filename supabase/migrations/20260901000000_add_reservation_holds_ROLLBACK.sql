@@ -5,6 +5,7 @@
 --       from 20260831000000.
 -- ========================================
 
+DROP FUNCTION IF EXISTS public.create_reservation_hold(UUID, TIMESTAMPTZ, TIMESTAMPTZ, INTEGER);
 DROP FUNCTION IF EXISTS public.purge_expired_reservation_holds();
 DROP TABLE IF EXISTS public.reservation_holds;
 

@@ -51,6 +51,9 @@ export function useReservationHold({
 
   // Refs keep the unmount/unload cleanup honest without re-running effects
   const holdTokenRef = useRef<string | null>(null);
+  // Identifies the selection the live hold was placed for, so a changed date,
+  // time or party size replaces the hold instead of keeping a stale one
+  const heldKeyRef = useRef<string | null>(null);
   const expiredFiredRef = useRef(false);
   const onExpiredRef = useRef(onExpired);
   onExpiredRef.current = onExpired;
@@ -74,6 +77,7 @@ export function useReservationHold({
 
   const release = useCallback(async () => {
     const token = holdTokenRef.current;
+    heldKeyRef.current = null;
     setHold(null, null);
     await releaseToken(token);
   }, [releaseToken, setHold]);
@@ -82,19 +86,28 @@ export function useReservationHold({
   useEffect(() => {
     let cancelled = false;
 
+    const clearHold = () => {
+      const token = holdTokenRef.current;
+      holdTokenRef.current = null;
+      heldKeyRef.current = null;
+      setHoldToken(null);
+      setExpiresAt(null);
+      setSecondsLeft(null);
+      if (token) releaseToken(token);
+    };
+
     if (!enabled || !startTime || !endTime || !partySize) {
-      if (holdTokenRef.current) {
-        const token = holdTokenRef.current;
-        holdTokenRef.current = null;
-        setHoldToken(null);
-        setExpiresAt(null);
-        setSecondsLeft(null);
-        releaseToken(token);
-      }
+      if (holdTokenRef.current) clearHold();
       return;
     }
 
-    if (holdTokenRef.current) return; // already holding
+    const selectionKey = `${startTime}|${endTime}|${partySize}|${locationSlug ?? ''}`;
+
+    // Already holding exactly this selection
+    if (holdTokenRef.current && heldKeyRef.current === selectionKey) return;
+
+    // Holding a different selection: give that table back before taking another
+    if (holdTokenRef.current) clearHold();
 
     async function createHold() {
       setIsCreating(true);
@@ -121,6 +134,7 @@ export function useReservationHold({
           setError(data?.error || 'Could not hold that table.');
           return;
         }
+        heldKeyRef.current = selectionKey;
         setHold(data.hold_token, data.expires_at);
       } catch (err) {
         if (!cancelled) setError('Could not hold that table. Please try again.');
@@ -145,6 +159,7 @@ export function useReservationHold({
       if (left <= 0 && !expiredFiredRef.current) {
         expiredFiredRef.current = true;
         holdTokenRef.current = null;
+        heldKeyRef.current = null;
         setHoldToken(null);
         onExpiredRef.current?.();
       }
@@ -168,6 +183,7 @@ export function useReservationHold({
           if (!expiredFiredRef.current) {
             expiredFiredRef.current = true;
             holdTokenRef.current = null;
+            heldKeyRef.current = null;
             setHoldToken(null);
             onExpiredRef.current?.();
           }
@@ -198,6 +214,7 @@ export function useReservationHold({
         if (!expiredFiredRef.current) {
           expiredFiredRef.current = true;
           holdTokenRef.current = null;
+          heldKeyRef.current = null;
           setHoldToken(null);
           setSecondsLeft(0);
           onExpiredRef.current?.();

@@ -7,7 +7,7 @@ import {
   isCapacityError,
   CAPACITY_ERROR_MESSAGE,
 } from '../../../lib/capacity';
-import { HOLD_EXPIRED_MESSAGE } from '../../../lib/holds';
+import { HOLD_EXPIRED_MESSAGE, fetchHeldTableIds } from '../../../lib/holds';
 
 /**
  * Reservations API (Pages Router)
@@ -381,9 +381,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             );
             
             console.log(`Found ${existingReservations.length} active overlapping reservations (out of ${allReservations?.length || 0} total)`);
-            
+
+            // Tables another guest is holding mid-checkout are not free to
+            // assign, or that guest would fail when they submit
+            const heldTableIds = locationId
+              ? await fetchHeldTableIds(client, locationId, startTime, endTime, holdId)
+              : new Set<string>();
+            if (heldTableIds.size > 0) {
+              console.log(`Skipping ${heldTableIds.size} table(s) held by other guests`);
+            }
+
             // Find first available table
             for (const table of availableTables) {
+              if (heldTableIds.has(String(table.id))) continue;
               const hasConflict = existingReservations.some((res: any) => {
                 // Ensure table_id matches (using String conversion for type safety)
                 if (!res.table_id || String(res.table_id) !== String(table.id)) return false;

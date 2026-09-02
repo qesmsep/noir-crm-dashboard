@@ -259,6 +259,9 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   // Set when the guest starts entering card details - the payment step, which
   // buys them the extension so they are not cut off mid-payment
   const [reachedPaymentStep, setReachedPaymentStep] = useState(false);
+  // The form pre-selects the first available slot, so a time being set is not
+  // evidence the guest wants it. Only an explicit pick places a hold.
+  const [timeChosenByGuest, setTimeChosenByGuest] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationData, setConfirmationData] = useState<any>(null);
   const [pendingReservation, setPendingReservation] = useState<any>(null);
@@ -462,6 +465,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
           if (result) {
             setDate(result.date);
             setAvailableTimes(result.slots);
+            setTimeChosenByGuest(false);
             setTime(result.slots[0] || '');
           }
         })();
@@ -499,6 +503,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
             if (result) {
               setDate(result.date);
               setAvailableTimes(result.slots);
+              setTimeChosenByGuest(false);
               setTime(result.slots[0] || '');
               return;
             }
@@ -599,9 +604,11 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
   useEffect(() => {
     if (availableTimes.length > 0) {
       if (!availableTimes.includes(time)) {
+        setTimeChosenByGuest(false);
         setTime(availableTimes[0] || '');
       }
     } else {
+      setTimeChosenByGuest(false);
       setTime(''); // Clear time if no available times
     }
   }, [availableTimes]);
@@ -728,7 +735,10 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     if (date) setDate(DateTime.fromJSDate(date));
   };
   
-  const handleTimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => setTime(e.target.value);
+  const handleTimeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTimeChosenByGuest(!!e.target.value);
+    setTime(e.target.value);
+  };
   
   const handlePartySizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -1072,6 +1082,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
           // The hold lapsed between the last tick and submitting
           if (response.status === 410 || data.code === 'HOLD_EXPIRED') {
             setTime('');
+            setTimeChosenByGuest(false);
             setReachedPaymentStep(false);
             toast({
               title: 'Your hold expired',
@@ -1190,7 +1201,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     error: holdError,
     extendForPayment,
   } = useReservationHold({
-    enabled: !!holdWindow && !showConfirmationModal,
+    enabled: timeChosenByGuest && !!holdWindow && !showConfirmationModal,
     startTime: holdWindow?.start ?? null,
     endTime: holdWindow?.end ?? null,
     partySize: form.party_size || null,
@@ -1198,6 +1209,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
     onExpired: () => {
       // The table went back in the pool - send them back to pick a time
       setTime('');
+      setTimeChosenByGuest(false);
       setReachedPaymentStep(false);
       toast({
         title: 'Your hold expired',
@@ -1564,7 +1576,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
             </FormControl>
 
             {/* Checkout hold countdown */}
-            {holdWindow && (
+            {timeChosenByGuest && holdWindow && (
               <HoldCountdown
                 secondsLeft={holdSecondsLeft}
                 isCreating={isPlacingHold}
@@ -1836,6 +1848,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   {alternativeTimes?.before && (
                     <Button
                       onClick={() => {
+                        setTimeChosenByGuest(true);
                         setTime(alternativeTimes.before!);
                         setShowAlternativeTimesModal(false);
                       }}
@@ -1853,6 +1866,7 @@ const ReservationForm: React.FC<ReservationFormProps> = ({
                   {alternativeTimes?.after && (
                     <Button
                       onClick={() => {
+                        setTimeChosenByGuest(true);
                         setTime(alternativeTimes.after!);
                         setShowAlternativeTimesModal(false);
                       }}

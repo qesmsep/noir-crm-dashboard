@@ -99,31 +99,6 @@ export async function fetchActiveHolds(
   return data || [];
 }
 
-/**
- * Live holds shaped for the shared occupancy math in `lib/capacity`, so held
- * tables and booked tables are counted the same way.
- */
-export async function fetchHoldOccupancy(
-  client: SupabaseClient,
-  locationId: string,
-  windowStart: Date,
-  windowEnd: Date,
-  exceptHoldId?: string | null
-): Promise<Array<{ start_time: string; end_time: string; occupancy: number }>> {
-  const holds = await fetchActiveHolds(
-    client,
-    locationId,
-    windowStart,
-    windowEnd,
-    exceptHoldId
-  );
-  return holds.map((h) => ({
-    start_time: h.start_time,
-    end_time: h.end_time,
-    occupancy: Number(h.seats) || 0,
-  }));
-}
-
 /** Table ids currently held for any part of [windowStart, windowEnd). */
 export async function fetchHeldTableIds(
   client: SupabaseClient,

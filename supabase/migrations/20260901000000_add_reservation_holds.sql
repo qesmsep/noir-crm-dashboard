@@ -93,6 +93,117 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ========================================
+-- STEP 3b: ATOMIC HOLD CREATION
+-- ========================================
+
+-- Choosing a table and holding it must be one transaction: two guests hitting
+-- the same slot at the same instant would otherwise both pass the "is it free"
+-- check and both be handed the same table. The advisory lock serializes hold
+-- creation per location, mirroring the capacity trigger.
+CREATE OR REPLACE FUNCTION public.create_reservation_hold(
+  p_location_id UUID,
+  p_start_time TIMESTAMPTZ,
+  p_end_time TIMESTAMPTZ,
+  p_party_size INTEGER
+)
+RETURNS public.reservation_holds AS $$
+DECLARE
+  v_table_id TEXT;
+  v_seats INTEGER;
+  v_cap INTEGER;
+  v_peak INTEGER;
+  v_minutes INTEGER;
+  v_hold public.reservation_holds;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext(p_location_id::text));
+
+  -- Smallest suitable table that is neither booked nor held for this window.
+  -- Tables 4, 8 and 12 are not bookable, matching the rest of the app.
+  SELECT t.id, t.seats INTO v_table_id, v_seats
+  FROM public.tables t
+  WHERE t.location_id = p_location_id
+    AND t.seats >= p_party_size
+    AND t.table_number::text NOT IN ('4', '8', '12')
+    AND NOT EXISTS (
+      SELECT 1 FROM public.reservations r
+      WHERE r.table_id = t.id
+        AND (r.status IS NULL OR r.status::text <> 'cancelled')
+        AND r.start_time < p_end_time
+        AND r.end_time > p_start_time
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.reservation_holds h
+      WHERE h.table_id = t.id
+        AND h.expires_at > NOW()
+        AND h.start_time < p_end_time
+        AND h.end_time > p_start_time
+    )
+  ORDER BY t.seats ASC, t.table_number ASC
+  LIMIT 1;
+
+  IF v_table_id IS NULL THEN
+    RAISE EXCEPTION 'NO_TABLE_AVAILABLE: no free table for % guests in that window', p_party_size
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT l.max_concurrent_guests INTO v_cap
+  FROM public.locations l WHERE l.id = p_location_id;
+
+  IF v_cap IS NOT NULL THEN
+    -- Peak seats in use across bookings and live holds during the window
+    WITH others AS (
+      SELECT r.start_time, r.end_time, COALESCE(t.seats, r.party_size) AS occupancy
+      FROM public.reservations r
+      LEFT JOIN public.tables t ON t.id = r.table_id
+      WHERE COALESCE(r.location_id, t.location_id) = p_location_id
+        AND (r.status IS NULL OR r.status::text <> 'cancelled')
+        AND r.private_event_id IS NULL
+        AND r.party_size IS NOT NULL
+        AND r.start_time < p_end_time
+        AND r.end_time > p_start_time
+      UNION ALL
+      SELECT h.start_time, h.end_time, h.seats
+      FROM public.reservation_holds h
+      WHERE h.location_id = p_location_id
+        AND h.expires_at > NOW()
+        AND h.start_time < p_end_time
+        AND h.end_time > p_start_time
+    ),
+    points AS (
+      SELECT p_start_time AS t
+      UNION
+      SELECT o.start_time FROM others o WHERE o.start_time >= p_start_time
+    )
+    SELECT COALESCE(MAX(occ), 0) INTO v_peak
+    FROM points p
+    CROSS JOIN LATERAL (
+      SELECT COALESCE(SUM(o.occupancy), 0) AS occ
+      FROM others o
+      WHERE o.start_time <= p.t AND o.end_time > p.t
+    ) s;
+
+    IF v_peak + v_seats > v_cap THEN
+      RAISE EXCEPTION 'CAPACITY_EXCEEDED: holding this table would put % seats in use at once (limit is %)',
+        v_peak + v_seats, v_cap
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  SELECT COALESCE(l.hold_duration_minutes, 5) INTO v_minutes
+  FROM public.locations l WHERE l.id = p_location_id;
+
+  INSERT INTO public.reservation_holds
+    (location_id, table_id, start_time, end_time, party_size, seats, stage, expires_at)
+  VALUES
+    (p_location_id, v_table_id, p_start_time, p_end_time, p_party_size, v_seats, 'details',
+     NOW() + (v_minutes || ' minutes')::interval)
+  RETURNING * INTO v_hold;
+
+  RETURN v_hold;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================
 -- STEP 4: COUNT LIVE HOLDS TOWARD CAPACITY
 -- ========================================
 
