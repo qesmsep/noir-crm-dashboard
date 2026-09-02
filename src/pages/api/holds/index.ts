@@ -19,6 +19,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const client = supabaseAdmin || supabase;
+  if (!supabaseAdmin) {
+    // reservation_holds is RLS-protected with no policies, so without the
+    // service key every hold read and write silently does nothing
+    console.warn('WARNING: SUPABASE_SERVICE_ROLE_KEY not set - hold operations will fail against reservation_holds.');
+  }
 
   try {
     const { start_time, end_time, party_size, location_slug } = req.body || {};

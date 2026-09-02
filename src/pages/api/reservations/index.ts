@@ -786,6 +786,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               startTime: new Date(body.start_time),
               endTime: new Date(body.end_time),
               seats: capacitySeats,
+              exceptHoldId: holdId,
             });
 
             if (!capacityCheck.allowed) {

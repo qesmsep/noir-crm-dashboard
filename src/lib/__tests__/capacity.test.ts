@@ -1,5 +1,6 @@
 import {
   calcPeakConcurrentGuests,
+  checkReservationCapacity,
   isCapacityError,
   CAPACITY_ERROR_MARKER,
 } from '../capacity';
@@ -79,5 +80,103 @@ describe('isCapacityError', () => {
     expect(isCapacityError({ message: 'duplicate key value violates unique constraint' })).toBe(false);
     expect(isCapacityError(null)).toBe(false);
     expect(isCapacityError({})).toBe(false);
+  });
+});
+
+/**
+ * Minimal stand-in for a Supabase query builder: chainable, thenable, and
+ * honouring only the filter that matters here (`neq`, used to exclude a hold).
+ */
+function fakeClient(tables: Record<string, any[]>) {
+  return {
+    from(table: string) {
+      let rows = [...(tables[table] || [])];
+      const builder: any = {
+        select: () => builder,
+        eq: () => builder,
+        or: () => builder,
+        lt: () => builder,
+        gt: () => builder,
+        neq: (col: string, val: any) => {
+          rows = rows.filter((r) => String(r[col]) !== String(val));
+          return builder;
+        },
+        single: () => Promise.resolve({ data: rows[0] ?? null, error: null }),
+        then: (resolve: any, reject: any) =>
+          Promise.resolve({ data: rows, error: null }).then(resolve, reject),
+      };
+      return builder;
+    },
+  } as any;
+}
+
+describe('checkReservationCapacity', () => {
+  const START = new Date('2026-09-01T20:00:00.000Z');
+  const END = new Date('2026-09-01T22:00:00.000Z');
+
+  // Cap 10. One booked 4-top and one held 4-top, both across the window.
+  const baseTables = {
+    locations: [{ max_concurrent_guests: 10 }],
+    tables: [
+      { id: 't1', seats: 4 },
+      { id: 't2', seats: 4 },
+    ],
+    reservations: [
+      {
+        start_time: START.toISOString(),
+        end_time: END.toISOString(),
+        party_size: 2,
+        table_id: 't1',
+        status: 'confirmed',
+        private_event_id: null,
+      },
+    ],
+    reservation_holds: [
+      {
+        id: 'hold-1',
+        table_id: 't2',
+        start_time: START.toISOString(),
+        end_time: END.toISOString(),
+        seats: 4,
+      },
+    ],
+  };
+
+  it("counts another guest's live hold against the cap", async () => {
+    // 4 booked + 4 held + 4 requested = 12 > 10. Ignoring the hold would
+    // wrongly allow this at 8.
+    const result = await checkReservationCapacity(fakeClient(baseTables), {
+      locationId: 'loc-1',
+      startTime: START,
+      endTime: END,
+      seats: 4,
+    });
+
+    expect(result.projectedPeak).toBe(12);
+    expect(result.allowed).toBe(false);
+  });
+
+  it("does not count the booking's own hold against it", async () => {
+    // Redeeming hold-1: only the booked 4-top counts, so 4 + 4 = 8 <= 10
+    const result = await checkReservationCapacity(fakeClient(baseTables), {
+      locationId: 'loc-1',
+      startTime: START,
+      endTime: END,
+      seats: 4,
+      exceptHoldId: 'hold-1',
+    });
+
+    expect(result.projectedPeak).toBe(8);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('allows anything when the location has no cap', async () => {
+    const result = await checkReservationCapacity(
+      fakeClient({ ...baseTables, locations: [{ max_concurrent_guests: null }] }),
+      { locationId: 'loc-1', startTime: START, endTime: END, seats: 99 }
+    );
+
+    expect(result.cap).toBeNull();
+    expect(result.allowed).toBe(true);
   });
 });

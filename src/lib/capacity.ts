@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchActiveHolds } from './holds';
 
 /**
  * Per-location concurrent seat capacity.
@@ -11,6 +12,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * `check_reservation_capacity` database trigger; the helpers here exist so API
  * routes can (a) hide time slots that would exceed the cap and (b) return a
  * friendly error before the insert ever reaches the trigger.
+ *
+ * Occupancy counts confirmed bookings plus tables currently held mid-checkout,
+ * matching what the trigger counts.
  *
  * Excluded from occupancy, mirroring the trigger:
  * - cancelled reservations
@@ -169,22 +173,37 @@ export async function checkReservationCapacity(
     endTime: Date;
     /** Seats this booking takes out of service (its table's capacity). */
     seats: number;
+    /**
+     * The hold this booking is converting from. It must be excluded, or the
+     * guest's own held table would count against them and block the booking.
+     */
+    exceptHoldId?: string | null;
   }
 ): Promise<CapacityCheckResult> {
-  const { locationId, startTime, endTime, seats } = params;
+  const { locationId, startTime, endTime, seats, exceptHoldId } = params;
 
   const cap = await getLocationCapacity(client, locationId);
   if (cap === null) {
     return { allowed: true, cap: null, projectedPeak: seats };
   }
 
-  const reservations = await fetchOccupancyReservations(
-    client,
-    locationId,
-    startTime,
-    endTime
-  );
-  const peak = calcPeakConcurrentGuests(reservations, startTime, endTime);
+  // Tables other guests are holding are out of service too, exactly as the
+  // trigger and the availability endpoints treat them
+  const [reservations, holds] = await Promise.all([
+    fetchOccupancyReservations(client, locationId, startTime, endTime),
+    fetchActiveHolds(client, locationId, startTime, endTime, exceptHoldId),
+  ]);
+
+  const occupancy = [
+    ...reservations,
+    ...holds.map((h) => ({
+      start_time: h.start_time,
+      end_time: h.end_time,
+      occupancy: Number(h.seats) || 0,
+    })),
+  ];
+
+  const peak = calcPeakConcurrentGuests(occupancy, startTime, endTime);
   const projectedPeak = peak + seats;
 
   return { allowed: projectedPeak <= cap, cap, projectedPeak };
