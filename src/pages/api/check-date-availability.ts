@@ -1,6 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import {
+  calcPeakConcurrentGuests,
+  fetchOccupancyReservations,
+  getLocationCapacity,
+} from '../../lib/capacity';
+import { fetchActiveHolds } from '../../lib/holds';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -309,6 +315,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 (r: any) => !r.status || r.status !== 'cancelled'
               );
 
+              // Location capacity limit: fetch the cap and ALL active
+              // reservations at this location for the day (any table/party
+              // size), so slots that would push total concurrent guests past
+              // the cap can be blocked. Admin override skips this, matching
+              // the booking API where verified admins may exceed the cap.
+              const skipCapacityCheck = adminOverride === 'true';
+              let capacityCap: number | null = null;
+              let occupancyReservations: Awaited<ReturnType<typeof fetchOccupancyReservations>> = [];
+              // Tables another guest is holding mid-checkout are unavailable,
+              // and their seats count toward the cap like booked ones
+              let activeHolds: Awaited<ReturnType<typeof fetchActiveHolds>> = [];
+              if (locationId) {
+                const dayStart = requestDate.startOf('day').toUTC().toJSDate();
+                const dayEnd = requestDate.endOf('day').plus({ hours: 6 }).toUTC().toJSDate();
+
+                activeHolds = await fetchActiveHolds(supabase, locationId, dayStart, dayEnd);
+
+                if (!skipCapacityCheck) {
+                  capacityCap = await getLocationCapacity(supabase, locationId);
+                  if (capacityCap !== null) {
+                    occupancyReservations = await fetchOccupancyReservations(
+                      supabase,
+                      locationId,
+                      dayStart,
+                      dayEnd
+                    );
+                  }
+                }
+              }
+
               // Get venue hours for this date and location
               const operatingHours = await getOperatingHoursForDate(requestDate, locationId);
 
@@ -336,10 +372,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     // The full window a reservation starting in this slot would actually occupy
                     const conflictWindowEnd = slotStart.plus({ hours: reservationDurationHours });
 
-                    // Check if ANY table is available for this time slot
-                    let tableAvailable = false;
+                    // Find the table that would actually be assigned. Tables are
+                    // ordered smallest-first, matching the booking API, so the
+                    // first free one is the table this booking would take.
+                    let assignedTable: any = null;
 
                     for (const table of availableTables) {
+                      // Someone else is holding this table for an overlapping window
+                      const heldForSlot = activeHolds.some((h) =>
+                        String(h.table_id) === String(table.id) &&
+                        slotStart.toUTC().toJSDate() < new Date(h.end_time) &&
+                        conflictWindowEnd.toUTC().toJSDate() > new Date(h.start_time)
+                      );
+                      if (heldForSlot) continue;
+
                       // Check if this table has any conflicting reservations over the full
                       // reservation duration (not just the 30-minute display slot)
                       const hasConflict = activeReservations.some((res: any) => {
@@ -353,13 +399,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                       });
 
                       if (!hasConflict) {
-                        tableAvailable = true;
+                        assignedTable = table;
                         break; // At least one table is available
                       }
                     }
 
                     // If no tables available for this slot, add it to blocked times
-                    if (!tableAvailable) {
+                    if (!assignedTable) {
                       blockedTimeRanges.push({
                         id: `no-tables-${hour}-${minute}`,
                         title: 'No tables available',
@@ -371,6 +417,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         endMinute: slotEnd.minute,
                         reason: 'all_tables_booked'
                       });
+                    } else if (capacityCap !== null) {
+                      // A table is free, but taking it out of service may push
+                      // the location past its concurrent seat limit
+                      const seatsClaimed = Number(assignedTable.seats) || partySizeNum;
+                      const occupancy = [
+                        ...occupancyReservations,
+                        ...activeHolds.map((h) => ({
+                          start_time: h.start_time,
+                          end_time: h.end_time,
+                          occupancy: Number(h.seats) || 0,
+                        })),
+                      ];
+                      const projectedPeak =
+                        calcPeakConcurrentGuests(
+                          occupancy,
+                          slotStart.toUTC().toJSDate(),
+                          conflictWindowEnd.toUTC().toJSDate()
+                        ) + seatsClaimed;
+
+                      if (projectedPeak > capacityCap) {
+                        blockedTimeRanges.push({
+                          id: `capacity-${hour}-${minute}`,
+                          title: 'At capacity',
+                          startTime: slotStart.toFormat('h:mm a'),
+                          endTime: slotEnd.toFormat('h:mm a'),
+                          startHour: hour,
+                          startMinute: minute,
+                          endHour: slotEnd.hour,
+                          endMinute: slotEnd.minute,
+                          reason: 'capacity_reached'
+                        });
+                      }
                     }
                   }
                 }

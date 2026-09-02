@@ -9,12 +9,17 @@ const DURATION_MIN = 0.5;
 const DURATION_MAX = 8;
 const DURATION_STEP = 0.5;
 const DURATION_DEFAULT = 2.0;
+const HOLD_MIN = 1;
+const HOLD_MAX = 60;
+const HOLD_DEFAULT = 5;
+const EXTENSION_MIN = 0;
+const EXTENSION_MAX = 60;
 const COVER_PRICE_MIN = 0;
 const COVER_PRICE_MAX = 100;
 const TIMEZONE = 'America/Chicago';
 
 interface LocationSettingsTabProps {
-  locationSlug: 'noirkc' | 'rooftopkc';
+  locationSlug: string;
   locationName: string;
   coverEnabled: boolean;
   setCoverEnabled: (enabled: boolean) => void;
@@ -26,6 +31,12 @@ interface LocationSettingsTabProps {
   setDuration: (duration: number) => void;
   adminPhone: string;
   setAdminPhone: (phone: string) => void;
+  maxGuests: number | null;
+  setMaxGuests: (maxGuests: number | null) => void;
+  holdMinutes: number;
+  setHoldMinutes: (minutes: number) => void;
+  holdPaymentExtensionMinutes: number;
+  setHoldPaymentExtensionMinutes: (minutes: number) => void;
   saving: boolean;
   message: { type: 'success' | 'error'; text: string } | null;
   onSave: () => void;
@@ -44,6 +55,12 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
   setDuration,
   adminPhone,
   setAdminPhone,
+  maxGuests,
+  setMaxGuests,
+  holdMinutes,
+  setHoldMinutes,
+  holdPaymentExtensionMinutes,
+  setHoldPaymentExtensionMinutes,
   saving,
   message,
   onSave,
@@ -281,6 +298,92 @@ const LocationSettingsTab: React.FC<LocationSettingsTabProps> = ({
                 </p>
               </div>
             )}
+
+            {/* Max Concurrent Guests */}
+            <div className={styles.formGroup}>
+              <label className={styles.label} htmlFor={`max-guests-${locationSlug}`}>
+                Max Guests At One Time
+              </label>
+              <input
+                id={`max-guests-${locationSlug}`}
+                type="number"
+                className={styles.input}
+                value={maxGuests ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setMaxGuests(null);
+                  } else {
+                    const value = parseInt(raw, 10);
+                    setMaxGuests(isNaN(value) || value < 1 ? null : value);
+                  }
+                }}
+                min={1}
+                step={1}
+                placeholder="No limit"
+                inputMode="numeric"
+              />
+              <p className={styles.inputHint}>
+                Total booked guests allowed on-site at any one moment across all tables.
+                New reservations that would exceed this are blocked (admins can override).
+                Leave blank for no limit.
+              </p>
+            </div>
+
+            {/* Checkout Hold */}
+            <div className={styles.formGroup}>
+              <label className={styles.label} htmlFor={`hold-minutes-${locationSlug}`}>
+                Hold Table During Checkout (minutes)
+              </label>
+              <input
+                id={`hold-minutes-${locationSlug}`}
+                type="number"
+                className={styles.input}
+                value={holdMinutes}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10);
+                  setHoldMinutes(
+                    isNaN(value) ? HOLD_DEFAULT : Math.max(HOLD_MIN, Math.min(HOLD_MAX, value))
+                  );
+                }}
+                min={HOLD_MIN}
+                max={HOLD_MAX}
+                step={1}
+                inputMode="numeric"
+              />
+              <p className={styles.inputHint}>
+                How long a guest&apos;s table and time are held while they finish booking.
+                They see a countdown, and must start over if it runs out.
+              </p>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label} htmlFor={`hold-extension-${locationSlug}`}>
+                Extra Time At Payment (minutes)
+              </label>
+              <input
+                id={`hold-extension-${locationSlug}`}
+                type="number"
+                className={styles.input}
+                value={holdPaymentExtensionMinutes}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value, 10);
+                  setHoldPaymentExtensionMinutes(
+                    isNaN(value)
+                      ? 0
+                      : Math.max(EXTENSION_MIN, Math.min(EXTENSION_MAX, value))
+                  );
+                }}
+                min={EXTENSION_MIN}
+                max={EXTENSION_MAX}
+                step={1}
+                inputMode="numeric"
+              />
+              <p className={styles.inputHint}>
+                Granted once, when the guest reaches card entry, so they are not cut off
+                mid-payment. Set to 0 for no extension.
+              </p>
+            </div>
 
             {/* Admin Notification Phone */}
             <div className={styles.formGroup}>

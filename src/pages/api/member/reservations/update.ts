@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { parse } from 'cookie';
 import { z } from 'zod';
+import { isCapacityError } from '@/lib/capacity';
 
 const updateSchema = z.object({
   reservation_id: z.string().uuid(),
@@ -94,6 +95,13 @@ export default async function handler(
       .single();
 
     if (updateError) {
+      // Location capacity trigger rejected the change (e.g. larger party size)
+      if (isCapacityError(updateError)) {
+        return res.status(400).json({
+          error: 'That party size would put us over capacity for your reservation time. Please contact us to adjust your reservation.',
+          code: 'CAPACITY_EXCEEDED',
+        });
+      }
       console.error('Error updating reservation:', updateError);
       return res.status(500).json({ error: 'Failed to update reservation' });
     }

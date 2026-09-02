@@ -66,6 +66,36 @@ const defaultSettings: Settings = {
   credit_card_fee_percentage: 4.0,
 };
 
+interface LocationConfig {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface LocationSettingsState {
+  coverEnabled: boolean;
+  coverPrice: number;
+  minakaUrl: string;
+  duration: number;
+  adminPhone: string;
+  maxGuests: number | null;
+  holdMinutes: number;
+  holdPaymentExtensionMinutes: number;
+}
+
+type LocationMessage = { type: 'success' | 'error'; text: string } | null;
+
+const DEFAULT_LOCATION_SETTINGS: LocationSettingsState = {
+  coverEnabled: false,
+  coverPrice: 0,
+  minakaUrl: '',
+  duration: 2.0,
+  adminPhone: '',
+  maxGuests: null,
+  holdMinutes: 5,
+  holdPaymentExtensionMinutes: 5,
+};
+
 export default function Settings() {
   const { settings: contextSettings, refreshSettings, refreshHoldFeeSettings } = useSettings();
   const [settings, setSettings] = useState<Settings>(contextSettings);
@@ -74,129 +104,106 @@ export default function Settings() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [holdFeeSaving, setHoldFeeSaving] = useState(false);
   const [holdFeeMessage, setHoldFeeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'noirkc' | 'rooftopkc'>('noirkc');
+  const [activeTab, setActiveTab] = useState<string>('');
 
-  // Noir KC location settings
-  const [noirKCCoverEnabled, setNoirKCCoverEnabled] = useState(false);
-  const [noirKCCoverPrice, setNoirKCCoverPrice] = useState(0);
-  const [noirKCMinakaUrl, setNoirKCMinakaUrl] = useState('');
-  const [noirKCDuration, setNoirKCDuration] = useState(2.0);
-  const [noirKCAdminPhone, setNoirKCAdminPhone] = useState('');
-  const [noirKCSaving, setNoirKCSaving] = useState(false);
-  const [noirKCMessage, setNoirKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // RooftopKC location settings
-  const [rooftopKCCoverEnabled, setRooftopKCCoverEnabled] = useState(false);
-  const [rooftopKCCoverPrice, setRooftopKCCoverPrice] = useState(0);
-  const [rooftopKCMinakaUrl, setRooftopKCMinakaUrl] = useState('');
-  const [rooftopKCDuration, setRooftopKCDuration] = useState(2.0);
-  const [rooftopKCAdminPhone, setRooftopKCAdminPhone] = useState('');
-  const [rooftopKCSaving, setRooftopKCSaving] = useState(false);
-  const [rooftopKCMessage, setRooftopKCMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // Per-location settings, keyed by location slug. Locations are loaded from
+  // the database so a newly added venue gets its own tab automatically.
+  const [locations, setLocations] = useState<LocationConfig[]>([]);
+  const [locationSettings, setLocationSettings] = useState<Record<string, LocationSettingsState>>({});
+  const [locationSaving, setLocationSaving] = useState<Record<string, boolean>>({});
+  const [locationMessage, setLocationMessage] = useState<Record<string, LocationMessage>>({});
 
   useEffect(() => {
     setSettings(contextSettings);
   }, [contextSettings]);
 
-  // Fetch Noir KC location settings
+  // Load active locations and their settings
   useEffect(() => {
-    async function fetchNoirKCSettings() {
+    async function fetchLocations() {
       try {
         const { data, error } = await supabaseAdmin
           .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone')
-          .eq('slug', 'noirkc')
-          .single();
+          .select('id, name, slug, cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone, max_concurrent_guests, hold_duration_minutes, hold_payment_extension_minutes')
+          .eq('status', 'active')
+          .order('name', { ascending: true });
 
-        if (!error && data) {
-          setNoirKCCoverEnabled(data.cover_enabled || false);
-          setNoirKCCoverPrice(data.cover_price || 0);
-          setNoirKCMinakaUrl(data.minaka_ical_url || '');
-          setNoirKCDuration(data.default_reservation_duration_hours || 2.0);
-          setNoirKCAdminPhone(data.admin_notification_phone || '');
+        if (error || !data) {
+          console.error('Error fetching locations:', error);
+          return;
         }
+
+        setLocations(data.map((l: any) => ({ id: l.id, name: l.name, slug: l.slug })));
+
+        const settingsBySlug: Record<string, LocationSettingsState> = {};
+        data.forEach((l: any) => {
+          settingsBySlug[l.slug] = {
+            coverEnabled: l.cover_enabled || false,
+            coverPrice: l.cover_price || 0,
+            minakaUrl: l.minaka_ical_url || '',
+            duration: l.default_reservation_duration_hours || 2.0,
+            adminPhone: l.admin_notification_phone || '',
+            maxGuests: l.max_concurrent_guests ?? null,
+            holdMinutes: l.hold_duration_minutes ?? 5,
+            holdPaymentExtensionMinutes: l.hold_payment_extension_minutes ?? 5,
+          };
+        });
+        setLocationSettings(settingsBySlug);
+        setActiveTab((prev) => prev || data[0]?.slug || '');
       } catch (error) {
-        console.error('Error fetching Noir KC settings:', error);
+        console.error('Error fetching locations:', error);
       }
     }
-    fetchNoirKCSettings();
+    fetchLocations();
   }, []);
 
-  // Fetch RooftopKC location settings
-  useEffect(() => {
-    async function fetchRooftopKCSettings() {
-      try {
-        const { data, error } = await supabaseAdmin
-          .from('locations')
-          .select('cover_enabled, cover_price, minaka_ical_url, default_reservation_duration_hours, admin_notification_phone')
-          .eq('slug', 'rooftopkc')
-          .single();
+  // Patch a single field for one location's settings
+  const updateLocationSetting = (
+    slug: string,
+    patch: Partial<LocationSettingsState>
+  ) => {
+    setLocationSettings((prev) => ({
+      ...prev,
+      [slug]: { ...(prev[slug] || DEFAULT_LOCATION_SETTINGS), ...patch },
+    }));
+  };
 
-        if (!error && data) {
-          setRooftopKCCoverEnabled(data.cover_enabled || false);
-          setRooftopKCCoverPrice(data.cover_price || 0);
-          setRooftopKCMinakaUrl(data.minaka_ical_url || '');
-          setRooftopKCDuration(data.default_reservation_duration_hours || 2.0);
-          setRooftopKCAdminPhone(data.admin_notification_phone || '');
-        }
-      } catch (error) {
-        console.error('Error fetching RooftopKC settings:', error);
-      }
-    }
-    fetchRooftopKCSettings();
-  }, []);
+  async function handleLocationSave(slug: string) {
+    const locationName = locations.find((l) => l.slug === slug)?.name || slug;
+    const current = locationSettings[slug];
+    if (!current) return;
 
-  async function handleNoirKCSave() {
-    setNoirKCSaving(true);
-    setNoirKCMessage(null);
+    setLocationSaving((prev) => ({ ...prev, [slug]: true }));
+    setLocationMessage((prev) => ({ ...prev, [slug]: null }));
 
     try {
       const { error } = await supabaseAdmin
         .from('locations')
         .update({
-          cover_enabled: noirKCCoverEnabled,
-          cover_price: noirKCCoverPrice,
-          minaka_ical_url: noirKCMinakaUrl,
-          default_reservation_duration_hours: noirKCDuration,
-          admin_notification_phone: noirKCAdminPhone,
+          cover_enabled: current.coverEnabled,
+          cover_price: current.coverPrice,
+          minaka_ical_url: current.minakaUrl,
+          default_reservation_duration_hours: current.duration,
+          admin_notification_phone: current.adminPhone,
+          max_concurrent_guests: current.maxGuests,
+          hold_duration_minutes: current.holdMinutes,
+          hold_payment_extension_minutes: current.holdPaymentExtensionMinutes,
         })
-        .eq('slug', 'noirkc');
+        .eq('slug', slug);
 
       if (error) throw error;
 
-      setNoirKCMessage({ type: 'success', text: 'Noir KC settings saved successfully' });
+      setLocationMessage((prev) => ({
+        ...prev,
+        [slug]: { type: 'success', text: `${locationName} settings saved successfully` },
+      }));
     } catch (error: any) {
-      console.error('Error saving Noir KC settings:', error);
-      setNoirKCMessage({ type: 'error', text: error.message || 'Failed to save settings' });
+      console.error(`Error saving ${locationName} settings:`, error);
+      setLocationMessage((prev) => ({
+        ...prev,
+        [slug]: { type: 'error', text: error.message || 'Failed to save settings' },
+      }));
     } finally {
-      setNoirKCSaving(false);
-    }
-  }
-
-  async function handleRooftopKCSave() {
-    setRooftopKCSaving(true);
-    setRooftopKCMessage(null);
-
-    try {
-      const { error } = await supabaseAdmin
-        .from('locations')
-        .update({
-          cover_enabled: rooftopKCCoverEnabled,
-          cover_price: rooftopKCCoverPrice,
-          minaka_ical_url: rooftopKCMinakaUrl,
-          default_reservation_duration_hours: rooftopKCDuration,
-          admin_notification_phone: rooftopKCAdminPhone,
-        })
-        .eq('slug', 'rooftopkc');
-
-      if (error) throw error;
-
-      setRooftopKCMessage({ type: 'success', text: 'RooftopKC settings saved successfully' });
-    } catch (error: any) {
-      console.error('❌ Error saving RooftopKC settings:', error);
-      setRooftopKCMessage({ type: 'error', text: error.message || 'Failed to save settings' });
-    } finally {
-      setRooftopKCSaving(false);
+      setLocationSaving((prev) => ({ ...prev, [slug]: false }));
     }
   }
 
@@ -345,63 +352,52 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Tabs - one per active location, driven by the database */}
         <div className={styles.tabs}>
-          <button
-            className={`${styles.tab} ${activeTab === 'noirkc' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('noirkc')}
-          >
-            Noir KC
-          </button>
-          <button
-            className={`${styles.tab} ${activeTab === 'rooftopkc' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('rooftopkc')}
-          >
-            RooftopKC
-          </button>
+          {locations.map((location) => (
+            <button
+              key={location.slug}
+              className={`${styles.tab} ${activeTab === location.slug ? styles.tabActive : ''}`}
+              onClick={() => setActiveTab(location.slug)}
+            >
+              {location.name}
+            </button>
+          ))}
         </div>
 
-        {/* Noir KC Location Settings Tab */}
-        {activeTab === 'noirkc' && (
-          <LocationSettingsTab
-            locationSlug="noirkc"
-            locationName="Noir KC"
-            coverEnabled={noirKCCoverEnabled}
-            setCoverEnabled={setNoirKCCoverEnabled}
-            coverPrice={noirKCCoverPrice}
-            setCoverPrice={setNoirKCCoverPrice}
-            minakaUrl={noirKCMinakaUrl}
-            setMinakaUrl={setNoirKCMinakaUrl}
-            duration={noirKCDuration}
-            setDuration={setNoirKCDuration}
-            adminPhone={noirKCAdminPhone}
-            setAdminPhone={setNoirKCAdminPhone}
-            saving={noirKCSaving}
-            message={noirKCMessage}
-            onSave={handleNoirKCSave}
-          />
-        )}
-
-        {/* RooftopKC Location Settings Tab */}
-        {activeTab === 'rooftopkc' && (
-          <LocationSettingsTab
-            locationSlug="rooftopkc"
-            locationName="RooftopKC"
-            coverEnabled={rooftopKCCoverEnabled}
-            setCoverEnabled={setRooftopKCCoverEnabled}
-            coverPrice={rooftopKCCoverPrice}
-            setCoverPrice={setRooftopKCCoverPrice}
-            minakaUrl={rooftopKCMinakaUrl}
-            setMinakaUrl={setRooftopKCMinakaUrl}
-            duration={rooftopKCDuration}
-            setDuration={setRooftopKCDuration}
-            adminPhone={rooftopKCAdminPhone}
-            setAdminPhone={setRooftopKCAdminPhone}
-            saving={rooftopKCSaving}
-            message={rooftopKCMessage}
-            onSave={handleRooftopKCSave}
-          />
-        )}
+        {/* Location Settings Tab for the active location */}
+        {locations.map((location) => {
+          if (activeTab !== location.slug) return null;
+          const current = locationSettings[location.slug] || DEFAULT_LOCATION_SETTINGS;
+          return (
+            <LocationSettingsTab
+              key={location.slug}
+              locationSlug={location.slug}
+              locationName={location.name}
+              coverEnabled={current.coverEnabled}
+              setCoverEnabled={(coverEnabled) => updateLocationSetting(location.slug, { coverEnabled })}
+              coverPrice={current.coverPrice}
+              setCoverPrice={(coverPrice) => updateLocationSetting(location.slug, { coverPrice })}
+              minakaUrl={current.minakaUrl}
+              setMinakaUrl={(minakaUrl) => updateLocationSetting(location.slug, { minakaUrl })}
+              duration={current.duration}
+              setDuration={(duration) => updateLocationSetting(location.slug, { duration })}
+              adminPhone={current.adminPhone}
+              setAdminPhone={(adminPhone) => updateLocationSetting(location.slug, { adminPhone })}
+              maxGuests={current.maxGuests}
+              setMaxGuests={(maxGuests) => updateLocationSetting(location.slug, { maxGuests })}
+              holdMinutes={current.holdMinutes}
+              setHoldMinutes={(holdMinutes) => updateLocationSetting(location.slug, { holdMinutes })}
+              holdPaymentExtensionMinutes={current.holdPaymentExtensionMinutes}
+              setHoldPaymentExtensionMinutes={(holdPaymentExtensionMinutes) =>
+                updateLocationSetting(location.slug, { holdPaymentExtensionMinutes })
+              }
+              saving={!!locationSaving[location.slug]}
+              message={locationMessage[location.slug] || null}
+              onSave={() => handleLocationSave(location.slug)}
+            />
+          );
+        })}
       </div>
     </AdminLayout>
   );

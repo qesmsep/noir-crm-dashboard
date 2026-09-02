@@ -21,7 +21,7 @@ interface TableFormData {
 }
 
 interface TablesSettingSectionProps {
-  locationSlug: 'noirkc' | 'rooftopkc';
+  locationSlug: string;
   locationName: string;
 }
 

@@ -2,6 +2,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
 import { verifyAdmin } from '../../../lib/admin-auth';
+import {
+  checkReservationCapacity,
+  isCapacityError,
+  CAPACITY_ERROR_MESSAGE,
+} from '../../../lib/capacity';
+import { HOLD_EXPIRED_MESSAGE, fetchHeldTableIds } from '../../../lib/holds';
 
 /**
  * Reservations API (Pages Router)
@@ -60,6 +66,9 @@ interface ReservationCreateBody {
 
   // Private event
   private_event_id?: string;
+
+  // Checkout hold being converted into this reservation
+  hold_token?: string;
 
   // Admin override - bypasses private event validation
   // SECURITY: Server-side verification required
@@ -181,6 +190,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .single();
         locationId = eventData?.location_id || null;
         console.log('[RSVP Location] Inherited location_id:', locationId);
+      }
+
+      // Redeem the checkout hold, if the guest has one. The held table wins over
+      // any table the client suggested, and hold_id is carried onto the insert so
+      // the capacity trigger does not count this hold against its own booking.
+      let holdId: string | null = null;
+      if (body.hold_token) {
+        const { data: hold, error: holdError } = await client
+          .from('reservation_holds')
+          .select('id, table_id, location_id, expires_at')
+          .eq('hold_token', body.hold_token)
+          .maybeSingle();
+
+        if (holdError) {
+          console.error('Error loading hold during reservation creation:', holdError);
+        } else if (!hold || new Date(hold.expires_at) <= new Date()) {
+          console.warn('Reservation attempted with an expired or unknown hold');
+          return res.status(410).json({
+            error: HOLD_EXPIRED_MESSAGE,
+            code: 'HOLD_EXPIRED',
+          });
+        } else {
+          holdId = hold.id;
+          tableId = hold.table_id;
+          locationId = locationId || hold.location_id;
+          console.log(`Redeeming hold ${hold.id} for table ${hold.table_id}`);
+        }
       }
 
       // If table_id is provided, validate it first
@@ -345,9 +381,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             );
             
             console.log(`Found ${existingReservations.length} active overlapping reservations (out of ${allReservations?.length || 0} total)`);
-            
+
+            // Tables another guest is holding mid-checkout are not free to
+            // assign, or that guest would fail when they submit
+            const heldTableIds = locationId
+              ? await fetchHeldTableIds(client, locationId, startTime, endTime, holdId)
+              : new Set<string>();
+            if (heldTableIds.size > 0) {
+              console.log(`Skipping ${heldTableIds.size} table(s) held by other guests`);
+            }
+
             // Find first available table
             for (const table of availableTables) {
+              if (heldTableIds.has(String(table.id))) continue;
               const hasConflict = existingReservations.some((res: any) => {
                 // Ensure table_id matches (using String conversion for type safety)
                 if (!res.table_id || String(res.table_id) !== String(table.id)) return false;
@@ -710,6 +756,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      // CAPACITY CHECK: Enforce the location's max concurrent guest limit.
+      // Friendly pre-check only — the check_reservation_capacity database
+      // trigger is the authoritative enforcement (it also covers paths that
+      // bypass this API). Verified admins may override.
+      if (!adminOverride && !body.private_event_id) {
+        try {
+          let capacityLocationId = locationId;
+          // The booking takes its whole table out of service, so the table's
+          // seat count is what consumes capacity - not the party size.
+          let capacitySeats = body.party_size;
+          const capacityTableId = tableId || body.table_id;
+
+          if (capacityTableId) {
+            const { data: capacityTable } = await client
+              .from('tables')
+              .select('location_id, seats')
+              .eq('id', capacityTableId)
+              .single();
+            if (capacityTable) {
+              capacityLocationId = capacityLocationId || capacityTable.location_id || null;
+              capacitySeats = Number(capacityTable.seats) || body.party_size;
+            }
+          }
+
+          if (capacityLocationId) {
+            const capacityCheck = await checkReservationCapacity(client, {
+              locationId: capacityLocationId,
+              startTime: new Date(body.start_time),
+              endTime: new Date(body.end_time),
+              seats: capacitySeats,
+              exceptHoldId: holdId,
+            });
+
+            if (!capacityCheck.allowed) {
+              console.warn(
+                `Reservation blocked by capacity limit: projected peak ${capacityCheck.projectedPeak} seats exceeds cap ${capacityCheck.cap} for location ${capacityLocationId}`
+              );
+              return res.status(400).json({
+                error: CAPACITY_ERROR_MESSAGE,
+                code: 'CAPACITY_EXCEEDED',
+              });
+            }
+          }
+        } catch (capacityCheckError) {
+          console.error('Error checking location capacity:', capacityCheckError);
+          // Fall through — the database trigger is the authoritative check
+        }
+      }
+
       // Extract only the fields that exist in the reservations table
       // The trigger function validates these columns exist, so they must be in the schema
       // Note: Some columns may not be in PostgREST schema cache - retry logic handles this
@@ -753,6 +848,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(body.bypass_code_used && { bypass_code_used: body.bypass_code_used }),
         ...(body.bypass_code_id && { bypass_code_id: body.bypass_code_id }),
         ...(body.cover_charge_waived !== undefined && { cover_charge_waived: body.cover_charge_waived }),
+        // Verified admins bypass the location capacity limit (DB trigger honors this flag)
+        ...(adminOverride && { capacity_override: true }),
+        // Links back to the hold this booking came from, so the capacity trigger
+        // does not count that hold against it
+        ...(holdId && { hold_id: holdId }),
       };
 
       console.log('Attempting to insert reservation with data:', JSON.stringify(reservationData, null, 2));
@@ -960,16 +1060,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }
             }
             
+            await releaseRedeemedHold(client, holdId);
             return res.status(201).json({ data: retryResult.data });
           }
         }
       }
 
       if (error) {
+        // The capacity trigger raced ahead of our pre-check (or the pre-check
+        // was skipped) — surface it as a friendly 400, not a server error
+        if (isCapacityError(error)) {
+          console.warn('Reservation rejected by capacity trigger:', error.message);
+          return res.status(400).json({
+            error: CAPACITY_ERROR_MESSAGE,
+            code: 'CAPACITY_EXCEEDED',
+          });
+        }
         console.error('Error creating reservation:', error);
         console.error('Error details:', JSON.stringify(error, null, 2));
         console.error('Reservation data attempted:', JSON.stringify(reservationData, null, 2));
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to create reservation',
           details: error.message || error.toString(),
           code: error.code,
@@ -1192,6 +1302,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // This case should not occur once all clients are updated.
       }
 
+      await releaseRedeemedHold(client, holdId);
+
       return res.status(201).json({ data });
     } catch (err) {
       console.error('Unhandled error creating reservation:', err);
@@ -1202,3 +1314,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+/**
+ * Drop the hold once its reservation exists. The row would lapse on its own,
+ * but until it does its seats keep counting against the location's cap.
+ */
+async function releaseRedeemedHold(client: any, holdId: string | null) {
+  if (!holdId) return;
+  try {
+    const { error } = await client.from('reservation_holds').delete().eq('id', holdId);
+    if (error) console.error('Failed to release redeemed hold (non-critical):', error);
+  } catch (err) {
+    console.error('Failed to release redeemed hold (non-critical):', err);
+  }
+}

@@ -9,6 +9,8 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { supabase } from '@/lib/supabase';
 import { getSundayOfWeek } from '@/utils/dateUtils';
 import type { LocationHours, WeeklyHours } from '@/types/hours';
+import { useReservationHold } from '@/hooks/useReservationHold';
+import HoldCountdown from '@/components/HoldCountdown';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -181,6 +183,63 @@ export default function SimpleReservationRequestModal({
   const [loadingHours, setLoadingHours] = useState(true);
   const [locationTimezone, setLocationTimezone] = useState<string>('America/Chicago');
   const [allWeeklyHours, setAllWeeklyHours] = useState<Record<string, any>>({});
+
+  // Once a date, time and party size are chosen, hold that table while the
+  // member finishes booking. The window matches what will actually be booked.
+  const holdWindow = useMemo(() => {
+    if (!date || !time || !partySize) return null;
+    try {
+      const [timeStr, period] = time.split(' ');
+      const [hourStr, minuteStr] = timeStr.split(':');
+      let hour = parseInt(hourStr);
+      const minute = parseInt(minuteStr);
+      if (isNaN(hour) || isNaN(minute)) return null;
+      if (period === 'PM' && hour !== 12) hour += 12;
+      else if (period === 'AM' && hour === 12) hour = 0;
+
+      const start = DateTime.fromJSDate(date, { zone: locationTimezone })
+        .set({ hour, minute, second: 0, millisecond: 0 });
+      if (!start.isValid) return null;
+      const end = start.plus({ hours: reservationDuration });
+      if (!end.isValid) return null;
+      return { start: start.toISO(), end: end.toISO() };
+    } catch {
+      return null;
+    }
+  }, [date, time, partySize, locationTimezone, reservationDuration]);
+
+  const {
+    holdToken,
+    secondsLeft: holdSecondsLeft,
+    isCreating: isPlacingHold,
+    error: holdError,
+    extendForPayment,
+  } = useReservationHold({
+    // Admins book on behalf of guests and bypass the cap anyway, so they are
+    // not put on a countdown
+    enabled: !adminOverride && !!holdWindow,
+    startTime: holdWindow?.start ?? null,
+    endTime: holdWindow?.end ?? null,
+    partySize: parseInt(partySize) || null,
+    locationSlug: selectedLocation,
+    onExpired: () => {
+      // The table went back in the pool - send them back to pick a time
+      setTime('');
+      setShowPayment(false);
+      toast({
+        title: 'Your hold expired',
+        description: 'That table was released. Please choose a time again.',
+        variant: 'warning',
+      });
+    },
+  });
+
+  // Reaching the payment step buys the member the extension
+  useEffect(() => {
+    if (showPayment && holdToken) {
+      extendForPayment();
+    }
+  }, [showPayment, holdToken, extendForPayment]);
 
   // AbortController ref to cancel in-flight requests
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -710,6 +769,8 @@ export default function SimpleReservationRequestModal({
           cover_price: coverPrice,
           source: 'public_booking',
           create_visitor: true,
+          // Claims the table held through checkout
+          hold_token: holdToken || undefined,
           stripe_payment_intent_id: paymentId,
           // No bypass code used since payment was made
           bypass_code_used: undefined,
@@ -722,6 +783,13 @@ export default function SimpleReservationRequestModal({
       const result = await response.json();
 
       if (!response.ok) {
+        // The payment extension should make this rare, but if the hold lapsed
+        // say so plainly. The authorization is never captured on this path.
+        if (response.status === 410 || result.code === 'HOLD_EXPIRED') {
+          throw new Error(
+            'Your hold on that table expired before the booking completed. Your card was not charged - please choose a time again.'
+          );
+        }
         throw new Error(result.error || 'Failed to create reservation');
       }
 
@@ -969,6 +1037,8 @@ export default function SimpleReservationRequestModal({
           cover_charge_applied: coverChargeApplies,
           cover_price: coverChargeApplies ? coverPrice : 0,
           source: memberId ? 'member_dashboard' : 'admin_portal',
+          // Claims the table held through checkout
+          hold_token: holdToken || undefined,
           member_id: memberId,
           account_id: accountId,
           // Bypass code fields
@@ -984,6 +1054,17 @@ export default function SimpleReservationRequestModal({
       const result = await response.json();
 
       if (!response.ok) {
+        // The hold lapsed between the last tick and submitting
+        if (response.status === 410 || result.code === 'HOLD_EXPIRED') {
+          setTime('');
+          setShowPayment(false);
+          toast({
+            title: 'Your hold expired',
+            description: result.error || 'That table was released. Please choose a time again.',
+            variant: 'warning',
+          });
+          return;
+        }
         throw new Error(result.error || 'Failed to create reservation');
       }
 
@@ -1528,6 +1609,16 @@ export default function SimpleReservationRequestModal({
           }}>
             please note, we do not serve food.
           </div>
+
+          {/* Checkout hold countdown */}
+          {!adminOverride && holdWindow && (
+            <HoldCountdown
+              secondsLeft={holdSecondsLeft}
+              isCreating={isPlacingHold}
+              error={holdError}
+              style={{ width: '100%', marginBottom: 0, marginTop: '0.5rem' }}
+            />
+          )}
 
           {/* Make Reservation Button */}
           {(() => {

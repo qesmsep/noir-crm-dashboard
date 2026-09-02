@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
+import {
+  calcPeakConcurrentGuests,
+  fetchOccupancyReservations,
+  getLocationCapacity,
+} from '../../../lib/capacity';
+import { fetchActiveHolds } from '../../../lib/holds';
 
 // Enable debug by default to help diagnose issues
 const DEBUG = process.env.DEBUG_AVAILABLE_SLOTS === '1' || process.env.NEXT_PUBLIC_DEBUG_AVAILABLE_SLOTS === '1' || true;
@@ -280,11 +286,14 @@ export async function POST(request: Request) {
     if (DEBUG) console.log('Tables found (after filtering):', availableTables);
     
     // Map to id, number, seats for frontend
-    const mappedTables = (availableTables || []).map(t => ({
-      id: t.id,
-      number: t.table_number,
-      seats: parseInt(t.seats, 10)
-    }));
+    // Smallest suitable table first, matching how the booking API assigns tables
+    const mappedTables = (availableTables || [])
+      .map(t => ({
+        id: t.id,
+        number: t.table_number,
+        seats: parseInt(t.seats, 10)
+      }))
+      .sort((a, b) => a.seats - b.seats);
     // 2. Get all reservations that overlap with this date (exclude cancelled reservations and private events)
     // We need reservations that: start_time < endOfDay AND end_time > startOfDay
     // Reuse the startOfDayLocal, endOfDayLocal, startOfDayUtc, and endOfDayUtc variables 
@@ -370,6 +379,35 @@ export async function POST(request: Request) {
       }
     }
     
+    // 2b. Location capacity limit: fetch the cap and all active reservations
+    // at this location for the day (any table/party size) so slots that would
+    // push total concurrent guests past the cap are hidden.
+    let capacityCap: number | null = null;
+    let occupancyReservations: Awaited<ReturnType<typeof fetchOccupancyReservations>> = [];
+    // Tables another guest is holding mid-checkout are unavailable, and their
+    // seats count toward the cap just like booked ones
+    let activeHolds: Awaited<ReturnType<typeof fetchActiveHolds>> = [];
+    if (locationId) {
+      // Extend the window past midnight so late slots' full duration is covered
+      const dayStart = new Date(startOfDayUtc!);
+      const dayEnd = new Date(endOfDayLocal.plus({ hours: 6 }).toUTC().toISO()!);
+
+      capacityCap = await getLocationCapacity(supabase, locationId);
+      // reservation_holds has RLS on with no policy, so it is readable only by
+      // the service role - the anon client would silently return nothing
+      activeHolds = await fetchActiveHolds(supabaseAdmin || supabase, locationId, dayStart, dayEnd);
+
+      if (capacityCap !== null) {
+        occupancyReservations = await fetchOccupancyReservations(
+          supabase,
+          locationId,
+          dayStart,
+          dayEnd
+        );
+        if (DEBUG) console.log(`Capacity limit for location ${locationId}: ${capacityCap} seats, ${occupancyReservations.length} reservations and ${activeHolds.length} holds counted for occupancy`);
+      }
+    }
+
     // 3. Generate time slots based on venue hours
     let timeRanges = [{ start: '18:00', end: '23:00' }]; // default
     
@@ -505,6 +543,17 @@ export async function POST(request: Request) {
       // For each table, check if it's free for this slot
       // A slot is available if at least ONE table is free for that slot
       const availableTable = mappedTables.find(table => {
+        // Someone else is holding this table for an overlapping window
+        const heldForSlot = activeHolds.some(h =>
+          String(h.table_id) === String(table.id) &&
+          slotStart < new Date(h.end_time) &&
+          slotEnd > new Date(h.start_time)
+        );
+        if (heldForSlot) {
+          if (DEBUG_SLOTS) console.log(`  Table ${table.id} is held by another guest for slot ${slot}`);
+          return false;
+        }
+
         // Filter reservations for this specific table (exclude null table_ids from private events)
         const tableReservations = reservations.filter(r => {
           if (!r.table_id) {
@@ -601,6 +650,30 @@ export async function POST(request: Request) {
       if (DEBUG_SLOTS && !availableTable) {
         console.log(`❌ NO TABLE AVAILABLE for slot ${slot} - all tables are booked`);
       }
+
+      // A table may be free, but the location's total concurrent guest limit
+      // can still rule the slot out
+      if (availableTable && capacityCap !== null) {
+        // Booking this table takes all of its seats out of service
+        const seatsClaimed = Number(availableTable.seats) || Number(party_size);
+        const occupancy = [
+          ...occupancyReservations,
+          ...activeHolds.map(h => ({
+            start_time: h.start_time,
+            end_time: h.end_time,
+            occupancy: Number(h.seats) || 0,
+          })),
+        ];
+        const projectedPeak =
+          calcPeakConcurrentGuests(occupancy, slotStart, slotEnd) + seatsClaimed;
+        if (projectedPeak > capacityCap) {
+          if (DEBUG || DEBUG_SLOTS) {
+            console.log(`🚫 SLOT ${slot} BLOCKED BY CAPACITY LIMIT: projected peak ${projectedPeak} > cap ${capacityCap}`);
+          }
+          continue; // Skip this slot
+        }
+      }
+
       if (availableTable) {
         availableSlots.push(slot);
         if (DEBUG || DEBUG_SLOTS) {
