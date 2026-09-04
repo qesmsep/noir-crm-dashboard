@@ -46,7 +46,6 @@ jest.mock('@stripe/react-stripe-js', () => ({
 
 // The real date picker renders a calendar in a portal; a button that reports one
 // fixed date keeps the test about the payment step.
-const SELECTED_DATE = new Date('2026-09-10T12:00:00.000Z');
 jest.mock('react-datepicker', () => ({
   __esModule: true,
   default: ({ onChange }: { onChange: (d: Date) => void }) => (
