@@ -56,6 +56,128 @@ const generateTimeSlots = (startHour: number, endHour: number) => {
 const thursdayTimeSlots = generateTimeSlots(16, 22); // 4:00 PM to 10:00 PM for Thursday
 const fridaySaturdayTimeSlots = generateTimeSlots(18, 23); // 6:00 PM to 11:00 PM for Fri/Sat
 
+// Payment step for non-members. Must live at module level: the parent modal
+// re-renders every second while the hold countdown ticks, and a component
+// declared inside it would be a new type each render, remounting the Stripe
+// PaymentElement and wiping the card form as the guest types.
+function PaymentStep({
+  partySize,
+  coverPrice,
+  clientSecret,
+  firstName,
+  lastName,
+  email,
+  onAuthorized,
+}: {
+  partySize: string;
+  coverPrice: number;
+  clientSecret: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  onAuthorized: (paymentIntentId: string) => Promise<void>;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const handlePaymentSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      setPaymentError('Stripe is not loaded. Please try again in a moment.');
+      return;
+    }
+
+    setPaymentProcessing(true);
+    setPaymentError(null);
+
+    try {
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          payment_method_data: {
+            billing_details: {
+              name: `${firstName} ${lastName}`.trim(),
+              email: email || undefined,
+            },
+          },
+        },
+        redirect: 'if_required',
+      });
+
+      if (stripeError) {
+        setPaymentError(stripeError.message || 'Payment failed');
+        setPaymentProcessing(false);
+        return;
+      }
+
+      if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture')) {
+        // Payment authorized (not captured yet), now create reservation
+        await onAuthorized(paymentIntent.id);
+        setPaymentProcessing(false);
+      } else {
+        setPaymentError(`Unexpected payment status: ${paymentIntent?.status}`);
+        setPaymentProcessing(false);
+      }
+    } catch (error: any) {
+      setPaymentError(error.message);
+      setPaymentProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handlePaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div>
+        <div style={{
+          padding: '1rem',
+          backgroundColor: '#F9FAFB',
+          borderRadius: '10px',
+          marginBottom: '1rem',
+        }}>
+          <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1F1F1F', margin: 0, textAlign: 'center' }}>
+            Reservation: {partySize} {parseInt(partySize) === 1 ? 'Guest' : 'Guests'} = ${parseInt(partySize) * coverPrice}
+          </p>
+        </div>
+        {clientSecret && <PaymentElement />}
+      </div>
+
+      {paymentError && (
+        <div style={{
+          padding: '0.75rem',
+          backgroundColor: '#FEE2E2',
+          border: '1px solid #FCA5A5',
+          borderRadius: '8px',
+          color: '#991B1B',
+          fontSize: '0.875rem',
+        }}>
+          {paymentError}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={!stripe || paymentProcessing}
+        style={{
+          width: '100%',
+          height: '48px',
+          backgroundColor: paymentProcessing ? '#D1D5DB' : '#A59480',
+          color: 'white',
+          fontSize: '1rem',
+          fontWeight: '600',
+          borderRadius: '10px',
+          border: 'none',
+          cursor: paymentProcessing ? 'not-allowed' : 'pointer',
+          boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
+        }}
+      >
+        {paymentProcessing ? 'Authorizing...' : `Authorize $${parseInt(partySize) * coverPrice}`}
+      </button>
+    </form>
+  );
+}
+
 // Format phone number as (XXX)XXX-XXXX
 const formatPhoneNumber = (value: string) => {
   if (!value) return '';
@@ -627,107 +749,14 @@ export default function SimpleReservationRequestModal({
   const allTimeSlots = getAllTimeSlots();
   const availableTimeSlots = getAvailableTimeSlots();
 
-  // Payment Step Component for non-members
-  function PaymentStep() {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [paymentProcessing, setPaymentProcessing] = useState(false);
-    const [paymentError, setPaymentError] = useState<string | null>(null);
-
-    const handlePaymentSubmit = async (event: React.FormEvent) => {
-      event.preventDefault();
-
-      if (!stripe || !elements) {
-        setPaymentError('Stripe is not loaded. Please try again in a moment.');
-        return;
-      }
-
-      setPaymentProcessing(true);
-      setPaymentError(null);
-
-      try {
-        const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-          elements,
-          confirmParams: {
-            payment_method_data: {
-              billing_details: {
-                name: `${firstName} ${lastName}`.trim(),
-                email: email || undefined,
-              },
-            },
-          },
-          redirect: 'if_required',
-        });
-
-        if (stripeError) {
-          setPaymentError(stripeError.message || 'Payment failed');
-          setPaymentProcessing(false);
-          return;
-        }
-
-        if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture')) {
-          // Payment authorized (not captured yet), now create reservation
-          await createReservationAfterPayment(paymentIntent.id);
-        } else {
-          setPaymentError(`Unexpected payment status: ${paymentIntent?.status}`);
-          setPaymentProcessing(false);
-        }
-      } catch (error: any) {
-        setPaymentError(error.message);
-        setPaymentProcessing(false);
-      }
-    };
-
-    return (
-      <form onSubmit={handlePaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div>
-          <div style={{
-            padding: '1rem',
-            backgroundColor: '#F9FAFB',
-            borderRadius: '10px',
-            marginBottom: '1rem',
-          }}>
-            <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1F1F1F', margin: 0, textAlign: 'center' }}>
-              Reservation: {partySize} {parseInt(partySize) === 1 ? 'Guest' : 'Guests'} = ${parseInt(partySize) * coverPrice}
-            </p>
-          </div>
-          {clientSecret && <PaymentElement />}
-        </div>
-
-        {paymentError && (
-          <div style={{
-            padding: '0.75rem',
-            backgroundColor: '#FEE2E2',
-            border: '1px solid #FCA5A5',
-            borderRadius: '8px',
-            color: '#991B1B',
-            fontSize: '0.875rem',
-          }}>
-            {paymentError}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={!stripe || paymentProcessing}
-          style={{
-            width: '100%',
-            height: '48px',
-            backgroundColor: paymentProcessing ? '#D1D5DB' : '#A59480',
-            color: 'white',
-            fontSize: '1rem',
-            fontWeight: '600',
-            borderRadius: '10px',
-            border: 'none',
-            cursor: paymentProcessing ? 'not-allowed' : 'pointer',
-            boxShadow: '0 2px 8px rgba(165, 148, 128, 0.2)',
-          }}
-        >
-          {paymentProcessing ? 'Authorizing...' : `Authorize $${parseInt(partySize) * coverPrice}`}
-        </button>
-      </form>
-    );
-  }
+  // A spent authorization cannot be confirmed again, so any failure after
+  // Stripe authorizes sends the guest back to the form. Submitting again
+  // mints a fresh PaymentIntent rather than reusing the dead clientSecret.
+  const resetPaymentStep = useCallback(() => {
+    setShowPayment(false);
+    setClientSecret(null);
+    setPaymentIntentId(null);
+  }, []);
 
   // Create reservation after successful payment authorization (not captured yet)
   const createReservationAfterPayment = async (paymentId: string) => {
@@ -824,13 +853,14 @@ export default function SimpleReservationRequestModal({
           onReservationCreated();
         }
 
-        // Reset and close
+        // Reset and close. Most callers keep this modal mounted and toggle
+        // isOpen, so state has to be cleared explicitly rather than relying on
+        // an unmount.
         setDate(null);
         setTime('');
         setPartySize('2');
         setNotes('');
-        setShowPayment(false);
-        setClientSecret(null);
+        resetPaymentStep();
         onClose();
 
       } catch (captureError: any) {
@@ -855,6 +885,7 @@ export default function SimpleReservationRequestModal({
           description: 'Payment capture failed. Your reservation has been cancelled. Please try again.',
           variant: 'error',
         });
+        resetPaymentStep();
       }
 
     } catch (error: any) {
@@ -894,6 +925,7 @@ export default function SimpleReservationRequestModal({
           variant: 'error',
         });
       }
+      resetPaymentStep();
     } finally {
       setIsCreatingReservation(false);
     }
@@ -1095,6 +1127,25 @@ export default function SimpleReservationRequestModal({
       setIsCreatingReservation(false);
     }
   };
+
+  // Stable options object so the Elements provider isn't re-initialized on
+  // every countdown tick
+  const stripeElementsOptions = useMemo(() => ({
+    clientSecret: clientSecret || undefined,
+    appearance: {
+      rules: {
+        '.Label': {
+          display: 'none'
+        },
+        '.TabLabel': {
+          display: 'none'
+        },
+        '.Tab': {
+          display: 'none'
+        }
+      }
+    }
+  }), [clientSecret]);
 
   // Memoize weekly hours lookup for performance
   const weeklyHoursMap = useMemo(() => {
@@ -1361,23 +1412,16 @@ export default function SimpleReservationRequestModal({
         {/* Show payment step or reservation form */}
         {showPayment ? (
           clientSecret ? (
-            <Elements stripe={stripePromise} options={{
-              clientSecret,
-              appearance: {
-                rules: {
-                  '.Label': {
-                    display: 'none'
-                  },
-                  '.TabLabel': {
-                    display: 'none'
-                  },
-                  '.Tab': {
-                    display: 'none'
-                  }
-                }
-              }
-            }}>
-              <PaymentStep />
+            <Elements stripe={stripePromise} options={stripeElementsOptions}>
+              <PaymentStep
+                partySize={partySize}
+                coverPrice={coverPrice}
+                clientSecret={clientSecret}
+                firstName={firstName}
+                lastName={lastName}
+                email={email}
+                onAuthorized={createReservationAfterPayment}
+              />
             </Elements>
           ) : (
             <div style={{ padding: '2rem', textAlign: 'center' }}>
