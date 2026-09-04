@@ -853,13 +853,14 @@ export default function SimpleReservationRequestModal({
           onReservationCreated();
         }
 
-        // Reset and close
+        // Reset and close. Most callers keep this modal mounted and toggle
+        // isOpen, so state has to be cleared explicitly rather than relying on
+        // an unmount.
         setDate(null);
         setTime('');
         setPartySize('2');
         setNotes('');
-        setShowPayment(false);
-        setClientSecret(null);
+        resetPaymentStep();
         onClose();
 
       } catch (captureError: any) {

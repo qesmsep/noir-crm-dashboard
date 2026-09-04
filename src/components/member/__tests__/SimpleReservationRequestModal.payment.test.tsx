@@ -32,6 +32,8 @@ jest.mock('@stripe/stripe-js', () => ({
   loadStripe: () => Promise.resolve({}),
 }));
 
+const mockConfirmPayment = jest.fn();
+
 jest.mock('@stripe/react-stripe-js', () => ({
   Elements: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PaymentElement: () => {
@@ -40,7 +42,7 @@ jest.mock('@stripe/react-stripe-js', () => ({
     }, []);
     return <div data-testid="payment-element" />;
   },
-  useStripe: () => ({ confirmPayment: jest.fn() }),
+  useStripe: () => ({ confirmPayment: mockConfirmPayment }),
   useElements: () => ({}),
 }));
 
@@ -130,12 +132,23 @@ const jsonResponse = (body: any, status = 200) =>
   } as Response);
 
 let createPaymentCalls = 0;
+let failReservation = false;
+let cancelPaymentCalls = 0;
 
 const routeFetch = (input: RequestInfo | URL) => {
   const url = typeof input === 'string' ? input : String(input);
 
   if (url.includes('/api/tables')) return jsonResponse({ data: [] });
   if (url.includes('/api/check-date-availability')) return jsonResponse({ blockedTimeRanges: [] });
+  if (url.includes('/api/cancel-payment')) {
+    cancelPaymentCalls += 1;
+    return jsonResponse({ cancelled: true });
+  }
+  if (url.includes('/api/capture-payment')) return jsonResponse({ captured: true });
+  if (url.includes('/api/reservations')) {
+    if (failReservation) return jsonResponse({ error: 'No tables available at that time' }, 409);
+    return jsonResponse({ data: { id: 'res-1' } });
+  }
   if (url.includes('/api/holds')) {
     return jsonResponse({
       hold_token: 'hold-123',
@@ -200,7 +213,12 @@ const reachPaymentStep = async () => {
 describe('SimpleReservationRequestModal payment step', () => {
   beforeEach(() => {
     createPaymentCalls = 0;
+    cancelPaymentCalls = 0;
+    failReservation = false;
     paymentElementMounts.mockClear();
+    mockConfirmPayment.mockResolvedValue({
+      paymentIntent: { id: 'pi_authorized', status: 'requires_capture' },
+    });
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-09-04T18:00:00.000Z'));
     global.fetch = jest.fn(routeFetch) as unknown as typeof fetch;
@@ -236,5 +254,29 @@ describe('SimpleReservationRequestModal payment step', () => {
     }
 
     expect(createPaymentCalls).toBe(1);
+  });
+
+  it('returns to the form and mints a fresh PaymentIntent when the booking fails after authorization', async () => {
+    await reachPaymentStep();
+    expect(createPaymentCalls).toBe(1);
+
+    // Stripe authorizes, then the reservation cannot be created
+    failReservation = true;
+    fireEvent.click(screen.getByText(/^Authorize \$/));
+    await flush();
+
+    // The spent authorization is cancelled and the payment step is torn down
+    await waitFor(() => expect(screen.queryByTestId('payment-element')).not.toBeInTheDocument());
+    expect(cancelPaymentCalls).toBe(1);
+    expect(screen.getByText('Make Reservation')).toBeInTheDocument();
+
+    // The guest's details survived, so submitting again goes straight back to
+    // payment - on a new PaymentIntent, not the dead one
+    failReservation = false;
+    fireEvent.click(screen.getByText('Make Reservation'));
+    await flush();
+
+    await waitFor(() => expect(screen.getByTestId('payment-element')).toBeInTheDocument());
+    expect(createPaymentCalls).toBe(2);
   });
 });
