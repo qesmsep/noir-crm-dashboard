@@ -27,6 +27,9 @@ jest.mock('@/utils/dateUtils', () => jest.requireActual('@/utils/dateUtils.ts'))
 
 // Counts how many times Stripe's card form is mounted. A remount is the bug.
 const paymentElementMounts = jest.fn();
+// Counts renders. Mounts staying at 1 only proves the fix if the countdown is
+// actually re-rendering the tree; without this the test could pass vacuously.
+const paymentElementRenders = jest.fn();
 
 jest.mock('@stripe/stripe-js', () => ({
   loadStripe: () => Promise.resolve({}),
@@ -37,6 +40,7 @@ const mockConfirmPayment = jest.fn();
 jest.mock('@stripe/react-stripe-js', () => ({
   Elements: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PaymentElement: () => {
+    paymentElementRenders();
     React.useEffect(() => {
       paymentElementMounts();
     }, []);
@@ -216,6 +220,7 @@ describe('SimpleReservationRequestModal payment step', () => {
     cancelPaymentCalls = 0;
     failReservation = false;
     paymentElementMounts.mockClear();
+    paymentElementRenders.mockClear();
     mockConfirmPayment.mockResolvedValue({
       paymentIntent: { id: 'pi_authorized', status: 'requires_capture' },
     });
@@ -231,6 +236,7 @@ describe('SimpleReservationRequestModal payment step', () => {
   it('mounts the Stripe card form once, not on every hold-countdown tick', async () => {
     await reachPaymentStep();
     expect(paymentElementMounts).toHaveBeenCalledTimes(1);
+    const rendersBefore = paymentElementRenders.mock.calls.length;
 
     // Five seconds of the checkout countdown, which re-renders the modal each tick
     for (let i = 0; i < 5; i += 1) {
@@ -239,7 +245,11 @@ describe('SimpleReservationRequestModal payment step', () => {
       });
     }
 
-    // The card form survived the re-renders instead of being torn down and rebuilt
+    // The ticks really did re-render the tree, so the mount count below is
+    // meaningful rather than a countdown that quietly stopped
+    expect(paymentElementRenders.mock.calls.length).toBeGreaterThan(rendersBefore);
+
+    // The card form survived those re-renders instead of being torn down and rebuilt
     expect(screen.getByTestId('payment-element')).toBeInTheDocument();
     expect(paymentElementMounts).toHaveBeenCalledTimes(1);
   });
