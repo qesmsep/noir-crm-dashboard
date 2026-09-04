@@ -749,6 +749,15 @@ export default function SimpleReservationRequestModal({
   const allTimeSlots = getAllTimeSlots();
   const availableTimeSlots = getAvailableTimeSlots();
 
+  // A spent authorization cannot be confirmed again, so any failure after
+  // Stripe authorizes sends the guest back to the form. Submitting again
+  // mints a fresh PaymentIntent rather than reusing the dead clientSecret.
+  const resetPaymentStep = useCallback(() => {
+    setShowPayment(false);
+    setClientSecret(null);
+    setPaymentIntentId(null);
+  }, []);
+
   // Create reservation after successful payment authorization (not captured yet)
   const createReservationAfterPayment = async (paymentId: string) => {
     setIsCreatingReservation(true);
@@ -875,6 +884,7 @@ export default function SimpleReservationRequestModal({
           description: 'Payment capture failed. Your reservation has been cancelled. Please try again.',
           variant: 'error',
         });
+        resetPaymentStep();
       }
 
     } catch (error: any) {
@@ -914,6 +924,7 @@ export default function SimpleReservationRequestModal({
           variant: 'error',
         });
       }
+      resetPaymentStep();
     } finally {
       setIsCreatingReservation(false);
     }
