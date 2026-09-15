@@ -10,6 +10,12 @@ import AddMemberModal from '../../components/members/AddMemberModal';
 import ArchivedMembersModal from '../../components/ArchivedMembersModal';
 import PendingMembersModal from '../../components/PendingMembersModal';
 import styles from '../../styles/Members.module.css';
+import {
+  MEMBER_STATUS_FILTERS,
+  MEMBER_STATUS_FILTER_LABELS,
+  isAccountCancelled,
+  matchesStatusFilter,
+} from '../../lib/memberStatusFilter';
 
 interface Member {
   member_id: string;
@@ -116,11 +122,6 @@ export default function MembersAdmin() {
       console.error('Error fetching no subscription accounts:', err);
     }
   }
-
-  // Helper to check if account is cancelled
-  const isAccountCancelled = (account: { accounts?: { subscription_cancel_at?: string | null; subscription_status?: string | null } }) => {
-    return account.accounts?.subscription_status === 'canceled' || !!account.accounts?.subscription_cancel_at;
-  };
 
   // Initialize selected members when modal opens
   useEffect(() => {
@@ -317,30 +318,10 @@ export default function MembersAdmin() {
 
   // Apply filters
   const filteredAccounts = accounts.filter(account => {
-    // Exclude accounts where all members are archived/inactive (unless filtering for canceled)
-    const hasArchivedMembers = account.allMembers.some(m => m.status === 'inactive');
-    const allMembersArchived = account.allMembers.every(m => m.status === 'inactive');
-
-    // Filter by subscription status
-    if (statusFilter !== 'all') {
-      const status = account.accounts?.subscription_status;
-      if (statusFilter === 'active' && status !== 'active') return false;
-      if (statusFilter === 'payment_failed') {
-        // Show only active accounts with failed payments
-        if (!failedPaymentAccounts.has(account.account_id)) return false;
-      }
-      if (statusFilter === 'canceled') {
-        // Show canceled accounts OR accounts with archived members
-        if (!isAccountCancelled(account) && !hasArchivedMembers) return false;
-      }
-      if (statusFilter === 'paused' && status !== 'paused') return false;
-    } else {
-      // For "all" filter, exclude accounts where all members are archived
-      if (allMembersArchived) return false;
+    // Filter by subscription status (see src/lib/memberStatusFilter.ts)
+    if (!matchesStatusFilter(account, statusFilter, { failedPaymentAccounts, noSubscriptionAccounts })) {
+      return false;
     }
-
-    // Exclude fully archived accounts from non-canceled filters
-    if (statusFilter !== 'canceled' && allMembersArchived) return false;
 
     // Filter by membership plan
     if (planFilter !== 'all') {
@@ -376,6 +357,11 @@ export default function MembersAdmin() {
       localStorage.setItem('membersSortDirection', newDirection);
     }
   };
+
+  const statusFilterLabel =
+    statusFilter === 'all'
+      ? ''
+      : MEMBER_STATUS_FILTER_LABELS[statusFilter as keyof typeof MEMBER_STATUS_FILTER_LABELS] ?? statusFilter;
 
   // Sort filtered accounts
   const sortedAccounts = [...filteredAccounts].sort((a, b) => {
@@ -624,13 +610,13 @@ export default function MembersAdmin() {
             <h1 className={styles.pageTitle}>Members</h1>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <span className={styles.memberCount}>
-                {sortedAccounts.reduce((sum, acc) => sum + acc.allMembers.length, 0)} {statusFilter !== 'all' ? statusFilter : ''} members
+                {sortedAccounts.reduce((sum, acc) => sum + acc.allMembers.length, 0)} {statusFilterLabel} members
                 {(statusFilter !== 'all' || planFilter !== 'all') && (
                   <span style={{ color: '#6B7280', fontWeight: '400' }}> ({members.length} total)</span>
                 )}
               </span>
               <span style={{ fontSize: '0.875rem', color: '#6B7280' }}>
-                {sortedAccounts.length} {statusFilter !== 'all' ? statusFilter : ''} accounts
+                {sortedAccounts.length} {statusFilterLabel} accounts
               </span>
             </div>
           </div>
@@ -651,11 +637,9 @@ export default function MembersAdmin() {
               onChange={(e) => setStatusFilter(e.target.value)}
               title="Filter by status"
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="payment_failed">Payment Failed</option>
-              <option value="canceled">Canceled</option>
-              <option value="paused">Paused</option>
+              {MEMBER_STATUS_FILTERS.map(value => (
+                <option key={value} value={value}>{MEMBER_STATUS_FILTER_LABELS[value]}</option>
+              ))}
             </select>
             {/* Plan Filter */}
             <select
